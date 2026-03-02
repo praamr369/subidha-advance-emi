@@ -1,0 +1,18 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<h2>📊 Business Dashboard</h2>
+
+<ul>
+  <li>💰 Today Collection: ₹ {{ dashboard.today_collection }}</li>
+  <li>⏳ Pending EMIs: {{ dashboard.pending_emis }}</li>
+  <li>🚨 Overdue EMIs: {{ dashboard.overdue_emis }}</li>
+  <li>📦 Active Subscriptions: {{ dashboard.active_subscriptions }}</li>
+  <li>🏆 Lucky Winners: {{ dashboard.won_subscriptions }}</li>
+  <li>📉 Total Outstanding: ₹ {{ dashboard.total_outstanding }}</li>
+</ul>
+
+<hr>
+
+{{ block.super }}
+{% endblock %}
