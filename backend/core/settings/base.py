@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from urllib.parse import urlparse
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 def _parse_bool(value: str | None, default: bool = False) -> bool:
@@ -141,8 +142,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend",
+                                "rest_framework.filters.SearchFilter",
+                                "rest_framework.filters.OrderingFilter"],
+
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),

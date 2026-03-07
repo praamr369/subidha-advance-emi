@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+
 import RoleGuard from "@/components/auth/RoleGuard";
 import { apiFetch } from "@/lib/api";
 
@@ -10,6 +11,17 @@ type Emi = {
   due_date: string;
   amount: number;
   status: string;
+};
+
+type PendingEmiResponse = {
+  customer: string;
+  emis: Array<{
+    id: number;
+    month_no: number;
+    due_date: string;
+    amount: string | number;
+    status: string;
+  }>;
 };
 
 export default function CashierCollectPage() {
@@ -25,10 +37,6 @@ export default function CashierCollectPage() {
   const [referenceNo, setReferenceNo] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  // =============================
-  // SEARCH CUSTOMER EMIs
-  // =============================
-
   const handleSearch = async () => {
     if (!phone.trim()) {
       setError("Phone is required.");
@@ -39,11 +47,9 @@ export default function CashierCollectPage() {
       setError("");
       setLoading(true);
 
-      const data: any = await apiFetch(
+      const data = (await apiFetch(
         `/cashier/pending-emis/?phone=${phone}`
-      );
-
-      console.log("API RESPONSE:", data);
+      )) as PendingEmiResponse;
 
       if (!data?.emis || data.emis.length === 0) {
         setCustomerName("");
@@ -52,8 +58,7 @@ export default function CashierCollectPage() {
         return;
       }
 
-      // 🔥 Normalize decimal strings to numbers
-      const normalized: Emi[] = data.emis.map((emi: any) => ({
+      const normalized: Emi[] = data.emis.map((emi) => ({
         id: emi.id,
         month_no: emi.month_no,
         due_date: emi.due_date,
@@ -63,9 +68,7 @@ export default function CashierCollectPage() {
 
       setCustomerName(data.customer || "");
       setEmis(normalized);
-
-    } catch (err: any) {
-      console.error(err);
+    } catch {
       setCustomerName("");
       setEmis([]);
       setError("Customer not found.");
@@ -73,10 +76,6 @@ export default function CashierCollectPage() {
       setLoading(false);
     }
   };
-
-  // =============================
-  // OPEN / CLOSE MODAL
-  // =============================
 
   const openPaymentModal = (emi: Emi) => {
     setSelectedEmi(emi);
@@ -91,16 +90,12 @@ export default function CashierCollectPage() {
     setReferenceNo("");
   };
 
-  // =============================
-  // SUBMIT PAYMENT
-  // =============================
-
   const submitPayment = async () => {
     if (!selectedEmi) return;
 
     const amount = Number(paymentAmount);
 
-    if (isNaN(amount) || amount <= 0) {
+    if (Number.isNaN(amount) || amount <= 0) {
       alert("Invalid amount.");
       return;
     }
@@ -130,13 +125,11 @@ export default function CashierCollectPage() {
       });
 
       alert("Payment recorded successfully.");
-
       closeModal();
       await handleSearch();
-
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Payment failed.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Payment failed.";
+      alert(message);
     } finally {
       setProcessing(false);
     }
@@ -145,10 +138,8 @@ export default function CashierCollectPage() {
   return (
     <RoleGuard allowedRoles={["CASHIER", "ADMIN"]}>
       <div className="p-6 space-y-6">
-
         <h1 className="text-2xl font-bold">EMI Collection</h1>
 
-        {/* SEARCH */}
         <div className="flex gap-4">
           <input
             type="text"
@@ -168,12 +159,9 @@ export default function CashierCollectPage() {
         {error && <p className="text-red-600">{error}</p>}
         {loading && <p>Loading...</p>}
 
-        {/* EMI TABLE */}
         {customerName && emis.length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold mt-4">
-              Customer: {customerName}
-            </h2>
+            <h2 className="text-lg font-semibold mt-4">Customer: {customerName}</h2>
 
             <table className="w-full border mt-4 text-sm">
               <thead>
@@ -206,16 +194,12 @@ export default function CashierCollectPage() {
           </div>
         )}
 
-        {/* PAYMENT MODAL */}
         {selectedEmi && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
             <div className="bg-white p-6 rounded w-96 space-y-4">
+              <h2 className="text-lg font-semibold">Collect EMI - Month {selectedEmi.month_no}</h2>
 
-              <h2 className="text-lg font-semibold">
-                Collect EMI - Month {selectedEmi.month_no}
-              </h2>
-
-              <p>Remaining: ₹ {selectedEmi.amount}</p>
+              <p>Total Due: ₹ {selectedEmi.amount}</p>
 
               <input
                 type="number"
@@ -230,9 +214,9 @@ export default function CashierCollectPage() {
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="border rounded px-3 py-2 w-full"
               >
-                <option value="CASH">CASH</option>
+                <option value="CASH">Cash</option>
                 <option value="UPI">UPI</option>
-                <option value="BANK">BANK</option>
+                <option value="BANK">Bank</option>
               </select>
 
               {paymentMethod !== "CASH" && (
@@ -241,30 +225,26 @@ export default function CashierCollectPage() {
                   value={referenceNo}
                   onChange={(e) => setReferenceNo(e.target.value)}
                   className="border rounded px-3 py-2 w-full"
-                  placeholder="Reference number"
+                  placeholder="Reference Number"
                 />
               )}
 
               <div className="flex justify-end gap-3">
-                <button
-                  onClick={closeModal}
-                  className="px-4 py-2 border rounded"
-                >
+                <button onClick={closeModal} className="px-4 py-2 border rounded">
                   Cancel
                 </button>
+
                 <button
                   onClick={submitPayment}
                   disabled={processing}
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                  className="px-4 py-2 bg-green-600 text-white rounded"
                 >
-                  {processing ? "Processing..." : "Confirm"}
+                  {processing ? "Processing..." : "Submit Payment"}
                 </button>
               </div>
-
             </div>
           </div>
         )}
-
       </div>
     </RoleGuard>
   );

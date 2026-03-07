@@ -1,20 +1,13 @@
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/constants";
+export const ACCESS_KEY = "access_token";
+export const REFRESH_KEY = "refresh_token";
+export const ROLE_KEY = "user_role";
 
-export interface TokenPair {
-  access: string;
-  refresh: string;
+export function getRole(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ROLE_KEY);
 }
 
-export function persistTokenPair(tokens: TokenPair): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
-  localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
-}
-
-export function clearTokenPair(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+export function isAuthenticated(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(localStorage.getItem(ACCESS_KEY));
 }

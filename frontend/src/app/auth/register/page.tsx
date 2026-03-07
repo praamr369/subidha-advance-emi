@@ -72,8 +72,7 @@ export default function RegisterPage() {
         <select value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="CUSTOMER">Customer</option>
           <option value="PARTNER">Partner</option>
-          <option value="ADMIN">Admin</option>
-        </select>
+                  </select>
 
         <button type="submit">Create Account</button>
       </form>

@@ -107,7 +107,7 @@ export default function CashierDashboardPage() {
             {/* TODAY TRANSACTIONS */}
             <div className="bg-white shadow rounded p-6">
               <h2 className="text-lg font-semibold mb-4">
-                Today's Transactions
+                Today&apos;s Transactions
               </h2>
 
               <table className="w-full text-sm border">
@@ -184,7 +184,7 @@ export default function CashierDashboardPage() {
   );
 }
 
-function StatCard({ title, value }: { title: string; value: any }) {
+function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="p-6 bg-white shadow rounded">
       <h2 className="text-sm text-gray-500">{title}</h2>

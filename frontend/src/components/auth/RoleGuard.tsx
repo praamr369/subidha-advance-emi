@@ -1,35 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 
-type Props = {
+type RoleGuardProps = {
   allowedRoles: string[];
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
-export default function RoleGuard({ allowedRoles, children }: Props) {
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
+export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const router = useRouter();
-  const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
+  const hydrated = useHydrated();
+  const role = hydrated ? (localStorage.getItem("user_role") || "").toUpperCase() : "";
 
   useEffect(() => {
-    const role = localStorage.getItem("user_role");
+    if (!hydrated) return;
 
     if (!role) {
       router.replace("/login");
       return;
     }
 
-    if (allowedRoles.includes(role)) {
-      setIsAllowed(true);
-    } else {
-      router.replace("/login");
+    if (!allowedRoles.includes(role)) {
+      router.replace("/unauthorized");
     }
-  }, [allowedRoles, router]);
+  }, [allowedRoles, hydrated, role, router]);
 
-  if (isAllowed === null) {
-    return null; // Prevent flash redirect
-  }
+  if (!hydrated) return null;
+  if (!role || !allowedRoles.includes(role)) return null;
 
   return <>{children}</>;
 }

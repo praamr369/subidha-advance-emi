@@ -2,36 +2,24 @@
 
 import { useEffect, useState } from "react";
 
-import PdfDownloadPanel from "@/components/reports/pdf-download-panel";
 import PortalPage from "@/components/ui/portal-page";
-import { fetchReportRows, type ReportRow } from "@/services/report.service";
+import { apiFetch } from "@/lib/api";
 
-const fallbackRows: ReportRow[] = [
-  { label: "Total Earned", value: "INR 12000" },
-  { label: "Paid", value: "INR 8000" },
-  { label: "Unpaid", value: "INR 4000" },
-];
+type Commission = { id: number; subscription: number; commission_amount: string; status: string; created_at: string };
 
 export default function PartnerCommissionsPage() {
-  const [rows, setRows] = useState<ReportRow[]>(fallbackRows);
+  const [rows, setRows] = useState<Commission[]>([]);
 
   useEffect(() => {
-    fetchReportRows("/reports/partner/commission-ledger/", fallbackRows).then(setRows);
+    apiFetch("/partner/commissions/").then((res) => setRows(res as Commission[]));
   }, []);
 
   return (
-    <PortalPage title="Commission Ledger" subtitle="Track paid/unpaid commission amounts generated from eligible collections.">
-      <PdfDownloadPanel
-        heading="Commission & Ledger Exports"
-        reports={[
-          {
-            buttonLabel: "Download Commission Ledger PDF",
-            fileName: "partner-commission-ledger.pdf",
-            title: "Partner Commission Ledger",
-            sections: [{ heading: "Commission Summary", rows }],
-          },
-        ]}
-      />
+    <PortalPage title="Commission Ledger" subtitle="Track earned commission from customer payment collections.">
+      <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr><th>ID</th><th>Subscription</th><th>Amount</th><th>Status</th><th>Created At</th></tr></thead>
+        <tbody>{rows.map((r) => <tr key={r.id}><td>{r.id}</td><td>{r.subscription}</td><td>{r.commission_amount}</td><td>{r.status}</td><td>{new Date(r.created_at).toLocaleString()}</td></tr>)}</tbody>
+      </table>
     </PortalPage>
   );
 }

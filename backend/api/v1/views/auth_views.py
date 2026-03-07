@@ -48,7 +48,7 @@ def register_user(request):
         )
 
         if role == UserRole.CUSTOMER:
-            Customer.objects.create(name=name, phone=phone)
+            Customer.objects.create(user=user, name=name, phone=phone)
 
     return Response(
         {
