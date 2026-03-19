@@ -1,73 +1,125 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
-import ModuleCard from "@/components/ui/module-card";
-import ModuleSection from "@/components/ui/module-section";
-import PortalPage from "@/components/ui/portal-page";
-import { apiFetch, logout } from "@/lib/api";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PortalPage from "@/components/ui/PortalPage";
+import { getPartnerDashboard } from "@/services/partner";
 
-type PartnerMetrics = {
-  total_customers: number;
-  total_emis_paid: number;
-  total_commission: string;
-  pending_commission: string;
-  paid_commission: string;
-};
+function money(value: string | number): string {
+  return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load partner dashboard.";
+}
 
 export default function PartnerDashboardPage() {
-  const router = useRouter();
-  const [metrics, setMetrics] = useState<PartnerMetrics | null>(null);
+  const [data, setData] = useState<Awaited<
+    ReturnType<typeof getPartnerDashboard>
+  > | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadPage(mode: "initial" | "refresh" = "initial") {
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
+
+    try {
+      const payload = await getPartnerDashboard();
+      setData(payload);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err));
+      setData(null);
+    } finally {
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
-    apiFetch("/partner/dashboard/")
-      .then((res) => setMetrics(res as PartnerMetrics))
-      .catch(() => setMetrics(null));
+    void loadPage("initial");
   }, []);
+
+  const stats = useMemo(() => {
+    if (!data) return undefined;
+    const summary = data.summary;
+    return [
+      {
+        label: "Active Customers",
+        value: summary.total_customers ?? 0,
+      },
+      {
+        label: "Active Subscriptions",
+        value: summary.active_subscriptions ?? 0,
+      },
+      {
+        label: "Collections (All Time)",
+        value: money(summary.total_revenue_collected ?? 0),
+      },
+      {
+        label: "Pending Commission",
+        value: money(summary.pending_commission ?? 0),
+      },
+    ];
+  }, [data]);
 
   return (
     <PortalPage
-      title="Partner Workspace"
-      subtitle="Register customers, create subscriptions, and monitor commissions."
+      title="Partner Dashboard"
+      subtitle="Monitor customer acquisition, collections, commissions, and active subscription progress."
+      breadcrumbs={[{ label: "Partner" }]}
+      stats={stats}
       actions={[
-        { href: "/partner/customers", label: "Customers" },
-        { href: "/partner/subscriptions", label: "Subscriptions" },
-        { href: "/partner/commissions", label: "Commissions" },
+        { href: "/partner/subscriptions", label: "View Subscriptions", variant: "primary" },
+        { href: "/partner/commissions", label: "View Commissions" },
       ]}
     >
-      <button
-        type="button"
-        className="rounded border px-3 py-2"
-        onClick={() => {
-          logout();
-          router.push("/login");
-        }}
-      >
-        Logout
-      </button>
+      {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
 
-      <ModuleSection
-        title="Partner Modules"
-        subtitle="Everything needed for partner-led customer onboarding and commission lifecycle."
-      >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <ModuleCard title="Customer Registration" description="Add and track referred customers." href="/partner/customers" />
-          <ModuleCard title="Subscription Creation" description="Create subscriptions for valid customers and slots." href="/partner/subscriptions" />
-          <ModuleCard title="Commission Ledger" description="Review pending and paid commission statements." href="/partner/commissions" />
+      {!loading && error ? (
+        <ErrorState
+          title="Unable to load partner dashboard"
+          description={error}
+          onRetry={() => void loadPage("initial")}
+        />
+      ) : null}
+
+      {!loading && !error && data ? (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-card-foreground">
+                Collection Activity
+              </h3>
+              <Link
+                href="/partner/reports"
+                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+              >
+                Open Reports
+              </Link>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Use Partner Reports for detailed collection metrics and earnings history.
+            </p>
+          </section>
+
+          <section className="rounded-xl border border-border bg-card p-5">
+            <h3 className="mb-3 text-sm font-semibold text-card-foreground">
+              Customer & Subscription Overview
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Use the Customers and Subscriptions pages for operational lists and drill-down.
+            </p>
+          </section>
         </div>
-      </ModuleSection>
-
-      {metrics ? (
-        <ModuleSection title="Live Partner KPIs" subtitle="Partner-level metrics from backend analytics.">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded border bg-white p-4">Customers: {metrics.total_customers}</div>
-            <div className="rounded border bg-white p-4">EMIs Paid: {metrics.total_emis_paid}</div>
-            <div className="rounded border bg-white p-4">Total Commission: ₹ {metrics.total_commission}</div>
-            <div className="rounded border bg-white p-4">Pending: ₹ {metrics.pending_commission}</div>
-            <div className="rounded border bg-white p-4">Paid: ₹ {metrics.paid_commission}</div>
-          </div>
-        </ModuleSection>
       ) : null}
     </PortalPage>
   );
