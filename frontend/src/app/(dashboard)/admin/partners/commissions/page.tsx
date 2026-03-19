@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/portal-page";
+import PortalPage from "@/components/ui/PortalPage";
 import DataTable from "@/components/ui/DataTable";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { apiFetch, toArray } from "@/lib/api";
 
 type Partner = {
@@ -234,71 +237,95 @@ export default function AdminPartnerCommissionsPage() {
       title="Partner Commissions"
       subtitle="Track partner-linked collections and estimate payout exposure from subscription payment activity."
     >
-      <section style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => router.push("/admin/partners")}>
+      <section className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href="/admin/partners"
+          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+        >
           Back to Partners
-        </button>
-        <button type="button" onClick={() => loadAll(true)} disabled={refreshing}>
+        </Link>
+        <button
+          type="button"
+          onClick={() => loadAll(true)}
+          disabled={refreshing}
+          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
-        <button type="button" onClick={() => router.push("/admin/payments")}>
-          Open Payments
-        </button>
-      </section>
-
-      <section
-        style={{
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-          gap: 10,
-        }}
-      >
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Partners in Scope: <b>{kpis.partnersInScope}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Linked Subscriptions: <b>{kpis.linkedSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Active Subscriptions: <b>{kpis.activeSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Won Subscriptions: <b>{kpis.wonSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Collected Amount: <b>{formatCurrency(kpis.collectedAmount)}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Estimated Commission: <b>{formatCurrency(kpis.estimatedCommission)}</b>
-        </div>
-      </section>
-
-      <section
-        style={{
-          marginBottom: 16,
-          border: "1px solid #e5e7eb",
-          borderRadius: 10,
-          padding: 16,
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Filters</h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: 12,
-          }}
+        <Link
+          href="/admin/payments"
+          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
         >
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="commission-partner">Partner</label>
+          Open Payments
+        </Link>
+      </section>
+
+      <section className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Partners in Scope
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {kpis.partnersInScope}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Linked Subscriptions
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {kpis.linkedSubscriptions}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Active Subscriptions
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {kpis.activeSubscriptions}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Won Subscriptions
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {kpis.wonSubscriptions}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Collected Amount
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {formatCurrency(kpis.collectedAmount)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Estimated Commission
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">
+            {formatCurrency(kpis.estimatedCommission)}
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-4 space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground">Filters</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-1">
+            <label
+              htmlFor="commission-partner"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Partner
+            </label>
             <select
               id="commission-partner"
               value={partnerFilter}
               onChange={(event) => setPartnerFilter(event.target.value)}
+              className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
             >
               <option value="">All partners</option>
               {partners.map((partner) => (
@@ -309,18 +336,29 @@ export default function AdminPartnerCommissionsPage() {
             </select>
           </div>
 
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="commission-search">Search</label>
+          <div className="space-y-1">
+            <label
+              htmlFor="commission-search"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Search
+            </label>
             <input
               id="commission-search"
               placeholder="Customer, product, batch, lucky no..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
             />
           </div>
 
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="commission-percent">Commission %</label>
+          <div className="space-y-1">
+            <label
+              htmlFor="commission-percent"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Commission %
+            </label>
             <input
               id="commission-percent"
               type="number"
@@ -328,11 +366,12 @@ export default function AdminPartnerCommissionsPage() {
               step="0.01"
               value={commissionPercent}
               onChange={(event) => setCommissionPercent(event.target.value)}
+              className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => {
@@ -340,40 +379,47 @@ export default function AdminPartnerCommissionsPage() {
               setQuery("");
               setCommissionPercent(String(DEFAULT_COMMISSION_PERCENTAGE));
             }}
+            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
             Reset Filters
           </button>
         </div>
       </section>
 
-      <DataTable<CommissionRow>
-        loading={loading}
-        error={error}
-        rows={rows}
-        columns={[
-          { key: "partner_label", title: "Partner" },
-          { key: "subscription_label", title: "Subscription" },
-          { key: "customer_label", title: "Customer" },
-          { key: "payment_count_label", title: "Payments" },
-          { key: "collected_amount_label", title: "Collected" },
-          { key: "estimated_commission_label", title: "Estimated Commission" },
-          { key: "status_label", title: "Subscription Status" },
-        ]}
-      />
+      {loading ? <LoadingBlock label="Loading partner commission exposure..." /> : null}
 
-      {!loading && !error && scopedSubscriptions.length > 0 ? (
-        <section
-          style={{
-            marginTop: 16,
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Priority Review Queue</h2>
+      {!loading && error ? (
+        <ErrorState
+          title="Unable to load partner commission data"
+          description={error}
+          onRetry={() => loadAll(false)}
+        />
+      ) : null}
 
-          <div style={{ display: "grid", gap: 10 }}>
-            {scopedSubscriptions.slice(0, 8).map((sub) => {
+      {!loading && !error ? (
+        <>
+          <DataTable<CommissionRow>
+            rows={rows}
+            error={null}
+            columns={[
+              { key: "partner_label", title: "Partner" },
+              { key: "subscription_label", title: "Subscription" },
+              { key: "customer_label", title: "Customer" },
+              { key: "payment_count_label", title: "Payments" },
+              { key: "collected_amount_label", title: "Collected" },
+              { key: "estimated_commission_label", title: "Estimated Commission" },
+              { key: "status_label", title: "Subscription Status" },
+            ]}
+          />
+
+          {scopedSubscriptions.length > 0 ? (
+            <section className="mt-4 space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h2 className="text-sm font-semibold text-foreground">
+                Priority Review Queue
+              </h2>
+
+              <div className="grid gap-3">
+                {scopedSubscriptions.slice(0, 8).map((sub) => {
               const partner = sub.partner ? partnerMap[sub.partner] : null;
               const subscriptionPayments = paymentBySubscription.get(sub.id) || [];
               const collectedAmount = subscriptionPayments.reduce(
@@ -382,67 +428,55 @@ export default function AdminPartnerCommissionsPage() {
               );
               const estimatedCommission = (collectedAmount * commissionRate) / 100;
 
-              return (
-                <div
-                  key={sub.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    padding: 12,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div>
-                      <strong>{partner?.username || "-"}</strong> — Subscription #{sub.id}
-                    </div>
-                    <div style={{ color: "#4b5563" }}>
-                      Customer: {sub.customer_name || `Customer ${sub.customer}`} • Collected:{" "}
-                      {formatCurrency(collectedAmount)} • Estimated commission:{" "}
-                      {formatCurrency(estimatedCommission)}
-                    </div>
-                  </div>
+                  return (
+                    <div
+                      key={sub.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm"
+                    >
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {partner?.username || "-"} — Subscription #{sub.id}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Customer: {sub.customer_name || `Customer ${sub.customer}`} • Collected:{" "}
+                          {formatCurrency(collectedAmount)} • Estimated commission:{" "}
+                          {formatCurrency(estimatedCommission)}
+                        </div>
+                      </div>
 
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/admin/subscriptions/${sub.id}`)}
-                    >
-                      View Subscription
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/admin/payments?subscription=${sub.id}`)}
-                    >
-                      View Payments
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/admin/subscriptions/${sub.id}`)}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          View Subscription
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/admin/payments?subscription=${sub.id}`)}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          View Payments
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="mt-4 rounded-2xl border border-border bg-muted/40 p-4">
+            <h2 className="text-sm font-semibold text-foreground">Operational Note</h2>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              This page estimates commission exposure from partner-linked subscriptions and recorded
+              payments. For final payout accounting, expose a dedicated backend commission API from
+              your Commission model.
+            </p>
+          </section>
+        </>
       ) : null}
-
-      <section
-        style={{
-          marginTop: 16,
-          border: "1px solid #e5e7eb",
-          borderRadius: 10,
-          padding: 16,
-          background: "#fafafa",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>Operational Note</h2>
-        <p style={{ marginBottom: 0 }}>
-          This page estimates commission exposure from partner-linked subscriptions and recorded payments.
-          For final payout accounting, expose a dedicated backend commission API from your Commission model.
-        </p>
-      </section>
     </PortalPage>
   );
 }
