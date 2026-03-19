@@ -75,29 +75,10 @@ export default function CustomerDashboardPage() {
       subtitle="Track your Lucky Plan subscriptions, EMI payments, profile status, and support activity."
       breadcrumbs={[{ label: "Customer" }]}
       stats={stats}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/customer/subscriptions"
-            className="inline-flex items-center rounded-md border border-border bg-foreground px-3 py-2 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
-          >
-            View Subscriptions
-          </Link>
-          <Link
-            href="/customer/payments"
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-          >
-            View Payments
-          </Link>
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-      }
+      actions={[
+        { href: "/customer/subscriptions", label: "View Subscriptions", variant: "primary" },
+        { href: "/customer/payments", label: "View Payments" },
+      ]}
     >
       {loading ? <LoadingBlock label="Loading customer dashboard..." /> : null}
 
@@ -112,9 +93,18 @@ export default function CustomerDashboardPage() {
       {!loading && !error && data ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <section className="rounded-xl border border-border bg-card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-card-foreground">
-              Your Subscriptions
-            </h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-card-foreground">
+                Your Subscriptions
+              </h3>
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
             {data.subscriptions.length === 0 ? (
               <EmptyState
                 title="No subscriptions found"

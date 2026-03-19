@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -75,23 +75,7 @@ export default function CashierDashboardPage() {
       subtitle="Record EMI collections, monitor daily payment intake, and track pending payment operations."
       breadcrumbs={[{ label: "Cashier" }]}
       stats={stats}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/cashier/collect"
-            className="inline-flex items-center rounded-md border border-border bg-foreground px-3 py-2 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
-          >
-            Collect Payment
-          </Link>
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-      }
+      actions={[{ href: "/cashier/collect", label: "Collect Payment", variant: "primary" }]}
     >
       {loading ? <LoadingBlock label="Loading cashier dashboard..." /> : null}
 
@@ -106,9 +90,18 @@ export default function CashierDashboardPage() {
       {!loading && !error && data ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <section className="rounded-xl border border-border bg-card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-card-foreground">
-              Today’s Summary
-            </h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-card-foreground">
+                Today’s Summary
+              </h3>
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
             <div className="space-y-1 text-sm text-muted-foreground">
               <div>
                 Cash: <span className="font-medium text-foreground">{money(data.today_cash_total)}</span>
