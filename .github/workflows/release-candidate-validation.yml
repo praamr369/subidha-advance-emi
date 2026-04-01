@@ -1,0 +1,50 @@
+name: release-candidate-validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - fix/**
+
+jobs:
+  backend-release-candidate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Backend release-candidate validation
+        run: bash scripts/validate-release-candidate.sh
+
+  frontend-release-candidate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.18.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend release-candidate validation
+        run: bash scripts/validate-release-candidate.sh
