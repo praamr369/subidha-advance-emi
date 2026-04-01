@@ -1,544 +1,917 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/portal-page";
-import { apiFetch, toArray } from "@/lib/api";
+import PortalPage from "@/components/ui/PortalPage";
+import { apiFetch } from "@/lib/api";
+import { normalizeApiError } from "@/services/api/errors";
+import {
+  collectPayment,
+  getAdminSubscriptionForCollection,
+  listSubscriptionEmisForCollection,
+  searchAdminSubscriptionsForCollection,
+  type AdminEmiCollectionCandidate,
+  type AdminSubscriptionCollectionCandidate,
+  type PaymentCollectionResult,
+  type PaymentMethod,
+} from "@/services/payments";
 
-type Customer = {
-  id: number;
-  name: string;
-  phone: string;
-  kyc_status: string;
-};
-
-type Subscription = {
-  id: number;
-  customer: number;
-  customer_name?: string;
-  customer_phone?: string;
-  product: number;
-  product_name?: string;
-  batch: number | null;
-  batch_code?: string;
-  lucky_id: number | null;
-  lucky_number?: number | null;
-  plan_type: string;
-  tenure_months: number;
-  monthly_amount: string;
-  total_amount: string;
-  status: string;
-  start_date: string;
-};
-
-type Emi = {
-  id: number;
-  subscription: number;
-  customer?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  month_no: number;
-  due_date: string;
+type FormState = {
+  subscription_id: string;
+  emi_id: string;
   amount: string;
-  status: string;
-  total_paid?: string;
-  balance_amount?: string;
-};
-
-type PaymentCreateForm = {
-  subscription: string;
-  emi: string;
-  amount: string;
-  method: string;
+  payment_method: PaymentMethod;
+  payment_date: string;
   reference_no: string;
-  payment_date: string;
+  notes: string;
 };
 
-type CreatedPayment = {
-  id: number;
-  customer: number;
-  subscription: number;
-  emi: number | null;
-  amount: string;
-  method: string;
-  reference_no: string | null;
-  payment_date: string;
-};
+const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
+  { value: "CASH", label: "Cash" },
+  { value: "UPI", label: "UPI" },
+  { value: "BANK", label: "Bank Transfer" },
+  { value: "CARD", label: "Card" },
+];
 
-const defaultForm: PaymentCreateForm = {
-  subscription: "",
-  emi: "",
-  amount: "",
-  method: "CASH",
-  reference_no: "",
-  payment_date: new Date().toISOString().slice(0, 10),
-};
+function getTodayDateInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  const day = `${now.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-function parseError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message?.trim() || "Request failed";
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
 
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const preferredKeys = ["detail", "amount", "emi", "subscription", "customer", "reference_no", "non_field_errors"];
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
-    for (const key of preferredKeys) {
-      const value = parsed[key];
-      if (Array.isArray(value) && value[0]) return String(value[0]);
-      if (typeof value === "string") return value;
-    }
+function buildDefaultForm(): FormState {
+  return {
+    subscription_id: "",
+    emi_id: "",
+    amount: "",
+    payment_method: "CASH",
+    payment_date: getTodayDateInputValue(),
+    reference_no: "",
+    notes: "",
+  };
+}
 
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first[0]) return String(first[0]);
-    if (typeof first === "string") return first;
-  } catch {
-    return raw;
+function formatCurrency(value?: string | number | null): string {
+  if (value === undefined || value === null || value === "") return "—";
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return String(value);
+
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(numeric);
+}
+
+function formatDateLabel(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function normalizeOutstandingAmount(
+  emi: AdminEmiCollectionCandidate | null
+): string {
+  if (!emi) return "";
+  if (emi.outstanding_amount && emi.outstanding_amount !== "0") {
+    return String(emi.outstanding_amount);
   }
 
-  return raw;
+  const amount = Number(emi.amount || 0);
+  const paid = Number(emi.paid_amount || 0);
+  const waived = Number(emi.waived_amount || 0);
+  const outstanding = amount - paid - waived;
+
+  return outstanding > 0 ? outstanding.toFixed(2) : "0.00";
 }
 
-function formatCurrency(value: string | number | null | undefined): string {
-  const amount = Number(value || 0);
-  return `₹${amount.toFixed(2)}`;
+function getSubscriptionLabel(
+  subscription: AdminSubscriptionCollectionCandidate
+): string {
+  const code = subscription.subscription_number || `SUB-${subscription.id}`;
+  const customer = subscription.customer_name || "Unknown customer";
+  const phone = subscription.customer_phone
+    ? ` • ${subscription.customer_phone}`
+    : "";
+  const product = subscription.product_name
+    ? ` • ${subscription.product_name}`
+    : "";
+  return `${code} • ${customer}${phone}${product}`;
 }
 
-export default function AdminCreatePaymentPage() {
-  const router = useRouter();
+function getEmiLabel(emi: AdminEmiCollectionCandidate): string {
+  const inst =
+    emi.installment_no !== undefined && emi.installment_no !== null
+      ? `EMI ${emi.installment_no}`
+      : `EMI #${emi.id}`;
+
+  return `${inst} • Due ${formatDateLabel(
+    emi.due_date
+  )} • Outstanding ${formatCurrency(normalizeOutstandingAmount(emi))} • ${
+    emi.status
+  }`;
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
+      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+    </div>
+  );
+}
+
+export default function PaymentRecordPage() {
   const searchParams = useSearchParams();
-  const subscriptionIdFromUrl = searchParams.get("subscription") || "";
+  const searchParamKey = searchParams.toString();
+  const [form, setForm] = useState<FormState>(() => buildDefaultForm());
 
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [emis, setEmis] = useState<Emi[]>([]);
+  const [subscriptionSearch, setSubscriptionSearch] = useState("");
+  const [subscriptionOptions, setSubscriptionOptions] = useState<
+    AdminSubscriptionCollectionCandidate[]
+  >([]);
+  const [selectedSubscription, setSelectedSubscription] =
+    useState<AdminSubscriptionCollectionCandidate | null>(null);
 
-  const [form, setForm] = useState<PaymentCreateForm>({
-    ...defaultForm,
-    subscription: subscriptionIdFromUrl,
-  });
+  const [emiOptions, setEmiOptions] = useState<AdminEmiCollectionCandidate[]>(
+    []
+  );
+  const [selectedEmi, setSelectedEmi] =
+    useState<AdminEmiCollectionCandidate | null>(null);
 
-  const [loadingBase, setLoadingBase] = useState(true);
+  const [searchingSubscriptions, setSearchingSubscriptions] = useState(false);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
   const [loadingEmis, setLoadingEmis] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [createdPayment, setCreatedPayment] = useState<CreatedPayment | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const [submitResult, setSubmitResult] =
+    useState<PaymentCollectionResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [prefillMessages, setPrefillMessages] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    async function loadBase(): Promise<void> {
-      try {
-        const [subscriptionRes, customerRes] = await Promise.all([
-          apiFetch("/admin/subscriptions/"),
-          apiFetch("/admin/customers/"),
-        ]);
+  const selectedMethodLabel =
+    PAYMENT_METHOD_OPTIONS.find(
+      (option) => option.value === form.payment_method
+    )?.label ?? form.payment_method;
 
-        if (cancelled) return;
-        setSubscriptions(toArray<Subscription>(subscriptionRes));
-        setCustomers(toArray<Customer>(customerRes));
-      } catch (e) {
-        if (cancelled) return;
-        setError(parseError(e));
-      } finally {
-        if (cancelled) return;
-        setLoadingBase(false);
-      }
-    }
-
-    loadBase();
-
-    return () => {
-      cancelled = true;
-    };
+  const updateField = useCallback(function updateField<K extends keyof FormState>(
+    key: K,
+    value: FormState[K]
+  ) {
+    setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const resetMessages = useCallback(() => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, []);
+
+  function resetSelectionState() {
+    setSelectedSubscription(null);
+    setSelectedEmi(null);
+    setSubscriptionOptions([]);
+    setEmiOptions([]);
+    setForm((prev) => ({
+      ...prev,
+      subscription_id: "",
+      emi_id: "",
+      amount: "",
+      reference_no: "",
+      notes: "",
+    }));
+  }
+
+  function resetForm() {
+    setForm(buildDefaultForm());
+    setSubscriptionSearch("");
+    setSubmitResult(null);
+    resetMessages();
+    resetSelectionState();
+  }
+
+  const loadSubscription = useCallback(async (
+    subscriptionId: number,
+    preferredEmiId?: number | null
+  ): Promise<{ preferredEmiApplied: boolean }> => {
+    resetMessages();
+    setLoadingSubscription(true);
+    setLoadingEmis(true);
+    setSubmitResult(null);
+
+    try {
+      const subscription = await getAdminSubscriptionForCollection(
+        subscriptionId
+      );
+      setSelectedSubscription(subscription);
+      setSubscriptionSearch(getSubscriptionLabel(subscription));
+      updateField("subscription_id", String(subscription.id));
+
+      const emis = await listSubscriptionEmisForCollection(subscription.id);
+      const relevantEmis = emis.filter(
+        (item) => item.status !== "PAID" && item.status !== "WAIVED"
+      );
+
+      setEmiOptions(relevantEmis);
+
+      const requestedEmi =
+        preferredEmiId != null
+          ? relevantEmis.find((item) => item.id === preferredEmiId) ?? null
+          : null;
+
+      const preferredEmi =
+        requestedEmi ??
+        relevantEmis.find(
+          (item) => normalizeOutstandingAmount(item) !== "0.00"
+        ) ??
+        relevantEmis[0] ??
+        null;
+
+      setSelectedEmi(preferredEmi);
+      updateField("emi_id", preferredEmi ? String(preferredEmi.id) : "");
+      updateField(
+        "amount",
+        preferredEmi ? normalizeOutstandingAmount(preferredEmi) : ""
+      );
+
+      return { preferredEmiApplied: preferredEmiId ? Boolean(requestedEmi) : true };
+    } catch (error) {
+      const normalized = normalizeApiError(error);
+      setErrorMessage(
+        normalized.message || "Failed to load subscription details."
+      );
+      setSelectedSubscription(null);
+      setSelectedEmi(null);
+      setEmiOptions([]);
+      updateField("subscription_id", "");
+      updateField("emi_id", "");
+      updateField("amount", "");
+      return { preferredEmiApplied: false };
+    } finally {
+      setLoadingSubscription(false);
+      setLoadingEmis(false);
+    }
+  }, [resetMessages, updateField]);
+
+  useEffect(() => {
+    const trimmed = subscriptionSearch.trim();
+
+    if (trimmed.length < 2) {
+      setSubscriptionOptions([]);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        setSearchingSubscriptions(true);
+        const results = await searchAdminSubscriptionsForCollection(trimmed);
+        if (!active) return;
+        setSubscriptionOptions(results);
+      } catch {
+        if (!active) return;
+        setSubscriptionOptions([]);
+      } finally {
+        if (active) {
+          setSearchingSubscriptions(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [subscriptionSearch]);
+
   useEffect(() => {
     let cancelled = false;
+    const params = new URLSearchParams(searchParamKey);
 
-    async function loadEmis(): Promise<void> {
-      if (!form.subscription) {
-        setEmis([]);
-        setForm((prev) => ({
-          ...prev,
-          emi: "",
-          amount: "",
-        }));
-        return;
+    const subscriptionParam = params.get("subscription");
+    const emiParam = params.get("emi");
+
+    if (!subscriptionParam && !emiParam) {
+      setPrefillMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    async function applyPrefill() {
+      const messages: string[] = [];
+
+      const subscriptionId = parsePositiveInteger(subscriptionParam);
+      const emiId = parsePositiveInteger(emiParam);
+
+      if (subscriptionParam && !subscriptionId) {
+        messages.push(
+          `Subscription prefill "${subscriptionParam}" was ignored because it is not a valid subscription id.`
+        );
       }
 
-      setLoadingEmis(true);
-      try {
-        const emiRes = await apiFetch(`/admin/emis/?subscription=${encodeURIComponent(form.subscription)}`);
-        if (cancelled) return;
+      if (emiParam && !emiId) {
+        messages.push(
+          `EMI prefill "${emiParam}" was ignored because it is not a valid EMI id.`
+        );
+      }
 
-        const rows = toArray<Emi>(emiRes).sort((a, b) => a.month_no - b.month_no);
-        setEmis(rows);
+      if (subscriptionId) {
+        const result = await loadSubscription(subscriptionId, emiId);
+        if (emiId && !result.preferredEmiApplied) {
+          messages.push(
+            `EMI #${emiId} was not applied because it is not available for subscription #${subscriptionId}.`
+          );
+        }
+      } else if (emiId) {
+        try {
+          const emiPayload = await getAdminEmiForPrefill(emiId);
+          if (!cancelled) {
+            const result = await loadSubscription(emiPayload.subscription, emiPayload.id);
+            if (!result.preferredEmiApplied) {
+              messages.push(
+                `EMI #${emiId} was loaded but is not currently collectible from the selected subscription state.`
+              );
+            }
+          }
+        } catch {
+          messages.push(
+            `EMI #${emiId} could not be loaded, so the EMI prefill was not applied.`
+          );
+        }
+      }
 
-        const firstPending = rows.find((item) => item.status === "PENDING");
-        setForm((prev) => ({
-          ...prev,
-          emi: firstPending ? String(firstPending.id) : "",
-          amount: firstPending ? String(firstPending.balance_amount || firstPending.amount) : "",
-        }));
-      } catch (e) {
-        if (cancelled) return;
-        setSubmitError(parseError(e));
-        setEmis([]);
-      } finally {
-        if (cancelled) return;
-        setLoadingEmis(false);
+      if (!cancelled) {
+        setPrefillMessages(messages);
       }
     }
 
-    loadEmis();
+    type PrefillEmiPayload = {
+      id: number;
+      subscription: number;
+    };
+
+    async function getAdminEmiForPrefill(emiId: number): Promise<PrefillEmiPayload> {
+      const data = await apiFetch<Record<string, unknown>>(`/admin/emis/${emiId}/`);
+      return {
+        id: Number(data.id ?? emiId),
+        subscription: Number(data.subscription ?? 0),
+      };
+    }
+
+    void applyPrefill();
 
     return () => {
       cancelled = true;
     };
-  }, [form.subscription]);
+  }, [loadSubscription, searchParamKey]);
 
-  const selectedSubscription = useMemo(
-    () => subscriptions.find((item) => String(item.id) === form.subscription) ?? null,
-    [subscriptions, form.subscription]
-  );
-
-  const selectedCustomer = useMemo(() => {
-    if (!selectedSubscription) return null;
-    return customers.find((item) => item.id === selectedSubscription.customer) ?? null;
-  }, [customers, selectedSubscription]);
-
-  const pendingEmis = useMemo(
-    () => emis.filter((item) => item.status === "PENDING"),
-    [emis]
-  );
-
-  const selectedEmi = useMemo(
-    () => pendingEmis.find((item) => String(item.id) === form.emi) ?? null,
-    [pendingEmis, form.emi]
-  );
-
-  const paymentPreview = useMemo(() => {
-    const amount = Number(form.amount || 0);
-    const monthlyAmount = Number(selectedSubscription?.monthly_amount || 0);
-    const pendingCount = pendingEmis.length;
-    return {
-      amount,
-      monthlyAmount,
-      pendingCount,
-      isExactMonthly: monthlyAmount > 0 && amount === monthlyAmount,
-    };
-  }, [form.amount, selectedSubscription?.monthly_amount, pendingEmis.length]);
-
-  function onSubscriptionChange(value: string): void {
-    setCreatedPayment(null);
-    setSubmitError(null);
-    setForm((prev) => ({
-      ...prev,
-      subscription: value,
-      emi: "",
-      amount: "",
-    }));
+  function onInputChange(
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) {
+    const { name, value } = event.target;
+    updateField(name as keyof FormState, value);
   }
 
-  function onEmiChange(value: string): void {
-    const emi = pendingEmis.find((item) => String(item.id) === value) ?? null;
-
-    setForm((prev) => ({
-      ...prev,
-      emi: value,
-      amount: emi ? String(emi.balance_amount || emi.amount) : "",
-    }));
+  function onSubscriptionPicked(
+    subscription: AdminSubscriptionCollectionCandidate
+  ) {
+    setSubscriptionSearch(getSubscriptionLabel(subscription));
+    setSubscriptionOptions([]);
+    void loadSubscription(subscription.id);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+  function onEmiChanged(event: ChangeEvent<HTMLSelectElement>) {
+    const emiId = Number(event.target.value);
+    updateField("emi_id", event.target.value);
+
+    const emi = emiOptions.find((item) => item.id === emiId) ?? null;
+    setSelectedEmi(emi);
+
+    if (emi) {
+      updateField("amount", normalizeOutstandingAmount(emi));
+    } else {
+      updateField("amount", "");
+    }
+  }
+
+  function validateForm(): string | null {
+    const subscriptionId = Number(form.subscription_id);
+    const emiId = Number(form.emi_id);
+    const amount = Number(form.amount);
+
+    if (!subscriptionId || !Number.isInteger(subscriptionId)) {
+      return "Select a valid subscription.";
+    }
+
+    if (!emiId || !Number.isInteger(emiId)) {
+      return "Select a valid EMI.";
+    }
+
+    if (!form.amount.trim()) {
+      return "Amount is required.";
+    }
+
+    if (Number.isNaN(amount) || amount <= 0) {
+      return "Amount must be greater than zero.";
+    }
+
+    if (!form.payment_date.trim()) {
+      return "Payment date is required.";
+    }
+
+    if (form.payment_method !== "CASH" && !form.reference_no.trim()) {
+      return "Reference number is required for non-cash collections.";
+    }
+
+    if (form.reference_no.trim().length > 100) {
+      return "Reference number is too long.";
+    }
+
+    if (form.notes.trim().length > 500) {
+      return "Notes must be within 500 characters.";
+    }
+
+    return null;
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitError(null);
-    setCreatedPayment(null);
-    setCreating(true);
+    resetMessages();
+    setSubmitResult(null);
+
+    const validationError = validateForm();
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      if (!selectedSubscription || !selectedCustomer) {
-        throw new Error("Please select a valid subscription.");
-      }
-
-      const payload: Record<string, unknown> = {
-        customer: selectedCustomer.id,
-        subscription: selectedSubscription.id,
+      const result = await collectPayment({
+        emi: Number(form.emi_id),
         amount: form.amount,
-        method: form.method,
+        payment_method: form.payment_method,
         payment_date: form.payment_date,
-      };
+        reference_no: form.reference_no.trim() || undefined,
+        notes: form.notes.trim() || undefined,
+      });
 
-      if (form.emi) payload.emi = Number(form.emi);
-      if (form.reference_no.trim()) payload.reference_no = form.reference_no.trim();
+      setSubmitResult(result);
+      setSuccessMessage(
+        `Payment #${result.payment.id} recorded successfully for EMI #${result.emi.id}.`
+      );
 
-      const created = (await apiFetch("/admin/payments/", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })) as CreatedPayment;
-
-      setCreatedPayment(created);
-
-      const refreshedEmis = await apiFetch(`/admin/emis/?subscription=${encodeURIComponent(String(selectedSubscription.id))}`);
-      const rows = toArray<Emi>(refreshedEmis).sort((a, b) => a.month_no - b.month_no);
-      setEmis(rows);
-
-      const firstPending = rows.find((item) => item.status === "PENDING");
-
-      setForm((prev) => ({
-        ...prev,
-        emi: firstPending ? String(firstPending.id) : "",
-        amount: firstPending ? String(firstPending.balance_amount || firstPending.amount) : "",
-        reference_no: "",
-        method: "CASH",
-        payment_date: new Date().toISOString().slice(0, 10),
-      }));
-    } catch (e) {
-      setSubmitError(parseError(e));
+      if (selectedSubscription?.id) {
+        await loadSubscription(selectedSubscription.id);
+      }
+    } catch (error) {
+      const normalized = normalizeApiError(error);
+      setErrorMessage(normalized.message || "Failed to record payment.");
     } finally {
-      setCreating(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
     <PortalPage
-      title="Create Payment"
-      subtitle="Collect EMI against a subscription, auto-target the pending installment, and update payment ledger safely."
+      title="Admin Collection Entry"
+      subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Payments", href: "/admin/payments" },
+        { label: "Collection Entry" },
+      ]}
+      actions={[
+        { label: "All Payments", href: "/admin/payments", variant: "secondary" },
+        {
+          label: "Reconciliation",
+          href: "/admin/payments/reconciliation",
+          variant: "secondary",
+        },
+      ]}
+      stats={[
+        {
+          label: "Selected subscription",
+          value: selectedSubscription?.subscription_number || "—",
+        },
+        {
+          label: "Selected EMI",
+          value: selectedEmi ? `#${selectedEmi.id}` : "—",
+        },
+        {
+          label: "Auto amount",
+          value: form.amount ? formatCurrency(form.amount) : "—",
+        },
+        {
+          label: "Method",
+          value: selectedMethodLabel,
+        },
+      ]}
     >
-      <section style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => router.push("/admin/payments")}>
-          Back to Payments
-        </button>
-        {selectedSubscription ? (
-          <>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/subscriptions/${selectedSubscription.id}`)}
-            >
-              Back to Subscription
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/customers/${selectedSubscription.customer}`)}
-            >
-              View Customer
-            </button>
-          </>
-        ) : null}
-      </section>
-
-      {createdPayment ? (
-        <section
-          style={{
-            marginBottom: 16,
-            border: "1px solid #bbf7d0",
-            background: "#f0fdf4",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <h3 style={{ marginTop: 0, marginBottom: 8, color: "#166534" }}>
-            Payment recorded successfully
-          </h3>
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            <div><strong>Payment ID:</strong> #{createdPayment.id}</div>
-            <div><strong>Amount:</strong> {formatCurrency(createdPayment.amount)}</div>
-            <div><strong>Method:</strong> {createdPayment.method}</div>
-            <div><strong>Date:</strong> {createdPayment.payment_date}</div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Collection workflow
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Counter staff should first select the subscription, then choose the EMI.
+              Amount auto-fills from outstanding value so payment entry remains controlled
+              and operationally fast.
+            </p>
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/subscriptions/${createdPayment.subscription}`)}
-            >
-              View Updated Subscription
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/payments")}
-            >
-              Open Payment List
-            </button>
-          </div>
-        </section>
-      ) : null}
+          <form onSubmit={onSubmit} className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label
+                htmlFor="subscription-search"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Search subscription
+              </label>
+              <input
+                id="subscription-search"
+                type="text"
+                value={subscriptionSearch}
+                onChange={(event) => setSubscriptionSearch(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                placeholder="Search by subscription number, customer, or phone"
+              />
 
-      <section
-        style={{
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-          gap: 10,
-        }}
-      >
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Selected Subscription: <b>{selectedSubscription ? `#${selectedSubscription.id}` : "-"}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Pending EMI Count: <b>{pendingEmis.length}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          EMI Amount: <b>{formatCurrency(selectedSubscription?.monthly_amount)}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Current Payment: <b>{formatCurrency(form.amount)}</b>
-        </div>
-      </section>
+              {searchingSubscriptions ? (
+                <p className="mt-2 text-xs text-slate-500">Searching subscriptions...</p>
+              ) : null}
 
-      {loadingBase ? <p>Loading payment context...</p> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-
-      {!loadingBase && !error ? (
-        <section style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 16 }}>
-          <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Payment Entry</h2>
-
-            <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="subscription">Subscription</label>
-                <select
-                  id="subscription"
-                  value={form.subscription}
-                  onChange={(event) => onSubscriptionChange(event.target.value)}
-                  required
-                >
-                  <option value="">Select subscription</option>
-                  {subscriptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      #{item.id} - {item.customer_name || `Customer ${item.customer}`} - {item.product_name || `Product ${item.product}`}
-                    </option>
+              {subscriptionOptions.length > 0 ? (
+                <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                  {subscriptionOptions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSubscriptionPicked(item)}
+                      className="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm transition hover:bg-slate-50 last:border-b-0"
+                    >
+                      <div className="font-medium text-slate-900">
+                        {item.subscription_number || `SUB-${item.id}`}
+                      </div>
+                      <div className="mt-1 text-slate-600">{getSubscriptionLabel(item)}</div>
+                    </button>
                   ))}
-                </select>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="subscription_id"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Subscription ID
+                </label>
+                <input
+                  id="subscription_id"
+                  name="subscription_id"
+                  type="text"
+                  value={form.subscription_id}
+                  readOnly
+                  className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-700"
+                  placeholder="Auto-filled from selection"
+                />
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="emi">Pending EMI</label>
+              <div>
+                <label
+                  htmlFor="emi_id"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  EMI selection <span className="text-red-600">*</span>
+                </label>
                 <select
-                  id="emi"
-                  value={form.emi}
-                  onChange={(event) => onEmiChange(event.target.value)}
-                  disabled={!form.subscription || loadingEmis || pendingEmis.length === 0}
+                  id="emi_id"
+                  name="emi_id"
+                  value={form.emi_id}
+                  onChange={onEmiChanged}
+                  disabled={!selectedSubscription || loadingEmis || emiOptions.length === 0}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
                 >
                   <option value="">
                     {loadingEmis
-                      ? "Loading EMI..."
-                      : pendingEmis.length === 0
-                        ? "No pending EMI"
-                        : "Select pending EMI"}
+                      ? "Loading EMI records..."
+                      : emiOptions.length === 0
+                        ? "No unpaid EMI available"
+                        : "Select EMI"}
                   </option>
-                  {pendingEmis.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      Month {item.month_no} - Due {item.due_date} - {formatCurrency(item.balance_amount || item.amount)}
+                  {emiOptions.map((emi) => (
+                    <option key={emi.id} value={emi.id}>
+                      {getEmiLabel(emi)}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="amount">Amount</label>
+              <div>
+                <label
+                  htmlFor="amount"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Amount <span className="text-red-600">*</span>
+                </label>
                 <input
                   id="amount"
+                  name="amount"
                   type="number"
                   min="0.01"
                   step="0.01"
-                  value={form.amount}
-                  onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
                   required
+                  value={form.amount}
+                  onChange={onInputChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  placeholder="Auto-filled from outstanding amount"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Auto-filled from selected EMI outstanding amount. Admin may edit only if
+                  partial collection is permitted in your backend service.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="payment_date"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Payment date <span className="text-red-600">*</span>
+                </label>
+                <input
+                  id="payment_date"
+                  name="payment_date"
+                  type="date"
+                  required
+                  value={form.payment_date}
+                  onChange={onInputChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
                 />
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="method">Method</label>
-                <select
-                  id="method"
-                  value={form.method}
-                  onChange={(event) => setForm((prev) => ({ ...prev, method: event.target.value }))}
+              <div>
+                <label
+                  htmlFor="payment_method"
+                  className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  <option value="CASH">CASH</option>
-                  <option value="UPI">UPI</option>
-                  <option value="BANK">BANK</option>
+                  Payment method <span className="text-red-600">*</span>
+                </label>
+                <select
+                  id="payment_method"
+                  name="payment_method"
+                  value={form.payment_method}
+                  onChange={onInputChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                >
+                  {PAYMENT_METHOD_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="reference_no">Reference No. (optional)</label>
+              <div>
+                <label
+                  htmlFor="reference_no"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Reference number
+                  {form.payment_method !== "CASH" ? (
+                    <span className="ml-1 text-red-600">*</span>
+                  ) : null}
+                </label>
                 <input
                   id="reference_no"
+                  name="reference_no"
+                  type="text"
                   value={form.reference_no}
-                  onChange={(event) => setForm((prev) => ({ ...prev, reference_no: event.target.value }))}
-                  placeholder="UPI / Bank reference"
-                />
-              </div>
-
-              <div style={{ display: "grid", gap: 6 }}>
-                <label htmlFor="payment_date">Payment Date</label>
-                <input
-                  id="payment_date"
-                  type="date"
-                  value={form.payment_date}
-                  onChange={(event) => setForm((prev) => ({ ...prev, payment_date: event.target.value }))}
-                  required
-                />
-              </div>
-
-              {submitError ? <p style={{ color: "#b91c1c", margin: 0 }}>{submitError}</p> : null}
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button type="submit" disabled={creating || !selectedSubscription || !form.amount}>
-                  {creating ? "Saving Payment..." : "Save Payment"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm((prev) => ({
-                      ...prev,
-                      emi: selectedEmi ? String(selectedEmi.id) : "",
-                      amount: selectedEmi ? String(selectedEmi.balance_amount || selectedEmi.amount) : "",
-                      method: "CASH",
-                      reference_no: "",
-                      payment_date: new Date().toISOString().slice(0, 10),
-                    }))
+                  onChange={onInputChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  placeholder={
+                    form.payment_method === "CASH"
+                      ? "Optional receipt reference"
+                      : "UPI / bank / card trace reference"
                   }
-                >
-                  Reset Entry
-                </button>
+                />
               </div>
-            </form>
-          </section>
 
-          <section style={{ display: "grid", gap: 16 }}>
-            <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Subscription Context</h3>
-              <p><strong>Customer:</strong> {selectedCustomer ? `${selectedCustomer.name} (${selectedCustomer.phone})` : "-"}</p>
-              <p><strong>Plan:</strong> {selectedSubscription?.plan_type || "-"}</p>
-              <p><strong>Batch:</strong> {selectedSubscription?.batch_code || "-"}</p>
-              <p><strong>Lucky ID:</strong> {selectedSubscription?.lucky_number ? `#${selectedSubscription.lucky_number}` : "-"}</p>
-              <p><strong>Status:</strong> {selectedSubscription?.status || "-"}</p>
-              <p><strong>Monthly EMI:</strong> {formatCurrency(selectedSubscription?.monthly_amount)}</p>
-            </section>
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="notes"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Notes
+                </label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={onInputChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  placeholder="Counter note, collection remark, or exception detail"
+                />
+              </div>
+            </div>
 
-            <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Selected EMI</h3>
-              <p><strong>Month:</strong> {selectedEmi?.month_no ?? "-"}</p>
-              <p><strong>Due Date:</strong> {selectedEmi?.due_date ?? "-"}</p>
-              <p><strong>EMI Amount:</strong> {formatCurrency(selectedEmi?.amount)}</p>
-              <p><strong>Balance:</strong> {formatCurrency(selectedEmi?.balance_amount || selectedEmi?.amount)}</p>
-              <p><strong>Status:</strong> {selectedEmi?.status ?? "-"}</p>
-            </section>
+            {errorMessage ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
 
-            <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Payment Validation Preview</h3>
-              <p><strong>Entered Amount:</strong> {formatCurrency(paymentPreview.amount)}</p>
-              <p><strong>Standard Monthly EMI:</strong> {formatCurrency(paymentPreview.monthlyAmount)}</p>
-              <p><strong>Pending EMIs Left:</strong> {paymentPreview.pendingCount}</p>
-              <p><strong>Exact Monthly Match:</strong> {paymentPreview.isExactMonthly ? "Yes" : "No"}</p>
-            </section>
-          </section>
+            {prefillMessages.length > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div className="font-medium">Some incoming prefills were not applied.</div>
+                <ul className="mt-2 list-disc pl-5">
+                  {prefillMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {successMessage ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {successMessage}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || loadingSubscription || loadingEmis}
+                className="inline-flex h-11 items-center rounded-xl bg-slate-900 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Saving..." : "Record Payment"}
+              </button>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={isSubmitting}
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Reset Form
+              </button>
+
+              <Link
+                href="/admin/payments"
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </Link>
+            </div>
+          </form>
         </section>
-      ) : null}
+
+        <aside className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Selected subscription
+            </h3>
+
+            <div className="mt-4 grid gap-3">
+              <StatCard
+                label="Subscription"
+                value={selectedSubscription?.subscription_number || "—"}
+                hint={selectedSubscription?.status || "No subscription selected"}
+              />
+              <StatCard
+                label="Customer"
+                value={selectedSubscription?.customer_name || "—"}
+                hint={selectedSubscription?.customer_phone || "Customer not loaded"}
+              />
+              <StatCard
+                label="Product"
+                value={selectedSubscription?.product_name || "—"}
+                hint={
+                  selectedSubscription?.batch_code
+                    ? `Batch ${selectedSubscription.batch_code}`
+                    : "Batch not loaded"
+                }
+              />
+              <StatCard
+                label="Monthly EMI"
+                value={formatCurrency(selectedSubscription?.monthly_amount)}
+                hint={
+                  selectedSubscription?.tenure_months
+                    ? `${selectedSubscription.tenure_months} months`
+                    : "Tenure not loaded"
+                }
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Selected EMI
+            </h3>
+
+            <div className="mt-4 grid gap-3">
+              <StatCard
+                label="EMI ID"
+                value={selectedEmi ? `#${selectedEmi.id}` : "—"}
+                hint={selectedEmi?.status || "No EMI selected"}
+              />
+              <StatCard
+                label="Due date"
+                value={formatDateLabel(selectedEmi?.due_date)}
+                hint="Scheduled due date"
+              />
+              <StatCard
+                label="EMI amount"
+                value={formatCurrency(selectedEmi?.amount)}
+                hint="Nominal installment amount"
+              />
+              <StatCard
+                label="Outstanding"
+                value={form.amount ? formatCurrency(form.amount) : "—"}
+                hint="Auto-filled collection amount"
+              />
+            </div>
+          </div>
+
+          {submitResult ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-800">
+                Last recorded payment
+              </h3>
+
+              <dl className="mt-4 space-y-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-emerald-800">Payment ID</dt>
+                  <dd className="font-medium text-emerald-900">
+                    #{submitResult.payment.id}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-emerald-800">EMI ID</dt>
+                  <dd className="font-medium text-emerald-900">#{submitResult.emi.id}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-emerald-800">Status</dt>
+                  <dd className="font-medium text-emerald-900">{submitResult.emi.status}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-emerald-800">Outstanding</dt>
+                  <dd className="font-medium text-emerald-900">
+                    {formatCurrency(submitResult.emi.outstanding_amount)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-800">
+              Control note
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              This screen remains safe only when payment creation goes through the hardened
+              backend collection service. Do not replace it with direct raw payment row
+              creation.
+            </p>
+          </div>
+        </aside>
+      </div>
     </PortalPage>
   );
 }

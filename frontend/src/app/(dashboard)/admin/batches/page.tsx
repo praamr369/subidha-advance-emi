@@ -1,401 +1,629 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Download, Layers, RefreshCw, Search, Trophy, Users } from "lucide-react";
 
-import RoleGuard from "@/components/auth/RoleGuard";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
+import { downloadCsv } from "@/lib/export/csv";
 
-type BatchSummary = {
+type BatchStatus =
+  | "DRAFT"
+  | "OPEN"
+  | "ACTIVE"
+  | "CLOSED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "UNKNOWN";
+
+type BatchRow = {
   id: number;
   batch_code: string;
-  status: string;
   total_slots: number;
   duration_months: number;
-  draw_day: number;
-  start_date: string;
+  start_date: string | null;
+  draw_day: number | null;
+  status: BatchStatus;
+  subscription_count: number;
+  lucky_id_count: number;
+  winner_count: number;
+  available_slots: number;
+  created_at: string | null;
 };
 
-type Subscription = {
-  id: number;
-  batch: number | null;
-  status: string;
-  plan_type: string;
-};
-
-type LuckyId = {
-  id: number;
-  batch: number;
-  lucky_number: number;
-  status: string;
-};
-
-const defaultForm = {
-  batch_code: "",
-  total_slots: "100",
-  duration_months: "15",
-  draw_day: "5",
-  start_date: "",
-  status: "DRAFT",
-};
-
-function parseApiError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message.trim();
-  if (!raw) return "Request failed";
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first.length > 0) return String(first[0]);
-    if (typeof first === "string") return first;
-  } catch {
-    return raw;
-  }
-
-  return raw;
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export default function BatchesPage() {
-  const [batches, setBatches] = useState<BatchSummary[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [luckyIds, setLuckyIds] = useState<LuckyId[]>([]);
+function toNullableNumber(value: unknown): number | null {
+  if (typeof value === "number") return value;
+  if (value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
+function toNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : value === null ? null : null;
+}
+
+function normalizeBatchStatus(value: unknown): BatchStatus {
+  const status = String(value ?? "").toUpperCase();
+
+  if (
+    status === "DRAFT" ||
+    status === "OPEN" ||
+    status === "ACTIVE" ||
+    status === "CLOSED" ||
+    status === "COMPLETED" ||
+    status === "CANCELLED"
+  ) {
+    return status;
+  }
+
+  return "UNKNOWN";
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleDateString();
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load batch register.";
+}
+
+function normalizeBatchRow(raw: Record<string, unknown>): BatchRow {
+  const luckyIdCount = toNumber(
+    raw.lucky_id_count ?? raw.lucky_count ?? raw.total_lucky_ids,
+    0
+  );
+
+  return {
+    id: toNumber(raw.id),
+    batch_code:
+      String(raw.batch_code ?? "").trim() ||
+      String(raw.code ?? "").trim() ||
+      `BATCH-${String(raw.id ?? "")}`,
+    total_slots: toNumber(raw.total_slots, 0),
+    duration_months: toNumber(raw.duration_months, 0),
+    start_date: toNullableString(raw.start_date),
+    draw_day: toNullableNumber(raw.draw_day),
+    status: normalizeBatchStatus(raw.status),
+    subscription_count: toNumber(raw.subscription_count, 0),
+    lucky_id_count: luckyIdCount,
+    winner_count: toNumber(raw.winner_count, 0),
+    available_slots: toNumber(raw.available_slots, 0),
+    created_at: toNullableString(raw.created_at),
+  };
+}
+
+function toObject(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
+
+function extractRowsAndNext(payload: unknown): {
+  rows: Record<string, unknown>[];
+  nextPath: string | null;
+} {
+  const objectPayload = toObject(payload);
+
+  if (objectPayload && Array.isArray(objectPayload.results)) {
+    const nextRaw = objectPayload.next;
+    return {
+      rows: toArray<Record<string, unknown>>(objectPayload.results),
+      nextPath: typeof nextRaw === "string" && nextRaw.trim() ? nextRaw : null,
+    };
+  }
+
+  return {
+    rows: toArray<Record<string, unknown>>(payload),
+    nextPath: null,
+  };
+}
+
+function normalizeApiPath(nextPath: string): string {
+  const trimmed = nextPath.trim();
+
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    const parsed = new URL(trimmed);
+    const combined = `${parsed.pathname}${parsed.search}`;
+    if (combined.startsWith("/api/v1/")) {
+      return combined.replace(/^\/api\/v1/, "");
+    }
+    return combined;
+  }
+
+  if (trimmed.startsWith("/api/v1/")) {
+    return trimmed.replace(/^\/api\/v1/, "");
+  }
+
+  return trimmed;
+}
+
+async function fetchAllPagedRows(path: string): Promise<Record<string, unknown>[]> {
+  let nextPath: string | null = path;
+  const collected: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+
+  for (let guard = 0; nextPath && guard < 100; guard += 1) {
+    const payload = await apiFetch<unknown>(nextPath);
+    const { rows, nextPath: rawNext } = extractRowsAndNext(payload);
+
+    for (const row of rows) {
+      const key =
+        typeof row.id !== "undefined" ? String(row.id) : JSON.stringify(row);
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        collected.push(row);
+      }
+    }
+
+    const normalizedNext = rawNext ? normalizeApiPath(rawNext) : "";
+    nextPath = normalizedNext || null;
+  }
+
+  return collected;
+}
+
+export default function AdminBatchesPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamKey = searchParams.toString();
+
+  const initialQuery = (searchParams.get("q") || "").trim();
+  const initialStatus = ((searchParams.get("status") || "").trim().toUpperCase() ||
+    "") as "" | BatchStatus;
+
+  const [rows, setRows] = useState<BatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [queryInput, setQueryInput] = useState(initialQuery);
+  const [statusInput, setStatusInput] = useState<"" | BatchStatus>(initialStatus);
 
-  const [form, setForm] = useState(defaultForm);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [statusFilter, setStatusFilter] = useState<"" | BatchStatus>(initialStatus);
 
-  async function loadAll(showRefreshing = false): Promise<void> {
-    try {
-      if (showRefreshing) setRefreshing(true);
-      else setLoading(true);
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
-      const [batchRes, subscriptionRes, luckyIdRes] = await Promise.all([
-        apiFetch("/admin/batches/"),
-        apiFetch("/admin/subscriptions/"),
-        apiFetch("/admin/lucky-ids/"),
-      ]);
+      try {
+        const params = new URLSearchParams();
+        if (query) params.set("q", query);
+        if (statusFilter) params.set("status", statusFilter);
+        const payload = await fetchAllPagedRows(
+          `/admin/batches/${params.toString() ? `?${params.toString()}` : ""}`
+        );
 
-      setBatches(toArray<BatchSummary>(batchRes));
-      setSubscriptions(toArray<Subscription>(subscriptionRes));
-      setLuckyIds(toArray<LuckyId>(luckyIdRes));
-      setError(null);
-    } catch (fetchError) {
-      setError(parseApiError(fetchError));
-      setBatches([]);
-      setSubscriptions([]);
-      setLuckyIds([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+        setRows(payload.map(normalizeBatchRow));
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") setRows([]);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
+    },
+    [query, statusFilter]
+  );
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    void loadPage("initial");
+  }, [loadPage]);
 
-  async function handleCreateBatch(event: FormEvent<HTMLFormElement>): Promise<void> {
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamKey);
+    const nextQuery = (params.get("q") || "").trim();
+    const nextStatus = ((params.get("status") || "").trim().toUpperCase() ||
+      "") as "" | BatchStatus;
+
+    setQueryInput(nextQuery);
+    setStatusInput(nextStatus);
+    setQuery(nextQuery);
+    setStatusFilter(nextStatus);
+  }, [searchParamKey]);
+
+  function replaceFilters(params: URLSearchParams) {
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  }
+
+  function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCreateError(null);
-    setCreating(true);
+    const params = new URLSearchParams();
+    const nextQuery = queryInput.trim();
 
-    try {
-      const payload = {
-        batch_code: form.batch_code.trim(),
-        total_slots: Number(form.total_slots),
-        duration_months: Number(form.duration_months),
-        draw_day: Number(form.draw_day),
-        start_date: form.start_date,
-        status: form.status,
-      };
-
-      const created = (await apiFetch("/admin/batches/", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })) as BatchSummary;
-
-      setBatches((prev) => [created, ...prev]);
-      setForm(defaultForm);
-    } catch (submitError) {
-      setCreateError(parseApiError(submitError));
-    } finally {
-      setCreating(false);
-    }
+    if (nextQuery) params.set("q", nextQuery);
+    if (statusInput) params.set("status", statusInput);
+    replaceFilters(params);
   }
 
-  const filteredBatches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-
-    return batches.filter((batch) => {
-      if (statusFilter && batch.status !== statusFilter) return false;
-      if (!needle) return true;
-
-      return [
-        batch.batch_code,
-        batch.status,
-        String(batch.id),
-        String(batch.draw_day),
-        String(batch.duration_months),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle);
-    });
-  }, [batches, query, statusFilter]);
-
-  const kpis = useMemo(() => {
-    const totalBatches = filteredBatches.length;
-    const openBatches = filteredBatches.filter((b) => b.status === "OPEN").length;
-    const draftBatches = filteredBatches.filter((b) => b.status === "DRAFT").length;
-    const closedBatches = filteredBatches.filter((b) => b.status === "CLOSED").length;
-
-    const batchIds = new Set(filteredBatches.map((b) => b.id));
-
-    const relatedSubscriptions = subscriptions.filter(
-      (s) => s.batch != null && batchIds.has(s.batch)
-    );
-    const relatedLuckyIds = luckyIds.filter((l) => batchIds.has(l.batch));
-
-    const activeSubscriptions = relatedSubscriptions.filter((s) => s.status === "ACTIVE").length;
-    const availableLuckyIds = relatedLuckyIds.filter((l) => l.status === "AVAILABLE").length;
-    const assignedLuckyIds = relatedLuckyIds.filter((l) => l.status === "ASSIGNED").length;
-    const wonLuckyIds = relatedLuckyIds.filter((l) => l.status === "WON").length;
-
-    return {
-      totalBatches,
-      openBatches,
-      draftBatches,
-      closedBatches,
-      activeSubscriptions,
-      availableLuckyIds,
-      assignedLuckyIds,
-      wonLuckyIds,
-    };
-  }, [filteredBatches, subscriptions, luckyIds]);
-
-  function getBatchSubscriptionCount(batchId: number): number {
-    return subscriptions.filter((s) => s.batch === batchId).length;
+  function handleResetFilters() {
+    setQueryInput("");
+    setStatusInput("");
+    replaceFilters(new URLSearchParams());
   }
 
-  function getBatchAvailableLuckyCount(batchId: number): number {
-    return luckyIds.filter((l) => l.batch === batchId && l.status === "AVAILABLE").length;
-  }
+  const liveCount = useMemo(
+    () => rows.filter((row) => row.status === "OPEN" || row.status === "ACTIVE").length,
+    [rows]
+  );
+
+  const totalSubscriptions = useMemo(
+    () => rows.reduce((sum, row) => sum + row.subscription_count, 0),
+    [rows]
+  );
+
+  const totalLuckyIds = useMemo(
+    () => rows.reduce((sum, row) => sum + row.lucky_id_count, 0),
+    [rows]
+  );
+
+  const totalWinners = useMemo(
+    () => rows.reduce((sum, row) => sum + row.winner_count, 0),
+    [rows]
+  );
+
+  const fullOrTightCount = useMemo(
+    () => rows.filter((row) => row.available_slots <= 5).length,
+    [rows]
+  );
+
+  const exportRows = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        batch_code: row.batch_code,
+        total_slots: row.total_slots,
+        duration_months: row.duration_months,
+        start_date: row.start_date ?? "",
+        draw_day: row.draw_day ?? "",
+        status: row.status,
+        subscription_count: row.subscription_count,
+        lucky_id_count: row.lucky_id_count,
+        available_slots: row.available_slots,
+        winner_count: row.winner_count,
+        created_at: row.created_at ?? "",
+      })),
+    [rows]
+  );
+
+  const columns = useMemo<Column<BatchRow>[]>(
+    () => [
+      {
+        key: "batch_code",
+        title: "Batch",
+        sortable: true,
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{row.batch_code}</div>
+            <div className="text-xs text-muted-foreground">Batch #{row.id}</div>
+            <div className="text-xs text-muted-foreground">
+              Created {formatDateTime(row.created_at)}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "duration_months",
+        title: "Schedule",
+        sortable: true,
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="text-sm text-foreground">{row.duration_months} months</div>
+            <div className="text-xs text-muted-foreground">
+              Start {formatDate(row.start_date)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Draw day {row.draw_day != null ? row.draw_day : "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "subscription_count",
+        title: "Volume",
+        align: "right",
+        sortable: true,
+        render: (row) => {
+          const assignedCount = Math.max(
+            row.lucky_id_count - row.available_slots - row.winner_count,
+            0
+          );
+
+          return (
+            <div className="space-y-1 text-right">
+              <div className="font-semibold text-foreground">
+                {row.subscription_count} subscriptions
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {row.lucky_id_count} Lucky IDs
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {assignedCount} assigned · {row.available_slots} available
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "status",
+        title: "State",
+        sortable: true,
+        render: (row) => (
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status={row.status} />
+            <StatusBadge
+              status={row.available_slots === 0 ? "FULL" : "AVAILABLE"}
+              label={
+                row.available_slots === 0
+                  ? "No Slots Left"
+                  : `${row.available_slots} Slots Open`
+              }
+            />
+            {row.winner_count > 0 ? (
+              <StatusBadge status="WON" label={`${row.winner_count} Winners`} />
+            ) : null}
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
   return (
-    <RoleGuard allowedRoles={["ADMIN"]}>
-      <div style={{ padding: 24, display: "grid", gap: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <h1 style={{ margin: 0 }}>Batch Management</h1>
-            <p style={{ marginTop: 6, color: "#4b5563" }}>
-              Create, monitor, and control Lucky Plan batches for EMI operations.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => loadAll(true)} disabled={refreshing}>
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
+    <PortalPage
+      title="Batch Register"
+      subtitle="Review Lucky Plan grouping, slot pressure, draw timing, and subscription attachment from one operational register without changing batch lifecycle logic."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Batches" },
+      ]}
+      actions={[
+        { href: "/admin/batches/create", label: "Create Batch", variant: "primary" },
+        {
+          href: "/admin/subscriptions/create",
+          label: "Create Subscription",
+          variant: "secondary",
+        },
+      ]}
+      stats={[
+        { label: "Visible Batches", value: rows.length },
+        { label: "Open / Active", value: liveCount, tone: liveCount > 0 ? "success" : undefined },
+        { label: "Subscription Volume", value: totalSubscriptions },
+        { label: "Winner Count", value: totalWinners, tone: totalWinners > 0 ? "info" : undefined },
+      ]}
+      statusBadge={{ label: "Batch Operations", tone: "info" }}
+    >
+      <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Visible Batches"
+            value={rows.length}
+            icon={<Layers className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Live Batches"
+            value={liveCount}
+            icon={<Users className="h-4 w-4" />}
+            tone={liveCount > 0 ? "success" : "default"}
+          />
+          <StatCard
+            label="Lucky IDs"
+            value={totalLuckyIds}
+            icon={<Users className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Slot Pressure"
+            value={fullOrTightCount}
+            subtext="Batches with 5 or fewer open slots"
+            icon={<Trophy className="h-4 w-4" />}
+            tone={fullOrTightCount > 0 ? "warning" : "info"}
+          />
         </div>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: 10,
-          }}
+        <WorkspaceSection
+          title="Batch workflow"
+          description="Use backend-backed search and status filters to keep the register focused, then route directly into batch detail, edit, and subscription workflows."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing || loading}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                type="button"
+                disabled={exportRows.length === 0 || loading}
+                onClick={() =>
+                  downloadCsv(
+                    "batch-register-current-view.csv",
+                    [
+                      { key: "id", header: "id" },
+                      { key: "batch_code", header: "batch_code" },
+                      { key: "total_slots", header: "total_slots" },
+                      { key: "duration_months", header: "duration_months" },
+                      { key: "start_date", header: "start_date" },
+                      { key: "draw_day", header: "draw_day" },
+                      { key: "status", header: "status" },
+                      { key: "subscription_count", header: "subscription_count" },
+                      { key: "lucky_id_count", header: "lucky_id_count" },
+                      { key: "available_slots", header: "available_slots" },
+                      { key: "winner_count", header: "winner_count" },
+                      { key: "created_at", header: "created_at" },
+                    ],
+                    exportRows
+                  )
+                }
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                Export Current View
+              </button>
+            </div>
+          }
         >
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Total Batches: <b>{kpis.totalBatches}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Open Batches: <b>{kpis.openBatches}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Draft Batches: <b>{kpis.draftBatches}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Closed Batches: <b>{kpis.closedBatches}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Active Subscriptions: <b>{kpis.activeSubscriptions}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Available Lucky IDs: <b>{kpis.availableLuckyIds}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Assigned Lucky IDs: <b>{kpis.assignedLuckyIds}</b>
-          </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-            Won Lucky IDs: <b>{kpis.wonLuckyIds}</b>
-          </div>
-        </section>
-
-        <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-          <h2 style={{ marginTop: 0 }}>Create Batch</h2>
-          <p style={{ color: "#4b5563", marginTop: 0 }}>
-            Draw day must be between 1 and 28. Use stable batch codes for business tracking.
-          </p>
-
-          <form
-            onSubmit={handleCreateBatch}
-            style={{
-              display: "grid",
-              gap: 10,
-              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-            }}
+          <TableToolbar
+            footer={
+              query || statusFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
+                  {query ? <StatusBadge status="OPEN" label={`Search: ${query}`} hideIcon /> : null}
+                  {statusFilter ? <StatusBadge status={statusFilter} hideIcon /> : null}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  This register stays read-only with respect to financial logic. Filtering only reduces operator noise while preserving batch status and Lucky ID traceability.
+                </div>
+              )
+            }
           >
-            <input
-              placeholder="Batch code (e.g. LP-2026-APR-A)"
-              value={form.batch_code}
-              onChange={(event) => setForm((state) => ({ ...state, batch_code: event.target.value }))}
-              required
-            />
-            <input
-              type="number"
-              min={1}
-              placeholder="Total slots"
-              value={form.total_slots}
-              onChange={(event) => setForm((state) => ({ ...state, total_slots: event.target.value }))}
-              required
-            />
-            <input
-              type="number"
-              min={1}
-              placeholder="Duration months"
-              value={form.duration_months}
-              onChange={(event) => setForm((state) => ({ ...state, duration_months: event.target.value }))}
-              required
-            />
-            <input
-              type="number"
-              min={1}
-              max={28}
-              placeholder="Draw day"
-              value={form.draw_day}
-              onChange={(event) => setForm((state) => ({ ...state, draw_day: event.target.value }))}
-              required
-            />
-            <input
-              type="date"
-              value={form.start_date}
-              onChange={(event) => setForm((state) => ({ ...state, start_date: event.target.value }))}
-              required
-            />
-            <select value={form.status} onChange={(event) => setForm((state) => ({ ...state, status: event.target.value }))}>
-              <option value="DRAFT">DRAFT</option>
-              <option value="OPEN">OPEN</option>
-              <option value="FULL">FULL</option>
-              <option value="DRAW_IN_PROGRESS">DRAW_IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="CLOSED">CLOSED</option>
-            </select>
+            <form
+              onSubmit={handleApplyFilters}
+              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
+            >
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={queryInput}
+                  onChange={(event) => setQueryInput(event.target.value)}
+                  placeholder="Search by batch code"
+                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
+                />
+              </label>
 
-            <button type="submit" disabled={creating}>
-              {creating ? "Creating..." : "Create Batch"}
-            </button>
-          </form>
+              <select
+                value={statusInput}
+                onChange={(event) => setStatusInput(event.target.value as "" | BatchStatus)}
+                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All states</option>
+                <option value="DRAFT">Draft</option>
+                <option value="OPEN">Open</option>
+                <option value="ACTIVE">Active</option>
+                <option value="CLOSED">Closed</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
 
-          {createError ? <p style={{ color: "#b91c1c", marginBottom: 0 }}>{createError}</p> : null}
-        </section>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Reset
+                </button>
+              </div>
+            </form>
+          </TableToolbar>
+        </WorkspaceSection>
 
-        <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, display: "grid", gap: 10 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Filters</h2>
+        {loading ? <LoadingBlock label="Loading batch register..." /> : null}
 
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            }}
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load batch register"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Batch rows"
+            description="Open a batch to review Lucky IDs, draw readiness, and linked subscriptions without leaving the operational register."
           >
-            <input
-              placeholder="Search batch code, id, status..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">All statuses</option>
-              <option value="DRAFT">DRAFT</option>
-              <option value="OPEN">OPEN</option>
-              <option value="FULL">FULL</option>
-              <option value="DRAW_IN_PROGRESS">DRAW_IN_PROGRESS</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="CLOSED">CLOSED</option>
-            </select>
-          </div>
-
-          <div>
-            <button type="button" onClick={() => { setQuery(""); setStatusFilter(""); }}>
-              Reset Filters
-            </button>
-          </div>
-        </section>
-
-        <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14 }}>
-          <h2 style={{ marginTop: 0 }}>Existing Batches</h2>
-
-          {loading ? <p>Loading batches...</p> : null}
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-
-          {!loading && !error ? (
-            <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Batch Code</th>
-                  <th>Status</th>
-                  <th>Slots</th>
-                  <th>Subscriptions</th>
-                  <th>Available Lucky IDs</th>
-                  <th>Duration</th>
-                  <th>Draw Day</th>
-                  <th>Start Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBatches.map((batch) => (
-                  <tr key={batch.id}>
-                    <td>{batch.id}</td>
-                    <td>{batch.batch_code}</td>
-                    <td>{batch.status}</td>
-                    <td>{batch.total_slots}</td>
-                    <td>{getBatchSubscriptionCount(batch.id)}</td>
-                    <td>{getBatchAvailableLuckyCount(batch.id)}</td>
-                    <td>{batch.duration_months}</td>
-                    <td>{batch.draw_day}</td>
-                    <td>{batch.start_date}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <Link href={`/admin/batches/${batch.id}`}>View</Link>
-                        <Link href={`/admin/subscriptions/create?batch=${batch.id}`}>Add Subscription</Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredBatches.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} style={{ textAlign: "center" }}>
-                      No batches found.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          ) : null}
-        </section>
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No batches found"
+                description="No batch records matched the current search and status filters."
+                action={
+                  <Link
+                    href="/admin/batches/create"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                  >
+                    Create Batch
+                  </Link>
+                }
+              />
+            ) : (
+              <DataTable<BatchRow>
+                rows={rows}
+                columns={columns}
+                onRowClick={(row) => router.push(`/admin/batches/${row.id}`)}
+                rowActions={(row) => (
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/admin/batches/${row.id}`}
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Open
+                    </Link>
+                    <Link
+                      href={`/admin/batches/${row.id}/edit`}
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Edit
+                    </Link>
+                    <Link
+                      href="/admin/subscriptions/create"
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Create Subscription
+                    </Link>
+                  </div>
+                )}
+              />
+            )}
+          </WorkspaceSection>
+        ) : null}
       </div>
-    </RoleGuard>
+    </PortalPage>
   );
 }

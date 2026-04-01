@@ -1,3 +1,3 @@
-import AdminSubscriptionsPage from "../page";
+import SubscriptionCreateView from "@/domains/subscriptions/views/SubscriptionCreateView";
 
-export default AdminSubscriptionsPage;
+export default SubscriptionCreateView;

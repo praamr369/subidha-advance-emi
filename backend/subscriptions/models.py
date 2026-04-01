@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 import hashlib
+from xml.parsers.expat import errors
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -20,6 +21,48 @@ class PlanType(models.TextChoices):
     EMI = "EMI", "EMI"
     RENT = "RENT", "Rent"
     LEASE = "LEASE", "Lease"
+
+
+class PublicLeadStatus(models.TextChoices):
+    NEW = "NEW", "New"
+    IN_PROGRESS = "IN_PROGRESS", "In Progress"
+    CONTACTED = "CONTACTED", "Contacted"
+    CONVERTED = "CONVERTED", "Converted"
+    CLOSED = "CLOSED", "Closed"
+
+
+class SupportRequestStatus(models.TextChoices):
+    SUBMITTED = "SUBMITTED", "Submitted"
+    UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
+    CLOSED = "CLOSED", "Closed"
+
+
+class SupportRequestCategory(models.TextChoices):
+    PAYMENT_ISSUE = "PAYMENT_ISSUE", "Payment Issue"
+    RECEIPT_ISSUE = "RECEIPT_ISSUE", "Receipt Issue"
+    EMI_ISSUE = "EMI_ISSUE", "EMI Issue"
+    SUBSCRIPTION_QUERY = "SUBSCRIPTION_QUERY", "Subscription Query"
+    DRAW_QUERY = "DRAW_QUERY", "Draw Query"
+    OTHER = "OTHER", "Other"
+
+
+class FulfillmentStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    DELIVERED = "DELIVERED", "Delivered"
+    RETURN_REQUESTED = "RETURN_REQUESTED", "Return Requested"
+    RETURNED = "RETURNED", "Returned"
+
+
+class DeliveryStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    SCHEDULED = "SCHEDULED", "Scheduled"
+    DISPATCHED = "DISPATCHED", "Dispatched"
+    OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY", "Out for Delivery"
+    DELIVERED = "DELIVERED", "Delivered"
+    FAILED = "FAILED", "Failed"
+    CANCELLED = "CANCELLED", "Cancelled"
+    RETURN_REQUESTED = "RETURN_REQUESTED", "Return Requested"
+    RETURNED = "RETURNED", "Returned"
 
 
 class SubscriptionStatus(models.TextChoices):
@@ -74,11 +117,11 @@ class LedgerDirection(models.TextChoices):
     DEBIT = "DEBIT", "Debit"
     CREDIT = "CREDIT", "Credit"
 
-
 class CommissionStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
-    APPROVED = "APPROVED", "Approved"
-    PAID = "PAID", "Paid"
+    SETTLED = "SETTLED", "Settled"
+    REVERSED = "REVERSED", "Reversed"
+
 
 
 # =====================================================
@@ -114,7 +157,17 @@ class Customer(TimeStampedModel):
         default=KycStatus.PENDING,
         db_index=True,
     )
-
+    kyc_reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="kyc_reviewed_customers",
+        null=True,
+        blank=True,
+    )
+    kyc_reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    kyc_rejection_reason = models.TextField(blank=True, default="") 
+    address = models.TextField(blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
     class Meta:
         db_table = "customers"
         ordering = ["-created_at"]
@@ -122,6 +175,8 @@ class Customer(TimeStampedModel):
             models.Index(fields=["phone"]),
             models.Index(fields=["kyc_status"]),
             models.Index(fields=["name"]),
+            models.Index(fields=["kyc_reviewed_at"]),
+            models.Index(fields=["city"]),
         ]
 
     def clean(self):
@@ -153,12 +208,33 @@ class Product(TimeStampedModel):
     name = models.CharField(max_length=255)
     base_price = models.DecimalField(max_digits=12, decimal_places=2)
 
+    category = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    subcategory = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    description = models.TextField(blank=True, default="")
+    image = models.ImageField(upload_to="products/", null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    plan_type_default = models.CharField(
+        max_length=10,
+        choices=PlanType.choices,
+        default=PlanType.EMI,
+        db_index=True,
+    )
+    is_emi_enabled = models.BooleanField(default=True, db_index=True)
+    is_rent_enabled = models.BooleanField(default=False, db_index=True)
+    is_lease_enabled = models.BooleanField(default=False, db_index=True)
+    is_rent_ready = models.BooleanField(default=False, db_index=True)
+    is_lease_ready = models.BooleanField(default=False, db_index=True)
+
     class Meta:
         db_table = "products"
         ordering = ["name", "id"]
         indexes = [
             models.Index(fields=["product_code"]),
             models.Index(fields=["name"]),
+            models.Index(fields=["category"]),
+            models.Index(fields=["subcategory"]),
+            models.Index(fields=["is_active"]),
         ]
         constraints = [
             models.CheckConstraint(
@@ -168,21 +244,239 @@ class Product(TimeStampedModel):
         ]
 
     def clean(self):
+        errors = {}
+
         if not self.product_code or not self.product_code.strip():
-            raise ValidationError({"product_code": "Product code is required."})
+            errors["product_code"] = "Product code is required."
         if not self.name or not self.name.strip():
-            raise ValidationError({"name": "Product name is required."})
+            errors["name"] = "Product name is required."
         if self.base_price is None or self.base_price <= MONEY_ZERO:
-            raise ValidationError({"base_price": "Base price must be greater than zero."})
+            errors["base_price"] = "Base price must be greater than zero."
+        if self.plan_type_default not in PlanType.values:
+            errors["plan_type_default"] = "Unsupported default plan type."
+        if not any([self.is_emi_enabled, self.is_rent_enabled, self.is_lease_enabled]):
+            errors["is_emi_enabled"] = "At least one product mode must be enabled."
+        if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
+            errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
+        if self.plan_type_default == PlanType.RENT and not self.is_rent_enabled:
+            errors["plan_type_default"] = "Default plan type RENT requires rent to be enabled."
+        if self.plan_type_default == PlanType.LEASE and not self.is_lease_enabled:
+            errors["plan_type_default"] = "Default plan type LEASE requires lease to be enabled."
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.product_code = (self.product_code or "").strip().upper()
         self.name = (self.name or "").strip()
+        self.category = (self.category or "").strip()
+        self.subcategory = (self.subcategory or "").strip()
+        self.description = (self.description or "").strip()
+        self.is_rent_ready = bool(self.is_rent_enabled)
+        self.is_lease_ready = bool(self.is_lease_enabled)
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product_code} - {self.name}"
+
+
+class PublicLead(TimeStampedModel):
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=10, db_index=True)
+    city = models.CharField(max_length=100, blank=True, default="")
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        related_name="public_leads",
+        null=True,
+        blank=True,
+    )
+    interested_product = models.CharField(max_length=255, blank=True, default="")
+    preferred_emi_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    admin_notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=PublicLeadStatus.choices,
+        default=PublicLeadStatus.NEW,
+        db_index=True,
+    )
+    source = models.CharField(max_length=40, default="PUBLIC_SITE")
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="assigned_public_leads",
+        null=True,
+        blank=True,
+    )
+    converted_customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.SET_NULL,
+        related_name="converted_public_leads",
+        null=True,
+        blank=True,
+    )
+    converted_subscription = models.ForeignKey(
+        "Subscription",
+        on_delete=models.SET_NULL,
+        related_name="converted_public_leads",
+        null=True,
+        blank=True,
+    )
+    converted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="converted_public_leads",
+        null=True,
+        blank=True,
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    contacted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    converted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "public_leads"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["phone"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["name"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["converted_customer", "created_at"]),
+            models.Index(fields=["converted_subscription", "created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if not self.name or not self.name.strip():
+            errors["name"] = "Lead name is required."
+
+        normalized_phone = (self.phone or "").strip()
+        if not normalized_phone:
+            errors["phone"] = "Phone number is required."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.phone = (self.phone or "").strip()
+        self.city = (self.city or "").strip()
+        self.interested_product = (self.interested_product or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.admin_notes = (self.admin_notes or "").strip()
+        self.source = (self.source or "").strip() or "PUBLIC_SITE"
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Lead #{self.id} - {self.name} ({self.phone})"
+
+
+class CustomerSupportRequest(TimeStampedModel):
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="support_requests",
+    )
+    payment = models.ForeignKey(
+        "Payment",
+        on_delete=models.PROTECT,
+        related_name="support_requests",
+        null=True,
+        blank=True,
+    )
+    subscription = models.ForeignKey(
+        "Subscription",
+        on_delete=models.PROTECT,
+        related_name="support_requests",
+        null=True,
+        blank=True,
+    )
+    category = models.CharField(
+        max_length=30,
+        choices=SupportRequestCategory.choices,
+        default=SupportRequestCategory.OTHER,
+        db_index=True,
+    )
+    message = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=SupportRequestStatus.choices,
+        default=SupportRequestStatus.SUBMITTED,
+        db_index=True,
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="assigned_support_requests",
+        null=True,
+        blank=True,
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    internal_notes = models.TextField(blank=True, default="")
+    resolved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="resolved_support_requests",
+        null=True,
+        blank=True,
+    )
+    resolution_summary = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "customer_support_requests"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["customer", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["category", "created_at"]),
+            models.Index(fields=["assigned_to", "created_at"]),
+            models.Index(fields=["payment"]),
+            models.Index(fields=["subscription"]),
+            models.Index(fields=["resolved_by", "created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if not self.message or not self.message.strip():
+            errors["message"] = "Support message is required."
+
+        if self.payment_id and self.customer_id:
+            if self.payment.customer_id != self.customer_id:
+                errors["payment"] = "Selected payment does not belong to this customer."
+
+        if self.subscription_id and self.customer_id:
+            if self.subscription.customer_id != self.customer_id:
+                errors["subscription"] = "Selected subscription does not belong to this customer."
+
+        if self.payment_id and self.subscription_id:
+            if self.payment.subscription_id != self.subscription_id:
+                errors["subscription"] = "Selected payment does not belong to the selected subscription."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.message = (self.message or "").strip()
+        self.internal_notes = (self.internal_notes or "").strip()
+        self.resolution_summary = (self.resolution_summary or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"SupportRequest #{self.pk} - Customer #{self.customer_id}"
 
 
 # =====================================================
@@ -377,6 +671,15 @@ class Subscription(TimeStampedModel):
         decimal_places=2,
         default=MONEY_ZERO,
     )
+    contract_reference = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    fulfillment_status = models.CharField(
+        max_length=20,
+        choices=FulfillmentStatus.choices,
+        default=FulfillmentStatus.PENDING,
+        db_index=True,
+    )
+    product_snapshot = models.JSONField(null=True, blank=True)
+    pricing_snapshot = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = "subscriptions"
@@ -446,7 +749,6 @@ class Subscription(TimeStampedModel):
             if self.tenure_months != self.batch.duration_months:
                 raise ValidationError({"tenure_months": "Tenure must match batch duration."})
 
-            # Only enforce AVAILABLE when creating or when changing lucky_id
             lucky_id_changed = False
             if self.pk:
                 old = Subscription.objects.filter(pk=self.pk).only("lucky_id_id").first()
@@ -456,7 +758,6 @@ class Subscription(TimeStampedModel):
                 raise ValidationError({"lucky_id": "Selected Lucky ID is not available."})
 
         else:
-            # Future-safe for RENT / LEASE
             if self.batch_id or self.lucky_id_id:
                 raise ValidationError(
                     {"batch": "Only EMI subscriptions can have batch/lucky ID mapping."}
@@ -466,6 +767,30 @@ class Subscription(TimeStampedModel):
             raise ValidationError({"winner_month": "Winner month must be positive."})
 
     def save(self, *args, **kwargs):
+        if not self.product_snapshot and self.product_id:
+            self.product_snapshot = {
+                "product_id": self.product_id,
+                "product_code": self.product.product_code,
+                "name": self.product.name,
+                "base_price": str(self.product.base_price),
+                "category": self.product.category,
+                "subcategory": self.product.subcategory,
+                "description": self.product.description,
+                "is_active": self.product.is_active,
+                "plan_type_default": self.product.plan_type_default,
+                "is_emi_enabled": self.product.is_emi_enabled,
+                "is_rent_enabled": self.product.is_rent_enabled,
+                "is_lease_enabled": self.product.is_lease_enabled,
+            }
+
+        if not self.pricing_snapshot:
+            self.pricing_snapshot = {
+                "plan_type": self.plan_type,
+                "tenure_months": self.tenure_months,
+                "monthly_amount": str(self.monthly_amount),
+                "total_amount": str(self.total_amount),
+            }
+
         self.full_clean()
 
         previous_lucky_id_id = None
@@ -476,7 +801,6 @@ class Subscription(TimeStampedModel):
         with transaction.atomic():
             super().save(*args, **kwargs)
 
-            # Keep LuckyId status synchronized for EMI plans
             if self.plan_type == PlanType.EMI and self.lucky_id_id:
                 LuckyId.objects.filter(pk=self.lucky_id_id).update(
                     status=LuckyIdStatus.WON
@@ -493,10 +817,28 @@ class Subscription(TimeStampedModel):
                         status=LuckyIdStatus.AVAILABLE
                     )
 
-    def total_paid(self) -> Decimal:
-        return q2(
-            self.payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+    def net_paid_amount(self) -> Decimal:
+        effective_paid = (
+            FinancialLedger.objects.filter(
+                emi__subscription=self,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            ).aggregate(total=Sum("amount"))["total"]
+            or MONEY_ZERO
         )
+
+        reversal_total = (
+            FinancialLedger.objects.filter(
+                emi__subscription=self,
+                entry_type=LedgerEntryType.PAYMENT_REVERSAL,
+            ).aggregate(total=Sum("amount"))["total"]
+            or MONEY_ZERO
+        )
+
+        net_paid = q2(Decimal(str(effective_paid)) - Decimal(str(reversal_total)))
+        return q2(max(net_paid, MONEY_ZERO))
+
+    def total_paid(self) -> Decimal:
+        return self.net_paid_amount()
 
     def total_pending_emi_amount(self) -> Decimal:
         return q2(
@@ -532,6 +874,169 @@ class Subscription(TimeStampedModel):
 
     def __str__(self):
         return f"Subscription #{self.pk} - {self.customer.name}"
+
+
+# =====================================================
+# DELIVERY
+# =====================================================
+
+class SubscriptionDelivery(TimeStampedModel):
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="deliveries",
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+        db_index=True,
+    )
+    delivery_reference = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+    )
+    scheduled_date = models.DateField(null=True, blank=True, db_index=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    out_for_delivery_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    failed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    return_requested_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    returned_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    receiver_name = models.CharField(max_length=100, blank=True, default="")
+    receiver_phone = models.CharField(max_length=20, blank=True, default="")
+    delivery_address_snapshot = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    failure_reason = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_subscription_deliveries",
+        null=True,
+        blank=True,
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="updated_subscription_deliveries",
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "subscription_deliveries"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["scheduled_date"]),
+            models.Index(fields=["delivered_at"]),
+            models.Index(fields=["delivery_reference"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscription"],
+                condition=Q(
+                    status__in=[
+                        DeliveryStatus.PENDING,
+                        DeliveryStatus.SCHEDULED,
+                        DeliveryStatus.DISPATCHED,
+                        DeliveryStatus.OUT_FOR_DELIVERY,
+                        DeliveryStatus.RETURN_REQUESTED,
+                    ]
+                ),
+                name="uq_active_subscription_delivery_per_subscription",
+            ),
+        ]
+
+    TERMINAL_STATUSES = {
+        DeliveryStatus.DELIVERED,
+        DeliveryStatus.FAILED,
+        DeliveryStatus.CANCELLED,
+        DeliveryStatus.RETURNED,
+    }
+
+    ACTIVE_STATUSES = {
+        DeliveryStatus.PENDING,
+        DeliveryStatus.SCHEDULED,
+        DeliveryStatus.DISPATCHED,
+        DeliveryStatus.OUT_FOR_DELIVERY,
+        DeliveryStatus.RETURN_REQUESTED,
+    }
+
+    def clean(self):
+        errors = {}
+
+        if not self.delivery_reference or not self.delivery_reference.strip():
+            errors["delivery_reference"] = "Delivery reference is required."
+
+        if self.subscription_id and self.subscription.plan_type != PlanType.EMI:
+            # Keep delivery future-safe for non-EMI plans, but require a contract.
+            # No additional validation is needed today beyond the linked subscription.
+            pass
+
+        if (
+            self.status == DeliveryStatus.SCHEDULED
+            and self.scheduled_date is None
+        ):
+            errors["scheduled_date"] = "Scheduled date is required for scheduled deliveries."
+
+        if self.status == DeliveryStatus.DISPATCHED and self.dispatched_at is None:
+            errors["dispatched_at"] = "Dispatch timestamp is required for dispatched deliveries."
+
+        if (
+            self.status == DeliveryStatus.OUT_FOR_DELIVERY
+            and self.out_for_delivery_at is None
+        ):
+            errors["out_for_delivery_at"] = (
+                "Out-for-delivery timestamp is required for this status."
+            )
+
+        if self.status == DeliveryStatus.DELIVERED and self.delivered_at is None:
+            errors["delivered_at"] = "Delivered timestamp is required for delivered records."
+
+        if self.status == DeliveryStatus.FAILED and self.failed_at is None:
+            errors["failed_at"] = "Failed timestamp is required for failed deliveries."
+
+        if self.status == DeliveryStatus.CANCELLED and self.cancelled_at is None:
+            errors["cancelled_at"] = "Cancelled timestamp is required for cancelled deliveries."
+
+        if (
+            self.status == DeliveryStatus.RETURN_REQUESTED
+            and self.return_requested_at is None
+        ):
+            errors["return_requested_at"] = (
+                "Return-requested timestamp is required for this status."
+            )
+
+        if self.status == DeliveryStatus.RETURNED and self.returned_at is None:
+            errors["returned_at"] = "Returned timestamp is required for returned deliveries."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.delivery_reference = (self.delivery_reference or "").strip().upper()
+        self.receiver_name = (self.receiver_name or "").strip()
+        self.receiver_phone = (self.receiver_phone or "").strip()
+        self.delivery_address_snapshot = (self.delivery_address_snapshot or "").strip()
+        self.failure_reason = (self.failure_reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in self.TERMINAL_STATUSES
+
+    @property
+    def is_active_delivery(self) -> bool:
+        return self.status in self.ACTIVE_STATUSES
+
+    def __str__(self):
+        return f"{self.delivery_reference} - Subscription {self.subscription_id}"
 
 
 # =====================================================
@@ -591,14 +1096,32 @@ class Emi(TimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def total_paid(self) -> Decimal:
-        return q2(
-            self.payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+    def net_paid_amount(self) -> Decimal:
+        effective_paid = (
+            FinancialLedger.objects.filter(
+                emi=self,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            ).aggregate(total=Sum("amount"))["total"]
+            or MONEY_ZERO
         )
 
+        reversal_total = (
+            FinancialLedger.objects.filter(
+                emi=self,
+                entry_type=LedgerEntryType.PAYMENT_REVERSAL,
+            ).aggregate(total=Sum("amount"))["total"]
+            or MONEY_ZERO
+        )
+
+        net_paid = q2(Decimal(str(effective_paid)) - Decimal(str(reversal_total)))
+        return q2(max(net_paid, MONEY_ZERO))
+
+    def total_paid(self) -> Decimal:
+        return self.net_paid_amount()
+
     def balance_amount(self) -> Decimal:
-        balance = q2(self.amount) - q2(self.total_paid())
-        return q2(balance)
+        balance = q2(self.amount) - q2(self.net_paid_amount())
+        return q2(max(balance, MONEY_ZERO))
 
     def is_fully_paid(self) -> bool:
         return self.balance_amount() <= MONEY_ZERO
@@ -642,6 +1165,14 @@ class Payment(TimeStampedModel):
         db_index=True,
     )
     payment_date = models.DateField(db_index=True)
+    plan_type_hint = models.CharField(
+        max_length=10,
+        choices=PlanType.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    allocation_metadata = models.JSONField(default=dict, blank=True)
     collected_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -706,6 +1237,8 @@ class Payment(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.reference_no = (self.reference_no or "").strip() or None
+        if not self.plan_type_hint and self.subscription_id:
+            self.plan_type_hint = self.subscription.plan_type
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -900,7 +1433,149 @@ class PaymentReconciliationEvent(models.Model):
     def __str__(self):
         return f"Reconciliation {self.reconciliation_id} - {self.event_type}"   
 
+class PartnerCollectionRequestStatus(models.TextChoices):
+    SUBMITTED = "SUBMITTED", "Submitted"
+    UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    CANCELLED = "CANCELLED", "Cancelled"
 
+
+class PartnerCollectionRequest(models.Model):
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="partner_collection_requests",
+    )
+
+    subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        related_name="partner_collection_requests",
+    )
+
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.PROTECT,
+        related_name="partner_collection_requests",
+    )
+
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PaymentMethod.choices,
+        db_index=True,
+    )
+
+    payment_date = models.DateField(db_index=True)
+
+    reference_no = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    notes = models.TextField(blank=True, default="")
+
+    status = models.CharField(
+        max_length=20,
+        choices=PartnerCollectionRequestStatus.choices,
+        default=PartnerCollectionRequestStatus.SUBMITTED,
+        db_index=True,
+    )
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reviewed_partner_collection_requests",
+    )
+
+    reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    review_note = models.TextField(blank=True, default="")
+
+    approved_payment = models.OneToOneField(
+        "subscriptions.Payment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="partner_collection_request",
+    )
+
+    approved_emi = models.ForeignKey(
+        "subscriptions.Emi",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="partner_collection_requests_approved",
+    )
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "partner_collection_requests"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["partner", "status"]),
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["payment_date"]),
+            models.Index(fields=["created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="chk_partner_collection_request_amount_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if self.amount is None or self.amount <= MONEY_ZERO:
+            errors["amount"] = "Amount must be greater than zero."
+
+        if not self.payment_date:
+            errors["payment_date"] = "Payment date is required."
+
+        if self.partner_id and getattr(self.partner, "role", None) != "PARTNER":
+            errors["partner"] = "Only partner users can create partner collection requests."
+
+        if self.subscription_id and self.customer_id:
+            if self.subscription.customer_id != self.customer_id:
+                errors["customer"] = "Customer must match subscription."
+
+        if self.subscription_id and self.partner_id:
+            if self.subscription.partner_id != self.partner_id:
+                errors["subscription"] = "Subscription must belong to the requesting partner."
+
+        if self.approved_payment_id and self.status != PartnerCollectionRequestStatus.APPROVED:
+            errors["status"] = "Approved payment can only exist for approved requests."
+
+        if self.approved_emi_id and self.approved_payment_id:
+            if self.approved_payment.emi_id and self.approved_payment.emi_id != self.approved_emi_id:
+                errors["approved_emi"] = "Approved EMI must match approved payment EMI."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip() or None
+        self.notes = (self.notes or "").strip()
+        self.review_note = (self.review_note or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"PartnerCollectionRequest #{self.pk} - Subscription {self.subscription_id}"
 
 
 
@@ -928,9 +1603,28 @@ class LuckyDraw(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="wins",
     )
+    winner_subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="winning_draws",
+    )
     draw_date = models.DateTimeField(default=timezone.now)
     draw_month = models.PositiveIntegerField()
     is_revealed = models.BooleanField(default=False, db_index=True)
+    revealed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    waived_emi_count = models.PositiveIntegerField(default=0)
+    waived_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+    )
+    waiver_scope = models.CharField(
+        max_length=40,
+        default="FUTURE_EMI_ONLY",
+    )
 
     class Meta:
         db_table = "lucky_draws"
@@ -939,11 +1633,20 @@ class LuckyDraw(TimeStampedModel):
         indexes = [
             models.Index(fields=["batch", "draw_month"]),
             models.Index(fields=["is_revealed"]),
+            models.Index(fields=["revealed_at"]),
         ]
         constraints = [
             models.CheckConstraint(
                 condition=Q(draw_month__gt=0),
                 name="chk_draw_month_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(waived_emi_count__gte=0),
+                name="chk_lucky_draw_waived_emi_count_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(waived_amount__gte=0),
+                name="chk_lucky_draw_waived_amount_non_negative",
             ),
         ]
 
@@ -969,11 +1672,25 @@ class LuckyDraw(TimeStampedModel):
         if self.winner_lucky_id and self.winner_lucky_id.batch_id != self.batch_id:
             errors["winner_lucky_id"] = "Winner Lucky ID must belong to the same batch."
 
+        if self.winner_subscription and self.winner_subscription.batch_id != self.batch_id:
+            errors["winner_subscription"] = "Winner subscription must belong to the same batch."
+
+        if self.winner_subscription and self.winner_lucky_id:
+            if self.winner_subscription.lucky_id_id != self.winner_lucky_id_id:
+                errors["winner_subscription"] = "Winner subscription must match winner Lucky ID."
+
         if self.is_revealed:
             if not self.revealed_seed:
                 errors["revealed_seed"] = "Revealed seed is required when draw is revealed."
             if not self.winner_lucky_id:
                 errors["winner_lucky_id"] = "Winner Lucky ID is required when draw is revealed."
+            if not self.winner_subscription:
+                errors["winner_subscription"] = "Winner subscription is required when draw is revealed."
+            if not self.revealed_at:
+                errors["revealed_at"] = "Reveal timestamp is required when draw is revealed."
+
+        if self.waived_amount is not None and self.waived_amount < MONEY_ZERO:
+            errors["waived_amount"] = "Waived amount cannot be negative."
 
         if errors:
             raise ValidationError(errors)
@@ -993,13 +1710,71 @@ class LuckyDraw(TimeStampedModel):
 
 class AuditLog(models.Model):
     class ActionType(models.TextChoices):
+        USER_CREATED = "USER_CREATED", "User Created"   
+        USER_UPDATED = "USER_UPDATED", "User Updated"
+        USER_ACTIVATED = "USER_ACTIVATED", "User Activated"
+        USER_DEACTIVATED = "USER_DEACTIVATED", "User Deactivated"
+        USER_PASSWORD_RESET = "USER_PASSWORD_RESET", "User Password Reset"
+        PARTNER_COMMISSION_SET = "PARTNER_COMMISSION_SET", "Partner Commission Set"
+        PARTNER_COMMISSION_UPDATED = "PARTNER_COMMISSION_UPDATED", "Partner Commission Updated"
+        LEAD_CREATED = "LEAD_CREATED", "Lead Created"
+        LEAD_STATUS_UPDATED = "LEAD_STATUS_UPDATED", "Lead Status Updated"
+        LEAD_ASSIGNED = "LEAD_ASSIGNED", "Lead Assigned"
+        LEAD_NOTE_UPDATED = "LEAD_NOTE_UPDATED", "Lead Notes Updated"
+        LEAD_CUSTOMER_LINKED = "LEAD_CUSTOMER_LINKED", "Lead Customer Linked"
+        LEAD_SUBSCRIPTION_LINKED = "LEAD_SUBSCRIPTION_LINKED", "Lead Subscription Linked"
+        LEAD_CONVERTED = "LEAD_CONVERTED", "Lead Converted"
+        SUPPORT_REQUEST_CREATED = "SUPPORT_REQUEST_CREATED", "Support Request Created"
+        SUPPORT_REQUEST_STATUS_UPDATED = "SUPPORT_REQUEST_STATUS_UPDATED", "Support Request Status Updated"
+        SUPPORT_REQUEST_ASSIGNED = "SUPPORT_REQUEST_ASSIGNED", "Support Request Assigned"
+        SUPPORT_REQUEST_NOTE_UPDATED = "SUPPORT_REQUEST_NOTE_UPDATED", "Support Request Notes Updated"
+        SUPPORT_REQUEST_RESOLVED = "SUPPORT_REQUEST_RESOLVED", "Support Request Resolved"
+        SUPPORT_REQUEST_RESOLUTION_RECORDED = (
+            "SUPPORT_REQUEST_RESOLUTION_RECORDED",
+            "Support Request Resolution Recorded",
+        )
+        DELIVERY_CREATED = "DELIVERY_CREATED", "Delivery Created"
+        DELIVERY_UPDATED = "DELIVERY_UPDATED", "Delivery Updated"
+        DELIVERY_STATUS_CHANGED = "DELIVERY_STATUS_CHANGED", "Delivery Status Changed"
+        DELIVERY_DISPATCHED = "DELIVERY_DISPATCHED", "Delivery Dispatched"
+        DELIVERY_COMPLETED = "DELIVERY_COMPLETED", "Delivery Completed"
+        DELIVERY_FAILED = "DELIVERY_FAILED", "Delivery Failed"
+        DELIVERY_CANCELLED = "DELIVERY_CANCELLED", "Delivery Cancelled"
+        DELIVERY_RETURN_REQUESTED = "DELIVERY_RETURN_REQUESTED", "Delivery Return Requested"
+        DELIVERY_RETURNED = "DELIVERY_RETURNED", "Delivery Returned"
         SUB_CREATED = "SUB_CREATED", "Subscription Created"
         EMI_PAID = "EMI_PAID", "EMI Paid"
         EMI_WAIVED = "EMI_WAIVED", "EMI Waived"
         DRAW_EXECUTED = "DRAW_EXECUTED", "Draw Executed"
+        DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
+        DRAW_REVEALED = "DRAW_REVEALED", "Draw Revealed"
+        WINNER_WAIVER_APPLIED = "WINNER_WAIVER_APPLIED", "Winner Waiver Applied"
+        WINNER_STATE_SYNCED = "WINNER_STATE_SYNCED", "Winner State Synced"
         COMMISSION_CREATED = "COMMISSION_CREATED", "Commission Created"
+        COMMISSION_SETTLED = "COMMISSION_SETTLED", "Commission Settled"
+        COMMISSION_PAYOUT_BATCH_CREATED = (
+            "COMMISSION_PAYOUT_BATCH_CREATED",
+            "Commission Payout Batch Created",
+        )
+        COMMISSION_PAYOUT_BATCH_FINALIZED = (
+            "COMMISSION_PAYOUT_BATCH_FINALIZED",
+            "Commission Payout Batch Finalized",
+        )
+        COMMISSION_PAYOUT_BATCH_CANCELLED = (
+            "COMMISSION_PAYOUT_BATCH_CANCELLED",
+            "Commission Payout Batch Cancelled",
+        )
         PAYMENT_RECONCILED = "PAYMENT_RECONCILED", "Payment Reconciled"
         PAYMENT_FLAGGED = "PAYMENT_FLAGGED", "Payment Flagged"
+
+        PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED", "Password Reset Requested"
+        PASSWORD_RESET_VERIFIED = "PASSWORD_RESET_VERIFIED", "Password Reset Verified"
+        PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED", "Password Reset Completed"
+        PASSWORD_RESET_FAILED = "PASSWORD_RESET_FAILED", "Password Reset Failed"
+        PASSWORD_RESET_EXPIRED = "PASSWORD_RESET_EXPIRED", "Password Reset Expired"
+        PASSWORD_RESET_LOCKED = "PASSWORD_RESET_LOCKED", "Password Reset Locked"
+        PASSWORD_RESET_RESENT = "PASSWORD_RESET_RESENT", "Password Reset Resent"
+        PASSWORD_RESET_INVALIDATED = "PASSWORD_RESET_INVALIDATED", "Password Reset Invalidated"
 
     action_type = models.CharField(
         max_length=50,
@@ -1069,6 +1844,14 @@ class FinancialLedger(TimeStampedModel):
         choices=LedgerDirection.choices,
         db_index=True,
     )
+    plan_type_hint = models.CharField(
+        max_length=10,
+        choices=PlanType.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    allocation_context = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "financial_ledger"
@@ -1100,6 +1883,8 @@ class FinancialLedger(TimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if not self.plan_type_hint and self.emi_id:
+            self.plan_type_hint = self.emi.subscription.plan_type
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -1107,171 +1892,197 @@ class FinancialLedger(TimeStampedModel):
         return f"{self.entry_type} - {self.amount}"
 
 
-# =====================================================
-# COMMISSION
-# =====================================================
 
-class Commission(TimeStampedModel):
+
+    
+
+# ================================
+# COMMISSION SYSTEM (ADDITIVE)
+# ================================
+
+
+
+
+class Commission(models.Model):
+    """
+    Commission model tied strictly to payment lifecycle.
+
+    Design principles:
+    - One commission per payment (enforced via OneToOne)
+    - Immutable financial record (status transitions only)
+    - Safe for future rental/leasing extension
+    """
+
     partner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="commissions",
     )
-    emi = models.OneToOneField(
-        Emi,
-        on_delete=models.CASCADE,
-        related_name="commission",
+
+    subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        related_name="commissions",
+        null=True,
+        blank=True,
     )
-    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    payment = models.OneToOneField(
+        "subscriptions.Payment",
+        on_delete=models.PROTECT,
+        related_name="commission",
+        null=True,
+        blank=True,
+    )
+
+    emi = models.ForeignKey(
+        "subscriptions.Emi",
+        on_delete=models.PROTECT,
+        related_name="commissions",
+        null=True,
+        blank=True,
+    )
+
+    # Financial fields
+    commission_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
+    commission_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
+    # State
     status = models.CharField(
         max_length=20,
         choices=CommissionStatus.choices,
         default=CommissionStatus.PENDING,
         db_index=True,
     )
-    is_settled = models.BooleanField(default=False, db_index=True)
+
+    settlement_date = models.DateField(null=True, blank=True)
+
+    reversal_reason = models.TextField(blank=True, default="")
+
+    metadata = models.JSONField(default=dict, blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "commissions"
-        ordering = ["-created_at", "-id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["partner", "emi"],
-                name="uq_partner_emi_commission",
-            ),
-            models.CheckConstraint(
-                condition=Q(commission_percentage__gte=0) & Q(commission_percentage__lte=100),
-                name="chk_commission_percentage_range",
-            ),
-            models.CheckConstraint(
-                condition=Q(commission_amount__gte=0),
-                name="chk_commission_amount_non_negative",
-            ),
-        ]
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["partner", "status"]),
-            models.Index(fields=["is_settled"]),
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["payment"]),
         ]
-
-    def expected_commission_amount(self) -> Decimal:
-        raw = q2(self.emi.amount) * q2(self.commission_percentage) / HUNDRED
-        return q2(raw)
 
     def clean(self):
         errors = {}
 
-        if getattr(self.partner, "role", None) != "PARTNER":
+        if self.commission_amount is None or self.commission_amount < MONEY_ZERO:
+            errors["commission_amount"] = "Commission amount cannot be negative."
+
+        if self.commission_rate is None or self.commission_rate < MONEY_ZERO:
+            errors["commission_rate"] = "Commission rate cannot be negative."
+        elif self.commission_rate > HUNDRED:
+            errors["commission_rate"] = "Commission rate cannot exceed 100.00."
+
+        if self.partner_id and getattr(self.partner, "role", None) != "PARTNER":
             errors["partner"] = "Commission only allowed for partner users."
 
-        expected = self.expected_commission_amount()
-        if q2(self.commission_amount) != expected:
-            errors["commission_amount"] = (
-                f"Commission amount mismatch. Expected {expected}."
-            )
+        if self.payment_id and self.subscription_id:
+            if self.payment.subscription_id != self.subscription_id:
+                errors["subscription"] = "Subscription must match payment subscription."
+
+        if self.payment_id and self.emi_id and self.payment.emi_id:
+            if self.payment.emi_id != self.emi_id:
+                errors["emi"] = "EMI must match payment EMI."
 
         if errors:
             raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Commission #{self.pk} - {self.partner_id}"
+        
 
 
-# =====================================================
-# COMMISSION PAYOUT BATCH
-# =====================================================
+User = settings.AUTH_USER_MODEL
+
 
 class CommissionPayoutBatch(models.Model):
-    month = models.DateField(db_index=True)
-    total_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        FINALIZED = "FINALIZED", "Finalized"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    batch_code = models.CharField(max_length=50, unique=True)
+
+    payout_date = models.DateField(default=timezone.now)
+
     processed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="processed_commission_batches",
+        User,
+        on_delete=models.PROTECT,
+        related_name="commission_payout_batches",
     )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    notes = models.TextField(blank=True, default="")
+
+    total_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.batch_code} ({self.status})"
+
+
+class CommissionPayoutLine(models.Model):
+    payout_batch = models.ForeignKey(
+        CommissionPayoutBatch,
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+
+    commission = models.OneToOneField(
+        "subscriptions.Commission",
+        on_delete=models.PROTECT,
+        related_name="payout_line",
+    )
+
+    partner = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="commission_payout_lines",
+    )
+
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "commission_payout_batches"
-        ordering = ["-month", "-id"]
-        indexes = [
-            models.Index(fields=["month"]),
-        ]
         constraints = [
             models.CheckConstraint(
-                condition=Q(total_amount__gte=0),
-                name="chk_commission_payout_batch_total_non_negative",
-            ),
+                condition=models.Q(amount__gte=0),
+                name="commission_payout_line_amount_non_negative",
+            )
         ]
-
-    def clean(self):
-        if self.total_amount is None or self.total_amount < MONEY_ZERO:
-            raise ValidationError({"total_amount": "Total amount cannot be negative."})
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Payout Batch {self.month}"
-
-
-class PartnerPayout(models.Model):
-    payout_batch = models.ForeignKey(
-        CommissionPayoutBatch,
-        related_name="partner_payouts",
-        on_delete=models.CASCADE,
-    )
-    partner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="partner_payouts",
-    )
-    total_commission = models.DecimalField(max_digits=14, decimal_places=2)
-    commission_count = models.PositiveIntegerField()
-    is_paid = models.BooleanField(default=False, db_index=True)
-    paid_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "partner_payouts"
-        unique_together = ("payout_batch", "partner")
-        indexes = [
-            models.Index(fields=["partner", "is_paid"]),
-        ]
-        constraints = [
-            models.CheckConstraint(
-                condition=Q(total_commission__gte=0),
-                name="chk_partner_payout_total_non_negative",
-            ),
-        ]
-
-    def clean(self):
-        errors = {}
-
-        if getattr(self.partner, "role", None) != "PARTNER":
-            errors["partner"] = "Payout partner must be a partner user."
-
-        if self.commission_count < 0:
-            errors["commission_count"] = "Commission count cannot be negative."
-
-        if self.is_paid and not self.paid_at:
-            errors["paid_at"] = "Paid timestamp is required when payout is marked paid."
-
-        if not self.is_paid and self.paid_at:
-            errors["paid_at"] = "Paid timestamp is allowed only for paid payouts."
-
-        if errors:
-            raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Partner Payout #{self.pk}"
+        return f"Batch {self.payout_batch_id} → Commission {self.commission_id}"

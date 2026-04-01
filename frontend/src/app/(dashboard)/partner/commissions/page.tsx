@@ -1,25 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DataTable from "@/components/ui/DataTable";
+import PortalPage from "@/components/ui/PortalPage";
+import { listPartnerCommissions, type PartnerCommission } from "@/services/partner";
 
-import PortalPage from "@/components/ui/portal-page";
-import { apiFetch } from "@/lib/api";
-
-type Commission = { id: number; subscription: number; commission_amount: string; status: string; created_at: string };
+function money(value?: string | number | null): string {
+  return `₹${Number(value ?? 0).toFixed(2)}`;
+}
 
 export default function PartnerCommissionsPage() {
-  const [rows, setRows] = useState<Commission[]>([]);
+  const [rows, setRows] = useState<PartnerCommission[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/partner/commissions/").then((res) => setRows(res as Commission[]));
+    listPartnerCommissions()
+      .then((payload) => {
+        setRows(payload);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to load commissions");
+      });
   }, []);
 
   return (
-    <PortalPage title="Commission Ledger" subtitle="Track earned commission from customer payment collections.">
-      <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr><th>ID</th><th>Subscription</th><th>Amount</th><th>Status</th><th>Created At</th></tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.id}><td>{r.id}</td><td>{r.subscription}</td><td>{r.commission_amount}</td><td>{r.status}</td><td>{new Date(r.created_at).toLocaleString()}</td></tr>)}</tbody>
-      </table>
+    <PortalPage
+      title="Commission Ledger"
+      subtitle="Partner commission visibility (earned, pending, and paid)."
+    >
+      <DataTable<PartnerCommission>
+        rows={rows}
+        error={error}
+        emptyText="No commission records found."
+        columns={[
+          { key: "id", title: "Commission ID" },
+          { key: "subscription", title: "Subscription" },
+          {
+            key: "commission_amount",
+            title: "Amount",
+            align: "right",
+            render: (row) => money((row as PartnerCommission & { commission_amount?: string | number }).commission_amount),
+          },
+          { key: "status", title: "Status" },
+          {
+            key: "created_at",
+            title: "Created",
+            render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : "-"),
+          },
+        ]}
+      />
     </PortalPage>
   );
 }

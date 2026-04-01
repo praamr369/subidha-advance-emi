@@ -1,6 +1,8 @@
+// frontend/src/components/ui/FormActions.tsx
 "use client";
 
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
 type FormActionButton = {
@@ -16,65 +18,12 @@ type FormActionsProps = {
   onSubmitClick?: () => void;
   submitting?: boolean;
   submitDisabled?: boolean;
-
   cancel?: FormActionButton | null;
   danger?: FormActionButton | null;
   extraActions?: ReactNode;
-
   align?: "left" | "right" | "between";
   sticky?: boolean;
 };
-
-function buttonBaseStyle(): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 42,
-    padding: "10px 14px",
-    borderRadius: 10,
-    fontSize: 14,
-    fontWeight: 700,
-    textDecoration: "none",
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function renderActionButton(
-  action: FormActionButton,
-  variant: "secondary" | "danger"
-) {
-  const style: React.CSSProperties = {
-    ...buttonBaseStyle(),
-    border:
-      variant === "danger" ? "1px solid #dc2626" : "1px solid #d1d5db",
-    background: variant === "danger" ? "#ffffff" : "#ffffff",
-    color: variant === "danger" ? "#b91c1c" : "#111827",
-    opacity: action.disabled ? 0.6 : 1,
-    pointerEvents: action.disabled ? "none" : "auto",
-  };
-
-  if (action.href) {
-    return (
-      <Link href={action.href} style={style}>
-        {action.label}
-      </Link>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={action.onClick}
-      disabled={action.disabled}
-      style={style}
-    >
-      {action.label}
-    </button>
-  );
-}
 
 export default function FormActions({
   submitLabel = "Save",
@@ -82,72 +31,76 @@ export default function FormActions({
   onSubmitClick,
   submitting = false,
   submitDisabled = false,
-
   cancel = null,
   danger = null,
   extraActions,
-
   align = "right",
   sticky = false,
 }: FormActionsProps) {
   const justifyContent =
     align === "left"
-      ? "flex-start"
+      ? "justify-start"
       : align === "between"
-      ? "space-between"
-      : "flex-end";
+      ? "justify-between"
+      : "justify-end";
+
+  const renderAction = (action: FormActionButton, variant: "secondary" | "danger") => {
+    const baseClasses =
+      "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60";
+    const variantClasses = {
+      secondary: "border-border bg-background text-foreground hover:bg-muted",
+      danger: "border-destructive/30 bg-background text-destructive hover:bg-destructive/10",
+    };
+
+    if (action.href) {
+      return (
+        <Link
+          href={action.href}
+          className={cn(baseClasses, variantClasses[variant])}
+        >
+          {action.label}
+        </Link>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={action.onClick}
+        disabled={action.disabled}
+        className={cn(baseClasses, variantClasses[variant])}
+      >
+        {action.label}
+      </button>
+    );
+  };
 
   return (
     <div
-      style={{
-        position: sticky ? "sticky" : "static",
-        bottom: sticky ? 0 : undefined,
-        zIndex: sticky ? 15 : undefined,
-        background: sticky ? "rgba(255,255,255,0.96)" : "transparent",
-        backdropFilter: sticky ? "blur(8px)" : undefined,
-        borderTop: sticky ? "1px solid #e5e7eb" : undefined,
-        padding: sticky ? "14px 0 0" : 0,
-        marginTop: 8,
-      }}
+      className={cn(
+        "mt-6",
+        sticky && "sticky bottom-0 bg-background/90 backdrop-blur",
+        sticky && "pt-4"
+      )}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent,
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
-      >
-        {align === "between" ? (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {danger ? renderActionButton(danger, "danger") : null}
+      <div className={cn("flex flex-wrap items-center gap-3", justifyContent)}>
+        {align === "between" && (
+          <div className="flex flex-wrap gap-3">
+            {danger && renderAction(danger, "danger")}
             {extraActions}
           </div>
-        ) : null}
-
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            marginLeft: align === "right" ? "auto" : undefined,
-          }}
-        >
-          {align !== "between" && danger ? renderActionButton(danger, "danger") : null}
-          {cancel ? renderActionButton(cancel, "secondary") : null}
+        )}
+        <div className="flex flex-wrap gap-3">
+          {align !== "between" && danger && renderAction(danger, "danger")}
+          {cancel && renderAction(cancel, "secondary")}
           <button
             type="submit"
             onClick={onSubmitClick}
             disabled={submitting || submitDisabled}
-            style={{
-              ...buttonBaseStyle(),
-              border: "1px solid #0f172a",
-              background: submitting || submitDisabled ? "#94a3b8" : "#0f172a",
-              color: "#ffffff",
-              opacity: submitting || submitDisabled ? 0.85 : 1,
-              cursor: submitting || submitDisabled ? "not-allowed" : "pointer",
-            }}
+            className={cn(
+              "inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60",
+              submitDisabled && "opacity-60"
+            )}
           >
             {submitting ? submitLoadingLabel : submitLabel}
           </button>

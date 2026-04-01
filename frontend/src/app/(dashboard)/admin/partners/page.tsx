@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import PortalPage from "@/components/ui/portal-page";
+import PortalPage from "@/components/ui/PortalPage";
 import DataTable from "@/components/ui/DataTable";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ErrorState from "@/components/feedback/ErrorState";
+import EmptyState from "@/components/feedback/EmptyState";
 import { apiFetch, toArray } from "@/lib/api";
 
 type Partner = {
@@ -13,27 +16,11 @@ type Partner = {
   email?: string;
   phone?: string;
   is_active: boolean;
-  referred_customers?: number;
-  active_subscriptions?: number;
+  referred_customers: number;
+  active_subscriptions: number;
   total_commission?: number | string;
-};
-
-type Subscription = {
-  id: number;
-  customer: number;
-  customer_name?: string;
-  customer_phone?: string;
-  product_name?: string;
-  partner: number | null;
-  partner_name?: string;
-  batch: number | null;
-  batch_code?: string;
-  lucky_id: number | null;
-  lucky_number?: number | null;
-  plan_type: string;
-  monthly_amount: string;
-  total_amount: string;
-  status: string;
+  total_monthly_book: number;
+  total_contract_value: number;
 };
 
 type PartnerRow = {
@@ -42,10 +29,11 @@ type PartnerRow = {
   phone: string;
   email: string;
   active_label: string;
-  referred_customers_label: string;
-  active_subscriptions_label: string;
-  total_monthly_book_label: string;
-  total_contract_value_label: string;
+  referred_customers: number;
+  active_subscriptions: number;
+  total_monthly_book: number;
+  total_contract_value: number;
+  total_commission: number;
 };
 
 function parseError(error: unknown): string {
@@ -64,103 +52,91 @@ function parseError(error: unknown): string {
   return raw;
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function formatCurrency(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function normalizePartner(item: unknown): Partner {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: toNumber(row.id),
+    username: typeof row.username === "string" ? row.username : "",
+    email: typeof row.email === "string" ? row.email : undefined,
+    phone: typeof row.phone === "string" ? row.phone : undefined,
+    is_active: row.is_active === true,
+    referred_customers: toNumber(row.referred_customers, 0),
+    active_subscriptions: toNumber(row.active_subscriptions, 0),
+    total_commission: toNumber(row.total_commission, 0).toFixed(2),
+    total_monthly_book: toNumber(row.total_monthly_book, 0),
+    total_contract_value: toNumber(row.total_contract_value, 0),
+  };
 }
 
 export default function AdminPartnersPage() {
   const router = useRouter();
 
   const [partners, setPartners] = useState<Partner[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
+  const [sortBy, setSortBy] = useState<
+    "username" | "monthly_book" | "contract_value" | "subscriptions"
+  >("monthly_book");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadAll(showRefreshing = false): Promise<void> {
+  const loadAll = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     try {
-      if (showRefreshing) setRefreshing(true);
-      else setLoading(true);
+      if (mode === "initial") {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
 
-      const [partnerRes, subscriptionRes] = await Promise.all([
-        apiFetch("/admin/partners/"),
-        apiFetch("/admin/subscriptions/"),
-      ]);
+      const partnerRes = await apiFetch("/admin/partners/");
+      const rows = toArray<unknown>(partnerRes).map(normalizePartner);
 
-      setPartners(toArray<Partner>(partnerRes));
-      setSubscriptions(toArray<Subscription>(subscriptionRes));
+      setPartners(rows);
       setError(null);
     } catch (e) {
       setError(parseError(e));
       setPartners([]);
-      setSubscriptions([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mode === "initial") {
+        setLoading(false);
+      } else {
+        setRefreshing(false);
+      }
     }
-  }
-
-  useEffect(() => {
-    loadAll();
   }, []);
 
-  const partnerMetrics = useMemo(() => {
-    const map = new Map<
-      number,
-      {
-        referredCustomers: Set<number>;
-        totalSubscriptions: number;
-        activeSubscriptions: number;
-        totalMonthlyBook: number;
-        totalContractValue: number;
-      }
-    >();
-
-    for (const sub of subscriptions) {
-      if (!sub.partner) continue;
-
-      if (!map.has(sub.partner)) {
-        map.set(sub.partner, {
-          referredCustomers: new Set<number>(),
-          totalSubscriptions: 0,
-          activeSubscriptions: 0,
-          totalMonthlyBook: 0,
-          totalContractValue: 0,
-        });
-      }
-
-      const entry = map.get(sub.partner)!;
-      entry.totalSubscriptions += 1;
-      entry.referredCustomers.add(sub.customer);
-      if (sub.status === "ACTIVE") entry.activeSubscriptions += 1;
-      entry.totalMonthlyBook += Number(sub.monthly_amount || 0);
-      entry.totalContractValue += Number(sub.total_amount || 0);
-    }
-
-    return map;
-  }, [subscriptions]);
+  useEffect(() => {
+    void loadAll("initial");
+  }, [loadAll]);
 
   const filteredPartners = useMemo(() => {
     const needle = query.trim().toLowerCase();
 
-    return partners.filter((partner) => {
+    const base = partners.filter((partner) => {
       if (activeFilter === "active" && !partner.is_active) return false;
       if (activeFilter === "inactive" && partner.is_active) return false;
 
       if (!needle) return true;
 
-      const metrics = partnerMetrics.get(partner.id);
       const haystack = [
         String(partner.id),
         partner.username,
         partner.phone,
         partner.email,
-        metrics ? String(metrics.referredCustomers.size) : "",
-        metrics ? String(metrics.activeSubscriptions) : "",
+        String(partner.referred_customers),
+        String(partner.active_subscriptions),
       ]
         .filter(Boolean)
         .join(" ")
@@ -168,27 +144,55 @@ export default function AdminPartnersPage() {
 
       return haystack.includes(needle);
     });
-  }, [partners, query, activeFilter, partnerMetrics]);
+
+    const sorted = [...base];
+
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "username":
+          return a.username.localeCompare(b.username);
+        case "contract_value":
+          return b.total_contract_value - a.total_contract_value;
+        case "subscriptions":
+          return b.active_subscriptions - a.active_subscriptions;
+        case "monthly_book":
+        default:
+          return b.total_monthly_book - a.total_monthly_book;
+      }
+    });
+
+    return sorted;
+  }, [partners, query, activeFilter, sortBy]);
 
   const kpis = useMemo(() => {
     const totalPartners = filteredPartners.length;
     const activePartners = filteredPartners.filter((p) => p.is_active).length;
     const inactivePartners = filteredPartners.filter((p) => !p.is_active).length;
 
-    let totalLinkedSubscriptions = 0;
-    let totalMonthlyBook = 0;
-    let totalContractValue = 0;
-    const referredCustomers = new Set<number>();
+    const totalLinkedSubscriptions = filteredPartners.reduce(
+      (sum, partner) => sum + partner.active_subscriptions,
+      0
+    );
 
-    for (const partner of filteredPartners) {
-      const metrics = partnerMetrics.get(partner.id);
-      if (!metrics) continue;
+    const totalMonthlyBook = filteredPartners.reduce(
+      (sum, partner) => sum + partner.total_monthly_book,
+      0
+    );
 
-      totalLinkedSubscriptions += metrics.totalSubscriptions;
-      totalMonthlyBook += metrics.totalMonthlyBook;
-      totalContractValue += metrics.totalContractValue;
-      for (const customerId of metrics.referredCustomers) referredCustomers.add(customerId);
-    }
+    const totalContractValue = filteredPartners.reduce(
+      (sum, partner) => sum + partner.total_contract_value,
+      0
+    );
+
+    const totalReferredCustomers = filteredPartners.reduce(
+      (sum, partner) => sum + partner.referred_customers,
+      0
+    );
+
+    const totalCommission = filteredPartners.reduce(
+      (sum, partner) => sum + toNumber(partner.total_commission, 0),
+      0
+    );
 
     return {
       totalPartners,
@@ -197,216 +201,390 @@ export default function AdminPartnersPage() {
       totalLinkedSubscriptions,
       totalMonthlyBook,
       totalContractValue,
-      referredCustomers: referredCustomers.size,
+      totalReferredCustomers,
+      totalCommission,
     };
-  }, [filteredPartners, partnerMetrics]);
+  }, [filteredPartners]);
 
   const rows = useMemo<PartnerRow[]>(() => {
-    return filteredPartners.map((partner) => {
-      const metrics = partnerMetrics.get(partner.id);
-
-      return {
-        id: partner.id,
-        username: partner.username,
-        phone: partner.phone || "-",
-        email: partner.email || "-",
-        active_label: partner.is_active ? "ACTIVE" : "INACTIVE",
-        referred_customers_label: String(
-          partner.referred_customers ?? metrics?.referredCustomers.size ?? 0
-        ),
-        active_subscriptions_label: String(
-          partner.active_subscriptions ?? metrics?.activeSubscriptions ?? 0
-        ),
-        total_monthly_book_label: formatCurrency(metrics?.totalMonthlyBook || 0),
-        total_contract_value_label: formatCurrency(metrics?.totalContractValue || 0),
-      };
-    });
-  }, [filteredPartners, partnerMetrics]);
+    return filteredPartners.map((partner) => ({
+      id: partner.id,
+      username: partner.username,
+      phone: partner.phone || "—",
+      email: partner.email || "—",
+      active_label: partner.is_active ? "ACTIVE" : "INACTIVE",
+      referred_customers: partner.referred_customers,
+      active_subscriptions: partner.active_subscriptions,
+      total_monthly_book: partner.total_monthly_book,
+      total_contract_value: partner.total_contract_value,
+      total_commission: toNumber(partner.total_commission, 0),
+    }));
+  }, [filteredPartners]);
 
   return (
     <PortalPage
       title="Partner Management"
-      subtitle="Monitor partner productivity, customer acquisition, linked subscriptions, and business contribution."
+      subtitle="Monitor partner productivity, customer acquisition, active subscriptions, collections workflow visibility, and commercial contribution."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Partners" },
+      ]}
+      actions={[
+        {
+          label: "Partner Commissions",
+          href: "/admin/finance/commissions",
+          variant: "secondary",
+        },
+        {
+          label: "Collection Requests",
+          href: "/admin/partners/collection-requests",
+          variant: "secondary",
+        },
+      ]}
+      stats={[
+        { label: "Partners", value: kpis.totalPartners },
+        { label: "Active", value: kpis.activePartners },
+        { label: "Subscriptions", value: kpis.totalLinkedSubscriptions },
+        { label: "Monthly Book", value: formatCurrency(kpis.totalMonthlyBook) },
+      ]}
     >
-      <section style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => loadAll(true)} disabled={refreshing}>
+      <div className="mb-4 flex flex-wrap gap-2.5">
+        <button
+          type="button"
+          onClick={() => void loadAll("refresh")}
+          disabled={refreshing}
+          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
-        <button type="button" onClick={() => router.push("/admin/partners/commissions")}>
+
+        <button
+          type="button"
+          onClick={() => router.push("/admin/finance/commissions")}
+          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
           Open Partner Commissions
         </button>
-        <button type="button" onClick={() => router.push("/admin/subscriptions")}>
+
+        <button
+          type="button"
+          onClick={() => router.push("/admin/partners/collection-requests")}
+          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Open Collection Requests
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/admin/subscriptions")}
+          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
           Open Subscriptions
         </button>
-      </section>
+      </div>
 
-      <section
-        style={{
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-          gap: 10,
-        }}
-      >
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Partners: <b>{kpis.totalPartners}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Active Partners: <b>{kpis.activePartners}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Inactive Partners: <b>{kpis.inactivePartners}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Referred Customers: <b>{kpis.referredCustomers}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Linked Subscriptions: <b>{kpis.totalLinkedSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Monthly Book Value: <b>{formatCurrency(kpis.totalMonthlyBook)}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Contract Value: <b>{formatCurrency(kpis.totalContractValue)}</b>
-        </div>
-      </section>
+      {loading ? <LoadingBlock label="Loading partners..." /> : null}
 
-      <section
-        style={{
-          marginBottom: 16,
-          border: "1px solid #e5e7eb",
-          borderRadius: 10,
-          padding: 16,
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Filters</h2>
+      {!loading && error ? (
+        <ErrorState
+          title="Unable to load partners"
+          description={error}
+          onRetry={() => void loadAll("initial")}
+        />
+      ) : null}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: 12,
-          }}
-        >
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="partner-search">Search</label>
-            <input
-              id="partner-search"
-              placeholder="Username, phone, email..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
+      {!loading && !error ? (
+        <>
+          <section className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Total Partners
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {kpis.totalPartners}
+              </div>
+            </div>
 
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="partner-active-filter">Partner Status</label>
-            <select
-              id="partner-active-filter"
-              value={activeFilter}
-              onChange={(event) => setActiveFilter(event.target.value)}
-            >
-              <option value="">All</option>
-              <option value="active">Active only</option>
-              <option value="inactive">Inactive only</option>
-            </select>
-          </div>
-        </div>
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Active Partners
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {kpis.activePartners}
+              </div>
+            </div>
 
-        <div>
-          <button
-            type="button"
-            onClick={() => {
-              setQuery("");
-              setActiveFilter("");
-            }}
-          >
-            Reset Filters
-          </button>
-        </div>
-      </section>
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Inactive Partners
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {kpis.inactivePartners}
+              </div>
+            </div>
 
-      <DataTable<PartnerRow>
-        loading={loading}
-        error={error}
-        rows={rows}
-        columns={[
-          { key: "id", title: "Partner ID" },
-          { key: "username", title: "Username" },
-          { key: "phone", title: "Phone" },
-          { key: "email", title: "Email" },
-          { key: "active_label", title: "Status" },
-          { key: "referred_customers_label", title: "Referred Customers" },
-          { key: "active_subscriptions_label", title: "Active Subscriptions" },
-          { key: "total_monthly_book_label", title: "Monthly Book" },
-          { key: "total_contract_value_label", title: "Contract Value" },
-        ]}
-      />
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Referred Customers
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {kpis.totalReferredCustomers}
+              </div>
+            </div>
 
-      {!loading && !error && filteredPartners.length > 0 ? (
-        <section
-          style={{
-            marginTop: 16,
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Quick Partner Actions</h2>
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Active Subscriptions
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {kpis.totalLinkedSubscriptions}
+              </div>
+            </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
-            {filteredPartners.slice(0, 8).map((partner) => {
-              const metrics = partnerMetrics.get(partner.id);
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Monthly Book Value
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {formatCurrency(kpis.totalMonthlyBook)}
+              </div>
+            </div>
 
-              return (
-                <div
-                  key={partner.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    padding: 12,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
-                  }}
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Contract Value
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {formatCurrency(kpis.totalContractValue)}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Commission Total
+              </div>
+              <div className="mt-2 text-xl font-semibold text-card-foreground">
+                {formatCurrency(kpis.totalCommission)}
+              </div>
+            </div>
+          </section>
+
+          <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-card-foreground">
+              Filters
+            </h2>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="grid gap-1.5">
+                <label
+                  htmlFor="partner-search"
+                  className="text-sm font-medium text-foreground"
                 >
-                  <div>
-                    <div>
-                      <strong>{partner.username}</strong> ({partner.phone || "No phone"})
-                    </div>
-                    <div style={{ color: "#4b5563" }}>
-                      Active subscriptions: {metrics?.activeSubscriptions || 0} • Referred customers:{" "}
-                      {metrics?.referredCustomers.size || 0} • Monthly book:{" "}
-                      {formatCurrency(metrics?.totalMonthlyBook || 0)}
-                    </div>
-                  </div>
+                  Search
+                </label>
+                <input
+                  id="partner-search"
+                  placeholder="Username, phone, email, partner id..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
 
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(`/admin/subscriptions?partner=${partner.id}`)
-                      }
-                    >
-                      View Subscriptions
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(`/admin/partners/commissions?partner=${partner.id}`)
-                      }
-                    >
-                      View Commissions
-                    </button>
+              <div className="grid gap-1.5">
+                <label
+                  htmlFor="partner-active-filter"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Partner Status
+                </label>
+                <select
+                  id="partner-active-filter"
+                  value={activeFilter}
+                  onChange={(event) => setActiveFilter(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="">All</option>
+                  <option value="active">Active only</option>
+                  <option value="inactive">Inactive only</option>
+                </select>
+              </div>
+
+              <div className="grid gap-1.5">
+                <label
+                  htmlFor="partner-sort"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Sort By
+                </label>
+                <select
+                  id="partner-sort"
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(
+                      event.target.value as
+                        | "username"
+                        | "monthly_book"
+                        | "contract_value"
+                        | "subscriptions"
+                    )
+                  }
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="monthly_book">Monthly Book</option>
+                  <option value="contract_value">Contract Value</option>
+                  <option value="subscriptions">Active Subscriptions</option>
+                  <option value="username">Username</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setActiveFilter("");
+                  setSortBy("monthly_book");
+                }}
+                className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </section>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              title="No partners found"
+              description="No partner records matched the current filter criteria."
+            />
+          ) : (
+            <DataTable<PartnerRow>
+              rows={rows}
+              emptyText="No partners available."
+              columns={[
+                { key: "id", title: "Partner ID" },
+                { key: "username", title: "Username" },
+                { key: "phone", title: "Phone" },
+                { key: "email", title: "Email" },
+                { key: "active_label", title: "Status" },
+                {
+                  key: "referred_customers",
+                  title: "Referred Customers",
+                  align: "right",
+                },
+                {
+                  key: "active_subscriptions",
+                  title: "Active Subscriptions",
+                  align: "right",
+                },
+                {
+                  key: "total_monthly_book",
+                  title: "Monthly Book",
+                  align: "right",
+                  render: (row) => formatCurrency(row.total_monthly_book),
+                },
+                {
+                  key: "total_contract_value",
+                  title: "Contract Value",
+                  align: "right",
+                  render: (row) => formatCurrency(row.total_contract_value),
+                },
+                {
+                  key: "total_commission",
+                  title: "Commission",
+                  align: "right",
+                  render: (row) => formatCurrency(row.total_commission),
+                },
+                {
+                  key: "actions",
+                  title: "Actions",
+                  render: (row) => (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/admin/subscriptions?partner=${row.id}`)
+                        }
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Subscriptions
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/admin/finance/commissions?partner=${row.id}`
+                          )
+                        }
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Commissions
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )}
+
+          {!loading && !error && filteredPartners.length > 0 ? (
+            <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h2 className="mb-3 text-base font-semibold text-card-foreground">
+                Quick Partner Actions
+              </h2>
+
+              <div className="grid gap-3">
+                {filteredPartners.slice(0, 8).map((partner) => (
+                  <div
+                    key={partner.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-4"
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        {partner.username}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          ({partner.phone || "No phone"})
+                        </span>
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Active subscriptions: {partner.active_subscriptions} •
+                        Referred customers: {partner.referred_customers} • Monthly
+                        book: {formatCurrency(partner.total_monthly_book)}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/admin/subscriptions?partner=${partner.id}`)
+                        }
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        View Subscriptions
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/admin/finance/commissions?partner=${partner.id}`
+                          )
+                        }
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        View Commissions
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </>
       ) : null}
     </PortalPage>
   );

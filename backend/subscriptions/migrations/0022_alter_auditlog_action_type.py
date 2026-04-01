@@ -1,0 +1,42 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("subscriptions", "0021_publiclead"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="auditlog",
+            name="action_type",
+            field=models.CharField(
+                choices=[
+                    ("USER_CREATED", "User Created"),
+                    ("SUB_CREATED", "Subscription Created"),
+                    ("EMI_PAID", "EMI Paid"),
+                    ("EMI_WAIVED", "EMI Waived"),
+                    ("DRAW_EXECUTED", "Draw Executed"),
+                    ("DRAW_COMMITTED", "Draw Committed"),
+                    ("DRAW_REVEALED", "Draw Revealed"),
+                    ("WINNER_WAIVER_APPLIED", "Winner Waiver Applied"),
+                    ("COMMISSION_CREATED", "Commission Created"),
+                    ("COMMISSION_SETTLED", "Commission Settled"),
+                    ("PAYMENT_RECONCILED", "Payment Reconciled"),
+                    ("PAYMENT_FLAGGED", "Payment Flagged"),
+                    ("PASSWORD_RESET_REQUESTED", "Password Reset Requested"),
+                    ("PASSWORD_RESET_VERIFIED", "Password Reset Verified"),
+                    ("PASSWORD_RESET_COMPLETED", "Password Reset Completed"),
+                    ("PASSWORD_RESET_FAILED", "Password Reset Failed"),
+                    ("PASSWORD_RESET_EXPIRED", "Password Reset Expired"),
+                    ("PASSWORD_RESET_LOCKED", "Password Reset Locked"),
+                    ("PASSWORD_RESET_RESENT", "Password Reset Resent"),
+                    ("PASSWORD_RESET_INVALIDATED", "Password Reset Invalidated"),
+                ],
+                db_index=True,
+                default="SUB_CREATED",
+                max_length=50,
+            ),
+        ),
+    ]

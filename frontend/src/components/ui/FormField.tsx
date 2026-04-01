@@ -1,5 +1,7 @@
+// frontend/src/components/ui/FormField.tsx
 "use client";
 
+import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
 type Tone = "default" | "danger" | "success" | "warning" | "info";
@@ -8,63 +10,31 @@ type FormFieldProps = {
   label?: string;
   htmlFor?: string;
   required?: boolean;
-
   helpText?: string;
   error?: string | null;
-
   children: ReactNode;
-
   prefix?: ReactNode;
   suffix?: ReactNode;
-
   disabled?: boolean;
   readOnly?: boolean;
-
   tone?: Tone;
-
   direction?: "column" | "row";
 };
 
-function getToneStyles(tone: Tone) {
+const getToneStyles = (tone: Tone) => {
   switch (tone) {
     case "danger":
-      return {
-        border: "#fecaca",
-        background: "#fffafa",
-        label: "#991b1b",
-        help: "#b91c1c",
-      };
+      return "border-destructive/50 bg-destructive/5 focus-within:ring-destructive";
     case "success":
-      return {
-        border: "#a7f3d0",
-        background: "#f0fdf4",
-        label: "#065f46",
-        help: "#047857",
-      };
+      return "border-emerald-500/50 bg-emerald-50/20 focus-within:ring-emerald-500";
     case "warning":
-      return {
-        border: "#fde68a",
-        background: "#fffbeb",
-        label: "#92400e",
-        help: "#b45309",
-      };
+      return "border-amber-500/50 bg-amber-50/20 focus-within:ring-amber-500";
     case "info":
-      return {
-        border: "#bfdbfe",
-        background: "#eff6ff",
-        label: "#1d4ed8",
-        help: "#2563eb",
-      };
-    case "default":
+      return "border-blue-500/50 bg-blue-50/20 focus-within:ring-blue-500";
     default:
-      return {
-        border: "#e5e7eb",
-        background: "#ffffff",
-        label: "#0f172a",
-        help: "#64748b",
-      };
+      return "border-border bg-background focus-within:ring-ring";
   }
-}
+};
 
 export default function FormField({
   label,
@@ -76,139 +46,51 @@ export default function FormField({
   prefix,
   suffix,
   disabled = false,
-  readOnly = false,
+  
   tone = "default",
   direction = "column",
 }: FormFieldProps) {
-  const styles = getToneStyles(error ? "danger" : tone);
+  const effectiveTone = error ? "danger" : tone;
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 6,
-        width: "100%",
-      }}
-    >
-      {label ? (
+    <div className="w-full">
+      {label && (
         <label
           htmlFor={htmlFor}
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: styles.label,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-          }}
+          className="mb-2 block text-sm font-medium text-foreground"
         >
-          <span>{label}</span>
-          {required ? (
-            <span
-              aria-hidden="true"
-              style={{
-                color: "#dc2626",
-                fontWeight: 800,
-              }}
-            >
-              *
-            </span>
-          ) : null}
+          {label}
+          {required && <span className="ml-1 text-destructive">*</span>}
         </label>
-      ) : null}
-
+      )}
       <div
-        style={{
-          display: "flex",
-          flexDirection: direction === "row" ? "row" : "column",
-          alignItems: direction === "row" ? "stretch" : undefined,
-          width: "100%",
-          border: `1px solid ${styles.border}`,
-          borderRadius: 10,
-          background: disabled ? "#f8fafc" : styles.background,
-          overflow: "hidden",
-          opacity: disabled ? 0.75 : 1,
-        }}
+        className={cn(
+          "flex items-stretch rounded-xl border transition focus-within:ring-2",
+          getToneStyles(effectiveTone),
+          disabled && "bg-muted/50 opacity-70",
+          direction === "row" && "flex-row"
+        )}
       >
-        {prefix ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "0 12px",
-              background: "#f8fafc",
-              borderRight: "1px solid #e5e7eb",
-              color: "#475569",
-              fontSize: 14,
-              whiteSpace: "nowrap",
-            }}
-          >
+        {prefix && (
+          <div className="flex items-center border-r border-border px-3 text-muted-foreground">
             {prefix}
           </div>
-        ) : null}
-
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            alignItems: "stretch",
-          }}
-        >
+        )}
+        <div className="min-w-0 flex-1">
           {children}
         </div>
-
-        {suffix ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "0 12px",
-              background: "#f8fafc",
-              borderLeft: "1px solid #e5e7eb",
-              color: "#475569",
-              fontSize: 14,
-              whiteSpace: "nowrap",
-            }}
-          >
+        {suffix && (
+          <div className="flex items-center border-l border-border px-3 text-muted-foreground">
             {suffix}
           </div>
-        ) : null}
+        )}
       </div>
-
-      {error ? (
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: "#b91c1c",
-            lineHeight: 1.5,
-          }}
-        >
-          {error}
-        </div>
-      ) : helpText ? (
-        <div
-          style={{
-            fontSize: 12,
-            color: styles.help,
-            lineHeight: 1.5,
-          }}
-        >
-          {helpText}
-        </div>
-      ) : null}
-
-      {(disabled || readOnly) && !error ? (
-        <div
-          style={{
-            fontSize: 11,
-            color: "#94a3b8",
-          }}
-        >
-          {disabled ? "Disabled" : "Read only"}
-        </div>
-      ) : null}
+      {error && (
+        <p className="mt-1 text-xs text-destructive">{error}</p>
+      )}
+      {helpText && !error && (
+        <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>
+      )}
     </div>
   );
 }

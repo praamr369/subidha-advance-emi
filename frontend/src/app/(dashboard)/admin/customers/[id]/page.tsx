@@ -1,371 +1,1310 @@
+// frontend/src/app/(dashboard)/admin/customers/[id]/page.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
+  Clock,
+  Search,
+  X,
+  RefreshCw,
+  Info,
+  CreditCard,
+  Wallet,
+  Building2,
+  Check,
+} from "lucide-react";
 
-import PortalPage from "@/components/ui/portal-page";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PortalPage from "@/components/ui/PortalPage";
+import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 
-type Customer = {
+// =====================================================
+// TYPES
+// =====================================================
+type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
+type KycStatus =
+  | "NOT_PROVIDED"
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "UNKNOWN";
+type SubscriptionStatus =
+  | "ACTIVE"
+  | "PENDING"
+  | "WON"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "DEFAULTED"
+  | "UNKNOWN";
+
+type CustomerDetailRecord = {
   id: number;
-  user?: number;
-  user_username?: string;
   name: string;
   phone: string;
-  kyc_status: string;
-  created_at?: string;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  kyc_status: KycStatus;
+  status: CustomerStatus;
+  user_id?: number | null;
+  created_at?: string | null;
+  kyc_reviewed_by_username?: string | null;
+  kyc_reviewed_at?: string | null;
+  kyc_rejection_reason?: string | null;
 };
 
-type Subscription = {
+type SubscriptionPreviewRow = {
   id: number;
-  customer: number;
-  customer_name?: string;
-  product: number;
+  subscription_number: string;
   product_name?: string;
-  product_code?: string;
-  batch: number | null;
-  batch_code?: string;
-  lucky_id: number | null;
+  batch_code?: string | null;
   lucky_number?: number | null;
-  partner: number | null;
-  partner_name?: string;
-  plan_type: string;
-  tenure_months: number;
-  monthly_amount: string;
+  plan_type?: string;
   total_amount: string;
-  status: string;
-  start_date: string;
-  emi_count?: number;
-  paid_emi_count?: number;
-  pending_emi_count?: number;
-  waived_emi_count?: number;
+  monthly_amount: string;
+  status: SubscriptionStatus;
+  start_date?: string | null;
 };
 
-type Payment = {
+type PaymentPreviewRow = {
   id: number;
-  customer: number;
-  subscription: number;
-  emi: number | null;
-  emi_month_no?: number | null;
   amount: string;
-  method: string;
-  reference_no: string | null;
-  payment_date: string;
-  collected_by_username?: string | null;
-  verified_by_username?: string | null;
+  method?: string;
+  reference_no?: string | null;
+  payment_date?: string | null;
+  subscription_id?: number | null;
+  subscription_number?: string;
+  is_reversed: boolean;
 };
 
-type Emi = {
+type KycDecisionResponse = {
   id: number;
-  subscription: number;
-  customer?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  month_no: number;
-  due_date: string;
-  amount: string;
-  status: string;
-  total_paid?: string;
-  balance_amount?: string;
+  kyc_status: KycStatus | "APPROVED";
+  kyc_reviewed_by_username?: string | null;
+  kyc_reviewed_at?: string | null;
+  kyc_rejection_reason?: string | null;
 };
 
-function parseError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message?.trim() || "Request failed";
+// =====================================================
+// UTILITIES
+// =====================================================
+function money(value: string | number | null | undefined): string {
+  return `₹${Number(value || 0).toFixed(2)}`;
+}
 
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first[0]) return String(first[0]);
-    if (typeof first === "string") return first;
-  } catch {
-    return raw;
+function toMoneyString(value: unknown): string {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
+}
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNullableNumber(value: unknown): number | null | undefined {
+  if (typeof value === "number") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function toNullableString(value: unknown): string | null | undefined {
+  if (typeof value === "string") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function toObject(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleDateString();
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load customer detail.";
+}
+
+function normalizeCustomerStatus(raw: Record<string, unknown>): CustomerStatus {
+  const status = String(raw.status ?? raw.customer_status ?? "").toUpperCase();
+  if (status === "ACTIVE") return "ACTIVE";
+  if (status === "INACTIVE") return "INACTIVE";
+  return "UNKNOWN";
+}
+
+function normalizeKycStatus(raw: Record<string, unknown>): KycStatus {
+  const status = String(raw.kyc_status ?? raw.kyc ?? "").toUpperCase();
+
+  if (status === "NOT_PROVIDED") return "NOT_PROVIDED";
+  if (status === "PENDING") return "PENDING";
+  if (status === "VERIFIED") return "VERIFIED";
+  if (status === "APPROVED") return "VERIFIED";
+  if (status === "REJECTED") return "REJECTED";
+  return "UNKNOWN";
+}
+
+function normalizeSubscriptionStatus(
+  raw: Record<string, unknown>
+): SubscriptionStatus {
+  const status = String(raw.status ?? raw.subscription_status ?? "").toUpperCase();
+  if (status === "ACTIVE") return "ACTIVE";
+  if (status === "PENDING") return "PENDING";
+  if (status === "WON") return "WON";
+  if (status === "COMPLETED") return "COMPLETED";
+  if (status === "CANCELLED") return "CANCELLED";
+  if (status === "DEFAULTED") return "DEFAULTED";
+  return "UNKNOWN";
+}
+
+function normalizeCustomerDetail(
+  raw: Record<string, unknown>
+): CustomerDetailRecord {
+  return {
+    id: toNumber(raw.id),
+    name: toStringValue(raw.name) || "Unnamed customer",
+    phone: toStringValue(raw.phone) || "—",
+    email: toNullableString(raw.email),
+    address: toNullableString(raw.address),
+    city: toNullableString(raw.city),
+    kyc_status: normalizeKycStatus(raw),
+    status: normalizeCustomerStatus(raw),
+    user_id: toNullableNumber(raw.user_id) ?? toNullableNumber(raw.user),
+    created_at: toNullableString(raw.created_at),
+    kyc_reviewed_by_username: toNullableString(raw.kyc_reviewed_by_username),
+    kyc_reviewed_at: toNullableString(raw.kyc_reviewed_at),
+    kyc_rejection_reason: toNullableString(raw.kyc_rejection_reason),
+  };
+}
+
+function normalizeSubscriptionPreview(
+  raw: Record<string, unknown>
+): SubscriptionPreviewRow {
+  const id = toNumber(raw.id);
+  const luckyNumber =
+    toNullableNumber(raw.lucky_number) ?? toNullableNumber(raw.lucky_no);
+
+  return {
+    id,
+    subscription_number:
+      toStringValue(raw.subscription_number) ||
+      toStringValue(raw.subscription_code) ||
+      `SUB-${id}`,
+    product_name:
+      toStringValue(raw.product_name) ||
+      toStringValue(raw.product_title) ||
+      undefined,
+    batch_code:
+      toNullableString(raw.batch_code) ??
+      toNullableString(raw.batch_number),
+    lucky_number: luckyNumber,
+    plan_type:
+      toStringValue(raw.plan_type) ||
+      toStringValue(raw.subscription_type) ||
+      undefined,
+    total_amount: toMoneyString(
+      raw.total_amount ?? raw.contract_value ?? raw.amount
+    ),
+    monthly_amount: toMoneyString(
+      raw.monthly_amount ?? raw.emi_amount ?? raw.installment_amount
+    ),
+    status: normalizeSubscriptionStatus(raw),
+    start_date:
+      toNullableString(raw.start_date) ??
+      toNullableString(raw.created_date),
+  };
+}
+
+function normalizePaymentPreview(
+  raw: Record<string, unknown>
+): PaymentPreviewRow {
+  const metadata = toObject(raw.allocation_metadata);
+  const reversal = metadata ? toObject(metadata.reversal) : null;
+
+  const subscriptionId =
+    toNullableNumber(raw.subscription_id) ?? toNullableNumber(raw.subscription);
+
+  const isReversed =
+    raw.is_reversed === true ||
+    raw.reversed === true ||
+    reversal?.is_reversed === true;
+
+  return {
+    id: toNumber(raw.id),
+    amount: toMoneyString(raw.amount),
+    method: toStringValue(raw.method) || undefined,
+    reference_no: toNullableString(raw.reference_no),
+    payment_date:
+      toNullableString(raw.payment_date) ??
+      toNullableString(raw.created_at),
+    subscription_id: subscriptionId,
+    subscription_number:
+      toStringValue(raw.subscription_number) ||
+      (subscriptionId ? `SUB-${subscriptionId}` : undefined),
+    is_reversed: isReversed,
+  };
+}
+
+function extractNestedArray(
+  payload: Record<string, unknown>,
+  keys: string[]
+): Record<string, unknown>[] {
+  for (const key of keys) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      return toArray<Record<string, unknown>>(value);
+    }
+  }
+  return [];
+}
+
+// =====================================================
+// UI COMPONENTS
+// =====================================================
+
+function StatCard({
+  title,
+  value,
+  icon,
+  trend,
+  trendValue,
+  tone = "default",
+  tooltip,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  trend?: "up" | "down" | "neutral";
+  trendValue?: string;
+  tone?: "default" | "success" | "warning" | "danger";
+  tooltip?: string;
+}) {
+  const toneColors = {
+    default: "border-border bg-card",
+    success: "border-emerald-200 bg-emerald-50/50",
+    warning: "border-amber-200 bg-amber-50/50",
+    danger: "border-red-200 bg-red-50/50",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${toneColors[tone]}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          {tooltip && (
+            <div className="group relative">
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 hidden w-48 rounded-lg bg-popover px-2 py-1 text-xs text-popover-foreground shadow-lg group-hover:block">
+                {tooltip}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="rounded-xl bg-background/50 p-2 text-muted-foreground">
+          {icon}
+        </div>
+      </div>
+      <div className="mt-2">
+        <p className="text-2xl font-semibold text-foreground">{value}</p>
+      </div>
+      {trend && trendValue && (
+        <div className="mt-3 flex items-center gap-1 text-xs">
+          {trend === "up" ? (
+            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
+          ) : trend === "down" ? (
+            <ArrowDownRight className="h-3 w-3 text-red-600" />
+          ) : null}
+          <span
+            className={
+              trend === "up"
+                ? "text-emerald-600"
+                : trend === "down"
+                  ? "text-red-600"
+                  : "text-muted-foreground"
+            }
+          >
+            {trendValue}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({
+  status,
+  tone,
+}: {
+  status: string;
+  tone: "success" | "warning" | "danger" | "info" | "default";
+}) {
+  const toneClasses = {
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    danger: "border-red-200 bg-red-50 text-red-700",
+    info: "border-blue-200 bg-blue-50 text-blue-700",
+    default: "border-border bg-muted text-foreground",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]}`}>
+      {status}
+    </span>
+  );
+}
+
+// Enhanced Subscriptions Table with sort and search
+function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<keyof SubscriptionPreviewRow>("start_date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const filteredRows = useMemo(() => {
+    if (!searchTerm) return rows;
+    const term = searchTerm.toLowerCase();
+    return rows.filter(
+      (row) =>
+        row.subscription_number.toLowerCase().includes(term) ||
+        (row.product_name?.toLowerCase() || "").includes(term) ||
+        (row.batch_code?.toLowerCase() || "").includes(term) ||
+        row.status.toLowerCase().includes(term)
+    );
+  }, [rows, searchTerm]);
+
+  const sortedRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+
+      if (typeof aVal === "string") aVal = aVal.toLowerCase();
+      if (typeof bVal === "string") bVal = bVal.toLowerCase();
+
+      if (aVal === bVal) return 0;
+      const direction = sortDirection === "asc" ? 1 : -1;
+      return (aVal < bVal ? -1 : 1) * direction;
+    });
+  }, [filteredRows, sortField, sortDirection]);
+
+  const handleSort = (field: keyof SubscriptionPreviewRow) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: keyof SubscriptionPreviewRow) => {
+    if (field !== sortField) return null;
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title="No subscriptions"
+        description="No subscription records were returned for this customer."
+      />
+    );
   }
 
-  return raw;
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by number, product, batch..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-0">
+          <thead>
+            <tr className="text-left">
+              <th
+                onClick={() => handleSort("subscription_number")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Subscription {getSortIcon("subscription_number")}
+              </th>
+              <th
+                onClick={() => handleSort("product_name")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Product / Plan {getSortIcon("product_name")}
+              </th>
+              <th
+                onClick={() => handleSort("total_amount")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right hover:text-foreground"
+              >
+                Financials {getSortIcon("total_amount")}
+              </th>
+              <th
+                onClick={() => handleSort("status")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Status {getSortIcon("status")}
+              </th>
+              <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Actions
+              </th>
+             </tr>
+          </thead>
+          <tbody>
+            {sortedRows.map((row) => {
+              const statusTone =
+                row.status === "ACTIVE"
+                  ? "success"
+                  : row.status === "WON"
+                  ? "info"
+                  : row.status === "COMPLETED"
+                  ? "default"
+                  : row.status === "CANCELLED" || row.status === "DEFAULTED"
+                  ? "danger"
+                  : "warning";
+
+              return (
+                <tr key={row.id} className="align-top hover:bg-muted/30 transition">
+                  <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                    <div className="font-medium">{row.subscription_number}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Start {formatDate(row.start_date)}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {row.batch_code || "No batch"}
+                      {typeof row.lucky_number === "number"
+                        ? ` · Lucky #${row.lucky_number}`
+                        : ""}
+                    </div>
+                  </td>
+                  <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                    <div className="font-medium">
+                      {row.product_name || "Unknown product"}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {row.plan_type || "—"}
+                    </div>
+                  </td>
+                  <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
+                    <div className="font-semibold">
+                      {money(row.total_amount)}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      EMI {money(row.monthly_amount)}
+                    </div>
+                  </td>
+                  <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                    <StatusBadge status={row.status} tone={statusTone} />
+                  </td>
+                  <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                    <div className="flex flex-col items-start gap-2">
+                      <Link
+                        href={`/admin/subscriptions/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Open Subscription
+                      </Link>
+                      <Link
+                        href={`/admin/payments?subscription=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Payments
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
-function formatCurrency(value: string | number | null | undefined): string {
-  const amount = Number(value || 0);
-  return `₹${amount.toFixed(2)}`;
+// Enhanced Payments Table
+function PaymentsTable({ rows }: { rows: PaymentPreviewRow[] }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<keyof PaymentPreviewRow>("payment_date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const filteredRows = useMemo(() => {
+    if (!searchTerm) return rows;
+    const term = searchTerm.toLowerCase();
+    return rows.filter(
+      (row) =>
+        row.id.toString().includes(term) ||
+        (row.subscription_number?.toLowerCase() || "").includes(term) ||
+        (row.reference_no?.toLowerCase() || "").includes(term) ||
+        (row.method?.toLowerCase() || "").includes(term)
+    );
+  }, [rows, searchTerm]);
+
+  const sortedRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+
+      if (typeof aVal === "string") aVal = aVal.toLowerCase();
+      if (typeof bVal === "string") bVal = bVal.toLowerCase();
+
+      if (aVal === bVal) return 0;
+      const direction = sortDirection === "asc" ? 1 : -1;
+      return (aVal < bVal ? -1 : 1) * direction;
+    });
+  }, [filteredRows, sortField, sortDirection]);
+
+  const handleSort = (field: keyof PaymentPreviewRow) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: keyof PaymentPreviewRow) => {
+    if (field !== sortField) return null;
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title="No payment history"
+        description="No payment records were returned for this customer."
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by ID, reference, subscription..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-0">
+          <thead>
+            <tr className="text-left">
+              <th
+                onClick={() => handleSort("id")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Payment {getSortIcon("id")}
+              </th>
+              <th
+                onClick={() => handleSort("subscription_number")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Contract {getSortIcon("subscription_number")}
+              </th>
+              <th
+                onClick={() => handleSort("method")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Method {getSortIcon("method")}
+              </th>
+              <th
+                onClick={() => handleSort("amount")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right hover:text-foreground"
+              >
+                Amount {getSortIcon("amount")}
+              </th>
+              <th
+                onClick={() => handleSort("is_reversed")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                State {getSortIcon("is_reversed")}
+              </th>
+              <th
+                onClick={() => handleSort("payment_date")}
+                className="cursor-pointer border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                Posted {getSortIcon("payment_date")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.map((row) => (
+              <tr key={row.id} className="align-top hover:bg-muted/30 transition">
+                <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                  <div className="font-medium">#{row.id}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {row.reference_no || "No reference"}
+                  </div>
+                </td>
+                <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                  {row.subscription_number || "—"}
+                </td>
+                <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                  <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                    {row.method || "—"}
+                  </span>
+                </td>
+                <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
+                  {money(row.amount)}
+                </td>
+                <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                  <span
+                    className={[
+                      "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                      row.is_reversed
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    ].join(" ")}
+                  >
+                    {row.is_reversed ? "Reversed" : "Active"}
+                  </span>
+                </td>
+                <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                  {formatDateTime(row.payment_date)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
+// =====================================================
+// API HELPERS
+// =====================================================
+async function submitCustomerKycDecision(
+  customerId: string,
+  payload: {
+    status: "VERIFIED" | "REJECTED";
+    reason?: string;
+  }
+): Promise<KycDecisionResponse> {
+  return apiFetch<KycDecisionResponse>(
+    `/admin/customers/${customerId}/kyc-decision/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
 export default function AdminCustomerDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const id = String(params?.id || "");
+  const customerId = params?.id;
 
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [emis, setEmis] = useState<Emi[]>([]);
-
+  const [customer, setCustomer] = useState<CustomerDetailRecord | null>(null);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionPreviewRow[]>([]);
+  const [payments, setPayments] = useState<PaymentPreviewRow[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [savingKyc, setSavingKyc] = useState(false);
+  const [kycReason, setKycReason] = useState("");
+  const [kycError, setKycError] = useState<string | null>(null);
+  const [kycSuccess, setKycSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadAll(): Promise<void> {
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (!customerId) return;
+
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
+      try {
+        const [customerResult, subscriptionResult, paymentResult] =
+          await Promise.allSettled([
+            apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
+            apiFetch<unknown>(`/admin/subscriptions/?customer=${customerId}`),
+            apiFetch<unknown>(`/admin/payments/?customer=${customerId}`),
+          ]);
+
+        if (customerResult.status !== "fulfilled") {
+          throw customerResult.reason;
+        }
+
+        const basePayload = customerResult.value;
+        const nextWarnings: string[] = [];
+
+        const normalizedCustomer = normalizeCustomerDetail(basePayload);
+
+        let nextSubscriptions: SubscriptionPreviewRow[] = [];
+        let nextPayments: PaymentPreviewRow[] = [];
+
+        if (subscriptionResult.status === "fulfilled") {
+          nextSubscriptions = toArray<Record<string, unknown>>(subscriptionResult.value)
+            .map(normalizeSubscriptionPreview)
+            .sort((a, b) => {
+              const aDate = Date.parse(a.start_date || "") || 0;
+              const bDate = Date.parse(b.start_date || "") || 0;
+              return bDate - aDate;
+            });
+        } else {
+          nextSubscriptions = extractNestedArray(basePayload, [
+            "subscriptions",
+            "subscription_rows",
+            "subscription_history",
+          ])
+            .map(normalizeSubscriptionPreview)
+            .sort((a, b) => {
+              const aDate = Date.parse(a.start_date || "") || 0;
+              const bDate = Date.parse(b.start_date || "") || 0;
+              return bDate - aDate;
+            });
+
+          nextWarnings.push(
+            "Subscription preview was loaded from customer detail payload because the filtered subscription endpoint did not return successfully."
+          );
+        }
+
+        if (paymentResult.status === "fulfilled") {
+          nextPayments = toArray<Record<string, unknown>>(paymentResult.value)
+            .map(normalizePaymentPreview)
+            .sort((a, b) => {
+              const aDate = Date.parse(a.payment_date || "") || 0;
+              const bDate = Date.parse(b.payment_date || "") || 0;
+              return bDate - aDate;
+            });
+        } else {
+          nextPayments = extractNestedArray(basePayload, [
+            "payments",
+            "payment_rows",
+            "payment_history",
+          ])
+            .map(normalizePaymentPreview)
+            .sort((a, b) => {
+              const aDate = Date.parse(a.payment_date || "") || 0;
+              const bDate = Date.parse(b.payment_date || "") || 0;
+              return bDate - aDate;
+            });
+
+          nextWarnings.push(
+            "Payment preview was loaded from customer detail payload because the filtered payment endpoint did not return successfully."
+          );
+        }
+
+        setCustomer(normalizedCustomer);
+        setSubscriptions(nextSubscriptions);
+        setPayments(nextPayments);
+        setWarnings(nextWarnings);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") {
+          setCustomer(null);
+          setSubscriptions([]);
+          setPayments([]);
+          setWarnings([]);
+        }
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
+    },
+    [customerId]
+  );
+
+  useEffect(() => {
+    void loadPage("initial");
+  }, [loadPage]);
+
+  const activeSubscriptionCount = useMemo(
+    () => subscriptions.filter((row) => row.status === "ACTIVE").length,
+    [subscriptions]
+  );
+
+  const totalContractValue = useMemo(
+    () =>
+      subscriptions.reduce(
+        (sum, row) => sum + Number(row.total_amount || 0),
+        0
+      ),
+    [subscriptions]
+  );
+
+  const activePayments = useMemo(
+    () => payments.filter((row) => !row.is_reversed),
+    [payments]
+  );
+
+  const latestSubscription = useMemo(
+    () => subscriptions[0] ?? null,
+    [subscriptions]
+  );
+
+  const actions = useMemo(() => {
+    const nextActions: Array<{
+      href: string;
+      label: string;
+      variant?: "primary" | "secondary" | "ghost" | "danger";
+    }> = [
+      {
+        href: "/admin/customers",
+        label: "Back to Register",
+        variant: "secondary",
+      },
+      {
+        href: customer ? `/admin/subscriptions?customer=${customer.id}` : "/admin/subscriptions",
+        label: "Open Subscriptions",
+        variant: "primary",
+      },
+    ];
+
+    if (customer) {
+      nextActions.push({
+        href: `/admin/subscriptions/create?customer=${customer.id}`,
+        label: "Create Subscription",
+        variant: "secondary",
+      });
+    }
+
+    return nextActions;
+  }, [customer]);
+
+  async function handleKycDecision(status: "VERIFIED" | "REJECTED") {
+    if (!customerId) return;
+
+    if (status === "REJECTED" && !kycReason.trim()) {
+      setKycError("Reason is required when rejecting KYC.");
+      setKycSuccess(null);
+      return;
+    }
+
+    setSavingKyc(true);
+    setKycError(null);
+    setKycSuccess(null);
+
     try {
-      setLoading(true);
+      const response = await submitCustomerKycDecision(customerId, {
+        status,
+        reason: kycReason.trim() || undefined,
+      });
 
-      const [customerRes, subscriptionRes, paymentRes, emiRes] = await Promise.all([
-        apiFetch(`/admin/customers/${id}/`),
-        apiFetch(`/admin/subscriptions/?customer=${encodeURIComponent(id)}`),
-        apiFetch(`/admin/payments/?customer=${encodeURIComponent(id)}`),
-        apiFetch("/admin/emis/"),
-      ]);
+      setCustomer((current) =>
+        current
+          ? {
+              ...current,
+              kyc_status:
+                response.kyc_status === "APPROVED"
+                  ? "VERIFIED"
+                  : response.kyc_status,
+              kyc_reviewed_by_username: response.kyc_reviewed_by_username ?? null,
+              kyc_reviewed_at: response.kyc_reviewed_at ?? null,
+              kyc_rejection_reason: response.kyc_rejection_reason ?? null,
+            }
+          : current
+      );
 
-      setCustomer(customerRes as Customer);
-      setSubscriptions(toArray<Subscription>(subscriptionRes));
-      setPayments(toArray<Payment>(paymentRes));
-      setEmis(toArray<Emi>(emiRes));
-      setError(null);
-    } catch (e) {
-      setError(parseError(e));
+      setKycSuccess(
+        status === "VERIFIED"
+          ? "KYC verified successfully."
+          : "KYC rejected successfully."
+      );
+      setKycReason("");
+      await loadPage("refresh");
+    } catch (err) {
+      setKycError(
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "Failed to submit KYC decision."
+      );
     } finally {
-      setLoading(false);
+      setSavingKyc(false);
     }
   }
 
-  useEffect(() => {
-    if (id) loadAll();
-  }, [id]);
+  const kycTone: "success" | "warning" | "danger" | "default" =
+    customer?.kyc_status === "VERIFIED"
+      ? "success"
+      : customer?.kyc_status === "REJECTED"
+      ? "danger"
+      : customer?.kyc_status === "PENDING"
+      ? "warning"
+      : "default";
 
-  const customerEmis = useMemo(() => {
-    const subscriptionIds = new Set(subscriptions.map((s) => s.id));
-    return emis.filter((item) => subscriptionIds.has(item.subscription));
-  }, [subscriptions, emis]);
-
-  const kpis = useMemo(() => {
-    const totalSubscriptions = subscriptions.length;
-    const activeSubscriptions = subscriptions.filter((s) => s.status === "ACTIVE").length;
-    const totalPaid = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const totalContractValue = subscriptions.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
-    const totalMonthlyValue = subscriptions.reduce((sum, item) => sum + Number(item.monthly_amount || 0), 0);
-    const pendingEmis = customerEmis.filter((item) => item.status === "PENDING").length;
-    const paidEmis = customerEmis.filter((item) => item.status === "PAID").length;
-
-    return {
-      totalSubscriptions,
-      activeSubscriptions,
-      totalPaid,
-      totalContractValue,
-      totalMonthlyValue,
-      pendingEmis,
-      paidEmis,
-    };
-  }, [subscriptions, payments, customerEmis]);
+  const customerStatusTone: "success" | "danger" | "default" =
+    customer?.status === "ACTIVE"
+      ? "success"
+      : customer?.status === "INACTIVE"
+      ? "danger"
+      : "default";
 
   return (
     <PortalPage
-      title={customer ? `${customer.name} - Customer Profile` : "Customer Profile"}
-      subtitle="Review profile information, subscription history, EMI obligations, and payment ledger for this customer."
+      title={customer?.name || `Customer #${customerId ?? "—"}`}
+      subtitle="Inspect customer profile, KYC state, linked contracts, and recent payment activity from one operational page."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Customers", href: "/admin/customers" },
+        { label: customer?.name || `Customer #${customerId ?? "—"}` },
+      ]}
+      actions={actions}
+      stats={[
+        {
+          label: "Active Subscriptions",
+          value: String(activeSubscriptionCount),
+          tone: activeSubscriptionCount > 0 ? "success" : undefined,
+        },
+        {
+          label: "Contract Value",
+          value: money(totalContractValue),
+          tone: "success",
+        },
+        {
+          label: "Active Payments",
+          value: String(activePayments.length),
+        },
+        {
+          label: "KYC",
+          value: customer?.kyc_status || "—",
+          tone:
+            customer?.kyc_status === "VERIFIED"
+              ? "success"
+              : customer?.kyc_status === "REJECTED"
+              ? "danger"
+              : "warning",
+        },
+      ]}
+      statusBadge={{
+        label: customer?.status || "Customer Detail",
+        tone: customer?.status === "ACTIVE" ? "success" : "info",
+      }}
     >
-      <section style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => router.push("/admin/customers")}>
-          Back to Customers
-        </button>
-        {customer ? (
+      <div className="space-y-6">
+        <section className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void loadPage("refresh")}
+            disabled={refreshing || loading}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </section>
+
+        {loading ? <LoadingBlock label="Loading customer detail..." /> : null}
+
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load customer detail"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error && !customer ? (
+          <EmptyState
+            title="Customer not available"
+            description="The requested customer could not be loaded."
+          />
+        ) : null}
+
+        {!loading && !error && customer ? (
           <>
-            <button type="button" onClick={() => router.push(`/admin/subscriptions/create?customer=${customer.id}`)}>
-              Create Subscription
-            </button>
-            <button type="button" onClick={() => router.push("/admin/payments")}>
-              Open Payments
-            </button>
+            {warnings.length > 0 && (
+              <SectionCard
+                title="Data source note"
+                description="The detail page loaded with fallback sources for some child data."
+              >
+                <div className="space-y-2">
+                  {warnings.map((warning) => (
+                    <div
+                      key={warning}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                    >
+                      {warning}
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Advanced Stats Row */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="Active Subscriptions"
+                value={String(activeSubscriptionCount)}
+                icon={<Building2 className="h-4 w-4" />}
+                tone={activeSubscriptionCount > 0 ? "success" : "default"}
+                tooltip="Subscriptions with status 'ACTIVE'"
+              />
+              <StatCard
+                title="Total Contract Value"
+                value={money(totalContractValue)}
+                icon={<Wallet className="h-4 w-4" />}
+                tone="success"
+                tooltip="Sum of total amounts for all subscriptions"
+              />
+              <StatCard
+                title="Active Payments"
+                value={String(activePayments.length)}
+                icon={<CreditCard className="h-4 w-4" />}
+                tone="default"
+                tooltip="Non-reversed payments"
+              />
+              <StatCard
+                title="KYC Status"
+                value={customer.kyc_status}
+                icon={
+                  customer.kyc_status === "VERIFIED" ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : customer.kyc_status === "REJECTED" ? (
+                    <X className="h-4 w-4" />
+                  ) : (
+                    <Clock className="h-4 w-4" />
+                  )
+                }
+                tone={kycTone}
+              />
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+              <SectionCard
+                title="Profile Overview"
+                description="Primary customer facts used for admin operations and profile verification."
+                actionHref={`/admin/customers/${customer.id}/edit`}
+                actionLabel="Edit Profile"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailValue label="Customer ID" value={`#${customer.id}`} />
+                  <DetailValue label="Name" value={customer.name} />
+                  <DetailValue label="Phone" value={customer.phone || "—"} />
+                  <DetailValue label="Email" value={customer.email || "—"} />
+                  <DetailValue label="Address" value={customer.address || "—"} />
+                  <DetailValue label="City" value={customer.city || "—"} />
+                  <DetailValue
+                    label="User ID"
+                    value={
+                      customer.user_id !== null && customer.user_id !== undefined
+                        ? String(customer.user_id)
+                        : "—"
+                    }
+                  />
+                  <DetailValue
+                    label="Created At"
+                    value={formatDateTime(customer.created_at)}
+                  />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <StatusBadge status={customer.status} tone={customerStatusTone} />
+                  <StatusBadge status={customer.kyc_status} tone={kycTone} />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="KYC Review"
+                description="Review and decide KYC for this existing customer. Reject requires a reason. Verify clears prior rejection reason."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailValue
+                    label="Current KYC Status"
+                    value={<StatusBadge status={customer.kyc_status} tone={kycTone} />}
+                  />
+                  <DetailValue
+                    label="Customer Status"
+                    value={<StatusBadge status={customer.status} tone={customerStatusTone} />}
+                  />
+                  <DetailValue
+                    label="Reviewed By"
+                    value={customer.kyc_reviewed_by_username || "—"}
+                  />
+                  <DetailValue
+                    label="Reviewed At"
+                    value={formatDateTime(customer.kyc_reviewed_at)}
+                  />
+                  <DetailValue
+                    label="Latest Subscription"
+                    value={
+                      latestSubscription
+                        ? latestSubscription.subscription_number
+                        : "No subscriptions"
+                    }
+                  />
+                  <DetailValue
+                    label="Rejection Reason"
+                    value={customer.kyc_rejection_reason || "—"}
+                  />
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {kycError ? (
+                    <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                      {kycError}
+                    </div>
+                  ) : null}
+
+                  {kycSuccess ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      {kycSuccess}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <label
+                      htmlFor="kyc-reason"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Review note / rejection reason
+                    </label>
+                    <textarea
+                      id="kyc-reason"
+                      value={kycReason}
+                      onChange={(event) => {
+                        setKycReason(event.target.value);
+                        setKycError(null);
+                        setKycSuccess(null);
+                      }}
+                      rows={4}
+                      placeholder="Optional for verification, required for rejection."
+                      className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+                      disabled={savingKyc}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleKycDecision("VERIFIED")}
+                      disabled={savingKyc}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Check className="h-4 w-4" />
+                      {savingKyc ? "Saving..." : "Verify KYC"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleKycDecision("REJECTED")}
+                      disabled={savingKyc}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <X className="h-4 w-4" />
+                      {savingKyc ? "Saving..." : "Reject KYC"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link
+                    href={`/admin/subscriptions/create?customer=${customer.id}`}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Create Subscription
+                  </Link>
+
+                  <Link
+                    href={`/admin/payments?customer=${customer.id}`}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Payments Register
+                  </Link>
+
+                  <Link
+                    href={`/admin/subscriptions?customer=${customer.id}`}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Subscriptions
+                  </Link>
+                </div>
+              </SectionCard>
+            </div>
+
+            <SectionCard
+              title="Linked Subscriptions"
+              description="Contract history and current subscription context for this customer."
+              actionHref={`/admin/subscriptions?customer=${customer.id}`}
+              actionLabel="View All"
+            >
+              <SubscriptionsTable rows={subscriptions} />
+            </SectionCard>
+
+            <SectionCard
+              title="Payment History"
+              description="Recent payment activity linked to this customer."
+              actionHref={`/admin/payments?customer=${customer.id}`}
+              actionLabel="View All"
+            >
+              <PaymentsTable rows={payments} />
+            </SectionCard>
           </>
         ) : null}
-      </section>
-
-      {loading ? <p>Loading customer profile...</p> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-
-      {!loading && !error && customer ? (
-        <>
-          <section
-            style={{
-              marginBottom: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-              gap: 10,
-            }}
-          >
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Customer ID: <b>#{customer.id}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              KYC Status: <b>{customer.kyc_status}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Total Subscriptions: <b>{kpis.totalSubscriptions}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Active Subscriptions: <b>{kpis.activeSubscriptions}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Total Paid: <b>{formatCurrency(kpis.totalPaid)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Monthly Exposure: <b>{formatCurrency(kpis.totalMonthlyValue)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Contract Value: <b>{formatCurrency(kpis.totalContractValue)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Pending EMI Count: <b>{kpis.pendingEmis}</b>
-            </div>
-          </section>
-
-          <section
-            style={{
-              marginBottom: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-              gap: 16,
-            }}
-          >
-            <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-              <h2 style={{ marginTop: 0 }}>Profile Information</h2>
-              <p><strong>Name:</strong> {customer.name}</p>
-              <p><strong>Phone:</strong> {customer.phone}</p>
-              <p><strong>Username:</strong> {customer.user_username || "-"}</p>
-              <p><strong>KYC:</strong> {customer.kyc_status}</p>
-              <p><strong>Created:</strong> {customer.created_at ? customer.created_at.slice(0, 10) : "-"}</p>
-            </section>
-
-            <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-              <h2 style={{ marginTop: 0 }}>Collections Snapshot</h2>
-              <p><strong>Total Paid:</strong> {formatCurrency(kpis.totalPaid)}</p>
-              <p><strong>Paid EMI Count:</strong> {kpis.paidEmis}</p>
-              <p><strong>Pending EMI Count:</strong> {kpis.pendingEmis}</p>
-              <p><strong>Subscriptions:</strong> {kpis.totalSubscriptions}</p>
-              <p><strong>Active Plans:</strong> {kpis.activeSubscriptions}</p>
-            </section>
-          </section>
-
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Subscription History</h2>
-
-            {subscriptions.length === 0 ? (
-              <p>No subscriptions found for this customer.</p>
-            ) : (
-              <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Product</th>
-                    <th>Batch</th>
-                    <th>Lucky ID</th>
-                    <th>Plan</th>
-                    <th>Tenure</th>
-                    <th>Monthly</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptions.map((sub) => (
-                    <tr key={sub.id}>
-                      <td>#{sub.id}</td>
-                      <td>{sub.product_name || "-"}</td>
-                      <td>{sub.batch_code || "-"}</td>
-                      <td>{sub.lucky_number != null ? `#${sub.lucky_number}` : "-"}</td>
-                      <td>{sub.plan_type}</td>
-                      <td>{sub.tenure_months}</td>
-                      <td>{formatCurrency(sub.monthly_amount)}</td>
-                      <td>{formatCurrency(sub.total_amount)}</td>
-                      <td>{sub.status}</td>
-                      <td>
-                        <button type="button" onClick={() => router.push(`/admin/subscriptions/${sub.id}`)}>
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>EMI Payment Ledger</h2>
-
-            {payments.length === 0 ? (
-              <p>No payments recorded for this customer.</p>
-            ) : (
-              <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th>Payment ID</th>
-                    <th>Subscription</th>
-                    <th>EMI Month</th>
-                    <th>Amount</th>
-                    <th>Method</th>
-                    <th>Reference</th>
-                    <th>Date</th>
-                    <th>Collected By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <td>#{payment.id}</td>
-                      <td>#{payment.subscription}</td>
-                      <td>{payment.emi_month_no ?? "-"}</td>
-                      <td>{formatCurrency(payment.amount)}</td>
-                      <td>{payment.method}</td>
-                      <td>{payment.reference_no || "-"}</td>
-                      <td>{payment.payment_date}</td>
-                      <td>{payment.collected_by_username || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-
-          <section style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>EMI Status Overview</h2>
-
-            {customerEmis.length === 0 ? (
-              <p>No EMI records found for this customer.</p>
-            ) : (
-              <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th>Subscription</th>
-                    <th>Month</th>
-                    <th>Due Date</th>
-                    <th>Amount</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customerEmis
-                    .slice()
-                    .sort((a, b) => {
-                      if (a.subscription !== b.subscription) return a.subscription - b.subscription;
-                      return a.month_no - b.month_no;
-                    })
-                    .map((emi) => (
-                      <tr key={emi.id}>
-                        <td>#{emi.subscription}</td>
-                        <td>{emi.month_no}</td>
-                        <td>{emi.due_date}</td>
-                        <td>{formatCurrency(emi.amount)}</td>
-                        <td>{formatCurrency(emi.total_paid)}</td>
-                        <td>{formatCurrency(emi.balance_amount || emi.amount)}</td>
-                        <td>{emi.status}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </>
-      ) : null}
+      </div>
     </PortalPage>
   );
 }

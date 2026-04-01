@@ -1,5 +1,3 @@
-import PortalPage from "@/components/ui/portal-page";
+import RevenueReportPage from "@/app/(dashboard)/admin/reports/revenue/page";
 
-export default function ReportsCollectionsPage() {
-  return <PortalPage title="Collections Report" subtitle="Collections report endpoint integration placeholder." />;
-}
+export default RevenueReportPage;

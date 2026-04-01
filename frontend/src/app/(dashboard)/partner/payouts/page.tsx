@@ -1,34 +1,36 @@
-import PortalPage from "@/components/ui/PortalPage";
-import EmptyState from "@/components/feedback/EmptyState";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function PartnerPayoutsPage() {
-  return (
-    <PortalPage
-      title="Partner Payouts"
-      subtitle="Payout visibility for finalized payout batches created from settled commissions."
-      breadcrumbs={[{ label: "Partner", href: "/partner" }, { label: "Payouts" }]}
-    >
-      <div className="space-y-4">
-        <EmptyState
-          title="Payout list not available in partner portal"
-          description="Payout batches are created and finalized by admin finance operations. Use the commissions page for real-time earnings and settlement visibility."
-        />
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/partner/commissions"
-            className="inline-flex items-center rounded-md border border-border bg-foreground px-3 py-2 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
-          >
-            View Commissions
-          </Link>
-          <Link
-            href="/partner/reports"
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-          >
-            View Reports
-          </Link>
-        </div>
-      </div>
-    </PortalPage>
-  );
+type PartnerPayoutsRedirectPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function buildRedirectQuery(
+  params: Record<string, string | string[] | undefined>
+): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value.trim()) {
+      search.set(key, value);
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string" && item.trim()) {
+          search.append(key, item);
+        }
+      }
+    }
+  }
+
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+export default async function PartnerPayoutsRedirectPage({
+  searchParams,
+}: PartnerPayoutsRedirectPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  redirect(`/partner/commissions${buildRedirectQuery(resolvedSearchParams)}`);
 }

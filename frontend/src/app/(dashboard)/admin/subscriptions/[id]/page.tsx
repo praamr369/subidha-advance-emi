@@ -1,453 +1,1262 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import PortalPage from "@/components/ui/portal-page";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import {
+  DetailItem as DetailValue,
+  WorkspaceSection as SectionCard,
+} from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
+import {
+  normalizeDeliveryRecord,
+  type DeliveryRecord,
+} from "@/services/deliveries";
+import { listPayments, type PaymentRecord } from "@/services/payments";
 
-type SubscriptionDetail = {
+type SubscriptionStatus =
+  | "ACTIVE"
+  | "WON"
+  | "COMPLETED"
+  | "DEFAULTED"
+  | "UNKNOWN";
+
+type PlanType = "EMI" | "RENT" | "LEASE" | "UNKNOWN";
+
+type EmiStatus = "PENDING" | "PAID" | "WAIVED" | "UNKNOWN";
+
+type AuditEvent = {
   id: number;
-  customer: number;
-  product: number;
-  partner: number | null;
-  batch: number | null;
+  action_type: string;
+  model_name: string;
+  object_id: number | string | null;
+  performed_by: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+};
+
+type FinancialSummary = {
+  subscription_id: number;
+  total_amount: string;
+  total_emi_amount: string;
+  emi_total: string;
+  paid_amount: string;
+  waived_amount: string;
+  stored_waived_amount: string;
+  waiver_ledger_amount: string;
+  reversed_amount: string;
+  pending_amount: string;
+  remaining_amount: string;
+  outstanding_amount: string;
+  emi_count_total: number;
+  emi_count_paid: number;
+  emi_count_waived: number;
+  emi_count_pending: number;
+  winner_status: string;
+  winner_month: number | null;
   lucky_id: number | null;
-  plan_type: string;
+  lucky_number: number | null;
+  batch: {
+    id: number | null;
+    batch_code: string | null;
+    status: string | null;
+  };
+  partner: {
+    id: number | null;
+    username: string | null;
+    phone: string | null;
+    commission_rate: string;
+  };
+};
+
+type ReconciliationFlags = {
+  is_financially_consistent: boolean;
+  pending_matches_remaining: boolean;
+  has_reversal_history: boolean;
+  has_waiver_history: boolean;
+  warnings: string[];
+};
+
+type WinnerSummary = {
+  winner_status: string;
+  winner_month: number | null;
+  lucky_id: number | null;
+  lucky_number: number | null;
+  draw_id: number | null;
+  draw_month: number | null;
+  draw_revealed_at: string | null;
+  waiver_scope: string | null;
+  waived_emi_count: number;
+  waived_amount: string;
+};
+
+type WinnerStatus = "WON" | "NOT_WON";
+
+type EmiRow = {
+  id: number;
+  month_no: number;
+  due_date: string | null;
+  amount: string;
+  status: EmiStatus;
+  derived_status: EmiStatus;
+  paid_amount: string;
+  total_paid: string;
+  reversed_amount: string;
+  waived_amount: string;
+  waiver_ledger_amount: string;
+  balance_amount: string;
+  is_overdue: boolean;
+  is_status_consistent: boolean;
+  warnings: string[];
+};
+
+type SubscriptionDetailRecord = {
+  id: number;
+  customer_id: number | null;
+  customer_name: string;
+  customer_phone: string;
+  product_id: number | null;
+  product_name: string;
+  product_code: string;
+  partner_id: number | null;
+  partner_name: string | null;
+  partner_phone: string | null;
+  batch_id: number | null;
+  batch_code: string | null;
+  batch_status: string | null;
+  lucky_id: number | null;
+  lucky_number: number | null;
+  plan_type: PlanType;
   tenure_months: number;
-  start_date: string;
+  start_date: string | null;
   total_amount: string;
   monthly_amount: string;
-  status: string;
+  status: SubscriptionStatus;
   winner_month: number | null;
+  winner_status: string;
   waived_amount: string;
-  created_at?: string;
+  fulfillment_status: string | null;
+  delivery_status: string | null;
+  created_at: string | null;
+  emi_count: number;
+  paid_emi_count: number;
+  pending_emi_count: number;
+  waived_emi_count: number;
+  financial_summary: FinancialSummary | null;
+  reconciliation_flags: ReconciliationFlags | null;
+  winner_summary: WinnerSummary | null;
+  delivery_summary: DeliveryRecord | null;
+  deliveries: DeliveryRecord[];
+  emis: EmiRow[];
 };
 
-type Customer = {
-  id: number;
-  name: string;
-  phone: string;
-  kyc_status: string;
-};
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
-type Product = {
-  id: number;
-  name: string;
-  base_price: string;
-  product_code?: string;
-};
+function toNullableNumber(value: unknown): number | null {
+  if (typeof value === "number") return value;
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
-type Batch = {
-  id: number;
-  batch_code: string;
-  duration_months: number;
-  status: string;
-  draw_day?: number;
-  start_date?: string;
-};
+function toStringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
 
-type Partner = {
-  id: number;
-  username: string;
-  phone: string;
-};
+function toNullableString(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value;
+  }
+  return value === null ? null : null;
+}
 
-type LuckyId = {
-  id: number;
-  lucky_number: number;
-  status?: string;
-  batch?: number;
-};
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
+}
 
-type Emi = {
-  id: number;
-  subscription: number;
-  month_no: number;
-  due_date: string;
-  amount: string;
-  status: string;
-};
+function toObject(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
 
-type Payment = {
-  id: number;
-  customer: number;
-  subscription: number;
-  emi: number | null;
-  amount: string;
-  method: string;
-  reference_no: string | null;
-  payment_date: string;
-  collected_by?: number | null;
-};
+function parseMoney(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
-function parseError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message?.trim() || "Request failed";
+function money(value: string | number | null | undefined): string {
+  return `₹${parseMoney(value).toFixed(2)}`;
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleDateString();
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
+function formatLuckyNumber(value: number | null): string {
+  if (value == null) return "—";
+  return `#${String(value).padStart(2, "0")}`;
+}
+
+function normalizeSubscriptionStatus(value: unknown): SubscriptionStatus {
+  const status = String(value ?? "").toUpperCase();
+  if (
+    status === "ACTIVE" ||
+    status === "WON" ||
+    status === "COMPLETED" ||
+    status === "DEFAULTED"
+  ) {
+    return status;
+  }
+  return "UNKNOWN";
+}
+
+function normalizePlanType(value: unknown): PlanType {
+  const planType = String(value ?? "").toUpperCase();
+  if (planType === "EMI" || planType === "RENT" || planType === "LEASE") {
+    return planType;
+  }
+  return "UNKNOWN";
+}
+
+function normalizeEmiStatus(value: unknown): EmiStatus {
+  const status = String(value ?? "").toUpperCase();
+  if (status === "PENDING" || status === "PAID" || status === "WAIVED") {
+    return status;
+  }
+  return "UNKNOWN";
+}
+
+function isWinnerLikeStatus(value: unknown): boolean {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  return normalized === "WON" || normalized === "DRAWN" || normalized === "WINNER";
+}
+
+function normalizeWinnerStatus(
+  value: unknown,
+  fallback: WinnerStatus = "NOT_WON"
+): WinnerStatus {
+  const normalized = String(value ?? "").trim().toUpperCase();
+
+  if (normalized === "NOT_WON") {
+    return "NOT_WON";
+  }
+
+  if (isWinnerLikeStatus(normalized)) {
+    return "WON";
+  }
+
+  return fallback;
+}
+
+function resolveWinnerStatus(...values: unknown[]): WinnerStatus {
+  if (values.some((value) => isWinnerLikeStatus(value))) {
+    return "WON";
+  }
+
+  return "NOT_WON";
+}
+
+function parseErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return "Failed to load subscription detail.";
+
+  const raw = error.message.trim();
+  if (!raw) return "Failed to load subscription detail.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first[0]) return String(first[0]);
-    if (typeof first === "string") return first;
+
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail;
+    }
+
+    for (const [field, value] of Object.entries(parsed)) {
+      if (Array.isArray(value) && value.length > 0) {
+        return `${field}: ${String(value[0])}`;
+      }
+      if (typeof value === "string" && value.trim()) {
+        return `${field}: ${value}`;
+      }
+    }
+
+    return raw;
   } catch {
     return raw;
   }
-
-  return raw;
 }
 
-function formatCurrency(value: string | number | null | undefined): string {
-  const amount = Number(value || 0);
-  return `₹${amount.toFixed(2)}`;
+function normalizeFinancialSummary(raw: unknown, subscriptionId: number): FinancialSummary | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+  const batch = (value.batch ?? {}) as Record<string, unknown>;
+  const partner = (value.partner ?? {}) as Record<string, unknown>;
+
+  return {
+    subscription_id: toNumber(value.subscription_id, subscriptionId),
+    total_amount: String(value.total_amount ?? "0.00"),
+    total_emi_amount: String(value.total_emi_amount ?? value.emi_total ?? "0.00"),
+    emi_total: String(value.emi_total ?? value.total_emi_amount ?? "0.00"),
+    paid_amount: String(value.paid_amount ?? "0.00"),
+    waived_amount: String(value.waived_amount ?? "0.00"),
+    stored_waived_amount: String(value.stored_waived_amount ?? value.waived_amount ?? "0.00"),
+    waiver_ledger_amount: String(value.waiver_ledger_amount ?? "0.00"),
+    reversed_amount: String(value.reversed_amount ?? "0.00"),
+    pending_amount: String(value.pending_amount ?? "0.00"),
+    remaining_amount: String(value.remaining_amount ?? value.outstanding_amount ?? "0.00"),
+    outstanding_amount: String(value.outstanding_amount ?? value.remaining_amount ?? "0.00"),
+    emi_count_total: toNumber(value.emi_count_total),
+    emi_count_paid: toNumber(value.emi_count_paid),
+    emi_count_waived: toNumber(value.emi_count_waived),
+    emi_count_pending: toNumber(value.emi_count_pending),
+    winner_status: normalizeWinnerStatus(value.winner_status),
+    winner_month: toNullableNumber(value.winner_month),
+    lucky_id: toNullableNumber(value.lucky_id),
+    lucky_number: toNullableNumber(value.lucky_number),
+    batch: {
+      id: toNullableNumber(batch.id),
+      batch_code: toStringValue(batch.batch_code).trim() || null,
+      status: toStringValue(batch.status).trim() || null,
+    },
+    partner: {
+      id: toNullableNumber(partner.id),
+      username: toStringValue(partner.username).trim() || null,
+      phone: toStringValue(partner.phone).trim() || null,
+      commission_rate: String(partner.commission_rate ?? "0.00"),
+    },
+  };
+}
+
+function normalizeReconciliationFlags(raw: unknown): ReconciliationFlags | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+
+  return {
+    is_financially_consistent: toBoolean(value.is_financially_consistent),
+    pending_matches_remaining: toBoolean(value.pending_matches_remaining),
+    has_reversal_history: toBoolean(value.has_reversal_history),
+    has_waiver_history: toBoolean(value.has_waiver_history),
+    warnings: toArray<unknown>(value.warnings).map((item) => String(item)),
+  };
+}
+
+function normalizeWinnerSummary(raw: unknown): WinnerSummary | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+
+  return {
+    winner_status: normalizeWinnerStatus(value.winner_status),
+    winner_month: toNullableNumber(value.winner_month),
+    lucky_id: toNullableNumber(value.lucky_id),
+    lucky_number: toNullableNumber(value.lucky_number),
+    draw_id: toNullableNumber(value.draw_id),
+    draw_month: toNullableNumber(value.draw_month),
+    draw_revealed_at: toNullableString(value.draw_revealed_at),
+    waiver_scope: toStringValue(value.waiver_scope).trim() || null,
+    waived_emi_count: toNumber(value.waived_emi_count),
+    waived_amount: String(value.waived_amount ?? "0.00"),
+  };
+}
+
+function normalizeEmiRow(raw: Record<string, unknown>): EmiRow {
+  return {
+    id: toNumber(raw.id),
+    month_no: toNumber(raw.month_no),
+    due_date: toNullableString(raw.due_date),
+    amount: String(raw.amount ?? "0.00"),
+    status: normalizeEmiStatus(raw.status),
+    derived_status: normalizeEmiStatus(raw.derived_status ?? raw.status),
+    paid_amount: String(raw.paid_amount ?? raw.total_paid ?? "0.00"),
+    total_paid: String(raw.total_paid ?? raw.paid_amount ?? "0.00"),
+    reversed_amount: String(raw.reversed_amount ?? "0.00"),
+    waived_amount: String(raw.waived_amount ?? "0.00"),
+    waiver_ledger_amount: String(raw.waiver_ledger_amount ?? "0.00"),
+    balance_amount: String(raw.balance_amount ?? "0.00"),
+    is_overdue: toBoolean(raw.is_overdue),
+    is_status_consistent: toBoolean(raw.is_status_consistent, true),
+    warnings: toArray<unknown>(raw.warnings).map((item) => String(item)),
+  };
+}
+
+function normalizeAuditEvent(raw: Record<string, unknown>): AuditEvent {
+  return {
+    id: toNumber(raw.id),
+    action_type: toStringValue(raw.action_type).trim() || "UNKNOWN",
+    model_name: toStringValue(raw.model_name).trim() || "UnknownModel",
+    object_id:
+      typeof raw.object_id === "string" || typeof raw.object_id === "number"
+        ? raw.object_id
+        : null,
+    performed_by: toNullableString(raw.performed_by),
+    metadata:
+      raw.metadata && typeof raw.metadata === "object" && !Array.isArray(raw.metadata)
+        ? (raw.metadata as Record<string, unknown>)
+        : {},
+    created_at: toNullableString(raw.created_at),
+  };
+}
+
+function normalizeSubscriptionDetail(
+  raw: Record<string, unknown>
+): SubscriptionDetailRecord {
+  const id = toNumber(raw.id);
+  const financialSummary = normalizeFinancialSummary(raw.financial_summary, id);
+  const winnerStatus = resolveWinnerStatus(
+    raw.status,
+    raw.winner_status,
+    financialSummary?.winner_status,
+    toObject(raw.winner_summary)?.winner_status
+  );
+
+  return {
+    id,
+    customer_id: toNullableNumber(raw.customer),
+    customer_name: toStringValue(raw.customer_name).trim() || "Unknown customer",
+    customer_phone: toStringValue(raw.customer_phone).trim() || "—",
+    product_id: toNullableNumber(raw.product),
+    product_name: toStringValue(raw.product_name).trim() || "Unknown product",
+    product_code: toStringValue(raw.product_code).trim() || "—",
+    partner_id: toNullableNumber(raw.partner),
+    partner_name: toStringValue(raw.partner_name).trim() || null,
+    partner_phone: toStringValue(raw.partner_phone).trim() || null,
+    batch_id: toNullableNumber(raw.batch),
+    batch_code: toStringValue(raw.batch_code).trim() || null,
+    batch_status: toStringValue(raw.batch_status).trim() || null,
+    lucky_id: toNullableNumber(raw.lucky_id),
+    lucky_number: toNullableNumber(raw.lucky_number),
+    plan_type: normalizePlanType(raw.plan_type),
+    tenure_months: toNumber(raw.tenure_months),
+    start_date: toNullableString(raw.start_date),
+    total_amount: String(raw.total_amount ?? "0.00"),
+    monthly_amount: String(raw.monthly_amount ?? "0.00"),
+    status: normalizeSubscriptionStatus(raw.status),
+    winner_month: toNullableNumber(raw.winner_month),
+    winner_status: winnerStatus,
+    waived_amount: String(raw.waived_amount ?? "0.00"),
+    fulfillment_status: toNullableString(raw.fulfillment_status),
+    delivery_status: toNullableString(raw.delivery_status),
+    created_at: toNullableString(raw.created_at),
+    emi_count: toNumber(raw.emi_count),
+    paid_emi_count: toNumber(raw.paid_emi_count),
+    pending_emi_count: toNumber(raw.pending_emi_count),
+    waived_emi_count: toNumber(raw.waived_emi_count),
+    financial_summary: financialSummary,
+    reconciliation_flags: normalizeReconciliationFlags(raw.reconciliation_flags),
+    winner_summary: normalizeWinnerSummary(raw.winner_summary),
+    delivery_summary:
+      raw.delivery_summary === null || raw.delivery_summary === undefined
+        ? null
+        : normalizeDeliveryRecord(raw.delivery_summary),
+    deliveries: toArray<Record<string, unknown>>(raw.deliveries).map(
+      normalizeDeliveryRecord
+    ),
+    emis: toArray<Record<string, unknown>>(raw.emis).map(normalizeEmiRow),
+  };
 }
 
 export default function AdminSubscriptionDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const id = String(params?.id || "");
+  const subscriptionId = params?.id;
 
-  const [subscription, setSubscription] = useState<SubscriptionDetail | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [luckyIds, setLuckyIds] = useState<LuckyId[]>([]);
-  const [emis, setEmis] = useState<Emi[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-
+  const [subscription, setSubscription] = useState<SubscriptionDetailRecord | null>(null);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [timeline, setTimeline] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (!subscriptionId) return;
 
-    async function load(): Promise<void> {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
       try {
-        const [
-          subRes,
-          customerRes,
-          productRes,
-          batchRes,
-          partnerRes,
-          luckyRes,
-          emiRes,
-          paymentRes,
-        ] = await Promise.all([
-          apiFetch(`/admin/subscriptions/${id}/`),
-          apiFetch("/admin/customers/"),
-          apiFetch("/admin/products/"),
-          apiFetch("/admin/batches/"),
-          apiFetch("/admin/partners/"),
-          apiFetch("/admin/lucky-ids/"),
-          apiFetch("/admin/emis/"),
-          apiFetch("/admin/payments/"),
+        const [subscriptionRes, paymentsRes, timelineRes] = await Promise.allSettled([
+          apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/`, {
+            cache: "no-store",
+          }),
+          listPayments({ subscription: subscriptionId }),
+          apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/timeline/`, {
+            cache: "no-store",
+          }),
         ]);
 
-        if (cancelled) return;
+        if (subscriptionRes.status !== "fulfilled") {
+          throw subscriptionRes.reason;
+        }
 
-        setSubscription(subRes as SubscriptionDetail);
-        setCustomers(toArray<Customer>(customerRes));
-        setProducts(toArray<Product>(productRes));
-        setBatches(toArray<Batch>(batchRes));
-        setPartners(toArray<Partner>(partnerRes));
-        setLuckyIds(toArray<LuckyId>(luckyRes));
-        setEmis(toArray<Emi>(emiRes));
-        setPayments(toArray<Payment>(paymentRes));
-      } catch (e) {
-        if (cancelled) return;
-        setError(parseError(e));
+        const nextSubscription = normalizeSubscriptionDetail(subscriptionRes.value);
+        const nextPayments =
+          paymentsRes.status === "fulfilled" ? paymentsRes.value.results ?? [] : [];
+        const nextTimeline =
+          timelineRes.status === "fulfilled"
+            ? toArray<Record<string, unknown>>(timelineRes.value.results)
+                .map(normalizeAuditEvent)
+                .sort((a, b) => {
+                  const aTime = Date.parse(a.created_at || "") || 0;
+                  const bTime = Date.parse(b.created_at || "") || 0;
+                  return bTime - aTime;
+                })
+            : [];
+
+        setSubscription(nextSubscription);
+        setPayments(nextPayments);
+        setTimeline(nextTimeline);
+        setError(null);
+      } catch (err) {
+        setError(parseErrorMessage(err));
+        setSubscription(null);
+        setPayments([]);
+        setTimeline([]);
       } finally {
-        if (cancelled) return;
-        setLoading(false);
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
-    }
-
-    if (id) load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  const customer = useMemo(
-    () => customers.find((item) => item.id === subscription?.customer) ?? null,
-    [customers, subscription]
+    },
+    [subscriptionId]
   );
 
-  const product = useMemo(
-    () => products.find((item) => item.id === subscription?.product) ?? null,
-    [products, subscription]
+  useEffect(() => {
+    void loadPage("initial");
+  }, [loadPage]);
+
+  const financialSummary = subscription?.financial_summary;
+  const reconciliationFlags = subscription?.reconciliation_flags;
+  const winnerSummary = subscription?.winner_summary;
+  const currentDelivery = subscription?.delivery_summary;
+  const deliveryHistory = subscription?.deliveries ?? [];
+  const emis = useMemo(() => subscription?.emis ?? [], [subscription?.emis]);
+
+  const activePayments = useMemo(
+    () => payments.filter((payment) => !payment.is_reversed),
+    [payments]
+  );
+  const reversedPayments = useMemo(
+    () => payments.filter((payment) => payment.is_reversed),
+    [payments]
+  );
+  const waivedEmis = useMemo(
+    () => emis.filter((emi) => emi.status === "WAIVED"),
+    [emis]
   );
 
-  const batch = useMemo(
-    () => batches.find((item) => item.id === subscription?.batch) ?? null,
-    [batches, subscription]
+  const winnerStatus = resolveWinnerStatus(
+    subscription?.status,
+    subscription?.winner_status,
+    winnerSummary?.winner_status,
+    financialSummary?.winner_status
+  );
+  const winnerIntegrityIssues = useMemo(
+    () =>
+      (reconciliationFlags?.warnings ?? []).filter((warning) =>
+        /winner|waiv/i.test(warning)
+      ),
+    [reconciliationFlags]
   );
 
-  const partner = useMemo(
-    () => partners.find((item) => item.id === subscription?.partner) ?? null,
-    [partners, subscription]
-  );
-
-  const luckyId = useMemo(
-    () => luckyIds.find((item) => item.id === subscription?.lucky_id) ?? null,
-    [luckyIds, subscription]
-  );
-
-  const subscriptionEmis = useMemo(
-    () => emis.filter((item) => item.subscription === subscription?.id),
-    [emis, subscription]
-  );
-
-  const subscriptionPayments = useMemo(
-    () => payments.filter((item) => item.subscription === subscription?.id),
-    [payments, subscription]
-  );
-
-  const totalPaid = useMemo(
-    () => subscriptionPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    [subscriptionPayments]
-  );
-
-  const totalScheduled = useMemo(
-    () => subscriptionEmis.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    [subscriptionEmis]
-  );
-
-  const pendingEmiCount = useMemo(
-    () => subscriptionEmis.filter((item) => item.status === "PENDING").length,
-    [subscriptionEmis]
-  );
-
-  const paidEmiCount = useMemo(
-    () => subscriptionEmis.filter((item) => item.status === "PAID").length,
-    [subscriptionEmis]
-  );
-
-  const waivedEmiCount = useMemo(
-    () => subscriptionEmis.filter((item) => item.status === "WAIVED").length,
-    [subscriptionEmis]
-  );
-
-  function handlePrint(): void {
-    if (!subscription) return;
-
-    const popup = window.open("", "_blank", "width=900,height=700");
-    if (!popup) return;
-
-    popup.document.write(`
-      <html>
-        <head>
-          <title>Subscription #${subscription.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { margin-bottom: 8px; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-            .row { margin: 8px 0; }
-            .label { font-weight: bold; display: inline-block; min-width: 180px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>Subscription Details</h1>
-          <div class="card">
-            <div class="row"><span class="label">Subscription ID:</span> #${subscription.id}</div>
-            <div class="row"><span class="label">Customer:</span> ${customer?.name ?? "-"} (${customer?.phone ?? "-"})</div>
-            <div class="row"><span class="label">Product:</span> ${product?.name ?? "-"}</div>
-            <div class="row"><span class="label">Batch:</span> ${batch?.batch_code ?? "-"}</div>
-            <div class="row"><span class="label">Lucky ID:</span> ${luckyId ? `#${String(luckyId.lucky_number).padStart(2, "0")}` : "-"}</div>
-            <div class="row"><span class="label">Partner:</span> ${partner?.username ?? "-"}</div>
-            <div class="row"><span class="label">Plan:</span> ${subscription.plan_type}</div>
-            <div class="row"><span class="label">Tenure:</span> ${subscription.tenure_months} months</div>
-            <div class="row"><span class="label">Monthly Amount:</span> ${formatCurrency(subscription.monthly_amount)}</div>
-            <div class="row"><span class="label">Total Amount:</span> ${formatCurrency(subscription.total_amount)}</div>
-            <div class="row"><span class="label">Paid So Far:</span> ${formatCurrency(totalPaid)}</div>
-            <div class="row"><span class="label">Status:</span> ${subscription.status}</div>
-          </div>
-          <script>window.onload = function(){ window.print(); };</script>
-        </body>
-      </html>
-    `);
-
-    popup.document.close();
-  }
+  const financeWarnings = reconciliationFlags?.warnings ?? [];
+  const showReconciliationWarning =
+    financeWarnings.length > 0 || !reconciliationFlags?.is_financially_consistent;
 
   return (
     <PortalPage
-      title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"}
-      subtitle="Track EMI schedule, reconciliation checkpoints, and Lucky Plan allocation details."
+      title={
+        subscription
+          ? `Subscription #${subscription.id}`
+          : `Subscription #${subscriptionId ?? "—"}`
+      }
+      subtitle="Canonical subscription finance, winner waiver visibility, reversal history, and audit context."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Subscriptions", href: "/admin/subscriptions" },
+        {
+          label: subscription
+            ? `Subscription #${subscription.id}`
+            : `Subscription #${subscriptionId ?? "—"}`,
+        },
+      ]}
+      actions={[
+        {
+          href: "/admin/subscriptions",
+          label: "Back to Register",
+          variant: "secondary",
+        },
+        ...(subscription
+          ? [
+              {
+                href: `/admin/payments/create?subscription=${subscription.id}`,
+                label: "Collect Payment",
+                variant: "primary" as const,
+              },
+              {
+                href: `/admin/finance/commissions?subscription=${subscription.id}`,
+                label: "Commission Rows",
+                variant: "secondary" as const,
+              },
+              {
+                href: `/admin/deliveries?subscription=${subscription.id}`,
+                label: "Delivery Workspace",
+                variant: "secondary" as const,
+              },
+            ]
+          : []),
+        ...(subscription?.customer_id != null
+          ? [
+              {
+                href: `/admin/customers/${subscription.customer_id}`,
+                label: "Open Customer",
+                variant: "secondary" as const,
+              },
+            ]
+          : []),
+        ...(subscription?.batch_id != null
+          ? [
+              {
+                href: `/admin/batches/${subscription.batch_id}`,
+                label: "Open Batch",
+                variant: "secondary" as const,
+              },
+            ]
+          : []),
+      ]}
+      stats={[
+        {
+          label: "Status",
+          value: subscription?.status || "—",
+          tone: winnerStatus === "WON" ? "success" : undefined,
+        },
+        {
+          label: "Winner",
+          value:
+            winnerStatus === "WON"
+              ? `Month ${winnerSummary?.winner_month ?? subscription?.winner_month ?? "—"}`
+              : "Not won",
+          tone: winnerStatus === "WON" ? "success" : undefined,
+        },
+        {
+          label: "Waived EMI",
+          value: String(financialSummary?.emi_count_waived ?? subscription?.waived_emi_count ?? 0),
+          tone:
+            (financialSummary?.emi_count_waived ?? subscription?.waived_emi_count ?? 0) > 0
+              ? "success"
+              : undefined,
+        },
+        {
+          label: "Remaining",
+          value: financialSummary ? money(financialSummary.remaining_amount) : "—",
+          tone:
+            reconciliationFlags?.pending_matches_remaining === false ? "danger" : undefined,
+        },
+      ]}
+      statusBadge={{
+        label:
+          winnerStatus === "WON"
+            ? "WON"
+            : subscription?.status || "Subscription Detail",
+        tone:
+          winnerStatus === "WON"
+            ? "success"
+            : subscription?.status === "DEFAULTED"
+            ? "danger"
+            : "info",
+      }}
     >
-      <section
-        style={{
-          marginBottom: 16,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
-        <button type="button" onClick={() => router.push("/admin/subscriptions")}>
-          Back to Subscriptions
-        </button>
-        {subscription ? (
+      <div className="space-y-6">
+        {loading ? <LoadingBlock label="Loading subscription detail..." /> : null}
+
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load subscription detail"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error && !subscription ? (
+          <EmptyState
+            title="Subscription not available"
+            description="The requested subscription could not be loaded."
+          />
+        ) : null}
+
+        {!loading && !error && subscription && financialSummary && reconciliationFlags ? (
           <>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/payments/create?subscription=${subscription.id}`)}
+            <SectionCard
+              title={winnerStatus === "WON" ? "Winner and waiver status" : "Winner status"}
+              action={
+                <button
+                  type="button"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={refreshing || loading}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <svg
+                    className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              }
+              description="Winning state, lucky number, and future EMI waiver visibility from backend business truth."
             >
-              Collect EMI
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/customers/${subscription.customer}`)}
+              <div
+                className={[
+                  "rounded-xl px-4 py-3 text-sm",
+                  winnerStatus === "WON" && winnerIntegrityIssues.length === 0
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : winnerIntegrityIssues.length > 0
+                    ? "border border-red-200 bg-red-50 text-red-800"
+                    : "border border-border bg-muted/40 text-foreground",
+                ].join(" ")}
+              >
+                <div className="mb-2">
+                  <StatusBadge
+                    status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
+                    label={winnerStatus === "WON" ? "Winner recorded" : "Not won"}
+                  />
+                </div>
+                {winnerStatus === "WON"
+                  ? `Winner month ${winnerSummary?.winner_month ?? subscription.winner_month ?? "—"} is recorded. Waiver scope is ${
+                      winnerSummary?.waiver_scope || "FUTURE_EMI_ONLY"
+                    }.`
+                  : "No winner signal is currently recorded for this subscription."}
+              </div>
+
+              {winnerIntegrityIssues.length > 0 ? (
+                <ul className="mt-4 space-y-2 text-sm text-red-800">
+                  {winnerIntegrityIssues.map((warning) => (
+                    <li key={warning} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </SectionCard>
+
+            <section className="grid gap-6 xl:grid-cols-2">
+              <SectionCard
+                title="Contract overview"
+                description="Commercial, customer, product, batch, and assignment context."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
+                  <DetailValue
+                    label="Status"
+                    value={<StatusBadge status={winnerStatus === "WON" ? "WON" : subscription.status} />}
+                  />
+                  <DetailValue label="Customer" value={subscription.customer_name} />
+                  <DetailValue label="Phone" value={subscription.customer_phone} />
+                  <DetailValue label="Product" value={subscription.product_name} />
+                  <DetailValue label="Product Code" value={subscription.product_code} />
+                  <DetailValue label="Plan Type" value={subscription.plan_type} />
+                  <DetailValue label="Tenure" value={`${subscription.tenure_months} months`} />
+                  <DetailValue label="Batch" value={subscription.batch_code || "—"} />
+                  <DetailValue
+                    label="Batch Status"
+                    value={
+                      subscription.batch_status ? (
+                        <StatusBadge status={subscription.batch_status} />
+                      ) : (
+                        "—"
+                      )
+                    }
+                  />
+                  <DetailValue
+                    label="Lucky ID"
+                    value={subscription.lucky_id != null ? `#${subscription.lucky_id}` : "—"}
+                  />
+                  <DetailValue
+                    label="Lucky Number"
+                    value={formatLuckyNumber(subscription.lucky_number)}
+                  />
+                  <DetailValue label="Partner" value={subscription.partner_name || "—"} />
+                  <DetailValue label="Partner Phone" value={subscription.partner_phone || "—"} />
+                  <DetailValue label="Start Date" value={formatDate(subscription.start_date)} />
+                  <DetailValue label="Created At" value={formatDateTime(subscription.created_at)} />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Winner / lucky context"
+                description="Winning draw linkage and waived EMI posture."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailValue
+                    label="Winner Status"
+                    value={<StatusBadge status={winnerStatus === "WON" ? "WON" : "NOT_WON"} label={winnerStatus === "WON" ? "Won" : "Not won"} />}
+                  />
+                  <DetailValue
+                    label="Winner Month"
+                    value={
+                      winnerSummary?.winner_month != null
+                        ? `Month ${winnerSummary.winner_month}`
+                        : subscription.winner_month != null
+                        ? `Month ${subscription.winner_month}`
+                        : "—"
+                    }
+                  />
+                  <DetailValue
+                    label="Lucky Number"
+                    value={formatLuckyNumber(winnerSummary?.lucky_number ?? subscription.lucky_number)}
+                  />
+                  <DetailValue
+                    label="Draw Reference"
+                    value={
+                      winnerSummary?.draw_id != null
+                        ? `Draw #${winnerSummary.draw_id} · Month ${winnerSummary.draw_month ?? "—"}`
+                        : "—"
+                    }
+                  />
+                  <DetailValue
+                    label="Draw Revealed"
+                    value={formatDateTime(winnerSummary?.draw_revealed_at)}
+                  />
+                  <DetailValue
+                    label="Waiver Scope"
+                    value={winnerSummary?.waiver_scope || "—"}
+                  />
+                  <DetailValue
+                    label="Waived EMI Count"
+                    value={String(winnerSummary?.waived_emi_count ?? financialSummary.emi_count_waived)}
+                  />
+                  <DetailValue
+                    label="Waived Amount"
+                    value={money(winnerSummary?.waived_amount ?? financialSummary.waived_amount)}
+                  />
+                </div>
+              </SectionCard>
+            </section>
+
+            <SectionCard
+              title="Delivery tracking"
+              description="Current fulfillment path, receiver details, and historical delivery records for this subscription."
             >
-              View Customer
-            </button>
-            <button type="button" onClick={handlePrint}>
-              Print Details
-            </button>
+              {currentDelivery ? (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <DetailValue label="Fulfillment Status" value={subscription.fulfillment_status || "—"} />
+                    <DetailValue label="Current Delivery Status" value={currentDelivery.status} />
+                    <DetailValue label="Delivery Reference" value={currentDelivery.delivery_reference} />
+                    <DetailValue label="Scheduled Date" value={formatDate(currentDelivery.scheduled_date)} />
+                    <DetailValue label="Dispatched At" value={formatDateTime(currentDelivery.dispatched_at)} />
+                    <DetailValue
+                      label="Out for Delivery"
+                      value={formatDateTime(currentDelivery.out_for_delivery_at)}
+                    />
+                    <DetailValue label="Delivered At" value={formatDateTime(currentDelivery.delivered_at)} />
+                    <DetailValue label="Receiver" value={currentDelivery.receiver_name || "—"} />
+                    <DetailValue label="Receiver Phone" value={currentDelivery.receiver_phone || "—"} />
+                    <DetailValue
+                      label="Address Snapshot"
+                      value={currentDelivery.delivery_address_snapshot || "—"}
+                    />
+                    <DetailValue label="Notes" value={currentDelivery.notes || "—"} />
+                    <DetailValue label="Failure Reason" value={currentDelivery.failure_reason || "—"} />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href={`/admin/deliveries/${currentDelivery.id}`}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open Delivery Detail
+                    </Link>
+                    <Link
+                      href={`/admin/deliveries?subscription=${subscription.id}`}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open Delivery Workspace
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                  No delivery record exists for this subscription yet. Create one from the delivery workspace when the item is ready for scheduling or dispatch.
+                </div>
+              )}
+
+              {deliveryHistory.length > 0 ? (
+                <div className="mt-6 overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="text-left">
+                        {["Reference", "Status", "Scheduled", "Delivered", "Receiver"].map((label) => (
+                          <th
+                            key={label}
+                            className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          >
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deliveryHistory.map((row) => (
+                        <tr key={row.id}>
+                          <td className="border-b border-border px-4 py-3 text-sm">
+                            <Link
+                              href={`/admin/deliveries/${row.id}`}
+                              className="font-medium text-primary underline-offset-4 hover:underline"
+                            >
+                              {row.delivery_reference}
+                            </Link>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm">
+                            <StatusBadge status={row.status} />
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm">
+                            {formatDate(row.scheduled_date)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm">
+                            {formatDateTime(row.delivered_at)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm">
+                            {row.receiver_name || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </SectionCard>
+
+            <SectionCard
+              title="Financial position"
+              description="Canonical ledger-aware finance summary for this subscription."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DetailValue label="Total Contract Value" value={money(financialSummary.total_amount)} />
+                <DetailValue label="EMI Schedule Total" value={money(financialSummary.total_emi_amount)} />
+                <DetailValue label="Paid Amount" value={money(financialSummary.paid_amount)} />
+                <DetailValue label="Reversed Amount" value={money(financialSummary.reversed_amount)} />
+                <DetailValue label="Waived Amount" value={money(financialSummary.waived_amount)} />
+                <DetailValue label="Pending Amount" value={money(financialSummary.pending_amount)} />
+                <DetailValue label="Remaining Amount" value={money(financialSummary.remaining_amount)} />
+                <DetailValue label="Monthly Amount" value={money(subscription.monthly_amount)} />
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DetailValue label="Stored Waived Amount" value={money(financialSummary.stored_waived_amount)} />
+                <DetailValue label="Waiver Ledger Amount" value={money(financialSummary.waiver_ledger_amount)} />
+                <DetailValue label="Active Payments" value={String(activePayments.length)} />
+                <DetailValue label="Reversed Payments" value={String(reversedPayments.length)} />
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Reconciliation status"
+              description="Backend flags for remaining balance alignment, reversals, waivers, and warning conditions."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DetailValue
+                  label="Financially Consistent"
+                  value={reconciliationFlags.is_financially_consistent ? "Yes" : "No"}
+                />
+                <DetailValue
+                  label="Pending Matches Remaining"
+                  value={reconciliationFlags.pending_matches_remaining ? "Yes" : "No"}
+                />
+                <DetailValue
+                  label="Reversal History"
+                  value={reconciliationFlags.has_reversal_history ? "Yes" : "No"}
+                />
+                <DetailValue
+                  label="Waiver History"
+                  value={reconciliationFlags.has_waiver_history ? "Yes" : "No"}
+                />
+              </div>
+
+              {showReconciliationWarning ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
+                  <div className="font-semibold">
+                    Review required
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {financeWarnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  Pending, waived, reversed, and remaining amounts align with the canonical backend summary.
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="EMI schedule"
+              description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
+            >
+              {emis.length === 0 ? (
+                <EmptyState
+                  title="No EMI schedule found"
+                  description="This subscription does not currently expose EMI rows."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Month
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Due Date
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Amount
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Paid
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Reversed
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Waived
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Balance
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Status
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Notes
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emis.map((emi) => (
+                        <tr key={emi.id} className="align-top">
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            Month {emi.month_no}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {formatDate(emi.due_date)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {money(emi.amount)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {money(emi.paid_amount)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {money(emi.reversed_amount)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {money(emi.waived_amount)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {money(emi.balance_amount)}
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <StatusBadge
+                              status={emi.status}
+                              isOverdue={emi.is_overdue}
+                            />
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-muted-foreground">
+                            <div className="space-y-1">
+                              {emi.is_overdue ? <div>Overdue</div> : null}
+                              {!emi.is_status_consistent ? (
+                                <div>
+                                  Derived finance state suggests {emi.derived_status}.
+                                </div>
+                              ) : null}
+                              {emi.warnings.map((warning) => (
+                                <div key={warning}>{warning}</div>
+                              ))}
+                              {emi.warnings.length === 0 && emi.is_status_consistent ? "—" : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+
+            <section className="grid gap-6 xl:grid-cols-2">
+              <SectionCard
+                title="Waived EMI rows"
+                description="Future waived rows should be visible distinctly and never rewrite already paid installments."
+              >
+                {waivedEmis.length === 0 ? (
+                  <EmptyState
+                    title="No waived EMI rows"
+                    description="No waived EMI rows are currently visible for this subscription."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {waivedEmis.map((emi) => (
+                      <div
+                        key={emi.id}
+                        className="rounded-xl border border-blue-200 bg-blue-50 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-blue-900">
+                              Month {emi.month_no}
+                            </div>
+                            <div className="mt-1 text-xs text-blue-800">
+                              Due {formatDate(emi.due_date)}
+                            </div>
+                            <div className="mt-1 text-xs text-blue-800">
+                              Waiver ledger: {money(emi.waiver_ledger_amount)}
+                            </div>
+                          </div>
+                          <div className="text-right text-sm font-semibold text-blue-900">
+                            <div>{money(emi.amount)}</div>
+                            {emi.warnings.length > 0 ? (
+                              <div className="mt-1 text-xs font-normal text-blue-800">
+                                {emi.warnings.join(" ")}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+
+              <SectionCard
+                title="Recent payments"
+                description="Operational payment visibility with reversed rows clearly marked."
+              >
+                {payments.length === 0 ? (
+                  <EmptyState
+                    title="No payments recorded"
+                    description="No payment rows are currently visible for this subscription."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {payments.slice(0, 10).map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="rounded-xl border border-border bg-muted/40 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-foreground">
+                              Payment #{payment.id} · {money(payment.amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {payment.method} · {formatDate(payment.payment_date)}
+                              {payment.emi_month_no != null
+                                ? ` · EMI Month ${payment.emi_month_no}`
+                                : ""}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Ref: {payment.reference_no || "—"} · Collected by:{" "}
+                              {payment.collected_by_username || "—"}
+                            </div>
+                          </div>
+
+                          <span
+                            className={[
+                              "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                              payment.is_reversed
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                            ].join(" ")}
+                          >
+                            {payment.is_reversed ? "REVERSED" : "ACTIVE"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            </section>
+
+            <SectionCard
+              title="Audit timeline"
+              description="Chronological audit visibility for subscription and EMI actions."
+            >
+              {timeline.length === 0 ? (
+                <EmptyState
+                  title="No audit events"
+                  description="No audit trail entries are currently visible for this subscription."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {timeline.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-border bg-muted/30 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-medium text-foreground">
+                          {item.action_type}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDateTime(item.created_at)}
+                        </div>
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        {item.model_name} #{item.object_id ?? "—"} · by{" "}
+                        {item.performed_by || "system"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
           </>
         ) : null}
-      </section>
-
-      {loading ? <p>Loading subscription details...</p> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-
-      {!loading && !error && subscription ? (
-        <>
-          <section
-            style={{
-              marginBottom: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-              gap: 10,
-            }}
-          >
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Contract Value: <b>{formatCurrency(subscription.total_amount)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Monthly EMI: <b>{formatCurrency(subscription.monthly_amount)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Paid So Far: <b>{formatCurrency(totalPaid)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Scheduled Total: <b>{formatCurrency(totalScheduled)}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Paid EMI Count: <b>{paidEmiCount}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Pending EMI Count: <b>{pendingEmiCount}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Waived EMI Count: <b>{waivedEmiCount}</b>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-              Status: <b>{subscription.status}</b>
-            </div>
-          </section>
-
-          <section
-            style={{
-              marginBottom: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-              gap: 16,
-            }}
-          >
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Subscription Information</h3>
-              <p><b>Subscription ID:</b> #{subscription.id}</p>
-              <p><b>Plan Type:</b> {subscription.plan_type}</p>
-              <p><b>Tenure:</b> {subscription.tenure_months} months</p>
-              <p><b>Start Date:</b> {subscription.start_date}</p>
-              <p><b>Status:</b> {subscription.status}</p>
-              <p><b>Winner Month:</b> {subscription.winner_month ?? "-"}</p>
-              <p><b>Waived Amount:</b> {formatCurrency(subscription.waived_amount)}</p>
-            </div>
-
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Customer / Allocation</h3>
-              <p><b>Customer:</b> {customer?.name ?? "-"}</p>
-              <p><b>Phone:</b> {customer?.phone ?? "-"}</p>
-              <p><b>KYC:</b> {customer?.kyc_status ?? "-"}</p>
-              <p><b>Product:</b> {product?.name ?? "-"}</p>
-              <p><b>Product Code:</b> {product?.product_code ?? "-"}</p>
-              <p><b>Batch:</b> {batch?.batch_code ?? "-"}</p>
-              <p><b>Lucky ID:</b> {luckyId ? `#${String(luckyId.lucky_number).padStart(2, "0")}` : "-"}</p>
-              <p><b>Partner:</b> {partner?.username ?? "-"}</p>
-            </div>
-          </section>
-
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-            <h3 style={{ marginTop: 0 }}>EMI Schedule</h3>
-
-            {subscriptionEmis.length === 0 ? (
-              <p>No EMI schedule found for this subscription.</p>
-            ) : (
-              <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Due Date</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptionEmis
-                    .slice()
-                    .sort((a, b) => a.month_no - b.month_no)
-                    .map((emi) => (
-                      <tr key={emi.id}>
-                        <td>{emi.month_no}</td>
-                        <td>{emi.due_date}</td>
-                        <td>{formatCurrency(emi.amount)}</td>
-                        <td>{emi.status}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Payment Ledger</h3>
-
-            {subscriptionPayments.length === 0 ? (
-              <p>No payments recorded yet.</p>
-            ) : (
-              <table border={1} cellPadding={8} cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th>Payment ID</th>
-                    <th>Date</th>
-                    <th>Amount</th>
-                    <th>Method</th>
-                    <th>Reference</th>
-                    <th>EMI ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptionPayments.map((payment) => (
-                    <tr key={payment.id}>
-                      <td>{payment.id}</td>
-                      <td>{payment.payment_date}</td>
-                      <td>{formatCurrency(payment.amount)}</td>
-                      <td>{payment.method}</td>
-                      <td>{payment.reference_no || "-"}</td>
-                      <td>{payment.emi ?? "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </>
-      ) : null}
+      </div>
     </PortalPage>
   );
 }

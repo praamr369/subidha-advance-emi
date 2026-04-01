@@ -1,22 +1,61 @@
 from django.urls import path
 from rest_framework import serializers, status
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from api.v1.serializers.public import PublicProductSerializer
 from subscriptions.models import Batch, LuckyDraw, Product, Subscription
-
-
+from subscriptions.services.public_lead_service import create_public_lead
 
 
 class PublicLeadSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     phone = serializers.RegexField(regex=r"^\d{10}$")
     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    product_id = serializers.IntegerField(required=False, allow_null=True)
     interested_product = serializers.CharField(max_length=255, required=False, allow_blank=True)
     preferred_emi_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
 
+
+def _serialize_public_winner(draw: LuckyDraw):
+    subscription = draw.winner_subscription
+
+    if not subscription and draw.winner_lucky_id_id:
+        subscription = (
+            draw.winner_lucky_id.subscriptions.select_related("customer", "product")
+            .order_by("id")
+            .first()
+        )
+
+    customer_name = None
+    product_name = None
+
+    if subscription:
+        customer = getattr(subscription, "customer", None)
+        product = getattr(subscription, "product", None)
+        customer_name = getattr(customer, "name", None)
+        product_name = getattr(product, "name", None)
+
+    lucky_number = getattr(draw.winner_lucky_id, "lucky_number", None)
+
+    return {
+        "id": draw.id,
+        "batch": draw.batch.batch_code,
+        "batch_code": draw.batch.batch_code,
+        "month": draw.draw_month,
+        "draw_month": draw.draw_month,
+        "draw_date": draw.draw_date,
+        "revealed_at": draw.revealed_at,
+        "lucky_id": f"{lucky_number:02d}" if lucky_number is not None else None,
+        "winner_lucky_id": draw.winner_lucky_id_id,
+        "customer_name": customer_name,
+        "product_name": product_name,
+        "committed_hash": draw.committed_hash,
+        "waived_emi_count": draw.waived_emi_count,
+        "waived_amount": str(draw.waived_amount),
+    }
 
 
 class PublicStatsView(APIView):
@@ -24,62 +63,47 @@ class PublicStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        total_batches = Batch.objects.count()
-        total_subscriptions = Subscription.objects.count()
-        active_subscriptions = Subscription.objects.filter(
-            status="ACTIVE"
-        ).count()
-        total_winners = Subscription.objects.filter(
-            status="WON"
-        ).count()
-
-        return Response({
-            "total_batches": total_batches,
-            "total_subscriptions": total_subscriptions,
-            "active_subscriptions": active_subscriptions,
-            "total_winners": total_winners,
-        })
+        return Response(
+            {
+                "total_batches": Batch.objects.count(),
+                "total_subscriptions": Subscription.objects.count(),
+                "active_subscriptions": Subscription.objects.filter(status="ACTIVE").count(),
+                "total_winners": Subscription.objects.filter(status="WON").count(),
+            }
+        )
 
 
 class PublicProductsView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-
     def get(self, request):
-        products = Product.objects.order_by("name", "id").values(
-            "id",
-            "product_code",
-            "name",
-            "base_price",
-        )
-
-        return Response(
-            {
-                "count": products.count(),
-                "results": list(products),
-            }
-        )
+        products = Product.objects.filter(is_active=True).order_by("name", "id")
+        serializer = PublicProductSerializer(products, many=True, context={'request': request})
+        return Response({"count": products.count(), "results": serializer.data})
 
 
-    def get(self, request):
-        products = Product.objects.order_by("name", "id").values(
-            "id",
-            "product_code",
-            "name",
-            "base_price",
-        )
-
-        return Response(
-            {
-                "count": products.count(),
-                "results": list(products),
-            }
-        )
-
-class PublicLeadView(APIView):
+class PublicProductDetailView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+
+    def get(self, request, id):
+        try:
+            product = Product.objects.get(id=id, is_active=True)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        data = {
+            "id": product.id,
+            "product_code": product.product_code,
+            "name": product.name,
+            "base_price": str(product.base_price),
+            "category": product.category,
+            "subcategory": product.subcategory,
+            "image": product.image.url if product.image else None,
+            "description": product.description,
+        }
+        return Response(data)
 
 
 class PublicLeadView(APIView):
@@ -89,20 +113,42 @@ class PublicLeadView(APIView):
     def post(self, request):
         serializer = PublicLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        validated = serializer.validated_data.copy()
+        product = None
+        product_id = validated.pop("product_id", None)
+
+        if product_id is not None:
+            try:
+                product = Product.objects.get(id=product_id, is_active=True)
+            except Product.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"product_id": "Selected product is not available."}
+                )
+
+        lead = create_public_lead(product=product, **validated)
+
         return Response(
-            {"message": "Lead submitted successfully", "data": serializer.validated_data},
+            {
+                "message": "Lead submitted successfully",
+                "lead_id": lead.id,
+                "created_at": lead.created_at,
+                "data": {
+                    "name": lead.name,
+                    "phone": lead.phone,
+                    "city": lead.city,
+                    "product_id": lead.product_id,
+                    "interested_product": lead.interested_product,
+                    "preferred_emi_amount": (
+                        str(lead.preferred_emi_amount)
+                        if lead.preferred_emi_amount is not None
+                        else None
+                    ),
+                    "notes": lead.notes,
+                },
+            },
             status=status.HTTP_201_CREATED,
         )
-
-    def post(self, request):
-        serializer = PublicLeadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(
-            {"message": "Lead submitted successfully", "data": serializer.validated_data},
-            status=status.HTTP_201_CREATED,
-        )
-
-
 
 
 class LatestWinnerView(APIView):
@@ -111,42 +157,73 @@ class LatestWinnerView(APIView):
 
     def get(self, request):
         latest = (
-            LuckyDraw.objects
-            .filter(is_revealed=True)
-            .select_related("batch", "winner_lucky_id")
+            LuckyDraw.objects.filter(is_revealed=True)
+            .select_related(
+                "batch",
+                "winner_lucky_id",
+                "winner_subscription__customer",
+                "winner_subscription__product",
+            )
             .order_by("-draw_date")
             .first()
         )
 
-        if not latest:
+        if not latest or not latest.winner_lucky_id:
             return Response({"winner": None})
 
-        lucky = latest.winner_lucky_id
+        return Response({"winner": _serialize_public_winner(latest)})
 
-        subscription = lucky.subscription_set.select_related("customer").first()
-        if not subscription:
-            return Response({"winner": None})
 
-        return Response({
-            "winner": {
-                "lucky_id": f"{lucky.lucky_number:02d}",
-                "customer_name": subscription.customer.name,
-                "batch": latest.batch.batch_code,
-                "month": latest.draw_month,
-                "draw_date": latest.draw_date,
+class PublicWinnerHistoryView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        limit_raw = (request.query_params.get("limit") or "").strip()
+
+        try:
+            limit = int(limit_raw) if limit_raw else 24
+        except ValueError:
+            limit = 24
+
+        limit = max(1, min(limit, 100))
+
+        queryset = (
+            LuckyDraw.objects.filter(is_revealed=True, winner_lucky_id__isnull=False)
+            .select_related(
+                "batch",
+                "winner_lucky_id",
+                "winner_subscription__customer",
+                "winner_subscription__product",
+            )
+            .order_by("-draw_date", "-id")[:limit]
+        )
+
+        results = [_serialize_public_winner(draw) for draw in queryset]
+
+        return Response(
+            {
+                "count": len(results),
+                "limit": limit,
+                "results": results,
             }
-        })
+        )
+
+
+class PublicHealthView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({"status": "ok"})
 
 
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
-
+    path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
-
-
-    path("leads/", PublicLeadView.as_view(), name="public-leads"),
-
-
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),
+    path("winner-history/", PublicWinnerHistoryView.as_view(), name="public-winner-history"),
+    path("health/", PublicHealthView.as_view(), name="public-health"),
 ]

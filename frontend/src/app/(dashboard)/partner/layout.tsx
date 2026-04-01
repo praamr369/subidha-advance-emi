@@ -1,18 +1,8 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import RoleLayout from "@/components/layout/RoleLayout";
+import DashboardShell from "@/components/layout/DashboardShell";
+import RoleGuard from "@/components/guards/RoleGuard";
 
 export default function PartnerLayout({ children }: { children: ReactNode }) {
-  return (
-    <RoleLayout
-      title="Partner"
-      links={[
-        { href: "/partner/dashboard", label: "Dashboard" },
-        { href: "/partner/customers", label: "Customers" },
-        { href: "/partner/payouts", label: "Payouts" },
-      ]}
-    >
-      {children}
-    </RoleLayout>
-  );
+  return <RoleGuard allowedRoles={["PARTNER"]}><DashboardShell>{children}</DashboardShell></RoleGuard>;
 }

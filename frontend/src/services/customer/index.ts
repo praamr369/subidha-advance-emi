@@ -1,0 +1,829 @@
+import { apiFetch } from "@/lib/api";
+import type { DeliveryRecord } from "@/services/deliveries";
+import { normalizeDeliveryRecord } from "@/services/deliveries";
+
+export type CustomerEmi = {
+  id: number;
+  subscription?: number;
+  sequence_no?: number;
+  month_no?: number;
+  due_date?: string;
+  amount?: number | string;
+  paid_amount?: number | string;
+  waived_amount?: number | string;
+  outstanding_amount?: number | string;
+  status?: string;
+  updated_at?: string;
+  paid_at?: string;
+};
+
+export type CustomerSubscriptionFinancialSummary = {
+  emi_total?: number | string;
+  paid_amount?: number | string;
+  waived_amount?: number | string;
+  outstanding_amount?: number | string;
+};
+
+export type CustomerSubscription = {
+  id: number;
+  subscription_number?: string;
+  status?: string;
+  start_date?: string;
+
+  plan_type?: string;
+  total_amount?: number | string;
+  monthly_amount?: number | string;
+  tenure_months?: number;
+
+  product?: number;
+  batch?: number | null;
+  lucky_id?: number | null;
+
+  product_name?: string;
+  batch_code?: string | null;
+  lucky_number?: number | null;
+  emi_count?: number;
+  paid_emi_count?: number;
+  pending_emi_count?: number;
+  waived_emi_count?: number;
+  total_paid_amount?: number | string;
+  outstanding_amount?: number | string;
+  last_payment_date?: string;
+  next_due_date?: string;
+
+  winner_month?: number | null;
+  waived_amount?: number | string;
+  delivery_status?: string;
+  contract_reference?: string | null;
+  fulfillment_status?: string;
+  product_snapshot?: Record<string, unknown> | null;
+  pricing_snapshot?: Record<string, unknown> | null;
+  created_at?: string;
+
+  financial_summary?: CustomerSubscriptionFinancialSummary;
+  delivery_summary?: DeliveryRecord | null;
+  deliveries?: DeliveryRecord[];
+  emis?: CustomerEmi[];
+};
+
+export type CustomerDashboardResponse = {
+  customer: {
+    id: number;
+    name: string;
+    phone: string;
+    kyc_status: string;
+  };
+  summary: {
+    active_subscriptions: number;
+    pending_emis: number;
+    paid_emis: number;
+    total_paid_amount: number | string;
+    waived_emis?: number;
+    outstanding_amount?: number | string;
+    under_verification_requests?: number;
+  };
+  subscriptions: CustomerSubscription[];
+};
+
+export type CustomerProfileResponse = {
+  id: number;
+  name: string;
+  phone: string;
+  kyc_status: string;
+  username: string;
+  summary: {
+    total_subscriptions: number;
+    active_subscriptions: number;
+    won_subscriptions: number;
+    completed_subscriptions: number;
+    pending_emis: number;
+    paid_emis: number;
+    waived_emis: number;
+    total_paid_amount: number | string;
+  };
+};
+
+export type CustomerSubscriptionListResponse = {
+  count: number;
+  results: CustomerSubscription[];
+};
+
+export type CustomerPayment = {
+  id: number;
+  customer?: number;
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_phone?: string;
+  subscription: number;
+  subscription_id?: number | null;
+  subscription_number?: string;
+  subscription_status?: string;
+  subscription_plan_type?: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  product_code?: string | null;
+  emi?: number | null;
+  emi_id?: number | null;
+  emi_month_no?: number | null;
+  emi_due_date?: string | null;
+  emi_amount?: string | null;
+  emi_status?: string | null;
+  batch?: number | null;
+  batch_id?: number | null;
+  batch_code?: string | null;
+  lucky_id?: number | null;
+  lucky_number?: number | null;
+  amount: string;
+  method: string;
+  reference_no?: string | null;
+  payment_date: string;
+  allocation_metadata?: Record<string, unknown> | null;
+  is_reversed?: boolean;
+  reversal_metadata?: Record<string, unknown> | null;
+  paid_at?: string;
+  collected_by?: number | null;
+  collected_by_id?: number | null;
+  collected_by_username?: string | null;
+  verified_by?: number | null;
+  verified_by_id?: number | null;
+  verified_by_username?: string | null;
+  created_at?: string;
+};
+
+export type CustomerPaymentListResponse = {
+  count: number;
+  total_paid_amount: number | string;
+  results: CustomerPayment[];
+};
+
+export type CustomerCollectionRequest = {
+  id: number | string;
+  subscription_id?: number | string;
+  subscription_number?: string;
+  amount?: number | string;
+  method?: string;
+  payment_date?: string;
+  submitted_at?: string;
+  status?: string;
+  reference_no?: string | null;
+  rejection_reason?: string | null;
+};
+
+export type CustomerCollectionRequestListResponse = {
+  count: number;
+  results: CustomerCollectionRequest[];
+};
+
+export type CustomerSupportRequest = {
+  id: number;
+  customer?: number | null;
+  customer_name?: string;
+  customer_phone?: string;
+  payment?: number | null;
+  payment_reference_no?: string | null;
+  payment_amount?: string | null;
+  payment_method?: string | null;
+  payment_date?: string | null;
+  subscription?: number | null;
+  subscription_number?: string | null;
+  category: string;
+  message: string;
+  status: string;
+  resolution_summary?: string;
+  resolved_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CustomerSupportRequestListResponse = {
+  count: number;
+  results: CustomerSupportRequest[];
+};
+
+export type CustomerSupportRequestCreateResponse = {
+  detail?: string;
+  request: CustomerSupportRequest;
+};
+
+type LegacyPaginatedResponse<T> = {
+  count?: number;
+  results?: T[];
+};
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+}
+
+function toMoneyString(value: unknown, fallback = "0.00"): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(2);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : fallback;
+  }
+
+  return fallback;
+}
+
+function toStringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function toBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  return undefined;
+}
+
+function toRecordOrNull(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+function toArray<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as LegacyPaginatedResponse<T>).results)
+  ) {
+    return (payload as LegacyPaginatedResponse<T>).results as T[];
+  }
+
+  return [];
+}
+
+function normalizeCustomerEmi(item: unknown): CustomerEmi {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: toNumber(row.id),
+    subscription:
+      row.subscription === null || row.subscription === undefined
+        ? undefined
+        : toNumber(row.subscription),
+    sequence_no:
+      row.sequence_no === null || row.sequence_no === undefined
+        ? undefined
+        : toNumber(row.sequence_no),
+    month_no:
+      row.month_no === null || row.month_no === undefined
+        ? undefined
+        : toNumber(row.month_no),
+    due_date: toStringOrUndefined(row.due_date),
+    amount:
+      row.amount === null || row.amount === undefined
+        ? undefined
+        : toMoneyString(row.amount),
+    paid_amount:
+      row.paid_amount === null || row.paid_amount === undefined
+        ? undefined
+        : toMoneyString(row.paid_amount),
+    waived_amount:
+      row.waived_amount === null || row.waived_amount === undefined
+        ? undefined
+        : toMoneyString(row.waived_amount),
+    outstanding_amount:
+      row.outstanding_amount === null || row.outstanding_amount === undefined
+        ? undefined
+        : toMoneyString(row.outstanding_amount),
+    status: toStringOrUndefined(row.status),
+    updated_at: toStringOrUndefined(row.updated_at),
+    paid_at: toStringOrUndefined(row.paid_at),
+  };
+}
+
+function normalizeFinancialSummary(
+  item: unknown
+): CustomerSubscriptionFinancialSummary {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    emi_total:
+      row.emi_total === null || row.emi_total === undefined
+        ? undefined
+        : toMoneyString(row.emi_total),
+    paid_amount:
+      row.paid_amount === null || row.paid_amount === undefined
+        ? undefined
+        : toMoneyString(row.paid_amount),
+    waived_amount:
+      row.waived_amount === null || row.waived_amount === undefined
+        ? undefined
+        : toMoneyString(row.waived_amount),
+    outstanding_amount:
+      row.outstanding_amount === null || row.outstanding_amount === undefined
+        ? undefined
+        : toMoneyString(row.outstanding_amount),
+  };
+}
+
+function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: toNumber(row.id),
+    subscription_number: toStringOrUndefined(row.subscription_number),
+    status: toStringOrUndefined(row.status),
+    start_date: toStringOrUndefined(row.start_date),
+
+    plan_type: toStringOrUndefined(row.plan_type),
+    total_amount:
+      row.total_amount === null || row.total_amount === undefined
+        ? undefined
+        : toMoneyString(row.total_amount),
+    monthly_amount:
+      row.monthly_amount === null || row.monthly_amount === undefined
+        ? undefined
+        : toMoneyString(row.monthly_amount),
+    tenure_months:
+      row.tenure_months === null || row.tenure_months === undefined
+        ? undefined
+        : toNumber(row.tenure_months),
+
+    product:
+      row.product === null || row.product === undefined
+        ? undefined
+        : toNumber(row.product),
+    batch:
+      row.batch === null || row.batch === undefined ? null : toNumber(row.batch),
+    lucky_id:
+      row.lucky_id === null || row.lucky_id === undefined
+        ? null
+        : toNumber(row.lucky_id),
+
+    product_name: toStringOrUndefined(row.product_name),
+    batch_code: toStringOrUndefined(row.batch_code) ?? null,
+    lucky_number:
+      row.lucky_number === null || row.lucky_number === undefined
+        ? null
+        : toNumber(row.lucky_number),
+    emi_count:
+      row.emi_count === null || row.emi_count === undefined
+        ? undefined
+        : toNumber(row.emi_count),
+    paid_emi_count:
+      row.paid_emi_count === null || row.paid_emi_count === undefined
+        ? undefined
+        : toNumber(row.paid_emi_count),
+    pending_emi_count:
+      row.pending_emi_count === null || row.pending_emi_count === undefined
+        ? undefined
+        : toNumber(row.pending_emi_count),
+    waived_emi_count:
+      row.waived_emi_count === null || row.waived_emi_count === undefined
+        ? undefined
+        : toNumber(row.waived_emi_count),
+    total_paid_amount:
+      row.total_paid_amount === null || row.total_paid_amount === undefined
+        ? undefined
+        : toMoneyString(row.total_paid_amount),
+    outstanding_amount:
+      row.outstanding_amount === null || row.outstanding_amount === undefined
+        ? undefined
+        : toMoneyString(row.outstanding_amount),
+    last_payment_date: toStringOrUndefined(row.last_payment_date),
+    next_due_date: toStringOrUndefined(row.next_due_date),
+
+    winner_month:
+      row.winner_month === null || row.winner_month === undefined
+        ? null
+        : toNumber(row.winner_month),
+    waived_amount:
+      row.waived_amount === null || row.waived_amount === undefined
+        ? undefined
+        : toMoneyString(row.waived_amount),
+    delivery_status: toStringOrUndefined(row.delivery_status),
+    contract_reference: toStringOrUndefined(row.contract_reference) ?? null,
+    fulfillment_status: toStringOrUndefined(row.fulfillment_status),
+    product_snapshot:
+      row.product_snapshot && typeof row.product_snapshot === "object"
+        ? (row.product_snapshot as Record<string, unknown>)
+        : null,
+    pricing_snapshot:
+      row.pricing_snapshot && typeof row.pricing_snapshot === "object"
+        ? (row.pricing_snapshot as Record<string, unknown>)
+        : null,
+    created_at: toStringOrUndefined(row.created_at),
+
+    financial_summary: normalizeFinancialSummary(row.financial_summary),
+    delivery_summary:
+      row.delivery_summary === null || row.delivery_summary === undefined
+        ? null
+        : normalizeDeliveryRecord(row.delivery_summary),
+    deliveries: toArray(row.deliveries).map(normalizeDeliveryRecord),
+    emis: toArray(row.emis).map(normalizeCustomerEmi),
+  };
+}
+
+function normalizeCustomerPayment(item: unknown): CustomerPayment {
+  const row = (item ?? {}) as Record<string, unknown>;
+  const subscriptionId =
+    row.subscription_id === null || row.subscription_id === undefined
+      ? row.subscription
+      : row.subscription_id;
+  const emiId =
+    row.emi_id === null || row.emi_id === undefined ? row.emi : row.emi_id;
+  const batchId =
+    row.batch_id === null || row.batch_id === undefined ? row.batch : row.batch_id;
+  const customerId =
+    row.customer_id === null || row.customer_id === undefined
+      ? row.customer
+      : row.customer_id;
+
+  return {
+    id: toNumber(row.id),
+    customer:
+      row.customer === null || row.customer === undefined
+        ? undefined
+        : toNumber(row.customer),
+    customer_id:
+      customerId === null || customerId === undefined ? null : toNumber(customerId),
+    customer_name: toStringOrUndefined(row.customer_name),
+    customer_phone: toStringOrUndefined(row.customer_phone),
+    subscription: toNumber(subscriptionId),
+    subscription_id:
+      subscriptionId === null || subscriptionId === undefined
+        ? null
+        : toNumber(subscriptionId),
+    subscription_number:
+      toStringOrUndefined(row.subscription_number) ??
+      (subscriptionId === null || subscriptionId === undefined
+        ? undefined
+        : `SUB-${toNumber(subscriptionId)}`),
+    subscription_status: toStringOrUndefined(row.subscription_status),
+    subscription_plan_type:
+      toStringOrUndefined(row.subscription_plan_type) ?? null,
+    product_id:
+      row.product_id === null || row.product_id === undefined
+        ? null
+        : toNumber(row.product_id),
+    product_name: toStringOrUndefined(row.product_name) ?? null,
+    product_code: toStringOrUndefined(row.product_code) ?? null,
+    emi:
+      emiId === null || emiId === undefined ? null : toNumber(emiId),
+    emi_id: emiId === null || emiId === undefined ? null : toNumber(emiId),
+    emi_month_no:
+      row.emi_month_no === null || row.emi_month_no === undefined
+        ? null
+        : toNumber(row.emi_month_no),
+    emi_due_date: toStringOrUndefined(row.emi_due_date) ?? null,
+    emi_amount:
+      row.emi_amount === null || row.emi_amount === undefined
+        ? null
+        : toMoneyString(row.emi_amount),
+    emi_status: toStringOrUndefined(row.emi_status) ?? null,
+    batch: batchId === null || batchId === undefined ? null : toNumber(batchId),
+    batch_id: batchId === null || batchId === undefined ? null : toNumber(batchId),
+    batch_code: toStringOrUndefined(row.batch_code) ?? null,
+    lucky_id:
+      row.lucky_id === null || row.lucky_id === undefined
+        ? null
+        : toNumber(row.lucky_id),
+    lucky_number:
+      row.lucky_number === null || row.lucky_number === undefined
+        ? null
+        : toNumber(row.lucky_number),
+    amount: toMoneyString(row.amount),
+    method: toStringOrUndefined(row.method) ?? "—",
+    reference_no: toStringOrUndefined(row.reference_no) ?? null,
+    payment_date:
+      toStringOrUndefined(row.payment_date) ??
+      toStringOrUndefined(row.paid_at) ??
+      "",
+    allocation_metadata: toRecordOrNull(row.allocation_metadata),
+    is_reversed: toBoolean(row.is_reversed) ?? false,
+    reversal_metadata: toRecordOrNull(row.reversal_metadata),
+    paid_at: toStringOrUndefined(row.paid_at),
+    collected_by:
+      row.collected_by === null || row.collected_by === undefined
+        ? null
+        : toNumber(row.collected_by),
+    collected_by_id:
+      row.collected_by_id === null || row.collected_by_id === undefined
+        ? null
+        : toNumber(row.collected_by_id),
+    collected_by_username:
+      toStringOrUndefined(row.collected_by_username) ?? null,
+    verified_by:
+      row.verified_by === null || row.verified_by === undefined
+        ? null
+        : toNumber(row.verified_by),
+    verified_by_id:
+      row.verified_by_id === null || row.verified_by_id === undefined
+        ? null
+        : toNumber(row.verified_by_id),
+    verified_by_username:
+      toStringOrUndefined(row.verified_by_username) ?? null,
+    created_at: toStringOrUndefined(row.created_at),
+  };
+}
+
+function normalizeCollectionRequest(item: unknown): CustomerCollectionRequest {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: row.id !== undefined && row.id !== null ? String(row.id) : "",
+    subscription_id:
+      row.subscription_id !== undefined && row.subscription_id !== null
+        ? String(row.subscription_id)
+        : undefined,
+    subscription_number:
+      toStringOrUndefined(row.subscription_number) ??
+      (row.subscription_id !== undefined && row.subscription_id !== null
+        ? `SUB-${String(row.subscription_id)}`
+        : undefined),
+    amount:
+      row.amount === null || row.amount === undefined
+        ? undefined
+        : toMoneyString(row.amount),
+    method: toStringOrUndefined(row.method),
+    payment_date: toStringOrUndefined(row.payment_date),
+    submitted_at:
+      toStringOrUndefined(row.submitted_at) ??
+      toStringOrUndefined(row.created_at),
+    status: toStringOrUndefined(row.status) ?? "SUBMITTED",
+    reference_no: toStringOrUndefined(row.reference_no) ?? null,
+    rejection_reason: toStringOrUndefined(row.rejection_reason) ?? null,
+  };
+}
+
+function normalizeCustomerSupportRequest(item: unknown): CustomerSupportRequest {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: toNumber(row.id),
+    customer:
+      row.customer === null || row.customer === undefined
+        ? null
+        : toNumber(row.customer),
+    customer_name: toStringOrUndefined(row.customer_name),
+    customer_phone: toStringOrUndefined(row.customer_phone),
+    payment:
+      row.payment === null || row.payment === undefined
+        ? null
+        : toNumber(row.payment),
+    payment_reference_no: toStringOrUndefined(row.payment_reference_no) ?? null,
+    payment_amount:
+      row.payment_amount === null || row.payment_amount === undefined
+        ? null
+        : toMoneyString(row.payment_amount),
+    payment_method: toStringOrUndefined(row.payment_method) ?? null,
+    payment_date: toStringOrUndefined(row.payment_date) ?? null,
+    subscription:
+      row.subscription === null || row.subscription === undefined
+        ? null
+        : toNumber(row.subscription),
+    subscription_number: toStringOrUndefined(row.subscription_number) ?? null,
+    category: toStringOrUndefined(row.category) ?? "OTHER",
+    message: toStringOrUndefined(row.message) ?? "",
+    status: toStringOrUndefined(row.status) ?? "SUBMITTED",
+    resolution_summary: toStringOrUndefined(row.resolution_summary) ?? "",
+    resolved_at: toStringOrUndefined(row.resolved_at) ?? null,
+    created_at: toStringOrUndefined(row.created_at),
+    updated_at: toStringOrUndefined(row.updated_at),
+  };
+}
+
+function normalizeDashboardResponse(payload: unknown): CustomerDashboardResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const rawCustomer = ((root.customer ?? {}) as Record<string, unknown>) || {};
+  const rawSummary = ((root.summary ?? {}) as Record<string, unknown>) || {};
+
+  return {
+    customer: {
+      id: toNumber(rawCustomer.id),
+      name: toStringOrUndefined(rawCustomer.name) ?? "",
+      phone: toStringOrUndefined(rawCustomer.phone) ?? "",
+      kyc_status: toStringOrUndefined(rawCustomer.kyc_status) ?? "",
+    },
+    summary: {
+      active_subscriptions: toNumber(rawSummary.active_subscriptions, 0),
+      pending_emis: toNumber(rawSummary.pending_emis, 0),
+      paid_emis: toNumber(rawSummary.paid_emis, 0),
+      total_paid_amount: toMoneyString(rawSummary.total_paid_amount, "0.00"),
+      waived_emis: toNumber(rawSummary.waived_emis, 0),
+      outstanding_amount: toMoneyString(rawSummary.outstanding_amount, "0.00"),
+      under_verification_requests: toNumber(
+        rawSummary.under_verification_requests,
+        0
+      ),
+    },
+    subscriptions: toArray(root.subscriptions).map(normalizeCustomerSubscription),
+  };
+}
+
+function normalizeProfileResponse(payload: unknown): CustomerProfileResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const rawSummary = ((root.summary ?? {}) as Record<string, unknown>) || {};
+
+  return {
+    id: toNumber(root.id),
+    name: toStringOrUndefined(root.name) ?? "",
+    phone: toStringOrUndefined(root.phone) ?? "",
+    kyc_status: toStringOrUndefined(root.kyc_status) ?? "",
+    username: toStringOrUndefined(root.username) ?? "",
+    summary: {
+      total_subscriptions: toNumber(rawSummary.total_subscriptions, 0),
+      active_subscriptions: toNumber(rawSummary.active_subscriptions, 0),
+      won_subscriptions: toNumber(rawSummary.won_subscriptions, 0),
+      completed_subscriptions: toNumber(rawSummary.completed_subscriptions, 0),
+      pending_emis: toNumber(rawSummary.pending_emis, 0),
+      paid_emis: toNumber(rawSummary.paid_emis, 0),
+      waived_emis: toNumber(rawSummary.waived_emis, 0),
+      total_paid_amount: toMoneyString(rawSummary.total_paid_amount, "0.00"),
+    },
+  };
+}
+
+function normalizePaymentListResponse(
+  payload: unknown
+): CustomerPaymentListResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+
+  return {
+    count: toNumber(root.count, 0),
+    total_paid_amount: toMoneyString(root.total_paid_amount, "0.00"),
+    results: toArray(root.results).map(normalizeCustomerPayment),
+  };
+}
+
+function normalizeSubscriptionListResponse(
+  payload: unknown
+): CustomerSubscriptionListResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+
+  return {
+    count: toNumber(root.count, 0),
+    results: toArray(root.results).map(normalizeCustomerSubscription),
+  };
+}
+
+function normalizeCollectionRequestListResponse(
+  payload: unknown
+): CustomerCollectionRequestListResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+
+  return {
+    count: toNumber(root.count, 0),
+    results: toArray(root.results).map(normalizeCollectionRequest),
+  };
+}
+
+export async function getCustomerDashboard(): Promise<CustomerDashboardResponse> {
+  const payload = await apiFetch<unknown>("/customer/dashboard/");
+  return normalizeDashboardResponse(payload);
+}
+
+export async function getCustomerProfile(): Promise<CustomerProfileResponse> {
+  const payload = await apiFetch<unknown>("/customer/profile/");
+  return normalizeProfileResponse(payload);
+}
+
+export async function listCustomerSubscriptions(params?: { status?: string }) {
+  const search = new URLSearchParams();
+
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/customer/subscriptions/${query ? `?${query}` : ""}`
+  );
+
+  return normalizeSubscriptionListResponse(payload);
+}
+
+export async function getCustomerSubscription(
+  id: number | string
+): Promise<CustomerSubscription> {
+  const payload = await apiFetch<unknown>(`/customer/subscriptions/${id}/`);
+  return normalizeCustomerSubscription(payload);
+}
+
+export async function listCustomerPayments(params?: {
+  subscription?: number | string;
+  emi?: number | string;
+  method?: string;
+}) {
+  const search = new URLSearchParams();
+
+  if (params?.subscription !== undefined && params.subscription !== "") {
+    search.set("subscription", String(params.subscription));
+  }
+
+  if (params?.emi !== undefined && params.emi !== "") {
+    search.set("emi", String(params.emi));
+  }
+
+  if (params?.method) {
+    search.set("method", params.method);
+  }
+
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/customer/payments/${query ? `?${query}` : ""}`
+  );
+
+  return normalizePaymentListResponse(payload);
+}
+
+export async function getCustomerPaymentDetail(
+  id: number | string
+): Promise<CustomerPayment> {
+  const payload = await apiFetch<unknown>(`/customer/payments/${id}/`);
+  return normalizeCustomerPayment(payload);
+}
+
+export async function listCustomerSupportRequests(params?: {
+  status?: string;
+  category?: string;
+}): Promise<CustomerSupportRequestListResponse> {
+  const search = new URLSearchParams();
+
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+
+  if (params?.category) {
+    search.set("category", params.category);
+  }
+
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/customer/support-requests/${query ? `?${query}` : ""}`
+  );
+  const root = (payload ?? {}) as Record<string, unknown>;
+
+  return {
+    count: toNumber(root.count, 0),
+    results: toArray(root.results).map(normalizeCustomerSupportRequest),
+  };
+}
+
+export async function getCustomerSupportRequest(
+  id: number | string
+): Promise<CustomerSupportRequest> {
+  const payload = await apiFetch<unknown>(`/customer/support-requests/${id}/`);
+  return normalizeCustomerSupportRequest(payload);
+}
+
+export async function createCustomerSupportRequest(payload: {
+  payment?: number;
+  subscription?: number;
+  category: string;
+  message: string;
+}): Promise<CustomerSupportRequestCreateResponse> {
+  const response = await apiFetch<unknown>("/customer/support-requests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const root = (response ?? {}) as Record<string, unknown>;
+
+  return {
+    detail: toStringOrUndefined(root.detail),
+    request: normalizeCustomerSupportRequest(root.request),
+  };
+}
+
+/**
+ * Additive future-ready reader for customer-side visibility of partner-submitted
+ * payment requests. This should remain separate from verified payments.
+ *
+ * Backend may not expose this yet. If the endpoint is unavailable, let the caller
+ * decide whether to suppress the error or hide the section.
+ */
+export async function listCustomerCollectionRequests(params?: {
+  subscription?: number | string;
+  status?: string;
+}) {
+  const search = new URLSearchParams();
+
+  if (params?.subscription !== undefined && params.subscription !== "") {
+    search.set("subscription", String(params.subscription));
+  }
+
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/customer/collection-requests/${query ? `?${query}` : ""}`
+  );
+
+  return normalizeCollectionRequestListResponse(payload);
+}

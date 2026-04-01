@@ -4,20 +4,33 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:routes": "node scripts/check-routes.mjs",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run build",
+    "test:e2e:smoke": "playwright test --project=chromium-smoke",
+    "test:e2e:smoke:headed": "playwright test --project=chromium-smoke --headed",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
-    "next": "16.1.6",
+    "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-query-devtools": "^5.91.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "next": "^16.2.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-query": "^1.2.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

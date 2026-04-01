@@ -1,20 +1,22 @@
 from decimal import Decimal, ROUND_HALF_UP
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from django.core.exceptions import ValidationError
-
 
 from subscriptions.models import (
     AuditLog,
     BatchStatus,
-    Subscription,
     LuckyId,
     LuckyIdStatus,
     PlanType,
+    Subscription,
+    SubscriptionStatus,
 )
+from subscriptions.services.audit_service import log_audit
+from subscriptions.services.batch_service import transition_batch_status
 from subscriptions.services.emi_engine import generate_emi_schedule
 from subscriptions.services.emi_reconciliation import reconcile_subscription_emis
-from subscriptions.models import BatchStatus
 
 
 @transaction.atomic
@@ -27,7 +29,9 @@ def create_emi_subscription(
     tenure_months: int,
     partner=None,
     start_date=None,
+    performed_by=None,
 ):
+    """Create an EMI subscription using deterministic installment generation."""
 
     if start_date is None:
         start_date = timezone.now().date()
@@ -35,28 +39,28 @@ def create_emi_subscription(
     if tenure_months <= 0:
         raise ValidationError("Tenure must be greater than zero.")
 
-    # 🔒 Lock LuckyId
+    if batch.status != BatchStatus.OPEN:
+        raise ValidationError("Batch is not open for subscription.")
+
     lucky = (
-        LuckyId.objects
-        .select_for_update()
+        LuckyId.objects.select_for_update()
+        .select_related("batch")
         .get(batch=batch, lucky_number=lucky_number)
     )
 
     if lucky.status != LuckyIdStatus.AVAILABLE:
         raise ValidationError("Lucky ID already assigned.")
 
-    
+    total_amount = Decimal(product.base_price).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+    monthly_amount = (total_amount / tenure_months).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
 
-    if batch.status != BatchStatus.OPEN:
-        raise ValidationError("Batch is not open for subscription.")
-
-    total_amount = product.base_price
-
-    base_monthly = (
-        total_amount / tenure_months
-    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    total_from_base = base_monthly * tenure_months
+    total_from_base = monthly_amount * tenure_months
     rounding_difference = total_amount - total_from_base
 
     subscription = Subscription.objects.create(
@@ -69,50 +73,39 @@ def create_emi_subscription(
         tenure_months=tenure_months,
         start_date=start_date,
         total_amount=total_amount,
-        monthly_amount=base_monthly,
-        status=Subscription.Status.ACTIVE,
+        monthly_amount=monthly_amount,
+        status=SubscriptionStatus.ACTIVE,
     )
 
-    # Assign Lucky ID
     lucky.status = LuckyIdStatus.ASSIGNED
     lucky.save(update_fields=["status"])
-    assigned_count = batch.lucky_ids.filter(
-        status=LuckyIdStatus.ASSIGNED
-    ).count()
 
-    if assigned_count == batch.total_slots:
+    assigned_count = batch.lucky_ids.filter(status=LuckyIdStatus.ASSIGNED).count()
+    if assigned_count >= batch.total_slots:
         transition_batch_status(batch, BatchStatus.FULL)
 
-    # Generate EMIs
-    generate_emi_schedule(
-        subscription,
-        rounding_difference=rounding_difference
-    )
+    generate_emi_schedule(subscription, rounding_difference=rounding_difference)
+    reconcile_subscription_emis(subscription)
+
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,
         instance=subscription,
-        performed_by=created_by_user_if_available,
+        performed_by=performed_by,
         metadata={
             "customer_id": customer.id,
             "batch_id": batch.id,
             "lucky_id": lucky.lucky_number,
             "total_amount": str(total_amount),
             "monthly_amount": str(monthly_amount),
+            "tenure_months": tenure_months,
         },
-
     )
 
-    # Financial integrity validation
-    reconcile_subscription_emis(subscription)
-
-    # Auto-close batch if full
-    if not LuckyId.objects.filter(
-        batch=batch,
-        status=LuckyIdStatus.AVAILABLE
-    ).exists():
-
-        batch.is_closed = True
-        batch.status = "CLOSED"
-        batch.save(update_fields=["is_closed", "status"])
+    # Important P0 hardening:
+    # A sold-out batch must remain FULL and drawable.
+    # Do not move to CLOSED just because all Lucky IDs are assigned.
+    if not LuckyId.objects.filter(batch=batch, status=LuckyIdStatus.AVAILABLE).exists():
+        if batch.status != BatchStatus.FULL:
+            transition_batch_status(batch, BatchStatus.FULL)
 
     return subscription

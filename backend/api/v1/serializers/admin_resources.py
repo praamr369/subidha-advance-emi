@@ -4,27 +4,38 @@ from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.models import User, UserRole
+from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
 from subscriptions.models import (
     Batch,
     Commission,
+    CommissionStatus,
     Customer,
     Emi,
     EmiStatus,
     LuckyDraw,
     LuckyId,
     LuckyIdStatus,
+    MONEY_ZERO,
     Payment,
+    PaymentMethod,
     PlanType,
     Product,
     Subscription,
     SubscriptionStatus,
+    KycStatus,
 )
-
-
-MONEY_ZERO = Decimal("0.00")
+from subscriptions.services.delivery_service import (
+    build_subscription_delivery_history,
+    build_subscription_delivery_summary,
+    get_current_subscription_delivery,
+)
+from subscriptions.services.subscription_financial_service import (
+    build_subscription_financial_snapshot,
+)
 
 
 def q2(value: Decimal) -> Decimal:
@@ -40,7 +51,9 @@ def build_emi_amounts(total_amount: Decimal, tenure_months: int) -> list[Decimal
     total_amount = q2(total_amount)
 
     if tenure_months <= 0:
-        raise serializers.ValidationError({"tenure_months": "Tenure must be greater than zero."})
+        raise serializers.ValidationError(
+            {"tenure_months": "Tenure must be greater than zero."}
+        )
 
     standard_amount = q2(total_amount / Decimal(tenure_months))
     amounts: list[Decimal] = []
@@ -60,21 +73,31 @@ def build_emi_amounts(total_amount: Decimal, tenure_months: int) -> list[Decimal
 
 class BatchAdminSerializer(serializers.ModelSerializer):
     available_slots = serializers.SerializerMethodField()
-    subscription_count = serializers.SerializerMethodField()
+    subscription_count = serializers.IntegerField(read_only=True)
+    lucky_id_count = serializers.IntegerField(read_only=True)
+    winner_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Batch
         fields = "__all__"
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "available_slots",
+            "subscription_count",
+            "lucky_id_count",
+            "winner_count",
+        ]
 
     def get_available_slots(self, obj):
         return obj.lucky_ids.filter(status=LuckyIdStatus.AVAILABLE).count()
 
-    def get_subscription_count(self, obj):
-        return obj.subscriptions.count()
-
     def validate(self, attrs):
-        data = {}
-        if self.instance:
+        instance = getattr(self, "instance", None)
+
+        if instance:
+            data = {}
             for field in [
                 "batch_code",
                 "total_slots",
@@ -83,45 +106,96 @@ class BatchAdminSerializer(serializers.ModelSerializer):
                 "start_date",
                 "status",
             ]:
-                data[field] = attrs.get(field, getattr(self.instance, field))
+                data[field] = attrs.get(field, getattr(instance, field))
         else:
             data = attrs.copy()
 
         candidate = Batch(**data)
-        if self.instance:
-            candidate.pk = self.instance.pk
+
+        if instance:
+            candidate.pk = instance.pk
+            candidate.id = instance.id
+            candidate._state.adding = False
+            candidate._state.db = instance._state.db
 
         try:
             candidate.full_clean()
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
+            raise serializers.ValidationError(
+                exc.message_dict or {"detail": exc.messages}
+            )
 
         return attrs
 
+
+# backend/api/v1/serializers/admin_resources.py
+
+# ... imports remain unchanged ...
 
 class CustomerAdminSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False, min_length=8)
     email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
-    user_username = serializers.CharField(source="user.username", read_only=True)
 
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    kyc_reviewed_by_username = serializers.CharField(
+        source="kyc_reviewed_by.username",
+        read_only=True,
+    )
+    kyc_reviewed_at = serializers.DateTimeField(read_only=True)
+    kyc_rejection_reason = serializers.CharField(read_only=True)
+
+    # Status computed from user.is_active
+    status = serializers.SerializerMethodField()
+
+    # Subscription aggregates (from annotations)
+    active_subscription_count = serializers.IntegerField(read_only=True)
+    total_subscription_value = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    address = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.CharField(required=False, allow_blank=True)
+    user_is_active = serializers.BooleanField(source="user.is_active", read_only=True)
     class Meta:
         model = Customer
         fields = (
             "id",
             "user",
             "user_username",
+            "user_is_active",
             "name",
             "phone",
+            "address",           # added
+            "city",
             "kyc_status",
+            "kyc_reviewed_by_username",
+            "kyc_reviewed_at",
+            "kyc_rejection_reason",
             "created_at",
             "username",
             "password",
             "email",
+            "status",
+            "active_subscription_count",
+            "total_subscription_value",
         )
-        read_only_fields = ("id", "created_at")
+        read_only_fields = (
+            "id",
+            "user_is_active",
+            "created_at",
+            "kyc_reviewed_by_username",
+            "kyc_reviewed_at",
+            "kyc_rejection_reason",
+            "active_subscription_count",
+            "total_subscription_value",
+        )
         extra_kwargs = {"user": {"required": False}}
 
+    def get_status(self, obj):
+        """Return customer status based on the user's is_active flag."""
+        return "ACTIVE" if obj.user.is_active else "INACTIVE"
+
+    # ... rest of the serializer unchanged ...
     def validate(self, attrs):
         username = attrs.pop("username", None)
         password = attrs.pop("password", None)
@@ -146,11 +220,15 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"username": "Username already exists."})
 
         if user and user.role != UserRole.CUSTOMER:
-            raise serializers.ValidationError({"user": "Selected user must have CUSTOMER role."})
+            raise serializers.ValidationError(
+                {"user": "Selected user must have CUSTOMER role."}
+            )
 
         if user and hasattr(user, "customer_profile"):
             if not self.instance or user.customer_profile.pk != self.instance.pk:
-                raise serializers.ValidationError({"user": "Selected user already has customer profile."})
+                raise serializers.ValidationError(
+                    {"user": "Selected user already has customer profile."}
+                )
 
         phone = attrs.get("phone")
         if phone:
@@ -158,7 +236,9 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             if self.instance:
                 duplicate = duplicate.exclude(pk=self.instance.pk)
             if duplicate.exists():
-                raise serializers.ValidationError({"phone": "Customer with this phone already exists."})
+                raise serializers.ValidationError(
+                    {"phone": "Customer with this phone already exists."}
+                )
 
         return attrs
 
@@ -209,17 +289,60 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
         return instance
 
 
+class CustomerKycDecisionSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[KycStatus.VERIFIED, KycStatus.REJECTED]
+    )
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+
+    def validate(self, attrs):
+        status_value = attrs["status"]
+        reason = (attrs.get("reason") or "").strip()
+
+        if status_value == KycStatus.REJECTED and not reason:
+            raise serializers.ValidationError(
+                {"reason": "Reason is required when rejecting KYC."}
+            )
+
+        attrs["reason"] = reason
+        return attrs
+
+
 class EmiAdminSerializer(serializers.ModelSerializer):
     customer = serializers.IntegerField(source="subscription.customer_id", read_only=True)
-    customer_name = serializers.CharField(source="subscription.customer.name", read_only=True)
-    customer_phone = serializers.CharField(source="subscription.customer.phone", read_only=True)
-    subscription_status = serializers.CharField(source="subscription.status", read_only=True)
+    customer_name = serializers.CharField(
+        source="subscription.customer.name",
+        read_only=True,
+    )
+    customer_phone = serializers.CharField(
+        source="subscription.customer.phone",
+        read_only=True,
+    )
+    subscription_status = serializers.CharField(
+        source="subscription.status",
+        read_only=True,
+    )
     batch = serializers.IntegerField(source="subscription.batch_id", read_only=True)
-    batch_code = serializers.CharField(source="subscription.batch.batch_code", read_only=True)
-    lucky_id = serializers.IntegerField(source="subscription.lucky_id_id", read_only=True)
-    lucky_number = serializers.IntegerField(source="subscription.lucky_id.lucky_number", read_only=True)
+    batch_code = serializers.CharField(
+        source="subscription.batch.batch_code",
+        read_only=True,
+    )
+    lucky_id = serializers.IntegerField(
+        source="subscription.lucky_id_id",
+        read_only=True,
+    )
+    lucky_number = serializers.IntegerField(
+        source="subscription.lucky_id.lucky_number",
+        read_only=True,
+    )
     total_paid = serializers.SerializerMethodField()
     balance_amount = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+    overdue_days = serializers.SerializerMethodField()
 
     class Meta:
         model = Emi
@@ -240,6 +363,8 @@ class EmiAdminSerializer(serializers.ModelSerializer):
             "status",
             "total_paid",
             "balance_amount",
+            "is_overdue",
+            "overdue_days",
         )
 
     def get_total_paid(self, obj):
@@ -247,6 +372,14 @@ class EmiAdminSerializer(serializers.ModelSerializer):
 
     def get_balance_amount(self, obj):
         return str(obj.balance_amount())
+
+    def get_is_overdue(self, obj):
+        return bool(obj.is_overdue())
+
+    def get_overdue_days(self, obj):
+        if not obj.is_overdue():
+            return 0
+        return max((timezone.now().date() - obj.due_date).days, 0)
 
     def validate(self, attrs):
         data = {}
@@ -263,14 +396,28 @@ class EmiAdminSerializer(serializers.ModelSerializer):
         try:
             candidate.full_clean()
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
+            raise serializers.ValidationError(
+                exc.message_dict or {"detail": exc.messages}
+            )
 
         return attrs
 
 
 class LuckyDrawAdminSerializer(serializers.ModelSerializer):
     batch_code = serializers.CharField(source="batch.batch_code", read_only=True)
-    winner_lucky_number = serializers.IntegerField(source="winner_lucky_id.lucky_number", read_only=True)
+
+    winner_lucky_number = serializers.IntegerField(
+        source="winner_lucky_id.lucky_number",
+        read_only=True,
+    )
+
+    winner_subscription_id = serializers.IntegerField(
+        source="winner_subscription.id",
+        read_only=True,
+    )
+
+    winner_subscription_number = serializers.SerializerMethodField()
+    winner_customer_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LuckyDraw
@@ -282,11 +429,48 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
             "revealed_seed",
             "winner_lucky_id",
             "winner_lucky_number",
+            "winner_subscription",
+            "winner_subscription_id",
+            "winner_subscription_number",
+            "winner_customer_name",
             "draw_date",
             "draw_month",
             "is_revealed",
+            "revealed_at",
+            "waived_emi_count",
+            "waived_amount",
+            "waiver_scope",
             "created_at",
         )
+        read_only_fields = (
+            "id",
+            "batch_code",
+            "winner_lucky_number",
+            "winner_subscription_id",
+            "winner_subscription_number",
+            "winner_customer_name",
+            "revealed_at",
+            "waived_emi_count",
+            "waived_amount",
+            "waiver_scope",
+            "created_at",
+        )
+
+    def get_winner_subscription_number(self, obj):
+        subscription = getattr(obj, "winner_subscription", None)
+        if not subscription:
+            return None
+        return (
+            getattr(subscription, "subscription_number", None)
+            or getattr(subscription, "contract_reference", None)
+            or f"SUB-{subscription.id}"
+        )
+
+    def get_winner_customer_name(self, obj):
+        subscription = getattr(obj, "winner_subscription", None)
+        if not subscription or not getattr(subscription, "customer_id", None):
+            return None
+        return getattr(subscription.customer, "name", None)
 
     def validate(self, attrs):
         data = {}
@@ -296,9 +480,14 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
                 "committed_hash",
                 "revealed_seed",
                 "winner_lucky_id",
+                "winner_subscription",
                 "draw_date",
                 "draw_month",
                 "is_revealed",
+                "revealed_at",
+                "waived_emi_count",
+                "waived_amount",
+                "waiver_scope",
             ]:
                 data[field] = attrs.get(field, getattr(self.instance, field))
         else:
@@ -307,202 +496,493 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
         candidate = LuckyDraw(**data)
         if self.instance:
             candidate.pk = self.instance.pk
+            candidate.id = self.instance.id
+            candidate._state.adding = False
+            candidate._state.db = self.instance._state.db
 
         try:
             candidate.full_clean()
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
+            raise serializers.ValidationError(
+                exc.message_dict or {"detail": exc.messages}
+            )
 
         return attrs
 
 
 class LuckyIdAdminSerializer(serializers.ModelSerializer):
     batch_code = serializers.CharField(source="batch.batch_code", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    subscription_id = serializers.SerializerMethodField()
+    subscription_number = serializers.SerializerMethodField()
 
     class Meta:
         model = LuckyId
-        fields = (
+        fields = [
             "id",
             "batch",
             "batch_code",
             "lucky_number",
             "status",
+            "customer_name",
+            "subscription_id",
+            "subscription_number",
             "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "batch_code",
+            "customer_name",
+            "subscription_id",
+            "subscription_number",
+            "created_at",
+        ]
+
+    def _linked_subscription(self, obj):
+        cache = getattr(self, "_linked_subscription_cache", None)
+        if cache is None:
+            cache = {}
+            self._linked_subscription_cache = cache
+
+        if obj.pk not in cache:
+            cache[obj.pk] = (
+                Subscription.objects.select_related("customer")
+                .filter(lucky_id=obj)
+                .order_by("-created_at", "-id")
+                .first()
+            )
+
+        return cache[obj.pk]
+
+    def get_customer_name(self, obj):
+        subscription = self._linked_subscription(obj)
+        if subscription and getattr(subscription, "customer_id", None):
+            return getattr(subscription.customer, "name", None)
+        return None
+
+    def get_subscription_id(self, obj):
+        subscription = self._linked_subscription(obj)
+        return subscription.id if subscription else None
+
+    def get_subscription_number(self, obj):
+        subscription = self._linked_subscription(obj)
+        if not subscription:
+            return None
+
+        return (
+            getattr(subscription, "subscription_number", None)
+            or getattr(subscription, "subscription_code", None)
+            or f"SUB-{subscription.id}"
         )
-
-    def validate(self, attrs):
-        data = {}
-        if self.instance:
-            for field in ["batch", "lucky_number", "status"]:
-                data[field] = attrs.get(field, getattr(self.instance, field))
-        else:
-            data = attrs.copy()
-
-        candidate = LuckyId(**data)
-        if self.instance:
-            candidate.pk = self.instance.pk
-
-        try:
-            candidate.full_clean()
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
-
-        return attrs
 
 
 class PaymentAdminSerializer(serializers.ModelSerializer):
+    customer_id = serializers.IntegerField(source="customer.id", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_phone = serializers.CharField(source="customer.phone", read_only=True)
-    subscription_status = serializers.CharField(source="subscription.status", read_only=True)
+
+    subscription_id = serializers.IntegerField(source="subscription.id", read_only=True)
+    subscription_number = serializers.SerializerMethodField()
+    subscription_status = serializers.CharField(
+        source="subscription.status",
+        read_only=True,
+    )
+    subscription_plan_type = serializers.CharField(
+        source="subscription.plan_type",
+        read_only=True,
+    )
+
+    product_id = serializers.SerializerMethodField()
+    product_name = serializers.SerializerMethodField()
+    product_code = serializers.SerializerMethodField()
+
+    batch_id = serializers.SerializerMethodField()
+    batch_code = serializers.SerializerMethodField()
+
+    partner_id = serializers.SerializerMethodField()
+    partner_username = serializers.SerializerMethodField()
+
+    lucky_id = serializers.SerializerMethodField()
+    lucky_number = serializers.SerializerMethodField()
+
+    emi_id = serializers.IntegerField(source="emi.id", read_only=True)
     emi_month_no = serializers.IntegerField(source="emi.month_no", read_only=True)
-    batch = serializers.IntegerField(source="subscription.batch_id", read_only=True)
-    batch_code = serializers.CharField(source="subscription.batch.batch_code", read_only=True)
-    lucky_number = serializers.IntegerField(source="subscription.lucky_id.lucky_number", read_only=True)
-    collected_by_username = serializers.CharField(source="collected_by.username", read_only=True)
-    verified_by_username = serializers.CharField(source="verified_by.username", read_only=True)
+    emi_due_date = serializers.SerializerMethodField()
+    emi_amount = serializers.SerializerMethodField()
+    emi_status = serializers.SerializerMethodField()
+
+    collected_by_id = serializers.SerializerMethodField()
+    collected_by_username = serializers.SerializerMethodField()
+
+    verified_by_id = serializers.SerializerMethodField()
+    verified_by_username = serializers.SerializerMethodField()
+
+    plan_type_hint = serializers.CharField(read_only=True)
+    is_reversed = serializers.SerializerMethodField()
+    reversal_metadata = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
         fields = (
             "id",
             "customer",
+            "customer_id",
             "customer_name",
             "customer_phone",
             "subscription",
+            "subscription_id",
+            "subscription_number",
             "subscription_status",
-            "emi",
-            "emi_month_no",
-            "batch",
+            "subscription_plan_type",
+            "product_id",
+            "product_name",
+            "product_code",
+            "batch_id",
             "batch_code",
+            "partner_id",
+            "partner_username",
+            "lucky_id",
             "lucky_number",
+            "emi",
+            "emi_id",
+            "emi_month_no",
+            "emi_due_date",
+            "emi_amount",
+            "emi_status",
             "amount",
             "method",
             "reference_no",
             "payment_date",
+            "plan_type_hint",
+            "allocation_metadata",
+            "is_reversed",
+            "reversal_metadata",
             "collected_by",
+            "collected_by_id",
             "collected_by_username",
             "verified_by",
+            "verified_by_id",
             "verified_by_username",
             "created_at",
         )
+        read_only_fields = fields
+
+    def get_subscription_number(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        if not subscription:
+            return None
+
+        return (
+            getattr(subscription, "subscription_number", None)
+            or getattr(subscription, "subscription_code", None)
+            or getattr(subscription, "contract_reference", None)
+            or f"SUB-{subscription.id}"
+        )
+
+    def get_product_id(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        product = getattr(subscription, "product", None) if subscription else None
+        return getattr(product, "id", None)
+
+    def get_product_name(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        product = getattr(subscription, "product", None) if subscription else None
+        return getattr(product, "name", None)
+
+    def get_product_code(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        product = getattr(subscription, "product", None) if subscription else None
+        return getattr(product, "product_code", None)
+
+    def get_batch_id(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        batch = getattr(subscription, "batch", None) if subscription else None
+        return getattr(batch, "id", None)
+
+    def get_batch_code(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        batch = getattr(subscription, "batch", None) if subscription else None
+        return getattr(batch, "batch_code", None)
+
+    def get_partner_id(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        partner = getattr(subscription, "partner", None) if subscription else None
+        return getattr(partner, "id", None)
+
+    def get_partner_username(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        partner = getattr(subscription, "partner", None) if subscription else None
+        return getattr(partner, "username", None) if partner else None
+
+    def get_lucky_id(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        lucky_id = getattr(subscription, "lucky_id", None) if subscription else None
+        return getattr(lucky_id, "id", None)
+
+    def get_lucky_number(self, obj):
+        subscription = getattr(obj, "subscription", None)
+        lucky_id = getattr(subscription, "lucky_id", None) if subscription else None
+        return getattr(lucky_id, "lucky_number", None)
+
+    def get_emi_due_date(self, obj):
+        emi = getattr(obj, "emi", None)
+        return getattr(emi, "due_date", None)
+
+    def get_emi_amount(self, obj):
+        emi = getattr(obj, "emi", None)
+        amount = getattr(emi, "amount", None)
+        return str(amount) if amount is not None else None
+
+    def get_emi_status(self, obj):
+        emi = getattr(obj, "emi", None)
+        return getattr(emi, "status", None)
+
+    def get_collected_by_id(self, obj):
+        user = getattr(obj, "collected_by", None)
+        return getattr(user, "id", None)
+
+    def get_collected_by_username(self, obj):
+        user = getattr(obj, "collected_by", None)
+        return getattr(user, "username", None)
+
+    def get_verified_by_id(self, obj):
+        user = getattr(obj, "verified_by", None)
+        return getattr(user, "id", None)
+
+    def get_verified_by_username(self, obj):
+        user = getattr(obj, "verified_by", None)
+        return getattr(user, "username", None)
+
+    def get_is_reversed(self, obj):
+        metadata = getattr(obj, "allocation_metadata", None) or {}
+        reversal = metadata.get("reversal") or {}
+        return bool(reversal.get("is_reversed"))
+
+    def get_reversal_metadata(self, obj):
+        metadata = getattr(obj, "allocation_metadata", None) or {}
+        reversal = metadata.get("reversal") or {}
+        return reversal
+
+
+class AdminPaymentCollectSerializer(serializers.Serializer):
+    emi = serializers.PrimaryKeyRelatedField(queryset=Emi.objects.none())
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
+    payment_date = serializers.DateField()
+    reference_no = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=100,
+    )
+    notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["emi"].queryset = Emi.objects.select_related(
+            "subscription",
+            "subscription__customer",
+            "subscription__product",
+            "subscription__partner",
+            "subscription__batch",
+            "subscription__lucky_id",
+        ).all()
+
+    def validate_amount(self, value):
+        if Decimal(value) <= MONEY_ZERO:
+            raise serializers.ValidationError(
+                "Payment amount must be greater than zero."
+            )
+        return value
+
+    def validate_reference_no(self, value):
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    def validate_notes(self, value):
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
     def validate(self, attrs):
-        data = {}
-        if self.instance:
-            for field in [
-                "customer",
-                "subscription",
-                "emi",
-                "amount",
-                "method",
-                "reference_no",
-                "payment_date",
-                "collected_by",
-                "verified_by",
-            ]:
-                data[field] = attrs.get(field, getattr(self.instance, field))
-        else:
-            data = attrs.copy()
+        emi = attrs["emi"]
+        subscription = emi.subscription
 
-        customer = data.get("customer")
-        subscription = data.get("subscription")
-        emi = data.get("emi")
-        amount = data.get("amount")
+        if subscription.customer_id != subscription.customer.id:
+            raise serializers.ValidationError(
+                {"emi": "Invalid subscription/customer relationship."}
+            )
 
-        if subscription and customer and subscription.customer_id != customer.id:
-            raise serializers.ValidationError({
-                "customer": "Selected customer does not match the subscription customer."
-            })
+        if subscription.status in {
+            SubscriptionStatus.COMPLETED,
+            SubscriptionStatus.DEFAULTED,
+        }:
+            raise serializers.ValidationError(
+                {"emi": "Cannot collect payment for a closed subscription."}
+            )
 
-        if emi:
-            if subscription and emi.subscription_id != subscription.id:
-                raise serializers.ValidationError({
-                    "emi": "Selected EMI does not belong to the selected subscription."
-                })
-            if customer and emi.subscription.customer_id != customer.id:
-                raise serializers.ValidationError({
-                    "emi": "Selected EMI does not belong to the selected customer."
-                })
-
-        if amount is not None and Decimal(amount) <= MONEY_ZERO:
-            raise serializers.ValidationError({"amount": "Payment amount must be greater than zero."})
-
-        candidate = Payment(**data)
-        if self.instance:
-            candidate.pk = self.instance.pk
-
-        try:
-            candidate.full_clean()
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
+        if emi.status == EmiStatus.WAIVED:
+            raise serializers.ValidationError(
+                {"emi": "Cannot collect payment for a waived EMI."}
+            )
 
         return attrs
 
-    def _sync_emi_status(self, emi):
-        if not emi:
-            return
 
-        if emi.status == EmiStatus.WAIVED:
-            return
+class AdminPaymentCollectResponseSerializer(serializers.Serializer):
+    payment = PaymentAdminSerializer()
+    emi = serializers.DictField()
+    subscription = serializers.DictField()
 
-        total_paid = emi.payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
-        if total_paid >= emi.amount:
-            emi.status = EmiStatus.PAID
-        else:
-            emi.status = EmiStatus.PENDING
-        emi.save(update_fields=["status"])
 
-    @transaction.atomic
-    def create(self, validated_data):
-        payment = Payment.objects.create(**validated_data)
-        self._sync_emi_status(payment.emi)
-        return payment
+class AdminPaymentReverseSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        trim_whitespace=True,
+        max_length=500,
+    )
 
-    @transaction.atomic
-    def update(self, instance, validated_data):
-        old_emi = instance.emi
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        affected_emis = [e for e in [old_emi, instance.emi] if e is not None]
-        unique_affected = {emi.pk: emi for emi in affected_emis}.values()
-
-        for emi in unique_affected:
-            self._sync_emi_status(emi)
-
-        return instance
+    def validate_reason(self, value):
+        reason = (value or "").strip()
+        if not reason:
+            raise serializers.ValidationError("Reversal reason is required.")
+        return reason
 
 
 class ProductAdminSerializer(serializers.ModelSerializer):
-    active_subscription_count = serializers.SerializerMethodField()
+    image = serializers.ImageField(required=False, allow_null=True)
+    clear_image = serializers.BooleanField(required=False, write_only=True, default=False)
 
     class Meta:
         model = Product
-        fields = "__all__"
+        fields = [
+            "id",
+            "product_code",
+            "name",
+            "base_price",
+            "category",
+            "subcategory",
+            "description",
+            "image",
+            "clear_image",
+            "is_active",
+            "is_emi_enabled",
+            "is_rent_enabled",
+            "is_lease_enabled",
+            "is_rent_ready",
+            "is_lease_ready",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "is_rent_ready",
+            "is_lease_ready",
+        ]
 
-    def get_active_subscription_count(self, obj):
-        return obj.subscriptions.filter(status=SubscriptionStatus.ACTIVE).count()
+    def validate(self, data):
+        instance = getattr(self, "instance", None)
 
-    def validate(self, attrs):
-        data = {}
-        if self.instance:
-            for field in ["product_code", "name", "base_price", "created_at"]:
-                data[field] = attrs.get(field, getattr(self.instance, field))
+        product_code = data.get(
+            "product_code",
+            instance.product_code if instance else None,
+        )
+        name = data.get(
+            "name",
+            instance.name if instance else None,
+        )
+        base_price = data.get(
+            "base_price",
+            instance.base_price if instance else None,
+        )
+        category = data.get(
+            "category",
+            instance.category if instance else "",
+        )
+        subcategory = data.get(
+            "subcategory",
+            instance.subcategory if instance else "",
+        )
+        description = data.get(
+            "description",
+            instance.description if instance else "",
+        )
+
+        clear_image = data.get("clear_image", False)
+        if clear_image:
+            image = None
         else:
-            data = attrs.copy()
+            image = data.get(
+                "image",
+                instance.image if instance else None,
+            )
 
-        candidate = Product(**data)
-        if self.instance:
-            candidate.pk = self.instance.pk
+        is_active = data.get(
+            "is_active",
+            instance.is_active if instance else True,
+        )
+        is_emi_enabled = data.get(
+            "is_emi_enabled",
+            instance.is_emi_enabled if instance else True,
+        )
+        is_rent_enabled = data.get(
+            "is_rent_enabled",
+            instance.is_rent_enabled if instance else False,
+        )
+        is_lease_enabled = data.get(
+            "is_lease_enabled",
+            instance.is_lease_enabled if instance else False,
+        )
+        plan_type_default = data.get(
+            "plan_type_default",
+            instance.plan_type_default if instance else PlanType.EMI,
+        )
+
+        candidate = Product(
+            product_code=product_code,
+            name=name,
+            base_price=base_price,
+            category=category,
+            subcategory=subcategory,
+            description=description,
+            image=image,
+            is_active=is_active,
+            plan_type_default=plan_type_default,
+            is_emi_enabled=is_emi_enabled,
+            is_rent_enabled=is_rent_enabled,
+            is_lease_enabled=is_lease_enabled,
+        )
+
+        if instance:
+            candidate.pk = instance.pk
+            candidate.id = instance.id
+            candidate._state.adding = False
+            candidate._state.db = instance._state.db
 
         try:
             candidate.full_clean()
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.message_dict or {"detail": exc.messages})
+            raise serializers.ValidationError(exc.message_dict)
 
-        return attrs
+        return data
+
+    def update(self, instance, validated_data):
+        clear_image = validated_data.pop("clear_image", False)
+
+        if clear_image and instance.image:
+            instance.image.delete(save=False)
+            validated_data["image"] = None
+
+        return super().update(instance, validated_data)
 
 
 class SubscriptionAdminSerializer(serializers.ModelSerializer):
@@ -516,6 +996,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     batch_status = serializers.CharField(source="batch.status", read_only=True)
 
     lucky_number = serializers.IntegerField(source="lucky_id.lucky_number", read_only=True)
+    fulfillment_status = serializers.CharField(read_only=True)
+    delivery_status = serializers.SerializerMethodField()
 
     partner_name = serializers.CharField(source="partner.username", read_only=True)
     partner_phone = serializers.CharField(source="partner.phone", read_only=True)
@@ -524,6 +1006,48 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     paid_emi_count = serializers.SerializerMethodField()
     pending_emi_count = serializers.SerializerMethodField()
     waived_emi_count = serializers.SerializerMethodField()
+
+    customer = serializers.PrimaryKeyRelatedField(
+        queryset=Customer.objects.select_related("user").all()
+    )
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True)
+    )
+    partner = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=UserRole.PARTNER),
+        required=False,
+        allow_null=True,
+    )
+    batch = serializers.PrimaryKeyRelatedField(
+        queryset=Batch.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    lucky_id = serializers.PrimaryKeyRelatedField(
+        queryset=LuckyId.objects.select_related("batch").all(),
+        required=False,
+        allow_null=True,
+    )
+    plan_type = serializers.ChoiceField(choices=PlanType.choices)
+    tenure_months = serializers.IntegerField(min_value=1)
+    start_date = serializers.DateField()
+
+    total_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    monthly_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    waived_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    winner_month = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Subscription
@@ -551,6 +1075,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "status",
             "winner_month",
             "waived_amount",
+            "delivery_status",
+            "fulfillment_status",
             "created_at",
             "emi_count",
             "paid_emi_count",
@@ -558,11 +1084,14 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "waived_emi_count",
         )
         read_only_fields = (
+            "id",
             "total_amount",
             "monthly_amount",
             "waived_amount",
             "winner_month",
             "created_at",
+            "delivery_status",
+            "fulfillment_status",
             "customer_name",
             "customer_phone",
             "product_name",
@@ -581,6 +1110,10 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     def get_emi_count(self, obj):
         return obj.emis.count()
 
+    def get_delivery_status(self, obj):
+        current_delivery = get_current_subscription_delivery(obj)
+        return getattr(current_delivery, "status", None)
+
     def get_paid_emi_count(self, obj):
         return obj.emis.filter(status=EmiStatus.PAID).count()
 
@@ -596,7 +1129,10 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         plan_type = attrs.get("plan_type", getattr(instance, "plan_type", None))
         batch = attrs.get("batch", getattr(instance, "batch", None))
         lucky_id = attrs.get("lucky_id", getattr(instance, "lucky_id", None))
-        tenure_months = attrs.get("tenure_months", getattr(instance, "tenure_months", None))
+        tenure_months = attrs.get(
+            "tenure_months",
+            getattr(instance, "tenure_months", None),
+        )
         product = attrs.get("product", getattr(instance, "product", None))
         status_value = attrs.get("status", getattr(instance, "status", None))
 
@@ -604,10 +1140,13 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"product": "Product is required."})
 
         if not tenure_months or tenure_months <= 0:
-            raise serializers.ValidationError({"tenure_months": "Tenure must be greater than zero."})
+            raise serializers.ValidationError(
+                {"tenure_months": "Tenure must be greater than zero."}
+            )
 
         financial_structure_changed = any(
-            field in attrs for field in ["product", "tenure_months", "batch", "lucky_id", "plan_type"]
+            field in attrs
+            for field in ["product", "tenure_months", "batch", "lucky_id", "plan_type"]
         )
 
         if instance and financial_structure_changed:
@@ -627,14 +1166,19 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
         if plan_type == PlanType.EMI:
             if not batch:
-                raise serializers.ValidationError({
-                    "batch": "Batch is required for EMI subscription."
-                })
+                raise serializers.ValidationError(
+                    {"batch": "Batch is required for EMI subscription."}
+                )
 
             if tenure_months != batch.duration_months:
-                raise serializers.ValidationError({
-                    "tenure_months": f"Tenure must match batch duration ({batch.duration_months} months)."
-                })
+                raise serializers.ValidationError(
+                    {
+                        "tenure_months": (
+                            f"Tenure must match batch duration "
+                            f"({batch.duration_months} months)."
+                        )
+                    }
+                )
 
             if not lucky_id:
                 next_lucky = (
@@ -644,25 +1188,25 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                     .first()
                 )
                 if not next_lucky:
-                    raise serializers.ValidationError({
-                        "lucky_id": "No available Lucky ID in selected batch."
-                    })
+                    raise serializers.ValidationError(
+                        {"lucky_id": "No available Lucky ID in selected batch."}
+                    )
                 attrs["lucky_id"] = next_lucky
                 lucky_id = next_lucky
 
             if lucky_id.batch_id != batch.id:
-                raise serializers.ValidationError({
-                    "lucky_id": "Lucky ID must belong to selected batch."
-                })
+                raise serializers.ValidationError(
+                    {"lucky_id": "Lucky ID must belong to selected batch."}
+                )
 
             lucky_id_changed = instance is None or (
                 instance and instance.lucky_id_id != lucky_id.id
             )
 
             if lucky_id_changed and lucky_id.status != LuckyIdStatus.AVAILABLE:
-                raise serializers.ValidationError({
-                    "lucky_id": "Selected Lucky ID is already assigned."
-                })
+                raise serializers.ValidationError(
+                    {"lucky_id": "Selected Lucky ID is already assigned."}
+                )
 
         if plan_type in {PlanType.RENT, PlanType.LEASE}:
             if batch is not None or lucky_id is not None:
@@ -670,10 +1214,28 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                     "Batch and Lucky ID are only allowed for EMI subscriptions."
                 )
 
-        if instance and status_value == SubscriptionStatus.WON and instance.status != SubscriptionStatus.WON:
-            raise serializers.ValidationError({
-                "status": "Winning state must be assigned only through lucky draw reveal flow."
-            })
+        if (
+            instance
+            and status_value == SubscriptionStatus.WON
+            and instance.status != SubscriptionStatus.WON
+        ):
+            raise serializers.ValidationError(
+                {"status": "Winning state must be assigned only through lucky draw reveal flow."}
+            )
+
+        if (
+            instance
+            and "status" in attrs
+            and instance.status == SubscriptionStatus.WON
+            and status_value != SubscriptionStatus.WON
+        ):
+            raise serializers.ValidationError(
+                {
+                    "status": (
+                        "Winner state cannot be downgraded through generic subscription edit flow."
+                    )
+                }
+            )
 
         return attrs
 
@@ -685,12 +1247,23 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         product = validated_data.get("product")
         tenure = validated_data.get("tenure_months") or 0
 
+        if not product:
+            raise serializers.ValidationError({"product": "Product is required."})
+        if not plan_type:
+            raise serializers.ValidationError({"plan_type": "Plan type is required."})
+        if not tenure:
+            raise serializers.ValidationError({"tenure_months": "Tenure is required."})
+        if not validated_data.get("start_date"):
+            raise serializers.ValidationError({"start_date": "Start date is required."})
+        if not validated_data.get("customer"):
+            raise serializers.ValidationError({"customer": "Customer is required."})
+
         if selected_lucky:
             locked_lucky = LuckyId.objects.select_for_update().get(pk=selected_lucky.pk)
             if locked_lucky.status != LuckyIdStatus.AVAILABLE:
-                raise serializers.ValidationError({
-                    "lucky_id": "Selected Lucky ID is no longer available."
-                })
+                raise serializers.ValidationError(
+                    {"lucky_id": "Selected Lucky ID is no longer available."}
+                )
             validated_data["lucky_id"] = locked_lucky
 
         if plan_type == PlanType.EMI and batch and not validated_data.get("lucky_id"):
@@ -701,9 +1274,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 .first()
             )
             if not next_lucky:
-                raise serializers.ValidationError({
-                    "lucky_id": "No available Lucky ID in selected batch."
-                })
+                raise serializers.ValidationError(
+                    {"lucky_id": "No available Lucky ID in selected batch."}
+                )
             validated_data["lucky_id"] = next_lucky
 
         total_amount = q2(Decimal(product.base_price))
@@ -711,11 +1284,13 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
         validated_data["total_amount"] = total_amount
         validated_data["monthly_amount"] = monthly_amount
-        validated_data.setdefault("waived_amount", MONEY_ZERO)
+        validated_data["waived_amount"] = MONEY_ZERO
         validated_data.setdefault("status", SubscriptionStatus.ACTIVE)
 
         try:
-            subscription = Subscription.objects.create(**validated_data)
+            subscription = Subscription(**validated_data)
+            subscription.full_clean()
+            subscription.save()
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
                 exc.message_dict or {"detail": exc.messages}
@@ -748,6 +1323,17 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         product_changed = "product" in validated_data
         tenure_changed = "tenure_months" in validated_data
 
+        existing_paid = instance.emis.filter(status=EmiStatus.PAID).exists()
+        existing_waived = instance.emis.filter(status=EmiStatus.WAIVED).exists()
+        existing_payments = instance.payments.exists()
+
+        if (product_changed or tenure_changed) and (
+            existing_paid or existing_waived or existing_payments
+        ):
+            raise serializers.ValidationError(
+                "Cannot rebuild EMI schedule after payment or EMI activity has started."
+            )
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
@@ -757,18 +1343,15 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 instance.total_amount / Decimal(instance.tenure_months)
             )
 
-        instance.save()
+        try:
+            instance.full_clean()
+            instance.save()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.message_dict or {"detail": exc.messages}
+            )
 
         if instance.plan_type == PlanType.EMI and (product_changed or tenure_changed):
-            existing_paid = instance.emis.filter(status=EmiStatus.PAID).exists()
-            existing_waived = instance.emis.filter(status=EmiStatus.WAIVED).exists()
-            existing_payments = instance.payments.exists()
-
-            if existing_paid or existing_waived or existing_payments:
-                raise serializers.ValidationError(
-                    "Cannot rebuild EMI schedule after payment or EMI activity has started."
-                )
-
             instance.emis.all().delete()
 
             emi_amounts = build_emi_amounts(
@@ -793,6 +1376,103 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         return instance
 
 
+class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
+    financial_summary = serializers.SerializerMethodField()
+    reconciliation_flags = serializers.SerializerMethodField()
+    winner_status = serializers.SerializerMethodField()
+    winner_summary = serializers.SerializerMethodField()
+    delivery_summary = serializers.SerializerMethodField()
+    deliveries = serializers.SerializerMethodField()
+    emis = serializers.SerializerMethodField()
+
+    class Meta(SubscriptionAdminSerializer.Meta):
+        fields = SubscriptionAdminSerializer.Meta.fields + (
+            "winner_status",
+            "winner_summary",
+            "financial_summary",
+            "reconciliation_flags",
+            "delivery_summary",
+            "deliveries",
+            "emis",
+        )
+        read_only_fields = fields
+
+    def _snapshot(self, obj):
+        cache_attr = "_subscription_financial_snapshot"
+        snapshot = getattr(obj, cache_attr, None)
+        if snapshot is None:
+            snapshot = build_subscription_financial_snapshot(obj)
+            setattr(obj, cache_attr, snapshot)
+        return snapshot
+
+    def get_emi_count(self, obj):
+        return self._snapshot(obj)["emi_count_total"]
+
+    def get_paid_emi_count(self, obj):
+        return self._snapshot(obj)["emi_count_paid"]
+
+    def get_pending_emi_count(self, obj):
+        return self._snapshot(obj)["emi_count_pending"]
+
+    def get_waived_emi_count(self, obj):
+        return self._snapshot(obj)["emi_count_waived"]
+
+    def get_winner_status(self, obj):
+        return self._snapshot(obj)["winner_status"]
+
+    def get_winner_summary(self, obj):
+        return self._snapshot(obj)["winner_summary"]
+
+    def get_financial_summary(self, obj):
+        snapshot = self._snapshot(obj)
+        return {
+            "subscription_id": snapshot["subscription_id"],
+            "total_amount": snapshot["total_amount"],
+            "total_emi_amount": snapshot["total_emi_amount"],
+            "emi_total": snapshot["emi_total"],
+            "paid_amount": snapshot["paid_amount"],
+            "waived_amount": snapshot["waived_amount"],
+            "stored_waived_amount": snapshot["stored_waived_amount"],
+            "waiver_ledger_amount": snapshot["waiver_ledger_amount"],
+            "reversed_amount": snapshot["reversed_amount"],
+            "pending_amount": snapshot["pending_amount"],
+            "remaining_amount": snapshot["remaining_amount"],
+            "outstanding_amount": snapshot["outstanding_amount"],
+            "emi_count_total": snapshot["emi_count_total"],
+            "emi_count_paid": snapshot["emi_count_paid"],
+            "emi_count_waived": snapshot["emi_count_waived"],
+            "emi_count_pending": snapshot["emi_count_pending"],
+            "winner_status": snapshot["winner_status"],
+            "winner_month": snapshot["winner_month"],
+            "lucky_id": snapshot["lucky_id"],
+            "lucky_number": snapshot["lucky_number"],
+            "batch": snapshot["batch"],
+            "partner": snapshot["partner"],
+        }
+
+    def get_reconciliation_flags(self, obj):
+        snapshot = self._snapshot(obj)
+        return {
+            "is_financially_consistent": snapshot["is_financially_consistent"],
+            "pending_matches_remaining": snapshot["pending_matches_remaining"],
+            "has_reversal_history": snapshot["has_reversal_history"],
+            "has_waiver_history": snapshot["has_waiver_history"],
+            "warnings": snapshot["warnings"],
+        }
+
+    def get_emis(self, obj):
+        return self._snapshot(obj)["emis"]
+
+    def get_delivery_summary(self, obj):
+        return build_subscription_delivery_summary(obj)
+
+    def get_deliveries(self, obj):
+        deliveries = getattr(obj, "_prefetched_objects_cache", {}).get("deliveries")
+        if deliveries is not None:
+            return AdminSubscriptionDeliveryReadSerializer(deliveries, many=True).data
+        return build_subscription_delivery_history(obj)
+
+
 class PartnerAdminSerializer(serializers.ModelSerializer):
     referred_customers = serializers.SerializerMethodField()
     active_subscriptions = serializers.SerializerMethodField()
@@ -812,7 +1492,12 @@ class PartnerAdminSerializer(serializers.ModelSerializer):
         )
 
     def get_referred_customers(self, obj):
-        return Subscription.objects.filter(partner=obj).values("customer").distinct().count()
+        return (
+            Subscription.objects.filter(partner=obj)
+            .values("customer")
+            .distinct()
+            .count()
+        )
 
     def get_active_subscriptions(self, obj):
         return Subscription.objects.filter(
@@ -822,11 +1507,17 @@ class PartnerAdminSerializer(serializers.ModelSerializer):
 
     def get_total_commission(self, obj):
         return (
-            Commission.objects.filter(partner=obj).aggregate(total=Sum("commission_amount"))["total"]
+            Commission.objects.filter(partner=obj)
+            .exclude(status=CommissionStatus.REVERSED)
+            .aggregate(
+                total=Sum("commission_amount")
+            )["total"]
             or MONEY_ZERO
         )
 
     def validate(self, attrs):
         if self.instance and self.instance.role != UserRole.PARTNER:
-            raise serializers.ValidationError("Only partner users can be represented here.")
+            raise serializers.ValidationError(
+                "Only partner users can be represented here."
+            )
         return attrs

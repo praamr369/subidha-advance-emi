@@ -1,100 +1,265 @@
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
+import hashlib
+from io import StringIO
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import TestCase
 
-from subscriptions.models import Batch, Customer, Emi, Product, Subscription
-from subscriptions.services.lucky_draw_service import create_lucky_draw_commit, reveal_lucky_draw
-from subscriptions.services.payment_service import record_emi_payment
+from api.v1.serializers import subscription
+from services.draws.run_monthly_draw import run_monthly_draw
+from services.payments.allocate_payment import allocate_payment
+from services.payments.record_payment import record_payment
+from services.reconciliation.check_emi_integrity import check_emi_integrity
+from services.reconciliation.check_subscription_integrity import check_subscription_integrity
+from services.subscriptions.create_subscription import create_subscription
+from subscriptions.models import Batch, BatchStatus, Customer, EmiStatus, FinancialLedger, Payment, PlanType, Product
+from subscriptions.services.lucky_draw_service import create_lucky_draw_commit, generate_commitment
 
 
-class FinancialIntegrityTests(TestCase):
+class FinancialFlowTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.customer_user = User.objects.create_user(
-            username="cust_test", password="pass1234", role="CUSTOMER", phone="9800000000"
+            username="cust_fin", password="pass1234", role="CUSTOMER", phone="9800000011"
         )
+        self.partner_user = User.objects.create_user(
+            username="partner_fin", password="pass1234", role="PARTNER", phone="9800000012"
+        )
+
         self.customer = Customer.objects.create(
-            user=self.customer_user, name="A", phone="9800000000"
+            user=self.customer_user,
+            name="Customer Fin",
+            phone="9800000011",
         )
         self.product = Product.objects.create(
-            product_code="P-001", name="P", base_price=Decimal("1000.00")
+            product_code="PRD-FIN",
+            name="Sofa",
+            base_price=Decimal("1000.00"),
         )
         self.batch = Batch.objects.create(
-            batch_code="B-100", total_slots=100, duration_months=10, draw_day=5, start_date=date(2026, 1, 1)
+            batch_code="BATCHFIN01",
+            total_slots=100,
+            duration_months=10,
+            draw_day=5,
+            start_date=date(2026, 1, 1),
+            status=BatchStatus.OPEN,
         )
-        self.l1 = self.batch.lucky_ids.get(lucky_number=1)
-        self.partner = User.objects.create_user(username="p1", password="pass1234", role="PARTNER")
 
-    def _create_subscription_with_emis(self, partner=None, tenure=10, total=Decimal("1000.00")):
-        """Helper to create subscription with all EMIs properly."""
-        monthly = total / tenure
-        sub = Subscription.objects.create(
+    def _create_subscription(self):
+        return create_subscription(
             customer=self.customer,
             product=self.product,
             batch=self.batch,
-            lucky_id=self.l1,
-            partner=partner,
-            plan_type="EMI",
-            tenure_months=tenure,
+            lucky_number=1,
+            tenure_months=10,
+            partner=self.partner_user,
             start_date=date(2026, 1, 1),
-            total_amount=total,
-            monthly_amount=monthly,
+            performed_by=self.partner_user,
         )
-        start = date(2026, 2, 1)
-        for i in range(1, tenure + 1):
-            Emi.objects.create(
-                subscription=sub,
-                month_no=i,
-                due_date=start + timedelta(days=30 * (i - 1)),
-                amount=monthly,
-            )
-        return sub
 
-    def test_payment_creates_ledger_entry(self):
-        sub = self._create_subscription_with_emis()
-        emi = sub.emis.get(month_no=1)
-        payment = record_emi_payment(
-            customer=self.customer,
-            subscription=sub,
+    def test_subscription_total_matches_sum_of_emis(self):
+        subscription = self._create_subscription()
+        summary = check_subscription_integrity(subscription=subscription)
+
+        self.assertTrue(summary["total_matches_emi_sum"])
+        self.assertTrue(summary["is_consistent"])
+
+        emi_total = sum((emi.amount for emi in subscription.emis.all()), start=Decimal("0.00"))
+        self.assertEqual(subscription.total_amount, emi_total)
+
+    def test_emi_amount_matches_paid_waived_outstanding(self):
+        subscription = self._create_subscription()
+        emi = subscription.emis.get(month_no=1)
+
+        payment = record_payment(
             emi_id=emi.id,
-            amount=Decimal("50.00"),
+            amount=Decimal("100.00"),
             method="CASH",
             payment_date=date(2026, 2, 1),
-            collected_by=self.partner,
-            reference_no="R-1",
+            reference_no="PAY-FIN-001",
+            collected_by=self.partner_user,
         )
-        self.assertIsNotNone(payment)
-        ledger = payment.ledger_entry
-        self.assertIsNotNone(ledger)
-        self.assertEqual(ledger.entry_type, "EMI_PAYMENT")
+        allocate_payment(payment=payment)
 
-    def test_lucky_draw_seed_commitment_verification(self):
-        self._create_subscription_with_emis()
+        emi.refresh_from_db()
+        emi_paid = sum((p.amount for p in emi.payments.all()), start=Decimal("0.00"))
+        emi_waived = emi.amount if emi.status == EmiStatus.WAIVED else Decimal("0.00")
+        emi_outstanding = emi.amount - emi_paid - emi_waived
 
-        draw, seed = create_lucky_draw_commit(batch=self.batch)
-        draw.draw_date = date(2026, 2, 5)
-        draw.save(update_fields=["draw_date"])
-        draw = reveal_lucky_draw(draw=draw, secret_seed=seed)
-        self.assertTrue(draw.is_revealed)
-        self.assertTrue(draw.verify_commitment())
+        self.assertEqual(emi.amount, emi_paid + emi_waived + emi_outstanding)
 
-        with self.assertRaises(ValidationError):
-            reveal_lucky_draw(draw=draw, secret_seed=seed)
 
-    def test_partner_commission_created_from_payment(self):
-        sub = self._create_subscription_with_emis(partner=self.partner)
-        emi = sub.emis.get(month_no=1)
-        payment = record_emi_payment(
-            customer=self.customer,
-            subscription=sub,
+    def test_subscription_snapshots_are_auto_populated(self):
+        subscription = self._create_subscription()
+
+        self.assertIsNotNone(subscription.product_snapshot)
+        self.assertIsNotNone(subscription.pricing_snapshot)
+        self.assertEqual(subscription.pricing_snapshot.get("plan_type"), PlanType.EMI)
+        self.assertEqual(subscription.product_snapshot.get("product_id"), self.product.id)
+
+    def test_payment_and_ledger_plan_type_hint_defaults_to_subscription_plan(self):
+        subscription = self._create_subscription()
+        emi = subscription.emis.get(month_no=1)
+
+        payment = record_payment(
             emi_id=emi.id,
-            amount=emi.amount,
+            amount=Decimal("100.00"),
             method="CASH",
             payment_date=date(2026, 2, 1),
-            collected_by=self.partner,
-            reference_no="R-2",
+            reference_no="PAY-FIN-PTYPE",
+            collected_by=self.partner_user,
         )
-        self.assertIsNotNone(payment)
+
+        payment.refresh_from_db()
+        self.assertEqual(payment.plan_type_hint, PlanType.EMI)
+
+        ledger = FinancialLedger.objects.get(payment=payment)
+        self.assertEqual(ledger.plan_type_hint, PlanType.EMI)
+
+    def test_payment_amount_matches_allocations(self):
+        subscription = self._create_subscription()
+        emi = subscription.emis.get(month_no=1)
+
+        payment = record_payment(
+            emi_id=emi.id,
+            amount=Decimal("100.00"),
+            method="CASH",
+            payment_date=date(2026, 2, 1),
+            reference_no="PAY-FIN-002",
+            collected_by=self.partner_user,
+        )
+
+        allocation = allocate_payment(payment=payment)
+        self.assertTrue(allocation["is_consistent"])
+        self.assertEqual(
+            Decimal(allocation["payment_amount"]),
+            Decimal(allocation["allocation_total"]),
+        )
+
+        emi_integrity = check_emi_integrity(emi=emi)
+        self.assertTrue(emi_integrity["is_payment_consistent"])
+
+    def test_winner_waiver_affects_only_future_emis(self):
+        subscription = self._create_subscription()
+
+        self.batch.status = BatchStatus.FULL
+        self.batch.save(update_fields=["status"])
+
+        draw, _ = create_lucky_draw_commit(batch=self.batch)
+
+        target_seed = None
+        for i in range(1, 20000):
+            candidate = f"seed-{i}"
+            combined = f"{candidate}-{self.batch.id}-{draw.draw_month}"
+            winner = int(hashlib.sha256(combined.encode()).hexdigest(), 16) % self.batch.total_slots
+            if winner == subscription.lucky_id.lucky_number:
+                target_seed = candidate
+            break
+
+        self.assertIsNotNone(target_seed, "Unable to find deterministic seed for test draw.")
+
+        draw.committed_hash = generate_commitment(target_seed)
+        draw.save(update_fields=["committed_hash"])
+
+        run_monthly_draw(draw_id=draw.id, revealed_seed=target_seed, performed_by=self.partner_user)
+
+        past_or_current = subscription.emis.filter(month_no__lte=draw.draw_month)
+        future = subscription.emis.filter(month_no__gt=draw.draw_month)
+
+        self.assertFalse(past_or_current.filter(status=EmiStatus.WAIVED).exists())
+        self.assertFalse(future.exclude(status=EmiStatus.WAIVED).exists())
+
+
+class ReconcileFinancialsCommandTests(FinancialFlowTests):
+    def test_reconcile_financials_reports_inconsistencies(self):
+        subscription = self._create_subscription()
+
+        print("DEBUG lucky_number:", subscription.lucky_id.lucky_number)
+        print("DEBUG total_slots:", self.batch.total_slots)
+
+        self.batch.status = BatchStatus.FULL
+        self.batch.save(update_fields=["status"])
+
+        draw, _ = create_lucky_draw_commit(batch=self.batch)
+
+        print("DEBUG draw_month:", draw.draw_month)
+        print("DEBUG batch_id:", self.batch.id)
+        subscription.total_amount = Decimal("999.00")
+        subscription.save(update_fields=["total_amount"])
+
+        out = StringIO()
+        call_command("reconcile_financials", stdout=out)
+        output = out.getvalue()
+
+        self.assertIn(f"Subscription ID: {subscription.id}", output)
+        self.assertIn("Consistent: false", output)
+        self.assertIn("Inconsistencies:", output)
+
+    def test_reconcile_financials_only_inconsistent_filter(self):
+        inconsistent = self._create_subscription()
+        inconsistent.total_amount = Decimal("123.00")
+        inconsistent.save(update_fields=["total_amount"])
+
+        clean = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=2,
+            tenure_months=10,
+            partner=self.partner_user,
+            start_date=date(2026, 1, 1),
+            performed_by=self.partner_user,
+        )
+
+        out = StringIO()
+        call_command("reconcile_financials", "--only-inconsistent", stdout=out)
+        output = out.getvalue()
+
+        self.assertIn(f"Subscription ID: {inconsistent.id}", output)
+        self.assertNotIn(f"Subscription ID: {clean.id}", output)
+
+    def test_reconcile_financials_subscription_and_batch_filters(self):
+        matching = self._create_subscription()
+
+        other_batch = Batch.objects.create(
+            batch_code="BATCHFIN02",
+            total_slots=100,
+            duration_months=10,
+            draw_day=6,
+            start_date=date(2026, 2, 1),
+            status=BatchStatus.OPEN,
+        )
+        create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=other_batch,
+            lucky_number=1,
+            tenure_months=10,
+            partner=self.partner_user,
+            start_date=date(2026, 2, 1),
+            performed_by=self.partner_user,
+        )
+
+        out_by_subscription = StringIO()
+        call_command(
+            "reconcile_financials",
+            "--subscription-id",
+            str(matching.id),
+            stdout=out_by_subscription,
+        )
+        self.assertIn(f"Subscription ID: {matching.id}", out_by_subscription.getvalue())
+
+        out_by_batch = StringIO()
+        call_command(
+            "reconcile_financials",
+            "--batch-id",
+            str(other_batch.id),
+            stdout=out_by_batch,
+        )
+        self.assertIn("Subscription ID:", out_by_batch.getvalue())
+        self.assertNotIn(
+            f"Subscription ID: {matching.id}",
+            out_by_batch.getvalue(),
+        )

@@ -23,7 +23,8 @@ class ExecuteWinnerView(APIView):
         try:
             result = WinnerService.execute_winner(
                 subscription_id=int(subscription_id),
-                winner_month=int(winner_month)
+                winner_month=int(winner_month),
+                performed_by=request.user,
             )
             return Response(result, status=status.HTTP_200_OK)
 

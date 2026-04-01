@@ -1,6 +1,10 @@
-import { getRole } from "@/lib/auth";
+import { getStoredSession } from "@/lib/auth/session";
+
+function normalize(value: string): string {
+  return value.trim().toUpperCase();
+}
 
 export function hasRole(allowed: string[]): boolean {
-  const role = (getRole() || "").toUpperCase();
-  return allowed.map((r) => r.toUpperCase()).includes(role);
+  const role = normalize(getStoredSession()?.role || "");
+  return allowed.some((value) => normalize(value) === role);
 }

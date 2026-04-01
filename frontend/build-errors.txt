@@ -1,0 +1,27 @@
+
+> subidha-frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 10.4s
+  Running TypeScript ...
+Failed to compile.
+
+./src/app/(dashboard)/admin/customers/page.tsx:44:27
+Type error: Argument of type '(customer: Customer) => JSX.Element' is not assignable to parameter of type '(value: CustomerListItem, index: number, array: CustomerListItem[]) => Element'.
+  Types of parameters 'customer' and 'value' are incompatible.
+    Type 'CustomerListItem' is not assignable to type 'Customer'.
+      Types of property 'email' are incompatible.
+        Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+          Type 'null' is not assignable to type 'string | undefined'.
+
+[0m [90m 42 |[39m               [33m<[39m[33m/[39m[33mthead[39m[33m>[39m
+ [90m 43 |[39m               [33m<[39m[33mtbody[39m[33m>[39m
+[31m[1m>[22m[39m[90m 44 |[39m                 {data[33m.[39mmap((customer[33m:[39m [33mCustomer[39m) [33m=>[39m (
+ [90m    |[39m                           [31m[1m^[22m[39m
+ [90m 45 |[39m                   [33m<[39m[33mtr[39m key[33m=[39m{customer[33m.[39mid} className[33m=[39m[32m"border-b border-border last:border-b-0"[39m[33m>[39m
+ [90m 46 |[39m                     [33m<[39m[33mtd[39m className[33m=[39m[32m"px-6 py-4 text-sm text-foreground"[39m[33m>[39m{customer[33m.[39mid}[33m<[39m[33m/[39m[33mtd[39m[33m>[39m
+ [90m 47 |[39m                     [33m<[39m[33mtd[39m className[33m=[39m[32m"px-6 py-4 text-sm font-medium text-foreground"[39m[33m>[39m[0m
+Next.js build worker exited with code: 1 and signal: null

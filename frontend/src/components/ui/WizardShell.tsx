@@ -1,22 +1,39 @@
+// frontend/src/components/ui/WizardShell.tsx
 "use client";
 
 import { type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 type WizardShellProps = {
   step: number;
   totalSteps: number;
   title: string;
   children: ReactNode;
+  className?: string;
 };
 
-export default function WizardShell({ step, totalSteps, title, children }: WizardShellProps) {
+export default function WizardShell({
+  step,
+  totalSteps,
+  title,
+  children,
+  className,
+}: WizardShellProps) {
   return (
-    <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 14, marginBottom: 20 }}>
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
-      <p style={{ color: "#4b5563" }}>
-        Step {step} of {totalSteps}
-      </p>
+    <div className={cn("rounded-2xl border border-border bg-card p-6 shadow-sm", className)}>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <div className="text-sm text-muted-foreground">
+          Step {step} of {totalSteps}
+        </div>
+      </div>
+      <div className="mb-6 h-1.5 w-full rounded-full bg-muted">
+        <div
+          className="h-1.5 rounded-full bg-primary transition-all"
+          style={{ width: `${(step / totalSteps) * 100}%` }}
+        />
+      </div>
       {children}
-    </section>
+    </div>
   );
 }

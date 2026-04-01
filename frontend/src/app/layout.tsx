@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import "./globals.css";
+import AppProviders from "@/providers/AppProviders";
+
 export const metadata: Metadata = {
-  title: "Subidha Core",
-  description: "Secure financial and subscription operations platform.",
+  title: {
+    default: "SUBIDHA CORE",
+    template: "%s | SUBIDHA CORE",
+  },
+  description: "Lucky Plan EMI operational platform",
 };
 
-type RootLayoutProps = {
-  readonly children: ReactNode;
-};
-
-export default function RootLayout({ children }: RootLayoutProps) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

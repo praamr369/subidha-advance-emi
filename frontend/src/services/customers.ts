@@ -1,41 +1,57 @@
-import { apiFetch } from "@/lib/api";
+import { request } from "@/services/api";
 
 export type CustomerRecord = {
   id: number;
-  user?: number | null;
-  user_username?: string;
   name: string;
   phone: string;
-  email?: string;
-  status?: string;
   kyc_status?: string;
+  address?: string;
   created_at?: string;
+  user?: number | null;
 };
 
-type CustomerListResponse =
-  | CustomerRecord[]
-  | {
-      count?: number;
-      results?: CustomerRecord[];
-    };
+type PaginatedResponse<T> = {
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: T[];
+};
 
-function toArray(payload: CustomerListResponse): CustomerRecord[] {
+function toArray<T>(
+  payload: T[] | PaginatedResponse<T> | null | undefined
+): T[] {
+  if (!payload) return [];
   if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.results)) return payload.results;
   return [];
 }
 
-function buildQuery(params?: {
+function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
+  return {
+    id: Number(row.id ?? 0),
+    name: typeof row.name === "string" ? row.name : "",
+    phone: typeof row.phone === "string" ? row.phone : "",
+    kyc_status:
+      typeof row.kyc_status === "string" ? row.kyc_status : undefined,
+    address: typeof row.address === "string" ? row.address : undefined,
+    created_at:
+      typeof row.created_at === "string" ? row.created_at : undefined,
+    user:
+      typeof row.user === "number"
+        ? row.user
+        : row.user === null
+          ? null
+          : undefined,
+  };
+}
+
+function buildCustomerQuery(params?: {
   q?: string;
-  phone?: string;
-  kyc_status?: string;
   page?: number;
 }) {
   const search = new URLSearchParams();
 
   if (params?.q) search.set("q", params.q);
-  if (params?.phone) search.set("phone", params.phone);
-  if (params?.kyc_status) search.set("kyc_status", params.kyc_status);
   if (params?.page) search.set("page", String(params.page));
 
   const query = search.toString();
@@ -44,22 +60,52 @@ function buildQuery(params?: {
 
 export async function listCustomers(params?: {
   q?: string;
-  phone?: string;
-  kyc_status?: string;
   page?: number;
-}): Promise<CustomerRecord[]> {
-  const payload = await apiFetch<CustomerListResponse>(
-    `/admin/customers/${buildQuery(params)}`
+}): Promise<{
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: CustomerRecord[];
+}> {
+  const payload = await request<PaginatedResponse<Record<string, unknown>>>(
+    `/admin/customers/${buildCustomerQuery(params)}`,
+    {
+      method: "GET",
+    } as RequestInit
   );
-  return toArray(payload);
+
+  const rows = toArray(payload).map(normalizeCustomer);
+
+  return {
+    count: Number(payload?.count ?? rows.length),
+    next: payload?.next ?? null,
+    previous: payload?.previous ?? null,
+    results: rows,
+  };
 }
 
-export async function searchCustomers(query: string): Promise<CustomerRecord[]> {
-  return listCustomers({ q: query });
+export async function searchCustomers(q: string): Promise<CustomerRecord[]> {
+  const trimmed = q.trim();
+  if (!trimmed) return [];
+
+  const payload = await request<
+    Record<string, unknown>[] | PaginatedResponse<Record<string, unknown>>
+  >(`/admin/customers/search/?q=${encodeURIComponent(trimmed)}`, {
+    method: "GET",
+  } as RequestInit);
+
+  return toArray(payload).map(normalizeCustomer);
 }
 
 export async function getCustomer(
   id: number | string
 ): Promise<CustomerRecord> {
-  return apiFetch<CustomerRecord>(`/admin/customers/${id}/`);
+  const payload = await request<Record<string, unknown>>(
+    `/admin/customers/${id}/`,
+    {
+      method: "GET",
+    } as RequestInit
+  );
+
+  return normalizeCustomer(payload ?? {});
 }

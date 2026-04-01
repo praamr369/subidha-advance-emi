@@ -1,48 +1,156 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from decimal import Decimal
+
+from django.http import HttpResponse
+from django.db.models import Sum
+from rest_framework import serializers
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from subscriptions.models import CommissionLedger
+from api.v1.permissions import IsPartner
+from subscriptions.models import Commission, CommissionStatus, MONEY_ZERO
+from subscriptions.services.commission_statement_service import (
+    CommissionStatementFilters,
+    build_commission_statement_payload,
+    render_commission_statement_csv,
+    render_commission_statement_pdf,
+)
 
 
-from rest_framework.generics import ListAPIView
-from subscriptions.models import Commission
-from accounts.serializers import CommissionSerializer
+def _money(value) -> str:
+    return f"{Decimal(value or MONEY_ZERO):.2f}"
 
 
-class PartnerCommissionListView(ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = CommissionSerializer
+class PartnerCommissionStatementExportQuerySerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        required=False,
+        choices=CommissionStatus.choices,
+    )
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+    export_format = serializers.ChoiceField(choices=["csv", "pdf"], default="csv")
 
-    def get_queryset(self):
-        return Commission.objects.filter(
-            partner=self.request.user
-        ).order_by("-created_at")
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError(
+                {"date_to": "date_to must be on or after date_from."}
+            )
+        return attrs
+
+
+class PartnerCommissionView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
 
     def get(self, request):
+        partner = request.user
 
-        user = request.user
-
-        if not user.groups.filter(name="partner").exists():
-            return Response({"error": "Partner only"}, status=403)
-
-        entries = (
-            CommissionLedger.objects
-            .filter(partner=user)
-            .select_related("payment", "payment__customer")
-            .order_by("-created_at")
+        commissions = (
+            Commission.objects
+            .filter(partner=partner)
+            .select_related("subscription", "payment", "emi")
+            .order_by("-created_at", "-id")
         )
 
-        data = []
+        total_commission = (
+            commissions.exclude(status=CommissionStatus.REVERSED)
+            .aggregate(total=Sum("commission_amount"))["total"]
+            or MONEY_ZERO
+        )
 
-        for e in entries:
-            data.append({
-                "id": e.id,
-                "customer": e.payment.customer.name,
-                "payment_id": e.payment.id,
-                "payment_amount": str(e.payment.amount),
-                "commission_amount": str(e.amount),
-                "created_at": e.created_at,
-            })
+        pending_commission = (
+            commissions.filter(status=CommissionStatus.PENDING)
+            .aggregate(total=Sum("commission_amount"))["total"]
+            or MONEY_ZERO
+        )
 
-        return Response(data)
+        settled_commission = (
+            commissions.filter(status=CommissionStatus.SETTLED)
+            .aggregate(total=Sum("commission_amount"))["total"]
+            or MONEY_ZERO
+        )
+
+        results = []
+        for commission in commissions:
+            results.append(
+                {
+                    "id": commission.id,
+                    "partner": commission.partner_id,
+                    "subscription": commission.subscription_id,
+                    "payment": commission.payment_id,
+                    "emi": commission.emi_id,
+                    "commission_rate": str(commission.commission_rate),
+                    "commission_amount": str(commission.commission_amount),
+                    "status": commission.status,
+                    "settlement_date": (
+                        str(commission.settlement_date)
+                        if commission.settlement_date
+                        else None
+                    ),
+                    "reversal_reason": commission.reversal_reason,
+                    "metadata": commission.metadata or {},
+                    "created_at": commission.created_at.isoformat()
+                    if commission.created_at
+                    else None,
+                    "updated_at": commission.updated_at.isoformat()
+                    if commission.updated_at
+                    else None,
+                }
+            )
+
+        return Response(
+            {
+                "count": commissions.count(),
+                "summary": {
+                    "total_commission": _money(total_commission),
+                    "pending_commission": _money(pending_commission),
+                    "settled_commission": _money(settled_commission),
+                },
+                "results": results,
+            }
+        )
+
+
+class PartnerCommissionStatementExportView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        serializer = PartnerCommissionStatementExportQuerySerializer(
+            data=request.query_params
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            payload = build_commission_statement_payload(
+                CommissionStatementFilters(
+                    partner=request.user,
+                    status=serializer.validated_data.get("status"),
+                    date_from=serializer.validated_data.get("date_from"),
+                    date_to=serializer.validated_data.get("date_to"),
+                )
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        export_format = serializer.validated_data["export_format"]
+        filename = f"partner_earnings_statement_{request.user.id}.{export_format}"
+
+        if export_format == "pdf":
+            response = HttpResponse(
+                render_commission_statement_pdf(payload),
+                content_type="application/pdf",
+            )
+        else:
+            response = HttpResponse(
+                render_commission_statement_csv(payload),
+                content_type="text/csv",
+            )
+
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response

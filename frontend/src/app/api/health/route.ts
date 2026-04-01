@@ -1,0 +1,10 @@
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    service: "frontend",
+    timestamp: new Date().toISOString(),
+    version: "phase-1",
+  });
+}

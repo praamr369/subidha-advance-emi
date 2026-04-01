@@ -1,122 +1,219 @@
 from decimal import Decimal
-from django.core.exceptions import ValidationError
-from django.db.models import Sum, Count, Max
 
-from subscriptions.models import EmiStatus, SubscriptionStatus
+from django.db.models import Sum
+
+from subscriptions.models import (
+    Emi,
+    EmiStatus,
+    MONEY_ZERO,
+    Payment,
+    Subscription,
+    SubscriptionStatus,
+)
 
 
-def reconcile_subscription_emis(subscription):
-    """
-    Deep financial integrity validation.
-    Raises ValidationError if corruption detected.
-    """
+def q2(value):
+    value = value or MONEY_ZERO
+    return Decimal(value).quantize(Decimal("0.01"))
 
-    emis = subscription.emis.all().order_by("month_no")
 
-    # ----------------------------------------------------
-    # 1️⃣ EMI Count Must Match Tenure
-    # ----------------------------------------------------
+def _is_payment_reversed(payment: Payment) -> bool:
+    metadata = payment.allocation_metadata or {}
+    reversal = metadata.get("reversal") or {}
+    return bool(reversal.get("is_reversed"))
 
-    if emis.count() != subscription.tenure_months:
-        raise ValidationError("EMI count does not match tenure.")
 
-    # ----------------------------------------------------
-    # 2️⃣ No Duplicate Month Numbers
-    # ----------------------------------------------------
+def effective_paid_for_emi(emi: Emi) -> Decimal:
+    total = MONEY_ZERO
+    for payment in emi.payments.all():
+        if _is_payment_reversed(payment):
+            continue
+        total += payment.amount or MONEY_ZERO
+    return q2(total)
 
-    duplicates = (
-        emis.values("month_no")
-        .annotate(c=Count("id"))
-        .filter(c__gt=1)
+
+def effective_paid_for_subscription(subscription: Subscription) -> Decimal:
+    total = MONEY_ZERO
+    payments = subscription.payments.all()
+    for payment in payments:
+        if _is_payment_reversed(payment):
+            continue
+        total += payment.amount or MONEY_ZERO
+    return q2(total)
+
+
+def waived_total_for_subscription(subscription: Subscription) -> Decimal:
+    total = (
+        subscription.emis.filter(status=EmiStatus.WAIVED).aggregate(total=Sum("amount"))["total"]
+        or MONEY_ZERO
     )
+    return q2(total)
 
-    if duplicates.exists():
-        raise ValidationError("Duplicate EMI month numbers detected.")
 
-    # ----------------------------------------------------
-    # 3️⃣ Month Continuity Check (1..tenure)
-    # ----------------------------------------------------
+def outstanding_total_for_subscription(subscription: Subscription) -> Decimal:
+    total = MONEY_ZERO
+    for emi in subscription.emis.all():
+        if emi.status == EmiStatus.WAIVED:
+            continue
+        outstanding = q2(emi.amount) - effective_paid_for_emi(emi)
+        if outstanding > MONEY_ZERO:
+            total += outstanding
+    return q2(total)
 
-    expected_months = set(range(1, subscription.tenure_months + 1))
-    actual_months = set(emis.values_list("month_no", flat=True))
 
-    if expected_months != actual_months:
-        raise ValidationError("EMI month sequence corrupted.")
+def sync_emi_status(emi: Emi, save: bool = True) -> EmiStatus:
+    """
+    Recompute one EMI status using effective payments only.
+    Soft-reversed payments are ignored.
+    """
+    if emi.status == EmiStatus.WAIVED:
+        return EmiStatus.WAIVED
 
-    # ----------------------------------------------------
-    # 4️⃣ No EMI Beyond Tenure
-    # ----------------------------------------------------
+    effective_paid = effective_paid_for_emi(emi)
+    next_status = EmiStatus.PAID if effective_paid >= q2(emi.amount) else EmiStatus.PENDING
 
-    max_month = emis.aggregate(max_m=Max("month_no"))["max_m"]
+    if save and emi.status != next_status:
+        emi.status = next_status
+        emi.save(update_fields=["status"])
 
-    if max_month > subscription.tenure_months:
-        raise ValidationError("EMI month exceeds tenure.")
+    return next_status
 
-    # ----------------------------------------------------
-    # 5️⃣ Sum Validation
-    # ----------------------------------------------------
 
-    total = emis.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+def sync_subscription_status(subscription: Subscription, save: bool = True) -> str:
+    """
+    Recompute subscription status from EMI truth.
+    Current P3 rule:
+    - COMPLETED only when every EMI is PAID or WAIVED
+    - otherwise ACTIVE
+    - WON remains untouched because draw outcome is business state, not payment-only state
+    """
+    current_status = subscription.status
 
-    if total != subscription.total_amount:
-        raise ValidationError(
-            f"EMI total mismatch. Expected {subscription.total_amount}, got {total}"
+    unresolved = subscription.emis.exclude(
+        status__in=[EmiStatus.PAID, EmiStatus.WAIVED]
+    ).exists()
+
+    if current_status == SubscriptionStatus.WON:
+        # Keep WON as-is; winning is determined by draw flow, not by reconciliation.
+        next_status = SubscriptionStatus.WON
+    else:
+        next_status = (
+            SubscriptionStatus.ACTIVE if unresolved else SubscriptionStatus.COMPLETED
         )
 
-    # ----------------------------------------------------
-    # 6️⃣ Negative EMI Protection
-    # ----------------------------------------------------
+    if save and subscription.status != next_status:
+        subscription.status = next_status
+        subscription.save(update_fields=["status"])
 
-    if emis.filter(amount__lt=0).exists():
-        raise ValidationError("Negative EMI detected.")
+    return next_status
 
-    # ----------------------------------------------------
-    # 7️⃣ Payment Integrity Check
-    # ----------------------------------------------------
+
+def reconcile_subscription_emis(subscription: Subscription):
+    """
+    Authoritative subscription reconciliation.
+
+    Returns a dictionary that can be used by:
+    - collect payment flow
+    - reversal flow
+    - admin diagnostics
+    - management commands
+
+    This implementation is reversal-aware.
+    """
+    subscription = (
+        Subscription.objects.prefetch_related(
+            "emis__payments",
+            "payments",
+        )
+        .get(pk=subscription.pk)
+    )
+
+    emis = list(subscription.emis.all().order_by("month_no"))
+
+    total_due = MONEY_ZERO
+    total_paid = MONEY_ZERO
+    total_waived = MONEY_ZERO
+
+    emi_rows = []
 
     for emi in emis:
-        paid = emi.payments.aggregate(
-            total=Sum("amount")
-        )["total"] or Decimal("0.00")
+        total_due += q2(emi.amount)
 
-        if paid > emi.amount:
-            raise ValidationError(
-                f"Overpayment detected on EMI month {emi.month_no}"
-            )
+        effective_paid = effective_paid_for_emi(emi)
+        total_paid += effective_paid
 
-    # ----------------------------------------------------
-    # 8️⃣ Winner Logic Consistency
-    # ----------------------------------------------------
+        if emi.status == EmiStatus.WAIVED:
+            total_waived += q2(emi.amount)
 
-    if subscription.status == SubscriptionStatus.WON:
+        next_status = sync_emi_status(emi, save=True)
 
-        if not subscription.winner_month:
-            raise ValidationError("Winner month missing for WON subscription.")
+        outstanding = q2(emi.amount) - effective_paid
+        if emi.status == EmiStatus.WAIVED:
+            outstanding = MONEY_ZERO
+        elif outstanding < MONEY_ZERO:
+            outstanding = MONEY_ZERO
 
-        post_winner_emis = emis.filter(
-            month_no__gt=subscription.winner_month
+        emi_rows.append(
+            {
+                "emi_id": emi.id,
+                "month_no": emi.month_no,
+                "status": next_status,
+                "amount": q2(emi.amount),
+                "effective_paid": q2(effective_paid),
+                "outstanding": q2(outstanding),
+            }
         )
 
-        if post_winner_emis.exclude(status=EmiStatus.WAIVED).exists():
-            raise ValidationError(
-                "Post-winner EMIs must be WAIVED."
-            )
+    # Recompute waived amount from EMI truth
+    recomputed_waived = waived_total_for_subscription(subscription)
+    if q2(subscription.waived_amount) != recomputed_waived:
+        subscription.waived_amount = recomputed_waived
+        subscription.save(update_fields=["waived_amount"])
 
-    # ----------------------------------------------------
-    # 9️⃣ Completion Consistency
-    # ----------------------------------------------------
+    next_subscription_status = sync_subscription_status(subscription, save=True)
 
-    remaining = emis.exclude(
-        status__in=[EmiStatus.PAID, EmiStatus.WAIVED]
+    outstanding_total = q2(total_due - total_paid - recomputed_waived)
+    if outstanding_total < MONEY_ZERO:
+        outstanding_total = MONEY_ZERO
+
+    is_consistent = q2(subscription.total_amount) == q2(total_paid + recomputed_waived + outstanding_total)
+
+    return {
+        "subscription_id": subscription.id,
+        "subscription_status": next_subscription_status,
+        "total_due": q2(total_due),
+        "paid": q2(total_paid),
+        "waived": q2(recomputed_waived),
+        "outstanding": q2(outstanding_total),
+        "is_consistent": is_consistent,
+        "emis": emi_rows,
+    }
+
+
+def reconcile_emi_ledger(emi: Emi):
+    """
+    Verify ledger total against effective payments for one EMI.
+    PAYMENT_REVERSAL entries reduce net ledger value.
+    """
+    from subscriptions.models import FinancialLedger, LedgerDirection
+
+    ledger_total = MONEY_ZERO
+    ledger_rows = FinancialLedger.objects.filter(emi=emi).order_by("created_at", "id")
+
+    for row in ledger_rows:
+        amount = q2(row.amount)
+        if row.entry_direction == LedgerDirection.CREDIT:
+            ledger_total += amount
+        else:
+            ledger_total -= amount
+
+    effective_paid = effective_paid_for_emi(
+        Emi.objects.prefetch_related("payments").get(pk=emi.pk)
     )
 
-    if not remaining.exists():
-        if subscription.status not in [
-            SubscriptionStatus.COMPLETED,
-            SubscriptionStatus.WON,
-        ]:
-            raise ValidationError(
-                "Subscription status inconsistent with EMI completion."
-            )
-
-    return True
+    return {
+        "emi_id": emi.id,
+        "payment_effective_total": q2(effective_paid),
+        "ledger_net_total": q2(ledger_total),
+        "is_consistent": q2(effective_paid) == q2(ledger_total),
+    }

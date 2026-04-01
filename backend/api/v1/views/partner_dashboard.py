@@ -1,210 +1,584 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
-from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.db.models import Sum
-from rest_framework import serializers
-from rest_framework.generics import ListAPIView
+from django.db.models import Count, Prefetch, Q, Sum
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import User, UserRole
-from api.v1.permissions import IsPartnerOrAdmin
-from api.v1.serializers import CommissionSerializer
+from api.v1.permissions import IsPartner
+from api.v1.serializers.partner_collection_request import (
+    PartnerCollectionRequestSerializer,
+)
+from api.v1.serializers.payment import PaymentSerializer
+from api.v1.serializers.subscription import (
+    SubscriptionDetailSerializer,
+    SubscriptionListSerializer,
+)
 from subscriptions.models import (
-    Batch,
-    Product,
-    BatchStatus,
     Commission,
+    CommissionStatus,
     Customer,
     Emi,
-    LuckyId,
-    LuckyIdStatus,
-    PlanType,
+    EmiStatus,
+    MONEY_ZERO,
+    PartnerCollectionRequest,
+    PartnerCollectionRequestStatus,
+    Payment,
     Subscription,
+    SubscriptionStatus,
 )
-from subscriptions.services.emi_engine import generate_emi_schedule
 
 
-class PartnerCustomerSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    user_id = serializers.IntegerField(read_only=True)
-    name = serializers.CharField(max_length=100)
-    phone = serializers.CharField(max_length=15)
-    username = serializers.CharField(max_length=150, write_only=True)
-    password = serializers.CharField(max_length=128, write_only=True)
+def _money(value) -> str:
+    return f"{Decimal(value or MONEY_ZERO):.2f}"
 
 
-class PartnerSubscriptionSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    customer = serializers.IntegerField()
-    product = serializers.IntegerField()
-    batch = serializers.IntegerField()
-    lucky_id = serializers.IntegerField()
-    tenure_months = serializers.IntegerField(min_value=1)
-    start_date = serializers.DateField()
+def _get_partner_user(request):
+    """
+    Canonical partner identity for current codebase.
+
+    Current schema:
+    - Subscription.partner points directly to accounts.User
+    - No partner_profile model exists
+    """
+    return request.user
+
+
+def _serialize_partner_customers(customers):
+    return [
+        {
+            "id": customer.id,
+            "name": customer.name,
+            "phone": customer.phone,
+            "kyc_status": customer.kyc_status,
+            "created_at": customer.created_at,
+        }
+        for customer in customers
+    ]
+
+
+def _partner_customer_queryset(partner):
+    return (
+        Customer.objects.filter(subscriptions__partner=partner)
+        .distinct()
+        .order_by("-created_at", "-id")
+    )
+
+
+def _partner_subscription_queryset(partner):
+    emi_queryset = (
+        Emi.objects.select_related("subscription")
+        .prefetch_related("payments")
+        .order_by("month_no", "due_date", "id")
+    )
+
+    return (
+        Subscription.objects.select_related(
+            "customer",
+            "batch",
+            "product",
+            "lucky_id",
+            "partner",
+        )
+        .prefetch_related(Prefetch("emis", queryset=emi_queryset))
+        .filter(partner=partner)
+        .order_by("-created_at", "-id")
+    )
+
+
+def _partner_all_payment_queryset(partner):
+    """
+    Full operational history, including reversed payments.
+    Use this only when audit-style visibility is explicitly needed.
+    """
+    return (
+        Payment.objects.select_related(
+            "customer",
+            "subscription",
+            "subscription__customer",
+            "subscription__product",
+            "subscription__batch",
+            "subscription__partner",
+            "subscription__lucky_id",
+            "emi",
+            "collected_by",
+            "verified_by",
+        )
+        .filter(subscription__partner=partner)
+        .order_by("-payment_date", "-id")
+    )
+
+
+def _partner_active_payment_queryset(partner):
+    """
+    Financial truth for partner-facing revenue and collection visibility.
+
+    Excludes reversed payments so:
+    - rejected/cancelled requests never inflate totals
+    - reversed rows do not remain in collected amount
+    - partner finance summary remains net-correct
+    """
+    return _partner_all_payment_queryset(partner).exclude(
+        allocation_metadata__reversal__is_reversed=True
+    )
+
+
+def _partner_collection_request_queryset(partner):
+    return (
+        PartnerCollectionRequest.objects.select_related(
+            "partner",
+            "subscription",
+            "customer",
+            "reviewed_by",
+            "approved_payment",
+            "approved_emi",
+        )
+        .filter(partner=partner)
+        .order_by("-created_at", "-id")
+    )
 
 
 class PartnerDashboardView(APIView):
-    permission_classes = [IsPartnerOrAdmin]
+    permission_classes = [IsAuthenticated, IsPartner]
 
     def get(self, request):
-        total_customers = Subscription.objects.filter(
-            partner=request.user
-        ).values("customer").distinct().count()
+        partner = _get_partner_user(request)
 
-        total_commission = Commission.objects.filter(
-            partner=request.user
-        ).aggregate(total=Sum("commission_amount"))["total"] or 0
+        subscriptions = _partner_subscription_queryset(partner)
 
-        pending_commission = Commission.objects.filter(
-            partner=request.user,
-            status="PENDING"
-        ).aggregate(total=Sum("commission_amount"))["total"] or 0
+        # Financial truth
+        active_payments = _partner_active_payment_queryset(partner)
 
-        paid_commission = Commission.objects.filter(
-            partner=request.user,
-            status="PAID"
-        ).aggregate(total=Sum("commission_amount"))["total"] or 0
+        # Full payment history kept available for future audit use if needed
+        all_payments = _partner_all_payment_queryset(partner)
 
-        total_emis_paid = Emi.objects.filter(
-            subscription__partner=request.user,
-            status="PAID"
-        ).count()
+        commissions = Commission.objects.filter(partner=partner)
+        collection_requests = _partner_collection_request_queryset(partner)
 
-        return Response({
-            "total_customers": total_customers,
-            "total_emis_paid": total_emis_paid,
-            "total_commission": total_commission,
-            "pending_commission": pending_commission,
-            "paid_commission": paid_commission,
-        })
-
-
-class PartnerCommissionListView(ListAPIView):
-    permission_classes = [IsPartnerOrAdmin]
-    serializer_class = CommissionSerializer
-
-    def get_queryset(self):
-        return Commission.objects.filter(
-            partner=self.request.user
-        ).order_by("-created_at")
-
-
-class PartnerCustomerListCreateView(APIView):
-    permission_classes = [IsPartnerOrAdmin]
-
-    def get(self, request):
-        customer_ids = Subscription.objects.filter(partner=request.user).values_list("customer_id", flat=True).distinct()
-        customers = Customer.objects.filter(id__in=customer_ids).order_by("-created_at")
-        payload = [
-            {
-                "id": customer.id,
-                "user_id": customer.user_id,
-                "name": customer.name,
-                "phone": customer.phone,
-            }
-            for customer in customers
-        ]
-        return Response(payload)
-
-    def post(self, request):
-        serializer = PartnerCustomerSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        if User.objects.filter(username=data["username"]).exists():
-            return Response({"error": "username already exists"}, status=400)
-        if Customer.objects.filter(phone=data["phone"]).exists():
-            return Response({"error": "phone already exists"}, status=400)
-
-        with transaction.atomic():
-            user = User.objects.create_user(
-                username=data["username"],
-                password=data["password"],
-                role=UserRole.CUSTOMER,
-                phone=data["phone"],
-                first_name=data["name"],
-            )
-            customer = Customer.objects.create(user=user, name=data["name"], phone=data["phone"])
-
-        return Response({"id": customer.id, "user_id": user.id, "name": customer.name, "phone": customer.phone}, status=201)
-
-
-class PartnerSubscriptionListCreateView(APIView):
-    permission_classes = [IsPartnerOrAdmin]
-
-    def get(self, request):
-        subscriptions = (
-            Subscription.objects
-            .select_related("customer", "product", "batch", "lucky_id")
-            .filter(partner=request.user)
-            .order_by("-created_at")
+        total_revenue = (
+            active_payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
         )
-        return Response([
+
+        total_customers = (
+            Customer.objects.filter(subscriptions__partner=partner)
+            .distinct()
+            .count()
+        )
+
+        emi_summary = Emi.objects.filter(subscription__partner=partner).aggregate(
+            pending=Count("id", filter=Q(status=EmiStatus.PENDING)),
+            paid=Count("id", filter=Q(status=EmiStatus.PAID)),
+            waived=Count("id", filter=Q(status=EmiStatus.WAIVED)),
+        )
+
+        commission_total = (
+            commissions.exclude(status=CommissionStatus.REVERSED).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        pending_commission = (
+            commissions.filter(status=CommissionStatus.PENDING).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        settled_commission = (
+            commissions.filter(status=CommissionStatus.SETTLED).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        request_summary = collection_requests.aggregate(
+            submitted_count=Count(
+                "id",
+                filter=Q(status=PartnerCollectionRequestStatus.SUBMITTED),
+            ),
+            under_review_count=Count(
+                "id",
+                filter=Q(status=PartnerCollectionRequestStatus.UNDER_REVIEW),
+            ),
+            approved_count=Count(
+                "id",
+                filter=Q(status=PartnerCollectionRequestStatus.APPROVED),
+            ),
+            rejected_count=Count(
+                "id",
+                filter=Q(status=PartnerCollectionRequestStatus.REJECTED),
+            ),
+            cancelled_count=Count(
+                "id",
+                filter=Q(status=PartnerCollectionRequestStatus.CANCELLED),
+            ),
+        )
+
+        # Primary workflow list:
+        # keep live/approved progress here, not rejected/cancelled history
+        recent_collection_requests = PartnerCollectionRequestSerializer(
+            collection_requests.filter(
+                status__in=[
+                    PartnerCollectionRequestStatus.SUBMITTED,
+                    PartnerCollectionRequestStatus.UNDER_REVIEW,
+                    PartnerCollectionRequestStatus.APPROVED,
+                ]
+            )[:10],
+            many=True,
+        ).data
+
+        # Verified financial activity:
+        # only non-reversed real payment rows
+        recent_verified_payments = PaymentSerializer(
+            active_payments[:10],
+            many=True,
+        ).data
+
+        # Operational follow-up:
+        # rejected/cancelled stay visible, but outside finance totals
+        follow_up_queue = PartnerCollectionRequestSerializer(
+            collection_requests.filter(
+                status__in=[
+                    PartnerCollectionRequestStatus.REJECTED,
+                    PartnerCollectionRequestStatus.CANCELLED,
+                ]
+            )[:10],
+            many=True,
+        ).data
+
+        return Response(
             {
-                "id": sub.id,
-                "customer": sub.customer_id,
-                "customer_name": sub.customer.name,
-                "product": sub.product_id,
-                "product_name": sub.product.name,
-                "batch": sub.batch_id,
-                "lucky_id": sub.lucky_id_id,
-                "lucky_number": sub.lucky_id.lucky_number if sub.lucky_id else None,
-                "tenure_months": sub.tenure_months,
-                "start_date": sub.start_date,
-                "monthly_amount": sub.monthly_amount,
-                "total_amount": sub.total_amount,
-                "status": sub.status,
+                "partner": {
+                    "id": partner.id,
+                    "username": getattr(partner, "username", "") or "",
+                    "email": getattr(partner, "email", "") or "",
+                    "phone": getattr(partner, "phone", "") or "",
+                    "role": getattr(partner, "role", "") or "",
+                },
+                "summary": {
+                    "total_customers": total_customers,
+                    "total_subscriptions": subscriptions.count(),
+                    "active_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.ACTIVE
+                    ).count(),
+                    "completed_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.COMPLETED
+                    ).count(),
+                    "won_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.WON
+                    ).count(),
+                    "defaulted_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.DEFAULTED
+                    ).count(),
+                    "pending_emis": emi_summary["pending"] or 0,
+                    "paid_emis": emi_summary["paid"] or 0,
+                    "waived_emis": emi_summary["waived"] or 0,
+                    "total_revenue_collected": _money(total_revenue),
+                    "total_commission": _money(commission_total),
+                    "pending_commission": _money(pending_commission),
+                    "settled_commission": _money(settled_commission),
+                    "submitted_collection_requests": request_summary["submitted_count"]
+                    or 0,
+                    "under_review_collection_requests": request_summary[
+                        "under_review_count"
+                    ]
+                    or 0,
+                    "approved_collection_requests": request_summary["approved_count"]
+                    or 0,
+                    "rejected_collection_requests": request_summary["rejected_count"]
+                    or 0,
+                    "cancelled_collection_requests": request_summary["cancelled_count"]
+                    or 0,
+                    "verified_payment_count": active_payments.count(),
+                    "all_payment_rows_count": all_payments.count(),
+                },
+                "recent_collection_requests": recent_collection_requests,
+                "recent_verified_payments": recent_verified_payments,
+                "follow_up_queue": follow_up_queue,
             }
-            for sub in subscriptions
-        ])
+        )
 
-    def post(self, request):
-        serializer = PartnerSubscriptionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        payload = serializer.validated_data
 
-        customer = Customer.objects.filter(pk=payload["customer"]).first()
-        product = Product.objects.filter(pk=payload["product"]).first()
-        batch = Batch.objects.filter(pk=payload["batch"]).first()
-        lucky = LuckyId.objects.filter(pk=payload["lucky_id"]).select_related("batch").first()
+class PartnerSubscriptionListView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
 
-        if not customer or not product or not batch or not lucky:
-            return Response({"error": "Invalid customer/product/batch/lucky_id"}, status=400)
-        if batch.status != BatchStatus.OPEN:
-            return Response({"error": "Selected batch is not open"}, status=400)
-        if lucky.batch_id != batch.id:
-            return Response({"error": "Lucky ID does not belong to selected batch"}, status=400)
-        if lucky.status != LuckyIdStatus.AVAILABLE:
-            return Response({"error": "Lucky ID is not available"}, status=400)
-        if Subscription.objects.filter(batch=batch, customer=customer, plan_type=PlanType.EMI).exists():
-            return Response({"error": "Customer already has EMI subscription in this batch"}, status=400)
+    def get(self, request):
+        partner = _get_partner_user(request)
 
-        total_amount = product.base_price
-        tenure = payload["tenure_months"]
-        monthly = (total_amount / tenure).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        rounding = total_amount - (monthly * tenure)
+        subscriptions = _partner_subscription_queryset(partner)
 
-        with transaction.atomic():
-            sub = Subscription.objects.create(
-                customer=customer,
-                product=product,
-                partner=request.user,
-                batch=batch,
-                lucky_id=lucky,
-                plan_type=PlanType.EMI,
-                tenure_months=tenure,
-                start_date=payload["start_date"],
-                total_amount=total_amount,
-                monthly_amount=monthly,
-                status="ACTIVE",
+        status_filter = (request.query_params.get("status") or "").strip()
+        plan_type = (request.query_params.get("plan_type") or "").strip()
+        customer_id = (request.query_params.get("customer") or "").strip()
+        product_id = (request.query_params.get("product") or "").strip()
+        batch_id = (request.query_params.get("batch") or "").strip()
+
+        if status_filter:
+            subscriptions = subscriptions.filter(status=status_filter)
+
+        if plan_type:
+            subscriptions = subscriptions.filter(plan_type=plan_type)
+
+        if customer_id:
+            if customer_id.isdigit():
+                subscriptions = subscriptions.filter(customer_id=int(customer_id))
+            else:
+                subscriptions = subscriptions.none()
+
+        if product_id:
+            if product_id.isdigit():
+                subscriptions = subscriptions.filter(product_id=int(product_id))
+            else:
+                subscriptions = subscriptions.none()
+
+        if batch_id:
+            if batch_id.isdigit():
+                subscriptions = subscriptions.filter(batch_id=int(batch_id))
+            else:
+                subscriptions = subscriptions.none()
+
+        return Response(
+            {
+                "count": subscriptions.count(),
+                "results": SubscriptionListSerializer(subscriptions, many=True).data,
+            }
+        )
+
+
+class PartnerSubscriptionDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request, pk):
+        partner = _get_partner_user(request)
+
+        subscription = _partner_subscription_queryset(partner).filter(pk=pk).first()
+        if subscription is None:
+            return Response(
+                {"detail": "Subscription not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
-            lucky.status = LuckyIdStatus.ASSIGNED
-            lucky.save(update_fields=["status"])
-            try:
-                generate_emi_schedule(sub, rounding_difference=rounding)
-            except ValidationError as exc:
-                raise serializers.ValidationError(str(exc))
 
-        return Response({"id": sub.id}, status=201)
+        return Response(SubscriptionDetailSerializer(subscription).data)
+
+
+class PartnerCustomerListView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        partner = _get_partner_user(request)
+
+        customers = _partner_customer_queryset(partner)
+
+        search = (request.query_params.get("q") or "").strip()
+        kyc_status = (request.query_params.get("kyc_status") or "").strip()
+
+        if search:
+            customers = customers.filter(
+                Q(name__icontains=search) | Q(phone__icontains=search)
+            )
+
+        if kyc_status:
+            customers = customers.filter(kyc_status=kyc_status)
+
+        return Response(
+            {
+                "count": customers.count(),
+                "results": _serialize_partner_customers(customers),
+            }
+        )
+
+
+class PartnerCustomerDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request, pk):
+        partner = _get_partner_user(request)
+
+        customer = _partner_customer_queryset(partner).filter(pk=pk).first()
+        if customer is None:
+            return Response({"detail": "Customer not found."}, status=404)
+
+        subscriptions = _partner_subscription_queryset(partner).filter(customer=customer)
+        payments = _partner_active_payment_queryset(partner).filter(customer=customer)
+        emis = Emi.objects.filter(subscription__partner=partner, subscription__customer=customer)
+
+        total_collected = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+
+        return Response(
+            {
+                "customer": {
+                    "id": customer.id,
+                    "name": customer.name,
+                    "phone": customer.phone,
+                    "kyc_status": customer.kyc_status,
+                    "created_at": customer.created_at,
+                },
+                "summary": {
+                    "total_subscriptions": subscriptions.count(),
+                    "active_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.ACTIVE
+                    ).count(),
+                    "completed_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.COMPLETED
+                    ).count(),
+                    "won_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.WON
+                    ).count(),
+                    "defaulted_subscriptions": subscriptions.filter(
+                        status=SubscriptionStatus.DEFAULTED
+                    ).count(),
+                    "pending_emis": emis.filter(status=EmiStatus.PENDING).count(),
+                    "paid_emis": emis.filter(status=EmiStatus.PAID).count(),
+                    "waived_emis": emis.filter(status=EmiStatus.WAIVED).count(),
+                    "total_collected": _money(total_collected),
+                },
+                "subscriptions": SubscriptionListSerializer(
+                    subscriptions,
+                    many=True,
+                ).data,
+                "recent_payments": PaymentSerializer(
+                    payments[:20],
+                    many=True,
+                ).data,
+            }
+        )
+
+
+class PartnerPaymentListView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        partner = _get_partner_user(request)
+
+        # Partner-facing payment register should show financial truth only
+        payments = _partner_active_payment_queryset(partner)
+
+        method = (request.query_params.get("method") or "").strip()
+        subscription_id = (request.query_params.get("subscription") or "").strip()
+        customer_id = (request.query_params.get("customer") or "").strip()
+        emi_id = (request.query_params.get("emi") or "").strip()
+        q = (request.query_params.get("q") or "").strip()
+
+        if method:
+            payments = payments.filter(method=method)
+
+        if subscription_id:
+            if subscription_id.isdigit():
+                payments = payments.filter(subscription_id=int(subscription_id))
+            else:
+                payments = payments.none()
+
+        if customer_id:
+            if customer_id.isdigit():
+                payments = payments.filter(customer_id=int(customer_id))
+            else:
+                payments = payments.none()
+
+        if emi_id:
+            if emi_id.isdigit():
+                payments = payments.filter(emi_id=int(emi_id))
+            else:
+                payments = payments.none()
+
+        if q:
+            payments = payments.filter(
+                Q(reference_no__icontains=q)
+                | Q(customer__name__icontains=q)
+                | Q(customer__phone__icontains=q)
+                | Q(subscription__product__name__icontains=q)
+                | Q(subscription__product__product_code__icontains=q)
+                | Q(subscription__batch__batch_code__icontains=q)
+            )
+
+        total_amount = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+
+        return Response(
+            {
+                "count": payments.count(),
+                "total_collected": _money(total_amount),
+                "results": PaymentSerializer(payments, many=True).data,
+            }
+        )
+
+
+class PartnerPaymentDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request, pk):
+        partner = _get_partner_user(request)
+
+        payment = _partner_active_payment_queryset(partner).filter(pk=pk).first()
+        if payment is None:
+            return Response(
+                {"detail": "Partner payment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        payload = PaymentSerializer(payment, context={"request": request}).data
+
+        return Response(
+            {
+                "payment": payload,
+                "status_label": "RECORDED",
+            }
+        )
+
+
+class PartnerEarningsSummaryView(APIView):
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        partner = _get_partner_user(request)
+
+        # Earnings summary must also exclude reversed rows
+        payments = _partner_active_payment_queryset(partner)
+        commissions = Commission.objects.filter(partner=partner)
+
+        total_collected = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+
+        total_commission = (
+            commissions.exclude(status=CommissionStatus.REVERSED).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        pending_commission = (
+            commissions.filter(status=CommissionStatus.PENDING).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        settled_commission = (
+            commissions.filter(status=CommissionStatus.SETTLED).aggregate(
+                total=Sum("commission_amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+
+        monthly_collection = list(
+            payments.values("payment_date__year", "payment_date__month")
+            .annotate(total=Sum("amount"))
+            .order_by("payment_date__year", "payment_date__month")
+        )
+
+        monthly_commission = list(
+            commissions.exclude(status=CommissionStatus.REVERSED)
+            .values("created_at__year", "created_at__month")
+            .annotate(total=Sum("commission_amount"))
+            .order_by("created_at__year", "created_at__month")
+        )
+
+        return Response(
+            {
+                "total_collected": _money(total_collected),
+                "total_commission": _money(total_commission),
+                "pending_commission": _money(pending_commission),
+                "settled_commission": _money(settled_commission),
+                "monthly_collection": monthly_collection,
+                "monthly_commission": monthly_commission,
+            }
+        )

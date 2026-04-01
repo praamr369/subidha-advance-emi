@@ -36,7 +36,12 @@ def customer_subscription_report(request):
 @permission_classes([IsCustomer])
 def customer_payment_receipt_report(request):
     customer = Customer.objects.filter(phone=request.user.phone).first()
-    payment = Payment.objects.filter(customer=customer).order_by("-payment_date", "-id").first()
+    payment = (
+        Payment.objects.select_related("customer", "subscription", "emi")
+        .filter(customer=customer)
+        .order_by("-payment_date", "-id")
+        .first()
+    )
 
     if not payment:
         return Response({"rows": []})
@@ -79,7 +84,7 @@ def partner_registration_report(request):
 @api_view(["GET"])
 @permission_classes([IsPartner])
 def partner_commission_ledger_report(request):
-    commissions = Commission.objects.filter(partner=request.user)
+    commissions = Commission.objects.filter(partner=request.user).select_related("payment", "payment__customer")
     paid = commissions.filter(status="PAID").aggregate(total=Sum("commission_amount"))["total"] or Decimal("0.00")
     total = commissions.aggregate(total=Sum("commission_amount"))["total"] or Decimal("0.00")
     unpaid = total - paid

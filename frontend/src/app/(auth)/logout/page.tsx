@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
-import { logout } from "@/lib/api";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { useLogout } from "@/hooks/useLogout";
 
 export default function LogoutPage() {
-  const router = useRouter();
+  const { logout, isLoggingOut } = useLogout();
 
   useEffect(() => {
-    logout();
-    router.replace("/login");
-  }, [router]);
+    void logout();
+  }, [logout]);
 
-  return <p style={{ padding: 24 }}>Signing out...</p>;
+  return (
+    <div className="p-6">
+      <LoadingBlock
+        label={isLoggingOut ? "Signing you out..." : "Preparing logout..."}
+      />
+    </div>
+  );
 }

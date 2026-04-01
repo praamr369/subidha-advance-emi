@@ -1,703 +1,839 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/portal-page";
-import DataTable from "@/components/ui/DataTable";
-import SearchSelect from "@/components/ui/SearchSelect";
-import WizardShell from "@/components/ui/WizardShell";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
+import { downloadCsv } from "@/lib/export/csv";
 
-type AdminSubscription = {
+type SubscriptionStatus =
+  | "ACTIVE"
+  | "PENDING"
+  | "WON"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "DEFAULTED"
+  | "UNKNOWN";
+
+type SubscriptionRow = {
   id: number;
-  customer: number;
-  product: number;
-  partner: number | null;
-  batch: number | null;
-  lucky_id: number | null;
-  plan_type: string;
-  tenure_months: number;
-  start_date: string;
+  subscription_number: string;
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_phone?: string;
+  product_id?: number | null;
+  product_name?: string;
+  product_code?: string | null;
+  batch_id?: number | null;
+  batch_code?: string | null;
+  lucky_id?: number | null;
+  lucky_number?: number | null;
+  partner_id?: number | null;
+  partner_name?: string;
+  plan_type?: string;
+  tenure_months?: number | null;
+  start_date?: string | null;
   total_amount: string;
   monthly_amount: string;
-  status: string;
+  status: SubscriptionStatus;
 };
 
-type Customer = { id: number; name: string; phone: string; kyc_status: string };
-type Product = { id: number; name: string; base_price: string; product_code?: string };
-type Batch = { id: number; batch_code: string; duration_months: number; status: string };
-type LuckyId = { id: number; lucky_number: number };
-type Partner = { id: number; username: string; phone: string };
-
-type CreateForm = {
-  customer: string | null;
-  product: string;
-  batch: string;
-  lucky_id: string;
-  partner: string;
-  plan_type: string;
-  tenure_months: string;
-  start_date: string;
-};
-
-type TableRow = {
-  id: number;
-  customer_name: string;
-  product_name: string;
-  partner_name: string;
-  batch_code: string;
-  lucky_label: string;
-  plan_type: string;
-  tenure_months: number;
-  monthly_amount: string;
-  total_amount: string;
-  status: string;
-  start_date: string;
-};
-
-const defaultForm: CreateForm = {
-  customer: null,
-  product: "",
-  batch: "",
-  lucky_id: "",
-  partner: "",
-  plan_type: "EMI",
-  tenure_months: "",
-  start_date: new Date().toISOString().slice(0, 10),
-};
-
-function parseError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message?.trim() || "Request failed";
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const preferredKeys = ["detail", "non_field_errors", "lucky_id", "batch", "customer", "product", "tenure_months"];
-
-    for (const key of preferredKeys) {
-      const value = parsed[key];
-      if (Array.isArray(value) && value[0]) return String(value[0]);
-      if (typeof value === "string") return value;
-    }
-
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first[0]) return String(first[0]);
-    if (typeof first === "string") return first;
-  } catch {
-    return raw;
-  }
-
-  return raw;
+function money(value: string | number | null | undefined): string {
+  return `₹${Number(value || 0).toFixed(2)}`;
 }
 
-function formatCurrency(value: string | number | null | undefined): string {
-  const amount = Number(value || 0);
-  return `₹${amount.toFixed(2)}`;
+function toMoneyString(value: unknown): string {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
+}
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNullableNumber(value: unknown): number | null | undefined {
+  if (typeof value === "number") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function toNullableString(value: unknown): string | null | undefined {
+  if (typeof value === "string") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleDateString();
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load subscription register.";
+}
+
+function parseIdFilter(value: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  return /^\d+$/.test(trimmed) ? trimmed : "";
+}
+
+function normalizeStatus(raw: Record<string, unknown>): SubscriptionStatus {
+  const status = String(raw.status ?? raw.subscription_status ?? "UNKNOWN").toUpperCase();
+
+  if (status === "ACTIVE") return "ACTIVE";
+  if (status === "PENDING") return "PENDING";
+  if (status === "WON") return "WON";
+  if (status === "COMPLETED") return "COMPLETED";
+  if (status === "CANCELLED") return "CANCELLED";
+  if (status === "DEFAULTED") return "DEFAULTED";
+  return "UNKNOWN";
+}
+
+function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow {
+  const id = toNumber(raw.id);
+  const customerId =
+    toNullableNumber(raw.customer_id) ?? toNullableNumber(raw.customer) ?? null;
+  const productId =
+    toNullableNumber(raw.product_id) ?? toNullableNumber(raw.product) ?? null;
+  const batchId =
+    toNullableNumber(raw.batch_id) ?? toNullableNumber(raw.batch) ?? null;
+  const luckyId =
+    toNullableNumber(raw.lucky_id) ?? toNullableNumber(raw.lucky) ?? null;
+  const partnerId =
+    toNullableNumber(raw.partner_id) ?? toNullableNumber(raw.partner) ?? null;
+  const luckyNumber =
+    toNullableNumber(raw.lucky_number) ?? toNullableNumber(raw.lucky_no) ?? null;
+
+  const subscriptionNumber =
+    toStringValue(raw.subscription_number) ||
+    toStringValue(raw.subscription_code) ||
+    `SUB-${id}`;
+
+  return {
+    id,
+    subscription_number: subscriptionNumber,
+    customer_id: customerId,
+    customer_name:
+      toStringValue(raw.customer_name) ||
+      toStringValue(raw.customer_display_name) ||
+      undefined,
+    customer_phone:
+      toStringValue(raw.customer_phone) ||
+      toStringValue(raw.phone) ||
+      undefined,
+    product_id: productId,
+    product_name:
+      toStringValue(raw.product_name) ||
+      toStringValue(raw.product_title) ||
+      undefined,
+    product_code:
+      toNullableString(raw.product_code) ??
+      toNullableString(raw.code),
+    batch_id: batchId,
+    batch_code:
+      toNullableString(raw.batch_code) ??
+      toNullableString(raw.batch_number),
+    lucky_id: luckyId,
+    lucky_number: luckyNumber,
+    partner_id: partnerId,
+    partner_name:
+      toStringValue(raw.partner_name) ||
+      toStringValue(raw.partner_username) ||
+      undefined,
+    plan_type:
+      toStringValue(raw.plan_type) ||
+      toStringValue(raw.subscription_type) ||
+      undefined,
+    tenure_months:
+      toNullableNumber(raw.tenure_months) ??
+      toNullableNumber(raw.tenure) ??
+      null,
+    start_date:
+      toNullableString(raw.start_date) ??
+      toNullableString(raw.created_date) ??
+      undefined,
+    total_amount: toMoneyString(raw.total_amount ?? raw.contract_value ?? raw.amount),
+    monthly_amount: toMoneyString(raw.monthly_amount ?? raw.emi_amount ?? raw.installment_amount),
+    status: normalizeStatus(raw),
+  };
+}
+
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function statusBadgeClass(status: SubscriptionStatus): string {
+  switch (status) {
+    case "ACTIVE":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "PENDING":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "WON":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    case "COMPLETED":
+      return "border-slate-200 bg-slate-100 text-slate-700";
+    case "CANCELLED":
+    case "DEFAULTED":
+      return "border-red-200 bg-red-50 text-red-700";
+    default:
+      return "border-border bg-muted text-foreground";
+  }
 }
 
 export default function AdminSubscriptionsPage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParamKey = searchParams.toString();
 
-  const [step, setStep] = useState(1);
+  const initialSearchQuery = (searchParams.get("q") || "").trim();
+  const initialStatusFilter = ((searchParams.get("status") || "").trim().toUpperCase() as "" | SubscriptionStatus);
+  const initialPlanTypeFilter = (searchParams.get("plan_type") || "").trim();
+  const initialCustomerFilter = parseIdFilter(searchParams.get("customer"));
+  const initialProductFilter = parseIdFilter(searchParams.get("product"));
+  const initialPartnerFilter = parseIdFilter(searchParams.get("partner"));
+  const initialBatchFilter = parseIdFilter(searchParams.get("batch"));
 
-  const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [availableLuckyIds, setAvailableLuckyIds] = useState<LuckyId[]>([]);
-
-  const [form, setForm] = useState<CreateForm>(defaultForm);
-
+  const [allRows, setAllRows] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [creatingSubscription, setCreatingSubscription] = useState(false);
-  const [successSubscription, setSuccessSubscription] = useState<AdminSubscription | null>(null);
+  const [searchInput, setSearchInput] = useState(initialSearchQuery);
+  const [statusInput, setStatusInput] = useState<"" | SubscriptionStatus>(initialStatusFilter);
+  const [planTypeInput, setPlanTypeInput] = useState(initialPlanTypeFilter);
 
-  const customerMap = useMemo(
-    () => Object.fromEntries(customers.map((c) => [c.id, c])),
-    [customers]
-  );
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery.toLowerCase());
+  const [statusFilter, setStatusFilter] = useState<"" | SubscriptionStatus>(initialStatusFilter);
+  const [planTypeFilter, setPlanTypeFilter] = useState(initialPlanTypeFilter.toLowerCase());
+  const [customerFilter, setCustomerFilter] = useState(initialCustomerFilter);
+  const [productFilter, setProductFilter] = useState(initialProductFilter);
+  const [partnerFilter, setPartnerFilter] = useState(initialPartnerFilter);
+  const [batchFilter, setBatchFilter] = useState(initialBatchFilter);
 
-  const productMap = useMemo(
-    () => Object.fromEntries(products.map((p) => [p.id, p])),
-    [products]
-  );
+  async function loadPage(mode: "initial" | "refresh" = "initial") {
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
 
-  const batchMap = useMemo(
-    () => Object.fromEntries(batches.map((b) => [b.id, b])),
-    [batches]
-  );
+    try {
+      const payload = await apiFetch<unknown>("/admin/subscriptions/");
+      const normalized = toArray<Record<string, unknown>>(payload).map(
+        normalizeSubscriptionRow
+      );
 
-  const partnerMap = useMemo(
-    () => Object.fromEntries(partners.map((p) => [p.id, p])),
-    [partners]
-  );
-
-  const selectedBatch = useMemo(
-    () => batches.find((b) => String(b.id) === form.batch) ?? null,
-    [batches, form.batch]
-  );
-
-  const selectedProduct = useMemo(
-    () => products.find((p) => String(p.id) === form.product) ?? null,
-    [products, form.product]
-  );
-
-  const selectedCustomer = useMemo(
-    () => customers.find((c) => String(c.id) === form.customer) ?? null,
-    [customers, form.customer]
-  );
-
-  const selectedPartner = useMemo(
-    () => partners.find((p) => String(p.id) === form.partner) ?? null,
-    [partners, form.partner]
-  );
-
-  const selectedLuckyId = useMemo(
-    () => availableLuckyIds.find((l) => String(l.id) === form.lucky_id) ?? null,
-    [availableLuckyIds, form.lucky_id]
-  );
-
-  const summary = useMemo(() => {
-    const duration = Number(form.tenure_months || 0);
-    const monthly = Number(selectedProduct?.base_price || 0);
-    const total = duration * monthly;
-    return { duration, monthly, total };
-  }, [form.tenure_months, selectedProduct?.base_price]);
-
-  const kpis = useMemo(() => {
-    const totalSubscriptions = subscriptions.length;
-    const activeSubscriptions = subscriptions.filter((s) => s.status === "ACTIVE").length;
-    const emiPlans = subscriptions.filter((s) => s.plan_type === "EMI").length;
-    const rentPlans = subscriptions.filter((s) => s.plan_type === "RENT").length;
-    const leasePlans = subscriptions.filter((s) => s.plan_type === "LEASE").length;
-    const openBatches = batches.filter((b) => b.status === "OPEN").length;
-    const monthlyBookedValue = subscriptions.reduce((sum, s) => sum + Number(s.monthly_amount || 0), 0);
-    const totalContractValue = subscriptions.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
-
-    return {
-      totalSubscriptions,
-      activeSubscriptions,
-      emiPlans,
-      rentPlans,
-      leasePlans,
-      openBatches,
-      monthlyBookedValue,
-      totalContractValue,
-    };
-  }, [subscriptions, batches]);
-
-  const tableRows = useMemo<TableRow[]>(
-    () =>
-      subscriptions.map((sub) => ({
-        id: sub.id,
-        customer_name: customerMap[sub.customer]
-          ? `${customerMap[sub.customer].name} (${customerMap[sub.customer].phone})`
-          : `Customer #${sub.customer}`,
-        product_name: productMap[sub.product]
-          ? productMap[sub.product].name
-          : `Product #${sub.product}`,
-        partner_name:
-          sub.partner && partnerMap[sub.partner]
-            ? `${partnerMap[sub.partner].username}${partnerMap[sub.partner].phone ? ` (${partnerMap[sub.partner].phone})` : ""}`
-            : "-",
-        batch_code:
-          sub.batch && batchMap[sub.batch]
-            ? batchMap[sub.batch].batch_code
-            : "-",
-        lucky_label: sub.lucky_id ? `#${sub.lucky_id}` : "-",
-        plan_type: sub.plan_type,
-        tenure_months: sub.tenure_months,
-        monthly_amount: formatCurrency(sub.monthly_amount),
-        total_amount: formatCurrency(sub.total_amount),
-        status: sub.status,
-        start_date: sub.start_date,
-      })),
-    [subscriptions, customerMap, productMap, partnerMap, batchMap]
-  );
+      setAllRows(normalized);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err));
+      if (mode === "initial") setAllRows([]);
+    } finally {
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      apiFetch("/admin/subscriptions/"),
-      apiFetch("/admin/customers/"),
-      apiFetch("/admin/products/"),
-      apiFetch("/admin/batches/"),
-      apiFetch("/admin/partners/"),
-    ])
-      .then(([sRes, cRes, pRes, bRes, partnerRes]) => {
-        if (cancelled) return;
-        setSubscriptions(toArray<AdminSubscription>(sRes));
-        setCustomers(toArray<Customer>(cRes));
-        setProducts(toArray<Product>(pRes));
-        setBatches(toArray<Batch>(bRes));
-        setPartners(toArray<Partner>(partnerRes));
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setError(parseError(e));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    void loadPage("initial");
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const params = new URLSearchParams(searchParamKey);
+    const nextSearch = (params.get("q") || "").trim();
+    const nextStatus = ((params.get("status") || "").trim().toUpperCase() as "" | SubscriptionStatus);
+    const nextPlanType = (params.get("plan_type") || "").trim();
 
-    if (!form.batch) {
-      setAvailableLuckyIds([]);
-      return;
-    }
+    setSearchInput(nextSearch);
+    setStatusInput(nextStatus);
+    setPlanTypeInput(nextPlanType);
 
-    apiFetch(`/admin/lucky-ids/available/?batch_id=${encodeURIComponent(form.batch)}`)
-      .then((res) => {
-        if (cancelled) return;
-        setAvailableLuckyIds(toArray<LuckyId>(res));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setAvailableLuckyIds([]);
-      });
+    setSearchQuery(nextSearch.toLowerCase());
+    setStatusFilter(nextStatus);
+    setPlanTypeFilter(nextPlanType.toLowerCase());
+    setCustomerFilter(parseIdFilter(params.get("customer")));
+    setProductFilter(parseIdFilter(params.get("product")));
+    setPartnerFilter(parseIdFilter(params.get("partner")));
+    setBatchFilter(parseIdFilter(params.get("batch")));
+  }, [searchParamKey]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [form.batch]);
-
-  useEffect(() => {
-    if (!selectedBatch) return;
-    setForm((prev) => ({
-      ...prev,
-      tenure_months: String(selectedBatch.duration_months || ""),
-    }));
-  }, [selectedBatch]);
-
-  useEffect(() => {
-    if (!form.customer || partners.length === 0 || subscriptions.length === 0) return;
-
-    const latest = subscriptions.find((sub) => String(sub.customer) === form.customer && sub.partner);
-    if (latest?.partner && partners.some((p) => p.id === latest.partner)) {
-      setForm((prev) => ({ ...prev, partner: String(latest.partner) }));
-    }
-  }, [form.customer, partners, subscriptions]);
-
-  async function customerSearchFn(q: string): Promise<Customer[]> {
-    const res = await apiFetch(`/admin/customers/search/?q=${encodeURIComponent(q)}`);
-    return toArray<Customer>(res);
+  function replaceFiltersInUrl(params: URLSearchParams) {
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
-  function handlePrintAcknowledgement(subscription: AdminSubscription): void {
-    const customer = customers.find((c) => c.id === subscription.customer);
-    const product = products.find((p) => p.id === subscription.product);
-    const batch = batches.find((b) => b.id === subscription.batch);
-    const partner = partners.find((p) => p.id === subscription.partner);
-
-    const popup = window.open("", "_blank", "width=900,height=700");
-    if (!popup) return;
-
-    popup.document.write(`
-      <html>
-        <head>
-          <title>Subscription Acknowledgement #${subscription.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { margin-bottom: 8px; }
-            .meta { margin-bottom: 20px; color: #444; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-            .row { margin: 8px 0; }
-            .label { font-weight: bold; display: inline-block; min-width: 180px; }
-          </style>
-        </head>
-        <body>
-          <h1>Subscription Acknowledgement</h1>
-          <div class="meta">Subidha Furniture - Lucky Plan EMI System</div>
-
-          <div class="card">
-            <div class="row"><span class="label">Subscription ID:</span> #${subscription.id}</div>
-            <div class="row"><span class="label">Customer:</span> ${customer?.name ?? "-"} (${customer?.phone ?? "-"})</div>
-            <div class="row"><span class="label">Product:</span> ${product?.name ?? "-"}</div>
-            <div class="row"><span class="label">Batch:</span> ${batch?.batch_code ?? "-"}</div>
-            <div class="row"><span class="label">Lucky ID:</span> ${subscription.lucky_id ? `#${subscription.lucky_id}` : "-"}</div>
-            <div class="row"><span class="label">Partner:</span> ${partner?.username ?? "-"}</div>
-            <div class="row"><span class="label">Plan Type:</span> ${subscription.plan_type}</div>
-            <div class="row"><span class="label">Tenure:</span> ${subscription.tenure_months} months</div>
-            <div class="row"><span class="label">Start Date:</span> ${subscription.start_date}</div>
-            <div class="row"><span class="label">Monthly Amount:</span> ₹${subscription.monthly_amount}</div>
-            <div class="row"><span class="label">Total Amount:</span> ₹${subscription.total_amount}</div>
-            <div class="row"><span class="label">Status:</span> ${subscription.status}</div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-
-    popup.document.close();
-  }
-
-  async function createSubscription(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCreateError(null);
-    setSuccessSubscription(null);
-    setCreatingSubscription(true);
 
-    try {
-      const payload: Record<string, unknown> = {
-        customer: Number(form.customer),
-        product: Number(form.product),
-        plan_type: form.plan_type,
-        tenure_months: Number(form.tenure_months),
-        start_date: form.start_date,
-      };
+    const nextSearch = searchInput.trim();
+    const nextPlanType = planTypeInput.trim();
 
-      if (form.batch) payload.batch = Number(form.batch);
-      if (form.partner) payload.partner = Number(form.partner);
-      if (form.lucky_id) payload.lucky_id = Number(form.lucky_id);
+    setSearchQuery(nextSearch.toLowerCase());
+    setStatusFilter(statusInput);
+    setPlanTypeFilter(nextPlanType.toLowerCase());
 
-      const created = (await apiFetch("/admin/subscriptions/", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })) as AdminSubscription;
+    const params = new URLSearchParams();
+    if (nextSearch) params.set("q", nextSearch);
+    if (statusInput) params.set("status", statusInput);
+    if (nextPlanType) params.set("plan_type", nextPlanType);
+    if (customerFilter) params.set("customer", customerFilter);
+    if (productFilter) params.set("product", productFilter);
+    if (partnerFilter) params.set("partner", partnerFilter);
+    if (batchFilter) params.set("batch", batchFilter);
 
-      setSubscriptions((prev) => [created, ...prev]);
-      setSuccessSubscription(created);
-
-      setForm(defaultForm);
-      setAvailableLuckyIds([]);
-      setStep(1);
-    } catch (e) {
-      setCreateError(parseError(e));
-    } finally {
-      setCreatingSubscription(false);
-    }
+    replaceFiltersInUrl(params);
   }
+
+  function handleResetFilters() {
+    setSearchInput("");
+    setStatusInput("");
+    setPlanTypeInput("");
+    setSearchQuery("");
+    setStatusFilter("");
+    setPlanTypeFilter("");
+    setCustomerFilter("");
+    setProductFilter("");
+    setPartnerFilter("");
+    setBatchFilter("");
+    replaceFiltersInUrl(new URLSearchParams());
+  }
+
+  const rows = useMemo(() => {
+    return allRows.filter((row) => {
+      const matchesStatus = statusFilter ? row.status === statusFilter : true;
+      if (!matchesStatus) return false;
+
+      const matchesPlanType = planTypeFilter
+        ? String(row.plan_type ?? "").toLowerCase().includes(planTypeFilter)
+        : true;
+      if (!matchesPlanType) return false;
+
+      if (customerFilter && String(row.customer_id ?? "") !== customerFilter) {
+        return false;
+      }
+
+      if (productFilter && String(row.product_id ?? "") !== productFilter) {
+        return false;
+      }
+
+      if (partnerFilter && String(row.partner_id ?? "") !== partnerFilter) {
+        return false;
+      }
+
+      if (batchFilter && String(row.batch_id ?? "") !== batchFilter) {
+        return false;
+      }
+
+      if (!searchQuery) return true;
+
+      const haystack = [
+        row.id,
+        row.subscription_number,
+        row.customer_name,
+        row.customer_phone,
+        row.product_name,
+        row.product_code,
+        row.batch_code,
+        row.lucky_number,
+        row.partner_name,
+        row.plan_type,
+        row.status,
+      ]
+        .map((value) => String(value ?? "").toLowerCase())
+        .join(" ");
+
+      return haystack.includes(searchQuery);
+    });
+  }, [
+    allRows,
+    batchFilter,
+    customerFilter,
+    partnerFilter,
+    planTypeFilter,
+    productFilter,
+    searchQuery,
+    statusFilter,
+  ]);
+
+  const activeCount = useMemo(
+    () => rows.filter((row) => row.status === "ACTIVE").length,
+    [rows]
+  );
+
+  const wonCount = useMemo(
+    () => rows.filter((row) => row.status === "WON").length,
+    [rows]
+  );
+
+  const completedCount = useMemo(
+    () => rows.filter((row) => row.status === "COMPLETED").length,
+    [rows]
+  );
+
+  const visibleContractValue = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
+    [rows]
+  );
+
+  const exportRows = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        subscription_number: row.subscription_number,
+        customer_name: row.customer_name ?? "",
+        customer_phone: row.customer_phone ?? "",
+        product_name: row.product_name ?? "",
+        product_code: row.product_code ?? "",
+        batch_code: row.batch_code ?? "",
+        lucky_number:
+          typeof row.lucky_number === "number" ? String(row.lucky_number) : "",
+        partner_name: row.partner_name ?? "",
+        plan_type: row.plan_type ?? "",
+        tenure_months:
+          typeof row.tenure_months === "number" ? String(row.tenure_months) : "",
+        start_date: row.start_date ?? "",
+        total_amount: row.total_amount,
+        monthly_amount: row.monthly_amount,
+        status: row.status,
+      })),
+    [rows]
+  );
+
+  const createSubscriptionHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (customerFilter) params.set("customer", customerFilter);
+    if (productFilter) params.set("product", productFilter);
+    if (partnerFilter) params.set("partner", partnerFilter);
+    if (batchFilter) params.set("batch", batchFilter);
+
+    const queryString = params.toString();
+    return queryString
+      ? `/admin/subscriptions/create?${queryString}`
+      : "/admin/subscriptions/create";
+  }, [batchFilter, customerFilter, partnerFilter, productFilter]);
 
   return (
     <PortalPage
-      title="Subscription Management"
-      subtitle="Create subscriptions, review portfolio health, and operate daily Lucky Plan workflows."
+      title="Subscription Register"
+      subtitle="Operational contract register for customer subscriptions, EMI plan visibility, and downstream handoff into detail, payments, and customer workflows."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Subscriptions" },
+      ]}
+      actions={[
+        {
+          href: createSubscriptionHref,
+          label: "Create Subscription",
+          variant: "primary",
+        },
+        {
+          href: "/admin/customers",
+          label: "Open Customers",
+          variant: "secondary",
+        },
+      ]}
+      stats={[
+        {
+          label: "Visible Subscriptions",
+          value: String(rows.length),
+        },
+        {
+          label: "Active",
+          value: String(activeCount),
+          tone: activeCount > 0 ? "success" : undefined,
+        },
+        {
+          label: "Won",
+          value: String(wonCount),
+          tone: wonCount > 0 ? "info" : undefined,
+        },
+        {
+          label: "Visible Contract Value",
+          value: money(visibleContractValue),
+          tone: "success",
+        },
+      ]}
+      statusBadge={{
+        label: "Contract Operations",
+        tone: "info",
+      }}
     >
-      <section
-        style={{
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-          gap: 10,
-        }}
-      >
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Subscriptions: <b>{kpis.totalSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Active Subscriptions: <b>{kpis.activeSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          EMI Plans: <b>{kpis.emiPlans}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Rent Plans: <b>{kpis.rentPlans}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Lease Plans: <b>{kpis.leasePlans}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Open Batches: <b>{kpis.openBatches}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Available Lucky IDs {form.batch ? "(selected batch)" : ""}: <b>{availableLuckyIds.length}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Monthly Booked Value: <b>{formatCurrency(kpis.monthlyBookedValue)}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Contract Value: <b>{formatCurrency(kpis.totalContractValue)}</b>
-        </div>
-      </section>
-
-      {successSubscription ? (
-        <section
-          style={{
-            marginBottom: 16,
-            border: "1px solid #bbf7d0",
-            background: "#f0fdf4",
-            borderRadius: 10,
-            padding: 16,
-          }}
+      <div className="space-y-6">
+        <SectionCard
+          title="Filter register"
+          description="Search by subscription, customer, phone, product, batch, lucky number, partner, or plan type."
         >
-          <h3 style={{ marginTop: 0, marginBottom: 8, color: "#166534" }}>
-            Subscription created successfully
-          </h3>
-
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            <div>
-              <strong>Subscription ID:</strong> #{successSubscription.id}
-            </div>
-            <div>
-              <strong>Customer:</strong>{" "}
-              {customerMap[successSubscription.customer]
-                ? `${customerMap[successSubscription.customer].name} (${customerMap[successSubscription.customer].phone})`
-                : successSubscription.customer}
-            </div>
-            <div>
-              <strong>Product:</strong>{" "}
-              {productMap[successSubscription.product]?.name ?? successSubscription.product}
-            </div>
-            <div>
-              <strong>Batch:</strong>{" "}
-              {successSubscription.batch
-                ? (batchMap[successSubscription.batch]?.batch_code ?? successSubscription.batch)
-                : "-"}
-            </div>
-            <div>
-              <strong>Plan:</strong> {successSubscription.plan_type}
-            </div>
-            <div>
-              <strong>Monthly Amount:</strong> {formatCurrency(successSubscription.monthly_amount)}
-            </div>
-            <div>
-              <strong>Status:</strong> {successSubscription.status}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/subscriptions/${successSubscription.id}`)}
-            >
-              View Subscription
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/payments/create?subscription=${successSubscription.id}`)}
-            >
-              Create Payment
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handlePrintAcknowledgement(successSubscription)}
-            >
-              Print Receipt / Acknowledgement
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSuccessSubscription(null);
-                setForm(defaultForm);
-                setStep(1);
-              }}
-            >
-              Create Another Subscription
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/customers/${successSubscription.customer}`)}
-            >
-              Go to Customer Profile
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <WizardShell step={step} totalSteps={3} title="Create Subscription Wizard">
-        <form onSubmit={createSubscription} style={{ display: "grid", gap: 12 }}>
-          {step === 1 ? (
-            <>
-              <SearchSelect<Customer>
-                label="Search Customer"
-                value={form.customer}
-                onChange={(value) => setForm((prev) => ({ ...prev, customer: value }))}
-                searchFn={customerSearchFn}
-                getOptionValue={(item) => String(item.id)}
-                getOptionLabel={(item) => `${item.name} (${item.phone}) - ${item.kyc_status}`}
-                placeholder="Type phone or name"
+          <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
+            <div className="lg:col-span-3">
+              <label
+                htmlFor="subscription-search"
+                className="mb-2 block text-sm font-medium text-foreground"
+              >
+                Search
+              </label>
+              <input
+                id="subscription-search"
+                type="text"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Subscription, customer, phone, product, batch"
+                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               />
+            </div>
 
-              {selectedCustomer ? (
-                <p style={{ margin: 0 }}>
-                  Selected: <b>{selectedCustomer.name}</b> ({selectedCustomer.phone})
-                </p>
-              ) : null}
+            <div>
+              <label
+                htmlFor="subscription-status"
+                className="mb-2 block text-sm font-medium text-foreground"
+              >
+                Status
+              </label>
+              <select
+                id="subscription-status"
+                value={statusInput}
+                onChange={(event) =>
+                  setStatusInput(event.target.value as "" | SubscriptionStatus)
+                }
+                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PENDING">Pending</option>
+                <option value="WON">Won</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="DEFAULTED">Defaulted</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
 
-              <button type="button" disabled={!form.customer} onClick={() => setStep(2)}>
-                Next: Plan & Product
+            <div>
+              <label
+                htmlFor="subscription-plan-type"
+                className="mb-2 block text-sm font-medium text-foreground"
+              >
+                Plan Type
+              </label>
+              <input
+                id="subscription-plan-type"
+                type="text"
+                value={planTypeInput}
+                onChange={(event) => setPlanTypeInput(event.target.value)}
+                placeholder="EMI, lucky, etc."
+                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <button
+        type="submit"
+        className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+      >
+                Apply
               </button>
-            </>
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                Reset
+              </button>
+            </div>
+          </form>
+
+          {customerFilter || productFilter || partnerFilter || batchFilter ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Context Filters
+              </span>
+              {customerFilter ? (
+                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                  Customer #{customerFilter}
+                </span>
+              ) : null}
+              {productFilter ? (
+                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                  Product #{productFilter}
+                </span>
+              ) : null}
+              {partnerFilter ? (
+                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                  Partner #{partnerFilter}
+                </span>
+              ) : null}
+              {batchFilter ? (
+                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                  Batch #{batchFilter}
+                </span>
+              ) : null}
+            </div>
           ) : null}
 
-          {step === 2 ? (
-            <>
-              <select
-                value={form.plan_type}
-                onChange={(event) => setForm((prev) => ({ ...prev, plan_type: event.target.value }))}
-              >
-                <option value="EMI">EMI</option>
-                <option value="RENT">RENT</option>
-                <option value="LEASE">LEASE</option>
-              </select>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
 
-              <select
-                required
-                value={form.batch}
-                onChange={(event) => setForm((prev) => ({ ...prev, batch: event.target.value }))}
-              >
-                <option value="">Select batch</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batch_code} ({b.status})
-                  </option>
-                ))}
-              </select>
+            <button
+              type="button"
+              disabled={exportRows.length === 0 || loading}
+              onClick={() =>
+                downloadCsv(
+                  "subscription-register-current-view.csv",
+                  [
+                    { key: "id", header: "id" },
+                    { key: "subscription_number", header: "subscription_number" },
+                    { key: "customer_name", header: "customer_name" },
+                    { key: "customer_phone", header: "customer_phone" },
+                    { key: "product_name", header: "product_name" },
+                    { key: "product_code", header: "product_code" },
+                    { key: "batch_code", header: "batch_code" },
+                    { key: "lucky_number", header: "lucky_number" },
+                    { key: "partner_name", header: "partner_name" },
+                    { key: "plan_type", header: "plan_type" },
+                    { key: "tenure_months", header: "tenure_months" },
+                    { key: "start_date", header: "start_date" },
+                    { key: "total_amount", header: "total_amount" },
+                    { key: "monthly_amount", header: "monthly_amount" },
+                    { key: "status", header: "status" },
+                  ],
+                  exportRows
+                )
+              }
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Export Current View
+            </button>
+          </div>
+        </SectionCard>
 
-              <select
-                required
-                value={form.product}
-                onChange={(event) => setForm((prev) => ({ ...prev, product: event.target.value }))}
-              >
-                <option value="">Select product</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} - {formatCurrency(p.base_price)}
-                  </option>
-                ))}
-              </select>
+        {loading ? <LoadingBlock label="Loading subscription register..." /> : null}
 
-              <select
-                value={form.partner}
-                onChange={(event) => setForm((prev) => ({ ...prev, partner: event.target.value }))}
-              >
-                <option value="">Auto/None partner</option>
-                {partners.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.username} ({p.phone || "-"})
-                  </option>
-                ))}
-              </select>
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load subscription register"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
 
-              <input
-                required
-                type="number"
-                min={1}
-                value={form.tenure_months}
-                onChange={(event) => setForm((prev) => ({ ...prev, tenure_months: event.target.value }))}
-                placeholder="Tenure months"
-              />
+        {!loading && !error ? (
+          <>
+            <SectionCard
+              title="Operational note"
+              description="Use this register for contract-level visibility. Open subscription detail for lifecycle, EMI schedule, payment history, and audit context."
+            >
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border border-border bg-muted/40 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Active
+                  </div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {String(activeCount)}
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Contracts currently running under active collection lifecycle.
+                  </p>
+                </div>
 
-              <input
-                required
-                type="date"
-                value={form.start_date}
-                onChange={(event) => setForm((prev) => ({ ...prev, start_date: event.target.value }))}
-              />
+                <div className="rounded-xl border border-border bg-muted/40 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Won
+                  </div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {String(wonCount)}
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Winner subscriptions still requiring contract visibility and audit trace.
+                  </p>
+                </div>
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <button type="button" onClick={() => setStep(1)}>
-                  Back
-                </button>
-                <button type="button" disabled={!form.product || !form.batch} onClick={() => setStep(3)}>
-                  Next: Lucky ID & Confirm
-                </button>
+                <div className="rounded-xl border border-border bg-muted/40 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Completed
+                  </div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {String(completedCount)}
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Completed contracts retained for history, audit, and financial traceability.
+                  </p>
+                </div>
               </div>
-            </>
-          ) : null}
+            </SectionCard>
 
-          {step === 3 ? (
-            <>
-              <select
-                value={form.lucky_id}
-                onChange={(event) => setForm((prev) => ({ ...prev, lucky_id: event.target.value }))}
-              >
-                <option value="">Auto-assign next available lucky ID</option>
-                {availableLuckyIds.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    #{String(l.lucky_number).padStart(2, "0")}
-                  </option>
-                ))}
-              </select>
+            <SectionCard
+              title="Subscription rows"
+              description="Review contract context and route into detail, customer, or payment operations."
+            >
+              {rows.length === 0 ? (
+                <EmptyState
+                  title="No subscriptions"
+                  description="No subscriptions match the current filter set."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Subscription
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Customer
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Product / Plan
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                          Financials
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Status
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
 
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-                <h3 style={{ marginTop: 0 }}>Summary</h3>
-                <p>
-                  Customer: <b>{selectedCustomer?.name || "-"}</b>
-                </p>
-                <p>
-                  Product: <b>{selectedProduct?.name || "-"}</b>
-                </p>
-                <p>
-                  Batch: <b>{selectedBatch?.batch_code || "-"}</b>
-                </p>
-                <p>
-                  Partner: <b>{selectedPartner?.username || "Auto / None"}</b>
-                </p>
-                <p>
-                  Lucky ID: <b>{selectedLuckyId ? `#${String(selectedLuckyId.lucky_number).padStart(2, "0")}` : "Auto assign"}</b>
-                </p>
-                <p>
-                  Plan: <b>{form.plan_type}</b>
-                </p>
-                <p>
-                  Duration: <b>{summary.duration}</b> months
-                </p>
-                <p>
-                  Monthly (preview): <b>{formatCurrency(summary.monthly)}</b>
-                </p>
-                <p>
-                  Total (preview): <b>{formatCurrency(summary.total)}</b>
-                </p>
-              </div>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.id} className="align-top">
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <div className="font-medium">{row.subscription_number}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Start {formatDate(row.start_date)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Tenure{" "}
+                              {typeof row.tenure_months === "number"
+                                ? `${row.tenure_months} months`
+                                : "—"}
+                            </div>
+                          </td>
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <button type="button" onClick={() => setStep(2)}>
-                  Back
-                </button>
-                <button type="submit" disabled={creatingSubscription}>
-                  {creatingSubscription ? "Creating..." : "Confirm Subscription"}
-                </button>
-              </div>
-            </>
-          ) : null}
-        </form>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <div className="font-medium">
+                              {row.customer_name || "Unknown customer"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.customer_phone || "No phone"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.partner_name ? `Partner ${row.partner_name}` : "No partner"}
+                            </div>
+                          </td>
 
-        {createError ? <p style={{ color: "#b91c1c", margin: 0 }}>{createError}</p> : null}
-      </WizardShell>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <div className="font-medium">
+                              {row.product_name || "Unknown product"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.product_code || "No product code"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.batch_code || "No batch"}
+                              {typeof row.lucky_number === "number"
+                                ? ` · Lucky #${row.lucky_number}`
+                                : ""}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.plan_type || "No plan type"}
+                            </div>
+                          </td>
 
-      <DataTable<TableRow>
-        loading={loading}
-        error={error}
-        rows={tableRows}
-        columns={[
-          { key: "id", title: "ID" },
-          { key: "customer_name", title: "Customer" },
-          { key: "product_name", title: "Product" },
-          { key: "partner_name", title: "Partner" },
-          { key: "batch_code", title: "Batch" },
-          { key: "lucky_label", title: "Lucky ID" },
-          { key: "plan_type", title: "Plan" },
-          { key: "tenure_months", title: "Tenure" },
-          { key: "monthly_amount", title: "Monthly" },
-          { key: "total_amount", title: "Total" },
-          { key: "status", title: "Status" },
-          { key: "start_date", title: "Start Date" },
-        ]}
-      />
+                          <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
+                            <div className="font-semibold">
+                              {money(row.total_amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              EMI {money(row.monthly_amount)}
+                            </div>
+                          </td>
+
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <span
+                              className={[
+                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                                statusBadgeClass(row.status),
+                              ].join(" ")}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <div className="flex flex-col items-start gap-2">
+                              <Link
+                                href={`/admin/subscriptions/${row.id}`}
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                              >
+                                Open Subscription
+                              </Link>
+
+                              {typeof row.customer_id === "number" ? (
+                                <Link
+                                  href={`/admin/customers/${row.customer_id}`}
+                                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                                >
+                                  Customer
+                                </Link>
+                              ) : null}
+
+                              <Link
+                                href={`/admin/payments?subscription=${row.id}`}
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                              >
+                                Payments Register
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          </>
+        ) : null}
+      </div>
     </PortalPage>
   );
 }

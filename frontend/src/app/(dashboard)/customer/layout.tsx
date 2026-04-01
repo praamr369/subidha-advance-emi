@@ -1,19 +1,8 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import RoleLayout from "@/components/layout/RoleLayout";
+import DashboardShell from "@/components/layout/DashboardShell";
+import RoleGuard from "@/components/guards/RoleGuard";
 
 export default function CustomerLayout({ children }: { children: ReactNode }) {
-  return (
-    <RoleLayout
-      title="Customer"
-      links={[
-        { href: "/customer/dashboard", label: "Dashboard" },
-        { href: "/customer/subscriptions", label: "Subscriptions" },
-        { href: "/customer/payments", label: "Payments" },
-        { href: "/customer/profile", label: "Profile" },
-      ]}
-    >
-      {children}
-    </RoleLayout>
-  );
+  return <RoleGuard allowedRoles={["CUSTOMER"]}><DashboardShell>{children}</DashboardShell></RoleGuard>;
 }

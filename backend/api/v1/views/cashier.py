@@ -1,175 +1,144 @@
-from django.db.models import Sum, Count
-from django.utils import timezone
-from django.core.exceptions import ValidationError
+from decimal import Decimal, InvalidOperation
 
-from rest_framework.views import APIView
+from rest_framework import permissions, status
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import APIView
 
 from api.v1.permissions import IsCashierOrAdmin
-from api.v1.serializers import (
-    EmiSerializer,
-    CollectPaymentSerializer,
-    PaymentSerializer,
-)
-
-from subscriptions.models import (
-    Customer,
-    Emi,
-    EmiStatus,
-    Payment,
-)
 from subscriptions.services.payment_service import record_emi_payment
 
 
-# ============================================================
-# CASHIER DASHBOARD
-# ============================================================
+def _parse_amount(value) -> Decimal:
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("Invalid payment amount.")
 
-class CashierDashboardView(APIView):
-    permission_classes = [IsCashierOrAdmin]
+    if amount <= 0:
+        raise ValueError("Payment amount must be greater than zero.")
 
-    def get(self, request):
-        today = timezone.localdate()
+    return amount
 
-        # -----------------------------
-        # Pending EMI Metrics
-        # -----------------------------
-        pending_emis = Emi.objects.filter(
-            status=EmiStatus.PENDING
-        )
-
-        total_pending_emis = pending_emis.count()
-        total_pending_amount = (
-            pending_emis.aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        # -----------------------------
-        # Today's Payments
-        # -----------------------------
-        today_payments = (
-            Payment.objects
-            .filter(payment_date=today)
-            .select_related(
-                "customer",
-                "subscription",
-                 "emi",
-                "collected_by",
-            )
-            .order_by("-id")
-        )
-
-        today_total_collected = (
-        today_payments.aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        today_transaction_count = today_payments.count()
-
-        cash_total = (
-            today_payments.filter(method="CASH")
-            .aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        digital_total = (
-            today_payments.exclude(method="CASH")
-            .aggregate(total=Sum("amount"))["total"] or 0
-        )
-        return Response({
-            # Pending
-            "total_pending_emis": total_pending_emis,
-            "total_pending_amount": total_pending_amount,
-
-            # Today Summary
-            "today_total_collected": today_total_collected,
-            "today_transaction_count": today_transaction_count,
-            "today_cash_total": cash_total,
-            "today_digital_total": digital_total,
-
-            # Transaction List
-            "today_transactions": PaymentSerializer(
-                today_payments,
-                many=True
-            ).data,
-        })
-
-
-# ============================================================
-# SEARCH CUSTOMER PENDING EMIs
-# ============================================================
-
-class CashierPendingEmis(APIView):
-    permission_classes = [IsCashierOrAdmin]
-
-    def get(self, request):
-        phone = request.query_params.get("phone")
-
-        if not phone:
-            return Response(
-                {"error": "phone parameter is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            customer = Customer.objects.get(phone=phone)
-        except Customer.DoesNotExist:
-            return Response(
-                {"error": "Customer not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        emis = (
-            Emi.objects
-            .filter(
-                subscription__customer=customer,
-                status=EmiStatus.PENDING
-            )
-            .order_by("due_date")
-        )
-
-        return Response({
-            "customer_id": customer.id,
-            "customer_name": customer.name,
-            "phone": customer.phone,
-            "total_pending_emis": emis.count(),
-            "total_pending_amount": emis.aggregate(
-                total=Sum("amount")
-            )["total"] or 0,
-            "emis": EmiSerializer(emis, many=True).data
-        })
-
-
-# ============================================================
-# COLLECT EMI PAYMENT
-# ============================================================
 
 class CashierCollectPayment(APIView):
-    permission_classes = [IsCashierOrAdmin]
+    """
+    Controlled cashier payment collection endpoint.
 
-    def post(self, request):
-        serializer = CollectPaymentSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    Enterprise rules:
+    - Cashier does not create Payment rows directly.
+    - All payment writes go through subscriptions.services.payment_service.record_emi_payment.
+    - Service owns validation, allocation metadata, ledger posting, audit, and status synchronization.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data or {}
+
+        emi_id = data.get("emi_id")
+        amount_raw = data.get("amount")
+        method = (data.get("method") or data.get("payment_method") or "CASH").strip().upper()
+        reference_no = (data.get("reference_no") or "").strip()
+        note = (data.get("note") or data.get("notes") or "").strip()
+
+        if emi_id in (None, ""):
+            return Response(
+                {"detail": "emi_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            payment = record_emi_payment(
+            emi_id = int(emi_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "emi_id must be a valid integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if amount_raw in (None, ""):
+            return Response(
+                {"detail": "amount is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount = _parse_amount(amount_raw)
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = record_emi_payment(
+                emi_id=emi_id,
+                amount=amount,
                 collected_by=request.user,
-                **serializer.validated_data
+                method=method,
+                reference_no=reference_no or None,
+                note=note or None,
             )
-
-        except Emi.DoesNotExist:
+        except ValueError as exc:
             return Response(
-                {"error": "EMI not found"},
-                status=status.HTTP_404_NOT_FOUND
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
-        except ValidationError as exc:
+        except Exception as exc:
             return Response(
-                {"error": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": f"Payment collection failed: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        return Response({
-            "message": "Payment recorded successfully",
-            "payment_id": payment.id,
-            "amount": payment.amount,
-            "payment_date": payment.payment_date,
-        }, status=status.HTTP_201_CREATED)
+        payment = result["payment"]
+        emi = result["emi"]
+        subscription = result["subscription"]
+
+        response_status = (
+            status.HTTP_201_CREATED
+            if result.get("created", True)
+            else status.HTTP_200_OK
+        )
+
+        return Response(
+            {
+                "message": (
+                    "Payment collected successfully."
+                    if result.get("created", True)
+                    else "Duplicate reference detected; existing payment returned."
+                ),
+                "created": result.get("created", True),
+                "payment": {
+                    "id": payment.id,
+                    "amount": str(payment.amount),
+                    "method": getattr(payment, "method", None),
+                    "reference_no": getattr(payment, "reference_no", None),
+                    "payment_date": getattr(payment, "payment_date", None),
+                    "created_at": getattr(payment, "created_at", None),
+                    "customer_id": getattr(payment, "customer_id", None),
+                    "subscription_id": getattr(payment, "subscription_id", None),
+                    "emi_id": getattr(payment, "emi_id", None),
+                    "collected_by_id": getattr(payment, "collected_by_id", None),
+                    "verified_by_id": getattr(payment, "verified_by_id", None),
+                    "allocation_metadata": getattr(payment, "allocation_metadata", {}) or {},
+                },
+                "emi": {
+                    "id": emi.id,
+                    "month_no": getattr(emi, "month_no", None),
+                    "status": getattr(emi, "status", None),
+                    "amount": str(getattr(emi, "amount", "")),
+                    "due_date": getattr(emi, "due_date", None),
+                },
+                "subscription": {
+                    "id": subscription.id,
+                    "status": getattr(subscription, "status", None),
+                    "plan_type": getattr(subscription, "plan_type", None),
+                    "total_amount": str(getattr(subscription, "total_amount", "")),
+                    "monthly_amount": str(getattr(subscription, "monthly_amount", "")),
+                    "customer_id": getattr(subscription, "customer_id", None),
+                    "product_id": getattr(subscription, "product_id", None),
+                    "batch_id": getattr(subscription, "batch_id", None),
+                    "lucky_id": getattr(subscription, "lucky_id_id", None),
+                },
+            },
+            status=response_status,
+        )

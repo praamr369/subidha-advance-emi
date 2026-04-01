@@ -3,20 +3,18 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function useAuthGuard(requiredRole: string) {
+import { ROUTES } from "@/lib/routes";
+import { useAuth } from "@/providers/AuthProvider";
+
+export function useAuthGuard() {
   const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const role = localStorage.getItem("user_role");
+    if (isLoading) return;
 
-    if (!token) {
-      router.push("/login");
-      return;
+    if (!isAuthenticated) {
+      router.replace(ROUTES.public.login);
     }
-
-    if (requiredRole && role !== requiredRole) {
-      router.push("/unauthorized");
-    }
-  }, [requiredRole, router]);
+  }, [isAuthenticated, isLoading, router]);
 }

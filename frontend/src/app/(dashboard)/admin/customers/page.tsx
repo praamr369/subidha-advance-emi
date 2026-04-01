@@ -1,381 +1,566 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
-import PortalPage from "@/components/ui/portal-page";
-import DataTable from "@/components/ui/DataTable";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
+import { downloadCsv } from "@/lib/export/csv";
 
-type Customer = {
-  id: number;
-  user?: number;
-  user_username?: string;
-  name: string;
-  phone: string;
-  kyc_status: string;
-  created_at?: string;
-};
-
-type Subscription = {
-  id: number;
-  customer: number;
-  customer_name?: string;
-  product: number;
-  product_name?: string;
-  batch: number | null;
-  batch_code?: string;
-  lucky_id: number | null;
-  lucky_number?: number | null;
-  plan_type: string;
-  tenure_months: number;
-  monthly_amount: string;
-  total_amount: string;
-  status: string;
-  start_date: string;
-};
-
-type Payment = {
-  id: number;
-  customer: number;
-  amount: string;
-  method: string;
-  payment_date: string;
-};
+type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
+type KycStatus =
+  | "NOT_PROVIDED"
+  | "PENDING"
+  | "APPROVED"
+  | "VERIFIED"
+  | "REJECTED"
+  | "UNKNOWN";
 
 type CustomerRow = {
   id: number;
   name: string;
   phone: string;
-  username: string;
-  kyc_status: string;
-  total_subscriptions: number;
-  active_subscriptions: number;
-  total_paid: string;
-  created_at: string;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  kyc_status: KycStatus;
+  status: CustomerStatus;
+  user_id?: number | null;
+  created_at?: string | null;
+  active_subscription_count?: number;
+  total_subscription_value?: string;
 };
 
-type Filters = {
-  q: string;
-  kyc_status: string;
-};
-
-const defaultFilters: Filters = {
-  q: "",
-  kyc_status: "",
-};
-
-function parseError(error: unknown): string {
-  if (!(error instanceof Error)) return "Request failed";
-  const raw = error.message?.trim() || "Request failed";
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const first = Object.values(parsed)[0];
-    if (Array.isArray(first) && first[0]) return String(first[0]);
-    if (typeof first === "string") return first;
-  } catch {
-    return raw;
-  }
-
-  return raw;
+function money(value: string | number | null | undefined): string {
+  return `₹${Number(value || 0).toFixed(2)}`;
 }
 
-function formatCurrency(value: string | number | null | undefined): string {
-  const amount = Number(value || 0);
-  return `₹${amount.toFixed(2)}`;
+function toMoneyString(value: unknown): string {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
+}
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function toNullableNumber(value: unknown): number | null | undefined {
+  if (typeof value === "number") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function toNullableString(value: unknown): string | null | undefined {
+  if (typeof value === "string") return value;
+  if (value === null) return null;
+  return undefined;
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load customer register.";
+}
+
+function normalizeCustomerStatus(raw: Record<string, unknown>): CustomerStatus {
+  const status = String(raw.status ?? raw.customer_status ?? "").toUpperCase();
+  if (status === "ACTIVE") return "ACTIVE";
+  if (status === "INACTIVE") return "INACTIVE";
+  return "UNKNOWN";
+}
+
+function normalizeKycStatus(raw: Record<string, unknown>): KycStatus {
+  const status = String(raw.kyc_status ?? raw.kyc ?? "").toUpperCase();
+  if (status === "NOT_PROVIDED") return "NOT_PROVIDED";
+  if (status === "PENDING") return "PENDING";
+  if (status === "APPROVED") return "APPROVED";
+  if (status === "VERIFIED") return "VERIFIED";
+  if (status === "REJECTED") return "REJECTED";
+  return "UNKNOWN";
+}
+
+function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
+  return {
+    id: toNumber(raw.id),
+    name: toStringValue(raw.name) || "Unnamed customer",
+    phone: toStringValue(raw.phone) || "—",
+    email: toNullableString(raw.email),
+    address: toNullableString(raw.address),
+    city: toNullableString(raw.city),
+    kyc_status: normalizeKycStatus(raw),
+    status: normalizeCustomerStatus(raw),
+    user_id: toNullableNumber(raw.user_id) ?? toNullableNumber(raw.user),
+    created_at: toNullableString(raw.created_at),
+    active_subscription_count:
+      toOptionalNumber(raw.active_subscription_count) ??
+      toOptionalNumber(raw.subscription_count) ??
+      0,
+    total_subscription_value: toMoneyString(
+      raw.total_subscription_value ?? raw.total_contract_value
+    ),
+  };
 }
 
 export default function AdminCustomersPage() {
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamKey = searchParams.toString();
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const initialQuery = (searchParams.get("q") || "").trim();
+  const initialKyc = ((searchParams.get("kyc_status") || "").trim().toUpperCase() ||
+    "") as "" | KycStatus;
+  const initialStatus = ((searchParams.get("status") || "").trim().toUpperCase() ||
+    "") as "" | CustomerStatus;
 
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
-
+  const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadAll(showRefreshing = false): Promise<void> {
-    try {
-      if (showRefreshing) setRefreshing(true);
-      else setLoading(true);
+  const [queryInput, setQueryInput] = useState(initialQuery);
+  const [kycInput, setKycInput] = useState<"" | KycStatus>(initialKyc);
+  const [statusInput, setStatusInput] = useState<"" | CustomerStatus>(initialStatus);
 
-      const [customerRes, subscriptionRes, paymentRes] = await Promise.all([
-        apiFetch("/admin/customers/"),
-        apiFetch("/admin/subscriptions/"),
-        apiFetch("/admin/payments/"),
-      ]);
+  const [query, setQuery] = useState(initialQuery);
+  const [kycFilter, setKycFilter] = useState<"" | KycStatus>(initialKyc);
+  const [statusFilter, setStatusFilter] = useState<"" | CustomerStatus>(initialStatus);
 
-      setCustomers(toArray<Customer>(customerRes));
-      setSubscriptions(toArray<Subscription>(subscriptionRes));
-      setPayments(toArray<Payment>(paymentRes));
-      setError(null);
-    } catch (e) {
-      setError(parseError(e));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
+      try {
+        const params = new URLSearchParams();
+        if (query) params.set("q", query);
+        if (kycFilter) params.set("kyc_status", kycFilter);
+        if (statusFilter) params.set("status", statusFilter);
+
+        const payload = await apiFetch<unknown>(
+          `/admin/customers/${params.toString() ? `?${params.toString()}` : ""}`
+        );
+        setRows(toArray<Record<string, unknown>>(payload).map(normalizeCustomerRow));
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") setRows([]);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
+    },
+    [kycFilter, query, statusFilter]
+  );
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    void loadPage("initial");
+  }, [loadPage]);
 
-  const filteredCustomers = useMemo(() => {
-    const q = filters.q.trim().toLowerCase();
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamKey);
+    const nextQuery = (params.get("q") || "").trim();
+    const nextKyc = ((params.get("kyc_status") || "").trim().toUpperCase() ||
+      "") as "" | KycStatus;
+    const nextStatus = ((params.get("status") || "").trim().toUpperCase() ||
+      "") as "" | CustomerStatus;
 
-    return customers.filter((customer) => {
-      if (filters.kyc_status && customer.kyc_status !== filters.kyc_status) return false;
+    setQueryInput(nextQuery);
+    setKycInput(nextKyc);
+    setStatusInput(nextStatus);
+    setQuery(nextQuery);
+    setKycFilter(nextKyc);
+    setStatusFilter(nextStatus);
+  }, [searchParamKey]);
 
-      if (!q) return true;
+  function replaceFilters(params: URLSearchParams) {
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  }
 
-      const haystack = [
-        String(customer.id),
-        customer.name,
-        customer.phone,
-        customer.user_username,
-        customer.kyc_status,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+  function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    const nextQuery = queryInput.trim();
+    if (nextQuery) params.set("q", nextQuery);
+    if (kycInput) params.set("kyc_status", kycInput);
+    if (statusInput) params.set("status", statusInput);
+    replaceFilters(params);
+  }
 
-      return haystack.includes(q);
-    });
-  }, [customers, filters]);
+  function handleResetFilters() {
+    setQueryInput("");
+    setKycInput("");
+    setStatusInput("");
+    replaceFilters(new URLSearchParams());
+  }
 
-  const customerRows = useMemo<CustomerRow[]>(() => {
-    return filteredCustomers.map((customer) => {
-      const customerSubscriptions = subscriptions.filter((s) => s.customer === customer.id);
-      const activeSubscriptions = customerSubscriptions.filter((s) => s.status === "ACTIVE");
-      const customerPayments = payments.filter((p) => p.customer === customer.id);
-      const totalPaid = customerPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalContractValue = useMemo(
+    () =>
+      rows.reduce(
+        (sum, row) => sum + Number(row.total_subscription_value || 0),
+        0
+      ),
+    [rows]
+  );
 
-      return {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        username: customer.user_username || "-",
-        kyc_status: customer.kyc_status,
-        total_subscriptions: customerSubscriptions.length,
-        active_subscriptions: activeSubscriptions.length,
-        total_paid: formatCurrency(totalPaid),
-        created_at: customer.created_at ? customer.created_at.slice(0, 10) : "-",
-      };
-    });
-  }, [filteredCustomers, subscriptions, payments]);
+  const activeCustomers = useMemo(
+    () => rows.filter((row) => row.status === "ACTIVE").length,
+    [rows]
+  );
 
-  const kpis = useMemo(() => {
-    const totalCustomers = filteredCustomers.length;
-    const verifiedCount = filteredCustomers.filter((c) => c.kyc_status === "VERIFIED").length;
-    const pendingKycCount = filteredCustomers.filter((c) => c.kyc_status === "PENDING").length;
-    const rejectedKycCount = filteredCustomers.filter((c) => c.kyc_status === "REJECTED").length;
+  const pendingKyc = useMemo(
+    () => rows.filter((row) => row.kyc_status === "PENDING").length,
+    [rows]
+  );
 
-    const filteredCustomerIds = new Set(filteredCustomers.map((c) => c.id));
-    const filteredSubscriptions = subscriptions.filter((s) => filteredCustomerIds.has(s.customer));
-    const filteredPayments = payments.filter((p) => filteredCustomerIds.has(p.customer));
+  const activeSubscriptions = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.active_subscription_count || 0), 0),
+    [rows]
+  );
 
-    const totalSubscriptions = filteredSubscriptions.length;
-    const activeSubscriptions = filteredSubscriptions.filter((s) => s.status === "ACTIVE").length;
-    const totalCollections = filteredPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const exportRows = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        email: row.email ?? "",
+        city: row.city ?? "",
+        address: row.address ?? "",
+        kyc_status: row.kyc_status,
+        status: row.status,
+        active_subscription_count: row.active_subscription_count ?? 0,
+        total_subscription_value: row.total_subscription_value ?? "0.00",
+        created_at: row.created_at ?? "",
+      })),
+    [rows]
+  );
 
-    return {
-      totalCustomers,
-      verifiedCount,
-      pendingKycCount,
-      rejectedKycCount,
-      totalSubscriptions,
-      activeSubscriptions,
-      totalCollections,
-    };
-  }, [filteredCustomers, subscriptions, payments]);
+  const columns = useMemo<Column<CustomerRow>[]>(
+    () => [
+      {
+        key: "name",
+        title: "Customer",
+        sortable: true,
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{row.name}</div>
+            <div className="text-xs text-muted-foreground">Customer #{row.id}</div>
+          </div>
+        ),
+      },
+      {
+        key: "phone",
+        title: "Contact",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="text-sm text-foreground">{row.phone || "—"}</div>
+            <div className="text-xs text-muted-foreground">{row.email || "No email"}</div>
+            <div className="text-xs text-muted-foreground">
+              {row.city || row.address || "No location"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "kyc_status",
+        title: "Compliance",
+        sortable: true,
+        render: (row) => (
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status={row.kyc_status} />
+            <StatusBadge status={row.status} />
+          </div>
+        ),
+      },
+      {
+        key: "active_subscription_count",
+        title: "Contract Context",
+        align: "right",
+        sortable: true,
+        render: (row) => (
+          <div className="space-y-1 text-right">
+            <div className="font-semibold text-foreground">
+              {row.active_subscription_count ?? 0} active
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {money(row.total_subscription_value)}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "created_at",
+        title: "Created",
+        sortable: true,
+        sortAccessor: (row) => Date.parse(row.created_at || "") || 0,
+        render: (row) => formatDateTime(row.created_at),
+      },
+    ],
+    []
+  );
 
   return (
     <PortalPage
-      title="Customer Management"
-      subtitle="Search customers, monitor KYC, track subscription activity, and open detailed customer profiles."
+      title="Customer Register"
+      subtitle="Search, review, and route customer records into KYC, subscription, and payment workflows with clear operational context."
+      breadcrumbs={[
+        { label: "Admin", href: "/admin" },
+        { label: "Customers" },
+      ]}
+      actions={[
+        { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
+        { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
+      ]}
+      stats={[
+        { label: "Visible Customers", value: rows.length },
+        { label: "Active Customers", value: activeCustomers, tone: "success" },
+        { label: "Pending KYC", value: pendingKyc, tone: pendingKyc > 0 ? "warning" : undefined },
+        { label: "Active Subscriptions", value: activeSubscriptions },
+      ]}
+      statusBadge={{ label: "Customer Operations", tone: "info" }}
     >
-      <section style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => router.push("/admin/customers/create")}>
-          Create Customer
-        </button>
-        <button type="button" onClick={() => loadAll(true)} disabled={refreshing}>
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
-        <button type="button" onClick={() => router.push("/admin/subscriptions")}>
-          Go to Subscriptions
-        </button>
-        <button type="button" onClick={() => router.push("/admin/payments")}>
-          Go to Payments
-        </button>
-      </section>
-
-      <section
-        style={{
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-          gap: 10,
-        }}
-      >
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Customers: <b>{kpis.totalCustomers}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Verified KYC: <b>{kpis.verifiedCount}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Pending KYC: <b>{kpis.pendingKycCount}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Rejected KYC: <b>{kpis.rejectedKycCount}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Subscriptions: <b>{kpis.totalSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Active Subscriptions: <b>{kpis.activeSubscriptions}</b>
-        </div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Total Collections: <b>{formatCurrency(kpis.totalCollections)}</b>
-        </div>
-      </section>
-
-      <section
-        style={{
-          marginBottom: 16,
-          border: "1px solid #e5e7eb",
-          borderRadius: 10,
-          padding: 16,
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Filters</h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: 12,
-          }}
-        >
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="customer-search">Search</label>
-            <input
-              id="customer-search"
-              placeholder="Search by name, phone, username, id..."
-              value={filters.q}
-              onChange={(event) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  q: event.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div style={{ display: "grid", gap: 6 }}>
-            <label htmlFor="kyc-status">KYC Status</label>
-            <select
-              id="kyc-status"
-              value={filters.kyc_status}
-              onChange={(event) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  kyc_status: event.target.value,
-                }))
-              }
-            >
-              <option value="">All</option>
-              <option value="PENDING">PENDING</option>
-              <option value="VERIFIED">VERIFIED</option>
-              <option value="REJECTED">REJECTED</option>
-              <option value="NOT_PROVIDED">NOT_PROVIDED</option>
-            </select>
-          </div>
+      <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Visible Customers"
+            value={rows.length}
+            icon={<Users className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Active Customers"
+            value={activeCustomers}
+            icon={<Users className="h-4 w-4" />}
+            tone="success"
+          />
+          <StatCard
+            label="Pending KYC"
+            value={pendingKyc}
+            icon={<ShieldCheck className="h-4 w-4" />}
+            tone={pendingKyc > 0 ? "warning" : "default"}
+          />
+          <StatCard
+            label="Visible Contract Value"
+            value={money(totalContractValue)}
+            icon={<Users className="h-4 w-4" />}
+            tone="info"
+          />
         </div>
 
-        <div>
-          <button type="button" onClick={() => setFilters(defaultFilters)}>
-            Reset Filters
-          </button>
-        </div>
-      </section>
-
-      <DataTable<CustomerRow>
-        loading={loading}
-        error={error}
-        rows={customerRows}
-        columns={[
-          { key: "id", title: "Customer ID" },
-          { key: "name", title: "Name" },
-          { key: "phone", title: "Phone" },
-          { key: "username", title: "Username" },
-          { key: "kyc_status", title: "KYC" },
-          { key: "total_subscriptions", title: "Subscriptions" },
-          { key: "active_subscriptions", title: "Active" },
-          { key: "total_paid", title: "Total Paid" },
-          { key: "created_at", title: "Created" },
-        ]}
-      />
-
-      {!loading && !error && customerRows.length > 0 ? (
-        <section
-          style={{
-            marginTop: 16,
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Quick Actions</h2>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            {filteredCustomers.slice(0, 8).map((customer) => (
-              <div
-                key={customer.id}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 12,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
+        <WorkspaceSection
+          title="Customer workflow"
+          description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing || loading}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <div>
-                  <div>
-                    <strong>{customer.name}</strong> ({customer.phone})
-                  </div>
-                  <div style={{ color: "#4b5563" }}>
-                    KYC: {customer.kyc_status} • Username: {customer.user_username || "-"}
-                  </div>
+                <RefreshCw className="h-4 w-4" />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                type="button"
+                disabled={exportRows.length === 0 || loading}
+                onClick={() =>
+                  downloadCsv(
+                    "customer-register-current-view.csv",
+                    [
+                      { key: "id", header: "id" },
+                      { key: "name", header: "name" },
+                      { key: "phone", header: "phone" },
+                      { key: "email", header: "email" },
+                      { key: "city", header: "city" },
+                      { key: "address", header: "address" },
+                      { key: "kyc_status", header: "kyc_status" },
+                      { key: "status", header: "status" },
+                      { key: "active_subscription_count", header: "active_subscription_count" },
+                      { key: "total_subscription_value", header: "total_subscription_value" },
+                      { key: "created_at", header: "created_at" },
+                    ],
+                    exportRows
+                  )
+                }
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                Export Current View
+              </button>
+            </div>
+          }
+        >
+          <TableToolbar
+            footer={
+              query || kycFilter || statusFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
+                  {query ? <StatusBadge status="OPEN" label={`Search: ${query}`} hideIcon /> : null}
+                  {kycFilter ? <StatusBadge status={kycFilter} hideIcon /> : null}
+                  {statusFilter ? <StatusBadge status={statusFilter} hideIcon /> : null}
                 </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Search-first workflow: name, phone, username, KYC state, and account state stay aligned with the backend filter set.
+                </div>
+              )
+            }
+          >
+            <form
+              onSubmit={handleApplyFilters}
+              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]"
+            >
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={queryInput}
+                  onChange={(event) => setQueryInput(event.target.value)}
+                  placeholder="Search by name, phone, username"
+                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
+                />
+              </label>
 
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" onClick={() => router.push(`/admin/customers/${customer.id}`)}>
-                    View Profile
-                  </button>
-                  <button type="button" onClick={() => router.push(`/admin/subscriptions/create?customer=${customer.id}`)}>
-                    Create Subscription
-                  </button>
-                  <button type="button" onClick={() => router.push("/admin/payments")}>
-                    View Payments
-                  </button>
-                </div>
+              <select
+                value={kycInput}
+                onChange={(event) => setKycInput(event.target.value as "" | KycStatus)}
+                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All KYC</option>
+                <option value="NOT_PROVIDED">Not Provided</option>
+                <option value="PENDING">Pending</option>
+                <option value="VERIFIED">Verified</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+
+              <select
+                value={statusInput}
+                onChange={(event) =>
+                  setStatusInput(event.target.value as "" | CustomerStatus)
+                }
+                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All states</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Reset
+                </button>
               </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+            </form>
+          </TableToolbar>
+        </WorkspaceSection>
+
+        {loading ? <LoadingBlock label="Loading customer register..." /> : null}
+
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load customer register"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Customer rows"
+            description="Open the customer detail page for KYC decisions, subscription context, and recent payment visibility."
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No customers found"
+                description="No customer records matched the current search and filter set."
+                action={
+                  <Link
+                    href="/admin/customers/create"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Create Customer
+                  </Link>
+                }
+              />
+            ) : (
+              <DataTable<CustomerRow>
+                rows={rows}
+                columns={columns}
+                pageSize={12}
+                rowActions={(row) => (
+                  <div className="flex flex-col items-end gap-2">
+                    <Link
+                      href={`/admin/customers/${row.id}`}
+                      className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
+                    >
+                      Open Customer
+                    </Link>
+                    <Link
+                      href={`/admin/customers/${row.id}/edit`}
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Edit
+                    </Link>
+                    <Link
+                      href={`/admin/subscriptions?customer=${row.id}`}
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Subscriptions
+                    </Link>
+                    <Link
+                      href={`/admin/payments?customer=${row.id}`}
+                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                    >
+                      Payments
+                    </Link>
+                  </div>
+                )}
+              />
+            )}
+          </WorkspaceSection>
+        ) : null}
+      </div>
     </PortalPage>
   );
 }

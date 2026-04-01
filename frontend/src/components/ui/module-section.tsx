@@ -1,23 +1,27 @@
+// frontend/src/components/ui/module-section.tsx
+import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 type ModuleSectionProps = {
   title: string;
   subtitle: string;
   children: ReactNode;
+  className?: string;
 };
 
 export default function ModuleSection({
   title,
   subtitle,
   children,
+  className,
 }: ModuleSectionProps) {
   return (
-    <section className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6">
+    <section className={cn("space-y-4", className)}>
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
-        <p className="text-slate-600">{subtitle}</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-1 text-muted-foreground">{subtitle}</p>
       </div>
-      {children}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
     </section>
   );
 }

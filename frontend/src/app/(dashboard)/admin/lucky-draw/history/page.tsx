@@ -1,9 +1,5 @@
-import PortalPage from "@/components/ui/portal-page";
+import AdminLuckyDrawListPage from "@/domains/lucky-draw/pages/AdminLuckyDrawListPage";
 
-export default function LuckyDrawHistoryPage() {
-  return (
-    <PortalPage title="Lucky Draw History" subtitle="Immutable draw outcomes with verification references.">
-      <p>Lucky draw history and audit trace placeholder.</p>
-    </PortalPage>
-  );
+export default function AdminLuckyDrawHistoryRoute() {
+  return <AdminLuckyDrawListPage historyOnly />;
 }

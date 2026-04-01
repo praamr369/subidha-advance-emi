@@ -6,7 +6,15 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.development")
+    default_settings = "core.settings.development"
+    if (
+        len(sys.argv) > 1
+        and sys.argv[1] == "test"
+        and not any(arg.startswith("--settings") for arg in sys.argv[2:])
+    ):
+        default_settings = "core.settings.test"
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", default_settings)
     try:
         import importlib
         module = importlib.import_module("django.core.management")

@@ -1,48 +1,52 @@
+// frontend/src/components/ui/DataTable.tsx
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2 } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 
 type Align = "left" | "center" | "right";
 
 export type Column<T> = {
   key: keyof T | string;
   title: string;
-
   width?: number | string;
   align?: Align;
-
   sortable?: boolean;
-
+  sortAccessor?: (row: T) => string | number | null | undefined;
   render?: (row: T) => ReactNode;
 };
 
 type DataTableProps<T> = {
   columns: Column<T>[];
   rows: T[];
-
   loading?: boolean;
   error?: string | null;
-
   emptyText?: string;
-
   pageSize?: number;
-
   onRowClick?: (row: T) => void;
-
   rowActions?: (row: T) => ReactNode;
 };
+
+function compareValues(
+  left: string | number | null | undefined,
+  right: string | number | null | undefined,
+  asc: boolean
+): number {
+  const a = left ?? "";
+  const b = right ?? "";
+  if (a === b) return 0;
+  if (a > b) return asc ? 1 : -1;
+  return asc ? -1 : 1;
+}
 
 export default function DataTable<T extends { id?: number | string }>({
   columns,
   rows,
-
   loading,
   error,
-
   emptyText = "No records found",
-
   pageSize = 15,
-
   onRowClick,
   rowActions,
 }: DataTableProps<T>) {
@@ -51,177 +55,145 @@ export default function DataTable<T extends { id?: number | string }>({
   const [sortAsc, setSortAsc] = useState(true);
 
   const processedRows = useMemo(() => {
-    let r = [...rows];
+    const nextRows = [...rows];
+    if (!sortKey) return nextRows;
 
-    if (sortKey) {
-      r.sort((a, b) => {
-        const va = (a as any)[sortKey];
-        const vb = (b as any)[sortKey];
+    const activeColumn = columns.find((column) => String(column.key) === sortKey);
 
-        if (va === vb) return 0;
+    nextRows.sort((a, b) => {
+      const left = activeColumn?.sortAccessor
+        ? activeColumn.sortAccessor(a)
+        : (a as Record<string, unknown>)[sortKey] as string | number | null | undefined;
+      const right = activeColumn?.sortAccessor
+        ? activeColumn.sortAccessor(b)
+        : (b as Record<string, unknown>)[sortKey] as string | number | null | undefined;
 
-        if (va > vb) return sortAsc ? 1 : -1;
-        return sortAsc ? -1 : 1;
-      });
-    }
+      return compareValues(left, right, sortAsc);
+    });
 
-    return r;
-  }, [rows, sortKey, sortAsc]);
+    return nextRows;
+  }, [columns, rows, sortAsc, sortKey]);
 
   const totalPages = Math.max(1, Math.ceil(processedRows.length / pageSize));
+  const clampedPage = Math.min(page, totalPages);
 
   const pageRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
+    const start = (clampedPage - 1) * pageSize;
     return processedRows.slice(start, start + pageSize);
-  }, [processedRows, page, pageSize]);
+  }, [clampedPage, pageSize, processedRows]);
 
-  if (loading)
+  const handleSort = (columnKey: string, sortable?: boolean) => {
+    if (!sortable) return;
+    if (sortKey === columnKey) {
+      setSortAsc((prev) => !prev);
+    } else {
+      setSortKey(columnKey);
+      setSortAsc(true);
+    }
+  };
+
+  if (loading) {
     return (
-      <div
-        style={{
-          padding: 30,
-          textAlign: "center",
-          color: "#64748b",
-        }}
-      >
-        Loading data...
+      <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading data...</span>
       </div>
     );
+  }
 
-  if (error)
+  if (error) {
     return (
-      <div
-        style={{
-          padding: 20,
-          border: "1px solid #fecaca",
-          background: "#fef2f2",
-          color: "#991b1b",
-          borderRadius: 8,
-        }}
-      >
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
         {error}
       </div>
     );
+  }
 
   return (
-    <div
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        overflow: "hidden",
-        background: "#ffffff",
-      }}
-    >
-      <div style={{ overflowX: "auto" }}>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 14,
-          }}
-        >
-          <thead
-            style={{
-              background: "#f8fafc",
-              borderBottom: "1px solid #e5e7eb",
-            }}
-          >
+    <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead className="bg-muted/30 border-b border-border">
             <tr>
-              {columns.map((col) => (
-                <th
-                  key={String(col.key)}
-                  onClick={() => {
-                    if (!col.sortable) return;
+              {columns.map((column) => {
+                const columnKey = String(column.key);
+                const isActiveSort = sortKey === columnKey;
+                const SortIcon = isActiveSort
+                  ? sortAsc
+                    ? ChevronUp
+                    : ChevronDown
+                  : ChevronsUpDown;
 
-                    const key = String(col.key);
-
-                    if (sortKey === key) {
-                      setSortAsc(!sortAsc);
-                    } else {
-                      setSortKey(key);
-                      setSortAsc(true);
-                    }
-                  }}
-                  style={{
-                    padding: "12px 14px",
-                    textAlign: col.align ?? "left",
-                    cursor: col.sortable ? "pointer" : "default",
-                    whiteSpace: "nowrap",
-                    userSelect: "none",
-                    fontWeight: 600,
-                  }}
-                >
-                  {col.title}
-
-                  {col.sortable && sortKey === col.key && (
-                    <span style={{ marginLeft: 6 }}>
-                      {sortAsc ? "▲" : "▼"}
-                    </span>
-                  )}
-                </th>
-              ))}
-
+                return (
+                  <th
+                    key={columnKey}
+                    onClick={() => handleSort(columnKey, column.sortable)}
+                    className={cn(
+                      "px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+                      column.sortable && "cursor-pointer select-none hover:text-foreground",
+                      column.align === "right" && "text-right",
+                      column.align === "center" && "text-center"
+                    )}
+                    style={{ width: column.width }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {column.title}
+                      {column.sortable && (
+                        <SortIcon className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
               {rowActions && (
-                <th
-                  style={{
-                    textAlign: "right",
-                    padding: "12px 14px",
-                  }}
-                >
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Actions
                 </th>
               )}
             </tr>
           </thead>
-
           <tbody>
             {pageRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length + (rowActions ? 1 : 0)}
-                  style={{
-                    padding: 30,
-                    textAlign: "center",
-                    color: "#64748b",
-                  }}
+                  className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   {emptyText}
                 </td>
               </tr>
             ) : (
-              pageRows.map((row, idx) => (
+              pageRows.map((row, index) => (
                 <tr
-                  key={String(row.id ?? idx)}
+                  key={row.id ?? index}
                   onClick={() => onRowClick?.(row)}
-                  style={{
-                    borderBottom: "1px solid #f1f5f9",
-                    cursor: onRowClick ? "pointer" : "default",
-                  }}
+                  className={cn(
+                    "border-b border-border transition-colors hover:bg-muted/30",
+                    onRowClick && "cursor-pointer"
+                  )}
                 >
-                  {columns.map((col) => (
-                    <td
-                      key={String(col.key)}
-                      style={{
-                        padding: "12px 14px",
-                        textAlign: col.align ?? "left",
-                      }}
-                    >
-                      {col.render
-                        ? col.render(row)
-                        : String(
-                            (row as Record<string, unknown>)[
-                              String(col.key)
-                            ] ?? "-"
-                          )}
-                    </td>
-                  ))}
-
+                  {columns.map((column) => {
+                    const key = String(column.key);
+                    const fallback = (row as Record<string, unknown>)[key];
+                    const content = column.render
+                      ? column.render(row)
+                      : String(fallback ?? "-");
+                    return (
+                      <td
+                        key={key}
+                        className={cn(
+                          "px-4 py-3 text-sm text-foreground",
+                          column.align === "right" && "text-right",
+                          column.align === "center" && "text-center"
+                        )}
+                      >
+                        {content}
+                      </td>
+                    );
+                  })}
                   {rowActions && (
                     <td
-                      style={{
-                        padding: "12px 14px",
-                        textAlign: "right",
-                      }}
+                      className="px-4 py-3 text-right"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {rowActions(row)}
@@ -235,30 +207,22 @@ export default function DataTable<T extends { id?: number | string }>({
       </div>
 
       {totalPages > 1 && (
-        <div
-          style={{
-            padding: 12,
-            display: "flex",
-            justifyContent: "space-between",
-            borderTop: "1px solid #e5e7eb",
-            fontSize: 13,
-          }}
-        >
-          <div>
-            Page {page} of {totalPages}
+        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
+          <div className="text-muted-foreground">
+            Page {clampedPage} of {totalPages}
           </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex gap-2">
             <button
-              disabled={page === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={clampedPage === 1}
+              className="rounded-md border border-border px-3 py-1 text-foreground transition hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent"
             >
               Previous
             </button>
-
             <button
-              disabled={page === totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={clampedPage === totalPages}
+              className="rounded-md border border-border px-3 py-1 text-foreground transition hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent"
             >
               Next
             </button>
