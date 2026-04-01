@@ -52,17 +52,7 @@ def _get_secret_key() -> str:
     )
 
 
-def _database_from_url(default: str | None = None) -> dict[str, str | int]:
-    database_url = os.getenv("DATABASE_URL")
-
-    if not database_url:
-        if _is_local_dev_mode():
-            database_url = default or "postgresql://subidha_furniture:subidha_password@localhost:5432/subidha_core"
-        else:
-            raise RuntimeError(
-                "DATABASE_URL environment variable is required when DEBUG is disabled."
-            )
-
+def _database_from_url(database_url: str) -> dict[str, str | int]:
     parsed = urlparse(database_url)
     engine_map = {
         "postgres": "django.db.backends.postgresql",
@@ -80,21 +70,12 @@ def _database_from_url(default: str | None = None) -> dict[str, str | int]:
 
     if not db_name:
         raise RuntimeError("DATABASE_URL must include a database name.")
-
     if not db_host:
         raise RuntimeError("DATABASE_URL must include a database host.")
-
     if not db_user:
-        if _is_local_dev_mode():
-            db_user = "subidha_furniture"
-        else:
-            raise RuntimeError("DATABASE_URL must include a database username.")
-
+        raise RuntimeError("DATABASE_URL must include a database username.")
     if db_password is None:
-        if _is_local_dev_mode():
-            db_password = "subidha_password"
-        else:
-            raise RuntimeError("DATABASE_URL must include a database password.")
+        raise RuntimeError("DATABASE_URL must include a database password.")
 
     return {
         "ENGINE": engine_map[parsed.scheme],
@@ -104,6 +85,88 @@ def _database_from_url(default: str | None = None) -> dict[str, str | int]:
         "HOST": db_host,
         "PORT": db_port,
     }
+
+
+def _database_from_env_fields() -> dict[str, str | int] | None:
+    db_name = os.getenv("DB_NAME") or os.getenv("POSTGRES_DB")
+    db_user = os.getenv("DB_USER") or os.getenv("POSTGRES_USER")
+    db_password = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("DB_HOST") or os.getenv("POSTGRES_HOST")
+    db_port = os.getenv("DB_PORT") or os.getenv("POSTGRES_PORT") or "5432"
+    db_engine = os.getenv("DB_ENGINE", "django.db.backends.postgresql")
+
+    any_field_present = any(
+        value is not None and str(value).strip() != ""
+        for value in [db_name, db_user, db_password, db_host, db_port, os.getenv("DB_ENGINE")]
+    )
+    if not any_field_present:
+        return None
+
+    if db_engine != "django.db.backends.postgresql":
+        raise RuntimeError("Only PostgreSQL is supported for DB_ENGINE.")
+
+    missing = []
+    if not db_name:
+        missing.append("DB_NAME/POSTGRES_DB")
+    if not db_user:
+        missing.append("DB_USER/POSTGRES_USER")
+    if not db_host:
+        missing.append("DB_HOST/POSTGRES_HOST")
+    if not db_password and not _is_local_dev_mode():
+        missing.append("DB_PASSWORD/POSTGRES_PASSWORD")
+
+    if missing:
+        raise RuntimeError(
+            "Database environment configuration is incomplete. Missing: " + ", ".join(missing)
+        )
+
+    try:
+        parsed_port = int(str(db_port).strip())
+    except (TypeError, ValueError):
+        raise RuntimeError("DB_PORT/POSTGRES_PORT must be an integer.")
+
+    return {
+        "ENGINE": db_engine,
+        "NAME": db_name,
+        "USER": db_user,
+        "PASSWORD": db_password or "",
+        "HOST": db_host,
+        "PORT": parsed_port,
+    }
+
+
+def _local_dev_sqlite_database() -> dict[str, str]:
+    return {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": str(BASE_DIR / "db.sqlite3"),
+    }
+
+
+def _get_database_config() -> dict[str, str | int]:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return _database_from_url(database_url)
+
+    field_config = _database_from_env_fields()
+    if field_config:
+        return field_config
+
+    if _is_local_dev_mode():
+        return _local_dev_sqlite_database()
+
+    raise RuntimeError(
+        "Database configuration is required when DEBUG is disabled. Set DATABASE_URL or DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT."
+    )
+
+
+def _get_conn_max_age() -> int:
+    raw_value = os.getenv("DB_CONN_MAX_AGE")
+    if raw_value is None:
+        return 60 if not _is_local_dev_mode() else 0
+    try:
+        return max(int(raw_value), 0)
+    except (TypeError, ValueError):
+        raise RuntimeError("DB_CONN_MAX_AGE must be an integer.")
 
 
 _load_dotenv(BASE_DIR / ".env")
@@ -162,12 +225,9 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    "default": _database_from_url(
-        "postgresql://subidha_furniture:ADRIKA1004@@localhost:5432/subidha_core"
-    )
-}
+DATABASES = {"default": _get_database_config()}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
+DATABASES["default"]["CONN_MAX_AGE"] = _get_conn_max_age()
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
