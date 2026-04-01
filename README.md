@@ -105,6 +105,30 @@ The system is built to support:
 
 ---
 
+## Backend environment setup
+
+The backend reads environment variables from `backend/.env` in local development.
+
+Safe setup path:
+
+1. Copy `backend/.env.example` to `backend/.env`
+2. Set `DJANGO_SECRET_KEY`
+3. For PostgreSQL, set either:
+   - `DATABASE_URL`, or
+   - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+
+Production rule:
+
+- Do not rely on code defaults for database credentials
+- In production-style mode, missing DB environment variables now fail fast with a clear runtime error
+
+Local development rule:
+
+- If no DB environment variables are provided and the app is in local/development mode, the backend falls back to local SQLite for safe startup
+- This avoids committing database credentials in code while keeping local bootstrapping simple
+
+---
+
 ## Suggested Repository Structure
 
 ```text
@@ -124,3 +148,4 @@ subidha-lucky-plan/
 ├── .gitignore
 ├── LICENSE
 └── CHANGELOG.md
+```
