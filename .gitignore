@@ -1,9 +1,8 @@
 
-# 2) `.gitignore`
 
-Create or replace `.gitignore` with this:
 
-```gitignore
+
+
 # ------------------------------
 # OS / editor
 # ------------------------------
