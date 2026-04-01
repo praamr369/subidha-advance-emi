@@ -26,7 +26,7 @@ This runs:
 
 ```bash
 python manage.py check
-python manage.py check --deploy --settings core.settings.base
+python manage.py check --deploy --settings core.settings.ci_deploy
 python manage.py test \
   subscriptions.tests.FinancialFlowTests \
   subscriptions.tests.ReconcileFinancialsCommandTests \
@@ -38,14 +38,14 @@ python manage.py test \
 Stable baseline coverage:
 
 - backend configuration importability
-- deploy-mode Django validation under production-like settings
+- deploy-mode Django validation under deterministic CI deploy settings
 - financial flow integrity checks already in repo
 - reconciliation command behavior already in repo
 - API contract and admin workflow coverage already in repo
 
 File-backed patch-specific backend modules are auto-included only when their files exist on the current branch.
 
-Current auto-discovery list:
+Audited patch-specific discovery set:
 
 - `api.v1.tests_health`
 - `api.v1.tests_financial_truth`
@@ -53,20 +53,14 @@ Current auto-discovery list:
 - `api.v1.tests_subscription_schedule_rebuild`
 - `api.v1.tests_batch_status`
 
-### Deploy-mode validation env
+### Deterministic backend DB strategy
 
-The script supports local use and CI use.
+The backend gate uses two explicit SQLite-backed settings paths:
 
-In CI, the workflow sets explicit safe validation values for:
+- `python manage.py test ...` defaults to `core.settings.test`, which already uses in-memory SQLite
+- `python manage.py check --deploy ...` now uses `core.settings.ci_deploy`, which imports the hardened base settings and then overrides the database to SQLite for deterministic CI and local validation
 
-- `DJANGO_ENV=production`
-- `DJANGO_DEBUG=false`
-- `DJANGO_SECRET_KEY`
-- `DJANGO_ALLOWED_HOSTS`
-- `DATABASE_URL`
-- `DEPLOY_CHECK_SETTINGS_MODULE=core.settings.base`
-
-For local runs, the script provides safe fallback defaults for the deploy check when those variables are not already set.
+This removes the previous fake-Postgres dependency from the release-candidate gate.
 
 ## 2. Frontend validation
 
@@ -106,6 +100,12 @@ It runs two focused jobs:
 
 - backend release-candidate validation
 - frontend release-candidate validation
+
+The backend CI job sets:
+
+- `DEPLOY_CHECK_SETTINGS_MODULE=core.settings.ci_deploy`
+
+No external database service is required for the current validation gate.
 
 ## 4. Usage rule
 
