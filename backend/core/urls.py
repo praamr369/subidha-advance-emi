@@ -1,22 +1,16 @@
-from django.contrib import admin
-from django.urls import path, include
-from rest_framework_simplejwt.views import TokenRefreshView,TokenObtainPairView
-from accounts.serializers import CustomTokenSerializer
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
 
-from api.v1.views.auth_views import register_user
-
-
-class CustomTokenView(TokenObtainPairView):
-    serializer_class = CustomTokenSerializer
-
+from api.v1.views.health import PublicLivenessView, PublicReadinessView
 
 urlpatterns = [
+    path("healthz/", PublicLivenessView.as_view(), name="healthz"),
+    path("readyz/", PublicReadinessView.as_view(), name="readyz"),
     path("admin/", admin.site.urls),
-
-    # Main API routes
     path("api/v1/", include("api.v1.urls")),
-]  
+]
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

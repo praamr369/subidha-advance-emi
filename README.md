@@ -142,6 +142,30 @@ Local development rule:
 
 ---
 
+## Operational health and release safety
+
+Minimal operator endpoints:
+
+- `GET /healthz/` → process liveness
+- `GET /readyz/` → DB and migration readiness
+- `GET /api/v1/public/health/` → API alias for liveness
+- `GET /api/v1/public/readiness/` → API alias for readiness
+
+Operational documentation:
+
+- `docs/deployment/OPERATIONS_RUNBOOK.md`
+- `docs/deployment/RELEASE_SMOKE_CHECKLIST.md`
+
+Use these docs for:
+
+- boot and migrate sequence
+- collectstatic
+- admin recovery
+- backup and restore expectations
+- post-release smoke checks
+
+---
+
 ## Suggested Repository Structure
 
 ```text

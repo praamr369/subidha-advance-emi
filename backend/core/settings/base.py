@@ -279,11 +279,21 @@ def _get_url_setting(name: str, default: str) -> str:
 
 _load_dotenv(BASE_DIR / ".env")
 
+ENVIRONMENT_NAME = _get_environment_name()
 DEBUG = _parse_bool(os.getenv("DJANGO_DEBUG"), default=_is_local_dev_mode())
 SECRET_KEY = _get_secret_key()
 ALLOWED_HOSTS = _get_allowed_hosts()
 CORS_ALLOWED_ORIGINS = _get_cors_allowed_origins()
 CSRF_TRUSTED_ORIGINS = _get_csrf_trusted_origins(CORS_ALLOWED_ORIGINS)
+HEALTHCHECK_DB_ALIAS = os.getenv("HEALTHCHECK_DB_ALIAS", "default")
+HEALTHCHECK_CHECK_MIGRATIONS = _parse_bool(
+    os.getenv("HEALTHCHECK_CHECK_MIGRATIONS"),
+    default=not _is_local_dev_mode(),
+)
+HEALTHCHECK_INCLUDE_DETAILS = _parse_bool(
+    os.getenv("HEALTHCHECK_INCLUDE_DETAILS"),
+    default=_is_local_dev_mode(),
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -459,6 +469,11 @@ LOGGING = {
         "django.request": {
             "handlers": ["console"],
             "level": "WARNING" if not _is_local_dev_mode() else "INFO",
+            "propagate": False,
+        },
+        "api.health": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
