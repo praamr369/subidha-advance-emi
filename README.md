@@ -119,13 +119,26 @@ Safe setup path:
 
 Production rule:
 
-- Do not rely on code defaults for database credentials
-- In production-style mode, missing DB environment variables now fail fast with a clear runtime error
+- Do not rely on code defaults for database credentials or deployment security settings
+- Outside local development, `DJANGO_ALLOWED_HOSTS` must be set explicitly
+- If you configure `CORS_ALLOWED_ORIGINS` outside local development, you must also set `CSRF_TRUSTED_ORIGINS`
+- Outside local development, missing critical environment variables now fail fast with clear runtime errors instead of silently falling back to permissive defaults
+
+Proxy / HTTPS rule:
+
+- If Django runs behind a reverse proxy or load balancer that terminates HTTPS, set `TRUST_X_FORWARDED_PROTO=true`
+- Optionally set `USE_X_FORWARDED_HOST=true` when your deployment relies on forwarded host headers
+- Secure cookies and HTTPS redirect default to enabled outside local development
+
+Static / media rule:
+
+- `STATIC_ROOT` and `MEDIA_ROOT` are environment-aware and can be overridden for deployment targets
+- Outside local development, static files use manifest-based static storage so collectstatic output is explicit and safer for production serving
 
 Local development rule:
 
 - If no DB environment variables are provided and the app is in local/development mode, the backend falls back to local SQLite for safe startup
-- This avoids committing database credentials in code while keeping local bootstrapping simple
+- Local development also gets safe localhost defaults for allowed hosts, CORS, and CSRF trusted origins
 
 ---
 
