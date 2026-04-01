@@ -26,21 +26,47 @@ This runs:
 
 ```bash
 python manage.py check
+python manage.py check --deploy --settings core.settings.base
 python manage.py test \
   subscriptions.tests.FinancialFlowTests \
   subscriptions.tests.ReconcileFinancialsCommandTests \
   api.v1.tests.PaymentFlowIntegrationTests \
   api.v1.tests.Phase7BContractTests \
-  api.v1.tests_health
+  ... file-backed patch-specific modules when present on the current branch
 ```
 
-Coverage intent:
+Stable baseline coverage:
 
 - backend configuration importability
-- financial flow integrity checks
-- reconciliation command behavior
-- API contract and admin workflow coverage already present in repo
-- health and readiness endpoint behavior
+- deploy-mode Django validation under production-like settings
+- financial flow integrity checks already in repo
+- reconciliation command behavior already in repo
+- API contract and admin workflow coverage already in repo
+
+File-backed patch-specific backend modules are auto-included only when their files exist on the current branch.
+
+Current auto-discovery list:
+
+- `api.v1.tests_health`
+- `api.v1.tests_financial_truth`
+- `api.v1.tests_payment_pagination`
+- `api.v1.tests_subscription_schedule_rebuild`
+- `api.v1.tests_batch_status`
+
+### Deploy-mode validation env
+
+The script supports local use and CI use.
+
+In CI, the workflow sets explicit safe validation values for:
+
+- `DJANGO_ENV=production`
+- `DJANGO_DEBUG=false`
+- `DJANGO_SECRET_KEY`
+- `DJANGO_ALLOWED_HOSTS`
+- `DATABASE_URL`
+- `DEPLOY_CHECK_SETTINGS_MODULE=core.settings.base`
+
+For local runs, the script provides safe fallback defaults for the deploy check when those variables are not already set.
 
 ## 2. Frontend validation
 
@@ -67,6 +93,8 @@ Coverage intent:
 - type safety
 - lint stability
 - production build viability
+
+The frontend validation path is unchanged.
 
 ## 3. CI workflow
 

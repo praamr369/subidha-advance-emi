@@ -10,6 +10,13 @@ on:
 jobs:
   backend-release-candidate:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: ci-only-deploy-validation-secret-key
+      DJANGO_ALLOWED_HOSTS: ci.subidha.local,localhost,127.0.0.1
+      DATABASE_URL: postgresql://subidha_ci:subidha_ci@127.0.0.1:5432/subidha_ci
+      DEPLOY_CHECK_SETTINGS_MODULE: core.settings.base
     defaults:
       run:
         working-directory: backend
