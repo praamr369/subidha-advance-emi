@@ -62,8 +62,8 @@ from api.v1.views.admin_resources import (
     PartnerAdminListViewSet,
     PaymentAdminViewSet,
     ProductAdminViewSet,
-    SubscriptionAdminViewSet,
 )
+from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
     PaymentReconciliationDetailView,
     PaymentReconciliationFlagView,
@@ -95,7 +95,7 @@ router.register(r"lucky-ids", LuckyIdAdminViewSet, basename="admin-lucky-ids")
 router.register(r"partners", PartnerAdminListViewSet, basename="admin-partners")
 router.register(r"payments", PaymentAdminViewSet, basename="admin-payments")
 router.register(r"products", ProductAdminViewSet, basename="admin-products")
-router.register(r"subscriptions", SubscriptionAdminViewSet, basename="admin-subscriptions")
+router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -121,7 +121,6 @@ urlpatterns = [
     path("support-requests/<int:pk>/assign/", AdminSupportRequestAssignView.as_view()),
     path("support-requests/<int:pk>/notes/", AdminSupportRequestNoteUpdateView.as_view()),
     path("support-requests/<int:pk>/resolve/", AdminSupportRequestResolveView.as_view()),
-
     path("internal-users/", AdminInternalUserListView.as_view()),
     path("internal-users/create/", AdminInternalUserCreateView.as_view()),
     path("internal-users/<int:pk>/", AdminInternalUserDetailView.as_view()),
@@ -136,7 +135,6 @@ urlpatterns = [
     path("commissions/reconciliation/", AdminCommissionReconciliationView.as_view()),
     path("commissions/statements/export/", AdminCommissionStatementExportView.as_view()),
     path("commissions/bulk-settle/", AdminCommissionBulkSettleView.as_view()),
-
     path("commission-payout-batches/", AdminPayoutBatchCreateView.as_view()),
     path("commission-payout-batches/list/", AdminPayoutBatchListView.as_view()),
     path("commission-payout-batches/preview/", AdminPayoutBatchPreviewView.as_view()),
@@ -144,7 +142,6 @@ urlpatterns = [
     path("commission-payout-batches/<int:pk>/export/", AdminPayoutBatchExportView.as_view()),
     path("commission-payout-batches/<int:pk>/finalize/", AdminPayoutBatchFinalizeView.as_view()),
     path("commission-payout-batches/<int:pk>/cancel/", AdminPayoutBatchCancelView.as_view()),
-
     path("reconciliations/", PaymentReconciliationListView.as_view()),
     path("reconciliations/<int:pk>/", PaymentReconciliationDetailView.as_view()),
     path("reconciliations/<int:pk>/flag/", PaymentReconciliationFlagView.as_view()),
@@ -153,23 +150,9 @@ urlpatterns = [
     path("reconciliations/<int:pk>/unlock/", PaymentReconciliationUnlockView.as_view()),
     path("audit-logs/", AuditLogListView.as_view(), name="admin-audit-log-list"),
     path("audit-logs/<int:pk>/", AuditLogDetailView.as_view(), name="admin-audit-log-detail"),
-    path(
-    "audit-logs/timeline/<str:model_name>/<str:object_id>/",
-    AuditObjectTimelineView.as_view(),
-    name="admin-audit-object-timeline",
-    ),
-    path(
-    "audit-logs/financial-report/",
-    financial_audit_report,
-    name="admin-financial-audit-report",
-    ),
+    path("audit-logs/timeline/<str:model_name>/<str:object_id>/", AuditObjectTimelineView.as_view(), name="admin-audit-object-timeline"),
+    path("audit-logs/financial-report/", financial_audit_report, name="admin-financial-audit-report"),
     path("collection-requests/", AdminPartnerCollectionRequestListView.as_view()),
-    path(
-        "collection-requests/<int:pk>/approve/",
-        AdminPartnerCollectionRequestApproveView.as_view(),
-    ),
-    path(
-        "collection-requests/<int:pk>/reject/",
-        AdminPartnerCollectionRequestRejectView.as_view(),
-    ),
+    path("collection-requests/<int:pk>/approve/", AdminPartnerCollectionRequestApproveView.as_view()),
+    path("collection-requests/<int:pk>/reject/", AdminPartnerCollectionRequestRejectView.as_view()),
 ]

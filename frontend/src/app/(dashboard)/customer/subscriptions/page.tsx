@@ -8,11 +8,12 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
+import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
-import {
-  listCustomerSubscriptions,
-  type CustomerSubscription,
-} from "@/services/customer";
+import { listCustomerSubscriptionsRegister, type CustomerSubscriptionRegisterResponse } from "@/services/customer/paginated-subscriptions";
+import type { CustomerSubscription } from "@/services/customer";
+
+const PAGE_SIZE = 25;
 
 function money(value?: string | number | null): string {
   return `₹${Number(value ?? 0).toFixed(2)}`;
@@ -104,17 +105,23 @@ export default function CustomerSubscriptionsPage() {
   const searchParams = useSearchParams();
 
   const statusFilter = (searchParams.get("status") || "").trim().toUpperCase();
+  const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
   const [statusInput, setStatusInput] = useState(statusFilter);
   const [rows, setRows] = useState<CustomerSubscription[]>([]);
   const [count, setCount] = useState(0);
+  const [page, setPage] = useState(currentPage);
+  const [numPages, setNumPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setStatusInput(statusFilter);
-  }, [statusFilter]);
+    setPage(currentPage);
+  }, [statusFilter, currentPage]);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -125,18 +132,28 @@ export default function CustomerSubscriptionsPage() {
       }
 
       try {
-        const payload = await listCustomerSubscriptions({
-          status: statusFilter || undefined,
-        });
+        const payload: CustomerSubscriptionRegisterResponse =
+          await listCustomerSubscriptionsRegister({
+            status: statusFilter || undefined,
+            page: currentPage,
+            pageSize: PAGE_SIZE,
+          });
 
         setRows(payload.results);
         setCount(payload.count);
+        setPage(payload.page);
+        setNumPages(payload.num_pages);
+        setHasNext(payload.has_next);
+        setHasPrevious(payload.has_previous);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
         if (mode === "initial") {
           setRows([]);
           setCount(0);
+          setNumPages(0);
+          setHasNext(false);
+          setHasPrevious(false);
         }
       } finally {
         if (mode === "initial") {
@@ -146,19 +163,19 @@ export default function CustomerSubscriptionsPage() {
         }
       }
     },
-    [statusFilter]
+    [currentPage, statusFilter]
   );
 
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
 
-  const activeCount = useMemo(
+  const pageActiveCount = useMemo(
     () => rows.filter((row) => (row.status || "").toUpperCase() === "ACTIVE").length,
     [rows]
   );
 
-  const winnerCount = useMemo(
+  const pageWinnerCount = useMemo(
     () =>
       rows.filter(
         (row) =>
@@ -168,7 +185,7 @@ export default function CustomerSubscriptionsPage() {
     [rows]
   );
 
-  const totalOutstanding = useMemo(
+  const pageOutstanding = useMemo(
     () =>
       rows.reduce(
         (sum, row) =>
@@ -181,7 +198,7 @@ export default function CustomerSubscriptionsPage() {
     [rows]
   );
 
-  const nextDueLabel = useMemo(() => {
+  const pageNextDueLabel = useMemo(() => {
     const nextDue = rows
       .map((row) => row.next_due_date)
       .filter((value): value is string => Boolean(value))
@@ -271,13 +288,21 @@ export default function CustomerSubscriptionsPage() {
     []
   );
 
+  function replacePage(targetPage: number) {
+    const next = new URLSearchParams();
+    if (statusFilter) next.set("status", statusFilter);
+    if (targetPage > 1) next.set("page", String(targetPage));
+    const query = next.toString();
+    router.replace(
+      query ? `/customer/subscriptions?${query}` : "/customer/subscriptions"
+    );
+  }
+
   function applyFilters() {
     const next = new URLSearchParams();
-
     if (statusInput) {
       next.set("status", statusInput);
     }
-
     const query = next.toString();
     router.replace(
       query ? `/customer/subscriptions?${query}` : "/customer/subscriptions"
@@ -310,15 +335,15 @@ export default function CustomerSubscriptionsPage() {
         },
       ]}
       stats={[
-        { label: "Subscriptions", value: count },
-        { label: "Active", value: activeCount },
-        { label: "Winner Benefit", value: winnerCount },
+        { label: "Matching Subscriptions", value: count },
+        { label: "Page Active", value: pageActiveCount },
+        { label: "Page Winner Benefit", value: pageWinnerCount },
         {
-          label: "Outstanding",
-          value: money(totalOutstanding),
-          tone: totalOutstanding > 0 ? "warning" : "success",
+          label: "Page Outstanding",
+          value: money(pageOutstanding),
+          tone: pageOutstanding > 0 ? "warning" : "success",
         },
-        { label: "Next Due", value: nextDueLabel },
+        { label: "Page Next Due", value: pageNextDueLabel },
       ]}
       statusBadge={{ label: "Customer Subscription Truth", tone: "info" }}
     >
@@ -389,7 +414,7 @@ export default function CustomerSubscriptionsPage() {
           />
         ) : null}
 
-        {!loading && !error && rows.length === 0 ? (
+        {!loading && !error && count === 0 ? (
           <EmptyState
             title="No subscriptions found"
             description={
@@ -400,7 +425,7 @@ export default function CustomerSubscriptionsPage() {
           />
         ) : null}
 
-        {!loading && !error && rows.length > 0 ? (
+        {!loading && !error && count > 0 ? (
           <>
             <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="mb-4">
@@ -414,28 +439,47 @@ export default function CustomerSubscriptionsPage() {
                 </p>
               </div>
 
-              <DataTable<CustomerSubscription>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) =>
-                  router.push(`/customer/subscriptions/${row.id}`)
-                }
-                rowActions={(row) => (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Link
-                      href={`/customer/subscriptions/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      View
-                    </Link>
-                    <Link
-                      href={`/customer/payments?subscription=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Payments
-                    </Link>
-                  </div>
-                )}
+              {rows.length > 0 ? (
+                <DataTable<CustomerSubscription>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) =>
+                    router.push(`/customer/subscriptions/${row.id}`)
+                  }
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Link
+                        href={`/customer/subscriptions/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        href={`/customer/payments?subscription=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Payments
+                      </Link>
+                    </div>
+                  )}
+                />
+              ) : (
+                <EmptyState
+                  title="No rows on this page"
+                  description="The current page has no results. Move to a previous page or change the filters."
+                />
+              )}
+
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={PAGE_SIZE}
+                numPages={numPages}
+                hasNext={hasNext}
+                hasPrevious={hasPrevious}
+                disabled={loading || refreshing}
+                onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                onNext={() => replacePage(page + 1)}
               />
             </section>
 
