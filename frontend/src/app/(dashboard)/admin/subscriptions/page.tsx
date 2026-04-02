@@ -598,7 +598,7 @@ export default function AdminSubscriptionsPage() {
               disabled={exportRows.length === 0 || loading}
               onClick={() =>
                 downloadCsv(
-                  "subscription-register-current-view.csv",
+                  `subscription-register-page-${page}.csv`,
                   [
                     { key: "id", header: "id" },
                     { key: "subscription_number", header: "subscription_number" },
@@ -621,9 +621,13 @@ export default function AdminSubscriptionsPage() {
               }
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Export Current Page
+              Export Current Page CSV
             </button>
           </div>
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            This export includes only the rows visible on the current page. Use the matching count and page controls below to move through the filtered register, then export another page if needed.
+          </p>
         </SectionCard>
 
         {loading ? <LoadingBlock label="Loading subscription register..." /> : null}
