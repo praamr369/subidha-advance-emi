@@ -1,8 +1,25 @@
 # Release Candidate Validation Guide
 
+## Primary repo-root command
+
+From the repository root, run the full release-candidate validation flow with one command:
+
+```bash
+bash scripts/run-release-candidate.sh
+```
+
+This orchestration runner executes, in order:
+
+1. `backend/scripts/validate-release-candidate.sh`
+2. `frontend/scripts/validate-release-candidate.sh`
+3. `npm run test:e2e:smoke`
+4. `npm run test:e2e:auth-smoke`
+
+The runner stops on the first failure, prints clear step labels, and ends with a final pass/fail summary.
+
 ## Focused smoke automation
 
-Run the deterministic release smoke suite from the frontend directory:
+If you need to run only the deterministic release smoke suite from the frontend directory:
 
 ```bash
 npm ci

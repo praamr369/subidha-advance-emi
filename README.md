@@ -155,6 +155,7 @@ Operational documentation:
 
 - `docs/deployment/OPERATIONS_RUNBOOK.md`
 - `docs/deployment/RELEASE_SMOKE_CHECKLIST.md`
+- `docs/deployment/RELEASE_CANDIDATE_VALIDATION.md`
 
 Use these docs for:
 
@@ -163,6 +164,19 @@ Use these docs for:
 - admin recovery
 - backup and restore expectations
 - post-release smoke checks
+- release-candidate validation
+
+---
+
+## Release-candidate runner
+
+From the repository root, run the full RC validation flow with:
+
+```bash
+bash scripts/run-release-candidate.sh
+```
+
+This orchestrates backend validation, frontend validation, deterministic smoke automation, and the separate real-login auth smoke slice in one operator-friendly command.
 
 ---
 
