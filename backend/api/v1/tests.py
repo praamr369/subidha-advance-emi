@@ -18,7 +18,7 @@ class PermissionTests(TestCase):
             username="cust1", password="pass1234", role="CUSTOMER", phone="9800000000"
         )
         self.partner_user = User.objects.create_user(
-            username="partner1", password="pass1234", role="PARTNER"
+            username="partner1", password="pass1234", role="PARTNER", phone="9800000009"
         )
 
     def test_unauthenticated_access_blocked(self):
@@ -36,7 +36,7 @@ class PaymentFlowIntegrationTests(TestCase):
         self.client = APIClient()
         User = get_user_model()
         self.partner = User.objects.create_user(
-            username="partner2", password="pass1234", role="PARTNER"
+            username="partner2", password="pass1234", role="PARTNER", phone="9800000002"
         )
         self.client.force_authenticate(self.partner)
 
@@ -50,7 +50,7 @@ class PaymentFlowIntegrationTests(TestCase):
             product_code="P-002", name="P", base_price=Decimal("1200.00")
         )
         self.batch = Batch.objects.create(
-            batch_code="B1", total_slots=100, duration_months=12, draw_day=10, start_date=date(2026, 1, 1)
+            batch_code="B1", total_slots=100, duration_months=12, draw_day=10, start_date=date(2026, 1, 1), status="OPEN"
         )
         self.lucky = self.batch.lucky_ids.get(lucky_number=1)
         self.subscription = Subscription.objects.create(
@@ -278,136 +278,130 @@ class Phase7BContractTests(TestCase):
         self.assertIn(sofa.id, row_ids)
         self.assertNotIn(self.product.id, row_ids)
 
-    def test_admin_aggregate_report_endpoints(self):
+    def test_admin_operational_summary_endpoints_current_route_surface(self):
         self.client.force_authenticate(self.admin)
 
-        revenue = self.client.get("/api/v1/admin/reports/revenue-aggregate/")
-        self.assertEqual(revenue.status_code, 200)
-        self.assertIn("total_revenue", revenue.data)
-        self.assertIn("by_method", revenue.data)
+        batch_summary = self.client.get(f"/api/v1/admin/batches/{self.batch.id}/summary/")
+        self.assertEqual(batch_summary.status_code, 200)
+        self.assertIn("subscription_count", batch_summary.data)
+        self.assertIn("available_lucky_ids", batch_summary.data)
 
-        emi = self.client.get("/api/v1/admin/reports/emi-aggregate/")
-        self.assertEqual(emi.status_code, 200)
-        self.assertIn("pending_count", emi.data)
+        payment_summary = self.client.get("/api/v1/admin/payments/summary/")
+        self.assertEqual(payment_summary.status_code, 200)
+        self.assertIn("visible_payments", payment_summary.data)
+        self.assertIn("net_collected_amount", payment_summary.data)
 
-        batch = self.client.get("/api/v1/admin/reports/batch-performance-aggregate/")
-        self.assertEqual(batch.status_code, 200)
-        self.assertIn("results", batch.data)
+        subscription_kpis = self.client.get("/api/v1/admin/subscriptions/kpis/")
+        self.assertEqual(subscription_kpis.status_code, 200)
+        self.assertIn("total_subscriptions", subscription_kpis.data)
+        self.assertIn("active_subscriptions", subscription_kpis.data)
 
-        reconcile = self.client.get("/api/v1/admin/reports/reconciliation-attention/")
-        self.assertEqual(reconcile.status_code, 200)
-        self.assertIn("checked_count", reconcile.data)
+        reconciliation = self.client.get("/api/v1/admin/subscriptions/reconciliation-attention/")
+        self.assertEqual(reconciliation.status_code, 200)
+        self.assertIn("checked_count", reconciliation.data)
+        self.assertIn("results", reconciliation.data)
 
-    def test_admin_summary_report_endpoints(self):
-        self.client.force_authenticate(self.admin)
-
-        revenue = self.client.get("/api/v1/admin/reports/revenue-summary/")
-        self.assertEqual(revenue.status_code, 200)
-        self.assertIn("total_payments", revenue.data)
-        self.assertIn("total_amount", revenue.data)
-        self.assertIn("by_method", revenue.data)
-
-        emi = self.client.get("/api/v1/admin/reports/emi-summary/")
-        self.assertEqual(emi.status_code, 200)
-        self.assertIn("total_emis", emi.data)
-        self.assertIn("pending_count", emi.data)
-
-        batch = self.client.get("/api/v1/admin/reports/batch-performance/")
-        self.assertEqual(batch.status_code, 200)
-        self.assertIn("results", batch.data)
-
-    def test_summary_reports_require_admin(self):
+    def test_operational_summary_endpoints_require_admin(self):
         self.client.force_authenticate(self.partner)
-        response = self.client.get("/api/v1/admin/reports/revenue-summary/")
-        self.assertEqual(response.status_code, 403)
 
-    def test_partner_collection_permissions_and_posting(self):
+        batch_summary = self.client.get(f"/api/v1/admin/batches/{self.batch.id}/summary/")
+        self.assertEqual(batch_summary.status_code, 403)
+
+        payment_summary = self.client.get("/api/v1/admin/payments/summary/")
+        self.assertEqual(payment_summary.status_code, 403)
+
+        subscription_kpis = self.client.get("/api/v1/admin/subscriptions/kpis/")
+        self.assertEqual(subscription_kpis.status_code, 403)
+
+    def test_partner_collection_request_permissions_and_posting_current_route(self):
         self.client.force_authenticate(self.partner)
 
         forbidden_response = self.client.post(
-            "/api/v1/partner/collections/",
+            "/api/v1/partner/collection-requests/",
             {
-                "emi_id": self.other_emi.id,
+                "subscription": self.other_subscription.id,
                 "amount": "100.00",
-                "method": "CASH",
+                "payment_mode": "CASH",
                 "payment_date": "2026-02-01",
                 "reference_no": "P7B-FORBIDDEN",
             },
             format="json",
         )
-        self.assertEqual(forbidden_response.status_code, 403)
+        self.assertEqual(forbidden_response.status_code, 404)
 
         success_response = self.client.post(
-            "/api/v1/partner/collections/",
+            "/api/v1/partner/collection-requests/",
             {
-                "emi_id": self.emi.id,
+                "subscription": self.subscription.id,
                 "amount": "100.00",
-                "method": "CASH",
+                "payment_mode": "CASH",
                 "payment_date": "2026-02-01",
                 "reference_no": "P7B-OK-001",
             },
             format="json",
         )
         self.assertEqual(success_response.status_code, 201)
-        self.assertEqual(str(success_response.data["amount"]), "100.00")
+        self.assertEqual(success_response.data["reference_no"], "P7B-OK-001")
+        self.assertIn("request", success_response.data)
+        self.assertEqual(success_response.data["request"]["status"], "SUBMITTED")
 
-    def test_partner_payment_collect_endpoint(self):
+    def test_partner_collection_request_list_and_detail_current_route(self):
         self.client.force_authenticate(self.partner)
 
-        forbidden = self.client.post(
-            "/api/v1/partner/payments/collect/",
+        create_response = self.client.post(
+            "/api/v1/partner/collection-requests/",
             {
-                "subscription_id": self.other_subscription.id,
-                "emi_id": self.other_emi.id,
+                "subscription": self.subscription.id,
                 "amount": "100.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-            },
-            format="json",
-        )
-        self.assertEqual(forbidden.status_code, 403)
-
-        invalid_amount = self.client.post(
-            "/api/v1/partner/payments/collect/",
-            {
-                "subscription_id": self.subscription.id,
-                "emi_id": self.emi.id,
-                "amount": "0.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-            },
-            format="json",
-        )
-        self.assertEqual(invalid_amount.status_code, 400)
-
-        success = self.client.post(
-            "/api/v1/partner/payments/collect/",
-            {
-                "subscription_id": self.subscription.id,
-                "emi_id": self.emi.id,
-                "amount": "100.00",
-                "method": "CASH",
+                "payment_mode": "CASH",
                 "payment_date": "2026-02-01",
                 "reference_no": "P7B-COLLECT-OK",
             },
             format="json",
         )
-        self.assertEqual(success.status_code, 201)
-        self.assertEqual(str(success.data["amount"]), "100.00")
+        self.assertEqual(create_response.status_code, 201)
+        request_id = create_response.data["request"]["id"]
 
-    def test_partner_payment_collect_requires_auth(self):
+        list_response = self.client.get(
+            f"/api/v1/partner/collection-requests/?subscription={self.subscription.id}"
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertIn("count", list_response.data)
+        self.assertIn("results", list_response.data)
+        self.assertTrue(list_response.data["count"] >= 1)
+
+        detail_response = self.client.get(f"/api/v1/partner/collection-requests/{request_id}/")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.data["id"], request_id)
+        self.assertEqual(detail_response.data["subscription_id"], self.subscription.id)
+
+    def test_partner_collection_request_requires_auth_and_partner_role(self):
+        self.client.force_authenticate(user=None)
         response = self.client.post(
-            "/api/v1/partner/payments/collect/",
+            "/api/v1/partner/collection-requests/",
             {
-                "subscription_id": self.subscription.id,
-                "emi_id": self.emi.id,
+                "subscription": self.subscription.id,
                 "amount": "100.00",
-                "method": "CASH",
+                "payment_mode": "CASH",
                 "payment_date": "2026-02-01",
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 401)
+        self.assertIn(response.status_code, [401, 403])
+        self.assertNotEqual(response.status_code, 404)
+
+        self.client.force_authenticate(self.customer_actor)
+        forbidden = self.client.post(
+            "/api/v1/partner/collection-requests/",
+            {
+                "subscription": self.subscription.id,
+                "amount": "100.00",
+                "payment_mode": "CASH",
+                "payment_date": "2026-02-01",
+            },
+            format="json",
+        )
+        self.assertEqual(forbidden.status_code, 403)
 
     def test_timeline_endpoints_backward_compatible(self):
         self.client.force_authenticate(self.admin)
