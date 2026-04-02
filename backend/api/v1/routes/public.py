@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.serializers.public import PublicProductSerializer
+from api.v1.views.health import PublicLivenessView, PublicReadinessView
 from subscriptions.models import Batch, LuckyDraw, Product, Subscription
 from subscriptions.services.public_lead_service import create_public_lead
 
@@ -210,14 +211,6 @@ class PublicWinnerHistoryView(APIView):
         )
 
 
-class PublicHealthView(APIView):
-    authentication_classes = []
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        return Response({"status": "ok"})
-
-
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
@@ -225,5 +218,6 @@ urlpatterns = [
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),
     path("winner-history/", PublicWinnerHistoryView.as_view(), name="public-winner-history"),
-    path("health/", PublicHealthView.as_view(), name="public-health"),
+    path("health/", PublicLivenessView.as_view(), name="public-health"),
+    path("readiness/", PublicReadinessView.as_view(), name="public-readiness"),
 ]

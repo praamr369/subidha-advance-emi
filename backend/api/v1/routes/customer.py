@@ -10,13 +10,13 @@ from api.v1.views.customer import (
     CustomerSupportRequestDetailView,
     CustomerSupportRequestListCreateView,
     CustomerSubscriptionDetailView,
-    CustomerSubscriptionListView,
 )
+from api.v1.views.paginated_registers import PaginatedCustomerSubscriptionListView
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
     path("profile/", CustomerProfileView.as_view()),
-    path("subscriptions/", CustomerSubscriptionListView.as_view()),
+    path("subscriptions/", PaginatedCustomerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", CustomerSubscriptionDetailView.as_view()),
     path("deliveries/", CustomerDeliveryListView.as_view()),
     path("deliveries/<int:pk>/", CustomerDeliveryDetailView.as_view()),

@@ -7,9 +7,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
-import { apiFetch, toArray } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+
+const PAGE_SIZE = 25;
 
 type SubscriptionStatus =
   | "ACTIVE"
@@ -41,6 +44,16 @@ type SubscriptionRow = {
   total_amount: string;
   monthly_amount: string;
   status: SubscriptionStatus;
+};
+
+type SubscriptionListPayload = {
+  count: number;
+  results: SubscriptionRow[];
+  page: number;
+  page_size: number;
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -95,7 +108,6 @@ function parseIdFilter(value: string | null): string {
 
 function normalizeStatus(raw: Record<string, unknown>): SubscriptionStatus {
   const status = String(raw.status ?? raw.subscription_status ?? "UNKNOWN").toUpperCase();
-
   if (status === "ACTIVE") return "ACTIVE";
   if (status === "PENDING") return "PENDING";
   if (status === "WON") return "WON";
@@ -174,6 +186,21 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
   };
 }
 
+function normalizeSubscriptionListPayload(payload: unknown): SubscriptionListPayload {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  return {
+    count: toNumber(root.count),
+    results: Array.isArray(root.results)
+      ? (root.results as Record<string, unknown>[]).map(normalizeSubscriptionRow)
+      : [],
+    page: Math.max(toNumber(root.page) || 1, 1),
+    page_size: Math.max(toNumber(root.page_size) || PAGE_SIZE, 1),
+    num_pages: Math.max(toNumber(root.num_pages), 0),
+    has_next: root.has_next === true,
+    has_previous: root.has_previous === true,
+  };
+}
+
 function SectionCard({
   title,
   description,
@@ -216,48 +243,91 @@ export default function AdminSubscriptionsPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-  const searchParamKey = searchParams.toString();
 
-  const initialSearchQuery = (searchParams.get("q") || "").trim();
-  const initialStatusFilter = ((searchParams.get("status") || "").trim().toUpperCase() as "" | SubscriptionStatus);
-  const initialPlanTypeFilter = (searchParams.get("plan_type") || "").trim();
-  const initialCustomerFilter = parseIdFilter(searchParams.get("customer"));
-  const initialProductFilter = parseIdFilter(searchParams.get("product"));
-  const initialPartnerFilter = parseIdFilter(searchParams.get("partner"));
-  const initialBatchFilter = parseIdFilter(searchParams.get("batch"));
+  const currentSearchQuery = (searchParams.get("q") || "").trim();
+  const currentStatusFilter = ((searchParams.get("status") || "").trim().toUpperCase() as "" | SubscriptionStatus);
+  const currentPlanTypeFilter = (searchParams.get("plan_type") || "").trim();
+  const currentCustomerFilter = parseIdFilter(searchParams.get("customer"));
+  const currentProductFilter = parseIdFilter(searchParams.get("product"));
+  const currentPartnerFilter = parseIdFilter(searchParams.get("partner"));
+  const currentBatchFilter = parseIdFilter(searchParams.get("batch"));
+  const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [allRows, setAllRows] = useState<SubscriptionRow[]>([]);
+  const [rows, setRows] = useState<SubscriptionRow[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(currentPage);
+  const [numPages, setNumPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [searchInput, setSearchInput] = useState(initialSearchQuery);
-  const [statusInput, setStatusInput] = useState<"" | SubscriptionStatus>(initialStatusFilter);
-  const [planTypeInput, setPlanTypeInput] = useState(initialPlanTypeFilter);
+  const [searchInput, setSearchInput] = useState(currentSearchQuery);
+  const [statusInput, setStatusInput] = useState<"" | SubscriptionStatus>(currentStatusFilter);
+  const [planTypeInput, setPlanTypeInput] = useState(currentPlanTypeFilter);
 
-  const [searchQuery, setSearchQuery] = useState(initialSearchQuery.toLowerCase());
-  const [statusFilter, setStatusFilter] = useState<"" | SubscriptionStatus>(initialStatusFilter);
-  const [planTypeFilter, setPlanTypeFilter] = useState(initialPlanTypeFilter.toLowerCase());
-  const [customerFilter, setCustomerFilter] = useState(initialCustomerFilter);
-  const [productFilter, setProductFilter] = useState(initialProductFilter);
-  const [partnerFilter, setPartnerFilter] = useState(initialPartnerFilter);
-  const [batchFilter, setBatchFilter] = useState(initialBatchFilter);
+  useEffect(() => {
+    setSearchInput(currentSearchQuery);
+    setStatusInput(currentStatusFilter);
+    setPlanTypeInput(currentPlanTypeFilter);
+    setPage(currentPage);
+  }, [currentBatchFilter, currentCustomerFilter, currentPage, currentPartnerFilter, currentPlanTypeFilter, currentProductFilter, currentSearchQuery, currentStatusFilter]);
+
+  function buildListPath(overrides?: Record<string, string>) {
+    const params = new URLSearchParams();
+    if (currentSearchQuery) params.set("q", currentSearchQuery);
+    if (currentStatusFilter) params.set("status", currentStatusFilter);
+    if (currentPlanTypeFilter) params.set("plan_type", currentPlanTypeFilter);
+    if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+    if (currentProductFilter) params.set("product", currentProductFilter);
+    if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+    if (currentBatchFilter) params.set("batch", currentBatchFilter);
+
+    Object.entries(overrides || {}).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    });
+
+    const queryString = params.toString();
+    return queryString ? `${pathname}?${queryString}` : pathname;
+  }
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const payload = await apiFetch<unknown>("/admin/subscriptions/");
-      const normalized = toArray<Record<string, unknown>>(payload).map(
-        normalizeSubscriptionRow
-      );
+      const params = new URLSearchParams();
+      if (currentSearchQuery) params.set("q", currentSearchQuery);
+      if (currentStatusFilter) params.set("status", currentStatusFilter);
+      if (currentPlanTypeFilter) params.set("plan_type", currentPlanTypeFilter);
+      if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+      if (currentProductFilter) params.set("product", currentProductFilter);
+      if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+      if (currentBatchFilter) params.set("batch", currentBatchFilter);
+      params.set("page", String(currentPage));
+      params.set("page_size", String(PAGE_SIZE));
 
-      setAllRows(normalized);
+      const payload = await apiFetch<unknown>(`/admin/subscriptions/?${params.toString()}`);
+      const normalized = normalizeSubscriptionListPayload(payload);
+
+      setRows(normalized.results);
+      setCount(normalized.count);
+      setPage(normalized.page);
+      setNumPages(normalized.num_pages);
+      setHasNext(normalized.has_next);
+      setHasPrevious(normalized.has_previous);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      if (mode === "initial") setAllRows([]);
+      if (mode === "initial") {
+        setRows([]);
+        setCount(0);
+        setNumPages(0);
+        setHasNext(false);
+        setHasPrevious(false);
+      }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -266,141 +336,55 @@ export default function AdminSubscriptionsPage() {
 
   useEffect(() => {
     void loadPage("initial");
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(searchParamKey);
-    const nextSearch = (params.get("q") || "").trim();
-    const nextStatus = ((params.get("status") || "").trim().toUpperCase() as "" | SubscriptionStatus);
-    const nextPlanType = (params.get("plan_type") || "").trim();
-
-    setSearchInput(nextSearch);
-    setStatusInput(nextStatus);
-    setPlanTypeInput(nextPlanType);
-
-    setSearchQuery(nextSearch.toLowerCase());
-    setStatusFilter(nextStatus);
-    setPlanTypeFilter(nextPlanType.toLowerCase());
-    setCustomerFilter(parseIdFilter(params.get("customer")));
-    setProductFilter(parseIdFilter(params.get("product")));
-    setPartnerFilter(parseIdFilter(params.get("partner")));
-    setBatchFilter(parseIdFilter(params.get("batch")));
-  }, [searchParamKey]);
-
-  function replaceFiltersInUrl(params: URLSearchParams) {
-    const queryString = params.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
-  }
+  }, [currentBatchFilter, currentCustomerFilter, currentPage, currentPartnerFilter, currentPlanTypeFilter, currentProductFilter, currentSearchQuery, currentStatusFilter]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const next = new URLSearchParams();
     const nextSearch = searchInput.trim();
     const nextPlanType = planTypeInput.trim();
 
-    setSearchQuery(nextSearch.toLowerCase());
-    setStatusFilter(statusInput);
-    setPlanTypeFilter(nextPlanType.toLowerCase());
+    if (nextSearch) next.set("q", nextSearch);
+    if (statusInput) next.set("status", statusInput);
+    if (nextPlanType) next.set("plan_type", nextPlanType);
+    if (currentCustomerFilter) next.set("customer", currentCustomerFilter);
+    if (currentProductFilter) next.set("product", currentProductFilter);
+    if (currentPartnerFilter) next.set("partner", currentPartnerFilter);
+    if (currentBatchFilter) next.set("batch", currentBatchFilter);
 
-    const params = new URLSearchParams();
-    if (nextSearch) params.set("q", nextSearch);
-    if (statusInput) params.set("status", statusInput);
-    if (nextPlanType) params.set("plan_type", nextPlanType);
-    if (customerFilter) params.set("customer", customerFilter);
-    if (productFilter) params.set("product", productFilter);
-    if (partnerFilter) params.set("partner", partnerFilter);
-    if (batchFilter) params.set("batch", batchFilter);
-
-    replaceFiltersInUrl(params);
+    const queryString = next.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
   function handleResetFilters() {
     setSearchInput("");
     setStatusInput("");
     setPlanTypeInput("");
-    setSearchQuery("");
-    setStatusFilter("");
-    setPlanTypeFilter("");
-    setCustomerFilter("");
-    setProductFilter("");
-    setPartnerFilter("");
-    setBatchFilter("");
-    replaceFiltersInUrl(new URLSearchParams());
+    const params = new URLSearchParams();
+    if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+    if (currentProductFilter) params.set("product", currentProductFilter);
+    if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+    if (currentBatchFilter) params.set("batch", currentBatchFilter);
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
-  const rows = useMemo(() => {
-    return allRows.filter((row) => {
-      const matchesStatus = statusFilter ? row.status === statusFilter : true;
-      if (!matchesStatus) return false;
+  function replacePage(targetPage: number) {
+    router.replace(buildListPath(targetPage > 1 ? { page: String(targetPage) } : { page: "" }));
+  }
 
-      const matchesPlanType = planTypeFilter
-        ? String(row.plan_type ?? "").toLowerCase().includes(planTypeFilter)
-        : true;
-      if (!matchesPlanType) return false;
-
-      if (customerFilter && String(row.customer_id ?? "") !== customerFilter) {
-        return false;
-      }
-
-      if (productFilter && String(row.product_id ?? "") !== productFilter) {
-        return false;
-      }
-
-      if (partnerFilter && String(row.partner_id ?? "") !== partnerFilter) {
-        return false;
-      }
-
-      if (batchFilter && String(row.batch_id ?? "") !== batchFilter) {
-        return false;
-      }
-
-      if (!searchQuery) return true;
-
-      const haystack = [
-        row.id,
-        row.subscription_number,
-        row.customer_name,
-        row.customer_phone,
-        row.product_name,
-        row.product_code,
-        row.batch_code,
-        row.lucky_number,
-        row.partner_name,
-        row.plan_type,
-        row.status,
-      ]
-        .map((value) => String(value ?? "").toLowerCase())
-        .join(" ");
-
-      return haystack.includes(searchQuery);
-    });
-  }, [
-    allRows,
-    batchFilter,
-    customerFilter,
-    partnerFilter,
-    planTypeFilter,
-    productFilter,
-    searchQuery,
-    statusFilter,
-  ]);
-
-  const activeCount = useMemo(
+  const pageActiveCount = useMemo(
     () => rows.filter((row) => row.status === "ACTIVE").length,
     [rows]
   );
 
-  const wonCount = useMemo(
+  const pageWonCount = useMemo(
     () => rows.filter((row) => row.status === "WON").length,
     [rows]
   );
 
-  const completedCount = useMemo(
-    () => rows.filter((row) => row.status === "COMPLETED").length,
-    [rows]
-  );
-
-  const visibleContractValue = useMemo(
+  const pageContractValue = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
     [rows]
   );
@@ -431,16 +415,16 @@ export default function AdminSubscriptionsPage() {
 
   const createSubscriptionHref = useMemo(() => {
     const params = new URLSearchParams();
-    if (customerFilter) params.set("customer", customerFilter);
-    if (productFilter) params.set("product", productFilter);
-    if (partnerFilter) params.set("partner", partnerFilter);
-    if (batchFilter) params.set("batch", batchFilter);
+    if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+    if (currentProductFilter) params.set("product", currentProductFilter);
+    if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+    if (currentBatchFilter) params.set("batch", currentBatchFilter);
 
     const queryString = params.toString();
     return queryString
       ? `/admin/subscriptions/create?${queryString}`
       : "/admin/subscriptions/create";
-  }, [batchFilter, customerFilter, partnerFilter, productFilter]);
+  }, [currentBatchFilter, currentCustomerFilter, currentPartnerFilter, currentProductFilter]);
 
   return (
     <PortalPage
@@ -464,22 +448,22 @@ export default function AdminSubscriptionsPage() {
       ]}
       stats={[
         {
-          label: "Visible Subscriptions",
-          value: String(rows.length),
+          label: "Matching Subscriptions",
+          value: String(count),
         },
         {
-          label: "Active",
-          value: String(activeCount),
-          tone: activeCount > 0 ? "success" : undefined,
+          label: "Page Active",
+          value: String(pageActiveCount),
+          tone: pageActiveCount > 0 ? "success" : undefined,
         },
         {
-          label: "Won",
-          value: String(wonCount),
-          tone: wonCount > 0 ? "info" : undefined,
+          label: "Page Won",
+          value: String(pageWonCount),
+          tone: pageWonCount > 0 ? "info" : undefined,
         },
         {
-          label: "Visible Contract Value",
-          value: money(visibleContractValue),
+          label: "Page Contract Value",
+          value: money(pageContractValue),
           tone: "success",
         },
       ]}
@@ -555,9 +539,9 @@ export default function AdminSubscriptionsPage() {
 
             <div className="flex flex-wrap items-end gap-2">
               <button
-        type="submit"
-        className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-      >
+                type="submit"
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+              >
                 Apply
               </button>
 
@@ -571,29 +555,29 @@ export default function AdminSubscriptionsPage() {
             </div>
           </form>
 
-          {customerFilter || productFilter || partnerFilter || batchFilter ? (
+          {currentCustomerFilter || currentProductFilter || currentPartnerFilter || currentBatchFilter ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Context Filters
               </span>
-              {customerFilter ? (
+              {currentCustomerFilter ? (
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                  Customer #{customerFilter}
+                  Customer #{currentCustomerFilter}
                 </span>
               ) : null}
-              {productFilter ? (
+              {currentProductFilter ? (
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                  Product #{productFilter}
+                  Product #{currentProductFilter}
                 </span>
               ) : null}
-              {partnerFilter ? (
+              {currentPartnerFilter ? (
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                  Partner #{partnerFilter}
+                  Partner #{currentPartnerFilter}
                 </span>
               ) : null}
-              {batchFilter ? (
+              {currentBatchFilter ? (
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                  Batch #{batchFilter}
+                  Batch #{currentBatchFilter}
                 </span>
               ) : null}
             </div>
@@ -637,7 +621,7 @@ export default function AdminSubscriptionsPage() {
               }
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Export Current View
+              Export Current Page
             </button>
           </div>
         </SectionCard>
@@ -661,37 +645,37 @@ export default function AdminSubscriptionsPage() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-border bg-muted/40 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Active
+                    Matching contracts
                   </div>
                   <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(activeCount)}
+                    {String(count)}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Contracts currently running under active collection lifecycle.
+                    Full filtered register size across all pages.
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border bg-muted/40 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Won
+                    Page active
                   </div>
                   <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(wonCount)}
+                    {String(pageActiveCount)}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Winner subscriptions still requiring contract visibility and audit trace.
+                    Active contracts visible on the current page.
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border bg-muted/40 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Completed
+                    Page won
                   </div>
                   <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(completedCount)}
+                    {String(pageWonCount)}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Completed contracts retained for history, audit, and financial traceability.
+                    Winner contracts visible on the current page.
                   </p>
                 </div>
               </div>
@@ -701,10 +685,15 @@ export default function AdminSubscriptionsPage() {
               title="Subscription rows"
               description="Review contract context and route into detail, customer, or payment operations."
             >
-              {rows.length === 0 ? (
+              {count === 0 ? (
                 <EmptyState
                   title="No subscriptions"
                   description="No subscriptions match the current filter set."
+                />
+              ) : rows.length === 0 ? (
+                <EmptyState
+                  title="No rows on this page"
+                  description="The current page has no results. Move to a previous page or change the filters."
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -741,10 +730,7 @@ export default function AdminSubscriptionsPage() {
                               Start {formatDate(row.start_date)}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              Tenure{" "}
-                              {typeof row.tenure_months === "number"
-                                ? `${row.tenure_months} months`
-                                : "—"}
+                              Tenure {typeof row.tenure_months === "number" ? `${row.tenure_months} months` : "—"}
                             </div>
                           </td>
 
@@ -769,9 +755,7 @@ export default function AdminSubscriptionsPage() {
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               {row.batch_code || "No batch"}
-                              {typeof row.lucky_number === "number"
-                                ? ` · Lucky #${row.lucky_number}`
-                                : ""}
+                              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               {row.plan_type || "No plan type"}
@@ -830,6 +814,20 @@ export default function AdminSubscriptionsPage() {
                   </table>
                 </div>
               )}
+
+              {count > 0 ? (
+                <PaginationControls
+                  count={count}
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  numPages={numPages}
+                  hasNext={hasNext}
+                  hasPrevious={hasPrevious}
+                  disabled={loading || refreshing}
+                  onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                  onNext={() => replacePage(page + 1)}
+                />
+              ) : null}
             </SectionCard>
           </>
         ) : null}

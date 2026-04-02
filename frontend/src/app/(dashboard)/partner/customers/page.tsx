@@ -9,15 +9,19 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
-  listPartnerCustomers,
-  type PartnerCustomer,
-} from "@/services/partner";
+  listPartnerCustomersRegister,
+  type PartnerCustomerRegisterResponse,
+} from "@/services/partner/registers";
+import type { PartnerCustomer } from "@/services/partner";
+
+const PAGE_SIZE = 25;
 
 function normalizeError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -43,10 +47,15 @@ export default function PartnerCustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const q = (searchParams.get("q") || "").trim();
-  const kycStatus = ((searchParams.get("kyc_status") || "").trim().toUpperCase() ||
-    "") as KycFilter;
+  const kycStatus = ((searchParams.get("kyc_status") || "").trim().toUpperCase() || "") as KycFilter;
+  const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [rawRows, setRawRows] = useState<PartnerCustomer[]>([]);
+  const [rows, setRows] = useState<PartnerCustomer[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(currentPage);
+  const [numPages, setNumPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +65,8 @@ export default function PartnerCustomersPage() {
   useEffect(() => {
     setSearchInput(q);
     setKycInput(kycStatus);
-  }, [kycStatus, q]);
+    setPage(currentPage);
+  }, [kycStatus, q, currentPage]);
 
   const loadCustomers = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -67,15 +77,27 @@ export default function PartnerCustomersPage() {
       }
 
       try {
-        const data = await listPartnerCustomers({
+        const data: PartnerCustomerRegisterResponse = await listPartnerCustomersRegister({
           q: q || undefined,
+          kycStatus: kycStatus || undefined,
+          page: currentPage,
+          pageSize: PAGE_SIZE,
         });
 
-        setRawRows(Array.isArray(data.results) ? data.results : []);
+        setRows(Array.isArray(data.results) ? data.results : []);
+        setCount(data.count);
+        setPage(data.page);
+        setNumPages(data.num_pages);
+        setHasNext(data.has_next);
+        setHasPrevious(data.has_previous);
         setError(null);
       } catch (err) {
         setError(normalizeError(err));
-        setRawRows([]);
+        setRows([]);
+        setCount(0);
+        setNumPages(0);
+        setHasNext(false);
+        setHasPrevious(false);
       } finally {
         if (mode === "initial") {
           setLoading(false);
@@ -84,7 +106,7 @@ export default function PartnerCustomersPage() {
         }
       }
     },
-    [q]
+    [currentPage, kycStatus, q]
   );
 
   useEffect(() => {
@@ -109,18 +131,21 @@ export default function PartnerCustomersPage() {
     router.replace("/partner/customers");
   }
 
-  const rows = useMemo(() => {
-    return rawRows.filter((row) =>
-      kycStatus ? String(row.kyc_status || "").toUpperCase() === kycStatus : true
-    );
-  }, [kycStatus, rawRows]);
+  function replacePage(targetPage: number) {
+    const next = new URLSearchParams();
+    if (q) next.set("q", q);
+    if (kycStatus) next.set("kyc_status", kycStatus);
+    if (targetPage > 1) next.set("page", String(targetPage));
+    const queryString = next.toString();
+    router.replace(queryString ? `/partner/customers?${queryString}` : "/partner/customers");
+  }
 
-  const pendingKyc = useMemo(
+  const pagePendingKyc = useMemo(
     () => rows.filter((row) => String(row.kyc_status || "").toUpperCase() === "PENDING").length,
     [rows]
   );
 
-  const verifiedKyc = useMemo(
+  const pageVerifiedKyc = useMemo(
     () =>
       rows.filter((row) => {
         const token = String(row.kyc_status || "").toUpperCase();
@@ -185,25 +210,25 @@ export default function PartnerCustomersPage() {
         },
       ]}
       stats={[
-        { label: "Visible Customers", value: rows.length },
-        { label: "Pending KYC", value: pendingKyc, tone: pendingKyc > 0 ? "warning" : undefined },
-        { label: "Verified KYC", value: verifiedKyc, tone: "success" },
+        { label: "Matching Customers", value: count },
+        { label: "Page Pending KYC", value: pagePendingKyc, tone: pagePendingKyc > 0 ? "warning" : undefined },
+        { label: "Page Verified KYC", value: pageVerifiedKyc, tone: "success" },
         { label: "Search", value: q || "All" },
       ]}
       statusBadge={{ label: "Partner Customer Scope", tone: "info" }}
     >
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Visible Customers" value={rows.length} icon={<Users className="h-4 w-4" />} />
+          <StatCard label="Matching Customers" value={count} icon={<Users className="h-4 w-4" />} />
           <StatCard
-            label="Pending KYC"
-            value={pendingKyc}
+            label="Page Pending KYC"
+            value={pagePendingKyc}
             icon={<ShieldCheck className="h-4 w-4" />}
-            tone={pendingKyc > 0 ? "warning" : "default"}
+            tone={pagePendingKyc > 0 ? "warning" : "default"}
           />
           <StatCard
-            label="Verified KYC"
-            value={verifiedKyc}
+            label="Page Verified KYC"
+            value={pageVerifiedKyc}
             icon={<ShieldCheck className="h-4 w-4" />}
             tone="success"
           />
@@ -302,7 +327,7 @@ export default function PartnerCustomersPage() {
             title="Customer rows"
             description="Open customer detail for partner-visible subscription and recent payment context."
           >
-            {rows.length === 0 ? (
+            {count === 0 ? (
               <EmptyState
                 title="No customers found"
                 description={
@@ -310,6 +335,11 @@ export default function PartnerCustomersPage() {
                     ? "No partner-scoped customers matched the current filters."
                     : "No customers are currently linked to this partner account."
                 }
+              />
+            ) : rows.length === 0 ? (
+              <EmptyState
+                title="No rows on this page"
+                description="The current page has no results. Move to a previous page or change the filters."
               />
             ) : (
               <DataTable<PartnerCustomer>
@@ -334,6 +364,20 @@ export default function PartnerCustomersPage() {
                 )}
               />
             )}
+
+            {count > 0 ? (
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={PAGE_SIZE}
+                numPages={numPages}
+                hasNext={hasNext}
+                hasPrevious={hasPrevious}
+                disabled={loading || refreshing}
+                onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                onNext={() => replacePage(page + 1)}
+              />
+            ) : null}
           </WorkspaceSection>
         ) : null}
       </div>

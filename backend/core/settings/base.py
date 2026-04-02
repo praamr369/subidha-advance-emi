@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 
 def _parse_bool(value: str | None, default: bool = False) -> bool:
@@ -18,6 +19,13 @@ def _parse_list(value: str | None, default: list[str]) -> list[str]:
     if not value:
         return default
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _parse_choice(value: str | None, default: str, allowed: set[str], name: str) -> str:
+    candidate = (value or default).strip()
+    if candidate not in allowed:
+        raise RuntimeError(f"{name} must be one of: {', '.join(sorted(allowed))}.")
+    return candidate
 
 
 def _load_dotenv(path: Path) -> None:
@@ -33,10 +41,48 @@ def _load_dotenv(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
+def _get_environment_name() -> str:
+    return (os.getenv("DJANGO_ENV") or os.getenv("ENVIRONMENT") or "development").strip().lower()
+
+
 def _is_local_dev_mode() -> bool:
-    env_name = (os.getenv("DJANGO_ENV") or os.getenv("ENVIRONMENT") or "development").strip().lower()
-    debug_flag = _parse_bool(os.getenv("DJANGO_DEBUG"), default=False)
-    return env_name in {"dev", "development", "local"} or debug_flag
+    return _get_environment_name() in {"dev", "development", "local"}
+
+
+def _validate_origin(origin: str, setting_name: str) -> str:
+    parsed = urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise RuntimeError(
+            f"{setting_name} entries must be full origins with http/https scheme: {origin}"
+        )
+    if parsed.path not in {"", "/"}:
+        raise RuntimeError(
+            f"{setting_name} entries must not include a path component: {origin}"
+        )
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _parse_origin_list(value: str | None, default: list[str], setting_name: str) -> list[str]:
+    items = _parse_list(value, default)
+    return [_validate_origin(item, setting_name) for item in items]
+
+
+def _parse_allowed_hosts(value: str | None, default: list[str]) -> list[str]:
+    hosts = _parse_list(value, default)
+    normalized: list[str] = []
+    for host in hosts:
+        if "://" in host or "/" in host:
+            raise RuntimeError(
+                f"DJANGO_ALLOWED_HOSTS entries must be bare hosts, not URLs: {host}"
+            )
+        if ":" in host and host != "[::1]":
+            raise RuntimeError(
+                f"DJANGO_ALLOWED_HOSTS entries must not include ports: {host}"
+            )
+        if host == "*" and not _is_local_dev_mode():
+            raise RuntimeError("Wildcard DJANGO_ALLOWED_HOSTS is not allowed outside local development.")
+        normalized.append(host)
+    return normalized
 
 
 def _get_secret_key() -> str:
@@ -48,21 +94,53 @@ def _get_secret_key() -> str:
         return "local-development-only-secret-key"
 
     raise RuntimeError(
-        "DJANGO_SECRET_KEY environment variable is required when DEBUG is disabled."
+        "DJANGO_SECRET_KEY environment variable is required outside local development."
     )
 
 
-def _database_from_url(default: str | None = None) -> dict[str, str | int]:
-    database_url = os.getenv("DATABASE_URL")
+def _get_allowed_hosts() -> list[str]:
+    raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS")
+    if raw_hosts:
+        hosts = _parse_allowed_hosts(raw_hosts, [])
+        if hosts:
+            return hosts
 
-    if not database_url:
-        if _is_local_dev_mode():
-            database_url = default or "postgresql://subidha_furniture:subidha_password@localhost:5432/subidha_core"
-        else:
-            raise RuntimeError(
-                "DATABASE_URL environment variable is required when DEBUG is disabled."
-            )
+    if _is_local_dev_mode():
+        return ["localhost", "127.0.0.1", "[::1]"]
 
+    raise RuntimeError(
+        "DJANGO_ALLOWED_HOSTS must be set outside local development."
+    )
+
+
+def _get_cors_allowed_origins() -> list[str]:
+    raw_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+    if raw_origins is not None:
+        return _parse_origin_list(raw_origins, [], "CORS_ALLOWED_ORIGINS")
+
+    if _is_local_dev_mode():
+        return LOCAL_DEV_ORIGINS
+
+    return []
+
+
+def _get_csrf_trusted_origins(cors_allowed_origins: list[str]) -> list[str]:
+    raw_origins = os.getenv("CSRF_TRUSTED_ORIGINS")
+    if raw_origins is not None:
+        return _parse_origin_list(raw_origins, [], "CSRF_TRUSTED_ORIGINS")
+
+    if _is_local_dev_mode():
+        return LOCAL_DEV_ORIGINS
+
+    if cors_allowed_origins:
+        raise RuntimeError(
+            "CSRF_TRUSTED_ORIGINS must be set outside local development when CORS_ALLOWED_ORIGINS is configured."
+        )
+
+    return []
+
+
+def _database_from_url(database_url: str) -> dict[str, str | int]:
     parsed = urlparse(database_url)
     engine_map = {
         "postgres": "django.db.backends.postgresql",
@@ -80,21 +158,12 @@ def _database_from_url(default: str | None = None) -> dict[str, str | int]:
 
     if not db_name:
         raise RuntimeError("DATABASE_URL must include a database name.")
-
     if not db_host:
         raise RuntimeError("DATABASE_URL must include a database host.")
-
     if not db_user:
-        if _is_local_dev_mode():
-            db_user = "subidha_furniture"
-        else:
-            raise RuntimeError("DATABASE_URL must include a database username.")
-
+        raise RuntimeError("DATABASE_URL must include a database username.")
     if db_password is None:
-        if _is_local_dev_mode():
-            db_password = "subidha_password"
-        else:
-            raise RuntimeError("DATABASE_URL must include a database password.")
+        raise RuntimeError("DATABASE_URL must include a database password.")
 
     return {
         "ENGINE": engine_map[parsed.scheme],
@@ -106,13 +175,124 @@ def _database_from_url(default: str | None = None) -> dict[str, str | int]:
     }
 
 
+def _database_from_env_fields() -> dict[str, str | int] | None:
+    db_name = os.getenv("DB_NAME") or os.getenv("POSTGRES_DB")
+    db_user = os.getenv("DB_USER") or os.getenv("POSTGRES_USER")
+    db_password = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("DB_HOST") or os.getenv("POSTGRES_HOST")
+    db_port = os.getenv("DB_PORT") or os.getenv("POSTGRES_PORT") or "5432"
+    db_engine = os.getenv("DB_ENGINE", "django.db.backends.postgresql")
+
+    any_field_present = any(
+        value is not None and str(value).strip() != ""
+        for value in [db_name, db_user, db_password, db_host, db_port, os.getenv("DB_ENGINE")]
+    )
+    if not any_field_present:
+        return None
+
+    if db_engine != "django.db.backends.postgresql":
+        raise RuntimeError("Only PostgreSQL is supported for DB_ENGINE.")
+
+    missing = []
+    if not db_name:
+        missing.append("DB_NAME/POSTGRES_DB")
+    if not db_user:
+        missing.append("DB_USER/POSTGRES_USER")
+    if not db_host:
+        missing.append("DB_HOST/POSTGRES_HOST")
+    if not db_password and not _is_local_dev_mode():
+        missing.append("DB_PASSWORD/POSTGRES_PASSWORD")
+
+    if missing:
+        raise RuntimeError(
+            "Database environment configuration is incomplete. Missing: " + ", ".join(missing)
+        )
+
+    try:
+        parsed_port = int(str(db_port).strip())
+    except (TypeError, ValueError):
+        raise RuntimeError("DB_PORT/POSTGRES_PORT must be an integer.")
+
+    return {
+        "ENGINE": db_engine,
+        "NAME": db_name,
+        "USER": db_user,
+        "PASSWORD": db_password or "",
+        "HOST": db_host,
+        "PORT": parsed_port,
+    }
+
+
+def _local_dev_sqlite_database() -> dict[str, str]:
+    return {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": str(BASE_DIR / "db.sqlite3"),
+    }
+
+
+def _get_database_config() -> dict[str, str | int]:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return _database_from_url(database_url)
+
+    field_config = _database_from_env_fields()
+    if field_config:
+        return field_config
+
+    if _is_local_dev_mode():
+        return _local_dev_sqlite_database()
+
+    raise RuntimeError(
+        "Database configuration is required outside local development. Set DATABASE_URL or DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT."
+    )
+
+
+def _get_conn_max_age() -> int:
+    raw_value = os.getenv("DB_CONN_MAX_AGE")
+    if raw_value is None:
+        return 60 if not _is_local_dev_mode() else 0
+    try:
+        return max(int(raw_value), 0)
+    except (TypeError, ValueError):
+        raise RuntimeError("DB_CONN_MAX_AGE must be an integer.")
+
+
+def _get_log_level() -> str:
+    return _parse_choice(
+        os.getenv("DJANGO_LOG_LEVEL"),
+        "DEBUG" if _is_local_dev_mode() else "INFO",
+        {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"},
+        "DJANGO_LOG_LEVEL",
+    )
+
+
+def _get_url_setting(name: str, default: str) -> str:
+    value = (os.getenv(name) or default).strip()
+    if "://" in value:
+        if not value.endswith("/"):
+            raise RuntimeError(f"{name} must end with a trailing slash.")
+        return value
+    if not value.startswith("/") or not value.endswith("/"):
+        raise RuntimeError(f"{name} must start and end with '/'.")
+    return value
+
+
 _load_dotenv(BASE_DIR / ".env")
 
+ENVIRONMENT_NAME = _get_environment_name()
+DEBUG = _parse_bool(os.getenv("DJANGO_DEBUG"), default=_is_local_dev_mode())
 SECRET_KEY = _get_secret_key()
-DEBUG = _parse_bool(os.getenv("DJANGO_DEBUG"), default=False)
-ALLOWED_HOSTS = _parse_list(
-    os.getenv("DJANGO_ALLOWED_HOSTS"),
-    ["localhost", "127.0.0.1"],
+ALLOWED_HOSTS = _get_allowed_hosts()
+CORS_ALLOWED_ORIGINS = _get_cors_allowed_origins()
+CSRF_TRUSTED_ORIGINS = _get_csrf_trusted_origins(CORS_ALLOWED_ORIGINS)
+HEALTHCHECK_DB_ALIAS = os.getenv("HEALTHCHECK_DB_ALIAS", "default")
+HEALTHCHECK_CHECK_MIGRATIONS = _parse_bool(
+    os.getenv("HEALTHCHECK_CHECK_MIGRATIONS"),
+    default=not _is_local_dev_mode(),
+)
+HEALTHCHECK_INCLUDE_DETAILS = _parse_bool(
+    os.getenv("HEALTHCHECK_INCLUDE_DETAILS"),
+    default=_is_local_dev_mode(),
 )
 
 INSTALLED_APPS = [
@@ -162,12 +342,9 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    "default": _database_from_url(
-        "postgresql://subidha_furniture:ADRIKA1004@@localhost:5432/subidha_core"
-    )
-}
+DATABASES = {"default": _get_database_config()}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
+DATABASES["default"]["CONN_MAX_AGE"] = _get_conn_max_age()
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -181,9 +358,24 @@ TIME_ZONE = "Asia/Kolkata"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_URL = _get_url_setting("STATIC_URL", "/static/")
+STATIC_ROOT = Path(os.getenv("STATIC_ROOT") or (BASE_DIR / "staticfiles"))
+MEDIA_URL = _get_url_setting("MEDIA_URL", "/media/")
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or (BASE_DIR / "media"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if _is_local_dev_mode()
+            else "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+        ),
+    },
+}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -210,18 +402,49 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 }
 
-CORS_ALLOWED_ORIGINS = _parse_list(
-    os.getenv("CORS_ALLOWED_ORIGINS"),
-    ["http://localhost:3000"],
+CORS_ALLOW_CREDENTIALS = _parse_bool(
+    os.getenv("CORS_ALLOW_CREDENTIALS"), default=bool(CORS_ALLOWED_ORIGINS)
 )
-CORS_ALLOW_CREDENTIALS = True
+if CORS_ALLOW_CREDENTIALS and not CORS_ALLOWED_ORIGINS and not _is_local_dev_mode():
+    raise RuntimeError(
+        "CORS_ALLOWED_ORIGINS must be configured outside local development when CORS_ALLOW_CREDENTIALS is enabled."
+    )
 
-SECURE_SSL_REDIRECT = _parse_bool(os.getenv("SECURE_SSL_REDIRECT"), default=not DEBUG)
-SESSION_COOKIE_SECURE = _parse_bool(os.getenv("SESSION_COOKIE_SECURE"), default=not DEBUG)
-CSRF_COOKIE_SECURE = _parse_bool(os.getenv("CSRF_COOKIE_SECURE"), default=not DEBUG)
+TRUST_X_FORWARDED_PROTO = _parse_bool(
+    os.getenv("TRUST_X_FORWARDED_PROTO"), default=False
+)
+if TRUST_X_FORWARDED_PROTO:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+USE_X_FORWARDED_HOST = _parse_bool(
+    os.getenv("USE_X_FORWARDED_HOST"), default=TRUST_X_FORWARDED_PROTO
+)
+
+SECURE_SSL_REDIRECT = _parse_bool(os.getenv("SECURE_SSL_REDIRECT"), default=not _is_local_dev_mode())
+SESSION_COOKIE_SECURE = _parse_bool(os.getenv("SESSION_COOKIE_SECURE"), default=not _is_local_dev_mode())
+CSRF_COOKIE_SECURE = _parse_bool(os.getenv("CSRF_COOKIE_SECURE"), default=not _is_local_dev_mode())
+SESSION_COOKIE_SAMESITE = _parse_choice(
+    os.getenv("SESSION_COOKIE_SAMESITE"),
+    "Lax",
+    {"Lax", "Strict", "None"},
+    "SESSION_COOKIE_SAMESITE",
+)
+CSRF_COOKIE_SAMESITE = _parse_choice(
+    os.getenv("CSRF_COOKIE_SAMESITE"),
+    "Lax",
+    {"Lax", "Strict", "None"},
+    "CSRF_COOKIE_SAMESITE",
+)
+if SESSION_COOKIE_SAMESITE == "None" and not SESSION_COOKIE_SECURE:
+    raise RuntimeError("SESSION_COOKIE_SECURE must be enabled when SESSION_COOKIE_SAMESITE is 'None'.")
+if CSRF_COOKIE_SAMESITE == "None" and not CSRF_COOKIE_SECURE:
+    raise RuntimeError("CSRF_COOKIE_SECURE must be enabled when CSRF_COOKIE_SAMESITE is 'None'.")
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 X_FRAME_OPTIONS = "DENY"
 
+LOG_LEVEL = _get_log_level()
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -236,7 +459,24 @@ LOGGING = {
             "formatter": "structured",
         }
     },
-    "root": {"handlers": ["console"], "level": "INFO"},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING" if not _is_local_dev_mode() else "INFO",
+            "propagate": False,
+        },
+        "api.health": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
 }
 
 CACHES = {

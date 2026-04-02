@@ -9,15 +9,19 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
-  listPartnerSubscriptions,
-  type PartnerSubscription,
-} from "@/services/partner";
+  listPartnerSubscriptionsRegister,
+  type PartnerSubscriptionRegisterResponse,
+} from "@/services/partner/registers";
+import type { PartnerSubscription } from "@/services/partner";
+
+const PAGE_SIZE = 25;
 
 function formatMoney(value?: string | number | null): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -67,10 +71,15 @@ export default function PartnerSubscriptionsPage() {
   const searchParams = useSearchParams();
   const q = (searchParams.get("q") || "").trim();
   const customerFilter = (searchParams.get("customer") || "").trim();
-  const initialStatus = ((searchParams.get("status") || "").trim().toUpperCase() ||
-    "") as FilterStatus;
+  const initialStatus = ((searchParams.get("status") || "").trim().toUpperCase() || "") as FilterStatus;
+  const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [rawRows, setRawRows] = useState<PartnerSubscription[]>([]);
+  const [rows, setRows] = useState<PartnerSubscription[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(currentPage);
+  const [numPages, setNumPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,10 +89,11 @@ export default function PartnerSubscriptionsPage() {
   useEffect(() => {
     setSearchInput(q);
     setStatusInput(initialStatus);
-  }, [initialStatus, q]);
+    setPage(currentPage);
+  }, [initialStatus, q, currentPage]);
 
   const loadSubscriptions = useCallback(
-    async (mode: "initial" | "refresh" = "initial", statusValue: FilterStatus = "") => {
+    async (mode: "initial" | "refresh" = "initial") => {
       if (mode === "initial") {
         setLoading(true);
       } else {
@@ -91,16 +101,29 @@ export default function PartnerSubscriptionsPage() {
       }
 
       try {
-        const response = await listPartnerSubscriptions({
-          status: statusValue || undefined,
-          customer: customerFilter || undefined,
-        });
+        const response: PartnerSubscriptionRegisterResponse =
+          await listPartnerSubscriptionsRegister({
+            status: initialStatus || undefined,
+            customer: customerFilter || undefined,
+            q: q || undefined,
+            page: currentPage,
+            pageSize: PAGE_SIZE,
+          });
 
-        setRawRows(Array.isArray(response.results) ? response.results : []);
+        setRows(Array.isArray(response.results) ? response.results : []);
+        setCount(response.count);
+        setPage(response.page);
+        setNumPages(response.num_pages);
+        setHasNext(response.has_next);
+        setHasPrevious(response.has_previous);
         setError(null);
       } catch (err) {
         setError(normalizeError(err));
-        setRawRows([]);
+        setRows([]);
+        setCount(0);
+        setNumPages(0);
+        setHasNext(false);
+        setHasPrevious(false);
       } finally {
         if (mode === "initial") {
           setLoading(false);
@@ -109,12 +132,12 @@ export default function PartnerSubscriptionsPage() {
         }
       }
     },
-    [customerFilter]
+    [currentPage, customerFilter, initialStatus, q]
   );
 
   useEffect(() => {
-    void loadSubscriptions("initial", initialStatus);
-  }, [initialStatus, loadSubscriptions]);
+    void loadSubscriptions("initial");
+  }, [loadSubscriptions]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,34 +165,24 @@ export default function PartnerSubscriptionsPage() {
     );
   }
 
-  const rows = useMemo(() => {
-    if (!q) return rawRows;
-
-    const term = q.toLowerCase();
-    return rawRows.filter((row) =>
-      [
-        row.subscription_number,
-        row.customer_name,
-        row.customer_phone,
-        row.product_name,
-        row.product_code,
-        row.batch_code,
-        row.partner_name,
-        row.lucky_number,
-      ]
-        .map((value) => String(value ?? "").toLowerCase())
-        .join(" ")
-        .includes(term)
+  function replacePage(targetPage: number) {
+    const next = new URLSearchParams();
+    if (q) next.set("q", q);
+    if (initialStatus) next.set("status", initialStatus);
+    if (customerFilter) next.set("customer", customerFilter);
+    if (targetPage > 1) next.set("page", String(targetPage));
+    const queryString = next.toString();
+    router.replace(
+      queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions"
     );
-  }, [q, rawRows]);
+  }
 
   const summary = useMemo(() => {
-    const total = rows.length;
-    const active = rows.filter((row) => statusToken(row.status) === "ACTIVE").length;
-    const completed = rows.filter((row) => statusToken(row.status) === "COMPLETED").length;
-    const won = rows.filter((row) => statusToken(row.status) === "WON").length;
-    const outstanding = rows.reduce((sum, row) => sum + getOutstandingAmount(row), 0);
-    return { total, active, completed, won, outstanding };
+    const pageActive = rows.filter((row) => statusToken(row.status) === "ACTIVE").length;
+    const pageCompleted = rows.filter((row) => statusToken(row.status) === "COMPLETED").length;
+    const pageWon = rows.filter((row) => statusToken(row.status) === "WON").length;
+    const pageOutstanding = rows.reduce((sum, row) => sum + getOutstandingAmount(row), 0);
+    return { pageActive, pageCompleted, pageWon, pageOutstanding };
   }, [rows]);
 
   const columns = useMemo<Column<PartnerSubscription>[]>(
@@ -290,21 +303,21 @@ export default function PartnerSubscriptionsPage() {
         },
       ]}
       stats={[
-        { label: "Visible", value: rows.length },
-        { label: "Active", value: summary.active, tone: "success" },
-        { label: "Won", value: summary.won, tone: summary.won > 0 ? "info" : undefined },
-        { label: "Outstanding", value: formatMoney(summary.outstanding), tone: "warning" },
+        { label: "Matching", value: count },
+        { label: "Page Active", value: summary.pageActive, tone: "success" },
+        { label: "Page Won", value: summary.pageWon, tone: summary.pageWon > 0 ? "info" : undefined },
+        { label: "Page Outstanding", value: formatMoney(summary.pageOutstanding), tone: "warning" },
       ]}
       statusBadge={{ label: "Partner Subscription Scope", tone: "info" }}
     >
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Visible" value={summary.total} />
-          <StatCard label="Active" value={summary.active} tone="success" />
-          <StatCard label="Completed" value={summary.completed} />
+          <StatCard label="Matching" value={count} />
+          <StatCard label="Page Active" value={summary.pageActive} tone="success" />
+          <StatCard label="Page Completed" value={summary.pageCompleted} />
           <StatCard
-            label="Outstanding"
-            value={formatMoney(summary.outstanding)}
+            label="Page Outstanding"
+            value={formatMoney(summary.pageOutstanding)}
             tone="warning"
             icon={<Wallet className="h-4 w-4" />}
           />
@@ -316,7 +329,7 @@ export default function PartnerSubscriptionsPage() {
           action={
             <button
               type="button"
-              onClick={() => void loadSubscriptions("refresh", initialStatus)}
+              onClick={() => void loadSubscriptions("refresh")}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -404,7 +417,7 @@ export default function PartnerSubscriptionsPage() {
           <ErrorState
             title="Failed to load subscriptions"
             description={error}
-            onRetry={() => void loadSubscriptions("initial", initialStatus)}
+            onRetry={() => void loadSubscriptions("initial")}
           />
         ) : null}
 
@@ -413,10 +426,15 @@ export default function PartnerSubscriptionsPage() {
             title="Subscription rows"
             description="Open the partner subscription detail page for EMI schedule and payment progress, or jump directly into collection workflow."
           >
-            {rows.length === 0 ? (
+            {count === 0 ? (
               <EmptyState
                 title="No subscriptions found"
                 description="No subscriptions matched the current partner scope and filter set."
+              />
+            ) : rows.length === 0 ? (
+              <EmptyState
+                title="No rows on this page"
+                description="The current page has no results. Move to a previous page or change the filters."
               />
             ) : (
               <DataTable<PartnerSubscription>
@@ -449,6 +467,20 @@ export default function PartnerSubscriptionsPage() {
                 )}
               />
             )}
+
+            {count > 0 ? (
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={PAGE_SIZE}
+                numPages={numPages}
+                hasNext={hasNext}
+                hasPrevious={hasPrevious}
+                disabled={loading || refreshing}
+                onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                onNext={() => replacePage(page + 1)}
+              />
+            ) : null}
           </WorkspaceSection>
         ) : null}
       </div>

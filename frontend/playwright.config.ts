@@ -2,8 +2,11 @@ import { defineConfig, devices } from "@playwright/test";
 
 const frontendBaseUrl =
   process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3100";
+const backendRootUrl =
+  process.env.PLAYWRIGHT_BACKEND_ROOT || "http://127.0.0.1:8100";
 const apiBaseUrl =
-  process.env.PLAYWRIGHT_API_URL || "http://127.0.0.1:8100/api/v1";
+  process.env.PLAYWRIGHT_API_URL || `${backendRootUrl}/api/v1`;
+const pythonExecutable = process.env.PLAYWRIGHT_PYTHON || "python";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -33,7 +36,14 @@ export default defineConfig({
     {
       name: "chromium-smoke",
       dependencies: ["setup"],
-      testIgnore: /.*\.setup\.ts/,
+      testIgnore: [/.*\.setup\.ts/, /.*real-login-smoke\.spec\.ts/],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "chromium-auth-smoke",
+      testMatch: /.*real-login-smoke\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },
@@ -41,15 +51,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command:
-        "../venv/bin/python ../backend/manage.py runserver 127.0.0.1:8100 --noreload",
-      url: `${apiBaseUrl}/public/health/`,
+      command: `bash -lc "rm -f ../backend/playwright-smoke.sqlite3 ../backend/playwright-smoke-meta.json && ${pythonExecutable} ../backend/manage.py migrate --noinput --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py seed_playwright_smoke --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py runserver 127.0.0.1:8100 --settings core.settings.playwright --noreload"`,
+      url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: false,
       timeout: 120_000,
       cwd: ".",
       env: {
         ...process.env,
         CORS_ALLOWED_ORIGINS: frontendBaseUrl,
+        CSRF_TRUSTED_ORIGINS: frontendBaseUrl,
         DJANGO_SETTINGS_MODULE: "core.settings.playwright",
         PYTHONUNBUFFERED: "1",
       },
