@@ -65,7 +65,6 @@ function parseIdFilter(value: string | null): string {
   return /^\d+$/.test(trimmed) ? trimmed : "";
 }
 
-// Payment table with sorting and search
 function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<keyof PaymentRegisterRow>("payment_date");
@@ -119,28 +118,33 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
     return (
       <EmptyState
         title="No payment rows"
-        description="No payment records match the current filter set."
+        description="No payment records match the current register filters."
       />
     );
   }
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search by customer, phone, reference..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+      <div className="mb-4 flex flex-wrap items-start gap-3">
+        <div className="flex-1 sm:max-w-xs">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Quick table search (screen only)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Quick search changes only the on-screen table below. CSV export uses the main register filters above.
+          </p>
         </div>
         {searchTerm && (
           <button
             onClick={() => setSearchTerm("")}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 pt-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
             Clear
@@ -197,7 +201,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
               <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Actions
               </th>
-             </tr>
+            </tr>
           </thead>
 
           <tbody>
@@ -499,7 +503,6 @@ export default function AdminPaymentsPage() {
       : "/admin/payments/create";
   }, [emiFilter, subscriptionFilter]);
 
-  // Compute some derived metrics
   const activeRate = summary.visible_payments > 0
     ? ((summary.active_payments / summary.visible_payments) * 100).toFixed(1)
     : "0";
@@ -550,7 +553,6 @@ export default function AdminPaymentsPage() {
       }}
     >
       <div className="space-y-6">
-        {/* Advanced Stats Row */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Visible Payments"
@@ -720,7 +722,7 @@ export default function AdminPaymentsPage() {
                 disabled={exportRows.length === 0 || loading}
                 onClick={() =>
                   downloadCsv(
-                    "payments-register-current-view.csv",
+                    "payments-register-filtered-rows.csv",
                     [
                       { key: "id", header: "id" },
                       { key: "customer_name", header: "customer_name" },
@@ -743,10 +745,14 @@ export default function AdminPaymentsPage() {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Download className="h-4 w-4" />
-                Export Current View
+                Export Filtered Register CSV
               </button>
             </div>
           </form>
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            This CSV exports the payment rows returned by the main register filters above. The quick search inside the payment table is for on-screen review only and does not change the download.
+          </p>
 
           {subscriptionFilter || customerFilter || batchFilter || partnerFilter || emiFilter ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
