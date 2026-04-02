@@ -36,7 +36,14 @@ export default defineConfig({
     {
       name: "chromium-smoke",
       dependencies: ["setup"],
-      testIgnore: /.*\.setup\.ts/,
+      testIgnore: [/.*\.setup\.ts/, /.*real-login-smoke\.spec\.ts/],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "chromium-auth-smoke",
+      testMatch: /.*real-login-smoke\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },

@@ -12,6 +12,8 @@
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run build",
     "test:e2e:smoke": "playwright test --project=chromium-smoke",
     "test:e2e:smoke:headed": "playwright test --project=chromium-smoke --headed",
+    "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
+    "test:e2e:auth-smoke:headed": "playwright test --project=chromium-auth-smoke --headed",
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {

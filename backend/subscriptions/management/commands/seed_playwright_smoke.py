@@ -23,6 +23,8 @@ from subscriptions.models import (
 from subscriptions.services.payment_service import record_emi_payment, verify_payment
 
 SMOKE_META_FILENAME = "playwright-smoke-meta.json"
+REAL_LOGIN_SECRET = "SmokeLogin123!"
+INVALID_LOGIN_SECRET = "SmokeLogin123!x"
 
 
 class Command(BaseCommand):
@@ -201,6 +203,20 @@ class Command(BaseCommand):
                     "name": customer_user.username,
                     "role": customer_user.role,
                     "dashboard_path": "/customer",
+                },
+            },
+            "real_login": {
+                "secret": REAL_LOGIN_SECRET,
+                "invalid_secret": INVALID_LOGIN_SECRET,
+                "roles": {
+                    "admin": {
+                        "username": admin.username,
+                        "dashboard_path": "/admin",
+                    },
+                    "cashier": {
+                        "username": cashier.username,
+                        "dashboard_path": "/cashier",
+                    },
                 },
             },
             "entities": {

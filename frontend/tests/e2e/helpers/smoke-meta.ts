@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export type SmokeRole = "admin" | "cashier" | "partner" | "customer";
+export type RealLoginRole = "admin" | "cashier";
 
 export type SmokeMeta = {
   roles: Record<
@@ -13,6 +14,17 @@ export type SmokeMeta = {
       dashboard_path: string;
     }
   >;
+  real_login: {
+    secret: string;
+    invalid_secret: string;
+    roles: Record<
+      RealLoginRole,
+      {
+        username: string;
+        dashboard_path: string;
+      }
+    >;
+  };
   entities: {
     admin_collection: {
       subscription_id: number;

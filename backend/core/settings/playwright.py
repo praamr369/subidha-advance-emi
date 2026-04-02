@@ -12,6 +12,10 @@ PLAYWRIGHT_DB_PATH = Path(BASE_DIR) / "playwright-smoke.sqlite3"
 PLAYWRIGHT_ROLE_CLASS = ".".join(
     ["api", "v1", "playwright_authentication", "PlaywrightRoleAuthentication"]
 )
+PLAYWRIGHT_REAL_LOGIN_SECRET = "SmokeLogin123!"
+PLAYWRIGHT_LOGIN_BACKEND = ".".join(
+    ["accounts", "playwright_auth_backend", "PlaywrightLoginBackend"]
+)
 
 DATABASES = {
     "default": {
@@ -27,6 +31,11 @@ REST_FRAMEWORK = {
         *tuple(REST_FRAMEWORK.get("DEFAULT_AUTHENTICATION_CLASSES", ())),
     ),
 }
+
+AUTHENTICATION_BACKENDS = (
+    PLAYWRIGHT_LOGIN_BACKEND,
+    *tuple(globals().get("AUTHENTICATION_BACKENDS", ("django.contrib.auth.backends.ModelBackend",))),
+)
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
