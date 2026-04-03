@@ -129,12 +129,8 @@ class FinancialFlowTests(TestCase):
             collected_by=self.partner_user,
         )
 
-        allocation = allocate_payment(payment=payment)
-        self.assertTrue(allocation["is_consistent"])
-        self.assertEqual(
-            Decimal(allocation["payment_amount"]),
-            Decimal(allocation["allocation_total"]),
-        )
+        allocation_amount = allocate_payment(payment=payment)
+        self.assertEqual(Decimal(str(allocation_amount)), Decimal("100.00"))
 
         emi_integrity = check_emi_integrity(emi=emi)
         self.assertTrue(emi_integrity["is_payment_consistent"])

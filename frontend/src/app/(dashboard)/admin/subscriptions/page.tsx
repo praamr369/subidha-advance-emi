@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -293,50 +293,62 @@ export default function AdminSubscriptionsPage() {
     return queryString ? `${pathname}?${queryString}` : pathname;
   }
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
-    try {
-      const params = new URLSearchParams();
-      if (currentSearchQuery) params.set("q", currentSearchQuery);
-      if (currentStatusFilter) params.set("status", currentStatusFilter);
-      if (currentPlanTypeFilter) params.set("plan_type", currentPlanTypeFilter);
-      if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
-      if (currentProductFilter) params.set("product", currentProductFilter);
-      if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
-      if (currentBatchFilter) params.set("batch", currentBatchFilter);
-      params.set("page", String(currentPage));
-      params.set("page_size", String(PAGE_SIZE));
+      try {
+        const params = new URLSearchParams();
+        if (currentSearchQuery) params.set("q", currentSearchQuery);
+        if (currentStatusFilter) params.set("status", currentStatusFilter);
+        if (currentPlanTypeFilter) params.set("plan_type", currentPlanTypeFilter);
+        if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+        if (currentProductFilter) params.set("product", currentProductFilter);
+        if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+        if (currentBatchFilter) params.set("batch", currentBatchFilter);
+        params.set("page", String(currentPage));
+        params.set("page_size", String(PAGE_SIZE));
 
-      const payload = await apiFetch<unknown>(`/admin/subscriptions/?${params.toString()}`);
-      const normalized = normalizeSubscriptionListPayload(payload);
+        const payload = await apiFetch<unknown>(`/admin/subscriptions/?${params.toString()}`);
+        const normalized = normalizeSubscriptionListPayload(payload);
 
-      setRows(normalized.results);
-      setCount(normalized.count);
-      setPage(normalized.page);
-      setNumPages(normalized.num_pages);
-      setHasNext(normalized.has_next);
-      setHasPrevious(normalized.has_previous);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setRows([]);
-        setCount(0);
-        setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
+        setRows(normalized.results);
+        setCount(normalized.count);
+        setPage(normalized.page);
+        setNumPages(normalized.num_pages);
+        setHasNext(normalized.has_next);
+        setHasPrevious(normalized.has_previous);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") {
+          setRows([]);
+          setCount(0);
+          setNumPages(0);
+          setHasNext(false);
+          setHasPrevious(false);
+        }
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+    },
+    [
+      currentBatchFilter,
+      currentCustomerFilter,
+      currentPage,
+      currentPartnerFilter,
+      currentPlanTypeFilter,
+      currentProductFilter,
+      currentSearchQuery,
+      currentStatusFilter,
+    ]
+  );
 
   useEffect(() => {
     void loadPage("initial");
-  }, [currentBatchFilter, currentCustomerFilter, currentPage, currentPartnerFilter, currentPlanTypeFilter, currentProductFilter, currentSearchQuery, currentStatusFilter]);
+  }, [loadPage]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

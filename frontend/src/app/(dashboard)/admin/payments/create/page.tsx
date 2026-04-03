@@ -222,12 +222,17 @@ export default function PaymentRecordPage() {
 
   const loadSubscription = useCallback(async (
     subscriptionId: number,
-    preferredEmiId?: number | null
+    preferredEmiId?: number | null,
+    options?: {
+      preserveFeedback?: boolean;
+    }
   ): Promise<{ preferredEmiApplied: boolean }> => {
-    resetMessages();
+    if (!options?.preserveFeedback) {
+      resetMessages();
+      setSubmitResult(null);
+    }
     setLoadingSubscription(true);
     setLoadingEmis(true);
-    setSubmitResult(null);
 
     try {
       const subscription = await getAdminSubscriptionForCollection(
@@ -494,7 +499,9 @@ export default function PaymentRecordPage() {
       );
 
       if (selectedSubscription?.id) {
-        await loadSubscription(selectedSubscription.id);
+        await loadSubscription(selectedSubscription.id, undefined, {
+          preserveFeedback: true,
+        });
       }
     } catch (error) {
       const normalized = normalizeApiError(error);

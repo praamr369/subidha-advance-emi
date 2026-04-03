@@ -33,6 +33,7 @@ def record_payment(
     emi_id: int,
     amount,
     collected_by,
+    method: Optional[str] = None,
     payment_method: str = "CASH",
     payment_date=None,
     reference_no: Optional[str] = None,
@@ -45,6 +46,7 @@ def record_payment(
     - emi_id
     - amount
     - collected_by
+    - method
     - payment_method
     - payment_date
     - reference_no
@@ -58,14 +60,15 @@ def record_payment(
     canonical service owns payment date assignment internally.
     """
     normalized_amount = _normalize_amount(amount)
+    resolved_method = method or payment_method or "CASH"
 
     result = record_emi_payment(
         emi_id=int(emi_id),
         amount=normalized_amount,
         collected_by=collected_by,
-        method=(payment_method or "CASH"),
+        method=resolved_method,
         reference_no=reference_no,
         note=notes,
     )
 
-    return result
+    return result["payment"]

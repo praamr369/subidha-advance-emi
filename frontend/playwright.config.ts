@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { defineConfig, devices } from "@playwright/test";
 
 const frontendBaseUrl =
@@ -6,7 +9,26 @@ const backendRootUrl =
   process.env.PLAYWRIGHT_BACKEND_ROOT || "http://127.0.0.1:8100";
 const apiBaseUrl =
   process.env.PLAYWRIGHT_API_URL || `${backendRootUrl}/api/v1`;
-const pythonExecutable = process.env.PLAYWRIGHT_PYTHON || "python";
+const resolvePythonExecutable = () => {
+  const envConfigured =
+    process.env.PLAYWRIGHT_PYTHON || process.env.PYTHON_BIN || "";
+
+  if (envConfigured.trim()) {
+    return envConfigured;
+  }
+
+  const candidates = [
+    path.resolve(__dirname, "../.venv/bin/python"),
+    path.resolve(__dirname, "../backend/.venv/bin/python"),
+    path.resolve(__dirname, "../../.venv/bin/python"),
+    "/home/subidha-furniture/subidha-lucky-plan/.venv/bin/python",
+  ];
+
+  const localMatch = candidates.find((candidate) => existsSync(candidate));
+  return localMatch || "python3";
+};
+
+const pythonExecutable = resolvePythonExecutable();
 
 export default defineConfig({
   testDir: "./tests/e2e",

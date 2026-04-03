@@ -18,7 +18,7 @@ test("partner payouts route redirects to commissions", async ({ page }) => {
   await page.goto("/partner/payouts");
   await expect(page).toHaveURL(/\/partner\/commissions$/);
   await expect(
-    page.getByRole("heading", { name: "Partner Commissions" })
+    page.getByRole("heading", { name: "Commission Ledger" })
   ).toBeVisible();
 });
 
@@ -31,7 +31,7 @@ test("partner customers detail flow and payments history work", async ({
   await page
     .getByPlaceholder("Search name or phone")
     .fill(manifest.entities.admin.search_query);
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("link", { name: "View Detail" }).click();
 
   await expect(page).toHaveURL(

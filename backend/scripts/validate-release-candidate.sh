@@ -3,6 +3,37 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  if [[ -x ".venv/bin/python" ]]; then
+    PYTHON_BIN="$(pwd)/.venv/bin/python"
+  elif [[ -x "../.venv/bin/python" ]]; then
+    PYTHON_BIN="$(cd .. && pwd)/.venv/bin/python"
+  elif [[ -x "../../.venv/bin/python" ]]; then
+    PYTHON_BIN="$(cd ../.. && pwd)/.venv/bin/python"
+  elif [[ -x "/home/subidha-furniture/subidha-lucky-plan/.venv/bin/python" ]]; then
+    PYTHON_BIN="/home/subidha-furniture/subidha-lucky-plan/.venv/bin/python"
+  fi
+fi
+
+if [[ -z "$PYTHON_BIN" ]]; then
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python)"
+  elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+  else
+    echo "No python interpreter found on PATH." >&2
+    exit 1
+  fi
+fi
+
+CHECK_SETTINGS_MODULE="${CHECK_SETTINGS_MODULE:-core.settings.test}"
+DEPLOY_CHECK_SETTINGS_MODULE="${DEPLOY_CHECK_SETTINGS_MODULE:-core.settings.production}"
+DEPLOY_CHECK_DJANGO_ENV="${DEPLOY_CHECK_DJANGO_ENV:-production}"
+DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret-key-2026}"
+DEPLOY_CHECK_ALLOWED_HOSTS="${DEPLOY_CHECK_ALLOWED_HOSTS:-localhost}"
+DEPLOY_CHECK_DATABASE_URL="${DEPLOY_CHECK_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/subidha_rc}"
+
 test_targets=(
   "subscriptions.tests.FinancialFlowTests"
   "subscriptions.tests.ReconcileFinancialsCommandTests"
@@ -26,11 +57,14 @@ append_test_target_if_present "api/v1/tests_payment_pagination.py" "api.v1.tests
 append_test_target_if_present "api/v1/tests_subscription_schedule_rebuild.py" "api.v1.tests_subscription_schedule_rebuild"
 append_test_target_if_present "api/v1/tests_batch_status.py" "api.v1.tests_batch_status"
 
-python manage.py check
+"$PYTHON_BIN" manage.py check --settings "$CHECK_SETTINGS_MODULE"
 
-DEPLOY_CHECK_SETTINGS_MODULE="${DEPLOY_CHECK_SETTINGS_MODULE:-core.settings.ci_deploy}"
-python manage.py check --deploy --settings "$DEPLOY_CHECK_SETTINGS_MODULE"
+DJANGO_ENV="$DEPLOY_CHECK_DJANGO_ENV" \
+DJANGO_SECRET_KEY="$DEPLOY_CHECK_SECRET_KEY" \
+DJANGO_ALLOWED_HOSTS="$DEPLOY_CHECK_ALLOWED_HOSTS" \
+DATABASE_URL="$DEPLOY_CHECK_DATABASE_URL" \
+  "$PYTHON_BIN" manage.py check --deploy --settings "$DEPLOY_CHECK_SETTINGS_MODULE"
 
 printf 'Running backend release-candidate tests:\n'
 printf ' - %s\n' "${test_targets[@]}"
-python manage.py test "${test_targets[@]}"
+"$PYTHON_BIN" manage.py test --settings "$CHECK_SETTINGS_MODULE" "${test_targets[@]}"

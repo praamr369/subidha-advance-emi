@@ -12,9 +12,47 @@ import StatusBadge from "@/components/ui/status-badge";
 import StatCard from "@/components/ui/StatCard";
 import { apiFetch } from "@/lib/api";
 
+type SubscriptionFinancialSummary = {
+  paid_amount?: string | number | null;
+  pending_amount?: string | number | null;
+  waived_amount?: string | number | null;
+  remaining_amount?: string | number | null;
+};
+
+type SubscriptionEmiRow = {
+  id: number;
+  month_no?: number | null;
+  due_date?: string | null;
+  amount?: string | number | null;
+  status?: string | null;
+};
+
+type SubscriptionDetailRecord = {
+  id: number;
+  status?: string | null;
+  total_amount?: string | number | null;
+  monthly_amount?: string | number | null;
+  tenure_months?: number | null;
+  lucky_number?: number | null;
+  product_name?: string | null;
+  batch_code?: string | null;
+  customer_name?: string | null;
+  plan_type?: string | null;
+  start_date?: string | null;
+  financial_summary?: SubscriptionFinancialSummary | null;
+  emis?: SubscriptionEmiRow[] | null;
+};
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Failed to load subscription details";
+}
+
 export default function PartnerSubscriptionDetailPage() {
   const params = useParams<{ id: string }>();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<SubscriptionDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,11 +60,11 @@ export default function PartnerSubscriptionDetailPage() {
     try {
       setLoading(true);
       // Note: Scoped to partner via backend route policy
-      const res = await apiFetch<any>(`/partner/subscriptions/${params.id}/`);
+      const res = await apiFetch<SubscriptionDetailRecord>(`/partner/subscriptions/${params.id}/`);
       setData(res);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to load subscription details");
+    } catch (err) {
+      setError(toErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -52,7 +90,7 @@ export default function PartnerSubscriptionDetailPage() {
         { label: `#${data.id}` },
       ]}
       stats={[
-        { label: "Status", value: data.status, tone: data.status === "ACTIVE" ? "success" : "info" },
+        { label: "Status", value: data.status || "—", tone: data.status === "ACTIVE" ? "success" : "info" },
         { label: "Paid", value: `₹${fs?.paid_amount || '0.00'}`, tone: "success" },
         { label: "Pending", value: `₹${fs?.pending_amount || '0.00'}`, tone: "warning" }
       ]}
@@ -99,7 +137,7 @@ export default function PartnerSubscriptionDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {data.emis?.map((emi: any) => (
+                {data.emis?.map((emi) => (
                   <tr key={emi.id} className="text-sm">
                     <td className="whitespace-nowrap px-6 py-4 font-medium">Month {emi.month_no}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">{emi.due_date || "—"}</td>
