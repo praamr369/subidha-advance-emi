@@ -16,6 +16,7 @@ Set at minimum:
 - `DJANGO_ENV`
 - `DJANGO_DEBUG`
 - `DJANGO_SECRET_KEY`
+- `JWT_SIGNING_KEY` (recommended separate JWT HMAC secret; minimum 32 characters)
 - `DJANGO_ALLOWED_HOSTS`
 - database settings via either `DATABASE_URL` or `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT`
 
@@ -147,6 +148,7 @@ pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" subidha-backu
 Common operational failure meanings:
 
 - `DJANGO_SECRET_KEY` missing → startup should fail immediately outside local development
+- weak `DJANGO_SECRET_KEY` or `JWT_SIGNING_KEY` → startup should fail immediately outside local development
 - `DJANGO_ALLOWED_HOSTS` missing → startup should fail immediately outside local development
 - DB env missing → startup should fail immediately outside local development
 - `readyz` returns 503 with database failure → app is up, DB path is not healthy

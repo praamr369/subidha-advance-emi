@@ -7,6 +7,17 @@ from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+LOCAL_DEV_SECRET_KEY = "local-development-only-secret-key"
+MIN_DJANGO_SECRET_KEY_LENGTH = 50
+MIN_JWT_SIGNING_KEY_LENGTH = 32
+DISALLOWED_SECRET_VALUES = {
+    "change-me",
+    "change-this-local-key",
+    "ci-only-deploy-validation-secret-key",
+    "local-development-only-secret-key",
+    "unsafe-dev-key",
+    "your-real-secret-key",
+}
 
 
 def _parse_bool(value: str | None, default: bool = False) -> bool:
@@ -85,17 +96,70 @@ def _parse_allowed_hosts(value: str | None, default: list[str]) -> list[str]:
     return normalized
 
 
+def _validate_secret_value(secret: str, *, name: str, minimum_length: int) -> str:
+    normalized = secret.strip()
+    lowered = normalized.lower()
+
+    if not normalized:
+        raise RuntimeError(f"{name} must not be blank.")
+    if len(normalized) < minimum_length:
+        raise RuntimeError(
+            f"{name} must be at least {minimum_length} characters long."
+        )
+    if len(set(normalized)) < 5:
+        raise RuntimeError(
+            f"{name} must contain at least 5 unique characters."
+        )
+    if lowered.startswith("django-insecure-"):
+        raise RuntimeError(
+            f"{name} must not use a Django auto-generated fallback value."
+        )
+    if lowered in DISALLOWED_SECRET_VALUES:
+        raise RuntimeError(
+            f"{name} must not use a development/test placeholder value."
+        )
+
+    return normalized
+
+
 def _get_secret_key() -> str:
     secret = os.getenv("DJANGO_SECRET_KEY")
     if secret:
-        return secret
+        if not _is_local_dev_mode():
+            return _validate_secret_value(
+                secret,
+                name="DJANGO_SECRET_KEY",
+                minimum_length=MIN_DJANGO_SECRET_KEY_LENGTH,
+            )
+        return secret.strip()
 
     if _is_local_dev_mode():
-        return "local-development-only-secret-key"
+        return LOCAL_DEV_SECRET_KEY
 
     raise RuntimeError(
         "DJANGO_SECRET_KEY environment variable is required outside local development."
     )
+
+
+def _get_jwt_signing_key(secret_key: str) -> str:
+    jwt_signing_key = os.getenv("JWT_SIGNING_KEY")
+    if jwt_signing_key:
+        if not _is_local_dev_mode():
+            return _validate_secret_value(
+                jwt_signing_key,
+                name="JWT_SIGNING_KEY",
+                minimum_length=MIN_JWT_SIGNING_KEY_LENGTH,
+            )
+        return jwt_signing_key.strip()
+
+    if not _is_local_dev_mode():
+        _validate_secret_value(
+            secret_key,
+            name="DJANGO_SECRET_KEY",
+            minimum_length=MIN_DJANGO_SECRET_KEY_LENGTH,
+        )
+
+    return secret_key
 
 
 def _get_allowed_hosts() -> list[str]:
@@ -284,6 +348,7 @@ _load_dotenv(BASE_DIR / ".env")
 ENVIRONMENT_NAME = _get_environment_name()
 DEBUG = _parse_bool(os.getenv("DJANGO_DEBUG"), default=_is_local_dev_mode())
 SECRET_KEY = _get_secret_key()
+JWT_SIGNING_KEY = _get_jwt_signing_key(SECRET_KEY)
 ALLOWED_HOSTS = _get_allowed_hosts()
 CORS_ALLOWED_ORIGINS = _get_cors_allowed_origins()
 CSRF_TRUSTED_ORIGINS = _get_csrf_trusted_origins(CORS_ALLOWED_ORIGINS)
@@ -401,6 +466,8 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": JWT_SIGNING_KEY,
     "UPDATE_LAST_LOGIN": True,
 }
 

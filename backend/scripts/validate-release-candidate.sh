@@ -30,7 +30,7 @@ fi
 CHECK_SETTINGS_MODULE="${CHECK_SETTINGS_MODULE:-core.settings.test}"
 DEPLOY_CHECK_SETTINGS_MODULE="${DEPLOY_CHECK_SETTINGS_MODULE:-core.settings.production}"
 DEPLOY_CHECK_DJANGO_ENV="${DEPLOY_CHECK_DJANGO_ENV:-production}"
-DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret-key-2026}"
+DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret-key-2026-rotate-before-production-a7m4q2x9}"
 DEPLOY_CHECK_ALLOWED_HOSTS="${DEPLOY_CHECK_ALLOWED_HOSTS:-localhost}"
 DEPLOY_CHECK_DATABASE_URL="${DEPLOY_CHECK_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/subidha_rc}"
 DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS="${DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS:-http://localhost}"

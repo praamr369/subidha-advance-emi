@@ -44,6 +44,7 @@ staticfiles/
 # Django local settings or secrets
 backend/.env
 backend/.env.*
+!backend/.env.production.template
 backend/venv/
 backend/.pytest_cache/
 backend/.mypy_cache/
@@ -62,6 +63,7 @@ yarn-error.log*
 pnpm-debug.log*
 frontend/.env.local
 frontend/.env.*
+!frontend/.env.production.template
 frontend/node_modules/
 frontend/.next/
 frontend/out/

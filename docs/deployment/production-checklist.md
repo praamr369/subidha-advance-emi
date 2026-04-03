@@ -1,8 +1,13 @@
 # Production Checklist
 
+See [PRODUCTION_HANDOFF.md](./PRODUCTION_HANDOFF.md) for the exact environment contract, startup commands, migration sequence, and post-deploy smoke steps.
+
 ## Backend
 - environment variables configured
+- production secrets loaded from secret manager or ops-managed env file
 - debug disabled
+- strong `DJANGO_SECRET_KEY` configured
+- `JWT_SIGNING_KEY` configured or intentionally inherited from the production Django secret
 - PostgreSQL configured
 - migrations applied
 - static handling configured
