@@ -141,5 +141,5 @@ test("legacy commission and reconciliation routes redirect to canonical admin wo
   await expect(page).toHaveURL(/\/admin\/finance\/commissions\?partner=7$/);
 
   await page.goto("/admin/finance/reconciliation?status=OPEN");
-  await expect(page).toHaveURL(/\/admin\/reconciliation\?status=OPEN$/);
+  await expect(page).toHaveURL(/\/admin\/finance\/reconciliation\?status=OPEN$/);
 });

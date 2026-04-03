@@ -1,6 +1,8 @@
-import os
+"""
+Settings package marker.
 
-if os.getenv("DJANGO_ENV") == "production":
-    from .production import *  # noqa
-else:
-    from .development import *  # noqa
+Concrete settings modules should be imported explicitly, for example:
+- core.settings.development
+- core.settings.production
+- core.settings.test
+"""

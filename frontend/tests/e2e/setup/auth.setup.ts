@@ -9,6 +9,7 @@ import {
   FRONTEND_BASE_URL,
   authStatePath,
   ensureSmokeDirectories,
+  resolvePythonExecutable,
   writeSmokeManifest,
   type RoleKey,
   type RoleCredentials,
@@ -17,12 +18,16 @@ import {
 
 const djangoEnv = {
   ...process.env,
+  CORS_ALLOWED_ORIGINS: FRONTEND_BASE_URL,
+  CSRF_TRUSTED_ORIGINS: FRONTEND_BASE_URL,
+  DJANGO_ENV: "development",
   DJANGO_SETTINGS_MODULE: "core.settings.playwright",
 };
 
 const ACCESS_TOKEN_KEY = "subidha_access_token";
 const REFRESH_TOKEN_KEY = "subidha_refresh_token";
 const SESSION_KEY = "subidha_session";
+const PYTHON_EXECUTABLE = resolvePythonExecutable();
 
 test("seed deterministic smoke data and capture role sessions", async ({
   browser,
@@ -30,7 +35,7 @@ test("seed deterministic smoke data and capture role sessions", async ({
   ensureSmokeDirectories();
 
   execFileSync(
-    "../venv/bin/python",
+    PYTHON_EXECUTABLE,
     ["../backend/manage.py", "migrate", "--noinput"],
     {
       cwd: process.cwd(),
@@ -42,7 +47,7 @@ test("seed deterministic smoke data and capture role sessions", async ({
   let raw: string;
   try {
     raw = execFileSync(
-      "../venv/bin/python",
+      PYTHON_EXECUTABLE,
       ["../backend/manage.py", "seed_playwright_smoke", "--json"],
       {
         cwd: process.cwd(),

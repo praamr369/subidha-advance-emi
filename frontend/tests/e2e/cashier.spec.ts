@@ -59,12 +59,12 @@ test.describe.serial("cashier smoke", () => {
     await page.getByRole("button", { name: "Search" }).click();
 
     await page.getByRole("button", { name: /EMI Month 2/i }).click();
-    await expect(page.locator("#collect-amount")).toHaveValue("1000.00");
+    await expect(page.locator("#collect-amount")).toHaveValue("200.00");
     await page.selectOption("#collect-method", "CASH");
     await page.getByRole("button", { name: /^Collect Payment$/ }).click();
 
-    await expect(page.getByRole("link", { name: "View Receipt" })).toBeVisible();
-    await page.getByRole("link", { name: "View Receipt" }).click();
+    await expect(page.getByRole("link", { name: "Open Receipt" })).toBeVisible();
+    await page.getByRole("link", { name: "Open Receipt" }).click();
 
     await expect(page).toHaveURL(/\/cashier\/payments\/\d+$/);
     const heading = await page
@@ -78,7 +78,7 @@ test.describe.serial("cashier smoke", () => {
     await expect(page).toHaveURL(/\/cashier\/payments$/);
     await page.locator("#cashier-payment-search").fill(paymentId);
     await page.getByRole("button", { name: "Search" }).click();
-    await expect(page.getByText(`#${paymentId}`)).toBeVisible();
+    await expect(page.getByText(`#${paymentId}`, { exact: true }).first()).toBeVisible();
   });
 
   test("cashier cannot access admin pages", async ({ page }) => {

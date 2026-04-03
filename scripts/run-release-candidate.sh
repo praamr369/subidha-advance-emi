@@ -6,6 +6,40 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CURRENT_STEP=""
 FAILED_STEP=""
 
+resolve_python_bin() {
+  if [[ -n "${PYTHON_BIN:-}" ]]; then
+    printf '%s\n' "$PYTHON_BIN"
+    return 0
+  fi
+
+  local candidates=(
+    "$ROOT_DIR/.venv/bin/python"
+    "$ROOT_DIR/backend/.venv/bin/python"
+    "$ROOT_DIR/../.venv/bin/python"
+    "/home/subidha-furniture/subidha-lucky-plan/.venv/bin/python"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+
+  return 1
+}
+
 run_step() {
   local label="$1"
   shift
@@ -24,6 +58,10 @@ run_step() {
 }
 
 trap 'if [[ -n "$FAILED_STEP" ]]; then printf "\n[RC] RELEASE CANDIDATE VALIDATION FAILED at: %s\n" "$FAILED_STEP" >&2; elif [[ -n "$CURRENT_STEP" ]]; then printf "\n[RC] RELEASE CANDIDATE VALIDATION FAILED during: %s\n" "$CURRENT_STEP" >&2; fi' ERR
+
+PYTHON_BIN="$(resolve_python_bin)"
+export PYTHON_BIN
+export PLAYWRIGHT_PYTHON="${PLAYWRIGHT_PYTHON:-$PYTHON_BIN}"
 
 printf '[RC] Repository root: %s\n' "$ROOT_DIR"
 printf '[RC] Starting release-candidate validation orchestration.\n'

@@ -77,6 +77,16 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
 )
+from api.v1.views.admin_reports import (
+    AdminBatchPerformanceAggregateView,
+    AdminBatchPerformanceSummaryView,
+    AdminEmiAggregateView,
+    AdminEmiSummaryView,
+    AdminPartnerAggregateView,
+    AdminReconciliationAttentionAggregateView,
+    AdminRevenueAggregateView,
+    AdminRevenueSummaryView,
+)
 from api.v1.views.admin_support_requests import (
     AdminSupportRequestAssignView,
     AdminSupportRequestDetailView,
@@ -100,6 +110,14 @@ router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="a
 urlpatterns = [
     path("", include(router.urls)),
     path("dashboard/", AdminDashboardView.as_view()),
+    path("reports/revenue-aggregate/", AdminRevenueAggregateView.as_view()),
+    path("reports/revenue-summary/", AdminRevenueSummaryView.as_view()),
+    path("reports/emi-aggregate/", AdminEmiAggregateView.as_view()),
+    path("reports/emi-summary/", AdminEmiSummaryView.as_view()),
+    path("reports/batch-performance-aggregate/", AdminBatchPerformanceAggregateView.as_view()),
+    path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
+    path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
+    path("reports/partner-aggregate/", AdminPartnerAggregateView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
     path("deliveries/<int:pk>/", AdminDeliveryDetailView.as_view()),

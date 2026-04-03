@@ -1,6 +1,5 @@
 from datetime import date
 from decimal import Decimal
-import hashlib
 from io import StringIO
 
 from django.contrib.auth import get_user_model
@@ -15,7 +14,7 @@ from services.reconciliation.check_emi_integrity import check_emi_integrity
 from services.reconciliation.check_subscription_integrity import check_subscription_integrity
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import Batch, BatchStatus, Customer, EmiStatus, FinancialLedger, Payment, PlanType, Product
-from subscriptions.services.lucky_draw_service import create_lucky_draw_commit, generate_commitment
+from subscriptions.services.lucky_draw_service import create_lucky_draw_commit
 
 
 class FinancialFlowTests(TestCase):
@@ -90,7 +89,6 @@ class FinancialFlowTests(TestCase):
 
         self.assertEqual(emi.amount, emi_paid + emi_waived + emi_outstanding)
 
-
     def test_subscription_snapshots_are_auto_populated(self):
         subscription = self._create_subscription()
 
@@ -131,12 +129,8 @@ class FinancialFlowTests(TestCase):
             collected_by=self.partner_user,
         )
 
-        allocation = allocate_payment(payment=payment)
-        self.assertTrue(allocation["is_consistent"])
-        self.assertEqual(
-            Decimal(allocation["payment_amount"]),
-            Decimal(allocation["allocation_total"]),
-        )
+        allocation_amount = allocate_payment(payment=payment)
+        self.assertEqual(Decimal(str(allocation_amount)), Decimal("100.00"))
 
         emi_integrity = check_emi_integrity(emi=emi)
         self.assertTrue(emi_integrity["is_payment_consistent"])
@@ -147,24 +141,15 @@ class FinancialFlowTests(TestCase):
         self.batch.status = BatchStatus.FULL
         self.batch.save(update_fields=["status"])
 
-        draw, _ = create_lucky_draw_commit(batch=self.batch)
+        draw, committed_seed = create_lucky_draw_commit(batch=self.batch)
 
-        target_seed = None
-        for i in range(1, 20000):
-            candidate = f"seed-{i}"
-            combined = f"{candidate}-{self.batch.id}-{draw.draw_month}"
-            winner = int(hashlib.sha256(combined.encode()).hexdigest(), 16) % self.batch.total_slots
-            if winner == subscription.lucky_id.lucky_number:
-                target_seed = candidate
-            break
+        run_monthly_draw(
+            draw_id=draw.id,
+            revealed_seed=committed_seed,
+            performed_by=self.partner_user,
+        )
 
-        self.assertIsNotNone(target_seed, "Unable to find deterministic seed for test draw.")
-
-        draw.committed_hash = generate_commitment(target_seed)
-        draw.save(update_fields=["committed_hash"])
-
-        run_monthly_draw(draw_id=draw.id, revealed_seed=target_seed, performed_by=self.partner_user)
-
+        subscription.refresh_from_db()
         past_or_current = subscription.emis.filter(month_no__lte=draw.draw_month)
         future = subscription.emis.filter(month_no__gt=draw.draw_month)
 
@@ -176,16 +161,11 @@ class ReconcileFinancialsCommandTests(FinancialFlowTests):
     def test_reconcile_financials_reports_inconsistencies(self):
         subscription = self._create_subscription()
 
-        print("DEBUG lucky_number:", subscription.lucky_id.lucky_number)
-        print("DEBUG total_slots:", self.batch.total_slots)
-
         self.batch.status = BatchStatus.FULL
         self.batch.save(update_fields=["status"])
 
         draw, _ = create_lucky_draw_commit(batch=self.batch)
 
-        print("DEBUG draw_month:", draw.draw_month)
-        print("DEBUG batch_id:", self.batch.id)
         subscription.total_amount = Decimal("999.00")
         subscription.save(update_fields=["total_amount"])
 

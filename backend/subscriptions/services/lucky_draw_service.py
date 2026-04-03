@@ -43,6 +43,17 @@ def _eligible_winner_subscriptions(batch: Batch):
     )
 
 
+def generate_commitment(seed: str) -> str:
+    """
+    Legacy compatibility alias for pre-committing a reveal seed hash.
+
+    Older tests and scripts imported this helper directly. Keep the hashing
+    contract stable while the canonical flow returns the seed from
+    create_lucky_draw_commit().
+    """
+    return hashlib.sha256((seed or "").strip().encode()).hexdigest()
+
+
 @transaction.atomic
 def create_lucky_draw_commit(batch: Batch):
     batch = Batch.objects.select_for_update().get(pk=batch.pk)
@@ -68,7 +79,7 @@ def create_lucky_draw_commit(batch: Batch):
         raise ValidationError("Draw commitment already exists for this batch month.")
 
     secret_seed = get_random_string(64)
-    committed_hash = hashlib.sha256(secret_seed.encode()).hexdigest()
+    committed_hash = generate_commitment(secret_seed)
 
     draw = LuckyDraw.objects.create(
         batch=batch,

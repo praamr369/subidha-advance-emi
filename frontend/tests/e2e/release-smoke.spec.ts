@@ -48,7 +48,9 @@ test.describe("admin release smoke", () => {
     const batchCode = `SMOKEE2E${Date.now().toString().slice(-6)}`;
 
     await page.goto("/admin/batches/create");
-    await expect(page.getByRole("heading", { name: /create batch/i })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Create Batch", exact: true }).first()
+    ).toBeVisible();
     await page.locator("#batch-code").fill(batchCode);
     await page.locator("#total-slots").fill(String(meta.entities.batch_create.total_slots));
     await page.locator("#duration-months").fill(String(meta.entities.batch_create.duration_months));
@@ -119,7 +121,12 @@ test.describe("cashier release smoke", () => {
     await expect(page.getByRole("heading", { name: /collect payment/i })).toBeVisible();
     await page.locator("#cashier-search-input").fill(target.customer_phone);
     await page.getByRole("button", { name: /^search$/i }).click();
-    await page.getByRole("button", { name: new RegExp(`Subscription #${target.subscription_id}`) }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`Subscription #${target.subscription_id} · EMI Month`),
+      })
+      .first()
+      .click();
     await page.getByRole("button", { name: /^collect payment$/i }).click();
 
     await expect(page.locator("body")).toContainText(/payment #/i);

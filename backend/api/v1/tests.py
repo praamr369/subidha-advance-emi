@@ -18,7 +18,7 @@ class PermissionTests(TestCase):
             username="cust1", password="pass1234", role="CUSTOMER", phone="9800000000"
         )
         self.partner_user = User.objects.create_user(
-            username="partner1", password="pass1234", role="PARTNER"
+            username="partner1", password="pass1234", role="PARTNER", phone="9800000009"
         )
 
     def test_unauthenticated_access_blocked(self):
@@ -36,7 +36,7 @@ class PaymentFlowIntegrationTests(TestCase):
         self.client = APIClient()
         User = get_user_model()
         self.partner = User.objects.create_user(
-            username="partner2", password="pass1234", role="PARTNER"
+            username="partner2", password="pass1234", role="PARTNER", phone="9800000002"
         )
         self.client.force_authenticate(self.partner)
 
@@ -50,7 +50,7 @@ class PaymentFlowIntegrationTests(TestCase):
             product_code="P-002", name="P", base_price=Decimal("1200.00")
         )
         self.batch = Batch.objects.create(
-            batch_code="B1", total_slots=100, duration_months=12, draw_day=10, start_date=date(2026, 1, 1)
+            batch_code="B1", total_slots=100, duration_months=12, draw_day=10, start_date=date(2026, 1, 1), status="OPEN"
         )
         self.lucky = self.batch.lucky_ids.get(lucky_number=1)
         self.subscription = Subscription.objects.create(

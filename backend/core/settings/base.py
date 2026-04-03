@@ -180,12 +180,14 @@ def _database_from_env_fields() -> dict[str, str | int] | None:
     db_user = os.getenv("DB_USER") or os.getenv("POSTGRES_USER")
     db_password = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
     db_host = os.getenv("DB_HOST") or os.getenv("POSTGRES_HOST")
-    db_port = os.getenv("DB_PORT") or os.getenv("POSTGRES_PORT") or "5432"
-    db_engine = os.getenv("DB_ENGINE", "django.db.backends.postgresql")
+    db_port_raw = os.getenv("DB_PORT") or os.getenv("POSTGRES_PORT")
+    db_port = db_port_raw or "5432"
+    db_engine_raw = os.getenv("DB_ENGINE")
+    db_engine = db_engine_raw or "django.db.backends.postgresql"
 
     any_field_present = any(
         value is not None and str(value).strip() != ""
-        for value in [db_name, db_user, db_password, db_host, db_port, os.getenv("DB_ENGINE")]
+        for value in [db_name, db_user, db_password, db_host, db_port_raw, db_engine_raw]
     )
     if not any_field_present:
         return None

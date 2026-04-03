@@ -95,3 +95,22 @@ export function writeSmokeManifest(manifest: SmokeManifest): void {
 export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+export function resolvePythonExecutable(): string {
+  const envConfigured =
+    process.env.PLAYWRIGHT_PYTHON || process.env.PYTHON_BIN || "";
+
+  if (envConfigured.trim()) {
+    return envConfigured;
+  }
+
+  const candidates = [
+    path.resolve(E2E_ROOT, "../../.venv/bin/python"),
+    path.resolve(E2E_ROOT, "../../backend/.venv/bin/python"),
+    path.resolve(E2E_ROOT, "../../../.venv/bin/python"),
+    "/home/subidha-furniture/subidha-lucky-plan/.venv/bin/python",
+  ];
+
+  const localMatch = candidates.find((candidate) => fs.existsSync(candidate));
+  return localMatch || "python3";
+}

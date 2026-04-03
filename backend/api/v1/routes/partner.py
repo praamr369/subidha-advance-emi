@@ -1,6 +1,8 @@
 from django.urls import path
 
 from api.v1.views.partner_collection_requests import (
+    LegacyPartnerCollectionListCreateView,
+    LegacyPartnerPaymentCollectView,
     PartnerCollectionRequestDetailView,
     PartnerCollectionRequestListCreateView,
 )
@@ -29,9 +31,11 @@ urlpatterns = [
     path("customers/<int:pk>/", PartnerCustomerDetailView.as_view()),
     path("payments/", PartnerPaymentListView.as_view()),
     path("payments/<int:pk>/", PartnerPaymentDetailView.as_view()),
+    path("payments/collect/", LegacyPartnerPaymentCollectView.as_view()),
     path("earnings/", PartnerEarningsSummaryView.as_view()),
     path("earnings/export/", PartnerCommissionStatementExportView.as_view()),
     path("commissions/", PartnerCommissionView.as_view()),
+    path("collections/", LegacyPartnerCollectionListCreateView.as_view()),
     path("collection-requests/", PartnerCollectionRequestListCreateView.as_view()),
     path("collection-requests/<int:pk>/", PartnerCollectionRequestDetailView.as_view()),
 ]

@@ -11,11 +11,11 @@ function normalizePath(value: string): string {
 
 async function submitThroughForm(page, username: string, secret: string) {
   await page.goto("/login");
-  await expect(page.locator("input").nth(0)).toBeVisible();
-  await expect(page.locator("input").nth(1)).toBeVisible();
-  await page.locator("input").nth(0).fill(username);
-  await page.locator("input").nth(1).fill(secret);
-  await page.locator("button").first().click();
+  await expect(page.locator("#username")).toBeVisible();
+  await expect(page.locator("#password")).toBeVisible();
+  await page.locator("#username").fill(username);
+  await page.locator("#password").fill(secret);
+  await page.getByRole("button", { name: /^sign in$/i }).click();
 }
 
 test.describe("real login smoke", () => {
