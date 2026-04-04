@@ -24,6 +24,24 @@ export type CustomerImportPreviewResponse = {
   invalid_count: number;
 };
 
+export type CustomerImportCommitRow = {
+  row_number: number;
+  name: string;
+  phone: string;
+  valid?: boolean;
+  errors?: string[];
+  created_customer_id?: number | null;
+  created_user_id?: number | null;
+  generated_username?: string;
+};
+
+export type CustomerImportCommitResponse = {
+  created: number;
+  skipped: number;
+  row_count: number;
+  rows: CustomerImportCommitRow[];
+};
+
 export async function listCustomers(): Promise<Customer[]> {
   const payload = await apiClient<unknown>("/admin/customers/");
   return toArray<Customer>(payload);
@@ -43,6 +61,19 @@ export async function previewCustomerImport(file: File): Promise<CustomerImportP
     retryCount: 0,
   });
 }
+
+export async function importCustomers(
+  file: File
+): Promise<CustomerImportCommitResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  return request<CustomerImportCommitResponse>("/admin/customers/import-csv/", {
+    method: "POST",
+    body: form,
+    retryCount: 0,
+  });
+}
+
 export type CustomerKycDecisionStatus = "VERIFIED" | "REJECTED";
 
 export type CustomerKycDecisionResponse = {

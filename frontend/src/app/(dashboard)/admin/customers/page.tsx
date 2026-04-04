@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -14,6 +22,12 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import {
+  importCustomers,
+  previewCustomerImport,
+  type CustomerImportCommitResponse,
+  type CustomerImportPreviewResponse,
+} from "@/domains/customers/api";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -89,6 +103,35 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load customer register.";
 }
 
+function toActionMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) return fallback;
+
+  const raw = error.message.trim();
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail;
+    }
+
+    for (const [field, value] of Object.entries(parsed)) {
+      if (Array.isArray(value) && value.length > 0) {
+        return `${field}: ${String(value[0])}`;
+      }
+
+      if (typeof value === "string" && value.trim()) {
+        return `${field}: ${value}`;
+      }
+    }
+
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
 function normalizeCustomerStatus(raw: Record<string, unknown>): CustomerStatus {
   const status = String(raw.status ?? raw.customer_status ?? "").toUpperCase();
   if (status === "ACTIVE") return "ACTIVE";
@@ -129,6 +172,7 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
 }
 
 export default function AdminCustomersPage() {
+  const customerImportFileRef = useRef<HTMLInputElement | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -152,6 +196,20 @@ export default function AdminCustomersPage() {
   const [query, setQuery] = useState(initialQuery);
   const [kycFilter, setKycFilter] = useState<"" | KycStatus>(initialKyc);
   const [statusFilter, setStatusFilter] = useState<"" | CustomerStatus>(initialStatus);
+
+  const [customerImportFile, setCustomerImportFile] = useState<File | null>(null);
+  const [customerImportPreviewState, setCustomerImportPreviewState] =
+    useState<CustomerImportPreviewResponse | null>(null);
+  const [customerImportCommitState, setCustomerImportCommitState] =
+    useState<CustomerImportCommitResponse | null>(null);
+  const [customerImportPreviewing, setCustomerImportPreviewing] = useState(false);
+  const [customerImportSubmitting, setCustomerImportSubmitting] = useState(false);
+  const [customerImportMessage, setCustomerImportMessage] = useState<string | null>(
+    null
+  );
+  const [customerImportError, setCustomerImportError] = useState<string | null>(
+    null
+  );
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -221,6 +279,121 @@ export default function AdminCustomersPage() {
     setStatusInput("");
     replaceFilters(new URLSearchParams());
   }
+
+  function resetCustomerImportState() {
+    setCustomerImportPreviewState(null);
+    setCustomerImportCommitState(null);
+    setCustomerImportMessage(null);
+    setCustomerImportError(null);
+  }
+
+  function clearCustomerImportSelection() {
+    setCustomerImportFile(null);
+    resetCustomerImportState();
+    if (customerImportFileRef.current) {
+      customerImportFileRef.current.value = "";
+    }
+  }
+
+  function handleCustomerImportFileChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const nextFile = event.target.files?.[0] ?? null;
+    setCustomerImportFile(nextFile);
+    resetCustomerImportState();
+  }
+
+  async function handleCustomerImportPreview() {
+    if (!customerImportFile) {
+      setCustomerImportError("Select a customer CSV file first.");
+      setCustomerImportMessage(null);
+      return;
+    }
+
+    setCustomerImportPreviewing(true);
+    setCustomerImportMessage(null);
+    setCustomerImportError(null);
+    setCustomerImportCommitState(null);
+
+    try {
+      const preview = await previewCustomerImport(customerImportFile);
+      setCustomerImportPreviewState(preview);
+      if (preview.invalid_count > 0) {
+        setCustomerImportMessage(
+          "Preview completed. Fix invalid rows before confirm import is enabled."
+        );
+      } else {
+        setCustomerImportMessage(
+          `Preview ready. ${preview.valid_count} row${preview.valid_count === 1 ? "" : "s"} can be imported safely.`
+        );
+      }
+    } catch (err) {
+      setCustomerImportPreviewState(null);
+      setCustomerImportError(
+        toActionMessage(err, "Unable to preview customer CSV.")
+      );
+    } finally {
+      setCustomerImportPreviewing(false);
+    }
+  }
+
+  async function handleCustomerImportConfirm() {
+    if (!customerImportFile) {
+      setCustomerImportError("Select a customer CSV file first.");
+      return;
+    }
+
+    if (!customerImportPreviewState) {
+      setCustomerImportError(
+        "Run preview first so the current file is validated before import."
+      );
+      return;
+    }
+
+    if (customerImportPreviewState.invalid_count > 0) {
+      setCustomerImportError(
+        "Fix invalid rows in preview before confirming customer import."
+      );
+      return;
+    }
+
+    setCustomerImportSubmitting(true);
+    setCustomerImportMessage(null);
+    setCustomerImportError(null);
+
+    try {
+      const result = await importCustomers(customerImportFile);
+      setCustomerImportCommitState(result);
+      setCustomerImportPreviewState(null);
+      setCustomerImportMessage(
+        `Customer import completed. Created ${result.created} row${
+          result.created === 1 ? "" : "s"
+        } and skipped ${result.skipped}.`
+      );
+      setCustomerImportFile(null);
+      if (customerImportFileRef.current) {
+        customerImportFileRef.current.value = "";
+      }
+      await loadPage("refresh");
+    } catch (err) {
+      setCustomerImportError(
+        toActionMessage(err, "Unable to confirm customer import.")
+      );
+    } finally {
+      setCustomerImportSubmitting(false);
+    }
+  }
+
+  const customerImportCanConfirm = useMemo(
+    () =>
+      Boolean(
+        customerImportFile &&
+          customerImportPreviewState &&
+          customerImportPreviewState.valid_count > 0 &&
+          customerImportPreviewState.invalid_count === 0
+      ),
+    [customerImportFile, customerImportPreviewState]
+  );
 
   const totalContractValue = useMemo(
     () =>
@@ -492,6 +665,284 @@ export default function AdminCustomersPage() {
               </div>
             </form>
           </TableToolbar>
+        </WorkspaceSection>
+
+        <WorkspaceSection
+          title="Customer CSV onboarding"
+          description="Preview and confirm the existing backend customer import flow from the admin workspace. Confirm import is intentionally gated behind a clean preview."
+        >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">
+                  Import controls
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Use this only for profile preload. Generated passwords are not
+                  returned by the backend, so portal credential handoff still
+                  needs a separate step.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="customer-import-file"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Customer CSV file
+                </label>
+                <input
+                  id="customer-import-file"
+                  ref={customerImportFileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleCustomerImportFileChange}
+                  disabled={customerImportPreviewing || customerImportSubmitting}
+                  className="block w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium"
+                />
+                <div className="text-xs text-muted-foreground">
+                  Required backend headers: <code>name</code>, <code>phone</code>
+                </div>
+                {customerImportFile ? (
+                  <div className="text-xs text-muted-foreground">
+                    Selected file: {customerImportFile.name}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleCustomerImportPreview()}
+                  disabled={
+                    !customerImportFile ||
+                    customerImportPreviewing ||
+                    customerImportSubmitting
+                  }
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {customerImportPreviewing ? "Previewing..." : "Preview CSV"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCustomerImportConfirm()}
+                  disabled={
+                    !customerImportCanConfirm ||
+                    customerImportPreviewing ||
+                    customerImportSubmitting
+                  }
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {customerImportSubmitting ? "Importing..." : "Confirm Import"}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearCustomerImportSelection}
+                  disabled={customerImportPreviewing || customerImportSubmitting}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {customerImportMessage ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  {customerImportMessage}
+                </div>
+              ) : null}
+
+              {customerImportError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {customerImportError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">
+                  Preview and result
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Preview must be clean before confirm import is enabled. This
+                  keeps the admin UI aligned with the safest current backend flow.
+                </p>
+              </div>
+
+              {customerImportPreviewState ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                      label="Columns"
+                      value={customerImportPreviewState.columns.length}
+                    />
+                    <StatCard
+                      label="Valid Rows"
+                      value={customerImportPreviewState.valid_count}
+                      tone="success"
+                    />
+                    <StatCard
+                      label="Invalid Rows"
+                      value={customerImportPreviewState.invalid_count}
+                      tone={
+                        customerImportPreviewState.invalid_count > 0
+                          ? "warning"
+                          : "default"
+                      }
+                    />
+                    <StatCard
+                      label="Confirm Ready"
+                      value={
+                        customerImportPreviewState.invalid_count === 0 &&
+                        customerImportPreviewState.valid_count > 0
+                          ? "Yes"
+                          : "No"
+                      }
+                      tone={
+                        customerImportPreviewState.invalid_count === 0 &&
+                        customerImportPreviewState.valid_count > 0
+                          ? "success"
+                          : "warning"
+                      }
+                    />
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    Detected columns:{" "}
+                    {customerImportPreviewState.columns.join(", ") || "—"}
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
+                      <thead>
+                        <tr className="text-left">
+                          <th className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Row
+                          </th>
+                          <th className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Name
+                          </th>
+                          <th className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Phone
+                          </th>
+                          <th className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Valid
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customerImportPreviewState.preview_rows.map((row) => (
+                          <tr key={row.row_number}>
+                            <td className="border-b border-border px-3 py-2 text-sm text-foreground">
+                              {row.row_number}
+                            </td>
+                            <td className="border-b border-border px-3 py-2 text-sm text-foreground">
+                              {row.name || "—"}
+                            </td>
+                            <td className="border-b border-border px-3 py-2 text-sm text-foreground">
+                              {row.phone || "—"}
+                            </td>
+                            <td className="border-b border-border px-3 py-2 text-sm text-foreground">
+                              {row.valid ? "Yes" : "No"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {customerImportPreviewState.errors.length > 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <div className="font-medium">Invalid row details</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {customerImportPreviewState.errors.map((item, index) => (
+                          <li key={`${item.row_number ?? "header"}-${index}`}>
+                            Row {item.row_number ?? "header"}
+                            {item.phone ? ` (${item.phone})` : ""}:{" "}
+                            {item.errors.join(", ")}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {customerImportCommitState ? (
+                <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+                  <div className="font-medium">Import result</div>
+                  <div>
+                    Created {customerImportCommitState.created} row
+                    {customerImportCommitState.created === 1 ? "" : "s"} and
+                    skipped {customerImportCommitState.skipped}.
+                  </div>
+
+                  {customerImportCommitState.rows.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-0">
+                        <thead>
+                          <tr className="text-left">
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Row
+                            </th>
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Name
+                            </th>
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Phone
+                            </th>
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Username
+                            </th>
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Customer ID
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customerImportCommitState.rows
+                            .filter((row) => row.created_customer_id)
+                            .slice(0, 10)
+                            .map((row) => (
+                              <tr key={row.row_number}>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.row_number}
+                                </td>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.name || "—"}
+                                </td>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.phone || "—"}
+                                </td>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.generated_username || "—"}
+                                </td>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.created_customer_id ?? "—"}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+
+                  <div className="text-xs text-emerald-900/80">
+                    Generated passwords are not returned by the backend. Use a
+                    separate credential handoff or password reset workflow for
+                    customers who need portal access.
+                  </div>
+                </div>
+              ) : null}
+
+              {!customerImportPreviewState && !customerImportCommitState ? (
+                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+                  Select a CSV file and run preview to inspect the current backend
+                  import result before confirm import is enabled.
+                </div>
+              ) : null}
+            </div>
+          </div>
         </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading customer register..." /> : null}
