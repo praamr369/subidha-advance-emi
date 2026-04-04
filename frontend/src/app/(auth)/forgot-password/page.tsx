@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
+import { buildResetPasswordHref } from "@/lib/auth/password-reset";
 import { APP_NAME } from "@/lib/constants";
 import { requestPasswordReset } from "@/services/auth.service";
 
@@ -15,7 +17,12 @@ function toMessage(error: unknown): string {
 }
 
 export default function ForgotPasswordPage() {
-  const [identifier, setIdentifier] = useState("");
+  const searchParams = useSearchParams();
+  const initialIdentifier = useMemo(
+    () => (searchParams.get("identifier") || "").trim(),
+    [searchParams]
+  );
+  const [identifier, setIdentifier] = useState(initialIdentifier);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +30,12 @@ export default function ForgotPasswordPage() {
   useEffect(() => {
     document.title = `Forgot Password | ${APP_NAME}`;
   }, []);
+
+  useEffect(() => {
+    if (initialIdentifier) {
+      setIdentifier(initialIdentifier);
+    }
+  }, [initialIdentifier]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,14 +59,14 @@ export default function ForgotPasswordPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-foreground">Forgot password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter your email address and we&apos;ll send you a link to reset your password.
+            Enter the customer&apos;s phone number, email, or username to request a 6-digit reset code.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-foreground">
-              Email or phone number
+              Phone, email, or username
             </label>
             <input
               id="identifier"
@@ -62,10 +75,13 @@ export default function ForgotPasswordPage() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
-              placeholder="Enter your email or phone"
+              placeholder="Enter phone, email, or username"
               disabled={submitting}
               required
             />
+            <p className="mt-2 text-xs text-muted-foreground">
+              SUBIDHA CORE uses OTP-based password reset. No reset link or plaintext password is issued from this screen.
+            </p>
           </div>
 
           {error && (
@@ -75,8 +91,25 @@ export default function ForgotPasswordPage() {
           )}
 
           {success && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              Password reset instructions sent! Check your email or SMS.
+            <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <div>
+                If an eligible account exists, a reset code has been requested. Ask the customer to check the registered SMS or email channel.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={buildResetPasswordHref(identifier)}
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Continue With OTP
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSuccess(false)}
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Request another identifier
+                </button>
+              </div>
             </div>
           )}
 
@@ -91,7 +124,7 @@ export default function ForgotPasswordPage() {
                 Sending...
               </>
             ) : (
-              "Send reset instructions"
+              "Send reset code"
             )}
           </button>
         </form>

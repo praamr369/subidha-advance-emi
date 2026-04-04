@@ -24,6 +24,10 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailRow, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import {
+  buildForgotPasswordHref,
+  resolvePasswordResetIdentifier,
+} from "@/lib/auth/password-reset";
 import { apiFetch } from "@/lib/api";
 
 type KycStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -312,6 +316,21 @@ export default function AdminCustomerCreatePage() {
     params.set("converted_customer", String(success.id));
     return `/admin/leads/${leadId}?${params.toString()}`;
   }, [leadId, success]);
+
+  const accessResetIdentifier = useMemo(
+    () =>
+      resolvePasswordResetIdentifier({
+        phone: success?.phone || trimmedPhone,
+        email: trimmedEmail,
+        username: success?.user_username || trimmedUsername,
+      }),
+    [success?.phone, success?.user_username, trimmedEmail, trimmedPhone, trimmedUsername]
+  );
+
+  const accessResetHref = useMemo(
+    () => buildForgotPasswordHref(accessResetIdentifier),
+    [accessResetIdentifier]
+  );
 
   function resetForm() {
     setName("");
@@ -739,6 +758,13 @@ export default function AdminCustomerCreatePage() {
               </div>
             </div>
           </div>
+
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="font-medium">Access handoff guidance</div>
+            <div className="mt-1 text-blue-800">
+              Manual create sets the initial password now, but the safer ongoing customer handoff is OTP reset using the customer&apos;s phone, email, or username. Do not store plaintext passwords in shared notes or source files.
+            </div>
+          </div>
         </SectionCard>
 
         {loadingLabel && <LoadingBlock label={loadingLabel} />}
@@ -766,6 +792,25 @@ export default function AdminCustomerCreatePage() {
               />
             </div>
 
+            <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <div className="font-medium">Customer access handoff</div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <DetailRow
+                  label="Login Username"
+                  value={success.user_username || trimmedUsername || "—"}
+                />
+                <DetailRow
+                  label="Reset Identifier"
+                  value={accessResetIdentifier || "No phone, email, or username available"}
+                />
+                <DetailRow label="Preferred Flow" value="OTP reset for ongoing access" />
+                <DetailRow label="Portal Entry" value="/login" />
+              </div>
+              <div className="mt-3 text-blue-800">
+                Use the OTP reset flow if the customer did not receive the initial password securely or needs to choose a new password immediately.
+              </div>
+            </div>
+
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href={`/admin/customers/${success.id}`}
@@ -780,6 +825,13 @@ export default function AdminCustomerCreatePage() {
                 className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
               >
                 Create Subscription
+              </Link>
+
+              <Link
+                href={accessResetHref}
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-900 transition hover:bg-blue-100"
+              >
+                Start OTP Reset
               </Link>
 
               {returnToLeadHref ? (

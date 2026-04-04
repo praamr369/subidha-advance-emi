@@ -28,6 +28,7 @@ import {
   type CustomerImportCommitResponse,
   type CustomerImportPreviewResponse,
 } from "@/domains/customers/api";
+import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -680,7 +681,7 @@ export default function AdminCustomersPage() {
                 <p className="text-sm text-muted-foreground">
                   Use this only for profile preload. Generated passwords are not
                   returned by the backend, so portal credential handoff still
-                  needs a separate step.
+                  needs a separate OTP reset or controlled first-password step.
                 </p>
               </div>
 
@@ -897,6 +898,9 @@ export default function AdminCustomersPage() {
                             <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
                               Customer ID
                             </th>
+                            <th className="border-b border-emerald-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
+                              Access Handoff
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -920,6 +924,18 @@ export default function AdminCustomersPage() {
                                 <td className="border-b border-emerald-200 px-3 py-2 text-sm">
                                   {row.created_customer_id ?? "—"}
                                 </td>
+                                <td className="border-b border-emerald-200 px-3 py-2 text-sm">
+                                  {row.phone ? (
+                                    <Link
+                                      href={buildForgotPasswordHref(row.phone)}
+                                      className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100"
+                                    >
+                                      Start OTP Reset
+                                    </Link>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </td>
                               </tr>
                             ))}
                         </tbody>
@@ -929,7 +945,7 @@ export default function AdminCustomersPage() {
 
                   <div className="text-xs text-emerald-900/80">
                     Generated passwords are not returned by the backend. Use a
-                    separate credential handoff or password reset workflow for
+                    separate credential handoff or the OTP reset workflow for
                     customers who need portal access.
                   </div>
                 </div>

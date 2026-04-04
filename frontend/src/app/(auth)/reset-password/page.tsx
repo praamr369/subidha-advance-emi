@@ -1,12 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
+import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { APP_NAME } from "@/lib/constants";
-import { confirmPasswordReset } from "@/services/auth.service";
+import {
+  confirmPasswordReset,
+  resendPasswordResetOtp,
+} from "@/services/auth.service";
 
 function toMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -18,29 +22,50 @@ function toMessage(error: unknown): string {
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const identifier = searchParams.get("identifier") || "";
-  const otp = searchParams.get("otp") || "";
+  const initialIdentifier = useMemo(
+    () => (searchParams.get("identifier") || "").trim(),
+    [searchParams]
+  );
+  const initialOtp = useMemo(
+    () => (searchParams.get("otp") || "").trim(),
+    [searchParams]
+  );
 
+  const [identifier, setIdentifier] = useState(initialIdentifier);
+  const [otp, setOtp] = useState(initialOtp);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = `Reset Password | ${APP_NAME}`;
-    if (!identifier || !otp) {
-      setError("Invalid or missing reset token.");
+  }, []);
+
+  useEffect(() => {
+    if (initialIdentifier) {
+      setIdentifier(initialIdentifier);
     }
-  }, [identifier, otp]);
+    if (initialOtp) {
+      setOtp(initialOtp);
+    }
+  }, [initialIdentifier, initialOtp]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!identifier || !otp) {
-      setError("Invalid reset token.");
+    if (!identifier.trim()) {
+      setError("Identifier is required.");
+      return;
+    }
+
+    if (!otp.trim()) {
+      setError("Enter the 6-digit OTP.");
       return;
     }
 
@@ -56,11 +81,12 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true);
     setError(null);
+    setResendMessage(null);
 
     try {
       await confirmPasswordReset({
-        identifier,
-        otp,
+        identifier: identifier.trim(),
+        otp: otp.trim(),
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
@@ -75,16 +101,26 @@ export default function ResetPasswordPage() {
     }
   }
 
-  if ((!identifier || !otp) && !error) {
-    return (
-      <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        </div>
-      </div>
-    );
+  async function handleResendOtp() {
+    if (!identifier.trim()) {
+      setError("Enter phone, email, or username before resending OTP.");
+      return;
+    }
+
+    setResending(true);
+    setError(null);
+    setResendMessage(null);
+
+    try {
+      const response = await resendPasswordResetOtp({
+        identifier: identifier.trim(),
+      });
+      setResendMessage(response.detail);
+    } catch (err) {
+      setError(toMessage(err));
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
@@ -93,11 +129,58 @@ export default function ResetPasswordPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-foreground">Reset password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter your new password below.
+            Enter the customer&apos;s identifier, the 6-digit OTP, and the new password.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-foreground">
+              Phone, email, or username
+            </label>
+            <input
+              id="identifier"
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+              placeholder="Enter phone, email, or username"
+              disabled={submitting || success}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="otp" className="mb-2 block text-sm font-medium text-foreground">
+              6-digit OTP
+            </label>
+            <input
+              id="otp"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+              placeholder="Enter the reset code"
+              disabled={submitting || success}
+              required
+            />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                The code is delivered through the configured SMS or email channel.
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleResendOtp()}
+                disabled={resending || submitting || success}
+                className="font-medium text-foreground transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resending ? "Resending..." : "Resend OTP"}
+              </button>
+            </div>
+          </div>
+
           <div>
             <label htmlFor="password" className="mb-2 block text-sm font-medium text-foreground">
               New password
@@ -154,6 +237,12 @@ export default function ResetPasswordPage() {
             </div>
           )}
 
+          {resendMessage && !error && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              {resendMessage}
+            </div>
+          )}
+
           {success && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               Password reset successfully! Redirecting to login...
@@ -169,8 +258,18 @@ export default function ResetPasswordPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <Link href="/login" className="font-medium text-foreground hover:underline">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+          <Link
+            href={buildForgotPasswordHref(identifier)}
+            className="font-medium text-foreground hover:underline"
+          >
+            Back to forgot password
+          </Link>
+          <span className="text-muted-foreground/60">•</span>
+          <Link
+            href="/login"
+            className="font-medium text-foreground hover:underline"
+          >
             Back to login
           </Link>
         </div>

@@ -54,6 +54,14 @@ export type ResetPasswordResponse = {
   detail: string;
 };
 
+export type ResendResetOtpRequest = {
+  identifier: string;
+};
+
+export type ResendResetOtpResponse = {
+  detail: string;
+};
+
 function buildApiUrl(path: string): string {
   const apiRoot = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
   return `${apiRoot}/api/v1${path}`;
@@ -176,4 +184,20 @@ export async function confirmPasswordReset(
   });
 
   return parseResponse<ResetPasswordResponse>(response);
+}
+
+export async function resendPasswordResetOtp(
+  payload: ResendResetOtpRequest
+): Promise<ResendResetOtpResponse> {
+  const response = await fetch(buildApiUrl("/auth/resend-reset-otp/"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      identifier: payload.identifier.trim(),
+    }),
+  });
+
+  return parseResponse<ResendResetOtpResponse>(response);
 }

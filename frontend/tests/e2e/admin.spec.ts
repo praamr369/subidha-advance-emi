@@ -106,6 +106,164 @@ test("admin customer detail handoff preserves subscription-create customer prefi
   ).toBeVisible();
 });
 
+test("admin customer create success exposes OTP access handoff without echoing the password", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/customers/", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 620,
+        user: 911,
+        user_username: "newcustomer620",
+        name: "New Customer",
+        phone: "01988001122",
+        kyc_status: "PENDING",
+        created_at: "2026-04-04T06:00:00Z",
+      }),
+    });
+  });
+
+  await page.goto("/admin/customers/create");
+  await page.locator("#customer-name").fill("New Customer");
+  await page.locator("#customer-phone").fill("01988001122");
+  await page.locator("#customer-username").fill("newcustomer620");
+  await page.locator("#customer-password").fill("SecurePass123!");
+  await page.getByRole("button", { name: "Create Customer" }).click();
+
+  await expect(page.locator("body")).toContainText("Customer access handoff");
+  await expect(page.locator("body")).toContainText("newcustomer620");
+  await expect(page.locator("body")).toContainText("01988001122");
+  await expect(page.locator("body")).not.toContainText("SecurePass123!");
+
+  await page.getByRole("link", { name: "Start OTP Reset" }).click();
+  await expect(page).toHaveURL(/\/forgot-password\?identifier=01988001122$/);
+  await expect(page.locator("#identifier")).toHaveValue("01988001122");
+  await expect(page.locator("body")).toContainText(
+    "request a 6-digit reset code"
+  );
+});
+
+test("admin customer detail shows OTP access handoff for existing customer", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/customers/55/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 55,
+        name: "Access Ready Customer",
+        phone: "01755555555",
+        email: "access@example.com",
+        user: 405,
+        user_username: "accessready55",
+        status: "ACTIVE",
+        kyc_status: "PENDING",
+        created_at: "2026-04-04T06:00:00Z",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscriptions/?customer=55", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ results: [] }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/payments/?customer=55", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ results: [] }),
+    });
+  });
+
+  await page.goto("/admin/customers/55");
+  await expect(page.locator("body")).toContainText("Access Handoff");
+  await expect(page.locator("body")).toContainText("accessready55");
+  await expect(page.locator("body")).toContainText("01755555555");
+  await expect(
+    page.locator('a[href="/forgot-password?identifier=01755555555"]')
+  ).toBeVisible();
+});
+
+test("public OTP reset flow supports prefilled identifier, resend, and manual code entry", async ({
+  page,
+}) => {
+  let forgotPayload: Record<string, unknown> | null = null;
+  let resendPayload: Record<string, unknown> | null = null;
+  let resetPayload: Record<string, unknown> | null = null;
+
+  await page.route("**/api/v1/auth/forgot-password/", async (route) => {
+    forgotPayload = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "If an eligible account exists, a reset code has been sent.",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/auth/resend-reset-otp/", async (route) => {
+    resendPayload = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "OTP resent successfully.",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/auth/reset-password/", async (route) => {
+    resetPayload = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "Password reset completed.",
+      }),
+    });
+  });
+
+  await page.goto("/forgot-password?identifier=01977001122");
+  await expect(page.locator("#identifier")).toHaveValue("01977001122");
+  await page.getByRole("button", { name: "Send reset code" }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "If an eligible account exists, a reset code has been requested."
+  );
+  expect(forgotPayload).toMatchObject({ identifier: "01977001122" });
+
+  await page.getByRole("link", { name: "Continue With OTP" }).click();
+  await expect(page).toHaveURL(/\/reset-password\?identifier=01977001122$/);
+  await expect(page.locator("#identifier")).toHaveValue("01977001122");
+
+  await page.getByRole("button", { name: "Resend OTP" }).click();
+  await expect(page.locator("body")).toContainText("OTP resent successfully.");
+  expect(resendPayload).toMatchObject({ identifier: "01977001122" });
+
+  await page.locator("#otp").fill("123456");
+  await page.locator("#password").fill("ResetPass123");
+  await page.locator("#confirm-password").fill("ResetPass123");
+  await page.getByRole("button", { name: "Reset password" }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "Password reset successfully! Redirecting to login..."
+  );
+  expect(resetPayload).toMatchObject({
+    identifier: "01977001122",
+    otp: "123456",
+    new_password: "ResetPass123",
+    confirm_password: "ResetPass123",
+  });
+});
+
 test("admin subscription create speeds up repeated onboarding without changing backend contract", async ({
   page,
 }) => {
@@ -377,6 +535,9 @@ test("admin customer CSV import preview enables confirm-import only after a clea
 
   await expect(page.locator("body")).toContainText("Customer import completed. Created 1 row and skipped 0.");
   await expect(page.locator("body")).toContainText("importreadycustomer");
+  await expect(
+    page.locator('a[href="/forgot-password?identifier=9100000001"]')
+  ).toBeVisible();
   expect(previewCalls).toBe(1);
   expect(importCalls).toBe(1);
 });

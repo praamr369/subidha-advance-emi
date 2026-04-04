@@ -29,6 +29,10 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import {
+  buildForgotPasswordHref,
+  resolvePasswordResetIdentifier,
+} from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 
 // =====================================================
@@ -60,6 +64,7 @@ type CustomerDetailRecord = {
   kyc_status: KycStatus;
   status: CustomerStatus;
   user_id?: number | null;
+  user_username?: string | null;
   created_at?: string | null;
   kyc_reviewed_by_username?: string | null;
   kyc_reviewed_at?: string | null;
@@ -203,6 +208,9 @@ function normalizeCustomerDetail(
     kyc_status: normalizeKycStatus(raw),
     status: normalizeCustomerStatus(raw),
     user_id: toNullableNumber(raw.user_id) ?? toNullableNumber(raw.user),
+    user_username:
+      toNullableString(raw.user_username) ??
+      toNullableString(raw.username),
     created_at: toNullableString(raw.created_at),
     kyc_reviewed_by_username: toNullableString(raw.kyc_reviewed_by_username),
     kyc_reviewed_at: toNullableString(raw.kyc_reviewed_at),
@@ -907,6 +915,21 @@ export default function AdminCustomerDetailPage() {
     [subscriptions]
   );
 
+  const passwordResetIdentifier = useMemo(
+    () =>
+      resolvePasswordResetIdentifier({
+        phone: customer?.phone,
+        email: customer?.email,
+        username: customer?.user_username,
+      }),
+    [customer?.email, customer?.phone, customer?.user_username]
+  );
+
+  const passwordResetHref = useMemo(
+    () => buildForgotPasswordHref(passwordResetIdentifier),
+    [passwordResetIdentifier]
+  );
+
   const actions = useMemo(() => {
     const nextActions: Array<{
       href: string;
@@ -1164,6 +1187,55 @@ export default function AdminCustomerDetailPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <StatusBadge status={customer.status} tone={customerStatusTone} />
                   <StatusBadge status={customer.kyc_status} tone={kycTone} />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Access Handoff"
+                description="Use the existing OTP reset contract for routine customer access handoff. Manual admin password changes should stay exceptional."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailValue
+                    label="Login Username"
+                    value={customer.user_username || "—"}
+                  />
+                  <DetailValue
+                    label="Reset Identifier"
+                    value={passwordResetIdentifier || "No phone, email, or username available"}
+                  />
+                  <DetailValue
+                    label="Phone Channel"
+                    value={customer.phone || "—"}
+                  />
+                  <DetailValue
+                    label="Email Fallback"
+                    value={customer.email || "No email configured"}
+                  />
+                </div>
+
+                <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  Ask the customer to use the OTP reset flow if they do not know the current password or need a first-login password rotation. This keeps long-term access handoff out of shared plaintext channels.
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Open Login
+                  </Link>
+                  <Link
+                    href={passwordResetHref}
+                    className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900 shadow-sm transition hover:bg-blue-100"
+                  >
+                    Start OTP Reset
+                  </Link>
+                  <Link
+                    href={`/admin/customers/${customer.id}/edit`}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Edit Account
+                  </Link>
                 </div>
               </SectionCard>
 
