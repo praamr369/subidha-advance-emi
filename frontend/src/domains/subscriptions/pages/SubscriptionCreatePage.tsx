@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -26,6 +26,9 @@ type ProductOption = {
   base_price?: string;
   category?: string;
   subcategory?: string;
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
 };
 
 type BatchOption = {
@@ -35,6 +38,7 @@ type BatchOption = {
   duration_months?: number;
   draw_day?: number;
   start_date?: string;
+  available_slots?: number;
 };
 
 type LuckyIdOption = {
@@ -64,6 +68,8 @@ type CreatedSubscriptionResponse = {
   monthly_amount?: string;
   status?: string;
 };
+
+const LUCKY_PREVIEW_LIMIT = 12;
 
 function money(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -134,6 +140,12 @@ function normalizeProduct(raw: Record<string, unknown>): ProductOption {
     base_price: toMoneyString(raw.base_price),
     category: toOptionalString(raw.category),
     subcategory: toOptionalString(raw.subcategory),
+    is_emi_enabled:
+      typeof raw.is_emi_enabled === "boolean" ? raw.is_emi_enabled : undefined,
+    is_rent_enabled:
+      typeof raw.is_rent_enabled === "boolean" ? raw.is_rent_enabled : undefined,
+    is_lease_enabled:
+      typeof raw.is_lease_enabled === "boolean" ? raw.is_lease_enabled : undefined,
   };
 }
 
@@ -145,6 +157,7 @@ function normalizeBatch(raw: Record<string, unknown>): BatchOption {
     duration_months: toOptionalNumber(raw.duration_months),
     draw_day: toOptionalNumber(raw.draw_day),
     start_date: toOptionalString(raw.start_date),
+    available_slots: toOptionalNumber(raw.available_slots),
   };
 }
 
@@ -163,6 +176,27 @@ function normalizePartner(raw: Record<string, unknown>): PartnerOption {
     username: toOptionalString(raw.username),
     phone: toOptionalString(raw.phone),
   };
+}
+
+function formatAvailableSlots(batch: BatchOption | null | undefined): string {
+  if (!batch || typeof batch.available_slots !== "number") return "Slots unavailable";
+  return `${batch.available_slots} slots open`;
+}
+
+function enabledPlanModes(product: ProductOption | null | undefined): string[] {
+  if (!product) return [];
+
+  const modes: string[] = [];
+  if (product.is_emi_enabled) modes.push("EMI");
+  if (product.is_rent_enabled) modes.push("RENT");
+  if (product.is_lease_enabled) modes.push("LEASE");
+  return modes;
+}
+
+function formatLuckyNumber(item: LuckyIdOption | null | undefined): string {
+  const value = item?.lucky_number ?? item?.id;
+  if (value == null) return "—";
+  return `#${String(value).padStart(2, "0")}`;
 }
 
 function SectionCard({
@@ -249,6 +283,12 @@ function SearchPanel<T>({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onSearch();
+            }
+          }}
           placeholder={placeholder}
           disabled={disabled || loading}
           className="h-10 flex-1 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
@@ -306,6 +346,7 @@ function SearchPanel<T>({
 export default function SubscriptionCreatePage() {
   const searchParams = useSearchParams();
   const searchParamKey = searchParams.toString();
+  const luckyRequestSequence = useRef(0);
   const [planType, setPlanType] = useState<PlanType>("EMI");
 
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
@@ -325,6 +366,7 @@ export default function SubscriptionCreatePage() {
   const [batchResults, setBatchResults] = useState<BatchOption[]>([]);
   const [luckyResults, setLuckyResults] = useState<LuckyIdOption[]>([]);
   const [partnerResults, setPartnerResults] = useState<PartnerOption[]>([]);
+  const [availableLuckyCount, setAvailableLuckyCount] = useState<number | null>(null);
 
   const [customerLoading, setCustomerLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
@@ -412,6 +454,32 @@ export default function SubscriptionCreatePage() {
     return (totalAmount / tenureMonths).toFixed(2);
   }, [totalAmount, tenureMonths]);
 
+  const productModes = useMemo(() => enabledPlanModes(product), [product]);
+  const luckyPreviewLabel = useMemo(() => {
+    if (!batch || availableLuckyCount == null) return null;
+    if (availableLuckyCount <= 0) {
+      return "No available Lucky IDs remain in this batch.";
+    }
+
+    const previewNumbers = luckyResults
+      .slice(0, LUCKY_PREVIEW_LIMIT)
+      .map((item) =>
+        item.lucky_number != null
+          ? `#${String(item.lucky_number).padStart(2, "0")}`
+          : `#${item.id}`
+      );
+
+    if (luckyId) {
+      return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}.`;
+    }
+
+    if (previewNumbers.length === 0) {
+      return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave Lucky ID blank to auto-assign the next available row.`;
+    }
+
+    return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave Lucky ID blank to auto-assign the next available row, or quick-pick from ${previewNumbers.join(", ")}.`;
+  }, [availableLuckyCount, batch, luckyId, luckyResults]);
+
   const canSubmit = useMemo(() => {
     if (!customer || !product || !startDate) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
@@ -419,13 +487,18 @@ export default function SubscriptionCreatePage() {
     return true;
   }, [customer, product, startDate, tenureMonths, isEmiPlan, batch]);
 
+  function nextLuckyRequestToken(): number {
+    luckyRequestSequence.current += 1;
+    return luckyRequestSequence.current;
+  }
+
   async function runCustomerSearch() {
     if (!customerQuery.trim()) return;
     setCustomerLoading(true);
     setError(null);
     try {
       const payload = await apiFetch<unknown>(
-        `/admin/customers/?q=${encodeURIComponent(customerQuery.trim())}`
+        `/admin/customers/search/?q=${encodeURIComponent(customerQuery.trim())}`
       );
       setCustomerResults(
         toArray<Record<string, unknown>>(payload).map(normalizeCustomer)
@@ -444,7 +517,7 @@ export default function SubscriptionCreatePage() {
     setError(null);
     try {
       const payload = await apiFetch<unknown>(
-        `/admin/products/?q=${encodeURIComponent(productQuery.trim())}`
+        `/admin/products/search/?q=${encodeURIComponent(productQuery.trim())}`
       );
       setProductResults(
         toArray<Record<string, unknown>>(payload).map(normalizeProduct)
@@ -477,6 +550,39 @@ export default function SubscriptionCreatePage() {
     }
   }
 
+  async function loadLuckyAvailability(
+    batchId: number,
+    query = "",
+    options?: { previewOnly?: boolean; requestToken?: number }
+  ) {
+    const payload = await apiFetch<Record<string, unknown>>(
+      `/admin/lucky-ids/available/?batch_id=${encodeURIComponent(String(batchId))}`
+    );
+    const allRows = toArray<Record<string, unknown>>(payload).map(normalizeLuckyId);
+    const trimmedQuery = query.trim();
+    const filteredRows = trimmedQuery
+      ? allRows.filter((item) =>
+          String(item.lucky_number ?? item.id).includes(trimmedQuery)
+        )
+      : allRows;
+
+    if (
+      typeof options?.requestToken === "number" &&
+      options.requestToken !== luckyRequestSequence.current
+    ) {
+      return;
+    }
+
+    setAvailableLuckyCount(
+      typeof payload.count === "number" ? payload.count : allRows.length
+    );
+    setLuckyResults(
+      options?.previewOnly && !trimmedQuery
+        ? filteredRows.slice(0, LUCKY_PREVIEW_LIMIT)
+        : filteredRows
+    );
+  }
+
   async function runLuckySearch() {
     if (!batch?.id) {
       setError("Select an open batch before searching Lucky IDs.");
@@ -485,25 +591,16 @@ export default function SubscriptionCreatePage() {
 
     setLuckyLoading(true);
     setError(null);
-    setGlobalLoadingLabel("Loading available Lucky IDs...");
     try {
-      const payload = await apiFetch<unknown>(
-        `/admin/lucky-ids/available/?batch_id=${encodeURIComponent(String(batch.id))}`
-      );
-      const rows = toArray<Record<string, unknown>>(payload)
-        .map(normalizeLuckyId)
-        .filter((item) =>
-          luckyQuery.trim()
-            ? String(item.lucky_number ?? item.id).includes(luckyQuery.trim())
-            : true
-        );
-      setLuckyResults(rows);
+      await loadLuckyAvailability(batch.id, luckyQuery, {
+        requestToken: nextLuckyRequestToken(),
+      });
     } catch (err) {
       setError(toErrorMessage(err));
+      setAvailableLuckyCount(null);
       setLuckyResults([]);
     } finally {
       setLuckyLoading(false);
-      setGlobalLoadingLabel(null);
     }
   }
 
@@ -566,10 +663,13 @@ export default function SubscriptionCreatePage() {
         if (resolvedPlanType) {
           setPlanType(resolvedPlanType);
           if (resolvedPlanType !== "EMI") {
+            nextLuckyRequestToken();
             setBatch(null);
             setLuckyId(null);
             setBatchResults([]);
             setLuckyResults([]);
+            setLuckyQuery("");
+            setAvailableLuckyCount(null);
           }
         } else {
           messages.push(
@@ -760,7 +860,45 @@ export default function SubscriptionCreatePage() {
     };
   }, [searchParamKey]);
 
-  function resetForAnotherCreate() {
+  useEffect(() => {
+    if (!isEmiPlan || !batch?.id) {
+      setAvailableLuckyCount(null);
+      setLuckyResults([]);
+      return;
+    }
+
+    const batchId = batch.id;
+    let cancelled = false;
+
+    async function warmLuckyPreview() {
+      setLuckyLoading(true);
+      try {
+        await loadLuckyAvailability(batchId, "", {
+          previewOnly: true,
+          requestToken: nextLuckyRequestToken(),
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setError(toErrorMessage(err));
+          setAvailableLuckyCount(null);
+          setLuckyResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLuckyLoading(false);
+        }
+      }
+    }
+
+    void warmLuckyPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batch?.id, isEmiPlan]);
+
+  function resetForFreshCreate() {
+    nextLuckyRequestToken();
     setPlanType("EMI");
     setCustomer(null);
     setProduct(null);
@@ -779,12 +917,46 @@ export default function SubscriptionCreatePage() {
     setBatchResults([]);
     setLuckyResults([]);
     setPartnerResults([]);
+    setAvailableLuckyCount(null);
 
     setStartDate(new Date().toISOString().slice(0, 10));
     setManualTenureMonths("12");
 
     setError(null);
     setSuccess(null);
+  }
+
+  async function prepareNextWithSameSetup() {
+    nextLuckyRequestToken();
+    setCustomer(null);
+    setLuckyId(null);
+
+    setCustomerQuery("");
+    setLuckyQuery("");
+
+    setCustomerResults([]);
+    setLuckyResults([]);
+
+    setError(null);
+    setSuccess(null);
+
+    if (isEmiPlan && batch?.id) {
+      setLuckyLoading(true);
+      try {
+        await loadLuckyAvailability(batch.id, "", {
+          previewOnly: true,
+          requestToken: nextLuckyRequestToken(),
+        });
+      } catch (err) {
+        setError(toErrorMessage(err));
+        setAvailableLuckyCount(null);
+        setLuckyResults([]);
+      } finally {
+        setLuckyLoading(false);
+      }
+    } else {
+      setAvailableLuckyCount(null);
+    }
   }
 
   async function handleSubmit() {
@@ -916,7 +1088,7 @@ export default function SubscriptionCreatePage() {
               value={
                 isEmiPlan
                   ? luckyId
-                    ? `Manual Lucky #${luckyId.lucky_number ?? luckyId.id}`
+                    ? `Manual Lucky ${formatLuckyNumber(luckyId)}`
                     : "Auto-assign first available if left empty"
                   : "Not used for rent/lease"
               }
@@ -931,7 +1103,7 @@ export default function SubscriptionCreatePage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <SearchPanel<CustomerOption>
               title="Customer"
-              description="Search by customer name or phone."
+              description="Search by customer name or phone. Press Enter to search."
               query={customerQuery}
               setQuery={setCustomerQuery}
               onSearch={runCustomerSearch}
@@ -973,17 +1145,23 @@ export default function SubscriptionCreatePage() {
 
             <SearchPanel<ProductOption>
               title="Product"
-              description="Search by product name or product code."
+              description="Search by product name or product code. Press Enter to search."
               query={productQuery}
               setQuery={setProductQuery}
               onSearch={runProductSearch}
               loading={productLoading}
               selected={product}
               onClear={() => {
+                nextLuckyRequestToken();
                 setProduct(null);
                 setProductResults([]);
                 setBatch(null);
                 setLuckyId(null);
+                setBatchQuery("");
+                setLuckyQuery("");
+                setBatchResults([]);
+                setLuckyResults([]);
+                setAvailableLuckyCount(null);
               }}
               results={productResults}
               renderSelected={(item) => (
@@ -993,6 +1171,9 @@ export default function SubscriptionCreatePage() {
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Base price {money(item.base_price)}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Enabled modes {enabledPlanModes(item).join(" / ") || "—"}
                   </div>
                 </div>
               )}
@@ -1004,6 +1185,9 @@ export default function SubscriptionCreatePage() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     Base price {money(item.base_price)} · {item.category || "—"} /{" "}
                     {item.subcategory || "—"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Enabled modes {enabledPlanModes(item).join(" / ") || "—"}
                   </div>
                 </div>
               )}
@@ -1018,7 +1202,7 @@ export default function SubscriptionCreatePage() {
 
             <SearchPanel<PartnerOption>
               title="Partner (optional)"
-              description="Attach a partner to the contract when applicable."
+              description="Attach a partner to the contract when applicable. Press Enter to search."
               query={partnerQuery}
               setQuery={setPartnerQuery}
               onSearch={runPartnerSearch}
@@ -1071,11 +1255,14 @@ export default function SubscriptionCreatePage() {
                   value={planType}
                   onChange={(event) => {
                     const nextPlanType = event.target.value as PlanType;
+                    nextLuckyRequestToken();
                     setPlanType(nextPlanType);
                     setBatch(null);
                     setLuckyId(null);
                     setBatchResults([]);
                     setLuckyResults([]);
+                    setLuckyQuery("");
+                    setAvailableLuckyCount(null);
                     setError(null);
                     setSuccess(null);
                   }}
@@ -1097,100 +1284,162 @@ export default function SubscriptionCreatePage() {
           <div className="grid gap-4 lg:grid-cols-2">
             {isEmiPlan ? (
               <>
-                <SearchPanel<BatchOption>
-                  title="Batch (Open only)"
-                  description="EMI subscriptions must be linked to an open batch."
-                  query={batchQuery}
-                  setQuery={setBatchQuery}
-                  onSearch={runBatchSearch}
-                  loading={batchLoading}
-                  selected={batch}
-                  onClear={() => {
-                    setBatch(null);
-                    setLuckyId(null);
-                    setBatchResults([]);
-                    setLuckyResults([]);
-                  }}
-                  results={batchResults}
-                  renderSelected={(item) => (
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {item.batch_code || `Batch #${item.id}`}
+                <div className="space-y-3">
+                  <SearchPanel<BatchOption>
+                    title="Batch (Open only)"
+                    description="EMI subscriptions must be linked to an open batch. Press Enter to search."
+                    query={batchQuery}
+                    setQuery={setBatchQuery}
+                    onSearch={runBatchSearch}
+                    loading={batchLoading}
+                    selected={batch}
+                    onClear={() => {
+                      nextLuckyRequestToken();
+                      setBatch(null);
+                      setLuckyId(null);
+                      setBatchQuery("");
+                      setLuckyQuery("");
+                      setBatchResults([]);
+                      setLuckyResults([]);
+                      setAvailableLuckyCount(null);
+                    }}
+                    results={batchResults}
+                    renderSelected={(item) => (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {item.batch_code || `Batch #${item.id}`}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.duration_months || 0} months · {item.status || "—"} ·{" "}
+                          {formatAvailableSlots(item)}
+                        </div>
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.duration_months || 0} months · {item.status || "—"}
+                    )}
+                    renderOption={(item) => (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {item.batch_code || `Batch #${item.id}`}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.duration_months || 0} months · Draw day{" "}
+                          {item.draw_day ?? "—"} · Start {item.start_date || "—"}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {formatAvailableSlots(item)}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  renderOption={(item) => (
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {item.batch_code || `Batch #${item.id}`}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.duration_months || 0} months · Draw day{" "}
-                        {item.draw_day ?? "—"} · Start {item.start_date || "—"}
-                      </div>
-                    </div>
-                  )}
-                  onSelect={(item) => {
-                    setBatch(item);
-                    setLuckyId(null);
-                    setBatchResults([]);
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  placeholder="Search batch by code"
-                />
+                    )}
+                    onSelect={(item) => {
+                      nextLuckyRequestToken();
+                      setBatch(item);
+                      setLuckyId(null);
+                      setLuckyQuery("");
+                      setBatchResults([]);
+                      setLuckyResults([]);
+                      setAvailableLuckyCount(null);
+                      setError(null);
+                      setSuccess(null);
+                    }}
+                    placeholder="Search batch by code"
+                  />
 
-                <SearchPanel<LuckyIdOption>
-                  title="Lucky ID (optional)"
-                  description="Leave empty to allow automatic first-available allocation."
-                  query={luckyQuery}
-                  setQuery={setLuckyQuery}
-                  onSearch={runLuckySearch}
-                  loading={luckyLoading}
-                  selected={luckyId}
-                  onClear={() => {
-                    setLuckyId(null);
-                    setLuckyResults([]);
-                  }}
-                  results={luckyResults}
-                  renderSelected={(item) => (
-                    <div>
-                      <div className="font-medium text-foreground">
-                        Lucky #{item.lucky_number ?? item.id}
+                  {batch ? (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                      <div className="font-medium">
+                        {batch.batch_code || `Batch #${batch.id}`} is ready for EMI onboarding.
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.status || "AVAILABLE"}
+                      <div className="mt-1 text-xs text-blue-800">
+                        Tenure is locked to {batch.duration_months || 0} months.{" "}
+                        {formatAvailableSlots(batch)}. Lucky IDs are limited to this batch only.
                       </div>
                     </div>
-                  )}
-                  renderOption={(item) => (
-                    <div>
-                      <div className="font-medium text-foreground">
-                        Lucky #{item.lucky_number ?? item.id}
+                  ) : null}
+                </div>
+
+                <div className="space-y-3">
+                  <SearchPanel<LuckyIdOption>
+                    title="Lucky ID (optional)"
+                    description="Press Enter to search a specific Lucky ID, or leave it blank to use backend auto-assignment."
+                    query={luckyQuery}
+                    setQuery={setLuckyQuery}
+                    onSearch={runLuckySearch}
+                    loading={luckyLoading}
+                    selected={luckyId}
+                    onClear={() => {
+                      setLuckyId(null);
+                      setLuckyResults([]);
+                      setError(null);
+                      setSuccess(null);
+                      if (batch?.id) {
+                        setLuckyLoading(true);
+                        void loadLuckyAvailability(batch.id, "", {
+                          previewOnly: true,
+                          requestToken: nextLuckyRequestToken(),
+                        })
+                          .catch((err) => {
+                            setError(toErrorMessage(err));
+                            setAvailableLuckyCount(null);
+                            setLuckyResults([]);
+                          })
+                          .finally(() => {
+                            setLuckyLoading(false);
+                          });
+                      } else {
+                        setAvailableLuckyCount(null);
+                      }
+                    }}
+                    results={luckyResults}
+                    renderSelected={(item) => (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          Lucky {formatLuckyNumber(item)}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.status || "AVAILABLE"}
+                        </div>
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.status || "AVAILABLE"}
+                    )}
+                    renderOption={(item) => (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          Lucky {formatLuckyNumber(item)}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.status || "AVAILABLE"}
+                        </div>
                       </div>
+                    )}
+                    onSelect={(item) => {
+                      setLuckyId(item);
+                      setLuckyResults([]);
+                      setError(null);
+                      setSuccess(null);
+                    }}
+                    disabled={!batch}
+                    placeholder={batch ? "Search Lucky ID by number" : "Select batch first"}
+                    emptyTitle={batch ? "No available Lucky IDs" : "Batch required"}
+                    emptyDescription={
+                      batch
+                        ? "No matching Lucky IDs are currently available in this batch."
+                        : "Select a batch before searching Lucky IDs."
+                    }
+                  />
+
+                  {batch ? (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                      <div className="font-medium">
+                        {luckyPreviewLabel || "Loading Lucky ID availability..."}
+                      </div>
+                      {!luckyQuery.trim() &&
+                      availableLuckyCount != null &&
+                      availableLuckyCount > luckyResults.length ? (
+                        <div className="mt-1 text-xs text-sky-800">
+                          Showing the first {LUCKY_PREVIEW_LIMIT} available Lucky IDs for quick pick. Search a specific number to narrow further.
+                        </div>
+                      ) : null}
                     </div>
-                  )}
-                  onSelect={(item) => {
-                    setLuckyId(item);
-                    setLuckyResults([]);
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  disabled={!batch}
-                  placeholder={batch ? "Search Lucky ID by number" : "Select batch first"}
-                  emptyTitle={batch ? "No available Lucky IDs" : "Batch required"}
-                  emptyDescription={
-                    batch
-                      ? "No matching Lucky IDs are currently available in this batch."
-                      : "Select a batch before searching Lucky IDs."
-                  }
-                />
+                  ) : null}
+                </div>
               </>
             ) : (
               <div className="lg:col-span-2">
@@ -1263,6 +1512,10 @@ export default function SubscriptionCreatePage() {
                   ? `${product.name}${product.product_code ? ` (${product.product_code})` : ""}`
                   : "—"
               }
+            />
+            <DetailValue
+              label="Enabled Modes"
+              value={productModes.length > 0 ? productModes.join(" / ") : "—"}
             />
             <DetailValue
               label="Batch"
@@ -1394,10 +1647,12 @@ export default function SubscriptionCreatePage() {
 
               <button
                 type="button"
-                onClick={resetForAnotherCreate}
+                onClick={() => {
+                  void prepareNextWithSameSetup();
+                }}
                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
               >
-                Create Another
+                Create Another With Same Setup
               </button>
             </div>
           </SectionCard>
@@ -1419,7 +1674,7 @@ export default function SubscriptionCreatePage() {
 
             <button
               type="button"
-              onClick={resetForAnotherCreate}
+              onClick={resetForFreshCreate}
               disabled={submitting}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >

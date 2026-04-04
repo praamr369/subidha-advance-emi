@@ -106,6 +106,202 @@ test("admin customer detail handoff preserves subscription-create customer prefi
   ).toBeVisible();
 });
 
+test("admin subscription create speeds up repeated onboarding without changing backend contract", async ({
+  page,
+}) => {
+  const customerSearchUrls: string[] = [];
+  const productSearchUrls: string[] = [];
+  const batchSearchUrls: string[] = [];
+  let luckyPreviewCalls = 0;
+  let createdSubscriptionBody: Record<string, unknown> | null = null;
+
+  await page.route("**/api/v1/admin/customers/search/**", async (route) => {
+    customerSearchUrls.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 101,
+          name: "Rahim Uddin",
+          phone: "01711111111",
+          kyc_status: "APPROVED",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/v1/admin/products/search/**", async (route) => {
+    productSearchUrls.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 202,
+          name: "Classic Wardrobe",
+          product_code: "ALM-7",
+          base_price: "360000.00",
+          category: "Furniture",
+          subcategory: "Wardrobe",
+          is_emi_enabled: true,
+          is_rent_enabled: true,
+          is_lease_enabled: false,
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/v1/admin/batches/?q=*", async (route) => {
+    batchSearchUrls.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: [
+          {
+            id: 17,
+            batch_code: "APR-2026-OPEN",
+            status: "OPEN",
+            duration_months: 12,
+            draw_day: 5,
+            start_date: "2026-04-05",
+            available_slots: 15,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/lucky-ids/available/?batch_id=17", async (route) => {
+    luckyPreviewCalls += 1;
+    const availableCount = luckyPreviewCalls === 1 ? 15 : 14;
+    const luckyIds = Array.from({ length: availableCount }, (_, index) => ({
+      id: 700 + index,
+      lucky_number: 7 + index,
+      status: "AVAILABLE",
+      batch: 17,
+    }));
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: availableCount,
+        results: luckyIds,
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscriptions/", async (route) => {
+    createdSubscriptionBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 8801,
+        customer: 101,
+        product: 202,
+        batch: 17,
+        lucky_id: 707,
+        partner: null,
+        plan_type: "EMI",
+        tenure_months: 12,
+        start_date: "2026-04-04",
+        total_amount: "360000.00",
+        monthly_amount: "30000.00",
+        status: "ACTIVE",
+      }),
+    });
+  });
+
+  await page.goto("/admin/subscriptions/create");
+
+  const customerInput = page.locator(
+    'input[placeholder="Search customer by name or phone"]'
+  );
+  const productInput = page.locator(
+    'input[placeholder="Search product by name or code"]'
+  );
+  const batchInput = page.locator('input[placeholder="Search batch by code"]');
+
+  await customerInput.fill("01711111111");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/admin/customers/search/?q=01711111111") &&
+        response.ok()
+    ),
+    customerInput.press("Enter"),
+  ]);
+  await page.getByRole("button", { name: /Rahim Uddin/ }).click();
+
+  await productInput.fill("ALM-7");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/admin/products/search/?q=ALM-7") &&
+        response.ok()
+    ),
+    productInput.press("Enter"),
+  ]);
+  await page.getByRole("button", { name: /Classic Wardrobe/ }).click();
+
+  await expect(page.locator("body")).toContainText("Enabled modes EMI / RENT");
+
+  await batchInput.fill("APR-2026-OPEN");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/admin/batches/?q=APR-2026-OPEN") &&
+        response.ok()
+    ),
+    batchInput.press("Enter"),
+  ]);
+  await page.getByRole("button", { name: /APR-2026-OPEN/ }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "APR-2026-OPEN is ready for EMI onboarding."
+  );
+  await expect(page.locator("body")).toContainText(
+    "15 Lucky IDs are currently available in APR-2026-OPEN."
+  );
+  await expect(page.locator("body")).toContainText(
+    "Showing the first 12 available Lucky IDs for quick pick."
+  );
+
+  await page.getByRole("button", { name: "Create Subscription" }).click();
+
+  await expect(page.locator("body")).toContainText("Subscription created");
+  await expect(
+    page.getByRole("button", { name: "Create Another With Same Setup" })
+  ).toBeVisible();
+
+  expect(customerSearchUrls).toHaveLength(1);
+  expect(productSearchUrls).toHaveLength(1);
+  expect(batchSearchUrls).toHaveLength(1);
+  expect(customerSearchUrls[0]).toContain("/api/v1/admin/customers/search/?q=01711111111");
+  expect(productSearchUrls[0]).toContain("/api/v1/admin/products/search/?q=ALM-7");
+  expect(createdSubscriptionBody).toMatchObject({
+    customer: 101,
+    product: 202,
+    batch: 17,
+    lucky_id: null,
+    plan_type: "EMI",
+    tenure_months: 12,
+  });
+
+  await page.getByRole("button", { name: "Create Another With Same Setup" }).click();
+
+  await expect(customerInput).toHaveValue("");
+  await expect(page.locator("body")).toContainText("Classic Wardrobe (ALM-7)");
+  await expect(page.locator("body")).toContainText("APR-2026-OPEN is ready for EMI onboarding.");
+  await expect(page.locator("body")).toContainText(
+    "14 Lucky IDs are currently available in APR-2026-OPEN."
+  );
+  expect(luckyPreviewCalls).toBeGreaterThanOrEqual(2);
+});
+
 test("admin customer CSV import preview enables confirm-import only after a clean preview", async ({
   page,
 }) => {
