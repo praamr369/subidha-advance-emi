@@ -74,7 +74,7 @@ class WinnerStateServiceTests(TestCase):
             due_date=date(2026, 5, 10),
         )
 
-    def test_draw_reveal_sets_subscription_and_lucky_id_to_won(self):
+    def test_draw_reveal_completes_fully_settled_winner_and_marks_lucky_id_won(self):
         draw, secret_seed = create_lucky_draw_commit(batch=self.batch)
 
         reveal_and_execute_draw(
@@ -86,11 +86,11 @@ class WinnerStateServiceTests(TestCase):
         self.subscription.refresh_from_db()
         self.lucky_id.refresh_from_db()
 
-        self.assertEqual(self.subscription.status, SubscriptionStatus.WON)
+        self.assertEqual(self.subscription.status, SubscriptionStatus.COMPLETED)
         self.assertEqual(self.subscription.winner_month, 1)
         self.assertEqual(self.lucky_id.status, LuckyIdStatus.WON)
 
-    def test_manual_winner_service_sets_subscription_and_lucky_id_to_won(self):
+    def test_manual_winner_service_completes_fully_settled_winner_and_marks_lucky_id_won(self):
         result = WinnerService.execute_winner(
             subscription_id=self.subscription.id,
             winner_month=1,
@@ -100,14 +100,14 @@ class WinnerStateServiceTests(TestCase):
         self.subscription.refresh_from_db()
         self.lucky_id.refresh_from_db()
 
-        self.assertEqual(self.subscription.status, SubscriptionStatus.WON)
+        self.assertEqual(self.subscription.status, SubscriptionStatus.COMPLETED)
         self.assertEqual(self.subscription.winner_month, 1)
         self.assertEqual(self.subscription.waived_amount, Decimal("2000.00"))
         self.assertEqual(self.lucky_id.status, LuckyIdStatus.WON)
-        self.assertEqual(result["subscription_status"], SubscriptionStatus.WON)
+        self.assertEqual(result["subscription_status"], SubscriptionStatus.COMPLETED)
         self.assertEqual(result["lucky_id_status"], LuckyIdStatus.WON)
 
-    def test_sync_winner_states_repairs_stale_rows_and_is_rerunnable(self):
+    def test_sync_winner_states_repairs_completed_winner_lucky_id_and_is_rerunnable(self):
         self.subscription.status = SubscriptionStatus.COMPLETED
         self.subscription.winner_month = 1
         self.subscription.waived_amount = Decimal("2000.00")
@@ -140,7 +140,7 @@ class WinnerStateServiceTests(TestCase):
         self.subscription.refresh_from_db()
         self.lucky_id.refresh_from_db()
 
-        self.assertEqual(self.subscription.status, SubscriptionStatus.WON)
+        self.assertEqual(self.subscription.status, SubscriptionStatus.COMPLETED)
         self.assertEqual(self.lucky_id.status, LuckyIdStatus.WON)
         self.assertEqual(
             AuditLog.objects.filter(action_type=AuditLog.ActionType.WINNER_STATE_SYNCED).count(),

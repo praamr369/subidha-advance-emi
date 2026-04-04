@@ -17,6 +17,9 @@ from subscriptions.models import (
     q2,
 )
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
+from subscriptions.services.subscription_status_service import (
+    resolve_expected_subscription_status,
+)
 from subscriptions.services.winner_state_service import get_subscription_winner_evidence
 
 
@@ -208,12 +211,26 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
     winning_draw = winner_evidence["winning_draw"]
     winner_month = winner_evidence["winner_month"]
     winner_status = "WON" if winner_evidence["is_winner"] else "NOT_WON"
+    expected_subscription_status = winner_evidence.get(
+        "expected_subscription_status"
+    ) or resolve_expected_subscription_status(
+        current_status=subscription.status,
+        emi_statuses=(row["status"] for row in emi_rows),
+        is_winner=winner_status == "WON",
+    )
 
     if winner_status == "WON" and winner_month is None:
         add_warning("Winner markers exist but winner month is not recorded.")
 
-    if winner_month is not None and subscription.status != SubscriptionStatus.WON:
-        add_warning("Winner month is recorded, but subscription status is not WON.")
+    if winner_month is not None and subscription.status != expected_subscription_status:
+        if expected_subscription_status == SubscriptionStatus.COMPLETED:
+            add_warning(
+                "Winner subscription is fully settled, but subscription status is not COMPLETED."
+            )
+        elif expected_subscription_status == SubscriptionStatus.WON:
+            add_warning(
+                "Winner subscription has unresolved EMI state, but subscription status is not WON."
+            )
 
     if (
         winner_status == "WON"

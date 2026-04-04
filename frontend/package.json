@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:routes": "node scripts/check-routes.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run build",
     "test:e2e:smoke": "playwright test --project=chromium-smoke",
     "test:e2e:smoke:headed": "playwright test --project=chromium-smoke --headed",
@@ -29,6 +29,8 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@types/estree": "^1.0.8",
+    "@types/json-schema": "^7.0.15",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

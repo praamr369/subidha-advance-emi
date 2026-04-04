@@ -205,6 +205,39 @@ class PartnerApiTests(APITestCase):
             self.subscription_primary_1.id,
         )
 
+    def test_partner_subscription_detail_only_returns_own_record(self):
+        self.client.force_authenticate(user=self.partner)
+
+        response = self.client.get(
+            f"/api/v1/partner/subscriptions/{self.subscription_primary_1.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+            msg=f"Unexpected partner subscription detail response: {response.status_code} {response.data}",
+        )
+        self.assertEqual(response.data["id"], self.subscription_primary_1.id)
+        self.assertEqual(response.data["partner_id"], self.partner.id)
+
+    def test_partner_subscription_detail_hides_other_partner_record(self):
+        self.client.force_authenticate(user=self.partner)
+
+        response = self.client.get(
+            f"/api/v1/partner/subscriptions/{self.subscription_other.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_partner_subscription_detail_requires_partner_role(self):
+        self.client.force_authenticate(user=self.customer_user)
+
+        response = self.client.get(
+            f"/api/v1/partner/subscriptions/{self.subscription_primary_1.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_partner_payment_detail_only_returns_own_record(self):
         self.client.force_authenticate(user=self.partner)
 

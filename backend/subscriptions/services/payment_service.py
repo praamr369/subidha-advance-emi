@@ -11,6 +11,7 @@ from subscriptions.models import (
     EmiStatus,
     FinancialLedger,
     LedgerEntryType,
+    LuckyIdStatus,
     MONEY_ZERO,
     Payment,
     Subscription,
@@ -19,6 +20,9 @@ from subscriptions.models import (
 from subscriptions.services.commission_service import (
     create_commission_for_payment,
     reverse_commission_for_payment,
+)
+from subscriptions.services.subscription_status_service import (
+    resolve_expected_subscription_status,
 )
 from services.payments.allocate_payment import allocate_payment
 
@@ -197,29 +201,24 @@ def _refresh_subscription_status(subscription: Subscription):
     if not emis.exists():
         return
 
-    paid_status = _safe_enum_value(getattr(EmiStatus, "PAID", "PAID"))
-    waived_status = _safe_enum_value(getattr(EmiStatus, "WAIVED", "WAIVED"))
-
-    completed_status = _safe_enum_value(
-        getattr(SubscriptionStatus, "COMPLETED", "COMPLETED")
-    )
-    active_status = _safe_enum_value(getattr(SubscriptionStatus, "ACTIVE", "ACTIVE"))
-    won_status = _safe_enum_value(getattr(SubscriptionStatus, "WON", "WON"))
-    defaulted_status = _safe_enum_value(
-        getattr(SubscriptionStatus, "DEFAULTED", "DEFAULTED")
-    )
-
     statuses = {_safe_enum_value(e.status) for e in emis}
     current_status = _safe_enum_value(getattr(subscription, "status", None))
+    winner_lucky_status = _safe_enum_value(getattr(LuckyIdStatus, "WON", "WON"))
+    is_winner = bool(
+        subscription.winner_month is not None
+        or current_status == _safe_enum_value(getattr(SubscriptionStatus, "WON", "WON"))
+        or _safe_enum_value(getattr(subscription.lucky_id, "status", None))
+        == winner_lucky_status
+    )
+    next_status = resolve_expected_subscription_status(
+        current_status=current_status,
+        emi_statuses=statuses,
+        is_winner=is_winner,
+    )
 
-    if statuses and statuses.issubset({paid_status, waived_status}):
-        subscription.status = completed_status
-    elif current_status in {won_status, defaulted_status}:
-        subscription.status = current_status
-    else:
-        subscription.status = active_status
-
-    subscription.save(update_fields=["status"])
+    if current_status != next_status:
+        subscription.status = next_status
+        subscription.save(update_fields=["status"])
 
 
 def _reconcile_after_payment(subscription: Subscription, emi: Emi):

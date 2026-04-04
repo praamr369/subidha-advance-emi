@@ -577,7 +577,6 @@ export default function AdminSubscriptionDetailPage() {
   );
 
   const winnerStatus = resolveWinnerStatus(
-    subscription?.status,
     subscription?.winner_status,
     winnerSummary?.winner_status,
     financialSummary?.winner_status
@@ -659,7 +658,12 @@ export default function AdminSubscriptionDetailPage() {
         {
           label: "Status",
           value: subscription?.status || "—",
-          tone: winnerStatus === "WON" ? "success" : undefined,
+          tone:
+            subscription?.status === "DEFAULTED"
+              ? "danger"
+              : subscription?.status === "COMPLETED"
+              ? "success"
+              : undefined,
         },
         {
           label: "Winner",
@@ -685,15 +689,12 @@ export default function AdminSubscriptionDetailPage() {
         },
       ]}
       statusBadge={{
-        label:
-          winnerStatus === "WON"
-            ? "WON"
-            : subscription?.status || "Subscription Detail",
+        label: subscription?.status || "Subscription Detail",
         tone:
-          winnerStatus === "WON"
-            ? "success"
-            : subscription?.status === "DEFAULTED"
+          subscription?.status === "DEFAULTED"
             ? "danger"
+            : subscription?.status === "COMPLETED"
+            ? "success"
             : "info",
       }}
     >
@@ -788,7 +789,7 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
                   <DetailValue
                     label="Status"
-                    value={<StatusBadge status={winnerStatus === "WON" ? "WON" : subscription.status} />}
+                    value={<StatusBadge status={subscription.status} />}
                   />
                   <DetailValue label="Customer" value={subscription.customer_name} />
                   <DetailValue label="Phone" value={subscription.customer_phone} />

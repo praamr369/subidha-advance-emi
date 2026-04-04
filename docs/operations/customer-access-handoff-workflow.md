@@ -4,6 +4,8 @@ This document describes the current supported customer credential handoff path i
 
 It is based on the code that exists today. It does not assume any fake password email or unsupported bulk credential workflow.
 
+Before relying on OTP handoff in a live environment, complete the checklist in [otp-delivery-readiness-checklist.md](./otp-delivery-readiness-checklist.md).
+
 ## 1. Confirmed capability in code
 
 ### Manual admin customer create

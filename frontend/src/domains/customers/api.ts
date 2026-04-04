@@ -42,6 +42,35 @@ export type CustomerImportCommitResponse = {
   rows: CustomerImportCommitRow[];
 };
 
+export type OtpDeliveryReadinessItem = {
+  status: string;
+  detail: string;
+};
+
+export type OtpDeliveryEmailReadiness = OtpDeliveryReadinessItem & {
+  fallback_enabled: boolean;
+  backend: string;
+  from_email_configured: boolean;
+};
+
+export type OtpDeliveryAdminVisibility = {
+  status: string;
+  detail: string;
+  list_endpoint: string;
+};
+
+export type OtpDeliveryReadinessResponse = {
+  overall_status: string;
+  summary: string;
+  delivery_backend: string;
+  public_reset_roles: string[];
+  public_reset_identifiers: string[];
+  sms: OtpDeliveryReadinessItem;
+  email: OtpDeliveryEmailReadiness;
+  console: OtpDeliveryReadinessItem;
+  admin_visibility: OtpDeliveryAdminVisibility;
+};
+
 export async function listCustomers(): Promise<Customer[]> {
   const payload = await apiClient<unknown>("/admin/customers/");
   return toArray<Customer>(payload);
@@ -72,6 +101,10 @@ export async function importCustomers(
     body: form,
     retryCount: 0,
   });
+}
+
+export async function getOtpDeliveryReadiness(): Promise<OtpDeliveryReadinessResponse> {
+  return request<OtpDeliveryReadinessResponse>("/admin/system/otp-delivery-readiness/");
 }
 
 export type CustomerKycDecisionStatus = "VERIFIED" | "REJECTED";

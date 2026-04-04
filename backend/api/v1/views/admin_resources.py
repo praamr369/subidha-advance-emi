@@ -343,8 +343,11 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         ).count()
         won_subscription_count = Subscription.objects.filter(
             batch=batch,
-            status=SubscriptionStatus.WON,
-        ).count()
+        ).filter(
+            Q(winner_month__isnull=False)
+            | Q(status=SubscriptionStatus.WON)
+            | Q(lucky_id__status=LuckyIdStatus.WON)
+        ).distinct().count()
 
         lucky_qs = LuckyId.objects.filter(batch=batch)
         available_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.AVAILABLE).count()

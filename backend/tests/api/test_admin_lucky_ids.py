@@ -119,6 +119,8 @@ class AdminLuckyIdReportingTests(APITestCase):
     def test_stale_winner_rows_are_visible_as_won_after_repair(self):
         self.winner_subscription.status = "COMPLETED"
         self.winner_subscription.save(update_fields=["status"])
+        self.winner_lucky_id.status = "ASSIGNED"
+        self.winner_lucky_id.save(update_fields=["status"])
         self.winner_lucky_id.refresh_from_db()
         self.assertEqual(self.winner_lucky_id.status, "ASSIGNED")
 

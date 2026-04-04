@@ -5,10 +5,14 @@ from django.db.models import Sum
 from subscriptions.models import (
     Emi,
     EmiStatus,
+    LuckyIdStatus,
     MONEY_ZERO,
     Payment,
     Subscription,
     SubscriptionStatus,
+)
+from subscriptions.services.subscription_status_service import (
+    resolve_expected_subscription_status,
 )
 
 
@@ -82,24 +86,24 @@ def sync_emi_status(emi: Emi, save: bool = True) -> EmiStatus:
 def sync_subscription_status(subscription: Subscription, save: bool = True) -> str:
     """
     Recompute subscription status from EMI truth.
-    Current P3 rule:
-    - COMPLETED only when every EMI is PAID or WAIVED
+    Winner history stays separate from contract lifecycle:
+    - COMPLETED when every EMI is PAID or WAIVED
+    - WON only while winner history exists and one or more EMI rows remain unresolved
+    - DEFAULTED remains untouched
     - otherwise ACTIVE
-    - WON remains untouched because draw outcome is business state, not payment-only state
     """
     current_status = subscription.status
-
-    unresolved = subscription.emis.exclude(
-        status__in=[EmiStatus.PAID, EmiStatus.WAIVED]
-    ).exists()
-
-    if current_status == SubscriptionStatus.WON:
-        # Keep WON as-is; winning is determined by draw flow, not by reconciliation.
-        next_status = SubscriptionStatus.WON
-    else:
-        next_status = (
-            SubscriptionStatus.ACTIVE if unresolved else SubscriptionStatus.COMPLETED
-        )
+    emi_statuses = list(subscription.emis.values_list("status", flat=True))
+    is_winner = bool(
+        subscription.winner_month is not None
+        or current_status == SubscriptionStatus.WON
+        or getattr(subscription.lucky_id, "status", None) == LuckyIdStatus.WON
+    )
+    next_status = resolve_expected_subscription_status(
+        current_status=current_status,
+        emi_statuses=emi_statuses,
+        is_winner=is_winner,
+    )
 
     if save and subscription.status != next_status:
         subscription.status = next_status

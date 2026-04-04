@@ -24,6 +24,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailRow, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
   buildForgotPasswordHref,
   resolvePasswordResetIdentifier,
@@ -765,6 +766,8 @@ export default function AdminCustomerCreatePage() {
               Manual create sets the initial password now, but the safer ongoing customer handoff is OTP reset using the customer&apos;s phone, email, or username. Do not store plaintext passwords in shared notes or source files.
             </div>
           </div>
+
+          <OtpDeliveryReadinessCard operatorContext="create" className="mt-4" />
         </SectionCard>
 
         {loadingLabel && <LoadingBlock label={loadingLabel} />}

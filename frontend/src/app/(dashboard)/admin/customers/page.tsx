@@ -28,6 +28,7 @@ import {
   type CustomerImportCommitResponse,
   type CustomerImportPreviewResponse,
 } from "@/domains/customers/api";
+import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -684,6 +685,8 @@ export default function AdminCustomersPage() {
                   needs a separate OTP reset or controlled first-password step.
                 </p>
               </div>
+
+              <OtpDeliveryReadinessCard operatorContext="import" />
 
               <div className="space-y-2">
                 <label

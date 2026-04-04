@@ -39,6 +39,25 @@ def _parse_choice(value: str | None, default: str, allowed: set[str], name: str)
     return candidate
 
 
+def _parse_int(
+    value: str | None,
+    default: int,
+    *,
+    minimum: int | None = None,
+    name: str,
+) -> int:
+    candidate = default if value is None else value
+    try:
+        parsed = int(str(candidate).strip())
+    except (TypeError, ValueError):
+        raise RuntimeError(f"{name} must be an integer.")
+
+    if minimum is not None and parsed < minimum:
+        raise RuntimeError(f"{name} must be at least {minimum}.")
+
+    return parsed
+
+
 def _load_dotenv(path: Path) -> None:
     if not path.exists():
         return
@@ -470,6 +489,78 @@ SIMPLE_JWT = {
     "SIGNING_KEY": JWT_SIGNING_KEY,
     "UPDATE_LAST_LOGIN": True,
 }
+
+OTP_DELIVERY_BACKEND = _parse_choice(
+    os.getenv("OTP_DELIVERY_BACKEND"),
+    "console" if _is_local_dev_mode() else "auto",
+    {"auto", "sms", "email", "console"},
+    "OTP_DELIVERY_BACKEND",
+)
+OTP_ALLOW_EMAIL_FALLBACK = _parse_bool(
+    os.getenv("OTP_ALLOW_EMAIL_FALLBACK"),
+    default=True,
+)
+PASSWORD_RESET_OTP_EXPIRY_MINUTES = _parse_int(
+    os.getenv("PASSWORD_RESET_OTP_EXPIRY_MINUTES"),
+    10,
+    minimum=1,
+    name="PASSWORD_RESET_OTP_EXPIRY_MINUTES",
+)
+PASSWORD_RESET_OTP_MAX_ATTEMPTS = _parse_int(
+    os.getenv("PASSWORD_RESET_OTP_MAX_ATTEMPTS"),
+    5,
+    minimum=1,
+    name="PASSWORD_RESET_OTP_MAX_ATTEMPTS",
+)
+PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = _parse_int(
+    os.getenv("PASSWORD_RESET_RESEND_COOLDOWN_SECONDS"),
+    60,
+    minimum=0,
+    name="PASSWORD_RESET_RESEND_COOLDOWN_SECONDS",
+)
+PASSWORD_RESET_MAX_RESENDS = _parse_int(
+    os.getenv("PASSWORD_RESET_MAX_RESENDS"),
+    3,
+    minimum=0,
+    name="PASSWORD_RESET_MAX_RESENDS",
+)
+
+EMAIL_BACKEND = (
+    os.getenv("EMAIL_BACKEND")
+    or (
+        "django.core.mail.backends.console.EmailBackend"
+        if _is_local_dev_mode()
+        else "django.core.mail.backends.smtp.EmailBackend"
+    )
+).strip()
+EMAIL_HOST = (os.getenv("EMAIL_HOST") or "localhost").strip()
+EMAIL_PORT = _parse_int(
+    os.getenv("EMAIL_PORT"),
+    25,
+    minimum=1,
+    name="EMAIL_PORT",
+)
+EMAIL_HOST_USER = (os.getenv("EMAIL_HOST_USER") or "").strip()
+EMAIL_HOST_PASSWORD = (os.getenv("EMAIL_HOST_PASSWORD") or "").strip()
+EMAIL_USE_TLS = _parse_bool(
+    os.getenv("EMAIL_USE_TLS"),
+    default=False,
+)
+EMAIL_USE_SSL = _parse_bool(
+    os.getenv("EMAIL_USE_SSL"),
+    default=False,
+)
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise RuntimeError("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.")
+
+DEFAULT_FROM_EMAIL = (
+    os.getenv("DEFAULT_FROM_EMAIL")
+    or (
+        "SUBIDHA CORE Dev <no-reply@local.subidha>"
+        if _is_local_dev_mode()
+        else ""
+    )
+).strip()
 
 CORS_ALLOW_CREDENTIALS = _parse_bool(
     os.getenv("CORS_ALLOW_CREDENTIALS"), default=bool(CORS_ALLOWED_ORIGINS)

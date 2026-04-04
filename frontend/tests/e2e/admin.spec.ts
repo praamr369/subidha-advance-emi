@@ -4,6 +4,38 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("admin") });
 
+const otpReadinessFixture = {
+  overall_status: "FALLBACK_READY",
+  summary:
+    "Auto mode can fall back to email because SMS delivery is not implemented in the current codebase.",
+  delivery_backend: "AUTO",
+  public_reset_roles: ["CUSTOMER", "PARTNER"],
+  public_reset_identifiers: ["phone", "email", "username"],
+  sms: {
+    status: "NOT_SUPPORTED",
+    detail:
+      "SMS delivery is a placeholder in the current codebase and has no provider integration.",
+  },
+  email: {
+    status: "READY",
+    fallback_enabled: true,
+    backend: "django.core.mail.backends.smtp.EmailBackend",
+    from_email_configured: true,
+    detail:
+      "Email OTP fallback is configured, but ops should still run a live reset test before promising access.",
+  },
+  console: {
+    status: "DISABLED",
+    detail: "Console OTP logging is disabled outside debug environments.",
+  },
+  admin_visibility: {
+    status: "API_ONLY",
+    detail:
+      "Admin password reset request list/detail/resend/invalidate APIs exist, but there is still no dedicated admin page for that workflow.",
+    list_endpoint: "/api/v1/admin/password-reset-requests/",
+  },
+};
+
 test("admin dashboard loads and subscription detail handoff preserves payment context", async ({
   page,
 }) => {
@@ -33,6 +65,302 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
     String(manifest.entities.admin.subscription_id)
   );
   await expect(page.locator("#emi_id")).not.toHaveValue("");
+});
+
+test("admin completed winner detail keeps contract status completed and shows winner history separately", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/subscriptions/901/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 901,
+        customer_id: 33,
+        customer_name: "Winner Customer",
+        customer_phone: "01711111111",
+        product_id: 44,
+        product_name: "Lucky Plan Product",
+        product_code: "LP-901",
+        partner_id: 12,
+        partner_name: "Partner One",
+        partner_phone: "01811111111",
+        batch_id: 55,
+        batch_code: "BATCH-901",
+        batch_status: "ACTIVE",
+        lucky_id: 77,
+        lucky_number: 15,
+        plan_type: "EMI",
+        tenure_months: 3,
+        start_date: "2026-03-01",
+        total_amount: "3000.00",
+        monthly_amount: "1000.00",
+        status: "COMPLETED",
+        winner_month: 1,
+        winner_status: "WON",
+        waived_amount: "2000.00",
+        fulfillment_status: null,
+        delivery_status: null,
+        created_at: "2026-03-01T08:00:00Z",
+        emi_count: 3,
+        paid_emi_count: 1,
+        pending_emi_count: 0,
+        waived_emi_count: 2,
+        financial_summary: {
+          subscription_id: 901,
+          total_amount: "3000.00",
+          total_emi_amount: "3000.00",
+          emi_total: "3000.00",
+          paid_amount: "1000.00",
+          waived_amount: "2000.00",
+          stored_waived_amount: "2000.00",
+          waiver_ledger_amount: "2000.00",
+          reversed_amount: "0.00",
+          pending_amount: "0.00",
+          remaining_amount: "0.00",
+          outstanding_amount: "0.00",
+          emi_count_total: 3,
+          emi_count_paid: 1,
+          emi_count_waived: 2,
+          emi_count_pending: 0,
+          winner_status: "WON",
+          winner_month: 1,
+          lucky_id: 77,
+          lucky_number: 15,
+          batch: {
+            id: 55,
+            batch_code: "BATCH-901",
+            status: "ACTIVE",
+          },
+          partner: {
+            id: 12,
+            username: "partner-one",
+            phone: "01811111111",
+            commission_rate: "5.00",
+          },
+        },
+        reconciliation_flags: {
+          is_financially_consistent: true,
+          pending_matches_remaining: true,
+          has_reversal_history: false,
+          has_waiver_history: true,
+          warnings: [],
+        },
+        winner_summary: {
+          winner_status: "WON",
+          winner_month: 1,
+          lucky_id: 77,
+          lucky_number: 15,
+          draw_id: 8,
+          draw_month: 1,
+          draw_revealed_at: "2026-03-05T09:00:00Z",
+          waiver_scope: "FUTURE_EMI_ONLY",
+          waived_emi_count: 2,
+          waived_amount: "2000.00",
+        },
+        delivery_summary: null,
+        deliveries: [],
+        emis: [
+          {
+            id: 1,
+            month_no: 1,
+            due_date: "2026-03-10",
+            amount: "1000.00",
+            status: "PAID",
+            derived_status: "PAID",
+            paid_amount: "1000.00",
+            total_paid: "1000.00",
+            reversed_amount: "0.00",
+            waived_amount: "0.00",
+            waiver_ledger_amount: "0.00",
+            balance_amount: "0.00",
+            is_overdue: false,
+            is_status_consistent: true,
+            warnings: [],
+          },
+          {
+            id: 2,
+            month_no: 2,
+            due_date: "2026-04-10",
+            amount: "1000.00",
+            status: "WAIVED",
+            derived_status: "WAIVED",
+            paid_amount: "0.00",
+            total_paid: "0.00",
+            reversed_amount: "0.00",
+            waived_amount: "1000.00",
+            waiver_ledger_amount: "1000.00",
+            balance_amount: "0.00",
+            is_overdue: false,
+            is_status_consistent: true,
+            warnings: [],
+          },
+          {
+            id: 3,
+            month_no: 3,
+            due_date: "2026-05-10",
+            amount: "1000.00",
+            status: "WAIVED",
+            derived_status: "WAIVED",
+            paid_amount: "0.00",
+            total_paid: "0.00",
+            reversed_amount: "0.00",
+            waived_amount: "1000.00",
+            waiver_ledger_amount: "1000.00",
+            balance_amount: "0.00",
+            is_overdue: false,
+            is_status_consistent: true,
+            warnings: [],
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/payments/?subscription=901", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        next: null,
+        previous: null,
+        total_paid_amount: "1000.00",
+        results: [
+          {
+            id: 91,
+            customer: 33,
+            customer_name: "Winner Customer",
+            customer_phone: "01711111111",
+            subscription: 901,
+            subscription_id: 901,
+            subscription_number: "SUB-901",
+            subscription_status: "COMPLETED",
+            product_name: "Lucky Plan Product",
+            product_code: "LP-901",
+            emi: 1,
+            emi_id: 1,
+            emi_month_no: 1,
+            emi_due_date: "2026-03-10",
+            emi_amount: "1000.00",
+            emi_status: "PAID",
+            batch: 55,
+            batch_code: "BATCH-901",
+            lucky_number: 15,
+            amount: "1000.00",
+            method: "CASH",
+            reference_no: "PAY-901",
+            payment_date: "2026-03-10",
+            paid_at: "2026-03-10T10:00:00Z",
+            collected_by: 1,
+            collected_by_username: "admin",
+            verified_by: null,
+            verified_by_username: null,
+            created_at: "2026-03-10T10:00:00Z",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscriptions/901/timeline/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ count: 0, results: [] }),
+    });
+  });
+
+  await page.goto("/admin/subscriptions/901");
+  await expect(
+    page.getByRole("heading", { name: "Subscription #901" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("COMPLETED");
+  await expect(page.locator("body")).toContainText("Winner recorded");
+  await expect(page.locator("body")).toContainText("Month 1");
+  await expect(page.locator("body")).not.toContainText("subscription status is not");
+});
+
+test("admin managed user edit page uses internal-user API and never calls partner subscription detail", async ({
+  page,
+}) => {
+  let partnerSubscriptionCalls = 0;
+  let patchPayload: Record<string, unknown> | null = null;
+
+  await page.route("**/api/v1/partner/subscriptions/**", async (route) => {
+    partnerSubscriptionCalls += 1;
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "Should not hit partner subscription endpoint" }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/internal-users/77/", async (route) => {
+    if (route.request().method() === "PATCH") {
+      patchPayload = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 77,
+          username: "managedpartner77",
+          phone: String(patchPayload.phone ?? "01999999999"),
+          email: String(patchPayload.email ?? "managed.partner.updated@example.com"),
+          first_name: String(patchPayload.first_name ?? "Managed"),
+          last_name: String(patchPayload.last_name ?? "Partner"),
+          full_name: "Managed Partner Updated",
+          role: String(patchPayload.role ?? "PARTNER"),
+          commission_rate: String(patchPayload.commission_rate ?? "7.25"),
+          is_active: Boolean(patchPayload.is_active ?? true),
+          is_staff: false,
+          is_superuser: false,
+          date_joined: "2026-04-01T08:30:00Z",
+          last_login: "2026-04-03T09:15:00Z",
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 77,
+        username: "managedpartner77",
+        phone: "01999999999",
+        email: "managed.partner@example.com",
+        first_name: "Managed",
+        last_name: "Partner",
+        full_name: "Managed Partner",
+        role: "PARTNER",
+        commission_rate: "6.50",
+        is_active: true,
+        is_staff: false,
+        is_superuser: false,
+        date_joined: "2026-04-01T08:30:00Z",
+        last_login: "2026-04-03T09:15:00Z",
+      }),
+    });
+  });
+
+  await page.goto("/admin/settings/users/77/edit");
+  await expect(
+    page.getByRole("heading", { name: "Edit Managed User: Managed Partner" })
+  ).toBeVisible();
+  await expect(page.locator("#commissionRate")).toHaveValue("6.50");
+
+  await page.locator("#firstName").fill("Managed Updated");
+  await page.locator("#commissionRate").fill("7.25");
+  await page.getByRole("button", { name: "Save Changes" }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "managedpartner77 updated successfully."
+  );
+  expect(patchPayload).not.toBeNull();
+  expect(patchPayload?.role).toBe("PARTNER");
+  expect(patchPayload?.commission_rate).toBe("7.25");
+  expect(partnerSubscriptionCalls).toBe(0);
 });
 
 test("admin payment create search uses q query contract and returns results", async ({
@@ -109,6 +437,17 @@ test("admin customer detail handoff preserves subscription-create customer prefi
 test("admin customer create success exposes OTP access handoff without echoing the password", async ({
   page,
 }) => {
+  await page.route(
+    "**/api/v1/admin/system/otp-delivery-readiness/",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(otpReadinessFixture),
+      });
+    }
+  );
+
   await page.route("**/api/v1/admin/customers/", async (route) => {
     await route.fulfill({
       status: 201,
@@ -133,6 +472,11 @@ test("admin customer create success exposes OTP access handoff without echoing t
   await page.getByRole("button", { name: "Create Customer" }).click();
 
   await expect(page.locator("body")).toContainText("Customer access handoff");
+  await expect(page.locator("body")).toContainText("OTP delivery readiness");
+  await expect(page.locator("body")).toContainText("Fallback Ready");
+  await expect(page.locator("body")).toContainText(
+    "SMS delivery is a placeholder in the current codebase"
+  );
   await expect(page.locator("body")).toContainText("newcustomer620");
   await expect(page.locator("body")).toContainText("01988001122");
   await expect(page.locator("body")).not.toContainText("SecurePass123!");
@@ -148,6 +492,17 @@ test("admin customer create success exposes OTP access handoff without echoing t
 test("admin customer detail shows OTP access handoff for existing customer", async ({
   page,
 }) => {
+  await page.route(
+    "**/api/v1/admin/system/otp-delivery-readiness/",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(otpReadinessFixture),
+      });
+    }
+  );
+
   await page.route("**/api/v1/admin/customers/55/", async (route) => {
     await route.fulfill({
       status: 200,
@@ -184,6 +539,8 @@ test("admin customer detail shows OTP access handoff for existing customer", asy
 
   await page.goto("/admin/customers/55");
   await expect(page.locator("body")).toContainText("Access Handoff");
+  await expect(page.locator("body")).toContainText("OTP delivery readiness");
+  await expect(page.locator("body")).toContainText("API Only");
   await expect(page.locator("body")).toContainText("accessready55");
   await expect(page.locator("body")).toContainText("01755555555");
   await expect(
@@ -466,6 +823,17 @@ test("admin customer CSV import preview enables confirm-import only after a clea
   let previewCalls = 0;
   let importCalls = 0;
 
+  await page.route(
+    "**/api/v1/admin/system/otp-delivery-readiness/",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(otpReadinessFixture),
+      });
+    }
+  );
+
   await page.route("**/api/v1/admin/customers/import/preview/", async (route) => {
     previewCalls += 1;
     await route.fulfill({
@@ -512,6 +880,10 @@ test("admin customer CSV import preview enables confirm-import only after a clea
   });
 
   await page.goto("/admin/customers");
+  await expect(page.locator("body")).toContainText("OTP delivery readiness");
+  await expect(page.locator("body")).toContainText(
+    "Imported customers still need OTP reset after import. Use this readiness card to confirm the live delivery path before promising portal access."
+  );
   await page
     .locator("#customer-import-file")
     .setInputFiles({

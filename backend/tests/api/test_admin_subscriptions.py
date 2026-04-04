@@ -139,6 +139,43 @@ class AdminSubscriptionDetailApiTests(APITestCase):
         self.assertEqual(len(waived_rows), 2)
         self.assertTrue(all(row["month_no"] > 1 for row in waived_rows))
 
+    def test_admin_subscription_detail_preserves_completed_winner_without_false_warning(self):
+        record_emi_payment(
+            emi_id=self.emi_1.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            method="CASH",
+            reference_no="SUB-API-PAY-002",
+        )
+
+        draw, secret_seed = create_lucky_draw_commit(batch=self.batch)
+        reveal_and_execute_draw(
+            draw_id=draw.id,
+            revealed_seed=secret_seed,
+            performed_by=self.admin,
+        )
+
+        self.subscription.refresh_from_db()
+        self.lucky_id.refresh_from_db()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "COMPLETED")
+        self.assertEqual(response.data["winner_status"], "WON")
+        self.assertEqual(response.data["winner_summary"]["winner_month"], 1)
+        self.assertEqual(response.data["financial_summary"]["remaining_amount"], "0.00")
+        self.assertEqual(response.data["financial_summary"]["waived_amount"], "2000.00")
+        self.assertEqual(self.lucky_id.status, "WON")
+        self.assertNotIn(
+            "Winner subscription is fully settled, but subscription status is not COMPLETED.",
+            response.data["reconciliation_flags"]["warnings"],
+        )
+        self.assertNotIn(
+            "Winner subscription has unresolved EMI state, but subscription status is not WON.",
+            response.data["reconciliation_flags"]["warnings"],
+        )
+
     def test_winner_status_warning_disappears_after_repair_sync(self):
         draw, secret_seed = create_lucky_draw_commit(batch=self.batch)
         reveal_and_execute_draw(
@@ -149,13 +186,15 @@ class AdminSubscriptionDetailApiTests(APITestCase):
 
         self.subscription.status = "COMPLETED"
         self.subscription.save(update_fields=["status"])
+        self.lucky_id.status = "ASSIGNED"
+        self.lucky_id.save(update_fields=["status"])
         self.lucky_id.refresh_from_db()
         self.assertEqual(self.lucky_id.status, "ASSIGNED")
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn(
-            "Winner month is recorded, but subscription status is not WON.",
+            "Winner subscription has unresolved EMI state, but subscription status is not WON.",
             response.data["reconciliation_flags"]["warnings"],
         )
 
@@ -169,8 +208,9 @@ class AdminSubscriptionDetailApiTests(APITestCase):
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "WON")
         self.assertEqual(response.data["winner_status"], "WON")
         self.assertNotIn(
-            "Winner month is recorded, but subscription status is not WON.",
+            "Winner subscription has unresolved EMI state, but subscription status is not WON.",
             response.data["reconciliation_flags"]["warnings"],
         )

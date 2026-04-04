@@ -29,6 +29,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
   buildForgotPasswordHref,
   resolvePasswordResetIdentifier,
@@ -1216,6 +1217,8 @@ export default function AdminCustomerDetailPage() {
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                   Ask the customer to use the OTP reset flow if they do not know the current password or need a first-login password rotation. This keeps long-term access handoff out of shared plaintext channels.
                 </div>
+
+                <OtpDeliveryReadinessCard operatorContext="detail" className="mt-4" />
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link

@@ -20,6 +20,9 @@ from subscriptions.models import (
     q2,
 )
 from subscriptions.services.audit_service import log_audit
+from subscriptions.services.subscription_status_service import (
+    resolve_expected_subscription_status,
+)
 
 
 WAIVER_SCOPE_FUTURE_ONLY = "FUTURE_EMI_ONLY"
@@ -134,6 +137,11 @@ def get_subscription_winner_evidence(subscription: Subscription) -> dict:
     )
 
     computed_waived_amount = q2(subscription.total_waived_emi_amount())
+    expected_subscription_status = resolve_expected_subscription_status(
+        current_status=subscription.status,
+        emi_statuses=(emi.status for emi in emis),
+        is_winner=is_winner,
+    )
 
     return {
         "is_winner": is_winner,
@@ -144,9 +152,8 @@ def get_subscription_winner_evidence(subscription: Subscription) -> dict:
         "computed_waived_amount": computed_waived_amount,
         "subscription_status": subscription.status,
         "lucky_id_status": lucky_status,
-        "needs_subscription_status_sync": (
-            is_winner and subscription.status != SubscriptionStatus.WON
-        ),
+        "expected_subscription_status": expected_subscription_status,
+        "needs_subscription_status_sync": subscription.status != expected_subscription_status,
         "needs_lucky_id_status_sync": (
             is_winner
             and subscription.lucky_id_id is not None
@@ -237,8 +244,13 @@ def apply_winner_state(
         newly_waived_amount = q2(newly_waived_amount + emi.amount)
 
     update_fields = []
-    if subscription.status != SubscriptionStatus.WON:
-        subscription.status = SubscriptionStatus.WON
+    expected_subscription_status = resolve_expected_subscription_status(
+        current_status=subscription.status,
+        emi_statuses=(emi.status for emi in emis),
+        is_winner=True,
+    )
+    if subscription.status != expected_subscription_status:
+        subscription.status = expected_subscription_status
         update_fields.append("status")
     if subscription.winner_month != winner_month:
         subscription.winner_month = winner_month
@@ -324,8 +336,9 @@ def sync_winner_state(
     old_lucky_status = getattr(subscription.lucky_id, "status", None)
 
     update_fields = []
-    if subscription.status != SubscriptionStatus.WON:
-        subscription.status = SubscriptionStatus.WON
+    expected_subscription_status = evidence["expected_subscription_status"]
+    if subscription.status != expected_subscription_status:
+        subscription.status = expected_subscription_status
         update_fields.append("status")
 
     winner_month = evidence["winner_month"]

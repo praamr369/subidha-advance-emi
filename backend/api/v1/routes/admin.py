@@ -77,6 +77,7 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
 )
+from api.v1.views.admin_otp_delivery import AdminOtpDeliveryReadinessView
 from api.v1.views.admin_reports import (
     AdminBatchPerformanceAggregateView,
     AdminBatchPerformanceSummaryView,
@@ -146,6 +147,7 @@ urlpatterns = [
     path("internal-users/<int:pk>/deactivate/", AdminInternalUserDeactivateView.as_view()),
     path("internal-users/<int:pk>/reset-password/", AdminInternalUserPasswordResetView.as_view()),
     path("internal-users/<int:pk>/audit/", AdminInternalUserAuditView.as_view()),
+    path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
     path("", include("api.v1.routes.admin_password_reset_requests")),
     path("commissions/<int:pk>/settle/", AdminCommissionSettleView.as_view()),
     path("commissions/", AdminCommissionListView.as_view()),

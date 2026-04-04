@@ -802,10 +802,12 @@ class Subscription(TimeStampedModel):
             super().save(*args, **kwargs)
 
             if self.plan_type == PlanType.EMI and self.lucky_id_id:
+                has_winner_history = (
+                    self.status == SubscriptionStatus.WON
+                    or self.winner_month is not None
+                )
                 LuckyId.objects.filter(pk=self.lucky_id_id).update(
-                    status=LuckyIdStatus.WON
-                    if self.status == SubscriptionStatus.WON
-                    else LuckyIdStatus.ASSIGNED
+                    status=LuckyIdStatus.WON if has_winner_history else LuckyIdStatus.ASSIGNED
                 )
 
             if previous_lucky_id_id and previous_lucky_id_id != self.lucky_id_id:
