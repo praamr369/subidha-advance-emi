@@ -14,17 +14,15 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import {
+  type BatchStatus,
+  type CanonicalBatchStatus,
+  isLiveBatchStatus,
+  normalizeBatchFilterStatus,
+  normalizeBatchStatus,
+} from "@/domains/batches/status";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
-
-type BatchStatus =
-  | "DRAFT"
-  | "OPEN"
-  | "ACTIVE"
-  | "CLOSED"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "UNKNOWN";
 
 type BatchRow = {
   id: number;
@@ -55,23 +53,6 @@ function toNullableNumber(value: unknown): number | null {
 
 function toNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : value === null ? null : null;
-}
-
-function normalizeBatchStatus(value: unknown): BatchStatus {
-  const status = String(value ?? "").toUpperCase();
-
-  if (
-    status === "DRAFT" ||
-    status === "OPEN" ||
-    status === "ACTIVE" ||
-    status === "CLOSED" ||
-    status === "COMPLETED" ||
-    status === "CANCELLED"
-  ) {
-    return status;
-  }
-
-  return "UNKNOWN";
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -201,8 +182,7 @@ export default function AdminBatchesPage() {
   const searchParamKey = searchParams.toString();
 
   const initialQuery = (searchParams.get("q") || "").trim();
-  const initialStatus = ((searchParams.get("status") || "").trim().toUpperCase() ||
-    "") as "" | BatchStatus;
+  const initialStatus = normalizeBatchFilterStatus(searchParams.get("status"));
 
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,10 +190,10 @@ export default function AdminBatchesPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [queryInput, setQueryInput] = useState(initialQuery);
-  const [statusInput, setStatusInput] = useState<"" | BatchStatus>(initialStatus);
+  const [statusInput, setStatusInput] = useState<"" | CanonicalBatchStatus>(initialStatus);
 
   const [query, setQuery] = useState(initialQuery);
-  const [statusFilter, setStatusFilter] = useState<"" | BatchStatus>(initialStatus);
+  const [statusFilter, setStatusFilter] = useState<"" | CanonicalBatchStatus>(initialStatus);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -248,8 +228,7 @@ export default function AdminBatchesPage() {
   useEffect(() => {
     const params = new URLSearchParams(searchParamKey);
     const nextQuery = (params.get("q") || "").trim();
-    const nextStatus = ((params.get("status") || "").trim().toUpperCase() ||
-      "") as "" | BatchStatus;
+    const nextStatus = normalizeBatchFilterStatus(params.get("status"));
 
     setQueryInput(nextQuery);
     setStatusInput(nextStatus);
@@ -279,7 +258,7 @@ export default function AdminBatchesPage() {
   }
 
   const liveCount = useMemo(
-    () => rows.filter((row) => row.status === "OPEN" || row.status === "ACTIVE").length,
+    () => rows.filter((row) => isLiveBatchStatus(row.status)).length,
     [rows]
   );
 
@@ -423,7 +402,7 @@ export default function AdminBatchesPage() {
       ]}
       stats={[
         { label: "Visible Batches", value: rows.length },
-        { label: "Open / Active", value: liveCount, tone: liveCount > 0 ? "success" : undefined },
+        { label: "Live Batches", value: liveCount, tone: liveCount > 0 ? "success" : undefined },
         { label: "Subscription Volume", value: totalSubscriptions },
         { label: "Winner Count", value: totalWinners, tone: totalWinners > 0 ? "info" : undefined },
       ]}
@@ -533,16 +512,18 @@ export default function AdminBatchesPage() {
 
               <select
                 value={statusInput}
-                onChange={(event) => setStatusInput(event.target.value as "" | BatchStatus)}
+                onChange={(event) =>
+                  setStatusInput(event.target.value as "" | CanonicalBatchStatus)
+                }
                 className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               >
                 <option value="">All states</option>
                 <option value="DRAFT">Draft</option>
                 <option value="OPEN">Open</option>
-                <option value="ACTIVE">Active</option>
-                <option value="CLOSED">Closed</option>
+                <option value="FULL">Full</option>
+                <option value="DRAW_IN_PROGRESS">Draw In Progress</option>
                 <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="CLOSED">Closed</option>
               </select>
 
               <div className="flex flex-wrap gap-2">

@@ -16,15 +16,15 @@ import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import {
+  BATCH_LIFECYCLE_TRANSITION_NOTE,
+  type BatchStatus,
+  type CanonicalBatchStatus,
+  isLiveBatchStatus,
+  nextAllowedBatchStatuses,
+  normalizeBatchStatus,
+} from "@/domains/batches/status";
 import { apiFetch } from "@/lib/api";
-
-type BatchStatus =
-  | "DRAFT"
-  | "OPEN"
-  | "ACTIVE"
-  | "CLOSED"
-  | "COMPLETED"
-  | "UNKNOWN";
 
 type BatchDetailRecord = {
   id: number;
@@ -89,20 +89,6 @@ function formatDateTime(value: string | null | undefined): string {
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
   return new Date(parsed).toLocaleString();
-}
-
-function normalizeBatchStatus(value: unknown): BatchStatus {
-  const status = String(value ?? "").toUpperCase();
-  if (
-    status === "DRAFT" ||
-    status === "OPEN" ||
-    status === "ACTIVE" ||
-    status === "CLOSED" ||
-    status === "COMPLETED"
-  ) {
-    return status;
-  }
-  return "UNKNOWN";
 }
 
 function normalizeBatchDetail(raw: Record<string, unknown>): BatchDetailRecord {
@@ -195,21 +181,6 @@ function parseFieldErrors(error: unknown): FieldErrors {
   }
 }
 
-function nextAllowedStatuses(status: BatchStatus): BatchStatus[] {
-  switch (status) {
-    case "DRAFT":
-      return ["OPEN"];
-    case "OPEN":
-      return ["ACTIVE", "CLOSED"];
-    case "ACTIVE":
-      return ["CLOSED"];
-    case "CLOSED":
-      return ["COMPLETED"];
-    default:
-      return [];
-  }
-}
-
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-destructive">{message}</p>;
@@ -225,7 +196,7 @@ export default function AdminBatchEditPage() {
 
   const [drawDay, setDrawDay] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [targetStatus, setTargetStatus] = useState<BatchStatus | "">("");
+  const [targetStatus, setTargetStatus] = useState<CanonicalBatchStatus | "">("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -278,7 +249,7 @@ export default function AdminBatchEditPage() {
   }, [loadPage]);
 
   const allowedStatuses = useMemo(
-    () => (batch ? nextAllowedStatuses(batch.status) : []),
+    () => (batch ? nextAllowedBatchStatuses(batch.status) : []),
     [batch]
   );
 
@@ -451,10 +422,7 @@ export default function AdminBatchEditPage() {
       ]}
       statusBadge={{
         label: batch?.status || "Batch Edit",
-        tone:
-          batch?.status === "OPEN" || batch?.status === "ACTIVE"
-            ? "success"
-            : "info",
+        tone: batch?.status && isLiveBatchStatus(batch.status) ? "success" : "info",
       }}
     >
       <div className="space-y-6">
@@ -507,8 +475,8 @@ export default function AdminBatchEditPage() {
                   value={String(luckyCreatedCount)}
                 />
                 <DetailValue
-                  label="Completion Rule"
-                  value="Completed is blocked while live subscriptions exist"
+                  label="Lifecycle Rule"
+                  value="Use the enum-backed transition sequence only"
                 />
               </div>
             </SectionCard>
@@ -678,7 +646,7 @@ export default function AdminBatchEditPage() {
                       id="target-status"
                       value={targetStatus}
                       onChange={(event) => {
-                        setTargetStatus(event.target.value as BatchStatus);
+                        setTargetStatus(event.target.value as CanonicalBatchStatus);
                         setError(null);
                         setSuccessMessage(null);
                       }}
@@ -709,8 +677,7 @@ export default function AdminBatchEditPage() {
               )}
 
               <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                DRAFT can move to OPEN. OPEN can move to ACTIVE or CLOSED. ACTIVE
-                can move to CLOSED. CLOSED can move to COMPLETED.
+                {BATCH_LIFECYCLE_TRANSITION_NOTE}
               </div>
             </SectionCard>
 

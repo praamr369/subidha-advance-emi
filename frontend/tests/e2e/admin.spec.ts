@@ -192,6 +192,103 @@ test("dead batch lucky-id generation route redirects to canonical batch detail",
   await expect(page).toHaveURL(/\/admin\/batches\/999999$/);
 });
 
+test("admin batch edit only exposes canonical lifecycle targets", async ({
+  page,
+}) => {
+  let currentStatus = "OPEN";
+  let postedStatus = "";
+
+  await page.route("**/api/v1/admin/batches/42/summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 42,
+        batch_code: "BATCH-42",
+        status: currentStatus,
+        duration_months: 12,
+        total_slots: 100,
+        draw_day: 5,
+        start_date: "2026-04-01",
+        subscription_count: 60,
+        active_subscription_count: 60,
+        won_subscription_count: 0,
+        available_lucky_ids: 40,
+        assigned_lucky_ids: 60,
+        won_lucky_ids: 0,
+        monthly_booked_value: "60000.00",
+        draw_count: 0,
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/batches/42/transition-status/", async (route) => {
+    const payload = route.request().postDataJSON() as { status?: string };
+    postedStatus = String(payload.status ?? "");
+    currentStatus = postedStatus || currentStatus;
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 42,
+        batch_code: "BATCH-42",
+        total_slots: 100,
+        duration_months: 12,
+        draw_day: 5,
+        start_date: "2026-04-01",
+        status: currentStatus,
+        created_at: "2026-04-01T08:30:00Z",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/batches/42/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 42,
+        batch_code: "BATCH-42",
+        total_slots: 100,
+        duration_months: 12,
+        draw_day: 5,
+        start_date: "2026-04-01",
+        status: currentStatus,
+        created_at: "2026-04-01T08:30:00Z",
+      }),
+    });
+  });
+
+  await page.goto("/admin/batches/42/edit");
+  await expect(
+    page.getByRole("heading", { name: "Edit BATCH-42" })
+  ).toBeVisible();
+
+  const optionTexts = await page
+    .locator("#target-status option")
+    .evaluateAll((options) => options.map((option) => option.textContent?.trim()));
+
+  expect(optionTexts).toEqual([
+    "Select next status",
+    "FULL",
+    "DRAW_IN_PROGRESS",
+  ]);
+  expect(optionTexts).not.toContain("ACTIVE");
+  expect(optionTexts).not.toContain("CANCELLED");
+  await expect(page.locator("body")).toContainText(
+    "OPEN can move to FULL or DRAW_IN_PROGRESS."
+  );
+
+  await page.locator("#target-status").selectOption("DRAW_IN_PROGRESS");
+  await page.getByRole("button", { name: "Change Status" }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "Batch status changed to DRAW_IN_PROGRESS."
+  );
+  expect(postedStatus).toBe("DRAW_IN_PROGRESS");
+});
+
 test("admin analytics shows an error state instead of fake zero fallback on dashboard failure", async ({
   page,
 }) => {

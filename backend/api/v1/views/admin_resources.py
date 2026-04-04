@@ -17,6 +17,7 @@ from django.utils.text import slugify
 
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
@@ -67,6 +68,7 @@ from subscriptions.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
+from subscriptions.services.batch_service import BATCH_STATUS_TRANSITIONS
 from subscriptions.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
@@ -224,27 +226,18 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         next_status = (next_status or "").strip().upper()
 
         supported_statuses = {choice[0] for choice in BatchStatus.choices}
-        supports_cancelled = "CANCELLED" in supported_statuses
-
         allowed_transitions = {
-            "DRAFT": {"DRAFT", "OPEN"},
-            "OPEN": {"OPEN", "ACTIVE", "CLOSED"},
-            "ACTIVE": {"ACTIVE", "CLOSED"},
-            "CLOSED": {"CLOSED", "COMPLETED"},
-            "COMPLETED": {"COMPLETED"},
+            status: set(transitions)
+            for status, transitions in BATCH_STATUS_TRANSITIONS.items()
         }
 
-        if supports_cancelled:
-            allowed_transitions["DRAFT"].add("CANCELLED")
-            allowed_transitions["CANCELLED"] = {"CANCELLED"}
-
         if next_status not in supported_statuses:
-            raise ValidationError(
+            raise DRFValidationError(
                 {"status": f"Unsupported batch status: {next_status}."}
             )
 
         if next_status not in allowed_transitions.get(current_status, set()):
-            raise ValidationError(
+            raise DRFValidationError(
                 {
                     "status": (
                         f"Invalid batch status transition from {current_status} to {next_status}."
@@ -253,24 +246,18 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
             )
 
         lucky_count = batch.lucky_ids.count()
-        subscription_count = batch.subscriptions.count()
-        supported_subscription_statuses = {choice[0] for choice in SubscriptionStatus.choices}
-        live_statuses = [status for status in ["ACTIVE", "PENDING"] if status in supported_subscription_statuses]
-
-        active_or_pending_count = (
-            batch.subscriptions.filter(status__in=live_statuses).count()
-            if live_statuses
-            else 0
-        )
+        available_lucky_count = batch.lucky_ids.filter(
+            status=LuckyIdStatus.AVAILABLE
+        ).count()
         draw_count = batch.lucky_draws.count()
 
         if next_status == "OPEN":
             if batch.total_slots != 100:
-                raise ValidationError(
+                raise DRFValidationError(
                     {"status": "Batch can move to OPEN only when total slots is exactly 100."}
                 )
             if lucky_count != batch.total_slots:
-                raise ValidationError(
+                raise DRFValidationError(
                     {
                         "status": (
                             f"Batch can move to OPEN only after all Lucky IDs are prepared. "
@@ -279,53 +266,40 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
                     }
                 )
 
-        if next_status == "ACTIVE":
-            if current_status != "OPEN":
-                raise ValidationError(
-                    {"status": "Only OPEN batches can move to ACTIVE."}
-                )
+        if next_status == "FULL":
             if lucky_count != batch.total_slots:
-                raise ValidationError(
+                raise DRFValidationError(
                     {
                         "status": (
-                            f"Batch can move to ACTIVE only when Lucky IDs match total slots. "
+                            f"Batch can move to FULL only when Lucky IDs match total slots. "
+                            f"Expected {batch.total_slots}, found {lucky_count}."
+                        )
+                    }
+                )
+            if available_lucky_count > 0:
+                raise DRFValidationError(
+                    {
+                        "status": (
+                            "Batch can move to FULL only when no Lucky IDs remain available."
+                        )
+                    }
+                )
+
+        if next_status == "DRAW_IN_PROGRESS":
+            if lucky_count != batch.total_slots:
+                raise DRFValidationError(
+                    {
+                        "status": (
+                            f"Batch can move to DRAW_IN_PROGRESS only when Lucky IDs match total slots. "
                             f"Expected {batch.total_slots}, found {lucky_count}."
                         )
                     }
                 )
 
-        if next_status == "CLOSED":
-            if current_status not in {"OPEN", "ACTIVE"}:
-                raise ValidationError(
-                    {"status": "Only OPEN or ACTIVE batches can move to CLOSED."}
-                )
-
         if next_status == "COMPLETED":
-            if current_status != "CLOSED":
-                raise ValidationError(
-                    {"status": "Only CLOSED batches can move to COMPLETED."}
-                )
-            if active_or_pending_count > 0:
-                raise ValidationError(
-                    {
-                        "status": (
-                            "Batch cannot move to COMPLETED while ACTIVE or PENDING subscriptions still exist."
-                        )
-                    }
-                )
-
-        if next_status == "CANCELLED":
-            if current_status != "DRAFT":
-                raise ValidationError(
-                    {"status": "Only DRAFT batches can be cancelled."}
-                )
-            if subscription_count > 0 or draw_count > 0:
-                raise ValidationError(
-                    {
-                        "status": (
-                            "Batch cannot be cancelled after subscriptions or draw records exist."
-                        )
-                    }
+            if draw_count <= 0:
+                raise DRFValidationError(
+                    {"status": "Batch can move to COMPLETED only after at least one draw record exists."}
                 )
 
     def perform_update(self, serializer):

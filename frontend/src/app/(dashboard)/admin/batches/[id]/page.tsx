@@ -12,17 +12,13 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import {
+  type BatchStatus,
+  isLiveBatchStatus,
+  normalizeBatchStatus,
+} from "@/domains/batches/status";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
-
-type BatchStatus =
-  | "DRAFT"
-  | "OPEN"
-  | "ACTIVE"
-  | "CLOSED"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "UNKNOWN";
 
 type SubscriptionStatus =
   | "ACTIVE"
@@ -126,21 +122,6 @@ function formatDateTime(value: string | null | undefined): string {
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
   return new Date(parsed).toLocaleString();
-}
-
-function normalizeBatchStatus(value: unknown): BatchStatus {
-  const status = String(value ?? "").toUpperCase();
-  if (
-    status === "DRAFT" ||
-    status === "OPEN" ||
-    status === "ACTIVE" ||
-    status === "CLOSED" ||
-    status === "COMPLETED" ||
-    status === "CANCELLED"
-  ) {
-    return status;
-  }
-  return "UNKNOWN";
 }
 
 function normalizeSubscriptionStatus(value: unknown): SubscriptionStatus {
@@ -370,15 +351,15 @@ function parseErrorMessage(error: unknown): string {
 function batchStatusToneClass(status: BatchStatus): string {
   switch (status) {
     case "OPEN":
-    case "ACTIVE":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "FULL":
+    case "DRAW_IN_PROGRESS":
+      return "border-amber-200 bg-amber-50 text-amber-700";
     case "DRAFT":
       return "border-blue-200 bg-blue-50 text-blue-700";
     case "CLOSED":
     case "COMPLETED":
       return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
     default:
       return "border-border bg-muted text-foreground";
   }
@@ -534,12 +515,7 @@ export default function AdminBatchDetailPage() {
       ]}
       statusBadge={{
         label: batch?.status || "Batch Detail",
-        tone:
-          batch?.status === "OPEN" || batch?.status === "ACTIVE"
-            ? "success"
-            : batch?.status === "CANCELLED"
-              ? "danger"
-              : "info",
+        tone: batch?.status && isLiveBatchStatus(batch.status) ? "success" : "info",
       }}
     >
       <div className="space-y-6">
