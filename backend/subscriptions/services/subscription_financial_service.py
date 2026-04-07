@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import Prefetch
@@ -330,6 +331,145 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
             "waived_amount": _money(waived_amount),
         },
         "emis": emi_rows,
+    }
+
+
+def attach_subscription_financial_snapshot(
+    subscription: Subscription, snapshot: dict | None = None
+) -> dict:
+    if snapshot is None:
+        snapshot = build_subscription_financial_snapshot(subscription)
+
+    setattr(subscription, "_subscription_financial_snapshot", snapshot)
+    setattr(subscription, "_customer_subscription_detail_snapshot", snapshot)
+    return snapshot
+
+
+def _pending_emi_sort_key(row: dict) -> tuple[date, int, int]:
+    due_date_raw = row.get("due_date")
+    try:
+        due_date = date.fromisoformat(str(due_date_raw))
+    except (TypeError, ValueError):
+        due_date = date.max
+
+    return (
+        due_date,
+        int(row.get("month_no") or 0),
+        int(row.get("id") or 0),
+    )
+
+
+def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
+    subscription_rows = list(subscriptions)
+
+    total_paid_amount = MONEY_ZERO
+    total_pending_amount = MONEY_ZERO
+    total_waived_amount = MONEY_ZERO
+    total_remaining_amount = MONEY_ZERO
+    total_overdue_amount = MONEY_ZERO
+    total_upcoming_amount = MONEY_ZERO
+
+    paid_emis = 0
+    pending_emis = 0
+    waived_emis = 0
+    overdue_emis = 0
+    upcoming_emis = 0
+
+    active_subscriptions = 0
+    completed_subscriptions = 0
+    winner_subscriptions = 0
+    has_payment_adjustments = False
+
+    next_due_subscription = None
+    next_due_emi = None
+
+    for subscription in subscription_rows:
+        snapshot = attach_subscription_financial_snapshot(subscription)
+
+        total_paid_amount = q2(
+            total_paid_amount + _decimal(snapshot.get("paid_amount"))
+        )
+        total_pending_amount = q2(
+            total_pending_amount + _decimal(snapshot.get("pending_amount"))
+        )
+        total_waived_amount = q2(
+            total_waived_amount + _decimal(snapshot.get("waived_amount"))
+        )
+        total_remaining_amount = q2(
+            total_remaining_amount + _decimal(snapshot.get("remaining_amount"))
+        )
+
+        paid_emis += int(snapshot.get("emi_count_paid") or 0)
+        pending_emis += int(snapshot.get("emi_count_pending") or 0)
+        waived_emis += int(snapshot.get("emi_count_waived") or 0)
+
+        if subscription.status == SubscriptionStatus.ACTIVE:
+            active_subscriptions += 1
+        if subscription.status == SubscriptionStatus.COMPLETED:
+            completed_subscriptions += 1
+        if snapshot.get("winner_status") == "WON":
+            winner_subscriptions += 1
+        if snapshot.get("has_reversal_history"):
+            has_payment_adjustments = True
+
+        for emi_row in snapshot.get("emis") or []:
+            if emi_row.get("derived_status") != EmiStatus.PENDING:
+                continue
+
+            balance_amount = _decimal(emi_row.get("balance_amount"))
+
+            if emi_row.get("is_overdue"):
+                overdue_emis += 1
+                total_overdue_amount = q2(total_overdue_amount + balance_amount)
+            else:
+                upcoming_emis += 1
+                total_upcoming_amount = q2(total_upcoming_amount + balance_amount)
+
+            if next_due_emi is None or _pending_emi_sort_key(emi_row) < _pending_emi_sort_key(
+                next_due_emi
+            ):
+                next_due_emi = emi_row
+                next_due_subscription = subscription
+
+    next_due_amount = _money(
+        _decimal(next_due_emi.get("balance_amount")) if next_due_emi else MONEY_ZERO
+    )
+
+    return {
+        "subscription_count": len(subscription_rows),
+        "active_subscriptions": active_subscriptions,
+        "completed_subscriptions": completed_subscriptions,
+        "winner_subscriptions": winner_subscriptions,
+        "pending_emis": pending_emis,
+        "upcoming_emis": upcoming_emis,
+        "overdue_emis": overdue_emis,
+        "paid_emis": paid_emis,
+        "waived_emis": waived_emis,
+        "total_paid_amount": _money(total_paid_amount),
+        "total_pending_amount": _money(total_pending_amount),
+        "total_waived_amount": _money(total_waived_amount),
+        "remaining_amount": _money(total_remaining_amount),
+        "outstanding_amount": _money(total_remaining_amount),
+        "overdue_amount": _money(total_overdue_amount),
+        "upcoming_amount": _money(total_upcoming_amount),
+        "next_due_amount": next_due_amount if next_due_emi else None,
+        "next_due_date": next_due_emi.get("due_date") if next_due_emi else None,
+        "next_due_is_overdue": bool(next_due_emi.get("is_overdue")) if next_due_emi else False,
+        "next_due_subscription_id": getattr(next_due_subscription, "id", None),
+        "next_due_subscription_number": (
+            f"SUB-{next_due_subscription.id}" if next_due_subscription else None
+        ),
+        "next_due_product_name": (
+            getattr(next_due_subscription.product, "name", None)
+            if next_due_subscription is not None
+            else None
+        ),
+        "next_due_lucky_number": (
+            getattr(next_due_subscription.lucky_id, "lucky_number", None)
+            if next_due_subscription is not None
+            else None
+        ),
+        "has_payment_adjustments": has_payment_adjustments,
     }
 
 

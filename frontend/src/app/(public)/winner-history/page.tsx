@@ -105,7 +105,10 @@ export default async function WinnerHistoryPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
+              <table
+                aria-label="Winner history records"
+                className="min-w-full border-separate border-spacing-0"
+              >
                 <thead>
                   <tr className="text-left">
                     <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

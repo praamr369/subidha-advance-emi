@@ -326,7 +326,9 @@ export default function CustomerSubscriptionRequestCreatePage() {
                       alt={selectedProduct?.name || "Requested product"}
                       sizes="320px"
                       className="h-56 w-full rounded-[28px]"
-                      fallbackLabel="Select a product"
+                      fallbackLabel={
+                        selectedProduct ? "Product media pending" : "Select a product"
+                      }
                       badge={selectedProduct?.product_code || "Preview"}
                     />
 

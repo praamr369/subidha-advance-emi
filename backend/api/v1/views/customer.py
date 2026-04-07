@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.db.models import Count, Prefetch, Q, Sum
 from rest_framework import status
 from rest_framework.response import Response
@@ -14,6 +12,7 @@ from api.v1.serializers.support_requests import (
     CustomerSupportRequestReadSerializer,
 )
 from api.v1.serializers.subscription import (
+    CustomerDashboardSubscriptionSerializer,
     SubscriptionDetailSerializer,
     SubscriptionListSerializer,
 )
@@ -35,9 +34,9 @@ from subscriptions.services.delivery_service import (
     get_subscription_delivery_prefetch,
 )
 from subscriptions.services.subscription_financial_service import (
+    build_customer_dashboard_summary,
     get_subscription_detail_queryset,
 )
-from subscriptions.services.winner_state_service import winner_history_q
 
 
 def _get_customer_or_404_response(request):
@@ -120,30 +119,8 @@ def _customer_support_request_queryset(customer):
     )
 
 
-def _safe_decimal(value) -> Decimal:
-    if value is None:
-        return MONEY_ZERO
-    return Decimal(str(value))
-
-
-def _build_dashboard_outstanding_amount(subscriptions) -> Decimal:
-    total_outstanding = MONEY_ZERO
-
-    for subscription in subscriptions:
-        for emi in getattr(subscription, "emis", []).all() if hasattr(getattr(subscription, "emis", None), "all") else getattr(subscription, "emis", []):
-            amount = _safe_decimal(getattr(emi, "amount", MONEY_ZERO))
-            paid = _safe_decimal(
-                emi.payments.aggregate(total=Sum("amount")).get("total") or MONEY_ZERO
-            )
-            waived = amount if getattr(emi, "status", "") == EmiStatus.WAIVED else MONEY_ZERO
-
-            outstanding = amount - paid - waived
-            if outstanding < MONEY_ZERO:
-                outstanding = MONEY_ZERO
-
-            total_outstanding += outstanding
-
-    return total_outstanding
+def _money_string(value) -> str:
+    return f"{value or MONEY_ZERO:.2f}"
 
 
 class CustomerDashboard(APIView):
@@ -154,22 +131,10 @@ class CustomerDashboard(APIView):
         if error_response is not None:
             return error_response
 
-        subscriptions = _customer_subscription_queryset(customer)
-
-        emi_summary = Emi.objects.filter(subscription__customer=customer).aggregate(
-            pending_emis=Count("id", filter=Q(status=EmiStatus.PENDING)),
-            paid_emis=Count("id", filter=Q(status=EmiStatus.PAID)),
-            waived_emis=Count("id", filter=Q(status=EmiStatus.WAIVED)),
+        subscriptions = list(
+            _customer_subscription_detail_queryset(customer).order_by("-created_at", "-id")
         )
-
-        total_paid_amount = (
-            Payment.objects.filter(customer=customer).aggregate(total=Sum("amount"))[
-                "total"
-            ]
-            or MONEY_ZERO
-        )
-
-        outstanding_amount = _build_dashboard_outstanding_amount(subscriptions)
+        summary = build_customer_dashboard_summary(subscriptions)
 
         return Response(
             {
@@ -179,20 +144,14 @@ class CustomerDashboard(APIView):
                     "phone": customer.phone,
                     "kyc_status": customer.kyc_status,
                 },
-                "summary": {
-                    "active_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.ACTIVE
-                    ).count(),
-                    "pending_emis": emi_summary["pending_emis"] or 0,
-                    "paid_emis": emi_summary["paid_emis"] or 0,
-                    "waived_emis": emi_summary["waived_emis"] or 0,
-                    "total_paid_amount": str(total_paid_amount),
-                    "outstanding_amount": str(outstanding_amount),
-                },
-                "subscriptions": SubscriptionListSerializer(
+                "summary": summary,
+                "subscriptions": CustomerDashboardSubscriptionSerializer(
                     subscriptions,
                     many=True,
-                    context={"request": request},
+                    context={
+                        "request": request,
+                        "use_canonical_financial_summary": True,
+                    },
                 ).data,
             }
         )
@@ -241,7 +200,9 @@ class CustomerSubscriptionListView(APIView):
         if error_response is not None:
             return error_response
 
-        subscriptions = _customer_subscription_queryset(customer)
+        subscriptions = _customer_subscription_detail_queryset(customer).order_by(
+            "-created_at", "-id"
+        )
 
         status_filter = (request.query_params.get("status") or "").strip()
         if status_filter:
@@ -253,7 +214,10 @@ class CustomerSubscriptionListView(APIView):
                 "results": SubscriptionListSerializer(
                     subscriptions,
                     many=True,
-                    context={"request": request},
+                    context={
+                        "request": request,
+                        "use_canonical_financial_summary": True,
+                    },
                 ).data,
             }
         )
@@ -314,12 +278,24 @@ class CustomerPaymentListView(APIView):
         if method:
             payments = payments.filter(method=method)
 
-        total_amount = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+        recorded_total = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+        reversed_payments = payments.filter(
+            allocation_metadata__reversal__is_reversed=True
+        )
+        total_amount = (
+            payments.exclude(allocation_metadata__reversal__is_reversed=True).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or MONEY_ZERO
+        )
+        reversed_total = reversed_payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
 
         return Response(
             {
                 "count": payments.count(),
-                "total_paid_amount": str(total_amount),
+                "total_paid_amount": _money_string(total_amount),
+                "recorded_amount_total": _money_string(recorded_total),
+                "reversed_amount_total": _money_string(reversed_total),
                 "results": PaymentSerializer(payments, many=True).data,
             }
         )

@@ -5,12 +5,21 @@ import { brandConfig } from "@/config/brand";
 import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
 
+const publicLogoSrc = brandConfig.publicLogoSrc || undefined;
+
 export const metadata: Metadata = {
   title: {
     default: brandConfig.platformName,
     template: `%s | ${brandConfig.platformName}`,
   },
   description: `${brandConfig.companyName} ${brandConfig.publicProgramName} EMI operational platform`,
+  icons: publicLogoSrc
+    ? {
+        icon: publicLogoSrc,
+        shortcut: publicLogoSrc,
+        apple: publicLogoSrc,
+      }
+    : undefined,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -49,6 +49,14 @@ function winnerWaiverSummary(subscription: CustomerSubscription): string {
   return "No winner or waiver recorded";
 }
 
+function contractRemainingAmount(subscription: CustomerSubscription): string | number | null | undefined {
+  return (
+    subscription.financial_summary?.remaining_amount ??
+    subscription.financial_summary?.outstanding_amount ??
+    subscription.outstanding_amount
+  );
+}
+
 function CardBody({
   subscription,
   compact,
@@ -120,10 +128,7 @@ function CardBody({
               Outstanding
             </div>
             <div className="mt-2 text-sm font-medium text-slate-900">
-              {money(
-                subscription.financial_summary?.outstanding_amount ??
-                  subscription.outstanding_amount
-              )}
+              {money(contractRemainingAmount(subscription))}
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200/80 bg-white/75 px-4 py-3">

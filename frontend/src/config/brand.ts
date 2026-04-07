@@ -3,7 +3,6 @@ export const brandConfig = {
   companyName: "Subidha Furniture",
   publicProgramName: "Lucky Plan",
   publicBranchLocation: "Asansol, West Bengal",
-  // Wire the provided asset here once it is present in frontend/public.
-  publicLogoSrc: null as string | null,
+  publicLogoSrc: "/brand/logo.png",
   publicLogoAlt: "Subidha Furniture logo",
 } as const;

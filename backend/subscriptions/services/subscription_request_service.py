@@ -37,11 +37,15 @@ def subscription_request_base_queryset():
 
 
 def subscription_request_lock_queryset():
+    """
+    Safe lock queryset for mutation flows.
+
+    Keep nullable relations like partner/customer out of the select_related set
+    here so PostgreSQL can apply FOR UPDATE without hitting nullable outer-join
+    restrictions during approve/reject/cancel operations.
+    """
     return SubscriptionRequest.objects.select_related(
         "requester",
-        "partner",
-        "customer",
-        "customer__user",
         "product",
         "batch",
     )

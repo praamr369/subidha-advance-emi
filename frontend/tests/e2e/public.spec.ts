@@ -6,6 +6,9 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
   page,
 }) => {
   await page.goto("/");
+  await expect(
+    page.getByRole("img", { name: "Subidha Furniture logo" }).first()
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
   await expect(page.getByText("Published Batches")).toBeVisible();
   await expect(page.getByText("Latest Published Winner")).toBeVisible();
@@ -64,7 +67,16 @@ test("public winner history page loads with live data", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Winner History" })
   ).toBeVisible();
-  await expect(page.getByText("PW-SMOKE-WINNER")).toBeVisible();
+  const winnerHistoryTable = page.getByRole("table", {
+    name: "Winner history records",
+  });
+  await expect(winnerHistoryTable).toBeVisible();
+  await expect(
+    winnerHistoryTable.getByRole("cell", {
+      name: "PW-SMOKE-WINNER",
+      exact: true,
+    })
+  ).toBeVisible();
 });
 
 test("public stats failure renders an error state instead of fake zero cards", async ({

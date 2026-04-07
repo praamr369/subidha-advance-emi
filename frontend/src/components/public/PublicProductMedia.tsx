@@ -28,8 +28,9 @@ export default function PublicProductMedia({
   fallbackLabel = "Media pending",
   badge,
 }: PublicProductMediaProps) {
-  const [hasError, setHasError] = useState(false);
-  const shouldRenderImage = Boolean(src) && !hasError;
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const resolvedSrc = src ?? null;
+  const shouldRenderImage = Boolean(resolvedSrc) && failedSrc !== resolvedSrc;
   const shouldBypassOptimization = shouldBypassNextImageOptimization(src);
 
   return (
@@ -45,14 +46,14 @@ export default function PublicProductMedia({
 
       {shouldRenderImage ? (
         <Image
-          src={src as string}
+          src={resolvedSrc as string}
           alt={alt}
           fill
           className={cn("object-cover", imageClassName)}
           sizes={sizes}
           priority={priority}
           unoptimized={shouldBypassOptimization}
-          onError={() => setHasError(true)}
+          onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(226,232,240,0.96))] text-slate-600">

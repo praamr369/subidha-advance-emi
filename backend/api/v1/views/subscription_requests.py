@@ -254,17 +254,17 @@ class CustomerSubscriptionRequestCancelView(APIView):
         if error_response is not None:
             return error_response
 
-        request_obj = (
-            subscription_request_lock_queryset()
-            .select_for_update()
-            .filter(
-                pk=pk,
-                requester=request.user,
-                customer=customer,
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(
+                    pk=pk,
+                    requester=request.user,
+                    customer=customer,
+                )
             )
-            .first()
-        )
-        if request_obj is None:
+        except SubscriptionRequest.DoesNotExist:
             return Response(
                 {"detail": "Subscription request not found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -410,13 +410,13 @@ class PartnerSubscriptionRequestCancelView(APIView):
     @transaction.atomic
     def post(self, request, pk):
         partner = _get_partner_user(request)
-        request_obj = (
-            subscription_request_lock_queryset()
-            .select_for_update()
-            .filter(pk=pk, partner=partner)
-            .first()
-        )
-        if request_obj is None:
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk, partner=partner)
+            )
+        except SubscriptionRequest.DoesNotExist:
             return Response(
                 {"detail": "Subscription request not found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -526,13 +526,13 @@ class AdminSubscriptionRequestApproveView(APIView):
 
     @transaction.atomic
     def post(self, request, pk):
-        request_obj = (
-            subscription_request_lock_queryset()
-            .select_for_update()
-            .filter(pk=pk)
-            .first()
-        )
-        if request_obj is None:
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except SubscriptionRequest.DoesNotExist:
             return Response(
                 {"detail": "Subscription request not found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -583,13 +583,13 @@ class AdminSubscriptionRequestRejectView(APIView):
 
     @transaction.atomic
     def post(self, request, pk):
-        request_obj = (
-            subscription_request_lock_queryset()
-            .select_for_update()
-            .filter(pk=pk)
-            .first()
-        )
-        if request_obj is None:
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except SubscriptionRequest.DoesNotExist:
             return Response(
                 {"detail": "Subscription request not found."},
                 status=status.HTTP_404_NOT_FOUND,

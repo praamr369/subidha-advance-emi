@@ -10,6 +10,7 @@ from subscriptions.services.delivery_service import (
     get_current_subscription_delivery,
 )
 from subscriptions.services.subscription_financial_service import (
+    attach_subscription_financial_snapshot,
     build_subscription_financial_snapshot,
 )
 
@@ -168,7 +169,27 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             return list(prefetched["emis"])
         return list(obj.emis.all())
 
+    def _use_canonical_financial_summary(self) -> bool:
+        return bool(self.context.get("use_canonical_financial_summary"))
+
+    def _snapshot(self, obj):
+        snapshot = getattr(obj, "_subscription_financial_snapshot", None)
+        if snapshot is None:
+            snapshot = attach_subscription_financial_snapshot(obj)
+        return snapshot
+
     def _compute_financial_summary(self, obj):
+        if self._use_canonical_financial_summary():
+            snapshot = self._snapshot(obj)
+            return {
+                "emi_total": Decimal(snapshot["emi_total"]),
+                "paid_amount": Decimal(snapshot["paid_amount"]),
+                "waived_amount": Decimal(snapshot["waived_amount"]),
+                "pending_amount": Decimal(snapshot["pending_amount"]),
+                "remaining_amount": Decimal(snapshot["remaining_amount"]),
+                "outstanding_amount": Decimal(snapshot["outstanding_amount"]),
+            }
+
         emis = self._get_emis(obj)
 
         emi_total = Decimal("0.00")
@@ -206,6 +227,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "emi_total": emi_total,
             "paid_amount": paid_total,
             "waived_amount": waived_total,
+            "pending_amount": outstanding,
+            "remaining_amount": outstanding,
             "outstanding_amount": outstanding,
         }
 
@@ -213,12 +236,18 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         return len(self._get_emis(obj))
 
     def get_paid_emi_count(self, obj):
+        if self._use_canonical_financial_summary():
+            return int(self._snapshot(obj)["emi_count_paid"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "PAID")
 
     def get_pending_emi_count(self, obj):
+        if self._use_canonical_financial_summary():
+            return int(self._snapshot(obj)["emi_count_pending"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "PENDING")
 
     def get_waived_emi_count(self, obj):
+        if self._use_canonical_financial_summary():
+            return int(self._snapshot(obj)["emi_count_waived"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "WAIVED")
 
     def get_total_paid_amount(self, obj):
@@ -235,6 +264,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "emi_total": str(summary["emi_total"]),
             "paid_amount": str(summary["paid_amount"]),
             "waived_amount": str(summary["waived_amount"]),
+            "pending_amount": str(summary["pending_amount"]),
+            "remaining_amount": str(summary["remaining_amount"]),
             "outstanding_amount": str(summary["outstanding_amount"]),
         }
 
@@ -264,6 +295,24 @@ class SubscriptionListSerializer(BaseSubscriptionSerializer):
         read_only_fields = fields
 
 
+class CustomerDashboardSubscriptionSerializer(SubscriptionListSerializer):
+    winner_status = serializers.SerializerMethodField()
+    winner_summary = serializers.SerializerMethodField()
+
+    class Meta(SubscriptionListSerializer.Meta):
+        fields = SubscriptionListSerializer.Meta.fields + (
+            "winner_status",
+            "winner_summary",
+        )
+        read_only_fields = fields
+
+    def get_winner_status(self, obj):
+        return self._snapshot(obj)["winner_status"]
+
+    def get_winner_summary(self, obj):
+        return self._snapshot(obj)["winner_summary"]
+
+
 class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
     winner_status = serializers.SerializerMethodField()
     winner_summary = serializers.SerializerMethodField()
@@ -282,11 +331,10 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
         read_only_fields = fields
 
     def _snapshot(self, obj):
-        cache_attr = "_customer_subscription_detail_snapshot"
-        snapshot = getattr(obj, cache_attr, None)
+        snapshot = getattr(obj, "_customer_subscription_detail_snapshot", None)
         if snapshot is None:
             snapshot = build_subscription_financial_snapshot(obj)
-            setattr(obj, cache_attr, snapshot)
+            attach_subscription_financial_snapshot(obj, snapshot)
         return snapshot
 
     def get_financial_summary(self, obj):
@@ -295,6 +343,8 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
             "emi_total": snapshot["emi_total"],
             "paid_amount": snapshot["paid_amount"],
             "waived_amount": snapshot["waived_amount"],
+            "pending_amount": snapshot["pending_amount"],
+            "remaining_amount": snapshot["remaining_amount"],
             "outstanding_amount": snapshot["outstanding_amount"],
         }
 

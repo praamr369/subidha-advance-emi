@@ -59,6 +59,149 @@ test("customer payment receipt is self-scoped", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("customer dashboard renders canonical financial grouping", async ({ page }) => {
+  await page.route("**/api/v1/customer/dashboard/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        customer: {
+          id: 31,
+          name: "Customer One",
+          phone: "01700000000",
+          kyc_status: "VERIFIED",
+        },
+        summary: {
+          subscription_count: 2,
+          active_subscriptions: 1,
+          completed_subscriptions: 0,
+          winner_subscriptions: 1,
+          pending_emis: 3,
+          upcoming_emis: 2,
+          overdue_emis: 1,
+          paid_emis: 4,
+          waived_emis: 2,
+          total_paid_amount: "4000.00",
+          total_pending_amount: "3000.00",
+          total_waived_amount: "2000.00",
+          remaining_amount: "3000.00",
+          outstanding_amount: "3000.00",
+          overdue_amount: "1000.00",
+          upcoming_amount: "2000.00",
+          next_due_amount: "1000.00",
+          next_due_date: "2026-04-15",
+          next_due_is_overdue: true,
+          next_due_subscription_id: 901,
+          next_due_subscription_number: "SUB-901",
+          next_due_product_name: "Aurora Sofa",
+          next_due_lucky_number: 8,
+          has_payment_adjustments: true,
+        },
+        subscriptions: [
+          {
+            id: 901,
+            subscription_number: "SUB-901",
+            status: "ACTIVE",
+            plan_type: "EMI",
+            total_amount: "3000.00",
+            monthly_amount: "1000.00",
+            tenure_months: 3,
+            product_name: "Aurora Sofa",
+            product_code: "AUR-901",
+            product_image: null,
+            batch_code: "BATCH-901",
+            lucky_number: 8,
+            emi_count: 3,
+            paid_emi_count: 1,
+            pending_emi_count: 2,
+            waived_emi_count: 0,
+            total_paid_amount: "1000.00",
+            outstanding_amount: "2000.00",
+            next_due_date: "2026-04-15",
+            winner_status: "NOT_WON",
+            financial_summary: {
+              emi_total: "3000.00",
+              paid_amount: "1000.00",
+              waived_amount: "0.00",
+              pending_amount: "2000.00",
+              remaining_amount: "2000.00",
+              outstanding_amount: "2000.00",
+            },
+            winner_summary: {
+              winner_status: "NOT_WON",
+              winner_month: null,
+              lucky_id: 301,
+              lucky_number: 8,
+              draw_id: null,
+              draw_month: null,
+              draw_revealed_at: null,
+              waiver_scope: null,
+              waived_emi_count: 0,
+              waived_amount: "0.00",
+            },
+          },
+          {
+            id: 902,
+            subscription_number: "SUB-902",
+            status: "WON",
+            plan_type: "EMI",
+            total_amount: "3000.00",
+            monthly_amount: "1000.00",
+            tenure_months: 3,
+            product_name: "Winner Sofa",
+            product_code: "WIN-902",
+            product_image: null,
+            batch_code: "BATCH-902",
+            lucky_number: 9,
+            emi_count: 3,
+            paid_emi_count: 0,
+            pending_emi_count: 1,
+            waived_emi_count: 2,
+            total_paid_amount: "0.00",
+            outstanding_amount: "1000.00",
+            next_due_date: "2026-04-18",
+            winner_status: "WON",
+            financial_summary: {
+              emi_total: "3000.00",
+              paid_amount: "0.00",
+              waived_amount: "2000.00",
+              pending_amount: "1000.00",
+              remaining_amount: "1000.00",
+              outstanding_amount: "1000.00",
+            },
+            winner_summary: {
+              winner_status: "WON",
+              winner_month: 1,
+              lucky_id: 302,
+              lucky_number: 9,
+              draw_id: 41,
+              draw_month: 1,
+              draw_revealed_at: "2026-04-01T09:00:00Z",
+              waiver_scope: "FUTURE_EMI_ONLY",
+              waived_emi_count: 2,
+              waived_amount: "2000.00",
+            },
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/customer");
+  await expect(
+    page.getByRole("heading", { name: "Customer Workspace" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Financial alignment");
+  await expect(page.locator("body")).toContainText("Overdue EMI");
+  await expect(page.locator("body")).toContainText("Upcoming EMI");
+  await expect(page.locator("body")).toContainText(
+    "Winner benefit is already reflected in contract totals"
+  );
+  await expect(page.locator("body")).toContainText("Settled totals already reflect any reversal history.");
+  await expect(page.locator("body")).toContainText("Aurora Sofa");
+  await expect(page.locator("body")).toContainText("Winner Sofa");
+});
+
 test("customer legacy emis route redirects to subscriptions", async ({ page }) => {
   await page.goto("/customer/emis");
   await expect(page).toHaveURL(/\/customer\/subscriptions$/);
@@ -85,7 +228,7 @@ test("customer completed winner detail separates contract and winner history", a
         lucky_id: 31,
         product_name: "Winner Product",
         product_code: "WIN-PROD-951",
-        product_image: "http://127.0.0.1:8100/media/products/winner-product.png",
+        product_image: null,
         batch_code: "WIN-BATCH-951",
         lucky_number: 8,
         emi_count: 3,
@@ -192,7 +335,7 @@ test("customer unsettled winner detail keeps winner history while contract is st
         lucky_id: 32,
         product_name: "Winner Product",
         product_code: "WIN-PROD-952",
-        product_image: "http://127.0.0.1:8100/media/products/winner-product.png",
+        product_image: null,
         batch_code: "WIN-BATCH-952",
         lucky_number: 9,
         emi_count: 3,
@@ -284,7 +427,7 @@ test("customer can submit a subscription request from the create form", async ({
             name: "Request Product",
             product_code: "REQ-041",
             base_price: "12000.00",
-            image: "http://127.0.0.1:8100/media/products/request-product.png",
+            image: null,
           },
         ],
         batches: [
@@ -328,7 +471,7 @@ test("customer can submit a subscription request from the create form", async ({
           product_id: 41,
           product_name: "Request Product",
           product_code: "REQ-041",
-          product_image: "http://127.0.0.1:8100/media/products/request-product.png",
+          product_image: null,
           batch_id: 51,
           batch_code: "REQ-BATCH-51",
           preferred_lucky_number: 12,
@@ -348,8 +491,12 @@ test("customer can submit a subscription request from the create form", async ({
   await expect(
     page.getByRole("heading", { name: "Create Subscription Request" })
   ).toBeVisible();
+  await expect(page.locator("aside").getByText("Select a product")).toBeVisible();
 
   await page.getByRole("combobox", { name: /^Product$/ }).selectOption("41");
+  await expect(
+    page.locator("aside").getByText("Product media pending")
+  ).toBeVisible();
   await page.getByRole("combobox", { name: /^Batch$/ }).selectOption("51");
   await page
     .getByRole("combobox", { name: /^Lucky number$/ })

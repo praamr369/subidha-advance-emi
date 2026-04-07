@@ -184,7 +184,7 @@ test("partner can submit a new-customer subscription request", async ({ page }) 
             name: "Partner Request Product",
             product_code: "PREQ-061",
             base_price: "15000.00",
-            image: "http://127.0.0.1:8100/media/products/partner-request.png",
+            image: null,
           },
         ],
         batches: [
@@ -242,7 +242,7 @@ test("partner can submit a new-customer subscription request", async ({ page }) 
           product_id: 61,
           product_name: "Partner Request Product",
           product_code: "PREQ-061",
-          product_image: "http://127.0.0.1:8100/media/products/partner-request.png",
+          product_image: null,
           batch_id: 71,
           batch_code: "PARTNER-BATCH-71",
           preferred_lucky_number: 22,

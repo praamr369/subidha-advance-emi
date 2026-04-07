@@ -76,6 +76,21 @@ class CustomerSubscriptionProductMediaTests(APITestCase):
             row["product_image"],
         )
 
+    def test_customer_dashboard_exposes_product_image_and_code(self):
+        response = self.client.get("/api/v1/customer/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["summary"]["subscription_count"], 1)
+        row = response.data["subscriptions"][0]
+        self.assertEqual(row["product_name"], "Media Ready Product")
+        self.assertEqual(row["product_code"], "MEDIA-PRODUCT-001")
+        self.assertTrue(
+            row["product_image"].startswith(
+                "http://testserver/media/products/media-product-001/"
+            ),
+            row["product_image"],
+        )
+
     def test_customer_subscription_detail_exposes_product_image_and_context(self):
         response = self.client.get(
             f"/api/v1/customer/subscriptions/{self.subscription.id}/"

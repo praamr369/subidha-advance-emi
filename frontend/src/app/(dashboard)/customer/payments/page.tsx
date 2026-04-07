@@ -246,7 +246,7 @@ export default function CustomerPaymentsPage() {
   return (
     <PortalPage
       title="My Payments"
-      subtitle="Customer-scoped payment history backed by your recorded payment rows."
+      subtitle="Customer-scoped payment history with recorded payment rows and a net settled total."
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Payments" },

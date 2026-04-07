@@ -13,6 +13,9 @@ from subscriptions.models import (
     SubscriptionRequest,
     SubscriptionRequestStatus,
 )
+from subscriptions.services.subscription_request_service import (
+    subscription_request_lock_queryset,
+)
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -169,6 +172,11 @@ class SubscriptionRequestWorkflowApiTests(APITestCase):
             ).exists()
         )
 
+    def test_subscription_request_lock_queryset_avoids_nullable_outer_joins(self):
+        query = str(subscription_request_lock_queryset().filter(pk=1).query).upper()
+
+        self.assertNotIn("LEFT OUTER JOIN", query)
+
     def test_partner_options_and_existing_customer_request_are_scoped_to_partner_visible_customers(self):
         self.client.force_authenticate(user=self.partner)
 
@@ -215,6 +223,55 @@ class SubscriptionRequestWorkflowApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(denied_response.status_code, status.HTTP_404_NOT_FOUND, denied_response.data)
+
+    def test_admin_can_approve_existing_linked_customer_request_without_creating_new_customer(self):
+        self.client.force_authenticate(user=self.customer_user)
+
+        before_customer_count = self.customer.__class__.objects.count()
+        before_subscription_count = Subscription.objects.count()
+        before_emi_count = Emi.objects.count()
+        before_payment_count = Payment.objects.count()
+
+        create_response = self.client.post(
+            "/api/v1/customer/subscription-requests/",
+            {
+                "product_id": self.product.id,
+                "batch_id": self.batch.id,
+                "preferred_lucky_number": 2,
+                "notes": "Approve my linked customer request",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        request_id = create_response.data["request"]["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        approve_response = self.client.post(
+            f"/api/v1/admin/subscription-requests/{request_id}/approve/",
+            {"review_note": "Approved existing customer request"},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK, approve_response.data)
+
+        request_obj = SubscriptionRequest.objects.get(pk=request_id)
+        subscription = Subscription.objects.get(pk=request_obj.approved_subscription_id)
+
+        self.assertEqual(request_obj.status, SubscriptionRequestStatus.APPROVED)
+        self.assertEqual(request_obj.customer_id, self.customer.id)
+        self.assertEqual(subscription.customer_id, self.customer.id)
+        self.assertIsNone(subscription.partner_id)
+        self.assertEqual(subscription.product_id, self.product.id)
+        self.assertEqual(subscription.batch_id, self.batch.id)
+        self.assertEqual(subscription.lucky_id.lucky_number, 2)
+        self.assertEqual(self.customer.__class__.objects.count(), before_customer_count)
+        self.assertEqual(Subscription.objects.count(), before_subscription_count + 1)
+        self.assertEqual(
+            Emi.objects.count(),
+            before_emi_count + self.batch.duration_months,
+        )
+        self.assertEqual(Payment.objects.count(), before_payment_count)
+        self.lucky_2.refresh_from_db()
+        self.assertEqual(self.lucky_2.status, LuckyIdStatus.ASSIGNED)
 
     def test_partner_new_customer_request_requires_admin_approval_before_real_subscription(self):
         self.client.force_authenticate(user=self.partner)
@@ -289,6 +346,72 @@ class SubscriptionRequestWorkflowApiTests(APITestCase):
                 action_type=AuditLog.ActionType.USER_CREATED,
                 model_name="Customer",
                 object_id=created_customer.id,
+            ).exists()
+        )
+
+    def test_failed_new_customer_approval_rolls_back_customer_creation_and_subscription_side_effects(self):
+        self.client.force_authenticate(user=self.partner)
+
+        create_response = self.client.post(
+            "/api/v1/partner/subscription-requests/",
+            {
+                "requested_customer_name": "Rollback Approval Customer",
+                "requested_customer_phone": "9500000016",
+                "requested_customer_email": "rollback-approval@example.com",
+                "requested_customer_address": "Rollback Road",
+                "requested_customer_city": "Rajshahi",
+                "product_id": self.product.id,
+                "batch_id": self.batch.id,
+                "preferred_lucky_number": 6,
+                "notes": "Fails after customer snapshot validation",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        request_id = create_response.data["request"]["id"]
+
+        self.lucky_6.status = LuckyIdStatus.ASSIGNED
+        self.lucky_6.save(update_fields=["status"])
+
+        before_customer_count = self.customer.__class__.objects.count()
+        before_user_count = self.customer_user.__class__.objects.count()
+        before_subscription_count = Subscription.objects.count()
+        before_emi_count = Emi.objects.count()
+        before_payment_count = Payment.objects.count()
+
+        self.client.force_authenticate(user=self.admin)
+        approve_response = self.client.post(
+            f"/api/v1/admin/subscription-requests/{request_id}/approve/",
+            {"create_customer": True, "review_note": "Should roll back"},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_400_BAD_REQUEST, approve_response.data)
+        self.assertIn("preferred_lucky_number", approve_response.data)
+
+        request_obj = SubscriptionRequest.objects.get(pk=request_id)
+        self.assertEqual(request_obj.status, SubscriptionRequestStatus.SUBMITTED)
+        self.assertIsNone(request_obj.customer_id)
+        self.assertIsNone(request_obj.approved_subscription_id)
+        self.assertEqual(self.customer.__class__.objects.count(), before_customer_count)
+        self.assertEqual(self.customer_user.__class__.objects.count(), before_user_count)
+        self.assertEqual(Subscription.objects.count(), before_subscription_count)
+        self.assertEqual(Emi.objects.count(), before_emi_count)
+        self.assertEqual(Payment.objects.count(), before_payment_count)
+        self.assertFalse(
+            self.customer_user.__class__.objects.filter(
+                email="rollback-approval@example.com"
+            ).exists()
+        )
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action_type=AuditLog.ActionType.SUBSCRIPTION_REQUEST_APPROVED,
+                object_id=request_obj.id,
+            ).exists()
+        )
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action_type=AuditLog.ActionType.USER_CREATED,
+                metadata__username__icontains="rollbackapprovalcustomer",
             ).exists()
         )
 

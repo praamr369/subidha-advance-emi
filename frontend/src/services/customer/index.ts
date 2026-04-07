@@ -22,6 +22,8 @@ export type CustomerSubscriptionFinancialSummary = {
   emi_total?: number | string;
   paid_amount?: number | string;
   waived_amount?: number | string;
+  pending_amount?: number | string;
+  remaining_amount?: number | string;
   outstanding_amount?: number | string;
 };
 
@@ -92,12 +94,30 @@ export type CustomerDashboardResponse = {
     kyc_status: string;
   };
   summary: {
+    subscription_count?: number;
     active_subscriptions: number;
+    completed_subscriptions?: number;
+    winner_subscriptions?: number;
     pending_emis: number;
+    upcoming_emis?: number;
+    overdue_emis?: number;
     paid_emis: number;
     total_paid_amount: number | string;
     waived_emis?: number;
+    total_pending_amount?: number | string;
+    total_waived_amount?: number | string;
+    remaining_amount?: number | string;
     outstanding_amount?: number | string;
+    overdue_amount?: number | string;
+    upcoming_amount?: number | string;
+    next_due_amount?: number | string | null;
+    next_due_date?: string | null;
+    next_due_is_overdue?: boolean;
+    next_due_subscription_id?: number | null;
+    next_due_subscription_number?: string | null;
+    next_due_product_name?: string | null;
+    next_due_lucky_number?: number | null;
+    has_payment_adjustments?: boolean;
     under_verification_requests?: number;
   };
   subscriptions: CustomerSubscription[];
@@ -334,6 +354,14 @@ function normalizeFinancialSummary(
       row.waived_amount === null || row.waived_amount === undefined
         ? undefined
         : toMoneyString(row.waived_amount),
+    pending_amount:
+      row.pending_amount === null || row.pending_amount === undefined
+        ? undefined
+        : toMoneyString(row.pending_amount),
+    remaining_amount:
+      row.remaining_amount === null || row.remaining_amount === undefined
+        ? undefined
+        : toMoneyString(row.remaining_amount),
     outstanding_amount:
       row.outstanding_amount === null || row.outstanding_amount === undefined
         ? undefined
@@ -640,12 +668,44 @@ function normalizeDashboardResponse(payload: unknown): CustomerDashboardResponse
       kyc_status: toStringOrUndefined(rawCustomer.kyc_status) ?? "",
     },
     summary: {
+      subscription_count: toNumber(rawSummary.subscription_count, 0),
       active_subscriptions: toNumber(rawSummary.active_subscriptions, 0),
+      completed_subscriptions: toNumber(rawSummary.completed_subscriptions, 0),
+      winner_subscriptions: toNumber(rawSummary.winner_subscriptions, 0),
       pending_emis: toNumber(rawSummary.pending_emis, 0),
+      upcoming_emis: toNumber(rawSummary.upcoming_emis, 0),
+      overdue_emis: toNumber(rawSummary.overdue_emis, 0),
       paid_emis: toNumber(rawSummary.paid_emis, 0),
       total_paid_amount: toMoneyString(rawSummary.total_paid_amount, "0.00"),
       waived_emis: toNumber(rawSummary.waived_emis, 0),
+      total_pending_amount: toMoneyString(rawSummary.total_pending_amount, "0.00"),
+      total_waived_amount: toMoneyString(rawSummary.total_waived_amount, "0.00"),
+      remaining_amount: toMoneyString(rawSummary.remaining_amount, "0.00"),
       outstanding_amount: toMoneyString(rawSummary.outstanding_amount, "0.00"),
+      overdue_amount: toMoneyString(rawSummary.overdue_amount, "0.00"),
+      upcoming_amount: toMoneyString(rawSummary.upcoming_amount, "0.00"),
+      next_due_amount:
+        rawSummary.next_due_amount === null || rawSummary.next_due_amount === undefined
+          ? null
+          : toMoneyString(rawSummary.next_due_amount, "0.00"),
+      next_due_date: toStringOrUndefined(rawSummary.next_due_date) ?? null,
+      next_due_is_overdue: toBoolean(rawSummary.next_due_is_overdue) ?? false,
+      next_due_subscription_id:
+        rawSummary.next_due_subscription_id === null ||
+        rawSummary.next_due_subscription_id === undefined
+          ? null
+          : toNumber(rawSummary.next_due_subscription_id),
+      next_due_subscription_number:
+        toStringOrUndefined(rawSummary.next_due_subscription_number) ?? null,
+      next_due_product_name:
+        toStringOrUndefined(rawSummary.next_due_product_name) ?? null,
+      next_due_lucky_number:
+        rawSummary.next_due_lucky_number === null ||
+        rawSummary.next_due_lucky_number === undefined
+          ? null
+          : toNumber(rawSummary.next_due_lucky_number),
+      has_payment_adjustments:
+        toBoolean(rawSummary.has_payment_adjustments) ?? false,
       under_verification_requests: toNumber(
         rawSummary.under_verification_requests,
         0

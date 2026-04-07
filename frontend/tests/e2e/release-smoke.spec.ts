@@ -195,6 +195,7 @@ test.describe("customer release smoke", () => {
   test("customer dashboard and payments history load", async ({ page }) => {
     await page.goto("/customer");
     await expect(page.locator("body")).toContainText(/customer workspace/i);
+    await expect(page.locator("body")).toContainText(/next payment due/i);
 
     await page.goto("/customer/payments");
     await expect(page.getByRole("heading", { name: /my payments/i })).toBeVisible();
