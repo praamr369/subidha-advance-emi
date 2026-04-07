@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
 
   async function handleResendOtp() {
     if (!identifier.trim()) {
-      setError("Enter phone, email, or username before resending OTP.");
+      setError("Enter email, username, or phone before resending OTP.");
       return;
     }
 
@@ -129,14 +129,14 @@ export default function ResetPasswordPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-foreground">Reset password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter the customer&apos;s identifier, the 6-digit OTP, and the new password.
+            Enter the account identifier, the 6-digit OTP from email, and the new password.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-foreground">
-              Phone, email, or username
+              Email, username, or phone
             </label>
             <input
               id="identifier"
@@ -144,7 +144,7 @@ export default function ResetPasswordPage() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
-              placeholder="Enter phone, email, or username"
+              placeholder="Enter email, username, or phone"
               disabled={submitting || success}
               required
             />
@@ -168,7 +168,7 @@ export default function ResetPasswordPage() {
             />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>
-                The code is delivered through the configured SMS or email channel.
+                The code is delivered to the registered account email only.
               </span>
               <button
                 type="button"

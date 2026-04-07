@@ -1,5 +1,6 @@
 import { request } from "@/services/api";
 import { toResultsArray } from "@/services/api/list";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 export type ProductRecord = {
   id: number;
@@ -36,6 +37,13 @@ export type CreateOrUpdateProductPayload =
   | Record<string, unknown>
   | FormData;
 
+function normalizeProductRecord(product: ProductRecord): ProductRecord {
+  return {
+    ...product,
+    image: resolveApiMediaUrl(product.image),
+  };
+}
+
 function buildQuery(params?: ProductListParams): string {
   if (!params) return "";
 
@@ -55,32 +63,37 @@ export async function listProducts(
   params?: ProductListParams
 ): Promise<ProductRecord[]> {
   const payload = await request(`/admin/products/${buildQuery(params)}`);
-  return toResultsArray<ProductRecord>(payload);
+  return toResultsArray<ProductRecord>(payload).map((product) =>
+    normalizeProductRecord(product)
+  );
 }
 
 export async function getProduct(
   id: number | string
 ): Promise<ProductRecord> {
-  return request(`/admin/products/${id}/`);
+  const payload = await request<ProductRecord>(`/admin/products/${id}/`);
+  return normalizeProductRecord(payload);
 }
 
 export async function createProduct(
   payload: CreateOrUpdateProductPayload
 ): Promise<ProductRecord> {
-  return request("/admin/products/", {
+  const result = await request<ProductRecord>("/admin/products/", {
     method: "POST",
     body: payload instanceof FormData ? payload : JSON.stringify(payload),
     retryCount: 0,
   });
+  return normalizeProductRecord(result);
 }
 
 export async function updateProduct(
   id: number | string,
   payload: CreateOrUpdateProductPayload
 ): Promise<ProductRecord> {
-  return request(`/admin/products/${id}/`, {
+  const result = await request<ProductRecord>(`/admin/products/${id}/`, {
     method: "PATCH",
     body: payload instanceof FormData ? payload : JSON.stringify(payload),
     retryCount: 0,
   });
+  return normalizeProductRecord(result);
 }

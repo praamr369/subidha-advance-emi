@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/constants";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 export type PublicStats = {
   total_batches: number;
@@ -132,6 +133,13 @@ async function fetchPublic<T>(
   return body as T;
 }
 
+function normalizePublicProduct(product: PublicProduct): PublicProduct {
+  return {
+    ...product,
+    image: resolveApiMediaUrl(product.image),
+  };
+}
+
 export async function getPublicStats(): Promise<PublicStats> {
   return fetchPublic<PublicStats>(
     "/public/stats/",
@@ -171,7 +179,9 @@ export async function listPublicProducts(): Promise<{
     "Unable to load products right now."
   );
 
-  const products = Array.isArray(payload.results) ? payload.results : [];
+  const products = Array.isArray(payload.results)
+    ? payload.results.map((product) => normalizePublicProduct(product))
+    : [];
 
   return {
     products,
@@ -183,11 +193,13 @@ export async function getPublicProductDetail(
   id: string | number
 ): Promise<PublicProduct | null> {
   try {
-    return await fetchPublic<PublicProduct>(
+    const product = await fetchPublic<PublicProduct>(
       `/public/products/${id}/`,
       { cache: "no-store" },
       "Unable to load product details right now."
     );
+
+    return normalizePublicProduct(product);
   } catch (error) {
     if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
       return null;

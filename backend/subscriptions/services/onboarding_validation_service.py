@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from subscriptions.models import Batch, BatchStatus, Customer, LuckyIdStatus, Product
 
 
-CUSTOMER_REQUIRED_HEADERS = ("name", "phone")
+CUSTOMER_REQUIRED_HEADERS = ("name", "phone", "email")
 PRODUCT_REQUIRED_HEADERS = ("name", "base_price")
 EXPECTED_LUCKY_NUMBERS = tuple(range(100))
 
@@ -32,32 +32,45 @@ def missing_customer_headers(headers: list[str]) -> list[str]:
 
 def validate_customer_import_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
     seen_phones: set[str] = set()
+    seen_emails: set[str] = set()
     validation_rows: list[dict[str, object]] = []
 
     for index, row in enumerate(rows, start=2):
         name = (row.get("name") or "").strip()
         phone = (row.get("phone") or "").strip()
+        email = (row.get("email") or "").strip()
 
         errors: list[str] = []
         if not name:
             errors.append("name is required")
         if not phone:
             errors.append("phone is required")
+        if not email:
+            errors.append("email is required")
 
         if phone and phone in seen_phones:
             errors.append("duplicate phone in upload")
         if phone:
             seen_phones.add(phone)
 
+        lowered_email = email.lower()
+        if lowered_email and lowered_email in seen_emails:
+            errors.append("duplicate email in upload")
+        if lowered_email:
+            seen_emails.add(lowered_email)
+
         existing_customer = Customer.objects.filter(phone=phone).first() if phone else None
         if existing_customer:
             errors.append("customer with this phone already exists")
+        if email and Customer.objects.filter(user__email__iexact=email).exists():
+            errors.append("user with this email already exists")
 
         validation_rows.append(
             {
                 "row_number": index,
                 "name": name,
                 "phone": phone,
+                "email": email,
                 "valid": len(errors) == 0,
                 "errors": errors,
             }

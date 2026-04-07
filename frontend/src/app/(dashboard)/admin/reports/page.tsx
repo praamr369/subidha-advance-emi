@@ -11,6 +11,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { getAdminDashboardSnapshot, getReconciliationSnapshot } from "@/services/reports";
 
 function money(value: string | number | undefined): string {
@@ -138,7 +139,7 @@ export default function AdminReportsPage() {
     {
       title: "Reconciliation Workspace",
       description: "Route into flagged subscription financial mismatches.",
-      href: "/admin/reconciliation",
+      href: buildAdminReconciliationRoute(),
       badge: "UNDER_REVIEW",
     },
   ];
@@ -154,7 +155,11 @@ export default function AdminReportsPage() {
         { label: "Reports" },
       ]}
       actions={[
-        { href: "/admin/reconciliation", label: "Open Reconciliation", variant: "secondary" },
+        {
+          href: buildAdminReconciliationRoute(),
+          label: "Open Reconciliation",
+          variant: "secondary",
+        },
         { href: "/admin/reports/revenue", label: "Open Revenue", variant: "primary" },
       ]}
       stats={[
@@ -255,8 +260,8 @@ export default function AdminReportsPage() {
               }
               action={
                 reconRows.length > 0 ? (
-                  <Link
-                    href="/admin/reconciliation"
+                <Link
+                    href={buildAdminReconciliationRoute()}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                   >
                     Open Full Queue

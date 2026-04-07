@@ -9,7 +9,9 @@ from rest_framework import serializers
 
 from accounts.models import User, UserRole
 from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
+from api.v1.serializers.media import serialize_media_url
 from subscriptions.models import (
+    AuditLog,
     Batch,
     Commission,
     CommissionStatus,
@@ -28,6 +30,7 @@ from subscriptions.models import (
     SubscriptionStatus,
     KycStatus,
 )
+from subscriptions.services.customer_account_service import sync_customer_login_identity
 from subscriptions.services.delivery_service import (
     build_subscription_delivery_history,
     build_subscription_delivery_summary,
@@ -132,10 +135,20 @@ class BatchAdminSerializer(serializers.ModelSerializer):
 
 # ... imports remain unchanged ...
 
+
+def _log_customer_account_audit(*, action_type: str, customer: Customer, performed_by=None, metadata=None):
+    AuditLog.objects.create(
+        action_type=action_type,
+        model_name="Customer",
+        object_id=customer.id,
+        performed_by=performed_by,
+        metadata=metadata or {},
+    )
+
 class CustomerAdminSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False, min_length=8)
-    email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
 
     user_username = serializers.CharField(source="user.username", read_only=True)
     kyc_reviewed_by_username = serializers.CharField(
@@ -156,6 +169,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     address = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
     user_is_active = serializers.BooleanField(source="user.is_active", read_only=True)
+
     class Meta:
         model = Customer
         fields = (
@@ -192,20 +206,28 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
         extra_kwargs = {"user": {"required": False}}
 
     def get_status(self, obj):
-        """Return customer status based on the user's is_active flag."""
         return "ACTIVE" if obj.user.is_active else "INACTIVE"
 
-    # ... rest of the serializer unchanged ...
+    def to_representation(self, instance):
+        payload = super().to_representation(instance)
+        payload["email"] = (getattr(instance.user, "email", "") or "").strip()
+        return payload
+
     def validate(self, attrs):
         username = attrs.pop("username", None)
         password = attrs.pop("password", None)
-        email = attrs.pop("email", "")
+        email = attrs.pop("email", None) if "email" in attrs else None
 
         attrs["_new_username"] = username
         attrs["_new_password"] = password
         attrs["_new_email"] = email
 
-        user = attrs.get("user")
+        user = attrs.get("user") or getattr(self.instance, "user", None)
+        final_email = (
+            (email or "").strip()
+            if email is not None
+            else (getattr(user, "email", "") or "").strip()
+        )
 
         if self.instance is None and user is None and (not username or not password):
             raise serializers.ValidationError(
@@ -230,6 +252,22 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                     {"user": "Selected user already has customer profile."}
                 )
 
+        if not final_email:
+            raise serializers.ValidationError(
+                {
+                    "email": (
+                        "Email is required for customer access and password reset. "
+                        "Add a valid email before saving this account."
+                    )
+                }
+            )
+
+        duplicate_email = User.objects.filter(email__iexact=final_email)
+        if user is not None:
+            duplicate_email = duplicate_email.exclude(pk=user.pk)
+        if duplicate_email.exists():
+            raise serializers.ValidationError({"email": "Email already exists."})
+
         phone = attrs.get("phone")
         if phone:
             duplicate = Customer.objects.filter(phone=phone)
@@ -240,13 +278,20 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                     {"phone": "Customer with this phone already exists."}
                 )
 
+            duplicate_user_phone = User.objects.filter(phone=phone)
+            if user is not None:
+                duplicate_user_phone = duplicate_user_phone.exclude(pk=user.pk)
+            if duplicate_user_phone.exists():
+                raise serializers.ValidationError({"phone": "Phone already exists."})
+
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         username = validated_data.pop("_new_username", None)
         password = validated_data.pop("_new_password", None)
-        email = validated_data.pop("_new_email", "")
+        email = (validated_data.pop("_new_email", None) or "").strip()
+        request = self.context.get("request")
 
         user = validated_data.get("user")
         if user is None:
@@ -259,32 +304,78 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                 first_name=validated_data.get("name", ""),
             )
             validated_data["user"] = user
+        else:
+            user.email = email
+            user.phone = validated_data.get("phone", "")
+            user.first_name = validated_data.get("name", "")
+            if username:
+                user.username = username
+            if password:
+                user.set_password(password)
+            user.save()
 
-        return Customer.objects.create(**validated_data)
+        customer = Customer.objects.create(**validated_data)
+        sync_customer_login_identity(
+            customer,
+            name=customer.name,
+            phone=customer.phone,
+            email=email,
+            address=customer.address,
+            city=customer.city,
+        )
+        _log_customer_account_audit(
+            action_type=AuditLog.ActionType.USER_CREATED,
+            customer=customer,
+            performed_by=getattr(request, "user", None),
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "user_id": customer.user_id,
+            },
+        )
+        return customer
 
     @transaction.atomic
     def update(self, instance, validated_data):
         username = validated_data.pop("_new_username", None)
         password = validated_data.pop("_new_password", None)
         email = validated_data.pop("_new_email", None)
+        request = self.context.get("request")
 
         user = validated_data.get("user") or instance.user
+        final_email = (
+            (email or "").strip()
+            if email is not None
+            else (getattr(user, "email", "") or "").strip()
+        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
 
         if username:
             user.username = username
-        if email is not None:
-            user.email = email
-        if instance.phone:
-            user.phone = instance.phone
-        if instance.name:
-            user.first_name = instance.name
         if password:
             user.set_password(password)
-        user.save()
+
+        sync_customer_login_identity(
+            instance,
+            name=instance.name,
+            phone=instance.phone,
+            email=final_email,
+            address=instance.address,
+            city=instance.city,
+        )
+        if username or password:
+            user.save()
+
+        _log_customer_account_audit(
+            action_type=AuditLog.ActionType.USER_UPDATED,
+            customer=instance,
+            performed_by=getattr(request, "user", None),
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "user_id": instance.user_id,
+            },
+        )
 
         return instance
 
@@ -983,6 +1074,20 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             validated_data["image"] = None
 
         return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        clear_image = validated_data.pop("clear_image", False)
+        if clear_image:
+            validated_data["image"] = None
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        payload = super().to_representation(instance)
+        payload["image"] = serialize_media_url(
+            self.context.get("request"),
+            getattr(instance, "image", None),
+        )
+        return payload
 
 
 class SubscriptionAdminSerializer(serializers.ModelSerializer):

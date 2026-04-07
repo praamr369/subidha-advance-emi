@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
@@ -76,7 +77,13 @@ from subscriptions.services.payment_service import (
 from subscriptions.services.audit_service import log_customer_kyc_decision
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
+    build_reconciliation_attention_payload,
     get_subscription_detail_queryset,
+)
+from subscriptions.services.winner_state_service import (
+    get_subscription_winner_evidence,
+    sync_winner_state,
+    winner_history_q,
 )
 
 # ... rest of the file
@@ -121,31 +128,44 @@ def _parse_customer_rows(uploaded_file):
 
 def _validate_customer_import_rows(rows):
     seen_phones = set()
+    seen_emails = set()
     validation_rows = []
 
     for index, row in enumerate(rows, start=2):
         name = (row.get("name") or "").strip()
         phone = (row.get("phone") or "").strip()
+        email = (row.get("email") or "").strip()
 
         errors = []
         if not name:
             errors.append("name is required")
         if not phone:
             errors.append("phone is required")
+        if not email:
+            errors.append("email is required")
 
         if phone and phone in seen_phones:
             errors.append("duplicate phone in upload")
         if phone:
             seen_phones.add(phone)
 
+        if email and email.lower() in seen_emails:
+            errors.append("duplicate email in upload")
+        if email:
+            seen_emails.add(email.lower())
+
         existing_customer = Customer.objects.filter(phone=phone).first() if phone else None
         if existing_customer:
             errors.append("customer with this phone already exists")
+        existing_email = User.objects.filter(email__iexact=email).first() if email else None
+        if existing_email:
+            errors.append("user with this email already exists")
 
         validation_rows.append({
             "row_number": index,
             "name": name,
             "phone": phone,
+            "email": email,
             "valid": len(errors) == 0,
             "errors": errors,
         })
@@ -158,6 +178,7 @@ def _build_customer_preview_response(headers, validation_rows):
         {
             "row_number": row["row_number"],
             "phone": row["phone"],
+            "email": row["email"],
             "errors": row["errors"],
         }
         for row in validation_rows
@@ -168,6 +189,7 @@ def _build_customer_preview_response(headers, validation_rows):
             "row_number": row["row_number"],
             "name": row["name"],
             "phone": row["phone"],
+            "email": row["email"],
             "valid": row["valid"],
         }
         for row in validation_rows[:20]
@@ -343,11 +365,7 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         ).count()
         won_subscription_count = Subscription.objects.filter(
             batch=batch,
-        ).filter(
-            Q(winner_month__isnull=False)
-            | Q(status=SubscriptionStatus.WON)
-            | Q(lucky_id__status=LuckyIdStatus.WON)
-        ).distinct().count()
+        ).filter(winner_history_q()).distinct().count()
 
         lucky_qs = LuckyId.objects.filter(batch=batch)
         available_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.AVAILABLE).count()
@@ -447,6 +465,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             search_filter = (
                 Q(name__icontains=search)
                 | Q(phone__icontains=search)
+                | Q(user__email__icontains=search)
                 | Q(user__username__icontains=search)
             )
             if search.isdigit():
@@ -531,9 +550,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 "active_subscriptions": subscriptions.filter(
                     status=SubscriptionStatus.ACTIVE
                 ).count(),
-                "won_subscriptions": subscriptions.filter(
-                    status=SubscriptionStatus.WON
-                ).count(),
+                "won_subscriptions": subscriptions.filter(winner_history_q()).distinct().count(),
                 "total_paid": str(
                     payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
                 ),
@@ -550,7 +567,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             return Response({"detail": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         headers, rows = _parse_customer_rows(uploaded)
-        required_headers = ["name", "phone"]
+        required_headers = ["name", "phone", "email"]
         missing_headers = [item for item in required_headers if item not in headers]
 
         if missing_headers:
@@ -586,7 +603,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             return Response({"detail": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         headers, rows = _parse_customer_rows(uploaded)
-        required_headers = ["name", "phone"]
+        required_headers = ["name", "phone", "email"]
         missing_headers = [item for item in required_headers if item not in headers]
         if missing_headers:
             return Response(
@@ -610,7 +627,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             return Response({"detail": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         headers, rows = _parse_customer_rows(uploaded)
-        required_headers = ["name", "phone"]
+        required_headers = ["name", "phone", "email"]
         missing_headers = [item for item in required_headers if item not in headers]
 
         if missing_headers:
@@ -640,6 +657,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                     password=generated_password,
                     role=UserRole.CUSTOMER,
                     phone=row["phone"],
+                    email=row["email"],
                     first_name=row["name"],
                 )
                 customer = Customer.objects.create(user=user, name=row["name"], phone=row["phone"])
@@ -668,8 +686,30 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         customer = self.get_object()
         if not customer.user:
             return Response({"detail": "No user linked to this customer."}, status=400)
-        customer.user.is_active = not customer.user.is_active
-        customer.user.save()
+        requested_state = request.data.get("is_active", None)
+        if requested_state is None:
+            next_state = not customer.user.is_active
+        elif isinstance(requested_state, bool):
+            next_state = requested_state
+        else:
+            next_state = str(requested_state).strip().lower() in {"true", "1", "yes"}
+
+        customer.user.is_active = next_state
+        customer.user.save(update_fields=["is_active"])
+        AuditLog.objects.create(
+            action_type=(
+                AuditLog.ActionType.USER_ACTIVATED
+                if next_state
+                else AuditLog.ActionType.USER_DEACTIVATED
+            ),
+            model_name="User",
+            object_id=customer.user_id,
+            performed_by=request.user,
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "customer_id": customer.id,
+            },
+        )
         return Response({"is_active": customer.user.is_active})
 
     @action(detail=True, methods=['post'], url_path='change-user-password')
@@ -681,7 +721,17 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         if not password or len(password) < 8:
             return Response({"detail": "Password must be at least 8 characters."}, status=400)
         customer.user.set_password(password)
-        customer.user.save()
+        customer.user.save(update_fields=["password"])
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.USER_PASSWORD_RESET,
+            model_name="User",
+            object_id=customer.user_id,
+            performed_by=request.user,
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "customer_id": customer.id,
+            },
+        )
         return Response({"detail": "Password changed successfully."})
 
 # =====================================================
@@ -1880,6 +1930,47 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             return SubscriptionAdminDetailSerializer
         return SubscriptionAdminSerializer
 
+    def _detail_subscription_needs_winner_repair(self, subscription) -> bool:
+        evidence = get_subscription_winner_evidence(subscription)
+        if not evidence["is_winner"]:
+            return False
+
+        winner_month_needs_sync = (
+            evidence["winner_month"] is not None
+            and subscription.winner_month != evidence["winner_month"]
+        )
+        waived_amount_needs_sync = (
+            Decimal(str(subscription.waived_amount or MONEY_ZERO))
+            != evidence["computed_waived_amount"]
+        )
+
+        return bool(
+            evidence["needs_subscription_status_sync"]
+            or evidence["needs_lucky_id_status_sync"]
+            or winner_month_needs_sync
+            or waived_amount_needs_sync
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if self._detail_subscription_needs_winner_repair(instance):
+            repair_result = sync_winner_state(
+                subscription=instance,
+                performed_by=request.user,
+                source="admin_subscription_detail_repair",
+                emit_audit=True,
+                commit=True,
+            )
+            if repair_result.get("changed"):
+                instance = get_object_or_404(
+                    get_subscription_detail_queryset(),
+                    pk=instance.pk,
+                )
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
     def get_queryset(self):
         if self.action == "retrieve":
             queryset = get_subscription_detail_queryset().order_by("-created_at", "-id")
@@ -2012,54 +2103,6 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             }
         )
 
-    def _build_reconciliation_attention_payload(self, queryset, sample_limit=200):
-        rows = []
-        flagged_count = 0
-        sampled = list(queryset[:sample_limit])
-
-        for item in sampled:
-            paid = item.total_paid()
-            waived = sum(
-                (emi.amount for emi in item.emis.all() if emi.status == EmiStatus.WAIVED),
-                MONEY_ZERO,
-            )
-            pending_outstanding = sum(
-                (emi.amount for emi in item.emis.all() if emi.status == EmiStatus.PENDING),
-                MONEY_ZERO,
-            )
-
-            computed = item.total_amount - paid - waived
-            if computed < MONEY_ZERO:
-                computed = MONEY_ZERO
-
-            delta = abs(computed - pending_outstanding)
-
-            if delta > Decimal("0.01"):
-                flagged_count += 1
-                rows.append(
-                    {
-                        "subscription_id": item.id,
-                        "subscription_number": f"SUB-{item.id}",
-                        "customer_name": item.customer.name,
-                        "total_amount": str(item.total_amount),
-                        "paid_amount": str(paid),
-                        "waived_amount": str(waived),
-                        "pending_outstanding": str(pending_outstanding),
-                        "computed_outstanding": str(computed),
-                        "delta": str(delta),
-                    }
-                )
-
-        return {
-            "checked_count": len(sampled),
-            "flagged_count": flagged_count,
-            "results": rows,
-            "note": (
-                "Checks first 200 filtered subscriptions for quick UI attention. "
-                "Use reconcile_financials for full-portfolio verification."
-            ),
-        }
-
     @action(detail=False, methods=["get"], url_path="kpis")
     def kpis(self, request):
         queryset = self.get_queryset()
@@ -2067,7 +2110,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 
         total = queryset.count()
         active = queryset.filter(status=SubscriptionStatus.ACTIVE).count()
-        won = queryset.filter(status=SubscriptionStatus.WON).count()
+        won = queryset.filter(winner_history_q()).distinct().count()
         completed = queryset.filter(status=SubscriptionStatus.COMPLETED).count()
         defaulted = queryset.filter(status=SubscriptionStatus.DEFAULTED).count()
 
@@ -2124,7 +2167,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         if total_outstanding < MONEY_ZERO:
             total_outstanding = MONEY_ZERO
 
-        reconciliation_attention = self._build_reconciliation_attention_payload(queryset)
+        reconciliation_attention = build_reconciliation_attention_payload(queryset)
 
         return Response(
             {
@@ -2156,7 +2199,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     @action(detail=False, methods=["get"], url_path="reconciliation-attention")
     def reconciliation_attention(self, request):
         queryset = self.get_queryset()
-        return Response(self._build_reconciliation_attention_payload(queryset))
+        return Response(build_reconciliation_attention_payload(queryset))
 
     @action(detail=True, methods=["get"], url_path="timeline")
     def timeline(self, request, pk=None):

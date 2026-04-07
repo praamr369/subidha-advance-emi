@@ -16,7 +16,6 @@ type OtpDeliveryReadinessCardProps = {
 function statusTone(status: string): string {
   switch (status) {
     case "READY":
-    case "FALLBACK_READY":
       return "border-emerald-200 bg-emerald-50 text-emerald-900";
     case "DEV_ONLY":
       return "border-amber-200 bg-amber-50 text-amber-900";
@@ -48,15 +47,11 @@ function contextHint(
   operatorContext: "create" | "detail" | "import"
 ): string {
   if (operatorContext === "import") {
-    if (data.overall_status === "FALLBACK_READY" || data.overall_status === "READY") {
+    if (data.overall_status === "READY") {
       return "Imported customers still need OTP reset after import. Use this readiness card to confirm the live delivery path before promising portal access.";
     }
 
     return "Imported customers should not be promised portal access until this card shows a live-ready delivery path.";
-  }
-
-  if (data.overall_status === "FALLBACK_READY") {
-    return "OTP handoff can rely on email fallback after one live test reset succeeds in the target environment.";
   }
 
   if (data.overall_status === "READY") {
@@ -67,7 +62,7 @@ function contextHint(
     return "Current OTP delivery is limited to debug or console-only behavior. Do not promise live customer access from this environment.";
   }
 
-  return "Do not promise self-service password reset until email fallback is configured and verified.";
+  return "Do not promise self-service password reset until email delivery is configured and verified.";
 }
 
 export default function OtpDeliveryReadinessCard({
@@ -163,7 +158,7 @@ export default function OtpDeliveryReadinessCard({
             <div className="rounded-lg border border-border bg-background p-3">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                Email fallback
+                Email delivery
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span

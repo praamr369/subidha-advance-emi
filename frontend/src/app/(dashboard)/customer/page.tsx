@@ -169,6 +169,11 @@ export default function CustomerDashboardPage() {
       href: ROUTES.customer.subscriptions,
     },
     {
+      title: "Subscription Requests",
+      description: "Submit a new subscription request and track admin approval status.",
+      href: ROUTES.customer.subscriptionRequests,
+    },
+    {
       title: "My Payments",
       description: "Inspect payment history and EMI-related collection records.",
       href: ROUTES.customer.payments,

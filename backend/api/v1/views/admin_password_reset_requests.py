@@ -8,6 +8,7 @@ from accounts.services.password_reset_service import (
     admin_invalidate_password_reset_request,
     admin_list_password_reset_requests,
     admin_resend_password_reset_request,
+    PasswordResetServiceError,
 )
 from api.v1.serializers.auth_password_reset import PasswordResetRequestAdminSerializer
 
@@ -75,6 +76,8 @@ def admin_password_reset_request_resend(request, request_id: int):
             request_id=request_id,
             performed_by=request.user,
         )
+    except PasswordResetServiceError as exc:
+        return Response({"detail": exc.detail}, status=exc.status_code)
     except ValueError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception:

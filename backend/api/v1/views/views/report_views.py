@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from api.permissions import IsAdmin, IsCustomer, IsPartner
 from subscriptions.models import Commission, Customer, FinancialLedger, Payment, Subscription
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 @api_view(["GET"])
@@ -110,7 +111,7 @@ def admin_collection_ledger_report(request):
 @permission_classes([IsAdmin])
 def admin_waiver_ledger_report(request):
     waived = FinancialLedger.objects.filter(entry_type="WAIVER").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    winners = Subscription.objects.filter(status="WON").count()
+    winners = Subscription.objects.filter(winner_history_q()).distinct().count()
 
     return Response({"rows": [{"label": "Total Waived", "value": f"INR {waived}"}, {"label": "Winner Count", "value": str(winners)}]})
 

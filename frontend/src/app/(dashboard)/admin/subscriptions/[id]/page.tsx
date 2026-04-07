@@ -13,6 +13,15 @@ import {
   DetailItem as DetailValue,
   WorkspaceSection as SectionCard,
 } from "@/components/ui/workspace";
+import {
+  buildSubscriptionDetailSemantics,
+  formatLuckyNumberLabel,
+  formatWinnerMonthLabel,
+} from "@/domains/subscriptions/detail/view-model";
+import {
+  DetailHeroSurface,
+  DetailMetricTile,
+} from "@/domains/subscriptions/detail/surfaces";
 import { apiFetch, toArray } from "@/lib/api";
 import {
   normalizeDeliveryRecord,
@@ -217,11 +226,6 @@ function formatDateTime(value: string | null | undefined): string {
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
   return new Date(parsed).toLocaleString();
-}
-
-function formatLuckyNumber(value: number | null): string {
-  if (value == null) return "—";
-  return `#${String(value).padStart(2, "0")}`;
 }
 
 function normalizeSubscriptionStatus(value: unknown): SubscriptionStatus {
@@ -436,7 +440,6 @@ function normalizeSubscriptionDetail(
   const id = toNumber(raw.id);
   const financialSummary = normalizeFinancialSummary(raw.financial_summary, id);
   const winnerStatus = resolveWinnerStatus(
-    raw.status,
     raw.winner_status,
     financialSummary?.winner_status,
     toObject(raw.winner_summary)?.winner_status
@@ -581,6 +584,51 @@ export default function AdminSubscriptionDetailPage() {
     winnerSummary?.winner_status,
     financialSummary?.winner_status
   );
+  const detailSemantics = useMemo(
+    () =>
+      buildSubscriptionDetailSemantics({
+        contractStatus: subscription?.status,
+        winnerStatus,
+        winnerMonth: winnerSummary?.winner_month ?? subscription?.winner_month,
+        luckyNumber: winnerSummary?.lucky_number ?? subscription?.lucky_number,
+        drawId: winnerSummary?.draw_id,
+        drawMonth: winnerSummary?.draw_month,
+        drawRevealedAt: winnerSummary?.draw_revealed_at,
+        waiverScope: winnerSummary?.waiver_scope,
+        waivedEmiCount:
+          winnerSummary?.waived_emi_count ??
+          financialSummary?.emi_count_waived ??
+          subscription?.waived_emi_count,
+        waivedAmount:
+          winnerSummary?.waived_amount ??
+          financialSummary?.waived_amount ??
+          subscription?.waived_amount,
+        remainingAmount:
+          financialSummary?.remaining_amount ?? financialSummary?.outstanding_amount,
+        outstandingAmount:
+          financialSummary?.outstanding_amount ?? financialSummary?.remaining_amount,
+      }),
+    [
+      financialSummary?.emi_count_waived,
+      financialSummary?.outstanding_amount,
+      financialSummary?.remaining_amount,
+      financialSummary?.waived_amount,
+      subscription?.lucky_number,
+      subscription?.status,
+      subscription?.waived_amount,
+      subscription?.waived_emi_count,
+      subscription?.winner_month,
+      winnerStatus,
+      winnerSummary?.draw_id,
+      winnerSummary?.draw_month,
+      winnerSummary?.draw_revealed_at,
+      winnerSummary?.lucky_number,
+      winnerSummary?.waived_amount,
+      winnerSummary?.waived_emi_count,
+      winnerSummary?.waiver_scope,
+      winnerSummary?.winner_month,
+    ]
+  );
   const winnerIntegrityIssues = useMemo(
     () =>
       (reconciliationFlags?.warnings ?? []).filter((warning) =>
@@ -600,7 +648,7 @@ export default function AdminSubscriptionDetailPage() {
           ? `Subscription #${subscription.id}`
           : `Subscription #${subscriptionId ?? "—"}`
       }
-      subtitle="Canonical subscription finance, winner waiver visibility, reversal history, and audit context."
+      subtitle="Contract lifecycle, winner history, waiver impact, finance, and audit context from canonical backend truth."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Subscriptions", href: "/admin/subscriptions" },
@@ -656,30 +704,28 @@ export default function AdminSubscriptionDetailPage() {
       ]}
       stats={[
         {
-          label: "Status",
-          value: subscription?.status || "—",
+          label: "Contract",
+          value: detailSemantics.contractStatus || "—",
           tone:
-            subscription?.status === "DEFAULTED"
+            detailSemantics.contractStatus === "DEFAULTED"
               ? "danger"
-              : subscription?.status === "COMPLETED"
+              : detailSemantics.contractStatus === "COMPLETED"
               ? "success"
+              : detailSemantics.contractStatus === "WON"
+              ? "info"
               : undefined,
         },
         {
-          label: "Winner",
-          value:
-            winnerStatus === "WON"
-              ? `Month ${winnerSummary?.winner_month ?? subscription?.winner_month ?? "—"}`
-              : "Not won",
-          tone: winnerStatus === "WON" ? "success" : undefined,
+          label: "Winner Benefit",
+          value: detailSemantics.hasWinnerHistory
+            ? formatWinnerMonthLabel(detailSemantics.winnerMonth)
+            : "Not won",
+          tone: detailSemantics.hasWinnerHistory ? "success" : undefined,
         },
         {
           label: "Waived EMI",
-          value: String(financialSummary?.emi_count_waived ?? subscription?.waived_emi_count ?? 0),
-          tone:
-            (financialSummary?.emi_count_waived ?? subscription?.waived_emi_count ?? 0) > 0
-              ? "success"
-              : undefined,
+          value: String(detailSemantics.waivedEmiCount),
+          tone: detailSemantics.hasWaiver ? "success" : undefined,
         },
         {
           label: "Remaining",
@@ -689,12 +735,14 @@ export default function AdminSubscriptionDetailPage() {
         },
       ]}
       statusBadge={{
-        label: subscription?.status || "Subscription Detail",
+        label: detailSemantics.contractStatus || "Subscription Detail",
         tone:
-          subscription?.status === "DEFAULTED"
+          detailSemantics.contractStatus === "DEFAULTED"
             ? "danger"
-            : subscription?.status === "COMPLETED"
+            : detailSemantics.contractStatus === "COMPLETED"
             ? "success"
+            : detailSemantics.contractStatus === "WON"
+            ? "info"
             : "info",
       }}
     >
@@ -718,72 +766,186 @@ export default function AdminSubscriptionDetailPage() {
 
         {!loading && !error && subscription && financialSummary && reconciliationFlags ? (
           <>
-            <SectionCard
-              title={winnerStatus === "WON" ? "Winner and waiver status" : "Winner status"}
-              action={
-                <button
-                  type="button"
-                  onClick={() => void loadPage("refresh")}
-                  disabled={refreshing || loading}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <svg
-                    className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+            <section className="grid gap-4">
+              <div className="rounded-[30px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.22),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_30px_120px_-48px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+                <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Operational Lens
+                    </p>
+                    <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                      Contract, winner, and waiver posture
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      Contract lifecycle, winner history, and waiver impact are shown as separate truths so completed winners stay readable without masking reconciliation issues.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void loadPage("refresh")}
+                    disabled={refreshing || loading}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-4 text-sm font-medium text-slate-700 shadow-[0_16px_36px_-24px_rgba(15,23,42,0.35)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  {refreshing ? "Refreshing..." : "Refresh"}
-                </button>
-              }
-              description="Winning state, lucky number, and future EMI waiver visibility from backend business truth."
-            >
-              <div
-                className={[
-                  "rounded-xl px-4 py-3 text-sm",
-                  winnerStatus === "WON" && winnerIntegrityIssues.length === 0
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : winnerIntegrityIssues.length > 0
-                    ? "border border-red-200 bg-red-50 text-red-800"
-                    : "border border-border bg-muted/40 text-foreground",
-                ].join(" ")}
-              >
-                <div className="mb-2">
-                  <StatusBadge
-                    status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
-                    label={winnerStatus === "WON" ? "Winner recorded" : "Not won"}
+                    <svg
+                      className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                    {refreshing ? "Refreshing..." : "Refresh detail"}
+                  </button>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr_1fr]">
+                  <DetailHeroSurface
+                    eyebrow="Contract Lifecycle"
+                    title={detailSemantics.contractHeadline}
+                    description={detailSemantics.contractDescription}
+                    tone={detailSemantics.contractTone}
+                    badge={<StatusBadge status={subscription.status} size="md" />}
+                    meta={
+                      <>
+                        <DetailMetricTile
+                          label="Lifecycle Status"
+                          value={detailSemantics.contractStatus}
+                          tone={detailSemantics.contractTone}
+                        />
+                        <DetailMetricTile
+                          label="Remaining Amount"
+                          value={money(financialSummary.remaining_amount)}
+                          hint={
+                            reconciliationFlags.pending_matches_remaining
+                              ? "Pending rows align with remaining balance."
+                              : "Remaining balance needs reconciliation review."
+                          }
+                          tone={
+                            reconciliationFlags.pending_matches_remaining ? "success" : "warning"
+                          }
+                        />
+                        <DetailMetricTile
+                          label="Tenure"
+                          value={`${subscription.tenure_months} months`}
+                          hint={`Start ${formatDate(subscription.start_date)}`}
+                        />
+                      </>
+                    }
+                  />
+
+                  <DetailHeroSurface
+                    eyebrow="Winner Benefit"
+                    title={detailSemantics.winnerHeadline}
+                    description={detailSemantics.winnerDescription}
+                    tone={detailSemantics.winnerTone}
+                    badge={
+                      <StatusBadge
+                        status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
+                        label={winnerStatus === "WON" ? "Winner recorded" : "Not won"}
+                        size="md"
+                      />
+                    }
+                    meta={
+                      <>
+                        <DetailMetricTile
+                          label="Winner Month"
+                          value={formatWinnerMonthLabel(detailSemantics.winnerMonth)}
+                          tone={detailSemantics.winnerTone}
+                        />
+                        <DetailMetricTile
+                          label="Lucky Number"
+                          value={formatLuckyNumberLabel(detailSemantics.luckyNumber)}
+                          hint={
+                            detailSemantics.drawId != null
+                              ? `Draw #${detailSemantics.drawId}`
+                              : "No draw reference exposed"
+                          }
+                        />
+                        <DetailMetricTile
+                          label="Draw Revealed"
+                          value={formatDateTime(detailSemantics.drawRevealedAt)}
+                          hint={
+                            detailSemantics.drawMonth != null
+                              ? `Draw month ${detailSemantics.drawMonth}`
+                              : "Winner month stored on contract"
+                          }
+                        />
+                      </>
+                    }
+                  />
+
+                  <DetailHeroSurface
+                    eyebrow="Waiver And Settlement"
+                    title={detailSemantics.waiverHeadline}
+                    description={detailSemantics.waiverDescription}
+                    tone={detailSemantics.waiverTone}
+                    badge={
+                      <StatusBadge
+                        status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
+                        label={detailSemantics.isSettled ? "No remaining amount" : "Exposure remains"}
+                        size="md"
+                      />
+                    }
+                    meta={
+                      <>
+                        <DetailMetricTile
+                          label="Waived EMI Rows"
+                          value={String(detailSemantics.waivedEmiCount)}
+                          tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
+                        />
+                        <DetailMetricTile
+                          label="Waived Amount"
+                          value={money(detailSemantics.waivedAmount)}
+                          tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
+                        />
+                        <DetailMetricTile
+                          label="Waiver Scope"
+                          value={detailSemantics.waiverScope || "—"}
+                          hint="Winner benefits waive future EMI rows only."
+                        />
+                      </>
+                    }
                   />
                 </div>
-                {winnerStatus === "WON"
-                  ? `Winner month ${winnerSummary?.winner_month ?? subscription.winner_month ?? "—"} is recorded. Waiver scope is ${
-                      winnerSummary?.waiver_scope || "FUTURE_EMI_ONLY"
-                    }.`
-                  : "No winner signal is currently recorded for this subscription."}
               </div>
 
               {winnerIntegrityIssues.length > 0 ? (
-                <ul className="mt-4 space-y-2 text-sm text-red-800">
-                  {winnerIntegrityIssues.map((warning) => (
-                    <li key={warning} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                      {warning}
-                    </li>
-                  ))}
-                </ul>
+                <div className="rounded-[24px] border border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.96),rgba(254,226,226,0.88))] p-4 shadow-[0_20px_70px_-40px_rgba(185,28,28,0.35)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-700">
+                    Winner Integrity Warning
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm text-red-900">
+                    {winnerIntegrityIssues.map((warning) => (
+                      <li key={warning} className="rounded-2xl border border-red-200/80 bg-white/60 px-4 py-3">
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : detailSemantics.hasWinnerHistory ? (
+                <div className="rounded-[24px] border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(209,250,229,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(5,150,105,0.3)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                    Winner State Synced
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-900">
+                    Winner history, Lucky ID state, and waiver posture are aligned with the canonical backend snapshot for this contract.
+                  </p>
+                </div>
               ) : null}
-            </SectionCard>
+            </section>
 
             <section className="grid gap-6 xl:grid-cols-2">
               <SectionCard
                 title="Contract overview"
                 description="Commercial, customer, product, batch, and assignment context."
+                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
@@ -814,7 +976,7 @@ export default function AdminSubscriptionDetailPage() {
                   />
                   <DetailValue
                     label="Lucky Number"
-                    value={formatLuckyNumber(subscription.lucky_number)}
+                    value={formatLuckyNumberLabel(subscription.lucky_number)}
                   />
                   <DetailValue label="Partner" value={subscription.partner_name || "—"} />
                   <DetailValue label="Partner Phone" value={subscription.partner_phone || "—"} />
@@ -826,6 +988,7 @@ export default function AdminSubscriptionDetailPage() {
               <SectionCard
                 title="Winner / lucky context"
                 description="Winning draw linkage and waived EMI posture."
+                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue
@@ -844,7 +1007,9 @@ export default function AdminSubscriptionDetailPage() {
                   />
                   <DetailValue
                     label="Lucky Number"
-                    value={formatLuckyNumber(winnerSummary?.lucky_number ?? subscription.lucky_number)}
+                    value={formatLuckyNumberLabel(
+                      winnerSummary?.lucky_number ?? subscription.lucky_number
+                    )}
                   />
                   <DetailValue
                     label="Draw Reference"
@@ -877,6 +1042,7 @@ export default function AdminSubscriptionDetailPage() {
             <SectionCard
               title="Delivery tracking"
               description="Current fulfillment path, receiver details, and historical delivery records for this subscription."
+              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
             >
               {currentDelivery ? (
                 <>
@@ -971,6 +1137,7 @@ export default function AdminSubscriptionDetailPage() {
             <SectionCard
               title="Financial position"
               description="Canonical ledger-aware finance summary for this subscription."
+              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue label="Total Contract Value" value={money(financialSummary.total_amount)} />
@@ -994,6 +1161,7 @@ export default function AdminSubscriptionDetailPage() {
             <SectionCard
               title="Reconciliation status"
               description="Backend flags for remaining balance alignment, reversals, waivers, and warning conditions."
+              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue
@@ -1035,6 +1203,7 @@ export default function AdminSubscriptionDetailPage() {
             <SectionCard
               title="EMI schedule"
               description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
+              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
             >
               {emis.length === 0 ? (
                 <EmptyState
@@ -1131,6 +1300,7 @@ export default function AdminSubscriptionDetailPage() {
               <SectionCard
                 title="Waived EMI rows"
                 description="Future waived rows should be visible distinctly and never rewrite already paid installments."
+                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
               >
                 {waivedEmis.length === 0 ? (
                   <EmptyState
@@ -1174,6 +1344,7 @@ export default function AdminSubscriptionDetailPage() {
               <SectionCard
                 title="Recent payments"
                 description="Operational payment visibility with reversed rows clearly marked."
+                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
               >
                 {payments.length === 0 ? (
                   <EmptyState
@@ -1225,6 +1396,7 @@ export default function AdminSubscriptionDetailPage() {
             <SectionCard
               title="Audit timeline"
               description="Chronological audit visibility for subscription and EMI actions."
+              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
             >
               {timeline.length === 0 ? (
                 <EmptyState

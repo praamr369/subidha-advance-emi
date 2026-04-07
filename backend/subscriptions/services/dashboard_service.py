@@ -11,6 +11,7 @@ from subscriptions.models import (
     Commission,
     LuckyDraw,
 )
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 def executive_dashboard_summary():
@@ -24,9 +25,7 @@ def executive_dashboard_summary():
         status=SubscriptionStatus.ACTIVE
     ).count()
 
-    won_subscriptions = Subscription.objects.filter(
-        status=SubscriptionStatus.WON
-    ).count()
+    won_subscriptions = Subscription.objects.filter(winner_history_q()).distinct().count()
 
     completed_subscriptions = Subscription.objects.filter(
         status=SubscriptionStatus.COMPLETED

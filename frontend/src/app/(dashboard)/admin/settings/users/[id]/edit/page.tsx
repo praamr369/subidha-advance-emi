@@ -159,7 +159,14 @@ export default function AdminInternalUserEditPage() {
 
     if (!user) return;
 
+    const trimmedEmail = email.trim();
+
     if (role === "PARTNER") {
+      if (!trimmedEmail) {
+        setError("Email is required for managed partner access and password reset.");
+        return;
+      }
+
       const trimmedRate = commissionRate.trim();
       if (!trimmedRate) {
         setError("Partner commission percentage is required.");
@@ -189,7 +196,7 @@ export default function AdminInternalUserEditPage() {
         role === "PARTNER"
           ? {
               phone: phone.trim(),
-              email: email.trim(),
+              email: trimmedEmail,
               first_name: firstName.trim(),
               last_name: lastName.trim(),
               role,
@@ -198,7 +205,7 @@ export default function AdminInternalUserEditPage() {
             }
           : {
               phone: phone.trim(),
-              email: email.trim(),
+              email: trimmedEmail,
               first_name: firstName.trim(),
               last_name: lastName.trim(),
               role,
@@ -342,7 +349,13 @@ export default function AdminInternalUserEditPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                 placeholder="Email address"
+                required={role === "PARTNER"}
               />
+              <p className="text-xs text-muted-foreground">
+                {role === "PARTNER"
+                  ? "Managed partner accounts must keep a valid email for password reset."
+                  : "Optional for internal-only admin and cashier accounts."}
+              </p>
             </div>
           </div>
 
@@ -400,7 +413,7 @@ export default function AdminInternalUserEditPage() {
                 </p>
               </div>
               <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                Managed partner creation and commission updates remain internal-only controls.
+                Managed partner creation and commission updates remain internal-only controls. Email stays mandatory so public reset never depends on phone or manual password sharing.
               </div>
             </div>
           ) : null}

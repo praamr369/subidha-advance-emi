@@ -10,6 +10,7 @@ from subscriptions.models import (
     LuckyIdStatus,
     Subscription,
 )
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 def _sum_decimal(queryset, field: str) -> Decimal:
@@ -79,7 +80,7 @@ def batch_liability_snapshot(batch: Batch) -> dict:
         "batch_code": batch.batch_code,
         "total_subscriptions": subscriptions.count(),
         "assigned_lucky_ids": batch.lucky_ids.filter(status=LuckyIdStatus.ASSIGNED).count(),
-        "winners_count": subscriptions.filter(status="WON").count(),
+        "winners_count": subscriptions.filter(winner_history_q()).distinct().count(),
         "total_contract_value": total_contract_value,
         "total_paid": total_paid,
         "total_waived": total_waived,

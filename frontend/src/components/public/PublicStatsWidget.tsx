@@ -85,15 +85,18 @@ export default function PublicStatsWidget() {
         return (
           <div
             key={card.key}
-            className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+            className="relative overflow-hidden rounded-[1.8rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.65)]"
           >
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {card.label}
             </div>
-            <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
+            <div className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
               {typeof value === "number" ? value.toLocaleString("en-IN") : "—"}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">{card.helper}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {card.helper}
+            </p>
           </div>
         );
       })}

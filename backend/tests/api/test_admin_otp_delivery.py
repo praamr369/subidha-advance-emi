@@ -20,19 +20,20 @@ class AdminOtpDeliveryReadinessTests(APITestCase):
         EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
         DEFAULT_FROM_EMAIL="SUBIDHA CORE <no-reply@example.com>",
     )
-    def test_admin_can_view_fallback_ready_status(self):
+    def test_admin_can_view_ready_status_for_email_only_public_reset(self):
         self.client.force_authenticate(user=self.admin)
 
         response = self.client.get("/api/v1/admin/system/otp-delivery-readiness/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["overall_status"], "FALLBACK_READY")
+        self.assertEqual(response.data["overall_status"], "READY")
         self.assertEqual(response.data["delivery_backend"], "AUTO")
         self.assertEqual(response.data["sms"]["status"], "NOT_SUPPORTED")
         self.assertEqual(response.data["email"]["status"], "READY")
         self.assertEqual(response.data["admin_visibility"]["status"], "API_ONLY")
         self.assertIn("CUSTOMER", response.data["public_reset_roles"])
         self.assertIn("PARTNER", response.data["public_reset_roles"])
+        self.assertIn("email delivery only", response.data["summary"].lower())
 
     @override_settings(
         DEBUG=True,

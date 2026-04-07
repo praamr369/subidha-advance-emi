@@ -8,17 +8,24 @@ function normalizeValue(value: string | null | undefined): string {
   return (value || "").trim();
 }
 
+export function resolvePasswordResetEmail(
+  identity: Pick<PasswordResetIdentity, "email">
+): string | null {
+  const email = normalizeValue(identity.email);
+  return email || null;
+}
+
 export function resolvePasswordResetIdentifier(
   identity: PasswordResetIdentity
 ): string | null {
-  const phone = normalizeValue(identity.phone);
-  if (phone) return phone;
-
   const email = normalizeValue(identity.email);
   if (email) return email;
 
   const username = normalizeValue(identity.username);
   if (username) return username;
+
+  const phone = normalizeValue(identity.phone);
+  if (phone) return phone;
 
   return null;
 }

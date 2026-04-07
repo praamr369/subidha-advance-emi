@@ -59,14 +59,14 @@ export default function ForgotPasswordPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-foreground">Forgot password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter the customer&apos;s phone number, email, or username to request a 6-digit reset code.
+            Enter the customer or partner account identifier to request a 6-digit reset code sent to the registered email address.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-foreground">
-              Phone, email, or username
+              Email, username, or phone
             </label>
             <input
               id="identifier"
@@ -75,12 +75,12 @@ export default function ForgotPasswordPage() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
-              placeholder="Enter phone, email, or username"
+              placeholder="Enter email, username, or phone"
               disabled={submitting}
               required
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              SUBIDHA CORE uses OTP-based password reset. No reset link or plaintext password is issued from this screen.
+              SUBIDHA CORE uses email-delivered OTP password reset. Accounts without email must be updated before reset can start.
             </p>
           </div>
 
@@ -93,7 +93,7 @@ export default function ForgotPasswordPage() {
           {success && (
             <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               <div>
-                If an eligible account exists, a reset code has been requested. Ask the customer to check the registered SMS or email channel.
+                If an eligible account exists, a reset code has been requested. Ask the user to check the registered account email.
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link

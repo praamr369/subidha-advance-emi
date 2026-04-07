@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LockKeyhole, ScrollText, ShieldCheck, UserPlus, Users, Wallet } from "lucide-react";
 
 import PageHeader from "@/components/ui/PageHeader";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 
 const controls = [
   {
@@ -29,7 +30,7 @@ const controls = [
     title: "Financial control policy",
     description:
       "Receipt controls, reversal-only correction flow, and reconciliation guardrails.",
-    href: "/admin/reconciliation",
+    href: buildAdminReconciliationRoute(),
     icon: <Wallet className="h-5 w-5" />,
   },
   {

@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsCustomer
+from api.v1.serializers.customer_profile import CustomerProfileSerializer
 from api.v1.serializers.delivery import CustomerSubscriptionDeliveryReadSerializer
 from api.v1.serializers.payment import PaymentSerializer
 from api.v1.serializers.support_requests import (
@@ -28,10 +29,15 @@ from subscriptions.models import (
 from subscriptions.services.customer_support_service import (
     create_customer_support_request,
 )
+from subscriptions.services.customer_account_service import build_customer_profile_summary
 from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     get_subscription_delivery_prefetch,
 )
+from subscriptions.services.subscription_financial_service import (
+    get_subscription_detail_queryset,
+)
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 def _get_customer_or_404_response(request):
@@ -64,6 +70,10 @@ def _customer_subscription_queryset(customer):
         )
         .order_by("-created_at", "-id")
     )
+
+
+def _customer_subscription_detail_queryset(customer):
+    return get_subscription_detail_queryset().filter(customer=customer)
 
 
 def _customer_delivery_queryset(customer):
@@ -180,7 +190,9 @@ class CustomerDashboard(APIView):
                     "outstanding_amount": str(outstanding_amount),
                 },
                 "subscriptions": SubscriptionListSerializer(
-                    subscriptions, many=True
+                    subscriptions,
+                    many=True,
+                    context={"request": request},
                 ).data,
             }
         )
@@ -194,37 +206,31 @@ class CustomerProfileView(APIView):
         if error_response is not None:
             return error_response
 
-        subscriptions = customer.subscriptions.all()
-        payments = Payment.objects.filter(customer=customer)
-        emis = Emi.objects.filter(subscription__customer=customer)
+        serializer = CustomerProfileSerializer(customer, context={"request": request})
+        return Response(serializer.data)
 
-        return Response(
-            {
-                "id": customer.id,
-                "name": customer.name,
-                "phone": customer.phone,
-                "kyc_status": customer.kyc_status,
-                "username": request.user.username,
-                "summary": {
-                    "total_subscriptions": subscriptions.count(),
-                    "active_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.ACTIVE
-                    ).count(),
-                    "won_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.WON
-                    ).count(),
-                    "completed_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.COMPLETED
-                    ).count(),
-                    "pending_emis": emis.filter(status=EmiStatus.PENDING).count(),
-                    "paid_emis": emis.filter(status=EmiStatus.PAID).count(),
-                    "waived_emis": emis.filter(status=EmiStatus.WAIVED).count(),
-                    "total_paid_amount": str(
-                        payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
-                    ),
-                },
-            }
+    def patch(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        serializer = CustomerProfileSerializer(
+            customer,
+            data=request.data,
+            partial=True,
+            context={"request": request},
         )
+        serializer.is_valid(raise_exception=True)
+        customer = serializer.save()
+
+        response_serializer = CustomerProfileSerializer(
+            customer,
+            context={"request": request},
+        )
+        payload = response_serializer.data
+        payload["detail"] = "Customer profile updated successfully."
+        payload["summary"] = build_customer_profile_summary(customer)
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class CustomerSubscriptionListView(APIView):
@@ -244,7 +250,11 @@ class CustomerSubscriptionListView(APIView):
         return Response(
             {
                 "count": subscriptions.count(),
-                "results": SubscriptionListSerializer(subscriptions, many=True).data,
+                "results": SubscriptionListSerializer(
+                    subscriptions,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -257,7 +267,9 @@ class CustomerSubscriptionDetailView(APIView):
         if error_response is not None:
             return error_response
 
-        subscription = _customer_subscription_queryset(customer).filter(pk=pk).first()
+        subscription = _customer_subscription_detail_queryset(customer).filter(
+            pk=pk
+        ).first()
 
         if subscription is None:
             return Response(
@@ -265,7 +277,12 @@ class CustomerSubscriptionDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response(SubscriptionDetailSerializer(subscription).data)
+        return Response(
+            SubscriptionDetailSerializer(
+                subscription,
+                context={"request": request},
+            ).data
+        )
 
 
 class CustomerPaymentListView(APIView):

@@ -12,6 +12,7 @@ from subscriptions.models import (
     Payment,
     LuckyDraw,
 )
+from subscriptions.services.winner_state_service import winner_history_q
 
 CACHE_KEY = "public_stats"
 CACHE_TIMEOUT = 60
@@ -28,9 +29,7 @@ def public_stats(request):
     total_batches = Batch.objects.count()
     total_subscriptions = Subscription.objects.count()
 
-    total_winners = Subscription.objects.filter(
-        status=SubscriptionStatus.WON
-    ).count()
+    total_winners = Subscription.objects.filter(winner_history_q()).distinct().count()
 
     active_subscriptions = Subscription.objects.filter(
         status=SubscriptionStatus.ACTIVE

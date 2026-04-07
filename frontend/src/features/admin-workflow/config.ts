@@ -1,4 +1,5 @@
 import type { WorkflowModule, WorkflowTask } from "@/features/admin-workflow/types";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 
 export const adminWorkflowModules: WorkflowModule[] = [
   {
@@ -75,13 +76,16 @@ export const adminWorkflowModules: WorkflowModule[] = [
     id: "reconciliation",
     title: "Subscription reconciliation",
     description: "Exception handling for subscription, EMI, and payment integrity before closeout.",
-    href: "/admin/reconciliation",
+    href: buildAdminReconciliationRoute(),
     owner: "Finance control",
     health: "critical",
     primaryMetric: "Open exceptions",
     supportingMetric: "Audit readiness",
     actions: [
-      { label: "Open subscription reconciliation", href: "/admin/reconciliation" },
+      {
+        label: "Open subscription reconciliation",
+        href: buildAdminReconciliationRoute(),
+      },
       { label: "Open audit logs", href: "/admin/audit-logs" },
     ],
   },

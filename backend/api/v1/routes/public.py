@@ -8,6 +8,7 @@ from api.v1.serializers.public import PublicProductSerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
 from subscriptions.models import Batch, LuckyDraw, Product, Subscription
 from subscriptions.services.public_lead_service import create_public_lead
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 class PublicLeadSerializer(serializers.Serializer):
@@ -69,7 +70,9 @@ class PublicStatsView(APIView):
                 "total_batches": Batch.objects.count(),
                 "total_subscriptions": Subscription.objects.count(),
                 "active_subscriptions": Subscription.objects.filter(status="ACTIVE").count(),
-                "total_winners": Subscription.objects.filter(status="WON").count(),
+                "total_winners": Subscription.objects.filter(
+                    winner_history_q()
+                ).distinct().count(),
             }
         )
 
@@ -94,17 +97,8 @@ class PublicProductDetailView(APIView):
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        data = {
-            "id": product.id,
-            "product_code": product.product_code,
-            "name": product.name,
-            "base_price": str(product.base_price),
-            "category": product.category,
-            "subcategory": product.subcategory,
-            "image": product.image.url if product.image else None,
-            "description": product.description,
-        }
-        return Response(data)
+        serializer = PublicProductSerializer(product, context={"request": request})
+        return Response(serializer.data)
 
 
 class PublicLeadView(APIView):

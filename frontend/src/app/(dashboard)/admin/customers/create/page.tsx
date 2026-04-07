@@ -27,7 +27,7 @@ import { DetailItem as DetailRow, WorkspaceSection as SectionCard } from "@/comp
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
   buildForgotPasswordHref,
-  resolvePasswordResetIdentifier,
+  resolvePasswordResetEmail,
 } from "@/lib/auth/password-reset";
 import { apiFetch } from "@/lib/api";
 
@@ -39,6 +39,7 @@ type CreatedCustomerResponse = {
   user_username?: string;
   name?: string;
   phone?: string;
+  email?: string;
   kyc_status?: string;
   created_at?: string;
 };
@@ -278,11 +279,12 @@ export default function AdminCustomerCreatePage() {
     return (
       trimmedName.length > 0 &&
       trimmedPhone.length > 0 &&
+      trimmedEmail.length > 0 &&
       trimmedUsername.length > 0 &&
       password.trim().length >= 8 &&
       kycStatus.length > 0
     );
-  }, [trimmedName, trimmedPhone, trimmedUsername, password, kycStatus]);
+  }, [trimmedEmail, trimmedName, trimmedPhone, trimmedUsername, password, kycStatus]);
 
   useEffect(() => {
     const nextName = toOptionalString(searchParams.get("name"));
@@ -320,12 +322,10 @@ export default function AdminCustomerCreatePage() {
 
   const accessResetIdentifier = useMemo(
     () =>
-      resolvePasswordResetIdentifier({
-        phone: success?.phone || trimmedPhone,
-        email: trimmedEmail,
-        username: success?.user_username || trimmedUsername,
+      resolvePasswordResetEmail({
+        email: success?.email || trimmedEmail,
       }),
-    [success?.phone, success?.user_username, trimmedEmail, trimmedPhone, trimmedUsername]
+    [success?.email, trimmedEmail]
   );
 
   const accessResetHref = useMemo(
@@ -368,7 +368,9 @@ export default function AdminCustomerCreatePage() {
       next.password = "Password must be at least 8 characters.";
     }
 
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (!trimmedEmail) {
+      next.email = "Email is required for customer access and password reset.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       next.email = "Enter a valid email address.";
     }
 
@@ -657,12 +659,13 @@ export default function AdminCustomerCreatePage() {
 
             <InputField
               id="customer-email"
-              label="Email (Optional)"
+              label="Email"
               value={email}
               onChange={setEmail}
               placeholder="Enter email address"
               icon={<Mail className="h-4 w-4" />}
               error={fieldErrors.email}
+              required
               disabled={submitting}
             />
 
@@ -763,7 +766,7 @@ export default function AdminCustomerCreatePage() {
           <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             <div className="font-medium">Access handoff guidance</div>
             <div className="mt-1 text-blue-800">
-              Manual create sets the initial password now, but the safer ongoing customer handoff is OTP reset using the customer&apos;s phone, email, or username. Do not store plaintext passwords in shared notes or source files.
+              Manual create sets the initial password now, but ongoing customer handoff should use email-delivered OTP reset. Do not store plaintext passwords in shared notes or source files.
             </div>
           </div>
 
@@ -804,13 +807,13 @@ export default function AdminCustomerCreatePage() {
                 />
                 <DetailRow
                   label="Reset Identifier"
-                  value={accessResetIdentifier || "No phone, email, or username available"}
+                  value={accessResetIdentifier || "Add email before password reset"}
                 />
                 <DetailRow label="Preferred Flow" value="OTP reset for ongoing access" />
                 <DetailRow label="Portal Entry" value="/login" />
               </div>
               <div className="mt-3 text-blue-800">
-                Use the OTP reset flow if the customer did not receive the initial password securely or needs to choose a new password immediately.
+                Use the OTP reset flow if the customer did not receive the initial password securely or needs to choose a new password immediately. The reset code is delivered to the registered email address only.
               </div>
             </div>
 
@@ -830,12 +833,18 @@ export default function AdminCustomerCreatePage() {
                 Create Subscription
               </Link>
 
-              <Link
-                href={accessResetHref}
-                className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-900 transition hover:bg-blue-100"
-              >
-                Start OTP Reset
-              </Link>
+              {accessResetIdentifier ? (
+                <Link
+                  href={accessResetHref}
+                  className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-900 transition hover:bg-blue-100"
+                >
+                  Start OTP Reset
+                </Link>
+              ) : (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-900">
+                  Add email before password reset
+                </div>
+              )}
 
               {returnToLeadHref ? (
                 <Link

@@ -5,16 +5,16 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 test.use({ storageState: authStatePath("admin") });
 
 const otpReadinessFixture = {
-  overall_status: "FALLBACK_READY",
+  overall_status: "READY",
   summary:
-    "Auto mode can fall back to email because SMS delivery is not implemented in the current codebase.",
+    "Customer and partner public password reset now depends on email delivery only.",
   delivery_backend: "AUTO",
   public_reset_roles: ["CUSTOMER", "PARTNER"],
   public_reset_identifiers: ["phone", "email", "username"],
   sms: {
     status: "NOT_SUPPORTED",
     detail:
-      "SMS delivery is a placeholder in the current codebase and has no provider integration.",
+      "SMS delivery is not used for public customer or partner password reset in the current codebase.",
   },
   email: {
     status: "READY",
@@ -22,7 +22,7 @@ const otpReadinessFixture = {
     backend: "django.core.mail.backends.smtp.EmailBackend",
     from_email_configured: true,
     detail:
-      "Email OTP fallback is configured, but ops should still run a live reset test before promising access.",
+      "Email OTP delivery is configured, but ops should still run a live reset test before promising access.",
   },
   console: {
     status: "DISABLED",
@@ -65,6 +65,166 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
     String(manifest.entities.admin.subscription_id)
   );
   await expect(page.locator("#emi_id")).not.toHaveValue("");
+});
+
+test("admin can review and approve a subscription request from the admin queue detail page", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/subscription-requests/81/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 81,
+        requester: 9,
+        requester_username: "partner_user",
+        requester_role_snapshot: "PARTNER",
+        partner: 9,
+        partner_id: 9,
+        partner_username: "partner_user",
+        customer: null,
+        customer_id: null,
+        customer_name: null,
+        customer_phone: null,
+        customer_email: null,
+        requested_customer_name: "Pending Review Customer",
+        requested_customer_phone: "01744444444",
+        requested_customer_email: "pending-review@example.com",
+        requested_customer_address: "Review Road",
+        requested_customer_city: "Dhaka",
+        product: 91,
+        product_id: 91,
+        product_name: "Approval Product",
+        product_code: "APP-091",
+        product_image: "http://127.0.0.1:8100/media/products/approval-product.png",
+        batch: 92,
+        batch_id: 92,
+        batch_code: "APP-BATCH-92",
+        preferred_lucky_number: 11,
+        requested_tenure_months_snapshot: 12,
+        notes: "Review this request",
+        status: "SUBMITTED",
+        reviewed_by: null,
+        reviewed_by_username: null,
+        reviewed_at: null,
+        review_note: "",
+        approved_subscription_id: null,
+        approved_subscription_number: null,
+        created_at: "2026-04-07T10:15:00Z",
+        updated_at: "2026-04-07T10:15:00Z",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscription-request-options/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        products: [
+          {
+            id: 91,
+            name: "Approval Product",
+            product_code: "APP-091",
+            base_price: "18000.00",
+            image: "http://127.0.0.1:8100/media/products/approval-product.png",
+          },
+        ],
+        batches: [
+          {
+            id: 92,
+            batch_code: "APP-BATCH-92",
+            duration_months: 12,
+            available_slots: 10,
+            start_date: "2026-04-01",
+            status: "OPEN",
+          },
+        ],
+        lucky_numbers: [11, 12, 13],
+        customers: [
+          {
+            id: 55,
+            name: "Existing Customer",
+            phone: "01799999999",
+            email: "existing@example.com",
+            kyc_status: "VERIFIED",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscription-requests/81/approve/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "Subscription request approved successfully.",
+        result: {
+          id: 81,
+          requester: 9,
+          requester_username: "partner_user",
+          requester_role_snapshot: "PARTNER",
+          partner: 9,
+          partner_id: 9,
+          partner_username: "partner_user",
+          customer: 55,
+          customer_id: 55,
+          customer_name: "Existing Customer",
+          customer_phone: "01799999999",
+          customer_email: "existing@example.com",
+          requested_customer_name: "Pending Review Customer",
+          requested_customer_phone: "01744444444",
+          requested_customer_email: "pending-review@example.com",
+          requested_customer_address: "Review Road",
+          requested_customer_city: "Dhaka",
+          product: 91,
+          product_id: 91,
+          product_name: "Approval Product",
+          product_code: "APP-091",
+          product_image: "http://127.0.0.1:8100/media/products/approval-product.png",
+          batch: 92,
+          batch_id: 92,
+          batch_code: "APP-BATCH-92",
+          preferred_lucky_number: 11,
+          requested_tenure_months_snapshot: 12,
+          notes: "Review this request",
+          status: "APPROVED",
+          reviewed_by: 1,
+          reviewed_by_username: "admin",
+          reviewed_at: "2026-04-07T10:20:00Z",
+          review_note: "Approved with linked customer",
+          approved_subscription_id: 901,
+          approved_subscription_number: "SUB-901",
+          created_at: "2026-04-07T10:15:00Z",
+          updated_at: "2026-04-07T10:20:00Z",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/admin/subscription-requests/81");
+  await expect(
+    page.getByRole("heading", { name: "Request #81" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Review action");
+
+  await page.getByRole("combobox", { name: /^Customer$/ }).selectOption("55");
+  await page
+    .getByRole("combobox", { name: /^Lucky number override$/ })
+    .selectOption("12");
+  await page
+    .getByRole("textbox", { name: /^Review note$/ })
+    .fill("Approved with linked customer");
+  await page.getByRole("button", { name: "Approve Request" }).click();
+
+  await expect(
+    page.getByText("Subscription request approved successfully.")
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Approved Subscription" })).toHaveAttribute(
+    "href",
+    "/admin/subscriptions/901"
+  );
 });
 
 test("admin completed winner detail keeps contract status completed and shows winner history separately", async ({
@@ -275,10 +435,57 @@ test("admin completed winner detail keeps contract status completed and shows wi
   await expect(
     page.getByRole("heading", { name: "Subscription #901" })
   ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Contract, winner, and waiver posture");
+  await expect(page.locator("body")).toContainText("Contract fully settled");
+  await expect(page.locator("body")).toContainText("Winner benefit recorded");
+  await expect(page.locator("body")).toContainText("Waiver settled the remaining exposure");
   await expect(page.locator("body")).toContainText("COMPLETED");
   await expect(page.locator("body")).toContainText("Winner recorded");
   await expect(page.locator("body")).toContainText("Month 1");
   await expect(page.locator("body")).not.toContainText("subscription status is not");
+  await expect(page.locator("body")).not.toContainText("Lucky ID status is not WON");
+});
+
+test("admin payment reconciliation compatibility route forwards query params to canonical workspace", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/subscriptions/reconciliation-attention/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        checked_count: 1,
+        flagged_count: 0,
+        results: [],
+        note: "No mismatches detected.",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/reconciliations/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      }),
+    });
+  });
+
+  await page.goto(
+    "/admin/payments/reconciliation?subscription=901&payment=91&status=FLAGGED&flagged=true&locked=false&q=winner"
+  );
+
+  await expect(page).toHaveURL(
+    /\/admin\/reconciliation\?view=payments&subscription=901&payment=91&status=FLAGGED&flagged=true&locked=false&q=winner$/
+  );
+  await expect(
+    page.getByRole("heading", { name: "Admin Reconciliation" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Payment reconciliation queue");
 });
 
 test("admin managed user edit page uses internal-user API and never calls partner subscription detail", async ({
@@ -452,40 +659,45 @@ test("admin customer create success exposes OTP access handoff without echoing t
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({
-        id: 620,
-        user: 911,
-        user_username: "newcustomer620",
-        name: "New Customer",
-        phone: "01988001122",
-        kyc_status: "PENDING",
-        created_at: "2026-04-04T06:00:00Z",
-      }),
-    });
+        body: JSON.stringify({
+          id: 620,
+          user: 911,
+          user_username: "newcustomer620",
+          name: "New Customer",
+          phone: "01988001122",
+          email: "newcustomer620@example.com",
+          kyc_status: "PENDING",
+          created_at: "2026-04-04T06:00:00Z",
+        }),
+      });
   });
 
   await page.goto("/admin/customers/create");
   await page.locator("#customer-name").fill("New Customer");
   await page.locator("#customer-phone").fill("01988001122");
+  await page.locator("#customer-email").fill("newcustomer620@example.com");
   await page.locator("#customer-username").fill("newcustomer620");
   await page.locator("#customer-password").fill("SecurePass123!");
   await page.getByRole("button", { name: "Create Customer" }).click();
 
   await expect(page.locator("body")).toContainText("Customer access handoff");
   await expect(page.locator("body")).toContainText("OTP delivery readiness");
-  await expect(page.locator("body")).toContainText("Fallback Ready");
+  await expect(page.locator("body")).toContainText("Ready");
   await expect(page.locator("body")).toContainText(
-    "SMS delivery is a placeholder in the current codebase"
+    "SMS delivery is not used for public customer or partner password reset"
   );
   await expect(page.locator("body")).toContainText("newcustomer620");
   await expect(page.locator("body")).toContainText("01988001122");
+  await expect(page.locator("body")).toContainText("newcustomer620@example.com");
   await expect(page.locator("body")).not.toContainText("SecurePass123!");
 
   await page.getByRole("link", { name: "Start OTP Reset" }).click();
-  await expect(page).toHaveURL(/\/forgot-password\?identifier=01988001122$/);
-  await expect(page.locator("#identifier")).toHaveValue("01988001122");
+  await expect(page).toHaveURL(
+    /\/forgot-password\?identifier=newcustomer620%40example\.com$/
+  );
+  await expect(page.locator("#identifier")).toHaveValue("newcustomer620@example.com");
   await expect(page.locator("body")).toContainText(
-    "request a 6-digit reset code"
+    "sent to the registered email address"
   );
 });
 
@@ -543,9 +755,93 @@ test("admin customer detail shows OTP access handoff for existing customer", asy
   await expect(page.locator("body")).toContainText("API Only");
   await expect(page.locator("body")).toContainText("accessready55");
   await expect(page.locator("body")).toContainText("01755555555");
+  await expect(page.locator("body")).toContainText("access@example.com");
   await expect(
-    page.locator('a[href="/forgot-password?identifier=01755555555"]')
+    page.locator('a[href="/forgot-password?identifier=access%40example.com"]')
   ).toBeVisible();
+});
+
+test("admin customer edit uses the real JSON contract and audit timeline", async ({
+  page,
+}) => {
+  let updatePayload: Record<string, unknown> | null = null;
+  const customerRecord = {
+    id: 77,
+    name: "Editable Customer",
+    phone: "01744444444",
+    email: "editable@example.com",
+    address: "Old Address",
+    city: "Dhaka",
+    user: 707,
+    user_username: "editable77",
+    user_is_active: true,
+    kyc_status: "PENDING",
+    created_at: "2026-04-04T06:00:00Z",
+  };
+
+  await page.route("**/api/v1/admin/customers/77/", async (route) => {
+    if (route.request().method() === "PUT") {
+      updatePayload = route.request().postDataJSON() as Record<string, unknown>;
+      Object.assign(customerRecord, updatePayload);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(customerRecord),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(customerRecord),
+    });
+  });
+
+  await page.route(
+    "**/api/v1/admin/audit-logs/timeline/Customer/77/",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          results: [
+            {
+              id: 1,
+              action_type: "USER_UPDATED",
+              performed_by_username: "admin",
+              created_at: "2026-04-04T07:00:00Z",
+            },
+          ],
+        }),
+      });
+    }
+  );
+
+  await page.goto("/admin/customers/77/edit");
+  await expect(
+    page.getByRole("heading", { name: "Edit Customer: Editable Customer" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("USER_UPDATED");
+
+  await page.locator("#name").fill("Edited Customer");
+  await page.locator("#phone").fill("01744444445");
+  await page.locator("#email").fill("edited@example.com");
+  await page.locator("#address").fill("Updated Address");
+  await page.locator("#city").fill("Chattogram");
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.locator("body")).toContainText(
+    "Customer account updated successfully."
+  );
+  expect(updatePayload).toMatchObject({
+    name: "Edited Customer",
+    phone: "01744444445",
+    email: "edited@example.com",
+    address: "Updated Address",
+    city: "Chattogram",
+    kyc_status: "PENDING",
+  });
 });
 
 test("public OTP reset flow supports prefilled identifier, resend, and manual code entry", async ({
@@ -588,22 +884,24 @@ test("public OTP reset flow supports prefilled identifier, resend, and manual co
     });
   });
 
-  await page.goto("/forgot-password?identifier=01977001122");
-  await expect(page.locator("#identifier")).toHaveValue("01977001122");
+  await page.goto("/forgot-password?identifier=customer-reset%40example.com");
+  await expect(page.locator("#identifier")).toHaveValue("customer-reset@example.com");
   await page.getByRole("button", { name: "Send reset code" }).click();
 
   await expect(page.locator("body")).toContainText(
     "If an eligible account exists, a reset code has been requested."
   );
-  expect(forgotPayload).toMatchObject({ identifier: "01977001122" });
+  expect(forgotPayload).toMatchObject({ identifier: "customer-reset@example.com" });
 
   await page.getByRole("link", { name: "Continue With OTP" }).click();
-  await expect(page).toHaveURL(/\/reset-password\?identifier=01977001122$/);
-  await expect(page.locator("#identifier")).toHaveValue("01977001122");
+  await expect(page).toHaveURL(
+    /\/reset-password\?identifier=customer-reset%40example\.com$/
+  );
+  await expect(page.locator("#identifier")).toHaveValue("customer-reset@example.com");
 
   await page.getByRole("button", { name: "Resend OTP" }).click();
   await expect(page.locator("body")).toContainText("OTP resent successfully.");
-  expect(resendPayload).toMatchObject({ identifier: "01977001122" });
+  expect(resendPayload).toMatchObject({ identifier: "customer-reset@example.com" });
 
   await page.locator("#otp").fill("123456");
   await page.locator("#password").fill("ResetPass123");
@@ -614,7 +912,7 @@ test("public OTP reset flow supports prefilled identifier, resend, and manual co
     "Password reset successfully! Redirecting to login..."
   );
   expect(resetPayload).toMatchObject({
-    identifier: "01977001122",
+    identifier: "customer-reset@example.com",
     otp: "123456",
     new_password: "ResetPass123",
     confirm_password: "ResetPass123",
@@ -870,6 +1168,7 @@ test("admin customer CSV import preview enables confirm-import only after a clea
             row_number: 2,
             name: "Import Ready Customer",
             phone: "9100000001",
+            email: "importreadycustomer@example.com",
             created_customer_id: 501,
             created_user_id: 801,
             generated_username: "importreadycustomer",
@@ -889,7 +1188,9 @@ test("admin customer CSV import preview enables confirm-import only after a clea
     .setInputFiles({
       name: "customers.csv",
       mimeType: "text/csv",
-      buffer: Buffer.from("name,phone\nImport Ready Customer,9100000001\n"),
+      buffer: Buffer.from(
+        "name,phone,email\nImport Ready Customer,9100000001,importreadycustomer@example.com\n"
+      ),
     });
 
   await expect(
@@ -908,7 +1209,9 @@ test("admin customer CSV import preview enables confirm-import only after a clea
   await expect(page.locator("body")).toContainText("Customer import completed. Created 1 row and skipped 0.");
   await expect(page.locator("body")).toContainText("importreadycustomer");
   await expect(
-    page.locator('a[href="/forgot-password?identifier=9100000001"]')
+    page.locator(
+      'a[href="/forgot-password?identifier=importreadycustomer%40example.com"]'
+    )
   ).toBeVisible();
   expect(previewCalls).toBe(1);
   expect(importCalls).toBe(1);

@@ -1,18 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
 import { downloadCsv } from "@/lib/export/csv";
+import {
+  buildAdminPaymentRoute,
+  buildAdminReconciliationRoute,
+  buildAdminSubscriptionRoute,
+} from "@/lib/route-builders";
+import {
+  flagReconciliation,
+  listReconciliations,
+  type ReconciliationRecord,
+} from "@/services/reconciliation";
 import { getReconciliationSnapshot } from "@/services/reports";
 
-type ReconciliationSnapshot = Awaited<
-  ReturnType<typeof getReconciliationSnapshot>
->;
+type ActiveView = "subscriptions" | "payments";
+
+type ReconciliationSnapshot = Awaited<ReturnType<typeof getReconciliationSnapshot>>;
+type ReconciliationExportRow = Record<string, string | number>;
 
 type SnapshotRow = {
   id: number;
@@ -87,16 +101,9 @@ function normalizeSnapshotRow(raw: Record<string, unknown>): SnapshotRow {
     toNumber(raw.subscription) ||
     toNumber(raw.id);
 
-  const rawTotal = raw.total_amount ?? raw.total;
-  const rawPaid = raw.paid_amount ?? raw.paid;
-  const rawWaived = raw.waived_amount ?? raw.waived;
-  const rawPending = raw.pending_outstanding ?? raw.outstanding;
-  const rawComputed = raw.computed_outstanding ?? raw.computed;
   const rawDelta = raw.delta;
-
   const deltaValue = toNumber(rawDelta);
   const explicitFlag = toBoolean(raw.flagged);
-  const computedFlag = Math.abs(deltaValue) > DELTA_EPSILON;
 
   return {
     id: toNumber(raw.id) || subscriptionId,
@@ -104,13 +111,17 @@ function normalizeSnapshotRow(raw: Record<string, unknown>): SnapshotRow {
     subscription_number:
       toStringValue(raw.subscription_number) || `SUB-${subscriptionId}`,
     customer_name: toStringValue(raw.customer_name) || undefined,
-    total_amount: toMoneyString(rawTotal),
-    paid_amount: toMoneyString(rawPaid),
-    waived_amount: toMoneyString(rawWaived),
-    pending_outstanding: toMoneyString(rawPending),
-    computed_outstanding: toMoneyString(rawComputed),
+    total_amount: toMoneyString(raw.total_amount ?? raw.total),
+    paid_amount: toMoneyString(raw.paid_amount ?? raw.paid),
+    waived_amount: toMoneyString(raw.waived_amount ?? raw.waived),
+    pending_outstanding: toMoneyString(
+      raw.pending_outstanding ?? raw.outstanding
+    ),
+    computed_outstanding: toMoneyString(
+      raw.computed_outstanding ?? raw.computed
+    ),
     delta: toMoneyString(rawDelta),
-    flagged: explicitFlag || computedFlag,
+    flagged: explicitFlag || Math.abs(deltaValue) > DELTA_EPSILON,
   };
 }
 
@@ -118,7 +129,37 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
-  return "Failed to load reconciliation dashboard.";
+  return "Failed to load reconciliation workspace.";
+}
+
+function parseBooleanFilter(value: string | null): boolean | undefined {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
+
+function ModeButton({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "inline-flex h-11 items-center justify-center rounded-2xl border px-4 text-sm font-medium transition duration-200",
+        active
+          ? "border-slate-900/10 bg-slate-900 text-white shadow-[0_18px_42px_-28px_rgba(15,23,42,0.8)]"
+          : "border-white/80 bg-white/75 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] hover:-translate-y-0.5 hover:bg-white",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
+  );
 }
 
 function SectionCard({
@@ -128,63 +169,129 @@ function SectionCard({
 }: {
   title: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="relative overflow-hidden rounded-[1.8rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.62)]">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
       </div>
-      <div className="mt-4">{children}</div>
+      <div className="mt-5">{children}</div>
     </section>
   );
 }
 
 export default function AdminReconciliationPage() {
+  const searchParams = useSearchParams();
+
+  const activeView: ActiveView = useMemo(() => {
+    return searchParams.get("view") === "payments" ? "payments" : "subscriptions";
+  }, [searchParams]);
+
+  const selectedSubscriptionId = useMemo(() => {
+    const raw = searchParams.get("subscription");
+    return raw ? toNumber(raw) : 0;
+  }, [searchParams]);
+
+  const selectedPaymentId = useMemo(() => {
+    const raw = searchParams.get("payment");
+    return raw ? toNumber(raw) : 0;
+  }, [searchParams]);
+
+  const selectedStatus = useMemo(
+    () => (searchParams.get("status") || "").trim(),
+    [searchParams]
+  );
+  const selectedSearch = useMemo(
+    () => (searchParams.get("q") || "").trim(),
+    [searchParams]
+  );
+  const selectedFlagged = useMemo(
+    () => parseBooleanFilter(searchParams.get("flagged")),
+    [searchParams]
+  );
+  const selectedLocked = useMemo(
+    () => parseBooleanFilter(searchParams.get("locked")),
+    [searchParams]
+  );
+
   const [snapshot, setSnapshot] = useState<ReconciliationSnapshot | null>(null);
-  const [allRows, setAllRows] = useState<SnapshotRow[]>([]);
+  const [snapshotRows, setSnapshotRows] = useState<SnapshotRow[]>([]);
+  const [paymentRows, setPaymentRows] = useState<ReconciliationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [flaggingId, setFlaggingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
-    try {
-      const payload = await getReconciliationSnapshot();
-      const normalizedRows = toRowsArray(payload).map(normalizeSnapshotRow);
+      try {
+        const loaders: Array<Promise<unknown>> = [getReconciliationSnapshot()];
+        if (activeView === "payments") {
+          loaders.push(
+            listReconciliations({
+              subscription: selectedSubscriptionId || undefined,
+              payment: selectedPaymentId || undefined,
+              status: selectedStatus || undefined,
+              flagged: selectedFlagged,
+              locked: selectedLocked,
+              q: selectedSearch || undefined,
+            })
+          );
+        }
 
-      setSnapshot(payload);
-      setAllRows(normalizedRows);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
+        const [snapshotPayload, reconciliationPayload] = await Promise.all(loaders);
+        setSnapshot(snapshotPayload as ReconciliationSnapshot);
+        setSnapshotRows(
+          toRowsArray(snapshotPayload).map(normalizeSnapshotRow)
+        );
+        setPaymentRows(
+          activeView === "payments"
+            ? ((reconciliationPayload as ReconciliationRecord[]) ?? [])
+            : []
+        );
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
         setSnapshot(null);
-        setAllRows([]);
+        setSnapshotRows([]);
+        setPaymentRows([]);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
-    } finally {
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setRefreshing(false);
-      }
-    }
-  }
+    },
+    [
+      activeView,
+      selectedFlagged,
+      selectedLocked,
+      selectedPaymentId,
+      selectedSearch,
+      selectedStatus,
+      selectedSubscriptionId,
+    ]
+  );
 
   useEffect(() => {
     void loadPage("initial");
-  }, []);
+  }, [loadPage]);
 
-  const flaggedRows = useMemo(
-    () => allRows.filter((row) => row.flagged),
-    [allRows]
-  );
+  const filteredSnapshotRows = useMemo(() => {
+    if (selectedSubscriptionId <= 0) {
+      return snapshotRows;
+    }
+
+    return snapshotRows.filter(
+      (row) => row.subscription_id === selectedSubscriptionId
+    );
+  }, [selectedSubscriptionId, snapshotRows]);
 
   const checkedCount = useMemo(() => {
     const objectSnapshot = toObject(snapshot);
@@ -192,8 +299,12 @@ export default function AdminReconciliationPage() {
       objectSnapshot?.checked_count ?? objectSnapshot?.checkedCount
     );
 
-    return payloadChecked > 0 ? payloadChecked : allRows.length;
-  }, [snapshot, allRows.length]);
+    if (selectedSubscriptionId > 0) {
+      return filteredSnapshotRows.length;
+    }
+
+    return payloadChecked > 0 ? payloadChecked : snapshotRows.length;
+  }, [filteredSnapshotRows.length, selectedSubscriptionId, snapshot, snapshotRows.length]);
 
   const flaggedCount = useMemo(() => {
     const objectSnapshot = toObject(snapshot);
@@ -201,35 +312,40 @@ export default function AdminReconciliationPage() {
       objectSnapshot?.flagged_count ?? objectSnapshot?.flaggedCount
     );
 
-    return payloadFlagged > 0 ? payloadFlagged : flaggedRows.length;
-  }, [snapshot, flaggedRows.length]);
+    if (selectedSubscriptionId > 0) {
+      return filteredSnapshotRows.filter((row) => row.flagged).length;
+    }
+
+    return payloadFlagged > 0 ? payloadFlagged : filteredSnapshotRows.length;
+  }, [filteredSnapshotRows, selectedSubscriptionId, snapshot]);
 
   const totalDelta = useMemo(
-    () => flaggedRows.reduce((sum, row) => sum + Math.abs(toNumber(row.delta)), 0),
-    [flaggedRows]
+    () =>
+      filteredSnapshotRows.reduce((sum, row) => sum + Math.abs(toNumber(row.delta)), 0),
+    [filteredSnapshotRows]
   );
 
   const totalPendingOutstanding = useMemo(
     () =>
-      flaggedRows.reduce(
+      filteredSnapshotRows.reduce(
         (sum, row) => sum + toNumber(row.pending_outstanding),
         0
       ),
-    [flaggedRows]
+    [filteredSnapshotRows]
   );
 
   const totalComputedOutstanding = useMemo(
     () =>
-      flaggedRows.reduce(
+      filteredSnapshotRows.reduce(
         (sum, row) => sum + toNumber(row.computed_outstanding),
         0
       ),
-    [flaggedRows]
+    [filteredSnapshotRows]
   );
 
-  const exportRows = useMemo(
-    () =>
-      flaggedRows.map((row) => ({
+  const snapshotExportRows = useMemo(
+    (): ReconciliationExportRow[] =>
+      filteredSnapshotRows.map((row) => ({
         subscription_id: row.subscription_id,
         subscription_number: row.subscription_number,
         customer_name: row.customer_name ?? "",
@@ -240,27 +356,104 @@ export default function AdminReconciliationPage() {
         computed_outstanding: row.computed_outstanding,
         delta: row.delta,
       })),
-    [flaggedRows]
+    [filteredSnapshotRows]
+  );
+
+  const paymentExportRows = useMemo(
+    (): ReconciliationExportRow[] =>
+      paymentRows.map((row) => ({
+        id: row.id,
+        payment_id: row.payment_id ?? row.payment ?? "",
+        subscription_number: row.subscription_number,
+        customer_name: row.customer_name ?? "",
+        reference_no: row.payment_reference_no ?? "",
+        status: row.status,
+        flagged: row.is_flagged ? "YES" : "NO",
+        locked: row.is_locked ? "YES" : "NO",
+        payment_amount: row.payment_amount ?? "0",
+        expected_amount: row.expected_amount ?? "0",
+        paid_amount: row.paid_amount ?? "0",
+        variance_amount: row.variance_amount ?? "0",
+        payment_date: row.payment_date ?? "",
+        reconciled_at: row.reconciled_at ?? "",
+        notes: row.notes ?? "",
+      })),
+    [paymentRows]
+  );
+
+  const paymentsViewHref = buildAdminReconciliationRoute({
+    view: "payments",
+    subscription: selectedSubscriptionId || undefined,
+    payment: selectedPaymentId || undefined,
+    status: selectedStatus || undefined,
+    flagged: selectedFlagged,
+    locked: selectedLocked,
+    q: selectedSearch || undefined,
+  });
+
+  const subscriptionsViewHref = buildAdminReconciliationRoute({
+    subscription: selectedSubscriptionId || undefined,
+  });
+
+  const paymentContextTitle = useMemo(() => {
+    if (selectedSubscriptionId > 0 && selectedPaymentId > 0) {
+      return `Filtered to subscription #${selectedSubscriptionId} and payment #${selectedPaymentId}.`;
+    }
+    if (selectedSubscriptionId > 0) {
+      return `Filtered to subscription #${selectedSubscriptionId}.`;
+    }
+    if (selectedPaymentId > 0) {
+      return `Filtered to payment #${selectedPaymentId}.`;
+    }
+    return "Showing the full payment reconciliation queue on the canonical admin reconciliation route.";
+  }, [selectedPaymentId, selectedSubscriptionId]);
+
+  const handleFlag = useCallback(
+    async (row: ReconciliationRecord) => {
+      if (row.is_flagged) return;
+
+      const confirmed = window.confirm(
+        `Flag reconciliation #${row.id}? This marks the record for operational follow-up.`
+      );
+      if (!confirmed) return;
+
+      setFlaggingId(row.id);
+      setError(null);
+
+      try {
+        await flagReconciliation(row.id, {
+          reason: `Flagged from canonical admin reconciliation workspace for payment #${
+            row.payment_id ?? row.payment ?? row.id
+          }.`,
+        });
+        await loadPage("refresh");
+      } catch (err) {
+        setError(toErrorMessage(err));
+      } finally {
+        setFlaggingId(null);
+      }
+    },
+    [loadPage]
   );
 
   return (
     <PortalPage
-      title="Reconciliation Dashboard"
-      subtitle="Portfolio-level financial consistency view for subscription balances, outstanding computation, and mismatch attention."
+      title="Admin Reconciliation"
+      subtitle="Canonical daily-operations reconciliation workspace for subscription attention and payment-level follow-up."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reconciliation" },
       ]}
       actions={[
         {
-          href: "/admin/payments/reconciliation",
-          label: "Payment Reconciliation",
+          href: "/admin/payments",
+          label: "Open Payments",
           variant: "secondary",
         },
         {
-          href: "/admin/payments",
-          label: "Open Payments",
-          variant: "primary",
+          href: "/admin/finance/reconciliation",
+          label: "Commission Reconciliation",
+          variant: "secondary",
         },
       ]}
       stats={[
@@ -274,210 +467,453 @@ export default function AdminReconciliationPage() {
           tone: flaggedCount > 0 ? "warning" : undefined,
         },
         {
-          label: "Pending Outstanding",
-          value: money(totalPendingOutstanding),
+          label:
+            activeView === "payments"
+              ? "Payment Reconciliation Rows"
+              : "Pending Outstanding",
+          value:
+            activeView === "payments"
+              ? String(paymentRows.length)
+              : money(totalPendingOutstanding),
+          tone:
+            activeView === "payments"
+              ? paymentRows.some((row) => row.is_flagged)
+                ? "warning"
+                : undefined
+              : undefined,
         },
         {
-          label: "Delta Exposure",
-          value: money(totalDelta),
+          label:
+            activeView === "payments" ? "Delta Exposure" : "Computed Outstanding",
+          value:
+            activeView === "payments"
+              ? money(totalDelta)
+              : money(totalComputedOutstanding),
           tone: totalDelta > 0 ? "danger" : undefined,
         },
       ]}
       statusBadge={{
-        label: "Portfolio Integrity",
-        tone: "info",
+        label:
+          activeView === "payments"
+            ? "Payment Queue"
+            : "Subscription Attention",
+        tone: activeView === "payments" ? "warning" : "info",
       }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-
-          <button
-            type="button"
-            disabled={exportRows.length === 0 || loading}
-            onClick={() =>
-              downloadCsv(
-                "reconciliation-dashboard-current-view.csv",
-                [
-                  { key: "subscription_id", header: "subscription_id" },
-                  { key: "subscription_number", header: "subscription_number" },
-                  { key: "customer_name", header: "customer_name" },
-                  { key: "total_amount", header: "total_amount" },
-                  { key: "paid_amount", header: "paid_amount" },
-                  { key: "waived_amount", header: "waived_amount" },
-                  { key: "pending_outstanding", header: "pending_outstanding" },
-                  { key: "computed_outstanding", header: "computed_outstanding" },
-                  { key: "delta", header: "delta" },
-                ],
-                exportRows
-              )
-            }
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Export Current View
-          </button>
+        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-foreground">
+              Canonical workflow mode
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Subscription attention and payment reconciliation now share one operational route.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ModeButton href={subscriptionsViewHref} active={activeView === "subscriptions"}>
+              Subscription Attention
+            </ModeButton>
+            <ModeButton href={paymentsViewHref} active={activeView === "payments"}>
+              Payment Queue
+            </ModeButton>
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              disabled={
+                loading ||
+                (activeView === "payments"
+                  ? paymentExportRows.length === 0
+                  : snapshotExportRows.length === 0)
+              }
+              onClick={() =>
+                downloadCsv<ReconciliationExportRow>(
+                  activeView === "payments"
+                    ? "admin-reconciliation-payments.csv"
+                    : "admin-reconciliation-subscriptions.csv",
+                  activeView === "payments"
+                    ? [
+                        { key: "id", header: "id" },
+                        { key: "payment_id", header: "payment_id" },
+                        { key: "subscription_number", header: "subscription_number" },
+                        { key: "customer_name", header: "customer_name" },
+                        { key: "reference_no", header: "reference_no" },
+                        { key: "status", header: "status" },
+                        { key: "flagged", header: "flagged" },
+                        { key: "locked", header: "locked" },
+                        { key: "payment_amount", header: "payment_amount" },
+                        { key: "expected_amount", header: "expected_amount" },
+                        { key: "paid_amount", header: "paid_amount" },
+                        { key: "variance_amount", header: "variance_amount" },
+                        { key: "payment_date", header: "payment_date" },
+                        { key: "reconciled_at", header: "reconciled_at" },
+                        { key: "notes", header: "notes" },
+                      ]
+                    : [
+                        { key: "subscription_id", header: "subscription_id" },
+                        { key: "subscription_number", header: "subscription_number" },
+                        { key: "customer_name", header: "customer_name" },
+                        { key: "total_amount", header: "total_amount" },
+                        { key: "paid_amount", header: "paid_amount" },
+                        { key: "waived_amount", header: "waived_amount" },
+                        { key: "pending_outstanding", header: "pending_outstanding" },
+                        { key: "computed_outstanding", header: "computed_outstanding" },
+                        { key: "delta", header: "delta" },
+                      ],
+                  activeView === "payments" ? paymentExportRows : snapshotExportRows
+                )
+              }
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Export Current View
+            </button>
+          </div>
         </section>
 
-        {loading ? <LoadingBlock label="Loading reconciliation dashboard..." /> : null}
+        {loading ? <LoadingBlock label="Loading reconciliation workspace..." /> : null}
 
         {!loading && error ? (
           <ErrorState
-            title="Unable to load reconciliation dashboard"
+            title="Unable to load reconciliation workspace"
             description={error}
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
 
-        {!loading && !error ? (
+        {!loading && !error && activeView === "subscriptions" ? (
           <>
             <SectionCard
-              title="Reconciliation Note"
-              description="This page shows only subscription rows that are actually mismatched. Use payment reconciliation when you need payment-specific reconciliation actions."
+              title="Subscription attention"
+              description="This view shows only subscription rows where pending outstanding and contract-derived remaining exposure do not align."
             >
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Snapshot Rows
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(checkedCount)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Filtered subscriptions reviewed in the current reconciliation snapshot.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Flagged Mismatches
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(flaggedCount)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Subscription rows where computed and pending outstanding do not align.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Computed Outstanding
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {money(totalComputedOutstanding)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Sum of system-computed outstanding values across flagged rows.
-                  </p>
-                </div>
+                <StatCard
+                  label="Checked rows"
+                  value={String(checkedCount)}
+                  subtext="Subscriptions inspected in the canonical attention snapshot"
+                />
+                <StatCard
+                  label="Flagged mismatches"
+                  value={String(flaggedCount)}
+                  subtext="Rows requiring reconciliation follow-up"
+                  tone={flaggedCount > 0 ? "warning" : "success"}
+                />
+                <StatCard
+                  label="Delta exposure"
+                  value={money(totalDelta)}
+                  subtext="Absolute mismatch between pending and computed outstanding"
+                  tone={totalDelta > 0 ? "danger" : "success"}
+                />
               </div>
             </SectionCard>
 
             <SectionCard
-              title="Flagged Subscription Rows"
-              description="Only mismatched subscription rows are shown below so the page matches the dashboard attention count."
+              title="Flagged subscription rows"
+              description="Open subscription detail to inspect canonical financial truth, or jump into payment reconciliation filtered to the affected contract."
             >
-              {flaggedRows.length === 0 ? (
+              {filteredSnapshotRows.length === 0 ? (
                 <EmptyState
                   title="No reconciliation mismatches"
-                  description="No subscription-level reconciliation mismatches are currently flagged."
+                  description="No subscription-level mismatches are currently flagged."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
-                    <thead>
-                      <tr className="text-left">
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Subscription
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Customer
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                          Contract
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                          Outstanding
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                          Delta
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {flaggedRows.map((row) => (
-                        <tr key={row.subscription_id} className="align-top">
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
-                              {row.subscription_number || `SUB-${row.subscription_id}`}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Subscription ID {row.subscription_id}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
-                              {row.customer_name || "Unknown customer"}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
-                            <div>Total {money(row.total_amount)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Paid {money(row.paid_amount)}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Waived {money(row.waived_amount)}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
-                            <div>Pending {money(row.pending_outstanding)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Computed {money(row.computed_outstanding)}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                            {money(row.delta)}
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="flex flex-col items-start gap-2">
-                              <Link
-                                href={`/admin/subscriptions/${row.subscription_id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Subscription
-                              </Link>
-
-                              <Link
-                                href={`/admin/payments/reconciliation?subscription=${row.subscription_id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Payment Reconciliation
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<SnapshotRow>
+                  rows={filteredSnapshotRows}
+                  emptyText="No flagged subscription rows."
+                  columns={[
+                    {
+                      key: "subscription_number",
+                      title: "Subscription",
+                      render: (row) => (
+                        <div className="space-y-1">
+                          <div className="font-medium text-foreground">
+                            {row.subscription_number}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Subscription ID {row.subscription_id}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "customer_name",
+                      title: "Customer",
+                      render: (row) => row.customer_name || "Unknown customer",
+                    },
+                    {
+                      key: "contract",
+                      title: "Contract",
+                      render: (row) => (
+                        <div className="space-y-1 text-sm">
+                          <div>Total {money(row.total_amount)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Paid {money(row.paid_amount)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Waived {money(row.waived_amount)}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "outstanding",
+                      title: "Outstanding",
+                      render: (row) => (
+                        <div className="space-y-1 text-sm">
+                          <div>Pending {money(row.pending_outstanding)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Computed {money(row.computed_outstanding)}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "delta",
+                      title: "Delta",
+                      align: "right",
+                      render: (row) => money(row.delta),
+                    },
+                    {
+                      key: "actions",
+                      title: "Actions",
+                      render: (row) => (
+                        <div className="flex flex-col items-start gap-2">
+                          <Link
+                            href={buildAdminSubscriptionRoute(row.subscription_id)}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Subscription
+                          </Link>
+                          <Link
+                            href={buildAdminReconciliationRoute({
+                              view: "payments",
+                              subscription: row.subscription_id,
+                            })}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Payment Queue
+                          </Link>
+                        </div>
+                      ),
+                    },
+                  ]}
+                />
               )}
             </SectionCard>
+          </>
+        ) : null}
+
+        {!loading && !error && activeView === "payments" ? (
+          <>
+            <SectionCard
+              title="Payment reconciliation queue"
+              description="This is the canonical payment-level follow-up workspace. Older `/admin/payments/reconciliation` links now redirect here."
+            >
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatCard
+                  label="Payment rows"
+                  value={String(paymentRows.length)}
+                  subtext="Reconciliation records in the current filter context"
+                />
+                <StatCard
+                  label="Flagged payments"
+                  value={String(paymentRows.filter((row) => row.is_flagged).length)}
+                  subtext="Payment rows already marked for follow-up"
+                  tone={
+                    paymentRows.some((row) => row.is_flagged) ? "warning" : "success"
+                  }
+                />
+                <StatCard
+                  label="Context"
+                  value={
+                    selectedSubscriptionId > 0
+                      ? `SUB-${selectedSubscriptionId}`
+                      : selectedPaymentId > 0
+                      ? `PAY-${selectedPaymentId}`
+                      : "Portfolio"
+                  }
+                  subtext={paymentContextTitle}
+                />
+              </div>
+            </SectionCard>
+
+            {selectedSubscriptionId > 0 && filteredSnapshotRows.length > 0 ? (
+              <SectionCard
+                title="Subscription attention in current context"
+                description="This payment view stays anchored to the same subscription-level attention truth."
+              >
+                <div className="space-y-3">
+                  {filteredSnapshotRows.map((row) => (
+                    <div
+                      key={`${row.subscription_id}-${row.id}`}
+                      className="rounded-xl border border-amber-200 bg-amber-50 p-4"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="font-medium text-foreground">
+                            {row.subscription_number} ·{" "}
+                            {row.customer_name || "Unknown customer"}
+                          </div>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            Pending {money(row.pending_outstanding)} · Computed{" "}
+                            {money(row.computed_outstanding)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Total {money(row.total_amount)} · Paid{" "}
+                            {money(row.paid_amount)} · Waived{" "}
+                            {money(row.waived_amount)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-foreground">
+                              {money(row.delta)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Delta</div>
+                          </div>
+
+                          <Link
+                            href={buildAdminReconciliationRoute({
+                              subscription: row.subscription_id,
+                            })}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Subscription Attention
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            ) : null}
+
+            {paymentRows.length === 0 ? (
+              <EmptyState
+                title="No payment reconciliation rows"
+                description={
+                  selectedSubscriptionId > 0 || selectedPaymentId > 0
+                    ? "No payment reconciliation records match the current filter context."
+                    : "No payment reconciliation records are currently available for admin review."
+                }
+              />
+            ) : (
+              <DataTable<ReconciliationRecord>
+                rows={paymentRows}
+                emptyText="No payment reconciliation rows."
+                columns={[
+                  {
+                    key: "record",
+                    title: "Record",
+                    render: (row) => (
+                      <div className="space-y-1">
+                        <div className="font-medium text-foreground">
+                          Reconciliation #{row.id}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Payment #{row.payment_id ?? row.payment ?? "—"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.payment_reference_no || "No reference"}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "subscription",
+                    title: "Subscription",
+                    render: (row) => (
+                      <div className="space-y-1">
+                        <div className="font-medium text-foreground">
+                          {row.subscription_number}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.customer_name || "Unknown customer"}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "amounts",
+                    title: "Amounts",
+                    render: (row) => (
+                      <div className="space-y-1 text-sm">
+                        <div>Payment {money(row.payment_amount ?? 0)}</div>
+                        <div>Expected {money(row.expected_amount ?? 0)}</div>
+                        <div>Paid {money(row.paid_amount ?? 0)}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "variance_amount",
+                    title: "Variance",
+                    align: "right",
+                    render: (row) => money(row.variance_amount ?? 0),
+                  },
+                  {
+                    key: "status",
+                    title: "State",
+                    render: (row) => (
+                      <div className="space-y-1">
+                        <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                          {row.status}
+                        </span>
+                        <div className="text-xs text-muted-foreground">
+                          {row.is_flagged ? "Flagged" : "Not flagged"} ·{" "}
+                          {row.is_locked ? "Locked" : "Unlocked"}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    title: "Actions",
+                    render: (row) => (
+                      <div className="flex flex-col items-start gap-2">
+                        <Link
+                          href={buildAdminPaymentRoute(
+                            row.payment_id ?? row.payment ?? row.id
+                          )}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Payment
+                        </Link>
+
+                        {typeof row.subscription_id === "number" ? (
+                          <Link
+                            href={buildAdminSubscriptionRoute(row.subscription_id)}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Subscription
+                          </Link>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          disabled={row.is_flagged || flaggingId === row.id}
+                          onClick={() => void handleFlag(row)}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {flaggingId === row.id
+                            ? "Flagging..."
+                            : row.is_flagged
+                            ? "Already Flagged"
+                            : "Flag"}
+                        </button>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            )}
           </>
         ) : null}
       </div>

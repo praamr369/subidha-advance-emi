@@ -75,7 +75,8 @@ export default function PublicLatestWinnerWidget() {
   }
 
   return (
-    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+    <div className="relative overflow-hidden rounded-[2rem] border border-emerald-200/80 bg-[radial-gradient(circle_at_top_right,rgba(110,231,183,0.18),transparent_34%),linear-gradient(180deg,rgba(236,253,245,0.98),rgba(220,252,231,0.88))] p-5 shadow-[0_28px_60px_-42px_rgba(6,95,70,0.45)]">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/80 to-transparent" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -98,13 +99,13 @@ export default function PublicLatestWinnerWidget() {
         <div className="flex flex-wrap gap-2">
           <Link
             href={ROUTES.public.winnerHistory}
-            className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+            className="inline-flex h-10 items-center rounded-xl border border-white/75 bg-white/75 px-4 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white"
           >
             View Winner History
           </Link>
           <Link
             href={ROUTES.public.apply}
-            className="inline-flex h-10 items-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+            className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5"
           >
             Apply Now
           </Link>

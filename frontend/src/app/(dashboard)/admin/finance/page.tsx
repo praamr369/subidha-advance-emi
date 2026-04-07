@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import type { AdminCommissionSummaryResponse } from "@/types/commission";
 
 type PayoutBatchRow = {
@@ -349,7 +350,7 @@ export default function AdminFinancePage() {
                 secondaryValue={`${String(summary?.summary?.reversed_count ?? 0)} reversed rows`}
                 primaryHref="/admin/finance/commissions"
                 primaryLabel="Review Commission Risk"
-                secondaryHref="/admin/payments/reconciliation"
+                secondaryHref={buildAdminReconciliationRoute({ view: "payments" })}
                 secondaryLabel="Payment Reconciliation"
                 tone={
                   Number(summary?.summary?.reversed_commission ?? 0) > 0 ? "danger" : "default"

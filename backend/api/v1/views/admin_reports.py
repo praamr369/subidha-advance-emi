@@ -17,6 +17,10 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.subscription_financial_service import (
+    build_reconciliation_attention_payload,
+)
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 class AdminRevenueAggregateView(APIView):
@@ -90,7 +94,7 @@ class AdminBatchPerformanceAggregateView(APIView):
                 subscription_count=Count("subscriptions", distinct=True),
                 won_count=Count(
                     "subscriptions",
-                    filter=Q(subscriptions__status=SubscriptionStatus.WON),
+                    filter=winner_history_q("subscriptions"),
                     distinct=True,
                 ),
                 draw_count=Count("lucky_draws", distinct=True),
@@ -122,50 +126,8 @@ class AdminReconciliationAttentionAggregateView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        subscriptions = (
-            Subscription.objects
-            .select_related("customer")
-            .prefetch_related("emis", "payments")
-        )
-        checked = 0
-        flagged = []
-
-        for item in subscriptions.iterator(chunk_size=200):
-            checked += 1
-            paid = item.payments.aggregate(
-                total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
-            )["total"]
-            waived = item.emis.filter(status=EmiStatus.WAIVED).aggregate(
-                total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
-            )["total"]
-            pending_outstanding = item.emis.filter(status=EmiStatus.PENDING).aggregate(
-                total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
-            )["total"]
-
-            computed = item.total_amount - paid - waived
-            delta = abs(computed - pending_outstanding)
-
-            if delta > Decimal("0.01"):
-                flagged.append(
-                    {
-                        "subscription_id": item.id,
-                        "customer_name": item.customer.name,
-                        "total_amount": str(item.total_amount),
-                        "paid_amount": str(paid),
-                        "waived_amount": str(waived),
-                        "pending_outstanding": str(pending_outstanding),
-                        "computed_outstanding": str(computed),
-                        "delta": str(delta),
-                    }
-                )
-
-        return Response(
-            {
-                "checked_count": checked,
-                "flagged_count": len(flagged),
-                "results": flagged,
-            }
-        )
+        subscriptions = Subscription.objects.all()
+        return Response(build_reconciliation_attention_payload(subscriptions))
 
 
 class AdminPartnerAggregateView(APIView):

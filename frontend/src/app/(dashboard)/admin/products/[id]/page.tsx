@@ -10,6 +10,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 type ProductDetailRecord = {
   id: number;
@@ -135,8 +136,10 @@ function normalizeProductDetail(
     description: toNullableString(raw.description),
     base_price: toMoneyString(raw.base_price ?? raw.price ?? raw.total_amount),
     image:
-      toNullableString(raw.image) ??
-      toNullableString(raw.image_url),
+      resolveApiMediaUrl(
+        toNullableString(raw.image) ??
+          toNullableString(raw.image_url)
+      ) ?? null,
     created_at: toNullableString(raw.created_at),
     is_active: toBoolean(raw.is_active, true),
     is_emi_enabled: toBoolean(raw.is_emi_enabled, true),

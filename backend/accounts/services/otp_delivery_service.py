@@ -90,7 +90,7 @@ def send_password_reset_otp_via_email(*, user, otp: str) -> str:
     return "EMAIL_OTP"
 
 
-def send_password_reset_otp(*, user, otp: str) -> str:
+def send_password_reset_otp(*, user, otp: str, email_only: bool = False) -> str:
     """
     Delivery priority:
     1. SMS when explicitly enabled and available
@@ -99,6 +99,15 @@ def send_password_reset_otp(*, user, otp: str) -> str:
     """
     delivery_backend = getattr(settings, "OTP_DELIVERY_BACKEND", "auto").strip().lower()
     allow_email_fallback = getattr(settings, "OTP_ALLOW_EMAIL_FALLBACK", True)
+
+    if email_only:
+        if delivery_backend == "email":
+            return send_password_reset_otp_via_email(user=user, otp=otp)
+
+        if delivery_backend == "auto" and allow_email_fallback:
+            return send_password_reset_otp_via_email(user=user, otp=otp)
+
+        raise OTPDeliveryError("Email OTP delivery is not configured for public password reset.")
 
     # Local/dev mode: console is acceptable and free
     if getattr(settings, "DEBUG", False) and delivery_backend == "console":

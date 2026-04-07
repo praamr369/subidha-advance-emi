@@ -155,6 +155,7 @@ class AdminInternalUserCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         role = attrs.get("role")
         rate = attrs.get("commission_rate", None)
+        email = (attrs.get("email") or "").strip()
 
         if rate is not None:
             if rate < Decimal("0.00"):
@@ -167,6 +168,10 @@ class AdminInternalUserCreateSerializer(serializers.Serializer):
                 )
 
         if role == UserRole.PARTNER:
+            if not email:
+                raise serializers.ValidationError(
+                    {"email": "Email is required for managed partner access and password reset."}
+                )
             if rate is None:
                 raise serializers.ValidationError(
                     {"commission_rate": "Commission rate is required for partner users."}
@@ -244,6 +249,11 @@ class AdminInternalUserUpdateSerializer(serializers.Serializer):
     def validate(self, attrs):
         role = attrs.get("role", self.instance.role if self.instance else None)
         rate = attrs.get("commission_rate", None)
+        final_email = (
+            (attrs.get("email") or "").strip()
+            if "email" in attrs
+            else (getattr(self.instance, "email", "") or "").strip()
+        )
 
         if rate is not None:
             if rate < Decimal("0.00"):
@@ -256,6 +266,10 @@ class AdminInternalUserUpdateSerializer(serializers.Serializer):
                 )
 
         if role == UserRole.PARTNER:
+            if not final_email:
+                raise serializers.ValidationError(
+                    {"email": "Email is required for managed partner access and password reset."}
+                )
             return attrs
 
         attrs["commission_rate"] = Decimal("0.00")

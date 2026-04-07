@@ -15,6 +15,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 
 type AuditLog = {
   id: number;
@@ -333,7 +334,7 @@ export default function AdminAuditLogsPage() {
           variant: "secondary",
         },
         {
-          href: "/admin/reconciliation",
+          href: buildAdminReconciliationRoute(),
           label: "Open Reconciliation",
           variant: "primary",
         },

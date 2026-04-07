@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PublicProductMedia from "@/components/public/PublicProductMedia";
 import DataTable from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
@@ -213,14 +214,29 @@ export default function CustomerSubscriptionsPage() {
         key: "subscription_number",
         title: "Subscription",
         render: (row: CustomerSubscription) => (
-          <div>
-            <div className="font-medium text-foreground">
-              {row.subscription_number || `SUB-${row.id}`}
+          <div className="flex items-start gap-3">
+            <div className="w-20 shrink-0">
+              <PublicProductMedia
+                src={row.product_image}
+                alt={row.product_name || "Subscription product"}
+                sizes="80px"
+                className="h-20 rounded-[18px]"
+                fallbackLabel="Media pending"
+                badge={row.product_code || "Product"}
+              />
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {row.product_name || row.plan_type || "Lucky Plan"}
-              {row.batch_code ? ` · ${row.batch_code}` : ""}
-              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+            <div className="min-w-0">
+              <div className="font-medium text-foreground">
+                {row.subscription_number || `SUB-${row.id}`}
+              </div>
+              <div className="mt-1 text-sm font-medium text-slate-900">
+                {row.product_name || row.plan_type || "Lucky Plan"}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {row.product_code || "Code pending"}
+                {row.batch_code ? ` · ${row.batch_code}` : ""}
+                {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+              </div>
             </div>
           </div>
         ),
@@ -323,6 +339,11 @@ export default function CustomerSubscriptionsPage() {
         { label: "Subscriptions" },
       ]}
       actions={[
+        {
+          href: "/customer/subscription-requests",
+          label: "Subscription Requests",
+          variant: "primary",
+        },
         {
           href: "/customer/payments",
           label: "My Payments",

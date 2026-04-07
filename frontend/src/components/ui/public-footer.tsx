@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import BrandLockup from "@/components/public/BrandLockup";
+import { brandConfig } from "@/config/brand";
 import { ROUTES } from "@/lib/routes";
 
 const footerLinks = [
@@ -13,18 +15,16 @@ const footerLinks = [
 
 export default function PublicFooter() {
   return (
-    <footer className="border-t border-border bg-background/95">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8">
+    <footer className="border-t border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8">
         <div className="max-w-xl">
-          <div className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-            SUBIDHA CORE
-          </div>
-          <h2 className="mt-2 text-lg font-semibold text-foreground">
-            Subidha Furniture Lucky Plan
-          </h2>
+          <BrandLockup
+            subtitle={`${brandConfig.publicProgramName} public catalogue, enquiry capture, and winner transparency`}
+          />
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Public information, product browsing, application capture, and winner
-            transparency for the Subidha Furniture Lucky Plan in Asansol, West Bengal.
+            transparency for the Subidha Furniture Lucky Plan in{" "}
+            {brandConfig.publicBranchLocation}.
           </p>
         </div>
 
@@ -44,9 +44,9 @@ export default function PublicFooter() {
         <div className="max-w-sm text-sm">
           <div className="font-medium text-foreground">Visit the branch</div>
           <p className="mt-2 text-muted-foreground">
-            Subidha Furniture
+            {brandConfig.companyName}
             <br />
-            Asansol, West Bengal
+            {brandConfig.publicBranchLocation}
           </p>
           <p className="mt-3 text-muted-foreground">
             Need a new enrollment or product enquiry? Use the online application

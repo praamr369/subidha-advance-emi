@@ -4,9 +4,13 @@ from django.db.models import Sum
 from rest_framework import serializers
 
 from api.v1.serializers.delivery import CustomerSubscriptionDeliveryReadSerializer
+from api.v1.serializers.media import serialize_media_url
 from subscriptions.models import Emi, Payment, Subscription
 from subscriptions.services.delivery_service import (
     get_current_subscription_delivery,
+)
+from subscriptions.services.subscription_financial_service import (
+    build_subscription_financial_snapshot,
 )
 
 
@@ -66,6 +70,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(source="product.id", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_code = serializers.CharField(source="product.product_code", read_only=True)
+    product_image = serializers.SerializerMethodField()
     product_base_price = serializers.DecimalField(
         source="product.base_price",
         max_digits=12,
@@ -109,6 +114,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "product_id",
             "product_name",
             "product_code",
+            "product_image",
             "product_base_price",
             "batch",
             "batch_id",
@@ -149,6 +155,12 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     def get_delivery_status(self, obj):
         current_delivery = get_current_subscription_delivery(obj)
         return getattr(current_delivery, "status", None)
+
+    def get_product_image(self, obj):
+        return serialize_media_url(
+            self.context.get("request"),
+            getattr(obj.product, "image", None),
+        )
 
     def _get_emis(self, obj):
         prefetched = getattr(obj, "_prefetched_objects_cache", {})
@@ -253,17 +265,44 @@ class SubscriptionListSerializer(BaseSubscriptionSerializer):
 
 
 class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
+    winner_status = serializers.SerializerMethodField()
+    winner_summary = serializers.SerializerMethodField()
     emis = serializers.SerializerMethodField()
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
 
     class Meta(BaseSubscriptionSerializer.Meta):
         fields = BaseSubscriptionSerializer.Meta.fields + (
+            "winner_status",
+            "winner_summary",
             "delivery_summary",
             "deliveries",
             "emis",
         )
         read_only_fields = fields
+
+    def _snapshot(self, obj):
+        cache_attr = "_customer_subscription_detail_snapshot"
+        snapshot = getattr(obj, cache_attr, None)
+        if snapshot is None:
+            snapshot = build_subscription_financial_snapshot(obj)
+            setattr(obj, cache_attr, snapshot)
+        return snapshot
+
+    def get_financial_summary(self, obj):
+        snapshot = self._snapshot(obj)
+        return {
+            "emi_total": snapshot["emi_total"],
+            "paid_amount": snapshot["paid_amount"],
+            "waived_amount": snapshot["waived_amount"],
+            "outstanding_amount": snapshot["outstanding_amount"],
+        }
+
+    def get_winner_status(self, obj):
+        return self._snapshot(obj)["winner_status"]
+
+    def get_winner_summary(self, obj):
+        return self._snapshot(obj)["winner_summary"]
 
     def get_emis(self, obj):
         emis = sorted(

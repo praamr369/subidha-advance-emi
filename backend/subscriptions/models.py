@@ -1,16 +1,46 @@
 from decimal import Decimal, ROUND_HALF_UP
 import hashlib
+from pathlib import Path
+from uuid import uuid4
 from xml.parsers.expat import errors
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, Sum
+from django.utils.text import slugify
 from django.utils import timezone
 
 
 MONEY_ZERO = Decimal("0.00")
 HUNDRED = Decimal("100.00")
+
+
+def _normalize_product_image_identity(value: str | None, *, fallback: str) -> str:
+    normalized = slugify((value or "").strip())
+    return normalized or fallback
+
+
+def product_image_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".img"
+
+    product_code = (getattr(instance, "product_code", "") or "").strip()
+    if product_code:
+        identity_seed = product_code
+        fallback_identity = "product"
+    else:
+        product_pk = getattr(instance, "pk", None)
+        identity_seed = f"product-{product_pk}" if product_pk else "product"
+        fallback_identity = identity_seed
+
+    identity = _normalize_product_image_identity(
+        identity_seed,
+        fallback=fallback_identity,
+    )
+    token = uuid4().hex[:10]
+    return f"products/{identity}/{identity}-{token}{extension}"
 
 
 # =====================================================
@@ -44,6 +74,13 @@ class SupportRequestCategory(models.TextChoices):
     SUBSCRIPTION_QUERY = "SUBSCRIPTION_QUERY", "Subscription Query"
     DRAW_QUERY = "DRAW_QUERY", "Draw Query"
     OTHER = "OTHER", "Other"
+
+
+class SubscriptionRequestStatus(models.TextChoices):
+    SUBMITTED = "SUBMITTED", "Submitted"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class FulfillmentStatus(models.TextChoices):
@@ -211,7 +248,7 @@ class Product(TimeStampedModel):
     category = models.CharField(max_length=120, blank=True, default="", db_index=True)
     subcategory = models.CharField(max_length=120, blank=True, default="", db_index=True)
     description = models.TextField(blank=True, default="")
-    image = models.ImageField(upload_to="products/", null=True, blank=True)
+    image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     plan_type_default = models.CharField(
@@ -477,6 +514,178 @@ class CustomerSupportRequest(TimeStampedModel):
 
     def __str__(self):
         return f"SupportRequest #{self.pk} - Customer #{self.customer_id}"
+
+
+class SubscriptionRequest(TimeStampedModel):
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="subscription_requests",
+    )
+    requester_role_snapshot = models.CharField(max_length=20, db_index=True)
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="partner_subscription_requests",
+        null=True,
+        blank=True,
+    )
+    customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.PROTECT,
+        related_name="subscription_requests",
+        null=True,
+        blank=True,
+    )
+    requested_customer_name = models.CharField(max_length=100, blank=True, default="")
+    requested_customer_phone = models.CharField(max_length=15, blank=True, default="")
+    requested_customer_email = models.EmailField(blank=True, default="")
+    requested_customer_address = models.TextField(blank=True, default="")
+    requested_customer_city = models.CharField(max_length=100, blank=True, default="")
+    product = models.ForeignKey(
+        "Product",
+        on_delete=models.PROTECT,
+        related_name="subscription_requests",
+    )
+    batch = models.ForeignKey(
+        "Batch",
+        on_delete=models.PROTECT,
+        related_name="subscription_requests",
+    )
+    preferred_lucky_number = models.PositiveSmallIntegerField()
+    requested_tenure_months_snapshot = models.PositiveIntegerField()
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=SubscriptionRequestStatus.choices,
+        default=SubscriptionRequestStatus.SUBMITTED,
+        db_index=True,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewed_subscription_requests",
+        null=True,
+        blank=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    review_note = models.TextField(blank=True, default="")
+    approved_subscription = models.OneToOneField(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        related_name="subscription_request",
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "subscription_requests"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["requester", "status"]),
+            models.Index(fields=["partner", "status"]),
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["product", "batch"]),
+            models.Index(fields=["batch", "status"]),
+            models.Index(fields=["created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(preferred_lucky_number__gte=0)
+                & Q(preferred_lucky_number__lte=99),
+                name="chk_subscription_request_lucky_number_range",
+            ),
+            models.CheckConstraint(
+                condition=Q(requested_tenure_months_snapshot__gt=0),
+                name="chk_subscription_request_tenure_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        valid_role_snapshots = {"ADMIN", "PARTNER", "CUSTOMER", "CASHIER"}
+
+        if not self.requester_role_snapshot or not self.requester_role_snapshot.strip():
+            errors["requester_role_snapshot"] = "Requester role snapshot is required."
+        elif self.requester_role_snapshot not in valid_role_snapshots:
+            errors["requester_role_snapshot"] = "Requester role snapshot is invalid."
+
+        if self.requester_role_snapshot == "CUSTOMER":
+            if self.partner_id:
+                errors["partner"] = "Customer subscription requests cannot carry a partner."
+            if self.customer_id and self.customer.user_id != self.requester_id:
+                errors["customer"] = "Customer requests must be linked to the requesting customer profile."
+
+        if self.requester_role_snapshot == "PARTNER" and self.partner_id != self.requester_id:
+            errors["partner"] = "Partner requests must use the requesting partner identity."
+
+        if not self.customer_id:
+            if not self.requested_customer_name or not self.requested_customer_name.strip():
+                errors["requested_customer_name"] = "Customer name is required when no customer is linked."
+            if not self.requested_customer_phone or not self.requested_customer_phone.strip():
+                errors["requested_customer_phone"] = "Customer phone is required when no customer is linked."
+            if not self.requested_customer_email or not self.requested_customer_email.strip():
+                errors["requested_customer_email"] = "Customer email is required when no customer is linked."
+
+        if self.approved_subscription_id and self.status != SubscriptionRequestStatus.APPROVED:
+            errors["status"] = "Approved subscription can only exist for approved requests."
+
+        if self.status == SubscriptionRequestStatus.APPROVED:
+            if not self.approved_subscription_id:
+                errors["approved_subscription"] = "Approved subscription is required for approved requests."
+            if not self.reviewed_by_id or not self.reviewed_at:
+                errors["reviewed_by"] = "Approved requests must store review metadata."
+
+        if self.status == SubscriptionRequestStatus.REJECTED:
+            if not self.reviewed_by_id or not self.reviewed_at:
+                errors["reviewed_by"] = "Rejected requests must store review metadata."
+
+        if self.customer_id and self.approved_subscription_id:
+            if self.approved_subscription.customer_id != self.customer_id:
+                errors["approved_subscription"] = "Approved subscription must belong to the resolved customer."
+
+        if self.approved_subscription_id:
+            if self.approved_subscription.product_id != self.product_id:
+                errors["approved_subscription"] = "Approved subscription must match the requested product."
+            if self.approved_subscription.batch_id != self.batch_id:
+                errors["approved_subscription"] = "Approved subscription must match the requested batch."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.requester_role_snapshot = (self.requester_role_snapshot or "").strip().upper()
+        self.requested_customer_name = (self.requested_customer_name or "").strip()
+        self.requested_customer_phone = (self.requested_customer_phone or "").strip()
+        self.requested_customer_email = (self.requested_customer_email or "").strip()
+        self.requested_customer_address = (self.requested_customer_address or "").strip()
+        self.requested_customer_city = (self.requested_customer_city or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.review_note = (self.review_note or "").strip()
+
+        if self.customer_id:
+            self.requested_customer_name = self.requested_customer_name or self.customer.name
+            self.requested_customer_phone = self.requested_customer_phone or self.customer.phone
+            self.requested_customer_email = (
+                self.requested_customer_email
+                or getattr(self.customer.user, "email", "")
+                or ""
+            )
+            self.requested_customer_address = (
+                self.requested_customer_address or self.customer.address
+            )
+            self.requested_customer_city = self.requested_customer_city or self.customer.city
+
+        if not self.requested_tenure_months_snapshot and self.batch_id:
+            self.requested_tenure_months_snapshot = self.batch.duration_months
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"SubscriptionRequest #{self.pk} - {self.status}"
 
 
 # =====================================================
@@ -1745,6 +1954,22 @@ class AuditLog(models.Model):
         DELIVERY_RETURN_REQUESTED = "DELIVERY_RETURN_REQUESTED", "Delivery Return Requested"
         DELIVERY_RETURNED = "DELIVERY_RETURNED", "Delivery Returned"
         SUB_CREATED = "SUB_CREATED", "Subscription Created"
+        SUBSCRIPTION_REQUEST_CREATED = (
+            "SUBSCRIPTION_REQUEST_CREATED",
+            "Subscription Request Created",
+        )
+        SUBSCRIPTION_REQUEST_APPROVED = (
+            "SUBSCRIPTION_REQUEST_APPROVED",
+            "Subscription Request Approved",
+        )
+        SUBSCRIPTION_REQUEST_REJECTED = (
+            "SUBSCRIPTION_REQUEST_REJECTED",
+            "Subscription Request Rejected",
+        )
+        SUBSCRIPTION_REQUEST_CANCELLED = (
+            "SUBSCRIPTION_REQUEST_CANCELLED",
+            "Subscription Request Cancelled",
+        )
         EMI_PAID = "EMI_PAID", "EMI Paid"
         EMI_WAIVED = "EMI_WAIVED", "EMI Waived"
         DRAW_EXECUTED = "DRAW_EXECUTED", "Draw Executed"

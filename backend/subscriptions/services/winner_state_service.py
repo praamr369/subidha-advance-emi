@@ -33,6 +33,15 @@ WINNER_WAIVER_SOURCES = {
 }
 
 
+def winner_history_q(prefix: str = "") -> Q:
+    normalized_prefix = f"{prefix}__" if prefix else ""
+    return (
+        Q(**{f"{normalized_prefix}winner_month__isnull": False})
+        | Q(**{f"{normalized_prefix}status": SubscriptionStatus.WON})
+        | Q(**{f"{normalized_prefix}lucky_id__status": LuckyIdStatus.WON})
+    )
+
+
 def _subscription_ref(subscription: Subscription) -> str:
     return (
         getattr(subscription, "subscription_number", None)

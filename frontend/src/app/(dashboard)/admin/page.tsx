@@ -34,6 +34,12 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
+import {
+  buildAdminBatchRoute,
+  buildAdminPaymentRoute,
+  buildAdminReconciliationRoute,
+  buildAdminSubscriptionRoute,
+} from "@/lib/route-builders";
 import type { PaymentRegisterRow, PaymentRegisterSummary } from "@/services/payments";
 import type { AdminCommissionSummaryResponse } from "@/types/commission";
 
@@ -526,7 +532,7 @@ function PaymentRow({ payment }: { payment: PaymentRegisterRow }) {
             <div className="text-xs text-muted-foreground">{isReversed ? "Reversed" : "Posted"}</div>
           </div>
           <Link
-            href={`/admin/payments/${payment.id}`}
+            href={buildAdminPaymentRoute(payment.id)}
             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
           >
             View
@@ -557,7 +563,7 @@ function ReconciliationRow({ row }: { row: ReconciliationAttentionRow }) {
             <div className="text-xs text-muted-foreground">Delta</div>
           </div>
           <Link
-            href={`/admin/subscriptions/${row.subscription_id}`}
+            href={buildAdminSubscriptionRoute(row.subscription_id)}
             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
           >
             View
@@ -844,7 +850,7 @@ export default function AdminDashboardPage() {
         id: "reconciliation",
         title: "Reconciliation mismatches need review",
         description: `${flaggedCount} subscription-level reconciliation rows were flagged.`,
-        href: "/admin/reconciliation",
+        href: buildAdminReconciliationRoute(),
         hrefLabel: "Open Reconciliation",
         tone: "warning",
         icon: <Receipt className="h-4 w-4" />,
@@ -876,7 +882,7 @@ export default function AdminDashboardPage() {
         id: "next-draw",
         title: "Upcoming draw window is close",
         description: `${nextDrawBatch.batch_code} draws in ${nextDrawBatch.days_until_draw ?? 0} day(s).`,
-        href: `/admin/batches/${nextDrawBatch.id}`,
+        href: buildAdminBatchRoute(nextDrawBatch.id),
         hrefLabel: "Open Batch",
         tone: "warning",
         icon: <Calendar className="h-4 w-4" />,
@@ -1246,7 +1252,7 @@ export default function AdminDashboardPage() {
                 primaryHref="/admin/batches"
                 primaryLabel="Open Batches"
                 secondaryHref={
-                  nextDrawBatch ? `/admin/batches/${nextDrawBatch.id}` : "/admin/lucky-draws"
+                  nextDrawBatch ? buildAdminBatchRoute(nextDrawBatch.id) : "/admin/lucky-draws"
                 }
                 secondaryLabel={nextDrawBatch ? "Open Batch" : "Lucky Draws"}
                 tone={nextDrawBatch ? "warning" : "default"}
@@ -1267,9 +1273,9 @@ export default function AdminDashboardPage() {
                     ? `${String(reconciliationAttention?.checked_count ?? 0)} checked rows`
                     : "Reconciliation lane unavailable"
                 }
-                primaryHref="/admin/reconciliation"
+                primaryHref={buildAdminReconciliationRoute()}
                 primaryLabel="Open Reconciliation"
-                secondaryHref="/admin/payments/reconciliation"
+                secondaryHref={buildAdminReconciliationRoute({ view: "payments" })}
                 secondaryLabel="Payment Reconciliation"
                 tone="default"
                 icon={<Receipt className="h-5 w-5" />}
@@ -1364,7 +1370,7 @@ export default function AdminDashboardPage() {
               <SectionCard
                 title="Reconciliation Attention Preview"
                 description="Subscription-level mismatches needing follow-up. Open the full reconciliation page for complete review."
-                actionHref="/admin/reconciliation"
+                actionHref={buildAdminReconciliationRoute()}
                 actionLabel="View All"
               >
                 {!laneHealth.reconciliation ? (

@@ -172,7 +172,12 @@ class Phase7BContractTests(TestCase):
     def test_customer_import_preview_and_commit(self):
         self.client.force_authenticate(self.admin)
 
-        preview_csv = "name,phone\nAlice,9800099991\n,9800099992\nBob,9800011000\n"
+        preview_csv = (
+            "name,phone,email\n"
+            "Alice,9800099991,alice@example.com\n"
+            ",9800099992,missing-name@example.com\n"
+            "Bob,9800011000,bob@example.com\n"
+        )
         preview_file = SimpleUploadedFile("customers.csv", preview_csv.encode("utf-8"), content_type="text/csv")
 
         preview_response = self.client.post(
@@ -185,7 +190,11 @@ class Phase7BContractTests(TestCase):
         self.assertEqual(preview_response.data["valid_row_count"], 1)
         self.assertEqual(preview_response.data["invalid_row_count"], 2)
 
-        commit_csv = "name,phone\nValid One,9800099993\nValid Two,9800099994\n"
+        commit_csv = (
+            "name,phone,email\n"
+            "Valid One,9800099993,valid-one@example.com\n"
+            "Valid Two,9800099994,valid-two@example.com\n"
+        )
         commit_file = SimpleUploadedFile("customers-commit.csv", commit_csv.encode("utf-8"), content_type="text/csv")
 
         commit_response = self.client.post(
@@ -200,7 +209,12 @@ class Phase7BContractTests(TestCase):
     def test_customer_import_preview_contract(self):
         self.client.force_authenticate(self.admin)
 
-        preview_csv = "name,phone\nAlice,9800099991\nNoName,\nBob,9800011000\n"
+        preview_csv = (
+            "name,phone,email\n"
+            "Alice,9800099991,alice-preview@example.com\n"
+            "NoName,,noname@example.com\n"
+            "Bob,9800011000,bob-preview@example.com\n"
+        )
         preview_file = SimpleUploadedFile("customers-preview.csv", preview_csv.encode("utf-8"), content_type="text/csv")
 
         response = self.client.post(
@@ -217,7 +231,7 @@ class Phase7BContractTests(TestCase):
 
     def test_customer_import_preview_requires_admin(self):
         self.client.force_authenticate(self.customer_actor)
-        preview_csv = "name,phone\nAlice,9800099911\n"
+        preview_csv = "name,phone,email\nAlice,9800099911,alice-protected@example.com\n"
         preview_file = SimpleUploadedFile("customers-preview.csv", preview_csv.encode("utf-8"), content_type="text/csv")
         response = self.client.post(
             "/api/v1/admin/customers/import/preview/",

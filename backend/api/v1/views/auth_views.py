@@ -38,7 +38,7 @@ class RegisterUserSerializer(serializers.Serializer):
 
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, min_length=8)
-    email = serializers.EmailField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=True, allow_blank=False)
     phone = serializers.CharField(required=True, allow_blank=False)
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
@@ -60,7 +60,9 @@ class RegisterUserSerializer(serializers.Serializer):
     def validate_email(self, value):
         value = (value or "").strip()
         if not value:
-            return ""
+            raise serializers.ValidationError(
+                "Email is required for customer access and password reset."
+            )
 
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Email already exists.")
@@ -113,7 +115,7 @@ class RegisterUserSerializer(serializers.Serializer):
         return User.objects.create_user(
             username=validated_data["username"],
             password=validated_data["password"],
-            email=validated_data.get("email", ""),
+            email=validated_data["email"],
             phone=validated_data["phone"],
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),

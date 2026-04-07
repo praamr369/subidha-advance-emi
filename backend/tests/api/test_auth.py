@@ -317,6 +317,23 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("phone", response.data)
 
+    def test_register_requires_email(self):
+        payload = {
+            "username": "email_missing_user",
+            "password": "CustomerPass123!",
+            "phone": "9000000295",
+            "role": UserRole.CUSTOMER,
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/register/",
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
     # -------------------------------------------------
     # LOGOUT
     # -------------------------------------------------

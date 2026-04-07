@@ -18,7 +18,20 @@ test("public product enquiry routes into apply and the apply form submits", asyn
   const suffix = Date.now().toString().slice(-8);
   const phone = `9${suffix.padStart(9, "0")}`;
 
+  await page.goto("/products");
+  await expect(
+    page.getByRole("heading", {
+      name: /Explore the live product catalogue before you enter the Lucky Plan flow/i,
+    })
+  ).toBeVisible();
+  await expect(page.getByText("Catalogue Filters").first()).toBeVisible();
+  await expect(page.getByText("Live results").first()).toBeVisible();
+  await expect(page.getByText("Media-ready cards")).toBeVisible();
+
   await page.goto(`/products/${manifest.entities.public.product_id}`);
+  await expect(page.getByText("Live public product detail").first()).toBeVisible();
+  await expect(page.getByText("Base price", { exact: true })).toBeVisible();
+  await expect(page.getByText("What happens next")).toBeVisible();
   await page.getByRole("link", { name: "Enquire Now" }).click();
   await expect(page).toHaveURL(/\/apply\?/);
   await expect(page.getByText("Selected Product Context")).toBeVisible();
@@ -31,6 +44,19 @@ test("public product enquiry routes into apply and the apply form submits", asyn
     .click();
 
   await expect(page.getByText(/Reference #\d+\./)).toBeVisible();
+});
+
+test("public product detail keeps enquiry workflow and catalogue facts visible", async ({
+  page,
+}) => {
+  const manifest = readSmokeManifest();
+
+  await page.goto(`/products/${manifest.entities.public.product_id}`);
+  await expect(page.getByText("Product code").first()).toBeVisible();
+  await expect(page.getByText("Media state").first()).toBeVisible();
+  await expect(page.getByText("Enquiry path")).toBeVisible();
+  await expect(page.getByText("Product context preserved")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Contact branch" })).toBeVisible();
 });
 
 test("public winner history page loads with live data", async ({ page }) => {

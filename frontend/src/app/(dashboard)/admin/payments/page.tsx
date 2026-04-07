@@ -26,6 +26,11 @@ import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { downloadCsv } from "@/lib/export/csv";
 import {
+  buildAdminPaymentRoute,
+  buildAdminReconciliationRoute,
+  buildAdminSubscriptionRoute,
+} from "@/lib/route-builders";
+import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
   type PaymentRegisterSummary,
@@ -271,7 +276,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                 <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                   <div className="flex flex-col items-start gap-2">
                     <Link
-                      href={`/admin/payments/${row.id}`}
+                      href={buildAdminPaymentRoute(row.id)}
                       className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                     >
                       View Payment
@@ -279,7 +284,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
 
                     {typeof row.subscription === "number" ? (
                       <Link
-                        href={`/admin/subscriptions/${row.subscription}`}
+                        href={buildAdminSubscriptionRoute(row.subscription)}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Subscription
@@ -287,11 +292,14 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                     ) : null}
 
                     <Link
-                      href={
-                        typeof row.subscription === "number"
-                          ? `/admin/payments/reconciliation?payment=${row.id}&subscription=${row.subscription}`
-                          : `/admin/payments/reconciliation?payment=${row.id}`
-                      }
+                      href={buildAdminReconciliationRoute({
+                        view: "payments",
+                        payment: row.id,
+                        subscription:
+                          typeof row.subscription === "number"
+                            ? row.subscription
+                            : undefined,
+                      })}
                       className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                     >
                       Reconciliation
@@ -522,7 +530,7 @@ export default function AdminPaymentsPage() {
           variant: "primary",
         },
         {
-          href: "/admin/payments/reconciliation",
+          href: buildAdminReconciliationRoute({ view: "payments" }),
           label: "Payment Reconciliation",
           variant: "secondary",
         },

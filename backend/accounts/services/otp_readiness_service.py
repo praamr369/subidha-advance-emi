@@ -30,7 +30,7 @@ def _email_status(*, email_backend: str, from_email: str) -> tuple[str, str]:
 
     return (
         "READY",
-        "Email OTP fallback is configured, but ops should still run a live reset test before promising access.",
+        "Email OTP delivery is configured, but ops should still run a live reset test before promising access.",
     )
 
 
@@ -50,40 +50,25 @@ def get_otp_delivery_readiness() -> dict[str, object]:
         from_email=from_email,
     )
 
-    if delivery_backend == "email":
-        overall_status = "READY" if email_status == "READY" else "NOT_READY"
-        summary = (
-            "Customer OTP reset depends entirely on email delivery in this environment."
-        )
-    elif delivery_backend == "console":
+    if delivery_backend == "console":
         overall_status = "DEV_ONLY"
         summary = (
             "Console OTP delivery is suitable only for development or smoke environments."
         )
-    elif delivery_backend == "sms":
-        overall_status = "NOT_READY"
+    elif email_status == "READY":
+        overall_status = "READY"
         summary = (
-            "SMS is selected in configuration, but the current codebase still uses a placeholder sender."
+            "Customer and partner public password reset now depends on email delivery only."
         )
-    elif allow_email_fallback and email_status == "READY":
-        overall_status = "FALLBACK_READY"
-        summary = (
-            "Auto mode can fall back to email because SMS delivery is not implemented in the current codebase."
-        )
-    elif allow_email_fallback and email_status == "DEV_ONLY":
+    elif email_status == "DEV_ONLY":
         overall_status = "DEV_ONLY"
         summary = (
-            "Auto mode can only fall back to console email delivery in this environment."
-        )
-    elif debug_enabled:
-        overall_status = "DEV_ONLY"
-        summary = (
-            "Auto mode will fall back to console OTP logging only while DEBUG is enabled."
+            "Public password reset can only use console email delivery in this environment."
         )
     else:
         overall_status = "NOT_READY"
         summary = (
-            "No live OTP delivery channel is currently ready. Do not promise self-service reset until email fallback is configured and tested."
+            "No live email delivery channel is currently ready. Do not promise self-service reset until email delivery is configured and tested."
         )
 
     return {
@@ -94,7 +79,7 @@ def get_otp_delivery_readiness() -> dict[str, object]:
         "public_reset_identifiers": ["phone", "email", "username"],
         "sms": {
             "status": "NOT_SUPPORTED",
-            "detail": "SMS delivery is a placeholder in the current codebase and has no provider integration.",
+            "detail": "SMS delivery is not used for public customer or partner password reset in the current codebase.",
         },
         "email": {
             "status": email_status,

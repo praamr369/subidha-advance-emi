@@ -30,6 +30,7 @@ export type PartnerSubscription = {
   total_amount?: string;
   monthly_amount?: string;
   status?: string;
+  winner_status?: string;
   winner_month?: number | null;
   waived_amount?: string;
   created_at?: string;
@@ -45,9 +46,23 @@ export type PartnerSubscription = {
     waived_amount?: string | number;
     outstanding_amount?: string | number;
   };
+  winner_summary?: PartnerSubscriptionWinnerSummary;
   last_payment_date?: string | null;
   next_due_date?: string | null;
   emis?: PartnerSubscriptionEmi[];
+};
+
+export type PartnerSubscriptionWinnerSummary = {
+  winner_status?: string;
+  winner_month?: number | null;
+  lucky_id?: number | null;
+  lucky_number?: number | null;
+  draw_id?: number | null;
+  draw_month?: number | null;
+  draw_revealed_at?: string | null;
+  waiver_scope?: string | null;
+  waived_emi_count?: number;
+  waived_amount?: string | number;
 };
 
 export type PartnerSubscriptionEmi = {
@@ -423,6 +438,50 @@ function normalizePartnerSubscriptionEmi(item: unknown): PartnerSubscriptionEmi 
   };
 }
 
+function normalizePartnerWinnerSummary(
+  item: unknown
+): PartnerSubscriptionWinnerSummary | undefined {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return undefined;
+  }
+
+  const row = item as Record<string, unknown>;
+
+  return {
+    winner_status: toStringOrUndefined(row.winner_status),
+    winner_month:
+      row.winner_month === null || row.winner_month === undefined
+        ? null
+        : toNumber(row.winner_month),
+    lucky_id:
+      row.lucky_id === null || row.lucky_id === undefined
+        ? null
+        : toNumber(row.lucky_id),
+    lucky_number:
+      row.lucky_number === null || row.lucky_number === undefined
+        ? null
+        : toNumber(row.lucky_number),
+    draw_id:
+      row.draw_id === null || row.draw_id === undefined
+        ? null
+        : toNumber(row.draw_id),
+    draw_month:
+      row.draw_month === null || row.draw_month === undefined
+        ? null
+        : toNumber(row.draw_month),
+    draw_revealed_at: toStringOrUndefined(row.draw_revealed_at) ?? null,
+    waiver_scope: toStringOrUndefined(row.waiver_scope) ?? null,
+    waived_emi_count:
+      row.waived_emi_count === null || row.waived_emi_count === undefined
+        ? undefined
+        : toNumber(row.waived_emi_count),
+    waived_amount:
+      row.waived_amount === null || row.waived_amount === undefined
+        ? undefined
+        : toMoneyString(row.waived_amount),
+  };
+}
+
 function normalizePartnerSubscriptionDetail(payload: unknown): PartnerSubscriptionDetail {
   const row = (payload ?? {}) as Record<string, unknown>;
   const summary = (row.financial_summary ?? {}) as Record<string, unknown>;
@@ -468,6 +527,7 @@ function normalizePartnerSubscriptionDetail(payload: unknown): PartnerSubscripti
     total_amount: toMoneyString(row.total_amount),
     monthly_amount: toMoneyString(row.monthly_amount),
     status: toStringOrUndefined(row.status),
+    winner_status: toStringOrUndefined(row.winner_status),
     winner_month:
       row.winner_month === null || row.winner_month === undefined
         ? null
@@ -486,6 +546,7 @@ function normalizePartnerSubscriptionDetail(payload: unknown): PartnerSubscripti
       waived_amount: toMoneyString(summary.waived_amount),
       outstanding_amount: toMoneyString(summary.outstanding_amount),
     },
+    winner_summary: normalizePartnerWinnerSummary(row.winner_summary),
     last_payment_date:
       row.last_payment_date === null
         ? null

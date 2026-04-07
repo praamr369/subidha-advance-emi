@@ -20,6 +20,11 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
+  buildSubscriptionDetailSemantics,
+  formatLuckyNumberLabel,
+  formatWinnerMonthLabel,
+} from "@/domains/subscriptions/detail/view-model";
+import {
   getPartnerSubscriptionDetail,
   type PartnerSubscriptionDetail,
   type PartnerSubscriptionEmi,
@@ -226,6 +231,50 @@ export default function PartnerSubscriptionDetailPage() {
     return derivedSummary;
   }, [derivedSummary, subscription]);
 
+  const winnerSummary = subscription?.winner_summary;
+  const detailSemantics = useMemo(
+    () =>
+      buildSubscriptionDetailSemantics({
+        contractStatus: subscription?.status,
+        winnerStatus: winnerSummary?.winner_status ?? subscription?.winner_status,
+        winnerMonth: winnerSummary?.winner_month ?? subscription?.winner_month,
+        luckyNumber: winnerSummary?.lucky_number ?? subscription?.lucky_number,
+        drawId: winnerSummary?.draw_id,
+        drawMonth: winnerSummary?.draw_month,
+        drawRevealedAt: winnerSummary?.draw_revealed_at,
+        waiverScope: winnerSummary?.waiver_scope,
+        waivedEmiCount:
+          winnerSummary?.waived_emi_count ??
+          subscription?.waived_emi_count ??
+          emiRows.filter((row) => row.status?.toUpperCase() === "WAIVED").length,
+        waivedAmount:
+          winnerSummary?.waived_amount ??
+          summary.waived_amount ??
+          subscription?.waived_amount,
+        outstandingAmount: summary.outstanding_amount,
+      }),
+    [
+      emiRows,
+      subscription?.lucky_number,
+      subscription?.status,
+      subscription?.waived_amount,
+      subscription?.waived_emi_count,
+      subscription?.winner_month,
+      subscription?.winner_status,
+      summary.outstanding_amount,
+      summary.waived_amount,
+      winnerSummary?.draw_id,
+      winnerSummary?.draw_month,
+      winnerSummary?.draw_revealed_at,
+      winnerSummary?.lucky_number,
+      winnerSummary?.waived_amount,
+      winnerSummary?.waived_emi_count,
+      winnerSummary?.waiver_scope,
+      winnerSummary?.winner_month,
+      winnerSummary?.winner_status,
+    ]
+  );
+
   const nextDueDate = subscription?.next_due_date || null;
   const nextDueOverdue = isPastDue(nextDueDate);
   const nextDueAge = nextDueOverdue ? diffInDays(nextDueDate) : 0;
@@ -366,8 +415,8 @@ export default function PartnerSubscriptionDetailPage() {
     >
       <div className="space-y-6">
         <WorkspaceSection
-          title="Partner workflow"
-          description="This view stays inside partner scope. Use it to confirm due position before collecting or following up."
+          title="Contract, winner, and waiver posture"
+          description="Partner detail keeps contract lifecycle, winner history, and waiver settlement separate so follow-up stays operationally clear."
           action={
             <button
               type="button"
@@ -382,21 +431,57 @@ export default function PartnerSubscriptionDetailPage() {
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DetailItem
-              label="Contract State"
-              value={<StatusBadge status={subscription?.status || "PENDING"} size="md" />}
-            />
-            <DetailItem
-              label="Winner State"
+              label="Contract Lifecycle"
               value={
-                subscription?.winner_month ? (
+                <div className="space-y-2">
                   <StatusBadge
-                    status="WON"
-                    label={`Winner month ${subscription.winner_month}`}
+                    status={subscription?.status || "PENDING"}
                     size="md"
                   />
-                ) : (
-                  "Not won"
-                )
+                  <div className="text-xs text-muted-foreground">
+                    {detailSemantics.contractHeadline}
+                  </div>
+                </div>
+              }
+            />
+            <DetailItem
+              label="Winner History"
+              value={
+                <div className="space-y-2">
+                  <StatusBadge
+                    status={
+                      detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"
+                    }
+                    label={
+                      detailSemantics.winnerStatus === "WON"
+                        ? "Winner recorded"
+                        : "Not won"
+                    }
+                    size="md"
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    {formatWinnerMonthLabel(detailSemantics.winnerMonth)} ·{" "}
+                    {formatLuckyNumberLabel(detailSemantics.luckyNumber)}
+                  </div>
+                </div>
+              }
+            />
+            <DetailItem
+              label="Waiver Posture"
+              value={
+                <div className="space-y-2">
+                  <StatusBadge
+                    status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
+                    label={
+                      detailSemantics.isSettled ? "Fully settled" : "Still settling"
+                    }
+                    size="md"
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    {detailSemantics.waivedEmiCount} waived EMI rows ·{" "}
+                    {money(detailSemantics.waivedAmount)}
+                  </div>
+                </div>
               }
             />
             <DetailItem
@@ -417,17 +502,6 @@ export default function PartnerSubscriptionDetailPage() {
                 ) : (
                   "No next due EMI"
                 )
-              }
-            />
-            <DetailItem
-              label="Batch State"
-              value={
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge
-                    status={subscription?.batch_status || "OPEN"}
-                    label={subscription?.batch_code || "No batch"}
-                  />
-                </div>
               }
             />
           </div>
@@ -539,7 +613,7 @@ export default function PartnerSubscriptionDetailPage() {
                         {subscription.batch_code || "—"}
                       </div>
                       <div className="text-muted-foreground">
-                        Lucky #{subscription.lucky_number ?? "—"}
+                        Lucky {formatLuckyNumberLabel(detailSemantics.luckyNumber)}
                       </div>
                     </div>
                   }

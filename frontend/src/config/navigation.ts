@@ -1,4 +1,5 @@
 import { ROUTES } from "@/lib/routes";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 
 export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER";
 
@@ -82,6 +83,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "support",
         },
         {
+          label: "Subscription Requests",
+          href: ROUTES.admin.subscriptionRequests,
+          icon: "subscriptions",
+        },
+        {
           label: "Customers",
           href: ROUTES.admin.customers,
           icon: "customers",
@@ -153,7 +159,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
         },
         {
           label: "Payment Reconciliation",
-          href: ROUTES.admin.paymentReconciliation,
+          href: buildAdminReconciliationRoute({ view: "payments" }),
           icon: "payments",
         },
         {
@@ -215,6 +221,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "collections",
         },
         {
+          label: "Subscription Requests",
+          href: ROUTES.partner.subscriptionRequests,
+          icon: "subscriptions",
+        },
+        {
           label: "Customers",
           href: ROUTES.partner.customers,
           icon: "customers",
@@ -265,6 +276,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
         {
           label: "Subscriptions",
           href: ROUTES.customer.subscriptions,
+          icon: "subscriptions",
+        },
+        {
+          label: "Subscription Requests",
+          href: ROUTES.customer.subscriptionRequests,
           icon: "subscriptions",
         },
         {

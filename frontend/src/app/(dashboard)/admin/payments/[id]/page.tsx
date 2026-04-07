@@ -21,6 +21,10 @@ import {
   WorkspaceSection as SectionCard,
 } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import {
+  buildAdminReconciliationRoute,
+  buildAdminSubscriptionRoute,
+} from "@/lib/route-builders";
 
 type PaymentDetailRecord = {
   id: number;
@@ -373,7 +377,7 @@ export default function AdminPaymentDetailRoutePage() {
 
     if (resolvedPayment?.subscription) {
       links.push({
-        href: `/admin/subscriptions/${resolvedPayment.subscription}`,
+        href: buildAdminSubscriptionRoute(resolvedPayment.subscription),
         label: "Open Subscription",
         variant: "primary",
       });
@@ -390,11 +394,11 @@ export default function AdminPaymentDetailRoutePage() {
     });
 
     links.push({
-      href: `/admin/payments/reconciliation?payment=${paymentId}${
-        resolvedPayment?.subscription
-          ? `&subscription=${resolvedPayment.subscription}`
-          : ""
-      }`,
+      href: buildAdminReconciliationRoute({
+        view: "payments",
+        payment: paymentId,
+        subscription: resolvedPayment?.subscription ?? undefined,
+      }),
       label: "Open Reconciliation",
       variant: "secondary",
     });
@@ -729,7 +733,7 @@ export default function AdminPaymentDetailRoutePage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   {resolvedPayment.subscription ? (
                     <Link
-                      href={`/admin/subscriptions/${resolvedPayment.subscription}`}
+                      href={buildAdminSubscriptionRoute(resolvedPayment.subscription)}
                       className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                     >
                       Open Subscription
@@ -984,7 +988,7 @@ export default function AdminPaymentDetailRoutePage() {
 
                 {resolvedPayment.subscription ? (
                   <Link
-                    href={`/admin/subscriptions/${resolvedPayment.subscription}`}
+                    href={buildAdminSubscriptionRoute(resolvedPayment.subscription)}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
                     Open Subscription

@@ -1,5 +1,8 @@
 import { apiFetch } from "@/lib/api";
-import type { CustomerSubscription } from "@/services/customer";
+import {
+  normalizeCustomerSubscription,
+  type CustomerSubscription,
+} from "@/services/customer";
 
 type PaginatedListResponse<T> = {
   count: number;
@@ -34,11 +37,18 @@ function buildQuery(
   return query ? `?${query}` : "";
 }
 
-function normalizePaginatedResponse<T>(payload: unknown): PaginatedListResponse<T> {
+function normalizePaginatedResponse<T>(
+  payload: unknown,
+  normalizeItem?: (item: unknown) => T
+): PaginatedListResponse<T> {
   const root = (payload ?? {}) as Record<string, unknown>;
   return {
     count: toNumber(root.count, 0),
-    results: Array.isArray(root.results) ? (root.results as T[]) : [],
+    results: Array.isArray(root.results)
+      ? normalizeItem
+        ? root.results.map(normalizeItem)
+        : (root.results as T[])
+      : [],
     page: toNumber(root.page, 1),
     page_size: toNumber(root.page_size, 25),
     num_pages: toNumber(root.num_pages, 0),
@@ -61,5 +71,8 @@ export async function listCustomerSubscriptionsRegister(params?: {
   });
 
   const payload = await apiFetch<unknown>(`/customer/subscriptions/${query}`);
-  return normalizePaginatedResponse<CustomerSubscription>(payload);
+  return normalizePaginatedResponse<CustomerSubscription>(
+    payload,
+    normalizeCustomerSubscription
+  );
 }

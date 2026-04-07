@@ -26,8 +26,16 @@ from subscriptions.services.winner_state_service import get_subscription_winner_
 CONSISTENCY_TOLERANCE = Decimal("0.01")
 
 
+def _decimal(value: Decimal | str | int | None) -> Decimal:
+    if value in (None, ""):
+        return MONEY_ZERO
+    if isinstance(value, Decimal):
+        return q2(value)
+    return q2(Decimal(str(value)))
+
+
 def _money(value: Decimal | str | int | None) -> str:
-    return f"{q2(value or MONEY_ZERO):.2f}"
+    return f"{_decimal(value):.2f}"
 
 
 def _date(value) -> str | None:
@@ -322,4 +330,49 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
             "waived_amount": _money(waived_amount),
         },
         "emis": emi_rows,
+    }
+
+
+def build_reconciliation_attention_payload(queryset) -> dict:
+    subscription_ids = queryset.values("pk")
+    subscriptions = (
+        get_subscription_detail_queryset()
+        .filter(pk__in=subscription_ids)
+        .order_by("id")
+    )
+
+    checked_count = queryset.count()
+    flagged_rows: list[dict] = []
+
+    for subscription in subscriptions.iterator(chunk_size=100):
+        snapshot = build_subscription_financial_snapshot(subscription)
+        pending_outstanding = _decimal(snapshot["pending_amount"])
+        computed_outstanding = _decimal(snapshot["remaining_amount"])
+        delta = q2(abs(pending_outstanding - computed_outstanding))
+
+        if delta <= CONSISTENCY_TOLERANCE:
+            continue
+
+        flagged_rows.append(
+            {
+                "subscription_id": subscription.id,
+                "subscription_number": f"SUB-{subscription.id}",
+                "customer_name": getattr(subscription.customer, "name", ""),
+                "total_amount": snapshot["total_amount"],
+                "paid_amount": snapshot["paid_amount"],
+                "waived_amount": snapshot["waived_amount"],
+                "pending_outstanding": _money(pending_outstanding),
+                "computed_outstanding": _money(computed_outstanding),
+                "delta": _money(delta),
+            }
+        )
+
+    return {
+        "checked_count": checked_count,
+        "flagged_count": len(flagged_rows),
+        "results": flagged_rows,
+        "note": (
+            "Attention rows use the canonical subscription financial snapshot. "
+            "Review flagged rows in admin reconciliation for operational follow-up."
+        ),
     }

@@ -28,6 +28,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 def _money(value) -> str:
@@ -266,9 +267,7 @@ class PartnerDashboardView(APIView):
                     "completed_subscriptions": subscriptions.filter(
                         status=SubscriptionStatus.COMPLETED
                     ).count(),
-                    "won_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.WON
-                    ).count(),
+                    "won_subscriptions": subscriptions.filter(winner_history_q()).distinct().count(),
                     "defaulted_subscriptions": subscriptions.filter(
                         status=SubscriptionStatus.DEFAULTED
                     ).count(),
@@ -342,7 +341,11 @@ class PartnerSubscriptionListView(APIView):
         return Response(
             {
                 "count": subscriptions.count(),
-                "results": SubscriptionListSerializer(subscriptions, many=True).data,
+                "results": SubscriptionListSerializer(
+                    subscriptions,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -360,7 +363,12 @@ class PartnerSubscriptionDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response(SubscriptionDetailSerializer(subscription).data)
+        return Response(
+            SubscriptionDetailSerializer(
+                subscription,
+                context={"request": request},
+            ).data
+        )
 
 
 class PartnerCustomerListView(APIView):
@@ -423,9 +431,7 @@ class PartnerCustomerDetailView(APIView):
                     "completed_subscriptions": subscriptions.filter(
                         status=SubscriptionStatus.COMPLETED
                     ).count(),
-                    "won_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.WON
-                    ).count(),
+                    "won_subscriptions": subscriptions.filter(winner_history_q()).distinct().count(),
                     "defaulted_subscriptions": subscriptions.filter(
                         status=SubscriptionStatus.DEFAULTED
                     ).count(),
@@ -437,6 +443,7 @@ class PartnerCustomerDetailView(APIView):
                 "subscriptions": SubscriptionListSerializer(
                     subscriptions,
                     many=True,
+                    context={"request": request},
                 ).data,
                 "recent_payments": PaymentSerializer(
                     payments[:20],

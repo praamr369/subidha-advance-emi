@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { brandConfig } from "@/config/brand";
 import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
 
 export const metadata: Metadata = {
   title: {
-    default: "SUBIDHA CORE",
-    template: "%s | SUBIDHA CORE",
+    default: brandConfig.platformName,
+    template: `%s | ${brandConfig.platformName}`,
   },
-  description: "Lucky Plan EMI operational platform",
+  description: `${brandConfig.companyName} ${brandConfig.publicProgramName} EMI operational platform`,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

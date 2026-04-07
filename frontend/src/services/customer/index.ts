@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { resolveApiMediaUrl } from "@/lib/media";
 import type { DeliveryRecord } from "@/services/deliveries";
 import { normalizeDeliveryRecord } from "@/services/deliveries";
 
@@ -24,6 +25,19 @@ export type CustomerSubscriptionFinancialSummary = {
   outstanding_amount?: number | string;
 };
 
+export type CustomerSubscriptionWinnerSummary = {
+  winner_status?: string;
+  winner_month?: number | null;
+  lucky_id?: number | null;
+  lucky_number?: number | null;
+  draw_id?: number | null;
+  draw_month?: number | null;
+  draw_revealed_at?: string | null;
+  waiver_scope?: string | null;
+  waived_emi_count?: number;
+  waived_amount?: number | string;
+};
+
 export type CustomerSubscription = {
   id: number;
   subscription_number?: string;
@@ -40,6 +54,8 @@ export type CustomerSubscription = {
   lucky_id?: number | null;
 
   product_name?: string;
+  product_code?: string | null;
+  product_image?: string | null;
   batch_code?: string | null;
   lucky_number?: number | null;
   emi_count?: number;
@@ -51,6 +67,7 @@ export type CustomerSubscription = {
   last_payment_date?: string;
   next_due_date?: string;
 
+  winner_status?: string;
   winner_month?: number | null;
   waived_amount?: number | string;
   delivery_status?: string;
@@ -61,6 +78,7 @@ export type CustomerSubscription = {
   created_at?: string;
 
   financial_summary?: CustomerSubscriptionFinancialSummary;
+  winner_summary?: CustomerSubscriptionWinnerSummary;
   delivery_summary?: DeliveryRecord | null;
   deliveries?: DeliveryRecord[];
   emis?: CustomerEmi[];
@@ -89,6 +107,9 @@ export type CustomerProfileResponse = {
   id: number;
   name: string;
   phone: string;
+  email: string;
+  address: string;
+  city: string;
   kyc_status: string;
   username: string;
   summary: {
@@ -101,6 +122,14 @@ export type CustomerProfileResponse = {
     waived_emis: number;
     total_paid_amount: number | string;
   };
+};
+
+export type UpdateCustomerProfilePayload = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
 };
 
 export type CustomerSubscriptionListResponse = {
@@ -154,24 +183,6 @@ export type CustomerPaymentListResponse = {
   count: number;
   total_paid_amount: number | string;
   results: CustomerPayment[];
-};
-
-export type CustomerCollectionRequest = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  amount?: number | string;
-  method?: string;
-  payment_date?: string;
-  submitted_at?: string;
-  status?: string;
-  reference_no?: string | null;
-  rejection_reason?: string | null;
-};
-
-export type CustomerCollectionRequestListResponse = {
-  count: number;
-  results: CustomerCollectionRequest[];
 };
 
 export type CustomerSupportRequest = {
@@ -330,7 +341,51 @@ function normalizeFinancialSummary(
   };
 }
 
-function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
+function normalizeWinnerSummary(
+  item: unknown
+): CustomerSubscriptionWinnerSummary | undefined {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return undefined;
+  }
+
+  const row = item as Record<string, unknown>;
+
+  return {
+    winner_status: toStringOrUndefined(row.winner_status),
+    winner_month:
+      row.winner_month === null || row.winner_month === undefined
+        ? null
+        : toNumber(row.winner_month),
+    lucky_id:
+      row.lucky_id === null || row.lucky_id === undefined
+        ? null
+        : toNumber(row.lucky_id),
+    lucky_number:
+      row.lucky_number === null || row.lucky_number === undefined
+        ? null
+        : toNumber(row.lucky_number),
+    draw_id:
+      row.draw_id === null || row.draw_id === undefined
+        ? null
+        : toNumber(row.draw_id),
+    draw_month:
+      row.draw_month === null || row.draw_month === undefined
+        ? null
+        : toNumber(row.draw_month),
+    draw_revealed_at: toStringOrUndefined(row.draw_revealed_at) ?? null,
+    waiver_scope: toStringOrUndefined(row.waiver_scope) ?? null,
+    waived_emi_count:
+      row.waived_emi_count === null || row.waived_emi_count === undefined
+        ? undefined
+        : toNumber(row.waived_emi_count),
+    waived_amount:
+      row.waived_amount === null || row.waived_amount === undefined
+        ? undefined
+        : toMoneyString(row.waived_amount),
+  };
+}
+
+export function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
   const row = (item ?? {}) as Record<string, unknown>;
 
   return {
@@ -365,6 +420,8 @@ function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
         : toNumber(row.lucky_id),
 
     product_name: toStringOrUndefined(row.product_name),
+    product_code: toStringOrUndefined(row.product_code) ?? null,
+    product_image: resolveApiMediaUrl(toStringOrUndefined(row.product_image) ?? null),
     batch_code: toStringOrUndefined(row.batch_code) ?? null,
     lucky_number:
       row.lucky_number === null || row.lucky_number === undefined
@@ -397,6 +454,7 @@ function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
     last_payment_date: toStringOrUndefined(row.last_payment_date),
     next_due_date: toStringOrUndefined(row.next_due_date),
 
+    winner_status: toStringOrUndefined(row.winner_status),
     winner_month:
       row.winner_month === null || row.winner_month === undefined
         ? null
@@ -419,6 +477,7 @@ function normalizeCustomerSubscription(item: unknown): CustomerSubscription {
     created_at: toStringOrUndefined(row.created_at),
 
     financial_summary: normalizeFinancialSummary(row.financial_summary),
+    winner_summary: normalizeWinnerSummary(row.winner_summary),
     delivery_summary:
       row.delivery_summary === null || row.delivery_summary === undefined
         ? null
@@ -531,35 +590,6 @@ function normalizeCustomerPayment(item: unknown): CustomerPayment {
   };
 }
 
-function normalizeCollectionRequest(item: unknown): CustomerCollectionRequest {
-  const row = (item ?? {}) as Record<string, unknown>;
-
-  return {
-    id: row.id !== undefined && row.id !== null ? String(row.id) : "",
-    subscription_id:
-      row.subscription_id !== undefined && row.subscription_id !== null
-        ? String(row.subscription_id)
-        : undefined,
-    subscription_number:
-      toStringOrUndefined(row.subscription_number) ??
-      (row.subscription_id !== undefined && row.subscription_id !== null
-        ? `SUB-${String(row.subscription_id)}`
-        : undefined),
-    amount:
-      row.amount === null || row.amount === undefined
-        ? undefined
-        : toMoneyString(row.amount),
-    method: toStringOrUndefined(row.method),
-    payment_date: toStringOrUndefined(row.payment_date),
-    submitted_at:
-      toStringOrUndefined(row.submitted_at) ??
-      toStringOrUndefined(row.created_at),
-    status: toStringOrUndefined(row.status) ?? "SUBMITTED",
-    reference_no: toStringOrUndefined(row.reference_no) ?? null,
-    rejection_reason: toStringOrUndefined(row.rejection_reason) ?? null,
-  };
-}
-
 function normalizeCustomerSupportRequest(item: unknown): CustomerSupportRequest {
   const row = (item ?? {}) as Record<string, unknown>;
 
@@ -633,6 +663,9 @@ function normalizeProfileResponse(payload: unknown): CustomerProfileResponse {
     id: toNumber(root.id),
     name: toStringOrUndefined(root.name) ?? "",
     phone: toStringOrUndefined(root.phone) ?? "",
+    email: toStringOrUndefined(root.email) ?? "",
+    address: toStringOrUndefined(root.address) ?? "",
+    city: toStringOrUndefined(root.city) ?? "",
     kyc_status: toStringOrUndefined(root.kyc_status) ?? "",
     username: toStringOrUndefined(root.username) ?? "",
     summary: {
@@ -671,17 +704,6 @@ function normalizeSubscriptionListResponse(
   };
 }
 
-function normalizeCollectionRequestListResponse(
-  payload: unknown
-): CustomerCollectionRequestListResponse {
-  const root = (payload ?? {}) as Record<string, unknown>;
-
-  return {
-    count: toNumber(root.count, 0),
-    results: toArray(root.results).map(normalizeCollectionRequest),
-  };
-}
-
 export async function getCustomerDashboard(): Promise<CustomerDashboardResponse> {
   const payload = await apiFetch<unknown>("/customer/dashboard/");
   return normalizeDashboardResponse(payload);
@@ -690,6 +712,16 @@ export async function getCustomerDashboard(): Promise<CustomerDashboardResponse>
 export async function getCustomerProfile(): Promise<CustomerProfileResponse> {
   const payload = await apiFetch<unknown>("/customer/profile/");
   return normalizeProfileResponse(payload);
+}
+
+export async function updateCustomerProfile(
+  payload: UpdateCustomerProfilePayload
+): Promise<CustomerProfileResponse> {
+  const response = await apiFetch<unknown>("/customer/profile/", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return normalizeProfileResponse(response);
 }
 
 export async function listCustomerSubscriptions(params?: { status?: string }) {
@@ -797,33 +829,4 @@ export async function createCustomerSupportRequest(payload: {
     detail: toStringOrUndefined(root.detail),
     request: normalizeCustomerSupportRequest(root.request),
   };
-}
-
-/**
- * Additive future-ready reader for customer-side visibility of partner-submitted
- * payment requests. This should remain separate from verified payments.
- *
- * Backend may not expose this yet. If the endpoint is unavailable, let the caller
- * decide whether to suppress the error or hide the section.
- */
-export async function listCustomerCollectionRequests(params?: {
-  subscription?: number | string;
-  status?: string;
-}) {
-  const search = new URLSearchParams();
-
-  if (params?.subscription !== undefined && params.subscription !== "") {
-    search.set("subscription", String(params.subscription));
-  }
-
-  if (params?.status) {
-    search.set("status", params.status);
-  }
-
-  const query = search.toString();
-  const payload = await apiFetch<unknown>(
-    `/customer/collection-requests/${query ? `?${query}` : ""}`
-  );
-
-  return normalizeCollectionRequestListResponse(payload);
 }

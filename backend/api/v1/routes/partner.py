@@ -22,11 +22,21 @@ from api.v1.views.partner_dashboard import (
     PartnerPaymentListView,
     PartnerSubscriptionDetailView,
 )
+from api.v1.views.subscription_requests import (
+    PartnerSubscriptionRequestCancelView,
+    PartnerSubscriptionRequestDetailView,
+    PartnerSubscriptionRequestListCreateView,
+    PartnerSubscriptionRequestOptionsView,
+)
 
 urlpatterns = [
     path("dashboard/", PartnerDashboardView.as_view()),
     path("subscriptions/", PaginatedPartnerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", PartnerSubscriptionDetailView.as_view()),
+    path("subscription-request-options/", PartnerSubscriptionRequestOptionsView.as_view()),
+    path("subscription-requests/", PartnerSubscriptionRequestListCreateView.as_view()),
+    path("subscription-requests/<int:pk>/", PartnerSubscriptionRequestDetailView.as_view()),
+    path("subscription-requests/<int:pk>/cancel/", PartnerSubscriptionRequestCancelView.as_view()),
     path("customers/", PaginatedPartnerCustomerListView.as_view()),
     path("customers/<int:pk>/", PartnerCustomerDetailView.as_view()),
     path("payments/", PartnerPaymentListView.as_view()),

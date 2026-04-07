@@ -18,6 +18,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
 import type { AdminWorkflowViewModel } from "@/features/admin-workflow/dashboard";
 import { fetchAdminWorkflow } from "@/features/admin-workflow/dashboard";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 
 // Simple class name utility
 function cn(...classes: (string | false | null | undefined)[]): string {
@@ -332,7 +333,7 @@ export default function AdminWorkflowDashboard() {
             />
             <QueueCard
               title="Reconciliation warnings"
-              href="/admin/reconciliation"
+              href={buildAdminReconciliationRoute()}
               icon={<ShieldAlert className="h-5 w-5" />}
               rows={state.data.reconciliationItems}
               emptyText="No reconciliation warnings are currently open."

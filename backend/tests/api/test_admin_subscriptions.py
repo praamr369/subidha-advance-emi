@@ -1,8 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from io import StringIO
 
-from django.core.management import call_command
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -176,7 +174,43 @@ class AdminSubscriptionDetailApiTests(APITestCase):
             response.data["reconciliation_flags"]["warnings"],
         )
 
-    def test_winner_status_warning_disappears_after_repair_sync(self):
+    def test_admin_subscription_detail_auto_repairs_completed_winner_lucky_id_drift(self):
+        record_emi_payment(
+            emi_id=self.emi_1.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            method="CASH",
+            reference_no="SUB-API-PAY-003",
+        )
+
+        draw, secret_seed = create_lucky_draw_commit(batch=self.batch)
+        reveal_and_execute_draw(
+            draw_id=draw.id,
+            revealed_seed=secret_seed,
+            performed_by=self.admin,
+        )
+
+        self.subscription.refresh_from_db()
+        self.lucky_id.status = "ASSIGNED"
+        self.lucky_id.save(update_fields=["status"])
+        self.lucky_id.refresh_from_db()
+        self.assertEqual(self.subscription.status, "COMPLETED")
+        self.assertEqual(self.lucky_id.status, "ASSIGNED")
+
+        response = self.client.get(self.url)
+        self.lucky_id.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "COMPLETED")
+        self.assertEqual(response.data["winner_status"], "WON")
+        self.assertEqual(response.data["winner_summary"]["winner_month"], 1)
+        self.assertEqual(self.lucky_id.status, "WON")
+        self.assertNotIn(
+            "Winner markers exist, but Lucky ID status is not WON.",
+            response.data["reconciliation_flags"]["warnings"],
+        )
+
+    def test_admin_subscription_detail_auto_repairs_unsettled_winner_drift(self):
         draw, secret_seed = create_lucky_draw_commit(batch=self.batch)
         reveal_and_execute_draw(
             draw_id=draw.id,
@@ -192,25 +226,19 @@ class AdminSubscriptionDetailApiTests(APITestCase):
         self.assertEqual(self.lucky_id.status, "ASSIGNED")
 
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn(
-            "Winner subscription has unresolved EMI state, but subscription status is not WON.",
-            response.data["reconciliation_flags"]["warnings"],
-        )
+        self.subscription.refresh_from_db()
+        self.lucky_id.refresh_from_db()
 
-        out = StringIO()
-        call_command(
-            "sync_winner_states",
-            "--subscription-id",
-            str(self.subscription.id),
-            stdout=out,
-        )
-
-        response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "WON")
         self.assertEqual(response.data["winner_status"], "WON")
+        self.assertEqual(self.subscription.status, "WON")
+        self.assertEqual(self.lucky_id.status, "WON")
         self.assertNotIn(
             "Winner subscription has unresolved EMI state, but subscription status is not WON.",
+            response.data["reconciliation_flags"]["warnings"],
+        )
+        self.assertNotIn(
+            "Winner markers exist, but Lucky ID status is not WON.",
             response.data["reconciliation_flags"]["warnings"],
         )

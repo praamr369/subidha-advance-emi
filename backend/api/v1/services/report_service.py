@@ -12,6 +12,7 @@ from api.v1.selectors.subscription_selector import (
 )
 from api.v1.services.commission_service import get_commission_summary_for_partner
 from subscriptions.models import Commission, FinancialLedger, Payment, Subscription
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 def build_customer_subscription_report_for_user(user) -> List[Dict[str, str]]:
@@ -119,7 +120,7 @@ def build_admin_waiver_ledger_report() -> List[Dict[str, str]]:
     waived = FinancialLedger.objects.filter(entry_type="WAIVER").aggregate(
         total=Sum("amount")
     )["total"] or Decimal("0.00")
-    winners = Subscription.objects.filter(status="WON").count()
+    winners = Subscription.objects.filter(winner_history_q()).distinct().count()
 
     return [
         {"label": "Total Waived", "value": f"INR {waived}"},
@@ -139,4 +140,3 @@ def build_admin_partner_payout_ledger_report() -> List[Dict[str, str]]:
         {"label": "Payable", "value": f"INR {payable}"},
         {"label": "Settled", "value": f"INR {settled}"},
     ]
-

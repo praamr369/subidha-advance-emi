@@ -32,6 +32,20 @@ ALLOWED_PUBLIC_RESET_ROLES = {
     UserRole.PARTNER,
 }
 
+MISSING_RESET_EMAIL_DETAIL = (
+    "Email is required before password reset. Ask support or an admin to add a valid email address to this account."
+)
+RESET_DELIVERY_FAILURE_DETAIL = (
+    "Password reset is temporarily unavailable. Please contact support or try again later."
+)
+
+
+class PasswordResetServiceError(Exception):
+    def __init__(self, detail: str, *, status_code: int):
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = status_code
+
 
 def generate_numeric_otp(length: int = 6) -> str:
     return "".join(str(random.randint(0, 9)) for _ in range(length))
@@ -60,13 +74,13 @@ def blacklist_all_outstanding_tokens_for_user(user):
 
 
 def _resolve_identifier_snapshot(user) -> str:
-    return (user.phone or user.email or user.username or "").strip()
+    return (user.email or user.username or user.phone or "").strip()
 
 
 def _resolve_delivery_channel(delivered_via: str) -> str:
     if delivered_via == "EMAIL_OTP":
         return PasswordResetChannel.EMAIL_OTP
-    return PasswordResetChannel.PHONE_OTP
+    return PasswordResetChannel.EMAIL_OTP
 
 
 def _create_audit(*, action_type: str, object_id: int, performed_by=None, metadata=None):
@@ -79,16 +93,35 @@ def _create_audit(*, action_type: str, object_id: int, performed_by=None, metada
     )
 
 
-def _send_otp_and_update_request(reset_request: PasswordResetRequest, otp: str) -> str | None:
-    delivered_via = None
+def _resolved_public_reset_email(user) -> str:
+    email = (getattr(user, "email", "") or "").strip()
+    if not email:
+        raise PasswordResetServiceError(
+            MISSING_RESET_EMAIL_DETAIL,
+            status_code=400,
+        )
+    return email
+
+
+def _send_otp_and_update_request(
+    reset_request: PasswordResetRequest,
+    otp: str,
+    *,
+    email_only: bool = False,
+) -> str:
     try:
-        delivered_via = send_password_reset_otp(user=reset_request.user, otp=otp)
-    except OTPDeliveryError:
-        delivered_via = None
+        delivered_via = send_password_reset_otp(
+            user=reset_request.user,
+            otp=otp,
+            email_only=email_only,
+        )
+    except OTPDeliveryError as exc:
+        raise PasswordResetServiceError(
+            RESET_DELIVERY_FAILURE_DETAIL,
+            status_code=503,
+        ) from exc
 
-    if delivered_via:
-        reset_request.channel = _resolve_delivery_channel(delivered_via)
-
+    reset_request.channel = _resolve_delivery_channel(delivered_via)
     reset_request.last_sent_at = timezone.now()
     reset_request.save(update_fields=["channel", "last_sent_at", "updated_at"])
     return delivered_via
@@ -123,9 +156,7 @@ def create_password_reset_request(
     if not user.is_active or user.role not in ALLOWED_PUBLIC_RESET_ROLES:
         return generic_response, None
 
-    resolved_identifier = _resolve_identifier_snapshot(user)
-    if not resolved_identifier:
-        return generic_response, None
+    resolved_identifier = _resolved_public_reset_email(user)
 
     otp = generate_numeric_otp()
     expires_at = timezone.now() + timedelta(
@@ -141,7 +172,7 @@ def create_password_reset_request(
         reset_request = PasswordResetRequest.objects.create(
             user=user,
             role_snapshot=user.role,
-            channel=PasswordResetChannel.PHONE_OTP,
+            channel=PasswordResetChannel.EMAIL_OTP,
             identifier_snapshot=resolved_identifier,
             otp_hash=make_password(otp),
             expires_at=expires_at,
@@ -152,7 +183,11 @@ def create_password_reset_request(
             last_sent_at=None,
         )
 
-        delivered_via = _send_otp_and_update_request(reset_request, otp)
+        delivered_via = _send_otp_and_update_request(
+            reset_request,
+            otp,
+            email_only=True,
+        )
 
         _create_audit(
             action_type=AuditLog.ActionType.PASSWORD_RESET_REQUESTED,
@@ -189,6 +224,8 @@ def resend_password_reset_otp(
     if not user.is_active or user.role not in ALLOWED_PUBLIC_RESET_ROLES:
         return generic_response
 
+    _resolved_public_reset_email(user)
+
     reset_request = get_latest_active_reset_request_for_user(user)
 
     if not reset_request:
@@ -224,40 +261,45 @@ def resend_password_reset_otp(
     if reset_request.resend_count >= max_resends:
         raise ValueError("Maximum OTP resend limit reached. Please request a new reset later.")
 
-    otp = generate_numeric_otp()
-    reset_request.otp_hash = make_password(otp)
-    reset_request.expires_at = now + timedelta(
-        minutes=getattr(settings, "PASSWORD_RESET_OTP_EXPIRY_MINUTES", 10)
-    )
-    reset_request.resend_count += 1
-    reset_request.requested_by_ip = requested_by_ip or reset_request.requested_by_ip
-    reset_request.requested_user_agent = (
-        (requested_user_agent or "").strip()[:1000] or reset_request.requested_user_agent
-    )
+    with transaction.atomic():
+        otp = generate_numeric_otp()
+        reset_request.otp_hash = make_password(otp)
+        reset_request.expires_at = now + timedelta(
+            minutes=getattr(settings, "PASSWORD_RESET_OTP_EXPIRY_MINUTES", 10)
+        )
+        reset_request.resend_count += 1
+        reset_request.requested_by_ip = requested_by_ip or reset_request.requested_by_ip
+        reset_request.requested_user_agent = (
+            (requested_user_agent or "").strip()[:1000] or reset_request.requested_user_agent
+        )
 
-    delivered_via = _send_otp_and_update_request(reset_request, otp)
-    reset_request.save(
-        update_fields=[
-            "otp_hash",
-            "expires_at",
-            "resend_count",
-            "requested_by_ip",
-            "requested_user_agent",
-            "updated_at",
-        ]
-    )
+        delivered_via = _send_otp_and_update_request(
+            reset_request,
+            otp,
+            email_only=True,
+        )
+        reset_request.save(
+            update_fields=[
+                "otp_hash",
+                "expires_at",
+                "resend_count",
+                "requested_by_ip",
+                "requested_user_agent",
+                "updated_at",
+            ]
+        )
 
-    _create_audit(
-        action_type=AuditLog.ActionType.PASSWORD_RESET_RESENT,
-        object_id=reset_request.id,
-        metadata={
-            "user_id": user.id,
-            "role": user.role,
-            "channel": reset_request.channel,
-            "delivery_backend": delivered_via or "UNAVAILABLE",
-            "resend_count": reset_request.resend_count,
-        },
-    )
+        _create_audit(
+            action_type=AuditLog.ActionType.PASSWORD_RESET_RESENT,
+            object_id=reset_request.id,
+            metadata={
+                "user_id": user.id,
+                "role": user.role,
+                "channel": reset_request.channel,
+                "delivery_backend": delivered_via or "UNAVAILABLE",
+                "resend_count": reset_request.resend_count,
+            },
+        )
 
     return generic_response
 
@@ -333,6 +375,8 @@ def admin_resend_password_reset_request(*, request_id: int, performed_by):
     if not user.is_active or user.role not in ALLOWED_PUBLIC_RESET_ROLES:
         raise ValueError("Reset request user is not eligible for public password reset.")
 
+    _resolved_public_reset_email(user)
+
     if reset_request.status == PasswordResetStatus.USED:
         raise ValueError("Cannot resend OTP for a used reset request.")
 
@@ -365,30 +409,35 @@ def admin_resend_password_reset_request(*, request_id: int, performed_by):
     if reset_request.resend_count >= max_resends:
         raise ValueError("Maximum OTP resend limit reached for this reset request.")
 
-    otp = generate_numeric_otp()
-    reset_request.otp_hash = make_password(otp)
-    reset_request.expires_at = now + timedelta(
-        minutes=getattr(settings, "PASSWORD_RESET_OTP_EXPIRY_MINUTES", 10)
-    )
-    reset_request.resend_count += 1
+    with transaction.atomic():
+        otp = generate_numeric_otp()
+        reset_request.otp_hash = make_password(otp)
+        reset_request.expires_at = now + timedelta(
+            minutes=getattr(settings, "PASSWORD_RESET_OTP_EXPIRY_MINUTES", 10)
+        )
+        reset_request.resend_count += 1
 
-    delivered_via = _send_otp_and_update_request(reset_request, otp)
-    reset_request.save(
-        update_fields=["otp_hash", "expires_at", "resend_count", "updated_at"]
-    )
+        delivered_via = _send_otp_and_update_request(
+            reset_request,
+            otp,
+            email_only=True,
+        )
+        reset_request.save(
+            update_fields=["otp_hash", "expires_at", "resend_count", "updated_at"]
+        )
 
-    _create_audit(
-        action_type=AuditLog.ActionType.PASSWORD_RESET_RESENT,
-        object_id=reset_request.id,
-        performed_by=performed_by,
-        metadata={
-            "user_id": user.id,
-            "channel": reset_request.channel,
-            "delivery_backend": delivered_via or "UNAVAILABLE",
-            "resend_count": reset_request.resend_count,
-            "resent_by_user_id": getattr(performed_by, "id", None),
-        },
-    )
+        _create_audit(
+            action_type=AuditLog.ActionType.PASSWORD_RESET_RESENT,
+            object_id=reset_request.id,
+            performed_by=performed_by,
+            metadata={
+                "user_id": user.id,
+                "channel": reset_request.channel,
+                "delivery_backend": delivered_via or "UNAVAILABLE",
+                "resend_count": reset_request.resend_count,
+                "resent_by_user_id": getattr(performed_by, "id", None),
+            },
+        )
 
     return {
         "detail": "OTP resent successfully.",

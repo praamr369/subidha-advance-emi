@@ -91,7 +91,11 @@ class PaginatedPartnerSubscriptionListView(PartnerSubscriptionListView):
         payload = build_paginated_payload(
             request,
             subscriptions,
-            serializer=lambda items: SubscriptionListSerializer(items, many=True).data,
+            serializer=lambda items: SubscriptionListSerializer(
+                items,
+                many=True,
+                context={"request": request},
+            ).data,
         )
         return Response(payload)
 
@@ -134,6 +138,10 @@ class PaginatedCustomerSubscriptionListView(CustomerSubscriptionListView):
         payload = build_paginated_payload(
             request,
             subscriptions,
-            serializer=lambda items: SubscriptionListSerializer(items, many=True).data,
+            serializer=lambda items: SubscriptionListSerializer(
+                items,
+                many=True,
+                context={"request": request},
+            ).data,
         )
         return Response(payload)

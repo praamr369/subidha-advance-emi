@@ -477,6 +477,11 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "forgot_password": "10/hour",
+        "resend_password_reset_otp": "10/hour",
+        "reset_password": "20/hour",
+    },
 }
 
 SIMPLE_JWT = {

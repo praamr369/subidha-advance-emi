@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 // ... (rest of the file remains as is, but we can add cn usage)
 
@@ -45,30 +46,30 @@ type PortalPageProps = {
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
   switch (variant) {
     case "primary":
-      return "bg-primary text-primary-foreground border-primary hover:opacity-95";
+      return "border-primary/80 bg-foreground text-background shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-28px_rgba(15,23,42,0.9)]";
     case "danger":
-      return "bg-destructive text-destructive-foreground border-destructive hover:opacity-95";
+      return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)] hover:-translate-y-0.5";
     case "ghost":
-      return "bg-transparent text-foreground border-dashed border-border hover:bg-accent hover:text-accent-foreground";
+      return "border-dashed border-border/70 bg-transparent text-foreground hover:bg-white/60 hover:text-foreground";
     case "secondary":
     default:
-      return "bg-card text-foreground border-border hover:bg-accent hover:text-accent-foreground";
+      return "border-white/70 bg-white/70 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:bg-white/90";
   }
 }
 
 function getToneClassName(tone: PortalStat["tone"] | PortalStatusBadge["tone"] = "default") {
   switch (tone) {
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-emerald-200/80 bg-emerald-50/90 text-emerald-900";
     case "warning":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-amber-200/80 bg-amber-50/90 text-amber-900";
     case "danger":
-      return "border-red-200 bg-red-50 text-red-700";
+      return "border-red-200/80 bg-red-50/90 text-red-900";
     case "info":
-      return "border-blue-200 bg-blue-50 text-blue-700";
+      return "border-sky-200/80 bg-sky-50/90 text-sky-900";
     case "default":
     default:
-      return "border-border bg-muted text-foreground";
+      return "border-white/70 bg-white/75 text-foreground";
   }
 }
 
@@ -106,16 +107,16 @@ export default function PortalPage({
 
   return (
     <main
-      className={[
-        "portal-page mx-auto grid gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8",
-        className ?? "",
-      ].join(" ")}
+      className={cn(
+        "portal-page mx-auto flex flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8",
+        className
+      )}
       style={{ maxWidth: resolvedMaxWidth }}
     >
       {breadcrumbs.length > 0 ? (
         <nav
           aria-label="Breadcrumb"
-          className="portal-page-breadcrumbs flex flex-wrap items-center gap-1 text-sm text-muted-foreground"
+          className="portal-page-breadcrumbs flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
         >
           {breadcrumbs.map((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
@@ -123,43 +124,55 @@ export default function PortalPage({
             return (
               <div
                 key={`${crumb.label}-${index}`}
-                className="flex items-center gap-1"
+                className="flex items-center gap-2"
               >
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
-                    className="rounded-sm transition hover:text-foreground"
+                    className="inline-flex items-center rounded-full border border-white/70 bg-white/60 px-3 py-1 text-xs font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:bg-white/90 hover:text-foreground"
                   >
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className={isLast ? "font-medium text-foreground" : ""}>
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs",
+                      isLast
+                        ? "border-slate-900/10 bg-slate-900 text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)]"
+                        : "border-white/70 bg-white/60 font-medium text-foreground"
+                    )}
+                  >
                     {crumb.label}
                   </span>
                 )}
 
-                {!isLast ? <ChevronRight className="h-4 w-4" /> : null}
+                {!isLast ? (
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                ) : null}
               </div>
             );
           })}
         </nav>
       ) : null}
 
-      <section className="portal-page-header rounded-2xl border border-border bg-card shadow-sm">
-        <div className="flex flex-col gap-5 p-5 sm:p-6">
+      <section className="portal-page-header relative overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.22),transparent_28%),radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_28px_80px_-48px_rgba(15,23,42,0.68)]">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.24),transparent_45%)]" />
+        <div className="pointer-events-none absolute -right-16 top-0 h-44 w-44 rounded-full bg-sky-200/25 blur-3xl" />
+        <div className="pointer-events-none absolute left-0 top-16 h-36 w-36 rounded-full bg-amber-200/20 blur-3xl" />
+        <div className="relative flex flex-col gap-6 p-5 sm:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight text-card-foreground sm:text-3xl">
+                <h1 className="text-2xl font-semibold tracking-tight text-card-foreground sm:text-3xl lg:text-[2rem]">
                   {title}
                 </h1>
 
                 {statusBadge ? (
                   <span
-                    className={[
-                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold",
-                      getToneClassName(statusBadge.tone),
-                    ].join(" ")}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur",
+                      getToneClassName(statusBadge.tone)
+                    )}
                   >
                     {(() => {
                       const Icon = getToneIcon(statusBadge.tone);
@@ -183,10 +196,10 @@ export default function PortalPage({
                   <Link
                     key={`${action.href}-${action.label}`}
                     href={action.href}
-                    className={[
-                      "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-medium transition",
-                      getActionClassName(action.variant),
-                    ].join(" ")}
+                    className={cn(
+                      "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-medium transition duration-200",
+                      getActionClassName(action.variant)
+                    )}
                   >
                     {action.label}
                   </Link>
@@ -200,25 +213,25 @@ export default function PortalPage({
               {stats.map((stat, index) => (
                 <div
                   key={`${stat.label}-${index}`}
-                  className="rounded-xl border border-border bg-muted/40 p-4"
+                  className="rounded-[1.4rem] border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_45px_-36px_rgba(15,23,42,0.58)] backdrop-blur"
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     {stat.label}
                   </div>
 
                   <div
-                    className={[
-                      "mt-2 text-2xl font-bold tracking-tight",
+                    className={cn(
+                      "mt-2 text-2xl font-semibold tracking-tight",
                       stat.tone === "success"
-                        ? "text-emerald-700"
+                        ? "text-emerald-800"
                         : stat.tone === "warning"
-                        ? "text-amber-700"
+                        ? "text-amber-800"
                         : stat.tone === "danger"
-                        ? "text-red-700"
+                        ? "text-red-800"
                         : stat.tone === "info"
-                        ? "text-blue-700"
-                        : "text-foreground",
-                    ].join(" ")}
+                        ? "text-sky-800"
+                        : "text-foreground"
+                    )}
                   >
                     {stat.value}
                   </div>
@@ -229,7 +242,7 @@ export default function PortalPage({
         </div>
       </section>
 
-      <section className="portal-page-content grid gap-4">{children}</section>
+      <section className="portal-page-content grid gap-5">{children}</section>
     </main>
   );
 }

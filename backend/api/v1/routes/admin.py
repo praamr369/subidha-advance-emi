@@ -96,6 +96,13 @@ from api.v1.views.admin_support_requests import (
     AdminSupportRequestResolveView,
     AdminSupportRequestStatusUpdateView,
 )
+from api.v1.views.subscription_requests import (
+    AdminSubscriptionRequestApproveView,
+    AdminSubscriptionRequestDetailView,
+    AdminSubscriptionRequestListView,
+    AdminSubscriptionRequestOptionsView,
+    AdminSubscriptionRequestRejectView,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -140,6 +147,11 @@ urlpatterns = [
     path("support-requests/<int:pk>/assign/", AdminSupportRequestAssignView.as_view()),
     path("support-requests/<int:pk>/notes/", AdminSupportRequestNoteUpdateView.as_view()),
     path("support-requests/<int:pk>/resolve/", AdminSupportRequestResolveView.as_view()),
+    path("subscription-request-options/", AdminSubscriptionRequestOptionsView.as_view()),
+    path("subscription-requests/", AdminSubscriptionRequestListView.as_view()),
+    path("subscription-requests/<int:pk>/", AdminSubscriptionRequestDetailView.as_view()),
+    path("subscription-requests/<int:pk>/approve/", AdminSubscriptionRequestApproveView.as_view()),
+    path("subscription-requests/<int:pk>/reject/", AdminSubscriptionRequestRejectView.as_view()),
     path("internal-users/", AdminInternalUserListView.as_view()),
     path("internal-users/create/", AdminInternalUserCreateView.as_view()),
     path("internal-users/<int:pk>/", AdminInternalUserDetailView.as_view()),

@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { readSmokeManifest } from "./helpers/smoke-data";
 import { readSmokeMeta, roleStorageStatePath } from "./helpers/smoke-meta";
 
 const backendRoot = process.env.PLAYWRIGHT_BACKEND_ROOT || "http://127.0.0.1:8100";
 const meta = readSmokeMeta();
+const manifest = readSmokeManifest();
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -39,6 +41,24 @@ test("admin login entry page is available", async ({ page, browser }) => {
   await expect(adminPage).toHaveURL(/\/admin(?:\/)?$/);
   await expect(adminPage.locator("body")).toContainText(/admin|payments|subscriptions/i);
   await context.close();
+});
+
+test.describe("public release smoke", () => {
+  test("public product catalogue and detail load", async ({ page }) => {
+    await page.goto("/products");
+    await expect(
+      page.getByRole("heading", {
+        name: /Explore the live product catalogue before you enter the Lucky Plan flow/i,
+      })
+    ).toBeVisible();
+    await expect(page.locator("body")).toContainText(/catalogue filters/i);
+    await expect(page.locator("body")).toContainText(/media-ready cards/i);
+
+    await page.goto(`/products/${manifest.entities.public.product_id}`);
+    await expect(page.locator("body")).toContainText(/live public product detail/i);
+    await expect(page.locator("body")).toContainText(/media state/i);
+    await expect(page.locator("body")).toContainText(/what happens next/i);
+  });
 });
 
 test.describe("admin release smoke", () => {
@@ -109,6 +129,31 @@ test.describe("admin release smoke", () => {
     expect(reverseResponse.ok()).toBeTruthy();
     await expect(page.locator("body")).toContainText(/reversed record|already been reversed|reversed successfully/i);
   });
+
+  test("admin subscription detail renders lifecycle surfaces", async ({ page }) => {
+    await page.goto(`/admin/subscriptions/${meta.entities.admin_collection.subscription_id}`);
+    await expect(page.getByRole("heading", { name: /subscription #/i })).toBeVisible();
+    await expect(page.locator("body")).toContainText(/contract, winner, and waiver posture/i);
+    await expect(page.locator("body")).toContainText(/contract lifecycle/i);
+    await expect(page.locator("body")).toContainText(/winner benefit/i);
+    await expect(page.locator("body")).toContainText(/waiver and settlement/i);
+  });
+
+  test("admin payment reconciliation compatibility route redirects to canonical workspace", async ({
+    page,
+  }) => {
+    await page.goto(
+      `/admin/payments/reconciliation?subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}`
+    );
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/admin/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
+      )
+    );
+    await expect(
+      page.getByRole("heading", { name: "Admin Reconciliation" })
+    ).toBeVisible();
+  });
 });
 
 test.describe("cashier release smoke", () => {
@@ -154,5 +199,16 @@ test.describe("customer release smoke", () => {
     await page.goto("/customer/payments");
     await expect(page.getByRole("heading", { name: /my payments/i })).toBeVisible();
     await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.reference_no);
+  });
+
+  test("customer subscription detail renders lifecycle surfaces", async ({ page }) => {
+    await page.goto(`/customer/subscriptions/${meta.entities.preseed_payment.subscription_id}`);
+    await expect(
+      page.getByRole("heading", { name: "Subscription Details" })
+    ).toBeVisible();
+    await expect(page.locator("body")).toContainText(/contract, winner, and waiver state/i);
+    await expect(page.locator("body")).toContainText(/contract lifecycle/i);
+    await expect(page.locator("body")).toContainText(/winner benefit/i);
+    await expect(page.locator("body")).toContainText(/waiver and settlement impact/i);
   });
 });

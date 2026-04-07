@@ -17,6 +17,7 @@ import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 type ProductDetailRecord = {
   id: number;
@@ -90,7 +91,10 @@ function normalizeProductDetail(
       toNullableString(raw.subcategory) ?? toNullableString(raw.sub_category),
     description: toNullableString(raw.description),
     base_price: toMoneyString(raw.base_price ?? raw.price ?? raw.total_amount),
-    image: toNullableString(raw.image) ?? toNullableString(raw.image_url),
+    image:
+      resolveApiMediaUrl(
+        toNullableString(raw.image) ?? toNullableString(raw.image_url)
+      ) ?? null,
     created_at: toNullableString(raw.created_at),
   };
 }
@@ -429,7 +433,7 @@ export default function AdminProductEditPage() {
               : toMoneyString(trimmedBasePrice),
           image:
             updated.image !== undefined
-              ? updated.image
+              ? resolveApiMediaUrl(updated.image) ?? null
               : removeExistingImage
                 ? null
                 : base.image,

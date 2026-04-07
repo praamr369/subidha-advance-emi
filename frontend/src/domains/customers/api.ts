@@ -7,12 +7,14 @@ export type CustomerImportPreviewRow = {
   row_number: number;
   name: string;
   phone: string;
+  email: string;
   valid: boolean;
 };
 
 export type CustomerImportPreviewError = {
   row_number: number | null;
   phone?: string;
+  email?: string;
   errors: string[];
 };
 
@@ -28,6 +30,7 @@ export type CustomerImportCommitRow = {
   row_number: number;
   name: string;
   phone: string;
+  email?: string;
   valid?: boolean;
   errors?: string[];
   created_customer_id?: number | null;

@@ -71,6 +71,8 @@ export default function AdminInternalUserCreatePage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const trimmedEmail = email.trim();
+
     if (password !== confirmPassword) {
       setError("Password and confirm password must match.");
       return;
@@ -84,6 +86,11 @@ export default function AdminInternalUserCreatePage() {
     }
 
     if (role === "PARTNER") {
+      if (!trimmedEmail) {
+        setError("Email is required for managed partner access and password reset.");
+        return;
+      }
+
       const trimmedRate = commissionRate.trim();
       if (!trimmedRate) {
         setError("Partner commission percentage is required.");
@@ -112,7 +119,7 @@ export default function AdminInternalUserCreatePage() {
         password,
         role,
         phone: phone.trim(),
-        email: email.trim(),
+        email: trimmedEmail,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         is_active: isActive,
@@ -264,7 +271,7 @@ export default function AdminInternalUserCreatePage() {
 
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-foreground">
-                Email
+                {role === "PARTNER" ? "Email" : "Email"}
               </label>
               <input
                 id="email"
@@ -273,7 +280,13 @@ export default function AdminInternalUserCreatePage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                 placeholder="Email"
+                required={role === "PARTNER"}
               />
+              <p className="text-xs text-muted-foreground">
+                {role === "PARTNER"
+                  ? "Managed partner accounts must have email before password reset can be used."
+                  : "Optional for internal-only admin and cashier accounts."}
+              </p>
             </div>
           </div>
 
@@ -349,7 +362,7 @@ export default function AdminInternalUserCreatePage() {
 
           {role === "PARTNER" ? (
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              This partner account will be fully admin-managed. That is the recommended direction for auditability and operational control.
+              This partner account will be fully admin-managed. Email is mandatory so OTP reset remains available without exposing plaintext passwords.
             </div>
           ) : null}
 

@@ -4,7 +4,7 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("customer") });
 
-test("customer dashboard, subscriptions, and payments routes load with live nav only", async ({
+test("customer dashboard, subscription requests, subscriptions, and payments routes load with live nav only", async ({
   page,
 }) => {
   await page.goto("/customer");
@@ -12,6 +12,17 @@ test("customer dashboard, subscriptions, and payments routes load with live nav 
     page.getByRole("heading", { name: "Customer Workspace" })
   ).toBeVisible();
   await expect(page.locator('a[href="/customer/emis"]')).toHaveCount(0);
+
+  await page
+    .getByRole("complementary")
+    .getByRole("link", { name: "Subscription Requests", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/customer\/subscription-requests$/);
+  await expect(
+    page
+      .getByRole("heading", { name: "Subscription Requests", exact: true })
+      .last()
+  ).toBeVisible();
 
   await page
     .getByRole("complementary")
@@ -51,4 +62,306 @@ test("customer payment receipt is self-scoped", async ({ page }) => {
 test("customer legacy emis route redirects to subscriptions", async ({ page }) => {
   await page.goto("/customer/emis");
   await expect(page).toHaveURL(/\/customer\/subscriptions$/);
+});
+
+test("customer completed winner detail separates contract and winner history", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/customer/subscriptions/951/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 951,
+        subscription_number: "SUB-951",
+        status: "COMPLETED",
+        start_date: "2026-03-01",
+        plan_type: "EMI",
+        total_amount: "3000.00",
+        monthly_amount: "1000.00",
+        tenure_months: 3,
+        product: 11,
+        batch: 21,
+        lucky_id: 31,
+        product_name: "Winner Product",
+        product_code: "WIN-PROD-951",
+        product_image: "http://127.0.0.1:8100/media/products/winner-product.png",
+        batch_code: "WIN-BATCH-951",
+        lucky_number: 8,
+        emi_count: 3,
+        paid_emi_count: 1,
+        pending_emi_count: 0,
+        waived_emi_count: 2,
+        total_paid_amount: "1000.00",
+        outstanding_amount: "0.00",
+        winner_status: "WON",
+        winner_month: 1,
+        waived_amount: "2000.00",
+        delivery_status: null,
+        fulfillment_status: null,
+        created_at: "2026-03-01T06:00:00Z",
+        financial_summary: {
+          emi_total: "3000.00",
+          paid_amount: "1000.00",
+          waived_amount: "2000.00",
+          outstanding_amount: "0.00",
+        },
+        winner_summary: {
+          winner_status: "WON",
+          winner_month: 1,
+          lucky_id: 31,
+          lucky_number: 8,
+          draw_id: 19,
+          draw_month: 1,
+          draw_revealed_at: "2026-03-05T09:00:00Z",
+          waiver_scope: "FUTURE_EMI_ONLY",
+          waived_emi_count: 2,
+          waived_amount: "2000.00",
+        },
+        delivery_summary: null,
+        deliveries: [],
+        emis: [
+          {
+            id: 1,
+            month_no: 1,
+            due_date: "2026-03-10",
+            amount: "1000.00",
+            paid_amount: "1000.00",
+            waived_amount: "0.00",
+            outstanding_amount: "0.00",
+            status: "PAID",
+          },
+          {
+            id: 2,
+            month_no: 2,
+            due_date: "2026-04-10",
+            amount: "1000.00",
+            paid_amount: "0.00",
+            waived_amount: "1000.00",
+            outstanding_amount: "0.00",
+            status: "WAIVED",
+          },
+          {
+            id: 3,
+            month_no: 3,
+            due_date: "2026-05-10",
+            amount: "1000.00",
+            paid_amount: "0.00",
+            waived_amount: "1000.00",
+            outstanding_amount: "0.00",
+            status: "WAIVED",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/customer/subscriptions/951");
+  await expect(
+    page.getByRole("heading", { name: "Subscription Details" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Product module");
+  await expect(page.locator("body")).toContainText("WIN-PROD-951");
+  await expect(page.locator("body")).toContainText("Lucky number");
+  await expect(page.locator("body")).toContainText("#8");
+  await expect(page.locator("body")).toContainText("Contract, winner, and waiver state");
+  await expect(page.locator("body")).toContainText("Contract fully settled");
+  await expect(page.locator("body")).toContainText("Winner benefit recorded");
+  await expect(page.locator("body")).toContainText("Waiver settled the remaining exposure");
+  await expect(page.locator("body")).toContainText("Winner history stays separate from contract status");
+});
+
+test("customer unsettled winner detail keeps winner history while contract is still settling", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/customer/subscriptions/952/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 952,
+        subscription_number: "SUB-952",
+        status: "WON",
+        start_date: "2026-03-01",
+        plan_type: "EMI",
+        total_amount: "3000.00",
+        monthly_amount: "1000.00",
+        tenure_months: 3,
+        product: 11,
+        batch: 21,
+        lucky_id: 32,
+        product_name: "Winner Product",
+        product_code: "WIN-PROD-952",
+        product_image: "http://127.0.0.1:8100/media/products/winner-product.png",
+        batch_code: "WIN-BATCH-952",
+        lucky_number: 9,
+        emi_count: 3,
+        paid_emi_count: 0,
+        pending_emi_count: 1,
+        waived_emi_count: 2,
+        total_paid_amount: "0.00",
+        outstanding_amount: "1000.00",
+        winner_status: "WON",
+        winner_month: 1,
+        waived_amount: "2000.00",
+        delivery_status: null,
+        fulfillment_status: null,
+        created_at: "2026-03-01T06:00:00Z",
+        financial_summary: {
+          emi_total: "3000.00",
+          paid_amount: "0.00",
+          waived_amount: "2000.00",
+          outstanding_amount: "1000.00",
+        },
+        winner_summary: {
+          winner_status: "WON",
+          winner_month: 1,
+          lucky_id: 32,
+          lucky_number: 9,
+          draw_id: 20,
+          draw_month: 1,
+          draw_revealed_at: "2026-03-05T09:00:00Z",
+          waiver_scope: "FUTURE_EMI_ONLY",
+          waived_emi_count: 2,
+          waived_amount: "2000.00",
+        },
+        delivery_summary: null,
+        deliveries: [],
+        emis: [
+          {
+            id: 1,
+            month_no: 1,
+            due_date: "2026-03-10",
+            amount: "1000.00",
+            paid_amount: "0.00",
+            waived_amount: "0.00",
+            outstanding_amount: "1000.00",
+            status: "PENDING",
+          },
+          {
+            id: 2,
+            month_no: 2,
+            due_date: "2026-04-10",
+            amount: "1000.00",
+            paid_amount: "0.00",
+            waived_amount: "1000.00",
+            outstanding_amount: "0.00",
+            status: "WAIVED",
+          },
+          {
+            id: 3,
+            month_no: 3,
+            due_date: "2026-05-10",
+            amount: "1000.00",
+            paid_amount: "0.00",
+            waived_amount: "1000.00",
+            outstanding_amount: "0.00",
+            status: "WAIVED",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/customer/subscriptions/952");
+  await expect(page.locator("body")).toContainText("Contract still settling");
+  await expect(page.locator("body")).toContainText("Winner benefit recorded");
+  await expect(page.locator("body")).toContainText("Waiver applied to future EMI rows");
+  await expect(page.locator("body")).toContainText("Still settling");
+});
+
+test("customer can submit a subscription request from the create form", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/customer/subscription-request-options/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        products: [
+          {
+            id: 41,
+            name: "Request Product",
+            product_code: "REQ-041",
+            base_price: "12000.00",
+            image: "http://127.0.0.1:8100/media/products/request-product.png",
+          },
+        ],
+        batches: [
+          {
+            id: 51,
+            batch_code: "REQ-BATCH-51",
+            duration_months: 12,
+            available_slots: 22,
+            start_date: "2026-04-01",
+            status: "OPEN",
+          },
+        ],
+        lucky_numbers: [11, 12, 13],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/subscription-requests/", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "Subscription request submitted successfully.",
+        request: {
+          id: 701,
+          requester_role_snapshot: "CUSTOMER",
+          customer_id: 31,
+          customer_name: "Customer One",
+          customer_phone: "01711111111",
+          customer_email: "customer@example.com",
+          requested_customer_name: "Customer One",
+          requested_customer_phone: "01711111111",
+          requested_customer_email: "customer@example.com",
+          requested_customer_address: "Address",
+          requested_customer_city: "Dhaka",
+          product_id: 41,
+          product_name: "Request Product",
+          product_code: "REQ-041",
+          product_image: "http://127.0.0.1:8100/media/products/request-product.png",
+          batch_id: 51,
+          batch_code: "REQ-BATCH-51",
+          preferred_lucky_number: 12,
+          requested_tenure_months_snapshot: 12,
+          notes: "Customer request note",
+          status: "SUBMITTED",
+          approved_subscription_id: null,
+          approved_subscription_number: null,
+          created_at: "2026-04-07T10:00:00Z",
+          updated_at: "2026-04-07T10:00:00Z",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/customer/subscription-requests/create");
+  await expect(
+    page.getByRole("heading", { name: "Create Subscription Request" })
+  ).toBeVisible();
+
+  await page.getByRole("combobox", { name: /^Product$/ }).selectOption("41");
+  await page.getByRole("combobox", { name: /^Batch$/ }).selectOption("51");
+  await page
+    .getByRole("combobox", { name: /^Lucky number$/ })
+    .selectOption("12");
+  await page.getByRole("textbox", { name: /^Notes$/ }).fill(
+    "Customer request note"
+  );
+  await page.getByRole("button", { name: "Submit Request" }).click();
+
+  await expect(page.getByText("Subscription request submitted.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Request" })).toHaveAttribute(
+    "href",
+    "/customer/subscription-requests/701"
+  );
 });

@@ -928,15 +928,15 @@ export default function AdminCustomersPage() {
                                   {row.created_customer_id ?? "—"}
                                 </td>
                                 <td className="border-b border-emerald-200 px-3 py-2 text-sm">
-                                  {row.phone ? (
+                                  {row.email ? (
                                     <Link
-                                      href={buildForgotPasswordHref(row.phone)}
+                                      href={buildForgotPasswordHref(row.email)}
                                       className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100"
                                     >
                                       Start OTP Reset
                                     </Link>
                                   ) : (
-                                    "—"
+                                    "Add email before reset"
                                   )}
                                 </td>
                               </tr>

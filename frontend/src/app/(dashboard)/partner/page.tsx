@@ -257,6 +257,11 @@ export default function PartnerDashboardPage() {
           variant: "primary",
         },
         {
+          href: "/partner/subscription-requests",
+          label: "Subscription Requests",
+          variant: "secondary",
+        },
+        {
           href: "/partner/collections",
           label: "Open Collection Queue",
         },

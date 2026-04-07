@@ -3,11 +3,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import ErrorState from "@/components/feedback/ErrorState";
 import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
+import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
+import {
+  buildSubscriptionDetailSemantics,
+  formatLuckyNumberLabel,
+  formatWinnerMonthLabel,
+} from "@/domains/subscriptions/detail/view-model";
+import {
+  DetailHeroSurface,
+  DetailMetricTile,
+  DetailSectionShell,
+} from "@/domains/subscriptions/detail/surfaces";
 
 import {
   getCustomerSubscription,
@@ -54,42 +66,6 @@ function formatDateTime(value?: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function badgeClass(status?: string): string {
-  switch ((status || "").toUpperCase()) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "COMPLETED":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "WON":
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    case "PAID":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "WAIVED":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "DELIVERED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "SCHEDULED":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "DISPATCHED":
-    case "OUT_FOR_DELIVERY":
-      return "border-sky-200 bg-sky-50 text-sky-700";
-    case "RETURN_REQUESTED":
-    case "RETURNED":
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    case "FAILED":
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "OVERDUE":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
 }
 
 type EmiRow = {
@@ -267,13 +243,54 @@ export default function CustomerSubscriptionDetailPage() {
     [emiRows]
   );
 
-  const winnerRecorded =
-    (subscription?.status || "").toUpperCase() === "WON" ||
-    (subscription?.winner_month !== null &&
-      subscription?.winner_month !== undefined);
+  const winnerSummary = subscription?.winner_summary;
+  const detailSemantics = useMemo(
+    () =>
+      buildSubscriptionDetailSemantics({
+        contractStatus: subscription?.status,
+        winnerStatus: winnerSummary?.winner_status ?? subscription?.winner_status,
+        winnerMonth: winnerSummary?.winner_month ?? subscription?.winner_month,
+        luckyNumber: winnerSummary?.lucky_number ?? subscription?.lucky_number,
+        drawId: winnerSummary?.draw_id,
+        drawMonth: winnerSummary?.draw_month,
+        drawRevealedAt: winnerSummary?.draw_revealed_at,
+        waiverScope: winnerSummary?.waiver_scope,
+        waivedEmiCount:
+          winnerSummary?.waived_emi_count ??
+          subscription?.waived_emi_count ??
+          waivedEmiCount,
+        waivedAmount:
+          winnerSummary?.waived_amount ??
+          financialSummary.waived_amount ??
+          subscription?.waived_amount,
+        outstandingAmount: financialSummary.outstanding_amount,
+      }),
+    [
+      financialSummary.outstanding_amount,
+      financialSummary.waived_amount,
+      subscription?.lucky_number,
+      subscription?.status,
+      subscription?.waived_amount,
+      subscription?.waived_emi_count,
+      subscription?.winner_month,
+      subscription?.winner_status,
+      waivedEmiCount,
+      winnerSummary?.draw_id,
+      winnerSummary?.draw_month,
+      winnerSummary?.draw_revealed_at,
+      winnerSummary?.lucky_number,
+      winnerSummary?.waived_amount,
+      winnerSummary?.waived_emi_count,
+      winnerSummary?.waiver_scope,
+      winnerSummary?.winner_month,
+      winnerSummary?.winner_status,
+    ]
+  );
 
   const paymentProgressLabel =
-    emiRows.length > 0 ? `${paidEmiCount} of ${emiRows.length} EMI rows paid` : "No EMI schedule";
+    emiRows.length > 0
+      ? `${paidEmiCount} of ${emiRows.length} EMI rows paid`
+      : "No EMI schedule";
 
   const columns = useMemo(
     () => [
@@ -315,13 +332,7 @@ export default function CustomerSubscriptionDetailPage() {
         key: "status",
         title: "Status",
         render: (row: EmiRow) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${badgeClass(
-              row.status
-            )}`}
-          >
-            {row.status}
-          </span>
+          <StatusBadge status={row.status} />
         ),
       },
     ],
@@ -331,7 +342,7 @@ export default function CustomerSubscriptionDetailPage() {
   return (
     <PortalPage
       title="Subscription Details"
-      subtitle="Track EMI schedule, payment progress, and subscription-level financial position."
+      subtitle="Track contract lifecycle, winner benefit history, waiver impact, and EMI settlement from your live subscription record."
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Subscriptions", href: "/customer/subscriptions" },
@@ -364,7 +375,7 @@ export default function CustomerSubscriptionDetailPage() {
           type="button"
           onClick={() => void loadPage("refresh")}
           disabled={refreshing}
-          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center rounded-xl border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-[0_16px_36px_-24px_rgba(15,23,42,0.35)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
@@ -389,393 +400,342 @@ export default function CustomerSubscriptionDetailPage() {
 
       {!loading && !error && subscription ? (
         <div className="space-y-6">
-          {subscription.delivery_summary ? (
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Delivery Tracking
-                  </p>
-                  <p className="mt-2 text-lg font-semibold text-card-foreground">
-                    {subscription.delivery_summary.delivery_reference}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    This delivery record is linked to your subscription and updates only from internal delivery operations.
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${badgeClass(
-                    subscription.delivery_summary.status
-                  )}`}
-                >
-                  {subscription.delivery_summary.status}
-                </span>
-              </div>
+          <section className="rounded-[30px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_30px_120px_-48px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Subscription clarity
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                Contract, winner, and waiver state
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                Contract lifecycle, winner benefit history, and waiver impact are shown separately so a completed winner remains easy to understand.
+              </p>
+            </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Scheduled Date</p>
-                  <p className="font-medium text-foreground">
-                    {formatDate(subscription.delivery_summary.scheduled_date)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Out for Delivery</p>
-                  <p className="font-medium text-foreground">
-                    {formatDateTime(subscription.delivery_summary.out_for_delivery_at)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Delivered At</p>
-                  <p className="font-medium text-foreground">
-                    {formatDateTime(subscription.delivery_summary.delivered_at)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Fulfillment Status</p>
-                  <p className="font-medium text-foreground">
-                    {text(subscription.fulfillment_status)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Receiver</p>
-                  <p className="font-medium text-foreground">
-                    {text(subscription.delivery_summary.receiver_name)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Receiver Phone</p>
-                  <p className="font-medium text-foreground">
-                    {text(subscription.delivery_summary.receiver_phone)}
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs text-muted-foreground">Address</p>
-                  <p className="font-medium text-foreground">
-                    {text(subscription.delivery_summary.delivery_address_snapshot)}
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs text-muted-foreground">Delivery Notes</p>
-                  <p className="font-medium text-foreground">
-                    {text(subscription.delivery_summary.notes)}
-                  </p>
-                </div>
-                {subscription.delivery_summary.failure_reason ? (
-                  <div className="md:col-span-2">
-                    <p className="text-xs text-muted-foreground">Failure / Return Reason</p>
-                    <p className="font-medium text-foreground">
-                      {subscription.delivery_summary.failure_reason}
+            <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr_1fr]">
+              <DetailHeroSurface
+                eyebrow="Contract lifecycle"
+                title={detailSemantics.contractHeadline}
+                description={detailSemantics.contractDescription}
+                tone={detailSemantics.contractTone}
+                badge={<StatusBadge status={subscription.status} size="md" />}
+                meta={
+                  <>
+                    <DetailMetricTile
+                      label="Lifecycle status"
+                      value={detailSemantics.contractStatus}
+                      tone={detailSemantics.contractTone}
+                    />
+                    <DetailMetricTile
+                      label="Payment progress"
+                      value={paymentProgressLabel}
+                      hint={
+                        pendingEmiCount > 0
+                          ? `${pendingEmiCount} EMI rows still need settlement.`
+                          : "No pending EMI rows remain."
+                      }
+                    />
+                    <DetailMetricTile
+                      label="Remaining amount"
+                      value={money(financialSummary.outstanding_amount)}
+                      tone={detailSemantics.isSettled ? "success" : "warning"}
+                    />
+                  </>
+                }
+              />
+
+              <DetailHeroSurface
+                eyebrow="Winner benefit"
+                title={detailSemantics.winnerHeadline}
+                description={detailSemantics.winnerDescription}
+                tone={detailSemantics.winnerTone}
+                badge={
+                  <StatusBadge
+                    status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"}
+                    label={
+                      detailSemantics.winnerStatus === "WON"
+                        ? "Winner recorded"
+                        : "Not won"
+                    }
+                    size="md"
+                  />
+                }
+                meta={
+                  <>
+                    <DetailMetricTile
+                      label="Winner month"
+                      value={formatWinnerMonthLabel(detailSemantics.winnerMonth)}
+                      tone={detailSemantics.winnerTone}
+                    />
+                    <DetailMetricTile
+                      label="Lucky number"
+                      value={formatLuckyNumberLabel(detailSemantics.luckyNumber)}
+                      hint={
+                        detailSemantics.drawId != null
+                          ? `Draw #${detailSemantics.drawId}`
+                          : "Lucky number stays linked to this contract"
+                      }
+                    />
+                    <DetailMetricTile
+                      label="Draw revealed"
+                      value={formatDateTime(detailSemantics.drawRevealedAt)}
+                      hint={
+                        detailSemantics.drawMonth != null
+                          ? `Draw month ${detailSemantics.drawMonth}`
+                          : "Winner month stored on the contract"
+                      }
+                    />
+                  </>
+                }
+              />
+
+              <DetailHeroSurface
+                eyebrow="Waiver and settlement impact"
+                title={detailSemantics.waiverHeadline}
+                description={detailSemantics.waiverDescription}
+                tone={detailSemantics.waiverTone}
+                badge={
+                  <StatusBadge
+                    status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
+                    label={detailSemantics.isSettled ? "Fully settled" : "Still settling"}
+                    size="md"
+                  />
+                }
+                meta={
+                  <>
+                    <DetailMetricTile
+                      label="Waived EMI rows"
+                      value={String(detailSemantics.waivedEmiCount)}
+                      tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
+                    />
+                    <DetailMetricTile
+                      label="Waived amount"
+                      value={money(detailSemantics.waivedAmount)}
+                      tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
+                    />
+                    <DetailMetricTile
+                      label="Waiver scope"
+                      value={detailSemantics.waiverScope || "—"}
+                      hint="Winner benefits apply only to future EMI rows."
+                    />
+                  </>
+                }
+              />
+            </div>
+          </section>
+
+          {detailSemantics.hasWinnerHistory ? (
+            <div className="rounded-[24px] border border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.96),rgba(224,242,254,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(2,132,199,0.28)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
+                Winner history stays separate from contract status
+              </p>
+              <p className="mt-2 text-sm leading-6 text-sky-950">
+                A winner subscription may appear as <span className="font-semibold">WON</span> while it still has remaining EMI exposure, and later as <span className="font-semibold">COMPLETED</span> once every EMI row is paid or waived. The winner record stays visible in both cases.
+              </p>
+            </div>
+          ) : pendingEmiCount > 0 ? (
+            <div className="rounded-[24px] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.96),rgba(254,243,199,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(217,119,6,0.28)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
+                Settlement note
+              </p>
+              <p className="mt-2 text-sm leading-6 text-amber-950">
+                Pending EMI rows remain outstanding until a payment is recorded or a waiver is applied in the backend.
+              </p>
+            </div>
+          ) : null}
+
+          <DetailSectionShell
+            title="Product module"
+            description="Live product media and the exact subscription-linked catalog context for this contract."
+          >
+            <CustomerProductSummaryCard subscription={subscription} />
+          </DetailSectionShell>
+
+          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <DetailSectionShell
+              title="Contract and allocation"
+              description="Customer-visible product, batch, lucky number, and lifecycle facts for this subscription."
+            >
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <DetailMetricTile
+                  label="Subscription"
+                  value={subscription.subscription_number || `SUB-${subscription.id}`}
+                />
+                <DetailMetricTile
+                  label="Product"
+                  value={text(subscription.product_name)}
+                  hint={text(subscription.plan_type)}
+                />
+                <DetailMetricTile
+                  label="Batch"
+                  value={text(subscription.batch_code)}
+                  hint={`Start ${formatDate(subscription.start_date)}`}
+                />
+                <DetailMetricTile
+                  label="Lucky number"
+                  value={formatLuckyNumberLabel(subscription.lucky_number)}
+                />
+                <DetailMetricTile
+                  label="Delivery status"
+                  value={text(subscription.delivery_status)}
+                  hint={`Fulfillment ${text(subscription.fulfillment_status)}`}
+                />
+                <DetailMetricTile
+                  label="Created"
+                  value={formatDate(subscription.created_at)}
+                />
+              </div>
+            </DetailSectionShell>
+
+            <DetailSectionShell
+              title="Financial position"
+              description="Current contract-level financial posture from EMI rows and the canonical backend summary."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DetailMetricTile
+                  label="EMI total"
+                  value={money(financialSummary.emi_total)}
+                />
+                <DetailMetricTile
+                  label="Paid amount"
+                  value={money(financialSummary.paid_amount)}
+                  tone="success"
+                />
+                <DetailMetricTile
+                  label="Waived amount"
+                  value={money(financialSummary.waived_amount)}
+                  tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
+                />
+                <DetailMetricTile
+                  label="Outstanding"
+                  value={money(financialSummary.outstanding_amount)}
+                  tone={detailSemantics.isSettled ? "success" : "warning"}
+                />
+                <DetailMetricTile
+                  label="Paid EMI rows"
+                  value={paidEmiCount}
+                />
+                <DetailMetricTile
+                  label="Pending EMI rows"
+                  value={pendingEmiCount}
+                  tone={pendingEmiCount > 0 ? "warning" : "success"}
+                />
+              </div>
+            </DetailSectionShell>
+          </div>
+
+          <DetailSectionShell
+            title="Delivery tracking"
+            description="Delivery events appear here only when the shop creates or updates linked delivery records."
+          >
+            {subscription.delivery_summary ? (
+              <>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Current delivery
                     </p>
+                    <p className="mt-2 text-lg font-semibold text-slate-950">
+                      {subscription.delivery_summary.delivery_reference}
+                    </p>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                      Delivery updates come from internal operations only and remain linked to this subscription for audit clarity.
+                    </p>
+                  </div>
+                  <StatusBadge status={subscription.delivery_summary.status} size="md" />
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <DetailMetricTile
+                    label="Scheduled date"
+                    value={formatDate(subscription.delivery_summary.scheduled_date)}
+                  />
+                  <DetailMetricTile
+                    label="Out for delivery"
+                    value={formatDateTime(subscription.delivery_summary.out_for_delivery_at)}
+                  />
+                  <DetailMetricTile
+                    label="Delivered at"
+                    value={formatDateTime(subscription.delivery_summary.delivered_at)}
+                  />
+                  <DetailMetricTile
+                    label="Receiver"
+                    value={text(subscription.delivery_summary.receiver_name)}
+                    hint={text(subscription.delivery_summary.receiver_phone)}
+                  />
+                  <DetailMetricTile
+                    label="Address"
+                    value={text(subscription.delivery_summary.delivery_address_snapshot)}
+                    className="sm:col-span-2 xl:col-span-2"
+                  />
+                  <DetailMetricTile
+                    label="Notes"
+                    value={text(subscription.delivery_summary.notes)}
+                    className="sm:col-span-2 xl:col-span-2"
+                  />
+                </div>
+
+                {Array.isArray(subscription.deliveries) &&
+                subscription.deliveries.length > 0 ? (
+                  <div className="mt-6 overflow-x-auto rounded-[22px] border border-slate-200/80 bg-white/70 p-2">
+                    <table className="min-w-full border-separate border-spacing-0">
+                      <thead>
+                        <tr className="text-left">
+                          {["Reference", "Status", "Scheduled", "Delivered"].map((label) => (
+                            <th
+                              key={label}
+                              className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"
+                            >
+                              {label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subscription.deliveries.map((row) => (
+                          <tr key={row.id}>
+                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-900">
+                              {row.delivery_reference}
+                            </td>
+                            <td className="border-b border-slate-200 px-4 py-3 text-sm">
+                              <StatusBadge status={row.status} />
+                            </td>
+                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-700">
+                              {formatDate(row.scheduled_date)}
+                            </td>
+                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-700">
+                              {formatDateTime(row.delivered_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : null}
+              </>
+            ) : (
+              <div className="rounded-[22px] border border-slate-200/80 bg-white/75 px-4 py-4 text-sm leading-6 text-slate-600 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.3)]">
+                Delivery tracking will appear here once the shop creates a delivery record for this subscription.
               </div>
+            )}
+          </DetailSectionShell>
 
-              {Array.isArray(subscription.deliveries) &&
-              subscription.deliveries.length > 0 ? (
-                <div className="mt-6 overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
-                    <thead>
-                      <tr className="text-left">
-                        {["Reference", "Status", "Scheduled", "Delivered"].map((label) => (
-                          <th
-                            key={label}
-                            className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                          >
-                            {label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {subscription.deliveries.map((row) => (
-                        <tr key={row.id}>
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {row.delivery_reference}
-                          </td>
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {row.status}
-                          </td>
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {formatDate(row.scheduled_date)}
-                          </td>
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {formatDateTime(row.delivered_at)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </section>
-          ) : (
-            <div className="rounded-xl border border-border bg-card px-4 py-4 text-sm text-muted-foreground shadow-sm">
-              Delivery tracking will appear here once the shop creates a delivery record for this subscription.
-            </div>
-          )}
-
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Subscription
-                  </p>
-                  <p className="text-lg font-semibold text-card-foreground">
-                    {subscription.subscription_number || `SUB-${subscription.id}`}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Product</p>
-                    <p className="font-medium text-foreground">
-                      {text(subscription.product_name)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Batch</p>
-                    <p className="font-medium text-foreground">
-                      {text(subscription.batch_code)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Lucky Number</p>
-                    <p className="font-medium text-foreground">
-                      {subscription.lucky_number ?? "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Start Date</p>
-                    <p className="font-medium text-foreground">
-                      {formatDate(subscription.start_date)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${badgeClass(
-                      subscription.status
-                    )}`}
-                  >
-                    {text(subscription.status)}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Waived Amount</p>
-                    <p className="font-medium text-foreground">
-                      {money(subscription.waived_amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Winner Month</p>
-                    <p className="font-medium text-foreground">
-                      {subscription.winner_month ?? "Not recorded"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Delivery Status
-                    </p>
-                    <p className="font-medium text-foreground">
-                      {text(subscription.delivery_status)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Fulfillment Status
-                    </p>
-                    <p className="font-medium text-foreground">
-                      {text(subscription.fulfillment_status)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Created At</p>
-                    <p className="font-medium text-foreground">
-                      {formatDate(subscription.created_at)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Lucky Draw Status
-              </p>
-              <p className="mt-2 text-lg font-semibold text-card-foreground">
-                {winnerRecorded ? "Winner benefit recorded" : "No winner benefit recorded"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {subscription?.winner_month
-                  ? `Winner month ${subscription.winner_month}`
-                  : "This subscription has no recorded winner month yet."}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Payment Progress
-              </p>
-              <p className="mt-2 text-lg font-semibold text-card-foreground">
-                {paymentProgressLabel}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {pendingEmiCount > 0
-                  ? `${pendingEmiCount} EMI rows are still pending.`
-                  : "No pending EMI rows remain."}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Waiver Status
-              </p>
-              <p className="mt-2 text-lg font-semibold text-card-foreground">
-                {waivedEmiCount > 0 || financialSummary.waived_amount > 0
-                  ? "Waiver recorded"
-                  : "No waiver recorded"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {waivedEmiCount > 0 || financialSummary.waived_amount > 0
-                  ? `${waivedEmiCount} EMI rows waived · ${money(financialSummary.waived_amount)} total waived`
-                  : "A waiver will appear here only after backend waiver entries are recorded."}
-              </p>
-            </div>
-          </section>
-
-          {winnerRecorded || waivedEmiCount > 0 || financialSummary.waived_amount > 0 ? (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-              Winner and waiver figures on this page come from recorded
-              subscription and EMI data only. Already paid EMI rows remain paid;
-              waiver totals reflect only the entries currently stored in the
-              backend.
-            </div>
-          ) : null}
-
-          {!winnerRecorded && pendingEmiCount > 0 ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              This subscription still has pending EMI rows. Until a payment is
-              recorded or a waiver is explicitly applied, those amounts remain
-              outstanding.
-            </div>
-          ) : null}
-
-          <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                EMIs Total
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-card-foreground">
-                {emiRows.length}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Paid EMIs
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-card-foreground">
-                {paidEmiCount}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Pending EMIs
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-card-foreground">
-                {pendingEmiCount}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Waived EMIs
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-card-foreground">
-                {waivedEmiCount}
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-card-foreground">
-                Financial Summary
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Current subscription-level financial position.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-border bg-background p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  EMI Total
-                </p>
-                <p className="mt-2 text-xl font-semibold text-foreground">
-                  {money(financialSummary.emi_total)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-background p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Paid Amount
-                </p>
-                <p className="mt-2 text-xl font-semibold text-emerald-700">
-                  {money(financialSummary.paid_amount)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-background p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Waived Amount
-                </p>
-                <p className="mt-2 text-xl font-semibold text-blue-700">
-                  {money(financialSummary.waived_amount)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-background p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Outstanding
-                </p>
-                <p className="mt-2 text-xl font-semibold text-amber-700">
-                  {money(financialSummary.outstanding_amount)}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-card-foreground">
-                EMI Schedule
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Verified customer-visible EMI records for this subscription.
-              </p>
-            </div>
-
+          <DetailSectionShell
+            title="EMI schedule"
+            description="Customer-visible EMI rows with paid, waived, and outstanding amounts shown separately."
+          >
             {emiRows.length === 0 ? (
               <EmptyState
                 title="No EMI schedule found"
                 description="No EMI rows were returned for this subscription."
               />
             ) : (
-              <DataTable<EmiRow> rows={emiRows} columns={columns} />
+              <div className="rounded-[22px] border border-slate-200/80 bg-white/80 p-2 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.26)]">
+                <DataTable<EmiRow> rows={emiRows} columns={columns} />
+              </div>
             )}
-          </section>
+          </DetailSectionShell>
         </div>
       ) : null}
     </PortalPage>

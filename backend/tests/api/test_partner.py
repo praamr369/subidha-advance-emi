@@ -7,7 +7,12 @@ from rest_framework.test import APITestCase
 from django.db.models import Sum
 
 from subscriptions.models import Commission, CommissionStatus, MONEY_ZERO
+from subscriptions.services.lucky_draw_service import (
+    create_lucky_draw_commit,
+    reveal_and_execute_draw,
+)
 from subscriptions.services.payment_service import record_emi_payment
+from subscriptions.services.winner_service import WinnerService
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -220,6 +225,25 @@ class PartnerApiTests(APITestCase):
         self.assertEqual(response.data["id"], self.subscription_primary_1.id)
         self.assertEqual(response.data["partner_id"], self.partner.id)
 
+    def test_partner_subscription_detail_exposes_winner_history_separately(self):
+        WinnerService.execute_winner(
+            subscription_id=self.subscription_primary_1.id,
+            winner_month=1,
+            performed_by=self.admin,
+        )
+        self.client.force_authenticate(user=self.partner)
+
+        response = self.client.get(
+            f"/api/v1/partner/subscriptions/{self.subscription_primary_1.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["status"], "COMPLETED")
+        self.assertEqual(response.data["winner_status"], "WON")
+        self.assertEqual(response.data["winner_summary"]["winner_month"], 1)
+        self.assertEqual(response.data["winner_summary"]["waived_emi_count"], 1)
+        self.assertEqual(response.data["winner_summary"]["waived_amount"], "190.00")
+
     def test_partner_subscription_detail_hides_other_partner_record(self):
         self.client.force_authenticate(user=self.partner)
 
@@ -372,6 +396,19 @@ class PartnerApiTests(APITestCase):
         response = self.client.get("/api/v1/partner/commissions/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_partner_dashboard_counts_completed_winner_in_won_subscriptions(self):
+        WinnerService.execute_winner(
+            subscription_id=self.subscription_primary_1.id,
+            winner_month=1,
+            performed_by=self.admin,
+        )
+        self.client.force_authenticate(user=self.partner)
+
+        response = self.client.get("/api/v1/partner/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["summary"]["won_subscriptions"], 1)
 
 from decimal import Decimal
 from datetime import date

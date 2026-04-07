@@ -1,1 +1,8 @@
-export const appConfig = { title: "SUBIDHA CORE", company: "Subidha Furniture", sidebarBrand: "Lucky Plan", paginationSize: 20 } as const;
+import { brandConfig } from "@/config/brand";
+
+export const appConfig = {
+  title: brandConfig.platformName,
+  company: brandConfig.companyName,
+  sidebarBrand: brandConfig.publicProgramName,
+  paginationSize: 20,
+} as const;

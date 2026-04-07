@@ -17,6 +17,7 @@ from subscriptions.models import (
 
 from subscriptions.services.risk_service import evaluate_all_active_subscriptions
 from subscriptions.services.financial_health_service import system_financial_health
+from subscriptions.services.winner_state_service import winner_history_q
 
 
 CACHE_KEY = "admin_dashboard_v1"
@@ -118,9 +119,7 @@ def build_admin_dashboard():
         status=SubscriptionStatus.COMPLETED
     ).count()
 
-    won_subscriptions = Subscription.objects.filter(
-        status=SubscriptionStatus.WON
-    ).count()
+    won_subscriptions = Subscription.objects.filter(winner_history_q()).distinct().count()
 
     # ------------------------------
     # 6️⃣ Batch & Draw Stats

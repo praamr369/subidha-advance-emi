@@ -202,6 +202,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!trimmedEmail) {
+      setError("Email is required for customer access and password reset.");
+      return;
+    }
+
     if (!password) {
       setError("Password is required.");
       return;
@@ -462,8 +467,9 @@ export default function RegisterPage() {
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter email (optional)"
+                      placeholder="Enter email"
                       className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      required
                     />
                   </div>
                 </div>

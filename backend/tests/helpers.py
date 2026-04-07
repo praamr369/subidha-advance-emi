@@ -24,6 +24,7 @@ def create_user(
     password: str = "TestPass123!",
     role: str = UserRole.CUSTOMER,
     phone: str = "",
+    email: str = "",
     first_name: str = "",
     is_staff: bool = False,
     is_superuser: bool = False,
@@ -33,57 +34,62 @@ def create_user(
         password=password,
         role=role,
         phone=phone,
+        email=email,
         first_name=first_name,
         is_staff=is_staff,
         is_superuser=is_superuser,
     )
 
 
-def create_admin_user(username="admin_test", phone="9000000001"):
+def create_admin_user(username="admin_test", phone="9000000001", email=""):
     return create_user(
         username=username,
         password="AdminPass123!",
         role=UserRole.ADMIN,
         phone=phone,
+        email=email,
         first_name="Admin",
         is_staff=True,
     )
 
 
-def create_partner_user(username="partner_test", phone="9000000002"):
+def create_partner_user(username="partner_test", phone="9000000002", email=""):
     return create_user(
         username=username,
         password="PartnerPass123!",
         role=UserRole.PARTNER,
         phone=phone,
+        email=email,
         first_name="Partner",
     )
 
 
-def create_cashier_user(username="cashier_test", phone="9000000004"):
+def create_cashier_user(username="cashier_test", phone="9000000004", email=""):
     return create_user(
         username=username,
         password="CashierPass123!",
         role=UserRole.CASHIER,
         phone=phone,
+        email=email,
         first_name="Cashier",
         is_staff=True,
     )
 
 
-def create_customer_user(username="customer_test", phone="9000000003"):
+def create_customer_user(username="customer_test", phone="9000000003", email=""):
     return create_user(
         username=username,
         password="CustomerPass123!",
         role=UserRole.CUSTOMER,
         phone=phone,
+        email=email,
         first_name="Customer",
     )
 
 
-def create_customer_profile(*, user=None, name="Test Customer", phone="9000000003"):
+def create_customer_profile(*, user=None, name="Test Customer", phone="9000000003", email=""):
     if user is None:
-        user = create_customer_user(phone=phone)
+        user = create_customer_user(phone=phone, email=email)
     return Customer.objects.create(
         user=user,
         name=name,

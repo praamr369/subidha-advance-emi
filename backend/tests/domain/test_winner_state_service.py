@@ -10,6 +10,7 @@ from subscriptions.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
+from subscriptions.services.winner_state_service import winner_history_q
 from subscriptions.services.winner_service import WinnerService
 from tests.helpers import (
     create_admin_user,
@@ -153,4 +154,17 @@ class WinnerStateServiceTests(TestCase):
         self.assertEqual(
             AuditLog.objects.filter(action_type=AuditLog.ActionType.WINNER_STATE_SYNCED).count(),
             2,
+        )
+
+    def test_winner_history_filter_includes_completed_winner_rows(self):
+        self.subscription.status = SubscriptionStatus.COMPLETED
+        self.subscription.winner_month = 1
+        self.subscription.waived_amount = Decimal("2000.00")
+        self.subscription.save(update_fields=["status", "winner_month", "waived_amount"])
+        self.lucky_id.status = LuckyIdStatus.WON
+        self.lucky_id.save(update_fields=["status"])
+
+        self.assertEqual(
+            self.subscription.__class__.objects.filter(winner_history_q()).distinct().count(),
+            1,
         )

@@ -1,5 +1,6 @@
 import PortalPage from "@/components/ui/PortalPage";
 import EmptyState from "@/components/feedback/EmptyState";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import Link from "next/link";
 
 export default function CustomerAnalyticsReportPage() {
@@ -24,7 +25,7 @@ export default function CustomerAnalyticsReportPage() {
             Overdue Report
           </Link>
           <Link
-            href="/admin/reconciliation"
+            href={buildAdminReconciliationRoute()}
             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
             Subscription Reconciliation

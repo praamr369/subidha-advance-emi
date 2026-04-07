@@ -292,6 +292,11 @@ export default function PartnerSubscriptionsPage() {
       ]}
       actions={[
         {
+          href: "/partner/subscription-requests",
+          label: "Subscription Requests",
+          variant: "primary",
+        },
+        {
           href: "/partner/customers",
           label: "Customers",
           variant: "secondary",

@@ -46,7 +46,11 @@ class AdminInternalUserCommissionTests(APITestCase):
         )
 
     def test_update_partner_commission_rate_is_audited(self):
-        partner = create_partner_user(username="partner_user_2", phone="9200000003")
+        partner = create_partner_user(
+            username="partner_user_2",
+            phone="9200000003",
+            email="partner2@example.com",
+        )
         partner.commission_rate = Decimal("4.00")
         partner.save(update_fields=["commission_rate"])
 
@@ -95,3 +99,42 @@ class AdminInternalUserCommissionTests(APITestCase):
 
         user = User.objects.get(id=response.data["id"])
         self.assertEqual(user.commission_rate, Decimal("0.00"))
+
+    def test_create_partner_requires_email(self):
+        payload = {
+            "username": "partner_missing_email",
+            "password": "PartnerPass123!",
+            "phone": "9200000005",
+            "role": "PARTNER",
+            "commission_rate": "6.50",
+            "is_active": True,
+        }
+
+        response = self.client.post(
+            "/api/v1/admin/internal-users/create/",
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    def test_update_partner_requires_email_when_current_record_has_none(self):
+        partner = create_partner_user(
+            username="partner_missing_email_existing",
+            phone="9200000006",
+            email="",
+        )
+
+        response = self.client.patch(
+            f"/api/v1/admin/internal-users/{partner.id}/",
+            {
+                "role": "PARTNER",
+                "commission_rate": "8.25",
+                "email": "",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)

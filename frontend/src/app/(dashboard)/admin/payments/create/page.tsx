@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch } from "@/lib/api";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { normalizeApiError } from "@/services/api/errors";
 import {
   collectPayment,
@@ -524,7 +525,7 @@ export default function PaymentRecordPage() {
         { label: "All Payments", href: "/admin/payments", variant: "secondary" },
         {
           label: "Reconciliation",
-          href: "/admin/payments/reconciliation",
+          href: buildAdminReconciliationRoute({ view: "payments" }),
           variant: "secondary",
         },
       ]}

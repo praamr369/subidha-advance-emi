@@ -32,7 +32,7 @@ import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/co
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
   buildForgotPasswordHref,
-  resolvePasswordResetIdentifier,
+  resolvePasswordResetEmail,
 } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 
@@ -918,12 +918,10 @@ export default function AdminCustomerDetailPage() {
 
   const passwordResetIdentifier = useMemo(
     () =>
-      resolvePasswordResetIdentifier({
-        phone: customer?.phone,
+      resolvePasswordResetEmail({
         email: customer?.email,
-        username: customer?.user_username,
       }),
-    [customer?.email, customer?.phone, customer?.user_username]
+    [customer?.email]
   );
 
   const passwordResetHref = useMemo(
@@ -1202,20 +1200,17 @@ export default function AdminCustomerDetailPage() {
                   />
                   <DetailValue
                     label="Reset Identifier"
-                    value={passwordResetIdentifier || "No phone, email, or username available"}
+                    value={passwordResetIdentifier || "Add email before password reset"}
                   />
+                  <DetailValue label="Phone" value={customer.phone || "—"} />
                   <DetailValue
-                    label="Phone Channel"
-                    value={customer.phone || "—"}
-                  />
-                  <DetailValue
-                    label="Email Fallback"
+                    label="Reset Email"
                     value={customer.email || "No email configured"}
                   />
                 </div>
 
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                  Ask the customer to use the OTP reset flow if they do not know the current password or need a first-login password rotation. This keeps long-term access handoff out of shared plaintext channels.
+                  Ask the customer to use the email OTP reset flow if they do not know the current password or need a first-login password rotation. Accounts without email must be updated before reset can start.
                 </div>
 
                 <OtpDeliveryReadinessCard operatorContext="detail" className="mt-4" />
@@ -1227,12 +1222,18 @@ export default function AdminCustomerDetailPage() {
                   >
                     Open Login
                   </Link>
-                  <Link
-                    href={passwordResetHref}
-                    className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900 shadow-sm transition hover:bg-blue-100"
-                  >
-                    Start OTP Reset
-                  </Link>
+                  {passwordResetIdentifier ? (
+                    <Link
+                      href={passwordResetHref}
+                      className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900 shadow-sm transition hover:bg-blue-100"
+                    >
+                      Start OTP Reset
+                    </Link>
+                  ) : (
+                    <div className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 shadow-sm">
+                      Add email before password reset
+                    </div>
+                  )}
                   <Link
                     href={`/admin/customers/${customer.id}/edit`}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
