@@ -28,6 +28,10 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.dashboard_canonical_financial_summary_service import (
+    get_dashboard_summary,
+)
+from subscriptions.services.dashboard_scopes import PartnerScope
 from subscriptions.services.winner_state_service import winner_history_q
 
 
@@ -145,157 +149,80 @@ class PartnerDashboardView(APIView):
 
     def get(self, request):
         partner = _get_partner_user(request)
-
-        subscriptions = _partner_subscription_queryset(partner)
-
-        # Financial truth
-        active_payments = _partner_active_payment_queryset(partner)
-
-        # Full payment history kept available for future audit use if needed
-        all_payments = _partner_all_payment_queryset(partner)
-
-        commissions = Commission.objects.filter(partner=partner)
-        collection_requests = _partner_collection_request_queryset(partner)
-
-        total_revenue = (
-            active_payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
-        )
-
-        total_customers = (
-            Customer.objects.filter(subscriptions__partner=partner)
-            .distinct()
-            .count()
-        )
-
-        emi_summary = Emi.objects.filter(subscription__partner=partner).aggregate(
-            pending=Count("id", filter=Q(status=EmiStatus.PENDING)),
-            paid=Count("id", filter=Q(status=EmiStatus.PAID)),
-            waived=Count("id", filter=Q(status=EmiStatus.WAIVED)),
-        )
-
-        commission_total = (
-            commissions.exclude(status=CommissionStatus.REVERSED).aggregate(
-                total=Sum("commission_amount")
-            )["total"]
-            or MONEY_ZERO
-        )
-
-        pending_commission = (
-            commissions.filter(status=CommissionStatus.PENDING).aggregate(
-                total=Sum("commission_amount")
-            )["total"]
-            or MONEY_ZERO
-        )
-
-        settled_commission = (
-            commissions.filter(status=CommissionStatus.SETTLED).aggregate(
-                total=Sum("commission_amount")
-            )["total"]
-            or MONEY_ZERO
-        )
-
-        request_summary = collection_requests.aggregate(
-            submitted_count=Count(
-                "id",
-                filter=Q(status=PartnerCollectionRequestStatus.SUBMITTED),
-            ),
-            under_review_count=Count(
-                "id",
-                filter=Q(status=PartnerCollectionRequestStatus.UNDER_REVIEW),
-            ),
-            approved_count=Count(
-                "id",
-                filter=Q(status=PartnerCollectionRequestStatus.APPROVED),
-            ),
-            rejected_count=Count(
-                "id",
-                filter=Q(status=PartnerCollectionRequestStatus.REJECTED),
-            ),
-            cancelled_count=Count(
-                "id",
-                filter=Q(status=PartnerCollectionRequestStatus.CANCELLED),
-            ),
-        )
-
-        # Primary workflow list:
-        # keep live/approved progress here, not rejected/cancelled history
-        recent_collection_requests = PartnerCollectionRequestSerializer(
-            collection_requests.filter(
-                status__in=[
-                    PartnerCollectionRequestStatus.SUBMITTED,
-                    PartnerCollectionRequestStatus.UNDER_REVIEW,
-                    PartnerCollectionRequestStatus.APPROVED,
-                ]
-            )[:10],
-            many=True,
-        ).data
-
-        # Verified financial activity:
-        # only non-reversed real payment rows
-        recent_verified_payments = PaymentSerializer(
-            active_payments[:10],
-            many=True,
-        ).data
-
-        # Operational follow-up:
-        # rejected/cancelled stay visible, but outside finance totals
-        follow_up_queue = PartnerCollectionRequestSerializer(
-            collection_requests.filter(
-                status__in=[
-                    PartnerCollectionRequestStatus.REJECTED,
-                    PartnerCollectionRequestStatus.CANCELLED,
-                ]
-            )[:10],
-            many=True,
-        ).data
+        dashboard = get_dashboard_summary(PartnerScope(), partner)
+        metrics = dashboard.metrics
 
         return Response(
             {
-                "partner": {
-                    "id": partner.id,
-                    "username": getattr(partner, "username", "") or "",
-                    "email": getattr(partner, "email", "") or "",
-                    "phone": getattr(partner, "phone", "") or "",
-                    "role": getattr(partner, "role", "") or "",
-                },
+                **dashboard.identity,
                 "summary": {
-                    "total_customers": total_customers,
-                    "total_subscriptions": subscriptions.count(),
-                    "active_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.ACTIVE
-                    ).count(),
-                    "completed_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.COMPLETED
-                    ).count(),
-                    "won_subscriptions": subscriptions.filter(winner_history_q()).distinct().count(),
-                    "defaulted_subscriptions": subscriptions.filter(
-                        status=SubscriptionStatus.DEFAULTED
-                    ).count(),
-                    "pending_emis": emi_summary["pending"] or 0,
-                    "paid_emis": emi_summary["paid"] or 0,
-                    "waived_emis": emi_summary["waived"] or 0,
-                    "total_revenue_collected": _money(total_revenue),
-                    "total_commission": _money(commission_total),
-                    "pending_commission": _money(pending_commission),
-                    "settled_commission": _money(settled_commission),
-                    "submitted_collection_requests": request_summary["submitted_count"]
-                    or 0,
-                    "under_review_collection_requests": request_summary[
-                        "under_review_count"
-                    ]
-                    or 0,
-                    "approved_collection_requests": request_summary["approved_count"]
-                    or 0,
-                    "rejected_collection_requests": request_summary["rejected_count"]
-                    or 0,
-                    "cancelled_collection_requests": request_summary["cancelled_count"]
-                    or 0,
-                    "verified_payment_count": active_payments.count(),
-                    "all_payment_rows_count": all_payments.count(),
+                    "subscription_count": dashboard.summary["subscription_count"],
+                    "total_customers": metrics["total_customers"],
+                    "total_subscriptions": dashboard.summary["subscription_count"],
+                    "active_subscriptions": dashboard.summary["active_subscriptions"],
+                    "completed_subscriptions": dashboard.summary["completed_subscriptions"],
+                    "won_subscriptions": dashboard.summary["winner_subscriptions"],
+                    "winner_subscriptions": dashboard.summary["winner_subscriptions"],
+                    "defaulted_subscriptions": metrics["defaulted_subscriptions"],
+                    "pending_emis": dashboard.summary["pending_emis"],
+                    "upcoming_emis": dashboard.summary["upcoming_emis"],
+                    "overdue_emis": dashboard.summary["overdue_emis"],
+                    "paid_emis": dashboard.summary["paid_emis"],
+                    "waived_emis": dashboard.summary["waived_emis"],
+                    "total_revenue_collected": dashboard.summary["total_paid_amount"],
+                    "total_paid_amount": dashboard.summary["total_paid_amount"],
+                    "total_pending_amount": dashboard.summary["total_pending_amount"],
+                    "total_waived_amount": dashboard.summary["total_waived_amount"],
+                    "remaining_amount": dashboard.summary["remaining_amount"],
+                    "outstanding_amount": dashboard.summary["outstanding_amount"],
+                    "overdue_amount": dashboard.summary["overdue_amount"],
+                    "upcoming_amount": dashboard.summary["upcoming_amount"],
+                    "next_due_amount": dashboard.summary["next_due_amount"],
+                    "next_due_date": dashboard.summary["next_due_date"],
+                    "next_due_is_overdue": dashboard.summary["next_due_is_overdue"],
+                    "next_due_subscription_id": dashboard.summary["next_due_subscription_id"],
+                    "next_due_subscription_number": dashboard.summary[
+                        "next_due_subscription_number"
+                    ],
+                    "next_due_product_name": dashboard.summary["next_due_product_name"],
+                    "next_due_lucky_number": dashboard.summary["next_due_lucky_number"],
+                    "has_payment_adjustments": dashboard.summary["has_payment_adjustments"],
+                    "total_commission": metrics["total_commission"],
+                    "pending_commission": metrics["pending_commission"],
+                    "settled_commission": metrics["settled_commission"],
+                    "submitted_collection_requests": metrics[
+                        "submitted_collection_requests"
+                    ],
+                    "under_review_collection_requests": metrics[
+                        "under_review_collection_requests"
+                    ],
+                    "approved_collection_requests": metrics[
+                        "approved_collection_requests"
+                    ],
+                    "rejected_collection_requests": metrics[
+                        "rejected_collection_requests"
+                    ],
+                    "cancelled_collection_requests": metrics[
+                        "cancelled_collection_requests"
+                    ],
+                    "verified_payment_count": metrics["verified_payment_count"],
+                    "all_payment_rows_count": metrics["all_payment_rows_count"],
                 },
-                "recent_collection_requests": recent_collection_requests,
-                "recent_verified_payments": recent_verified_payments,
-                "follow_up_queue": follow_up_queue,
+                "winner_surface": dashboard.winner_surface,
+                "reconciliation": dashboard.reconciliation,
+                "due_subscriptions": dashboard.due_subscriptions[:10],
+                "recent_collection_requests": PartnerCollectionRequestSerializer(
+                    dashboard.collection_request_rows,
+                    many=True,
+                ).data,
+                "recent_verified_payments": PaymentSerializer(
+                    dashboard.payment_rows,
+                    many=True,
+                ).data,
+                "follow_up_queue": PartnerCollectionRequestSerializer(
+                    dashboard.follow_up_rows,
+                    many=True,
+                ).data,
             }
         )
 

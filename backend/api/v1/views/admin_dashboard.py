@@ -22,5 +22,5 @@ class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        dashboard_data = build_admin_dashboard()
+        dashboard_data = build_admin_dashboard(actor_user=request.user)
         return Response(dashboard_data)

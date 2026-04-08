@@ -29,12 +29,15 @@ from subscriptions.services.customer_support_service import (
     create_customer_support_request,
 )
 from subscriptions.services.customer_account_service import build_customer_profile_summary
+from subscriptions.services.dashboard_canonical_financial_summary_service import (
+    get_dashboard_summary,
+)
+from subscriptions.services.dashboard_scopes import CustomerScope
 from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     get_subscription_delivery_prefetch,
 )
 from subscriptions.services.subscription_financial_service import (
-    build_customer_dashboard_summary,
     get_subscription_detail_queryset,
 )
 
@@ -127,26 +130,18 @@ class CustomerDashboard(APIView):
     permission_classes = [IsCustomer]
 
     def get(self, request):
-        customer, error_response = _get_customer_or_404_response(request)
+        _, error_response = _get_customer_or_404_response(request)
         if error_response is not None:
             return error_response
 
-        subscriptions = list(
-            _customer_subscription_detail_queryset(customer).order_by("-created_at", "-id")
-        )
-        summary = build_customer_dashboard_summary(subscriptions)
+        dashboard = get_dashboard_summary(CustomerScope(), request.user)
 
         return Response(
             {
-                "customer": {
-                    "id": customer.id,
-                    "name": customer.name,
-                    "phone": customer.phone,
-                    "kyc_status": customer.kyc_status,
-                },
-                "summary": summary,
+                **dashboard.identity,
+                "summary": dashboard.summary,
                 "subscriptions": CustomerDashboardSubscriptionSerializer(
-                    subscriptions,
+                    dashboard.subscriptions,
                     many=True,
                     context={
                         "request": request,

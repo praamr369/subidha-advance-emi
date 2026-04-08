@@ -9,6 +9,10 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.admin_resources import EmiAdminSerializer as EmiSerializer
 from api.v1.serializers.payment import PaymentSerializer
+from subscriptions.services.dashboard_canonical_financial_summary_service import (
+    get_dashboard_summary,
+)
+from subscriptions.services.dashboard_scopes import CashierScope
 from subscriptions.models import Customer, Emi, EmiStatus, Payment
 
 
@@ -145,45 +149,23 @@ class CashierDashboardView(APIView):
     permission_classes = [IsCashierOrAdmin]
 
     def get(self, request):
-        today = timezone.localdate()
-
-        pending_emis = Emi.objects.filter(status=EmiStatus.PENDING)
-
-        total_pending_emis = pending_emis.count()
-        total_pending_amount = (
-            pending_emis.aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        today_payments = _cashier_visible_payments_queryset().filter(
-            created_at__date=today
-        )
-
-        today_total_collected = (
-            today_payments.aggregate(total=Sum("amount"))["total"] or 0
-        )
-
-        today_transaction_count = today_payments.count()
-
-        today_cash_total = (
-            today_payments.filter(method="CASH").aggregate(total=Sum("amount"))["total"]
-            or 0
-        )
-
-        today_digital_total = (
-            today_payments.exclude(method="CASH").aggregate(total=Sum("amount"))["total"]
-            or 0
-        )
+        dashboard = get_dashboard_summary(CashierScope(), request.user)
+        metrics = dashboard.metrics
 
         return Response(
             {
-                "total_pending_emis": total_pending_emis,
-                "total_pending_amount": total_pending_amount,
-                "today_total_collected": today_total_collected,
-                "today_transaction_count": today_transaction_count,
-                "today_cash_total": today_cash_total,
-                "today_digital_total": today_digital_total,
+                "summary": dashboard.summary,
+                "winner_surface": dashboard.winner_surface,
+                "reconciliation": dashboard.reconciliation,
+                "due_subscriptions": dashboard.due_subscriptions[:10],
+                "total_pending_emis": dashboard.summary["pending_emis"],
+                "total_pending_amount": dashboard.summary["total_pending_amount"],
+                "today_total_collected": metrics["today_total_collected"],
+                "today_transaction_count": metrics["today_transaction_count"],
+                "today_cash_total": metrics["today_cash_total"],
+                "today_digital_total": metrics["today_digital_total"],
                 "today_transactions": PaymentSerializer(
-                    today_payments,
+                    dashboard.payment_rows,
                     many=True,
                     context={"request": request},
                 ).data,

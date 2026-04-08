@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.db.models import Count, Sum
 from django.core.cache import cache
@@ -6,6 +7,8 @@ from django.utils import timezone
 
 from subscriptions.models import (
     BatchStatus,
+    Commission,
+    CommissionStatus,
     Emi,
     Payment,
     Subscription,
@@ -14,6 +17,10 @@ from subscriptions.models import (
     Batch,
     LuckyDraw,
 )
+from subscriptions.services.dashboard_canonical_financial_summary_service import (
+    get_dashboard_summary,
+)
+from subscriptions.services.dashboard_scopes import AdminScope
 
 from subscriptions.services.risk_service import evaluate_all_active_subscriptions
 from subscriptions.services.financial_health_service import system_financial_health
@@ -22,6 +29,10 @@ from subscriptions.services.winner_state_service import winner_history_q
 
 CACHE_KEY = "admin_dashboard_v1"
 CACHE_TIMEOUT = 60  # seconds
+
+
+def _money(value) -> str:
+    return f"{Decimal(str(value or 0)).quantize(Decimal('0.01')):.2f}"
 
 
 def _next_draw_date_for_batch(today: date, draw_day: int) -> date:
@@ -34,7 +45,7 @@ def _next_draw_date_for_batch(today: date, draw_day: int) -> date:
     return date(today.year, today.month + 1, draw_day)
 
 
-def build_admin_dashboard():
+def build_admin_dashboard(*, actor_user=None):
 
     # ------------------------------
     # 1️⃣ Try cache first
@@ -44,6 +55,9 @@ def build_admin_dashboard():
         return cached
 
     today = timezone.localdate()
+    canonical_dashboard = get_dashboard_summary(AdminScope(), actor_user)
+    canonical_summary = canonical_dashboard.summary
+    canonical_metrics = canonical_dashboard.metrics
 
     # ------------------------------
     # 2️⃣ Risk Engine
@@ -62,13 +76,8 @@ def build_admin_dashboard():
     # ------------------------------
     # 3️⃣ Financial Metrics
     # ------------------------------
-    total_revenue = Payment.objects.aggregate(
-        total=Sum("amount")
-    )["total"] or 0
-
-    today_collection = Payment.objects.filter(
-        payment_date=today
-    ).aggregate(total=Sum("amount"))["total"] or 0
+    total_revenue = canonical_summary["total_paid_amount"]
+    today_collection = canonical_metrics["collections"]["today_net_amount"]
 
     today_payment_queryset = Payment.objects.select_related(
         "customer",
@@ -94,32 +103,20 @@ def build_admin_dashboard():
         today_active_queryset.aggregate(total=Sum("amount"))["total"] or 0
     )
 
-    total_outstanding = Emi.objects.filter(
-        status=EmiStatus.PENDING
-    ).aggregate(total=Sum("amount"))["total"] or 0
+    total_outstanding = canonical_summary["outstanding_amount"]
 
     # ------------------------------
     # 4️⃣ EMI Stats
     # ------------------------------
-    pending_emis = Emi.objects.filter(
-        status=EmiStatus.PENDING
-    ).count()
-
-    overdue_emis = Emi.objects.filter(
-        status=EmiStatus.PENDING,
-        due_date__lt=today
-    ).count()
+    pending_emis = canonical_summary["pending_emis"]
+    overdue_emis = canonical_summary["overdue_emis"]
 
     # ------------------------------
     # 5️⃣ Subscription Stats
     # ------------------------------
-    active_subscriptions = total_active
-
-    completed_subscriptions = Subscription.objects.filter(
-        status=SubscriptionStatus.COMPLETED
-    ).count()
-
-    won_subscriptions = Subscription.objects.filter(winner_history_q()).distinct().count()
+    active_subscriptions = canonical_summary["active_subscriptions"]
+    completed_subscriptions = canonical_summary["completed_subscriptions"]
+    won_subscriptions = canonical_summary["winner_subscriptions"]
 
     # ------------------------------
     # 6️⃣ Batch & Draw Stats
@@ -227,6 +224,50 @@ def build_admin_dashboard():
             "today_collection": today_collection,
             "total_outstanding": total_outstanding,
         },
+        "summary": canonical_summary,
+        "winner_surface": canonical_dashboard.winner_surface,
+        "reconciliation": canonical_dashboard.reconciliation,
+        "due_subscriptions": canonical_dashboard.due_subscriptions[:10],
+        "subscription_kpis": {
+            "total_customers": canonical_metrics["total_customers"],
+            "total_subscriptions": canonical_summary["subscription_count"],
+            "defaulted_subscriptions": canonical_metrics["defaulted_subscriptions"],
+            "total_contract_value": canonical_metrics["total_contract_value"],
+            "total_monthly_value": canonical_metrics["total_monthly_value"],
+            "total_waived_value": canonical_metrics["total_waived_value"],
+        },
+        "commission_summary": {
+            "total_commission": _money(
+                Commission.objects.exclude(status=CommissionStatus.REVERSED).aggregate(
+                    total=Sum("commission_amount")
+                )["total"]
+            ),
+            "pending_commission": _money(
+                Commission.objects.filter(status=CommissionStatus.PENDING).aggregate(
+                    total=Sum("commission_amount")
+                )["total"]
+            ),
+            "settled_commission": _money(
+                Commission.objects.filter(status=CommissionStatus.SETTLED).aggregate(
+                    total=Sum("commission_amount")
+                )["total"]
+            ),
+            "reversed_commission": _money(
+                Commission.objects.filter(status=CommissionStatus.REVERSED).aggregate(
+                    total=Sum("commission_amount")
+                )["total"]
+            ),
+            "total_count": Commission.objects.count(),
+            "pending_count": Commission.objects.filter(
+                status=CommissionStatus.PENDING
+            ).count(),
+            "settled_count": Commission.objects.filter(
+                status=CommissionStatus.SETTLED
+            ).count(),
+            "reversed_count": Commission.objects.filter(
+                status=CommissionStatus.REVERSED
+            ).count(),
+        },
 
         # 📊 EMI Layer
         "emi": {
@@ -263,13 +304,7 @@ def build_admin_dashboard():
         "recent_activity": recent_activity,
 
         "operations": {
-            "due_today_emis": Emi.objects.filter(
-                status=EmiStatus.PENDING,
-                due_date=today,
-            ).count(),
-            "overdue_emis": overdue_emis,
-            "open_batches": open_batch_count,
-            "next_draw_batch": next_draw_batch,
+            **canonical_metrics["operations"],
         },
 
         # 🧠 Risk Layer
