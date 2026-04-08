@@ -134,13 +134,18 @@ export default function AdminAccountingPage() {
           variant: "primary",
         },
         {
-          href: ROUTES.admin.accountingExpenses,
-          label: "Expenses",
+          href: ROUTES.admin.accountingTrialBalance,
+          label: "Reports",
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.accountingBooks,
-          label: "Books",
+          href: ROUTES.admin.accountingTaxInvoices,
+          label: "GST Docs",
+          variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.accountingItrPack,
+          label: "ITR Pack",
           variant: "secondary",
         },
       ]}
@@ -279,6 +284,30 @@ export default function AdminAccountingPage() {
                   className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Books and money movements
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingTrialBalance}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Trial balance, profit & loss, and balance sheet reports
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingTaxInvoices}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  GST tax invoices, credit notes, and debit notes
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingItrPack}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  ITR export pack generation
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingBridges}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Controlled accounting bridge runs
                 </Link>
               </WorkspaceSection>
             </div>
