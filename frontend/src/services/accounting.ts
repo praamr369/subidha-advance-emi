@@ -322,7 +322,7 @@ export type GstNote = {
 
 export type ExportPackJob = {
   id: number;
-  pack_type: "ITR_HANDOFF";
+  pack_type: "ITR_HANDOFF" | "GST_HANDOFF";
   financial_year: string;
   start_date?: string | null;
   end_date?: string | null;
@@ -333,6 +333,171 @@ export type ExportPackJob = {
   error_message?: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type AccountingPeriod = {
+  id: number;
+  code: string;
+  label: string;
+  start_date: string;
+  end_date: string;
+  is_locked: boolean;
+  locked_at?: string | null;
+  locked_by?: number | null;
+  locked_by_username?: string | null;
+  lock_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PostingLock = {
+  id: number;
+  lock_date: string;
+  reason?: string;
+  locked_by?: number | null;
+  locked_by_username?: string | null;
+  locked_at?: string | null;
+};
+
+export type AssetCategory = {
+  id: number;
+  code: string;
+  name: string;
+  method: "SLM" | "WDM";
+  useful_life_months: number;
+  rate_annual?: string | null;
+  default_salvage: string;
+  is_active: boolean;
+};
+
+export type Asset = {
+  id: number;
+  asset_code: string;
+  category: number;
+  category_code?: string;
+  category_name?: string;
+  description: string;
+  acquisition_date: string;
+  in_service_date: string;
+  cost_amount: string;
+  salvage_value: string;
+  accumulated_depreciation: string;
+  status: "ACTIVE" | "DISPOSED";
+  vendor?: number | null;
+  vendor_name?: string | null;
+  purchase_bill?: number | null;
+  purchase_bill_no?: string | null;
+};
+
+export type DepreciationLine = {
+  id: number;
+  asset: number;
+  asset_code?: string;
+  asset_description?: string;
+  depreciation_amount: string;
+  journal_entry?: number | null;
+  journal_entry_no?: string | null;
+};
+
+export type DepreciationRun = {
+  id: number;
+  run_code: string;
+  period_start: string;
+  period_end: string;
+  status: "DRAFT" | "RUNNING" | "POSTED" | "CANCELLED";
+  created_by?: number | null;
+  created_by_username?: string | null;
+  executed_at?: string | null;
+  posted_at?: string | null;
+  lines: DepreciationLine[];
+};
+
+export type AccountingPurchaseBill = {
+  id: number;
+  bill_no: string;
+  bill_date: string;
+  vendor: number;
+  vendor_name?: string;
+  tax_mode: string;
+  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
+  subtotal: string;
+  tax_total: string;
+  grand_total: string;
+  finance_account?: number | null;
+  finance_account_name?: string | null;
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+  notes?: string;
+};
+
+export type VendorSettlement = {
+  id: number;
+  settlement_no: string;
+  vendor: number;
+  vendor_name?: string;
+  settlement_date: string;
+  amount: string;
+  finance_account: number;
+  finance_account_name?: string;
+  reference_no?: string | null;
+  purchase_bill?: number | null;
+  purchase_bill_no?: string | null;
+  status: "DRAFT" | "POSTED" | "CANCELLED";
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+};
+
+export type FinanceBookRow = {
+  finance_account_id: number;
+  finance_account_name: string;
+  kind: string;
+  journal_entry_id: number;
+  entry_no: string;
+  entry_date: string;
+  memo?: string | null;
+  source_model?: string | null;
+  source_id?: string | null;
+  description?: string | null;
+  debit_amount: string;
+  credit_amount: string;
+};
+
+export type FinanceBookReport = {
+  start_date: string | null;
+  end_date: string | null;
+  finance_account_kinds: string[];
+  rows: FinanceBookRow[];
+};
+
+export type SalesBookRow = {
+  invoice_id: number;
+  document_no?: string | null;
+  invoice_date: string;
+  customer_name?: string | null;
+  billing_channel: string;
+  tax_mode: string;
+  grand_total: string;
+  tax_total: string;
+  journal_entry_id: number;
+  journal_entry_no: string;
+};
+
+export type PurchaseBookRow = {
+  purchase_bill_id: number;
+  bill_no: string;
+  bill_date: string;
+  vendor_name: string;
+  tax_mode: string;
+  grand_total: string;
+  tax_total: string;
+  journal_entry_id: number;
+  journal_entry_no: string;
+};
+
+export type SimpleBookReport<T> = {
+  start_date: string | null;
+  end_date: string | null;
+  rows: T[];
 };
 
 export type BridgeRunResponse = {
@@ -347,6 +512,23 @@ export type BridgeRunResponse = {
     existing_count: number;
     dry_run: boolean;
   }>;
+};
+
+export type Phase3BridgeRunResponse = {
+  start_date: string;
+  end_date: string;
+  dry_run: boolean;
+  purpose: string;
+  candidates?: number;
+  created_count?: number;
+  existing_count?: number;
+  purchase_candidates?: number;
+  purchase_created?: number;
+  purchase_existing?: number;
+  adjustment_candidates?: number;
+  adjustment_created?: number;
+  adjustment_existing?: number;
+  skipped?: Array<Record<string, unknown>>;
 };
 
 function buildQuery(
@@ -603,6 +785,16 @@ export function postTaxInvoice(id: number) {
   );
 }
 
+export function cancelTaxInvoice(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ tax_invoice: TaxInvoice }>>(
+    `/accounting/tax-invoices/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
 export function listCreditNotes(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<GstNote>>(
     `/accounting/credit-notes/${buildQuery(params)}`
@@ -632,6 +824,16 @@ export function postCreditNote(id: number) {
     {
       method: "POST",
       body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelCreditNote(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ credit_note: GstNote }>>(
+    `/accounting/credit-notes/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
     }
   );
 }
@@ -669,8 +871,22 @@ export function postDebitNote(id: number) {
   );
 }
 
+export function cancelDebitNote(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ debit_note: GstNote }>>(
+    `/accounting/debit-notes/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
 export function listItrExportPacks() {
   return apiFetch<ExportPackJob[]>("/accounting/exports/itr-pack/");
+}
+
+export function listGstExportPacks() {
+  return apiFetch<ExportPackJob[]>("/accounting/exports/gst-pack/");
 }
 
 export function createItrExportPack(payload: {
@@ -679,6 +895,17 @@ export function createItrExportPack(payload: {
   end_date?: string;
 }) {
   return apiFetch<ExportPackJob>("/accounting/exports/itr-pack/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createGstExportPack(payload: {
+  financial_year?: string;
+  start_date?: string;
+  end_date?: string;
+}) {
+  return apiFetch<ExportPackJob>("/accounting/exports/gst-pack/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -717,6 +944,280 @@ export function runAccountingBridge(payload: {
   dry_run?: boolean;
 }) {
   return apiFetch<BridgeRunResponse>("/accounting/bridges/run/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listAccountingPeriods(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<AccountingPeriod>>(
+    `/accounting/periods/${buildQuery(params)}`
+  );
+}
+
+export function createAccountingPeriod(payload: Partial<AccountingPeriod>) {
+  return apiFetch<AccountingPeriod>("/accounting/periods/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function lockAccountingPeriod(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
+    `/accounting/periods/${id}/lock/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function unlockAccountingPeriod(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
+    `/accounting/periods/${id}/unlock/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function closeAccountingPeriod(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
+    `/accounting/periods/${id}/close/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function reopenAccountingPeriod(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
+    `/accounting/periods/${id}/reopen/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function listPostingLocks(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<PostingLock>>(
+    `/accounting/locks/${buildQuery(params)}`
+  );
+}
+
+export function createPostingLock(payload: { lock_date: string; reason?: string }) {
+  return apiFetch<PostingLock>("/accounting/locks/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function removePostingLock(id: number) {
+  return apiFetch<PostingLock>(`/accounting/locks/${id}/`, {
+    method: "DELETE",
+  });
+}
+
+export function listAssetCategories(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<AssetCategory>>(
+    `/accounting/assets/categories/${buildQuery(params)}`
+  );
+}
+
+export function createAssetCategory(payload: Partial<AssetCategory>) {
+  return apiFetch<AssetCategory>("/accounting/assets/categories/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listAssets(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<Asset>>(
+    `/accounting/assets/${buildQuery(params)}`
+  );
+}
+
+export function createAsset(payload: Partial<Asset>) {
+  return apiFetch<Asset>("/accounting/assets/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listDepreciationRuns(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<DepreciationRun>>(
+    `/accounting/depreciation/runs/${buildQuery(params)}`
+  );
+}
+
+export function createDepreciationRun(payload: Partial<DepreciationRun>) {
+  return apiFetch<DepreciationRun>("/accounting/depreciation/runs/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runDepreciation(id: number) {
+  return apiFetch<AccountingActionResponse<{ depreciation_run: DepreciationRun }>>(
+    `/accounting/depreciation/runs/${id}/run/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function postDepreciation(id: number) {
+  return apiFetch<AccountingActionResponse<{ depreciation_run: DepreciationRun }>>(
+    `/accounting/depreciation/runs/${id}/post/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelDepreciation(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ depreciation_run: DepreciationRun }>>(
+    `/accounting/depreciation/runs/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function listPurchaseBills(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<AccountingPurchaseBill>>(
+    `/accounting/purchase-bills/${buildQuery(params)}`
+  );
+}
+
+export function approvePurchaseBill(id: number) {
+  return apiFetch<AccountingActionResponse<{ purchase_bill: AccountingPurchaseBill }>>(
+    `/accounting/purchase-bills/${id}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function postPurchaseBill(id: number) {
+  return apiFetch<AccountingActionResponse<{ purchase_bill: AccountingPurchaseBill }>>(
+    `/accounting/purchase-bills/${id}/post/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelPurchaseBill(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ purchase_bill: AccountingPurchaseBill }>>(
+    `/accounting/purchase-bills/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function listVendorSettlements(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<VendorSettlement>>(
+    `/accounting/vendor-settlements/${buildQuery(params)}`
+  );
+}
+
+export function createVendorSettlement(payload: Partial<VendorSettlement>) {
+  return apiFetch<VendorSettlement>("/accounting/vendor-settlements/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function postVendorSettlement(id: number) {
+  return apiFetch<AccountingActionResponse<{ vendor_settlement: VendorSettlement }>>(
+    `/accounting/vendor-settlements/${id}/post/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelVendorSettlement(id: number, reason = "") {
+  return apiFetch<AccountingActionResponse<{ vendor_settlement: VendorSettlement }>>(
+    `/accounting/vendor-settlements/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function getCashBook(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<FinanceBookReport>(`/accounting/books/cash/${buildQuery(params)}`);
+}
+
+export function getBankBook(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<FinanceBookReport>(`/accounting/books/bank/${buildQuery(params)}`);
+}
+
+export function getUpiBook(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<FinanceBookReport>(`/accounting/books/upi/${buildQuery(params)}`);
+}
+
+export function getSalesBook(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<SimpleBookReport<SalesBookRow>>(`/accounting/books/sales/${buildQuery(params)}`);
+}
+
+export function getPurchaseBook(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<SimpleBookReport<PurchaseBookRow>>(`/accounting/books/purchase/${buildQuery(params)}`);
+}
+
+export function runRetailSaleBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-retail-sale/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runInventoryPostingBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-inventory-posting/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runEmiSubscriptionBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-emi-subscription/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runEmiPaymentBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-emi-payment/", {
     method: "POST",
     body: JSON.stringify(payload),
   });

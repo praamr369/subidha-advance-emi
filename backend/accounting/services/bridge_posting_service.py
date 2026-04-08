@@ -32,6 +32,17 @@ def post_bridge_entry(
         purpose=purpose,
     ).select_related("journal_entry").first()
     if existing is not None:
+        _log_accounting_event(
+            event="ACCOUNTING_BRIDGE_SKIPPED_DUPLICATE",
+            instance=existing,
+            performed_by=posted_by,
+            metadata={
+                "source_model": source_model,
+                "source_id": source_id,
+                "purpose": purpose,
+                "journal_entry_id": existing.journal_entry_id,
+            },
+        )
         return existing.journal_entry, False
 
     journal_entry = create_journal_entry(
@@ -59,6 +70,17 @@ def post_bridge_entry(
             source_model=source_model,
             source_id=source_id,
             purpose=purpose,
+        )
+        _log_accounting_event(
+            event="ACCOUNTING_BRIDGE_SKIPPED_DUPLICATE",
+            instance=bridge,
+            performed_by=posted_by,
+            metadata={
+                "source_model": source_model,
+                "source_id": source_id,
+                "purpose": purpose,
+                "journal_entry_id": bridge.journal_entry_id,
+            },
         )
         return bridge.journal_entry, False
 

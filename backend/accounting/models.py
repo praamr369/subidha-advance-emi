@@ -39,6 +39,62 @@ def generate_employee_code() -> str:
     return _generate_reference("EMP")
 
 
+def generate_asset_code() -> str:
+    return _generate_reference("AST")
+
+
+def generate_depreciation_run_code() -> str:
+    return _generate_reference("DEPR")
+
+
+def generate_vendor_settlement_no() -> str:
+    return _generate_reference("VSET")
+
+
+def _transition_allowed(previous_status: str | None, next_status: str | None, allowed: set[tuple[str, str]]) -> bool:
+    return (previous_status or "", next_status or "") in allowed
+
+
+def _immutable_status_guard(
+    instance,
+    *,
+    immutable_statuses: set[str],
+    allowed_transitions: set[tuple[str, str]] | None = None,
+    status_field: str = "status",
+    label: str = "record",
+):
+    if not instance.pk:
+        return
+
+    existing = instance.__class__.objects.filter(pk=instance.pk).only(status_field).first()
+    if existing is None:
+        return
+
+    previous_status = getattr(existing, status_field, None)
+    next_status = getattr(instance, status_field, None)
+    if previous_status not in immutable_statuses:
+        return
+
+    allowed = allowed_transitions or set()
+    if _transition_allowed(previous_status, next_status, allowed):
+        return
+
+    raise ValidationError(
+        {status_field: f"{label.capitalize()} is immutable once it reaches {previous_status}."}
+    )
+
+
+def _posted_reference_guard(instance, *, label: str):
+    if not instance.pk:
+        return
+
+    existing = instance.__class__.objects.filter(pk=instance.pk).only("posted_journal_entry_id").first()
+    if existing is None or not getattr(existing, "posted_journal_entry_id", None):
+        return
+
+    raise ValidationError({"posted_journal_entry": f"{label.capitalize()} is immutable once posted."})
+
+
 class AccountingTimeStampedModel(models.Model):
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -96,6 +152,29 @@ class MoneyMovementStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class AssetDepreciationMethod(models.TextChoices):
+    SLM = "SLM", "Straight Line"
+    WDM = "WDM", "Written Down"
+
+
+class AssetStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    DISPOSED = "DISPOSED", "Disposed"
+
+
+class DepreciationRunStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    RUNNING = "RUNNING", "Running"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorSettlementStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
 class TaxDocumentStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
     APPROVED = "APPROVED", "Approved"
@@ -110,6 +189,7 @@ class SupplyKind(models.TextChoices):
 
 class ExportPackType(models.TextChoices):
     ITR_HANDOFF = "ITR_HANDOFF", "ITR Handoff"
+    GST_HANDOFF = "GST_HANDOFF", "GST Handoff"
 
 
 class ExportPackStatus(models.TextChoices):
@@ -117,6 +197,86 @@ class ExportPackStatus(models.TextChoices):
     RUNNING = "RUNNING", "Running"
     DONE = "DONE", "Done"
     FAILED = "FAILED", "Failed"
+
+
+class AccountingPeriod(AccountingTimeStampedModel):
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    label = models.CharField(max_length=80)
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    is_locked = models.BooleanField(default=False, db_index=True)
+    locked_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="locked_accounting_periods",
+    )
+    lock_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_periods"
+        ordering = ["start_date", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["start_date", "end_date"],
+                name="accounting_period_unique_date_range",
+            ),
+            models.CheckConstraint(
+                condition=Q(end_date__gte=models.F("start_date")),
+                name="accounting_period_end_after_start",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["is_locked", "start_date", "end_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not (self.code or "").strip():
+            errors["code"] = "Accounting period code is required."
+        if not (self.label or "").strip():
+            errors["label"] = "Accounting period label is required."
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            errors["end_date"] = "End date cannot be earlier than start date."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.label = (self.label or "").strip()
+        self.lock_reason = (self.lock_reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} ({self.start_date} - {self.end_date})"
+
+
+class PostingLock(AccountingTimeStampedModel):
+    lock_date = models.DateField(unique=True, db_index=True)
+    reason = models.TextField(blank=True, default="")
+    locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="accounting_posting_locks",
+    )
+    locked_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        db_table = "accounting_posting_locks"
+        ordering = ["-lock_date", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.reason = (self.reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Posting lock {self.lock_date}"
 
 
 class DocumentSequence(AccountingTimeStampedModel):
@@ -299,6 +459,7 @@ class JournalEntry(AccountingTimeStampedModel):
         indexes = [
             models.Index(fields=["entry_type", "status"]),
             models.Index(fields=["source_model", "source_id"]),
+            models.Index(fields=["status", "entry_date"]),
         ]
 
     def clean(self):
@@ -311,6 +472,12 @@ class JournalEntry(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={JournalEntryStatus.POSTED, JournalEntryStatus.VOID},
+            allowed_transitions={(JournalEntryStatus.POSTED, JournalEntryStatus.VOID)},
+            label="journal entry",
+        )
         self.entry_no = (self.entry_no or generate_entry_no()).strip().upper()
         self.memo = (self.memo or "").strip()
         self.source_model = (self.source_model or "").strip() or None
@@ -351,6 +518,9 @@ class JournalEntryLine(AccountingTimeStampedModel):
     class Meta:
         db_table = "accounting_journal_entry_lines"
         ordering = ["id"]
+        indexes = [
+            models.Index(fields=["chart_account", "id"]),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=Q(debit_amount__gte=MONEY_ZERO),
@@ -416,6 +586,233 @@ class Vendor(AccountingTimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class AssetCategory(AccountingTimeStampedModel):
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    method = models.CharField(
+        max_length=10,
+        choices=AssetDepreciationMethod.choices,
+        default=AssetDepreciationMethod.SLM,
+        db_index=True,
+    )
+    useful_life_months = models.PositiveIntegerField(default=12)
+    rate_annual = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    default_salvage = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_asset_categories"
+        ordering = ["code", "id"]
+
+    def clean(self):
+        errors = {}
+        if self.useful_life_months <= 0:
+            errors["useful_life_months"] = "Useful life must be greater than zero."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+class Asset(AccountingTimeStampedModel):
+    asset_code = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        default=generate_asset_code,
+    )
+    category = models.ForeignKey(
+        AssetCategory,
+        on_delete=models.PROTECT,
+        related_name="assets",
+    )
+    description = models.CharField(max_length=255)
+    acquisition_date = models.DateField(db_index=True)
+    in_service_date = models.DateField(db_index=True)
+    cost_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    salvage_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    accumulated_depreciation = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=AssetStatus.choices,
+        default=AssetStatus.ACTIVE,
+        db_index=True,
+    )
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assets",
+    )
+    purchase_bill = models.ForeignKey(
+        "inventory.PurchaseBill",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assets",
+    )
+
+    class Meta:
+        db_table = "accounting_assets"
+        ordering = ["asset_code", "id"]
+        indexes = [
+            models.Index(fields=["status", "in_service_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.in_service_date and self.acquisition_date and self.in_service_date < self.acquisition_date:
+            errors["in_service_date"] = "In-service date cannot be earlier than acquisition date."
+        if (self.salvage_value or MONEY_ZERO) > (self.cost_amount or MONEY_ZERO):
+            errors["salvage_value"] = "Salvage value cannot exceed cost amount."
+        if (self.accumulated_depreciation or MONEY_ZERO) > (self.cost_amount or MONEY_ZERO):
+            errors["accumulated_depreciation"] = "Accumulated depreciation cannot exceed cost amount."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.asset_code = (self.asset_code or generate_asset_code()).strip().upper()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.asset_code
+
+
+class DepreciationRun(AccountingTimeStampedModel):
+    run_code = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        default=generate_depreciation_run_code,
+    )
+    period_start = models.DateField(db_index=True)
+    period_end = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=12,
+        choices=DepreciationRunStatus.choices,
+        default=DepreciationRunStatus.DRAFT,
+        db_index=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_depreciation_runs",
+    )
+    executed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_depreciation_runs"
+        ordering = ["-period_end", "-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(period_end__gte=models.F("period_start")),
+                name="accounting_depr_run_end_after_start",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.period_end and self.period_start and self.period_end < self.period_start:
+            errors["period_end"] = "Period end cannot be earlier than period start."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={DepreciationRunStatus.POSTED, DepreciationRunStatus.CANCELLED},
+            label="depreciation run",
+        )
+        self.run_code = (self.run_code or generate_depreciation_run_code()).strip().upper()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.run_code
+
+
+class DepreciationLine(AccountingTimeStampedModel):
+    run = models.ForeignKey(
+        DepreciationRun,
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    asset = models.ForeignKey(
+        Asset,
+        on_delete=models.PROTECT,
+        related_name="depreciation_lines",
+    )
+    depreciation_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="depreciation_line",
+    )
+
+    class Meta:
+        db_table = "accounting_depreciation_lines"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "asset"],
+                name="accounting_depreciation_line_unique_run_asset",
+            ),
+        ]
+
+    def clean(self):
+        if (self.depreciation_amount or MONEY_ZERO) <= MONEY_ZERO:
+            raise ValidationError({"depreciation_amount": "Depreciation amount must be greater than zero."})
+
+    def save(self, *args, **kwargs):
+        _posted_reference_guard(self, label="depreciation line")
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class ExpenseVoucher(AccountingTimeStampedModel):
@@ -507,6 +904,15 @@ class ExpenseVoucher(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={ExpenseVoucherStatus.APPROVED, ExpenseVoucherStatus.POSTED, ExpenseVoucherStatus.CANCELLED},
+            allowed_transitions={
+                (ExpenseVoucherStatus.APPROVED, ExpenseVoucherStatus.POSTED),
+                (ExpenseVoucherStatus.APPROVED, ExpenseVoucherStatus.CANCELLED),
+            },
+            label="expense voucher",
+        )
         self.voucher_no = (self.voucher_no or generate_voucher_no()).strip().upper()
         self.bill_no = (self.bill_no or "").strip()
         self.notes = (self.notes or "").strip()
@@ -620,6 +1026,22 @@ class SalarySheet(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={
+                SalarySheetStatus.APPROVED,
+                SalarySheetStatus.POSTED,
+                SalarySheetStatus.PAID_PARTIAL,
+                SalarySheetStatus.PAID,
+            },
+            allowed_transitions={
+                (SalarySheetStatus.APPROVED, SalarySheetStatus.POSTED),
+                (SalarySheetStatus.POSTED, SalarySheetStatus.PAID_PARTIAL),
+                (SalarySheetStatus.POSTED, SalarySheetStatus.PAID),
+                (SalarySheetStatus.PAID_PARTIAL, SalarySheetStatus.PAID),
+            },
+            label="salary sheet",
+        )
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -667,6 +1089,7 @@ class SalaryPayment(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _posted_reference_guard(self, label="salary payment")
         self.reference_no = (self.reference_no or "").strip() or None
         self.full_clean()
         super().save(*args, **kwargs)
@@ -731,6 +1154,11 @@ class MoneyMovement(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={MoneyMovementStatus.POSTED, MoneyMovementStatus.CANCELLED},
+            label="money movement",
+        )
         self.movement_no = (
             self.movement_no or generate_movement_no()
         ).strip().upper()
@@ -741,6 +1169,85 @@ class MoneyMovement(AccountingTimeStampedModel):
 
     def __str__(self):
         return self.movement_no
+
+
+class VendorSettlement(AccountingTimeStampedModel):
+    settlement_no = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        default=generate_vendor_settlement_no,
+    )
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        related_name="vendor_settlements",
+    )
+    settlement_date = models.DateField(db_index=True)
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        related_name="vendor_settlements",
+    )
+    reference_no = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    purchase_bill = models.ForeignKey(
+        "inventory.PurchaseBill",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="vendor_settlements",
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=VendorSettlementStatus.choices,
+        default=VendorSettlementStatus.DRAFT,
+        db_index=True,
+    )
+    posted_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="vendor_settlement",
+    )
+
+    class Meta:
+        db_table = "accounting_vendor_settlements"
+        ordering = ["-settlement_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["vendor", "settlement_date"]),
+            models.Index(fields=["status", "settlement_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if (self.amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["amount"] = "Settlement amount must be greater than zero."
+        if self.status == VendorSettlementStatus.POSTED and not self.posted_journal_entry_id:
+            errors["posted_journal_entry"] = "Posted vendor settlements must reference a journal entry."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={VendorSettlementStatus.POSTED, VendorSettlementStatus.CANCELLED},
+            label="vendor settlement",
+        )
+        self.settlement_no = (
+            self.settlement_no or generate_vendor_settlement_no()
+        ).strip().upper()
+        self.reference_no = (self.reference_no or "").strip() or None
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.settlement_no
 
 
 class AccountingBridgePosting(AccountingTimeStampedModel):
@@ -837,6 +1344,15 @@ class TaxInvoice(AccountingTimeStampedModel):
         db_index=True,
     )
     notes = models.TextField(blank=True, default="")
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_tax_invoices",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancel_reason = models.TextField(blank=True, default="")
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -851,6 +1367,13 @@ class TaxInvoice(AccountingTimeStampedModel):
         null=True,
         blank=True,
         related_name="posted_tax_invoice",
+    )
+    reversal_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_tax_invoice",
     )
 
     class Meta:
@@ -875,6 +1398,16 @@ class TaxInvoice(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED},
+            allowed_transitions={
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED),
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.CANCELLED),
+                (TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED),
+            },
+            label="tax invoice",
+        )
         self.invoice_no = (self.invoice_no or "").strip().upper() or None
         self.supplier_name = (self.supplier_name or "").strip()
         self.supplier_gstin = (self.supplier_gstin or "").strip().upper()
@@ -887,6 +1420,7 @@ class TaxInvoice(AccountingTimeStampedModel):
             (self.place_of_supply_state_code or "").strip().upper()
         )
         self.notes = (self.notes or "").strip()
+        self.cancel_reason = (self.cancel_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -1010,6 +1544,15 @@ class CreditNote(AccountingTimeStampedModel):
         default=TaxDocumentStatus.DRAFT,
         db_index=True,
     )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_credit_notes",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancel_reason = models.TextField(blank=True, default="")
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1024,6 +1567,13 @@ class CreditNote(AccountingTimeStampedModel):
         null=True,
         blank=True,
         related_name="posted_credit_note",
+    )
+    reversal_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_credit_note",
     )
 
     class Meta:
@@ -1043,8 +1593,19 @@ class CreditNote(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED},
+            allowed_transitions={
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED),
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.CANCELLED),
+                (TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED),
+            },
+            label="credit note",
+        )
         self.note_no = (self.note_no or "").strip().upper() or None
         self.reason = (self.reason or "").strip()
+        self.cancel_reason = (self.cancel_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -1091,6 +1652,15 @@ class DebitNote(AccountingTimeStampedModel):
         default=TaxDocumentStatus.DRAFT,
         db_index=True,
     )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_debit_notes",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancel_reason = models.TextField(blank=True, default="")
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1105,6 +1675,13 @@ class DebitNote(AccountingTimeStampedModel):
         null=True,
         blank=True,
         related_name="posted_debit_note",
+    )
+    reversal_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_debit_note",
     )
 
     class Meta:
@@ -1124,8 +1701,19 @@ class DebitNote(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED},
+            allowed_transitions={
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.POSTED),
+                (TaxDocumentStatus.APPROVED, TaxDocumentStatus.CANCELLED),
+                (TaxDocumentStatus.POSTED, TaxDocumentStatus.CANCELLED),
+            },
+            label="debit note",
+        )
         self.note_no = (self.note_no or "").strip().upper() or None
         self.reason = (self.reason or "").strip()
+        self.cancel_reason = (self.cancel_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

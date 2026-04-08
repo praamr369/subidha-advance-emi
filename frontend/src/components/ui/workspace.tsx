@@ -54,7 +54,7 @@ export function WorkspaceSection({
         ) : actionHref && actionLabel ? (
           <Link
             href={actionHref}
-            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/75 bg-white/75 px-3.5 py-2 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:bg-white"
+            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] transition hover:-translate-y-0.5 hover:bg-slate-200"
           >
             {actionLabel}
             <ArrowUpRight className="h-3.5 w-3.5" />

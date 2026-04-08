@@ -18,11 +18,13 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   approveTaxInvoice,
+  cancelTaxInvoice,
   createTaxInvoice,
   listTaxInvoices,
   postTaxInvoice,
   type TaxInvoice,
 } from "@/services/accounting";
+import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -153,6 +155,17 @@ export default function AccountingTaxInvoicesPage() {
     }
   }
 
+  async function handleCancel(id: number) {
+    try {
+      await cancelTaxInvoice(id, "Cancelled from GST tax invoice workspace.");
+      setNotice("Tax invoice cancelled through reversal journal.");
+      await loadPage("refresh");
+    } catch (err) {
+      setNotice(null);
+      setError(accountingErrorMessage(err, "Failed to cancel the tax invoice."));
+    }
+  }
+
   return (
     <PortalPage
       title="Tax Invoices"
@@ -219,22 +232,37 @@ export default function AccountingTaxInvoicesPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {invoice.status === "DRAFT" ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleApprove(invoice.id)}
-                              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
-                            >
-                              Approve
-                            </button>
+                            <ConfirmActionButton
+                              label="Approve"
+                              title={`Approve ${invoice.invoice_no || `invoice ${invoice.id}`}?`}
+                              description="Approval issues or confirms the document number and freezes the draft for posting."
+                              onConfirm={async () => {
+                                await handleApprove(invoice.id);
+                              }}
+                              variant="secondary"
+                            />
                           ) : null}
                           {invoice.status === "APPROVED" ? (
-                            <button
-                              type="button"
-                              onClick={() => void handlePost(invoice.id)}
-                              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900"
-                            >
-                              Post
-                            </button>
+                            <ConfirmActionButton
+                              label="Post"
+                              title={`Post ${invoice.invoice_no || `invoice ${invoice.id}`}?`}
+                              description="Posting creates the GST journal and makes the document immutable except through controlled cancellation."
+                              onConfirm={async () => {
+                                await handlePost(invoice.id);
+                              }}
+                              variant="primary"
+                            />
+                          ) : null}
+                          {invoice.status === "POSTED" ? (
+                            <ConfirmActionButton
+                              label="Cancel"
+                              title={`Cancel ${invoice.invoice_no || `invoice ${invoice.id}`}?`}
+                              description="Cancellation keeps the original document immutable and creates a reversal journal."
+                              onConfirm={async () => {
+                                await handleCancel(invoice.id);
+                              }}
+                              variant="destructive"
+                            />
                           ) : null}
                           <span className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">
                             {invoice.status}

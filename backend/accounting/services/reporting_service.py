@@ -12,6 +12,8 @@ from accounting.models import (
     JournalEntryLine,
     JournalEntryStatus,
 )
+from billing.models import BillingInvoice
+from inventory.models import PurchaseBill
 
 
 def _money(value) -> Decimal:
@@ -135,8 +137,10 @@ def build_profit_loss(*, start_date: date | None = None, end_date: date | None =
         for row in rows:
             collapsed[(group, row["account_id"])] += row["amount"]
 
+    account_map = ChartOfAccount.objects.in_bulk([account_id for _, account_id in collapsed.keys()])
+
     for (group, account_id), amount in collapsed.items():
-        account = ChartOfAccount.objects.get(pk=account_id)
+        account = account_map[account_id]
         payload = {
             "account_id": account.id,
             "account_code": account.code,
@@ -325,4 +329,109 @@ def build_cashbook(
             "chart_account_code": finance_account.chart_account.code,
         },
         **ledger,
+    }
+
+
+def build_finance_book(
+    *,
+    kinds: list[str],
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> dict:
+    finance_accounts = list(
+        FinanceAccount.objects.select_related("chart_account")
+        .filter(kind__in=kinds)
+        .order_by("name", "id")
+    )
+    chart_account_ids = [account.chart_account_id for account in finance_accounts]
+    finance_account_by_chart_account_id = {
+        account.chart_account_id: account for account in finance_accounts
+    }
+    rows = []
+    for line in _posted_lines_queryset(start_date=start_date, end_date=end_date).filter(
+        chart_account_id__in=chart_account_ids
+    ):
+        matched_account = finance_account_by_chart_account_id[line.chart_account_id]
+        rows.append(
+            {
+                "finance_account_id": matched_account.id,
+                "finance_account_name": matched_account.name,
+                "kind": matched_account.kind,
+                "journal_entry_id": line.journal_entry_id,
+                "entry_no": line.journal_entry.entry_no,
+                "entry_date": line.journal_entry.entry_date.isoformat(),
+                "memo": line.journal_entry.memo,
+                "source_model": line.journal_entry.source_model,
+                "source_id": line.journal_entry.source_id,
+                "description": line.description,
+                "debit_amount": _money_string(line.debit_amount),
+                "credit_amount": _money_string(line.credit_amount),
+            }
+        )
+    return {
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "finance_account_kinds": kinds,
+        "rows": rows,
+    }
+
+
+def build_sales_book(*, start_date: date | None = None, end_date: date | None = None) -> dict:
+    queryset = BillingInvoice.objects.select_related("posted_journal_entry").filter(
+        status="POSTED",
+        posted_journal_entry__isnull=False,
+    )
+    if start_date:
+        queryset = queryset.filter(invoice_date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(invoice_date__lte=end_date)
+    rows = [
+        {
+            "invoice_id": invoice.id,
+            "document_no": invoice.document_no,
+            "invoice_date": invoice.invoice_date.isoformat(),
+            "customer_name": invoice.customer_name_snapshot,
+            "billing_channel": invoice.billing_channel,
+            "tax_mode": invoice.tax_mode,
+            "grand_total": _money_string(invoice.grand_total),
+            "tax_total": _money_string(invoice.tax_total),
+            "journal_entry_id": invoice.posted_journal_entry_id,
+            "journal_entry_no": invoice.posted_journal_entry.entry_no,
+        }
+        for invoice in queryset.order_by("-invoice_date", "-id")
+    ]
+    return {
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "rows": rows,
+    }
+
+
+def build_purchase_book(*, start_date: date | None = None, end_date: date | None = None) -> dict:
+    queryset = PurchaseBill.objects.select_related("vendor", "posted_journal_entry").filter(
+        status="POSTED",
+        posted_journal_entry__isnull=False,
+    )
+    if start_date:
+        queryset = queryset.filter(bill_date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(bill_date__lte=end_date)
+    rows = [
+        {
+            "purchase_bill_id": bill.id,
+            "bill_no": bill.bill_no,
+            "bill_date": bill.bill_date.isoformat(),
+            "vendor_name": bill.vendor.name,
+            "tax_mode": bill.tax_mode,
+            "grand_total": _money_string(bill.grand_total),
+            "tax_total": _money_string(bill.tax_total),
+            "journal_entry_id": bill.posted_journal_entry_id,
+            "journal_entry_no": bill.posted_journal_entry.entry_no,
+        }
+        for bill in queryset.order_by("-bill_date", "-id")
+    ]
+    return {
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "rows": rows,
     }

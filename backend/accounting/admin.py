@@ -2,8 +2,13 @@ from django.contrib import admin
 
 from accounting.models import (
     AccountingBridgePosting,
+    AccountingPeriod,
+    Asset,
+    AssetCategory,
     ChartOfAccount,
     CreditNote,
+    DepreciationLine,
+    DepreciationRun,
     DebitNote,
     DocumentSequence,
     EmployeeProfile,
@@ -13,11 +18,13 @@ from accounting.models import (
     JournalEntry,
     JournalEntryLine,
     MoneyMovement,
+    PostingLock,
     SalaryPayment,
     SalarySheet,
     TaxInvoice,
     TaxInvoiceLine,
     Vendor,
+    VendorSettlement,
 )
 
 
@@ -101,6 +108,53 @@ class DocumentSequenceAdmin(admin.ModelAdmin):
     list_display = ("series_code", "financial_year", "prefix", "next_number", "is_active")
     search_fields = ("series_code", "financial_year", "prefix")
     list_filter = ("is_active",)
+
+
+@admin.register(AccountingPeriod)
+class AccountingPeriodAdmin(admin.ModelAdmin):
+    list_display = ("code", "label", "start_date", "end_date", "is_locked", "locked_by")
+    search_fields = ("code", "label")
+    list_filter = ("is_locked",)
+
+
+@admin.register(PostingLock)
+class PostingLockAdmin(admin.ModelAdmin):
+    list_display = ("lock_date", "locked_by", "locked_at")
+    search_fields = ("reason", "locked_by__username")
+
+
+@admin.register(AssetCategory)
+class AssetCategoryAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "method", "useful_life_months", "is_active")
+    search_fields = ("code", "name")
+    list_filter = ("method", "is_active")
+
+
+@admin.register(Asset)
+class AssetAdmin(admin.ModelAdmin):
+    list_display = ("asset_code", "description", "category", "cost_amount", "accumulated_depreciation", "status")
+    search_fields = ("asset_code", "description", "vendor__name")
+    list_filter = ("status", "category")
+
+
+class DepreciationLineInline(admin.TabularInline):
+    model = DepreciationLine
+    extra = 0
+
+
+@admin.register(DepreciationRun)
+class DepreciationRunAdmin(admin.ModelAdmin):
+    list_display = ("run_code", "period_start", "period_end", "status", "created_by")
+    search_fields = ("run_code", "created_by__username")
+    list_filter = ("status",)
+    inlines = [DepreciationLineInline]
+
+
+@admin.register(VendorSettlement)
+class VendorSettlementAdmin(admin.ModelAdmin):
+    list_display = ("settlement_no", "vendor", "settlement_date", "amount", "status")
+    search_fields = ("settlement_no", "vendor__name", "reference_no")
+    list_filter = ("status",)
 
 
 class TaxInvoiceLineInline(admin.TabularInline):

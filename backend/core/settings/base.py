@@ -395,6 +395,9 @@ INSTALLED_APPS = [
     "accounts",
     "api",
     "accounting",
+    "inventory",
+    "billing",
+    "reminders",
     "subscriptions",
     "django_extensions",
 ]

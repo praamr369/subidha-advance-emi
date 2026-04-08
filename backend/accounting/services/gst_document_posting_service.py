@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounting.models import (
+    AccountingBridgePosting,
     MONEY_ZERO,
     ChartOfAccount,
     ChartOfAccountType,
@@ -17,10 +18,9 @@ from accounting.models import (
     TaxDocumentStatus,
     TaxInvoice,
 )
+from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.journal_posting_service import (
     _log_accounting_event,
-    create_journal_entry,
-    post_journal_entry,
 )
 
 
@@ -192,12 +192,11 @@ def post_tax_invoice(*, tax_invoice_id: int, posted_by) -> tuple[TaxInvoice, boo
 
     accounts = ensure_gst_system_accounts()
     tax_total = _tax_total(invoice)
-    journal_entry = create_journal_entry(
+    posted_journal, created = post_bridge_entry(
+        source_instance=invoice,
+        purpose="GST_TAX_INVOICE",
         entry_date=invoice.invoice_date,
-        entry_type=JournalEntryType.SYSTEM_BRIDGE,
         memo=f"Tax invoice {invoice.invoice_no or invoice.id}",
-        source_model="TaxInvoice",
-        source_id=str(invoice.id),
         lines=[
             {
                 "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
@@ -218,11 +217,15 @@ def post_tax_invoice(*, tax_invoice_id: int, posted_by) -> tuple[TaxInvoice, boo
                 "credit_amount": tax_total,
             },
         ],
-    )
-    posted_journal, _ = post_journal_entry(
-        journal_entry_id=journal_entry.id,
         posted_by=posted_by,
     )
+    if not created:
+        bridge = AccountingBridgePosting.objects.get(
+            source_model="TaxInvoice",
+            source_id=str(invoice.id),
+            purpose="GST_TAX_INVOICE",
+        )
+        posted_journal = bridge.journal_entry
     invoice.posted_journal_entry = posted_journal
     invoice.status = TaxDocumentStatus.POSTED
     invoice.save(update_fields=["posted_journal_entry", "status", "updated_at"])
@@ -303,12 +306,11 @@ def post_credit_note(*, credit_note_id: int, posted_by) -> tuple[CreditNote, boo
         raise ValueError("Only approved credit notes can be posted.")
 
     accounts = ensure_gst_system_accounts()
-    journal_entry = create_journal_entry(
+    posted_journal, created = post_bridge_entry(
+        source_instance=note,
+        purpose="GST_CREDIT_NOTE",
         entry_date=note.note_date,
-        entry_type=JournalEntryType.SYSTEM_BRIDGE,
         memo=f"Credit note {note.note_no or note.id}",
-        source_model="CreditNote",
-        source_id=str(note.id),
         lines=[
             {
                 "chart_account": accounts["SALES_REVENUE"],
@@ -329,11 +331,15 @@ def post_credit_note(*, credit_note_id: int, posted_by) -> tuple[CreditNote, boo
                 "credit_amount": note.total_adjustment,
             },
         ],
-    )
-    posted_journal, _ = post_journal_entry(
-        journal_entry_id=journal_entry.id,
         posted_by=posted_by,
     )
+    if not created:
+        bridge = AccountingBridgePosting.objects.get(
+            source_model="CreditNote",
+            source_id=str(note.id),
+            purpose="GST_CREDIT_NOTE",
+        )
+        posted_journal = bridge.journal_entry
     note.posted_journal_entry = posted_journal
     note.status = TaxDocumentStatus.POSTED
     note.save(update_fields=["posted_journal_entry", "status", "updated_at"])
@@ -357,12 +363,11 @@ def post_debit_note(*, debit_note_id: int, posted_by) -> tuple[DebitNote, bool]:
         raise ValueError("Only approved debit notes can be posted.")
 
     accounts = ensure_gst_system_accounts()
-    journal_entry = create_journal_entry(
+    posted_journal, created = post_bridge_entry(
+        source_instance=note,
+        purpose="GST_DEBIT_NOTE",
         entry_date=note.note_date,
-        entry_type=JournalEntryType.SYSTEM_BRIDGE,
         memo=f"Debit note {note.note_no or note.id}",
-        source_model="DebitNote",
-        source_id=str(note.id),
         lines=[
             {
                 "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
@@ -383,11 +388,15 @@ def post_debit_note(*, debit_note_id: int, posted_by) -> tuple[DebitNote, bool]:
                 "credit_amount": note.tax_adjustment,
             },
         ],
-    )
-    posted_journal, _ = post_journal_entry(
-        journal_entry_id=journal_entry.id,
         posted_by=posted_by,
     )
+    if not created:
+        bridge = AccountingBridgePosting.objects.get(
+            source_model="DebitNote",
+            source_id=str(note.id),
+            purpose="GST_DEBIT_NOTE",
+        )
+        posted_journal = bridge.journal_entry
     note.posted_journal_entry = posted_journal
     note.status = TaxDocumentStatus.POSTED
     note.save(update_fields=["posted_journal_entry", "status", "updated_at"])

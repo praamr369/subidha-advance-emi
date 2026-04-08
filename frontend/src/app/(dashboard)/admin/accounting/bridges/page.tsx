@@ -9,10 +9,19 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
-import { runAccountingBridge, type BridgeRunResponse } from "@/services/accounting";
+import {
+  runAccountingBridge,
+  runEmiPaymentBridge,
+  runEmiSubscriptionBridge,
+  runInventoryPostingBridge,
+  runRetailSaleBridge,
+  type BridgeRunResponse,
+  type Phase3BridgeRunResponse,
+} from "@/services/accounting";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -21,6 +30,7 @@ export default function AccountingBridgesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<BridgeRunResponse | null>(null);
+  const [phase3Results, setPhase3Results] = useState<Phase3BridgeRunResponse[]>([]);
   const [form, setForm] = useState({
     start_date: today.slice(0, 8) + "01",
     end_date: today,
@@ -50,6 +60,32 @@ export default function AccountingBridgesPage() {
     }
   }
 
+  async function handlePhase3Run(
+    label: string,
+    runner: (payload: {
+      start_date: string;
+      end_date: string;
+      dry_run?: boolean;
+    }) => Promise<Phase3BridgeRunResponse>
+  ) {
+    setSubmitting(true);
+    try {
+      const payload = await runner({
+        start_date: form.start_date,
+        end_date: form.end_date,
+        dry_run: form.dry_run,
+      });
+      setPhase3Results((current) => [payload, ...current.filter((item) => item.purpose !== payload.purpose)]);
+      setError(null);
+      setNotice(`${label} ${form.dry_run ? "dry run" : "live run"} completed.`);
+    } catch (err) {
+      setNotice(null);
+      setError(accountingErrorMessage(err, `Failed to run ${label.toLowerCase()}.`));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <PortalPage
       title="Bridge Runs"
@@ -64,7 +100,8 @@ export default function AccountingBridgesPage() {
         { href: ROUTES.admin.accountingTaxInvoices, label: "GST Docs", variant: "secondary" },
       ]}
       stats={[
-        { label: "Purpose", value: "PAYMENT_COLLECTION", tone: "info" },
+        { label: "Legacy Bridge", value: "PAYMENT_COLLECTION", tone: "info" },
+        { label: "Phase-3 Runners", value: String(phase3Results.length), tone: "info" },
         { label: "Dry Run", value: form.dry_run ? "Yes" : "No", tone: form.dry_run ? "warning" : "success" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
@@ -91,7 +128,7 @@ export default function AccountingBridgesPage() {
                 End date
                 <input type="date" value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))} className={accountingFieldClassName()} />
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-white/75 bg-white/75 px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
                 <input
                   type="checkbox"
                   checked={form.payment_collection}
@@ -99,7 +136,7 @@ export default function AccountingBridgesPage() {
                 />
                 PAYMENT_COLLECTION purpose
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-white/75 bg-white/75 px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
                 <input
                   type="checkbox"
                   checked={form.dry_run}
@@ -107,7 +144,11 @@ export default function AccountingBridgesPage() {
                 />
                 Dry run only
               </label>
-              <button type="submit" className="rounded-xl border border-slate-900/10 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              <button
+                type="submit"
+                className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                disabled={submitting}
+              >
                 Run Bridge
               </button>
             </form>
@@ -118,16 +159,16 @@ export default function AccountingBridgesPage() {
             description="The response below comes directly from the bridge run endpoint, including idempotent existing-count tracking."
           >
             {!result ? (
-              <div className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
                 Run a dry run or live bridge to see the latest result payload here.
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4 text-sm text-muted-foreground">
+                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
                   {result.start_date} to {result.end_date} • {result.dry_run ? "Dry run" : "Live run"}
                 </div>
                 {result.results.map((row) => (
-                  <div key={row.purpose} className="rounded-[1.35rem] border border-white/75 bg-white/75 px-4 py-4">
+                  <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
                     <div className="font-semibold text-foreground">{row.purpose}</div>
                     <div className="mt-1 text-sm text-muted-foreground">
                       Candidates: {row.candidates} • Created: {row.created_count} • Existing: {row.existing_count}
@@ -138,6 +179,71 @@ export default function AccountingBridgesPage() {
             )}
           </WorkspaceSection>
         </div>
+
+        <WorkspaceSection
+          title="Phase-3 Bridge Runners"
+          description="Run the newer additive bridges separately so retail billing, inventory posting, EMI subscription deferral, and EMI receipt posting remain explicit and auditable."
+          contentClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
+          <ActionButton
+            variant="primary"
+            loading={submitting}
+            onClick={() => void handlePhase3Run("Retail sale bridge", runRetailSaleBridge)}
+          >
+            Run retail sale
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            loading={submitting}
+            onClick={() => void handlePhase3Run("Inventory bridge", runInventoryPostingBridge)}
+          >
+            Run inventory posting
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            loading={submitting}
+            onClick={() => void handlePhase3Run("EMI subscription bridge", runEmiSubscriptionBridge)}
+          >
+            Run EMI subscription
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            loading={submitting}
+            onClick={() => void handlePhase3Run("EMI payment bridge", runEmiPaymentBridge)}
+          >
+            Run EMI payment receipts
+          </ActionButton>
+        </WorkspaceSection>
+
+        <WorkspaceSection
+          title="Phase-3 Results"
+          description="Each result reflects the real bridge endpoint response, including skips where accounting recognition is intentionally deferred for safety."
+        >
+          {phase3Results.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
+              Run one of the Phase-3 bridge actions to inspect its latest payload here.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {phase3Results.map((row) => (
+                <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
+                  <div className="font-semibold text-foreground">{row.purpose}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {row.start_date} to {row.end_date} • {row.dry_run ? "Dry run" : "Live run"}
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Candidates: {row.candidates ?? 0} • Created: {row.created_count ?? 0} • Existing: {row.existing_count ?? 0}
+                  </div>
+                  {row.skipped && row.skipped.length > 0 ? (
+                    <div className="mt-2 text-xs text-amber-700">
+                      Skipped: {row.skipped.length} rows
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </WorkspaceSection>
       </div>
     </PortalPage>
   );

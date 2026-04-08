@@ -142,7 +142,12 @@ class TaxInvoiceSerializer(serializers.ModelSerializer):
         source="posted_journal_entry.entry_no",
         read_only=True,
     )
+    reversal_journal_entry_no = serializers.CharField(
+        source="reversal_journal_entry.entry_no",
+        read_only=True,
+    )
     approved_by_username = serializers.CharField(source="approved_by.username", read_only=True)
+    cancelled_by_username = serializers.CharField(source="cancelled_by.username", read_only=True)
     lines = TaxInvoiceLineSerializer(many=True, required=False)
 
     class Meta:
@@ -170,11 +175,17 @@ class TaxInvoiceSerializer(serializers.ModelSerializer):
             "total_amount",
             "status",
             "notes",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "lines",
             "created_at",
             "updated_at",
@@ -183,11 +194,17 @@ class TaxInvoiceSerializer(serializers.ModelSerializer):
             "id",
             "invoice_no",
             "status",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -245,7 +262,12 @@ class BaseGstNoteSerializer(serializers.ModelSerializer):
         source="posted_journal_entry.entry_no",
         read_only=True,
     )
+    reversal_journal_entry_no = serializers.CharField(
+        source="reversal_journal_entry.entry_no",
+        read_only=True,
+    )
     approved_by_username = serializers.CharField(source="approved_by.username", read_only=True)
+    cancelled_by_username = serializers.CharField(source="cancelled_by.username", read_only=True)
 
     note_series_code = ""
     note_prefix = ""
@@ -302,11 +324,17 @@ class CreditNoteSerializer(BaseGstNoteSerializer):
             "tax_adjustment",
             "total_adjustment",
             "status",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -314,11 +342,17 @@ class CreditNoteSerializer(BaseGstNoteSerializer):
             "id",
             "note_no",
             "status",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -344,11 +378,17 @@ class DebitNoteSerializer(BaseGstNoteSerializer):
             "tax_adjustment",
             "total_adjustment",
             "status",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -356,11 +396,17 @@ class DebitNoteSerializer(BaseGstNoteSerializer):
             "id",
             "note_no",
             "status",
+            "cancelled_by",
+            "cancelled_by_username",
+            "cancelled_at",
+            "cancel_reason",
             "approved_by",
             "approved_by_username",
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "reversal_journal_entry",
+            "reversal_journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -392,6 +438,10 @@ class ItrExportPackCreateSerializer(AccountingDateRangeQuerySerializer):
     financial_year = serializers.CharField(required=False, allow_blank=True)
 
 
+class GstExportPackCreateSerializer(AccountingDateRangeQuerySerializer):
+    financial_year = serializers.CharField(required=False, allow_blank=True)
+
+
 class BridgeRunSerializer(AccountingDateRangeQuerySerializer):
     dry_run = serializers.BooleanField(required=False, default=False)
     purposes = serializers.ListField(
@@ -413,10 +463,13 @@ class EmptyPhase2ActionSerializer(serializers.Serializer):
     pass
 
 
+class CancelPhase2ActionSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+
+
 class BridgeRunResponseSerializer(serializers.Serializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
     purposes = serializers.ListField(child=serializers.CharField())
     dry_run = serializers.BooleanField()
     results = serializers.ListField(child=serializers.DictField())
-

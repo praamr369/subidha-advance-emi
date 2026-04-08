@@ -134,12 +134,17 @@ export default function AdminAccountingPage() {
           variant: "primary",
         },
         {
-          href: ROUTES.admin.accountingTrialBalance,
-          label: "Reports",
+          href: ROUTES.admin.accountingPeriods,
+          label: "Periods",
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.accountingTaxInvoices,
+          href: ROUTES.admin.accountingAssets,
+          label: "Assets",
+          variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.accountingGst,
           label: "GST Docs",
           variant: "secondary",
         },
@@ -286,6 +291,12 @@ export default function AdminAccountingPage() {
                   Books and money movements
                 </Link>
                 <Link
+                  href={ROUTES.admin.accountingBooksCash}
+                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
+                >
+                  Daily cash, bank, UPI, sales, and purchase books
+                </Link>
+                <Link
                   href={ROUTES.admin.accountingTrialBalance}
                   className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
                 >
@@ -308,6 +319,24 @@ export default function AdminAccountingPage() {
                   className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Controlled accounting bridge runs
+                </Link>
+                <Link
+                  href={ROUTES.admin.inventory}
+                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
+                >
+                  Inventory stock controls and adjustments
+                </Link>
+                <Link
+                  href={ROUTES.admin.billing}
+                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
+                >
+                  Billing invoices, notes, and receipts
+                </Link>
+                <Link
+                  href={ROUTES.admin.reminders}
+                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
+                >
+                  Reminder queue and follow-up controls
                 </Link>
               </WorkspaceSection>
             </div>

@@ -18,12 +18,31 @@ from api.v1.views.accounting_phase2 import (
     CreditNoteViewSet,
     DebitNoteViewSet,
     GeneralLedgerReportView,
+    GstExportPackListCreateView,
     ItrExportPackDetailView,
     ItrExportPackDownloadView,
     ItrExportPackListCreateView,
     ProfitLossReportView,
     TaxInvoiceViewSet,
     TrialBalanceReportView,
+)
+from api.v1.views.accounting_phase3 import (
+    AccountingPeriodViewSet,
+    AccountingPurchaseBillViewSet,
+    AssetCategoryViewSet,
+    AssetViewSet,
+    BankBookView,
+    CashBookView,
+    DepreciationRunViewSet,
+    EmiPaymentBridgeRunView,
+    EmiSubscriptionBridgeRunView,
+    InventoryBridgeRunView,
+    PostingLockViewSet,
+    PurchaseBookView,
+    RetailSaleBridgeRunView,
+    SalesBookView,
+    UpiBookView,
+    VendorSettlementViewSet,
 )
 
 router = DefaultRouter()
@@ -38,6 +57,13 @@ router.register(r"salary-sheets", SalarySheetViewSet, basename="accounting-salar
 router.register(r"tax-invoices", TaxInvoiceViewSet, basename="accounting-tax-invoices")
 router.register(r"credit-notes", CreditNoteViewSet, basename="accounting-credit-notes")
 router.register(r"debit-notes", DebitNoteViewSet, basename="accounting-debit-notes")
+router.register(r"periods", AccountingPeriodViewSet, basename="accounting-periods")
+router.register(r"locks", PostingLockViewSet, basename="accounting-locks")
+router.register(r"assets/categories", AssetCategoryViewSet, basename="accounting-asset-categories")
+router.register(r"assets", AssetViewSet, basename="accounting-assets")
+router.register(r"depreciation/runs", DepreciationRunViewSet, basename="accounting-depreciation-runs")
+router.register(r"purchase-bills", AccountingPurchaseBillViewSet, basename="accounting-purchase-bills")
+router.register(r"vendor-settlements", VendorSettlementViewSet, basename="accounting-vendor-settlements")
 
 urlpatterns = [
     path("reports/trial-balance/", TrialBalanceReportView.as_view()),
@@ -45,9 +71,19 @@ urlpatterns = [
     path("reports/balance-sheet/", BalanceSheetReportView.as_view()),
     path("reports/general-ledger/", GeneralLedgerReportView.as_view()),
     path("reports/cashbook/", CashbookReportView.as_view()),
+    path("books/cash/", CashBookView.as_view()),
+    path("books/bank/", BankBookView.as_view()),
+    path("books/upi/", UpiBookView.as_view()),
+    path("books/sales/", SalesBookView.as_view()),
+    path("books/purchase/", PurchaseBookView.as_view()),
     path("exports/itr-pack/", ItrExportPackListCreateView.as_view()),
     path("exports/itr-pack/<int:pk>/", ItrExportPackDetailView.as_view()),
     path("exports/itr-pack/<int:pk>/download/", ItrExportPackDownloadView.as_view()),
+    path("exports/gst-pack/", GstExportPackListCreateView.as_view()),
     path("bridges/run/", BridgeRunView.as_view()),
+    path("bridges/run-retail-sale/", RetailSaleBridgeRunView.as_view()),
+    path("bridges/run-inventory-posting/", InventoryBridgeRunView.as_view()),
+    path("bridges/run-emi-subscription/", EmiSubscriptionBridgeRunView.as_view()),
+    path("bridges/run-emi-payment/", EmiPaymentBridgeRunView.as_view()),
     path("", include(router.urls)),
 ]

@@ -18,6 +18,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   approveCreditNote,
+  cancelCreditNote,
   createCreditNote,
   listCreditNotes,
   listTaxInvoices,
@@ -25,6 +26,7 @@ import {
   type GstNote,
   type TaxInvoice,
 } from "@/services/accounting";
+import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -120,6 +122,17 @@ export default function AccountingCreditNotesPage() {
     }
   }
 
+  async function handleCancel(id: number) {
+    try {
+      await cancelCreditNote(id, "Cancelled from GST credit note workspace.");
+      setNotice("Credit note cancelled through reversal journal.");
+      await loadPage("refresh");
+    } catch (err) {
+      setNotice(null);
+      setError(accountingErrorMessage(err, "Failed to cancel the credit note."));
+    }
+  }
+
   return (
     <PortalPage
       title="Credit Notes"
@@ -177,14 +190,37 @@ export default function AccountingCreditNotesPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {note.status === "DRAFT" ? (
-                            <button type="button" onClick={() => void handleApprove(note.id)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
-                              Approve
-                            </button>
+                            <ConfirmActionButton
+                              label="Approve"
+                              title={`Approve ${note.note_no || `credit note ${note.id}`}?`}
+                              description="Approval freezes the note draft for controlled posting."
+                              onConfirm={async () => {
+                                await handleApprove(note.id);
+                              }}
+                              variant="secondary"
+                            />
                           ) : null}
                           {note.status === "APPROVED" ? (
-                            <button type="button" onClick={() => void handlePost(note.id)} className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
-                              Post
-                            </button>
+                            <ConfirmActionButton
+                              label="Post"
+                              title={`Post ${note.note_no || `credit note ${note.id}`}?`}
+                              description="Posting creates the GST adjustment journal and keeps the note immutable."
+                              onConfirm={async () => {
+                                await handlePost(note.id);
+                              }}
+                              variant="primary"
+                            />
+                          ) : null}
+                          {note.status === "POSTED" ? (
+                            <ConfirmActionButton
+                              label="Cancel"
+                              title={`Cancel ${note.note_no || `credit note ${note.id}`}?`}
+                              description="Cancellation creates a reversal journal while preserving the original note."
+                              onConfirm={async () => {
+                                await handleCancel(note.id);
+                              }}
+                              variant="destructive"
+                            />
                           ) : null}
                           <span className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">
                             {note.status}

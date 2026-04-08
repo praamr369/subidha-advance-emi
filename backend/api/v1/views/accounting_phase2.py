@@ -13,7 +13,9 @@ from rest_framework.views import APIView
 from accounting.models import CreditNote, DebitNote, ExportPackJob, TaxInvoice
 from accounting.services.bridge_run_service import run_bridge_postings
 from accounting.services.export_pack_service import (
+    create_gst_export_pack_job,
     create_itr_export_pack_job,
+    generate_gst_export_pack,
     generate_itr_export_pack,
 )
 from accounting.services.gst_document_posting_service import (
@@ -23,6 +25,11 @@ from accounting.services.gst_document_posting_service import (
     post_credit_note,
     post_debit_note,
     post_tax_invoice,
+)
+from accounting.services.gst_lifecycle_service import (
+    cancel_credit_note,
+    cancel_debit_note,
+    cancel_tax_invoice,
 )
 from accounting.services.reporting_service import (
     build_balance_sheet,
@@ -36,11 +43,13 @@ from api.v1.serializers.accounting_phase2 import (
     BalanceSheetQuerySerializer,
     BridgeRunSerializer,
     CashbookQuerySerializer,
+    CancelPhase2ActionSerializer,
     CreditNoteSerializer,
     DebitNoteSerializer,
     EmptyPhase2ActionSerializer,
     ExportPackJobSerializer,
     GeneralLedgerQuerySerializer,
+    GstExportPackCreateSerializer,
     ItrExportPackCreateSerializer,
     TaxInvoiceSerializer,
     AccountingDateRangeQuerySerializer,
@@ -66,6 +75,8 @@ class TaxInvoiceViewSet(AdminAccountingPhase2ViewSet):
     def get_serializer_class(self):
         if self.action in {"approve", "post_document"}:
             return EmptyPhase2ActionSerializer
+        if self.action == "cancel_document":
+            return CancelPhase2ActionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -96,6 +107,21 @@ class TaxInvoiceViewSet(AdminAccountingPhase2ViewSet):
         payload = TaxInvoiceSerializer(invoice, context=self.get_serializer_context())
         return Response({"updated": updated, "tax_invoice": payload.data})
 
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_document(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            invoice, updated = cancel_tax_invoice(
+                tax_invoice_id=int(pk),
+                performed_by=request.user,
+                reason=serializer.validated_data["reason"],
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = TaxInvoiceSerializer(invoice, context=self.get_serializer_context())
+        return Response({"updated": updated, "tax_invoice": payload.data})
+
 
 class CreditNoteViewSet(AdminAccountingPhase2ViewSet):
     queryset = CreditNote.objects.select_related(
@@ -112,6 +138,8 @@ class CreditNoteViewSet(AdminAccountingPhase2ViewSet):
     def get_serializer_class(self):
         if self.action in {"approve", "post_document"}:
             return EmptyPhase2ActionSerializer
+        if self.action == "cancel_document":
+            return CancelPhase2ActionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -142,6 +170,21 @@ class CreditNoteViewSet(AdminAccountingPhase2ViewSet):
         payload = CreditNoteSerializer(note, context=self.get_serializer_context())
         return Response({"updated": updated, "credit_note": payload.data})
 
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_document(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            note, updated = cancel_credit_note(
+                credit_note_id=int(pk),
+                performed_by=request.user,
+                reason=serializer.validated_data["reason"],
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = CreditNoteSerializer(note, context=self.get_serializer_context())
+        return Response({"updated": updated, "credit_note": payload.data})
+
 
 class DebitNoteViewSet(AdminAccountingPhase2ViewSet):
     queryset = DebitNote.objects.select_related(
@@ -158,6 +201,8 @@ class DebitNoteViewSet(AdminAccountingPhase2ViewSet):
     def get_serializer_class(self):
         if self.action in {"approve", "post_document"}:
             return EmptyPhase2ActionSerializer
+        if self.action == "cancel_document":
+            return CancelPhase2ActionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -182,6 +227,21 @@ class DebitNoteViewSet(AdminAccountingPhase2ViewSet):
             note, updated = post_debit_note(
                 debit_note_id=int(pk),
                 posted_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = DebitNoteSerializer(note, context=self.get_serializer_context())
+        return Response({"updated": updated, "debit_note": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_document(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            note, updated = cancel_debit_note(
+                debit_note_id=int(pk),
+                performed_by=request.user,
+                reason=serializer.validated_data["reason"],
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -245,6 +305,26 @@ class ItrExportPackListCreateView(AdminAccountingReportView):
             created_by=request.user,
         )
         job = generate_itr_export_pack(job_id=job.id)
+        payload = ExportPackJobSerializer(job)
+        return Response(payload.data, status=status.HTTP_201_CREATED)
+
+
+class GstExportPackListCreateView(AdminAccountingReportView):
+    def get(self, request):
+        queryset = ExportPackJob.objects.select_related("created_by").filter(pack_type="GST_HANDOFF")
+        serializer = ExportPackJobSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = GstExportPackCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = create_gst_export_pack_job(
+            financial_year=serializer.validated_data.get("financial_year", ""),
+            start_date=serializer.validated_data.get("start_date"),
+            end_date=serializer.validated_data.get("end_date"),
+            created_by=request.user,
+        )
+        job = generate_gst_export_pack(job_id=job.id)
         payload = ExportPackJobSerializer(job)
         return Response(payload.data, status=status.HTTP_201_CREATED)
 

@@ -50,10 +50,10 @@ function getActionClassName(variant: PortalAction["variant"] = "secondary") {
     case "danger":
       return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)] hover:-translate-y-0.5";
     case "ghost":
-      return "border-dashed border-border/70 bg-transparent text-foreground hover:bg-white/60 hover:text-foreground";
+      return "border-dashed border-slate-300 bg-transparent text-slate-900 hover:bg-slate-100 hover:text-slate-950";
     case "secondary":
     default:
-      return "border-white/70 bg-white/70 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:bg-white/90";
+      return "border-slate-200 bg-slate-100 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] hover:-translate-y-0.5 hover:bg-slate-200";
   }
 }
 

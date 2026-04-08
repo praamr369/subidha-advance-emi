@@ -13,6 +13,7 @@ from accounting.models import (
     JournalEntryStatus,
     JournalEntryType,
 )
+from accounting.services.period_service import assert_accounting_period_open
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -152,6 +153,13 @@ def post_journal_entry(*, journal_entry_id: int, posted_by) -> tuple[JournalEntr
     if journal_entry.status == JournalEntryStatus.VOID:
         raise ValueError("Void journal entries cannot be posted.")
 
+    assert_accounting_period_open(
+        reference_date=journal_entry.entry_date,
+        performed_by=posted_by,
+        instance=journal_entry,
+        event="ACCOUNTING_JOURNAL_POST_BLOCKED",
+    )
+
     line_payloads = [
         {
             "chart_account": line.chart_account,
@@ -202,6 +210,13 @@ def void_journal_entry(*, journal_entry_id: int, performed_by, reason: str) -> t
     if journal_entry.status != JournalEntryStatus.POSTED:
         raise ValueError("Only posted journal entries can be voided.")
 
+    assert_accounting_period_open(
+        reference_date=journal_entry.entry_date,
+        performed_by=performed_by,
+        instance=journal_entry,
+        event="ACCOUNTING_JOURNAL_VOID_BLOCKED",
+    )
+
     reason = (reason or "").strip()
     if not reason:
         raise ValueError("Void reason is required.")
@@ -221,4 +236,3 @@ def void_journal_entry(*, journal_entry_id: int, performed_by, reason: str) -> t
         },
     )
     return journal_entry, True
-
