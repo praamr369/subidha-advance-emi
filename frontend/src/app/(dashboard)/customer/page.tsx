@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,42 +13,60 @@ import {
   Wallet,
 } from "lucide-react";
 
+import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
+import {
+  buildSettlementPosture,
+  buildWinnerPosture,
+  formatDate,
+  money,
+} from "@/lib/dashboard-summary";
 import { ROUTES } from "@/lib/routes";
 import { getCustomerDashboard } from "@/services/customer";
+import {
+  getDashboardSummaryV2,
+  listDashboardOverdue,
+  listDashboardRecentPayments,
+  listDashboardUpcoming,
+  listDashboardWinners,
+  normalizeDashboardSummary,
+} from "@/services/dashboards";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
-type CustomerDashboardResponse = Awaited<ReturnType<typeof getCustomerDashboard>>;
-type CustomerDashboardData = NonNullable<CustomerDashboardResponse>;
-type CustomerDashboardSummary = CustomerDashboardData["summary"];
-type CustomerSubscription = CustomerDashboardData["subscriptions"][number];
-
-function money(value: string | number | undefined | null): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-
-  return new Date(parsed).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+type LegacyDashboardResponse = Awaited<ReturnType<typeof getCustomerDashboard>>;
+type LegacyDashboardData = NonNullable<LegacyDashboardResponse>;
+type CustomerSubscription = LegacyDashboardData["subscriptions"][number];
+type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
+type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
+type DashboardPaymentsPayload = Awaited<
+  ReturnType<typeof listDashboardRecentPayments>
+>;
+type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
   return "Failed to load customer workspace.";
+}
+
+function statusPriority(subscription: CustomerSubscription): number {
+  switch ((subscription.status || "").toUpperCase()) {
+    case "ACTIVE":
+      return 0;
+    case "WON":
+      return 1;
+    case "COMPLETED":
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 type QuickLink = {
@@ -76,109 +94,64 @@ function QuickLinkCard({ title, description, href }: QuickLink) {
   );
 }
 
-function statusPriority(subscription: CustomerSubscription): number {
-  switch ((subscription.status || "").toUpperCase()) {
-    case "ACTIVE":
-      return 0;
-    case "WON":
-      return 1;
-    case "COMPLETED":
-      return 2;
-    default:
-      return 3;
-  }
-}
-
-function buildSettlementPosture(summary: CustomerDashboardSummary) {
-  const remainingAmount = Number(
-    summary.remaining_amount ?? summary.outstanding_amount ?? 0
-  );
-  const overdueEmis = Number(summary.overdue_emis ?? 0);
-  const nextDueDate = summary.next_due_date;
-  const nextDueAmount = summary.next_due_amount;
-
-  if (remainingAmount <= 0) {
-    return {
-      title: "All linked contracts are currently settled",
-      description:
-        "Paid and waived EMI history already closes the current contract exposure visible to you.",
-      tone:
-        "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(220,252,231,0.84))]",
-      badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      badgeLabel: "Settled",
-    };
-  }
-
-  if (overdueEmis > 0) {
-    return {
-      title: `${overdueEmis} overdue EMI need attention`,
-      description: `Overdue exposure currently stands at ${money(
-        summary.overdue_amount
-      )}. Your oldest unpaid EMI is already past due.`,
-      tone:
-        "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.84))]",
-      badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
-      badgeLabel: "Overdue",
-    };
-  }
-
-  return {
-    title: "Contracts are still settling on schedule",
-    description: nextDueDate
-      ? `Your next scheduled EMI is ${money(nextDueAmount)} on ${formatDate(
-          nextDueDate
-        )}.`
-      : "There is remaining contract exposure, but no next due row is currently visible.",
-    tone:
-      "border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.84))]",
-    badgeClass: "border-sky-200 bg-sky-50 text-sky-700",
-    badgeLabel: "In progress",
-  };
-}
-
-function buildWinnerPosture(summary: CustomerDashboardSummary) {
-  const winnerSubscriptions = Number(summary.winner_subscriptions ?? 0);
-  const waivedAmount = Number(summary.total_waived_amount ?? 0);
-
-  if (winnerSubscriptions > 0 || waivedAmount > 0) {
-    return {
-      title: "Winner benefit is already reflected in contract totals",
-      description: `${winnerSubscriptions} subscription${
-        winnerSubscriptions === 1 ? "" : "s"
-      } carry winner history, and ${money(
-        summary.total_waived_amount
-      )} is already recorded as waived EMI value.`,
-      badgeClass: "border-violet-200 bg-violet-50 text-violet-700",
-      badgeLabel: "Winner benefit",
-    };
-  }
-
-  return {
-    title: "No winner waiver is currently recorded",
-    description:
-      "If a draw benefit is applied later, it will appear separately from payment settlement and contract status.",
-    badgeClass: "border-slate-200 bg-slate-100 text-slate-700",
-    badgeLabel: "No winner benefit",
-  };
-}
-
 export default function CustomerDashboardPage() {
-  const [data, setData] = useState<CustomerDashboardResponse | null>(null);
+  const [legacy, setLegacy] = useState<LegacyDashboardResponse | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
+  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
+  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
+  const [recentPayments, setRecentPayments] =
+    useState<DashboardPaymentsPayload | null>(null);
+  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [windowPreset, setWindowPreset] =
+    useState<DashboardWindowPreset>("DEFAULT");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const payload = await getCustomerDashboard();
-      setData(payload);
+      const query =
+        windowPreset === "CUSTOM"
+          ? {
+              window: windowPreset,
+              start_date: startDate || undefined,
+              end_date: endDate || undefined,
+            }
+          : { window: windowPreset };
+
+      const [
+        legacyPayload,
+        canonicalPayload,
+        overduePayload,
+        upcomingPayload,
+        recentPaymentsPayload,
+        winnersPayload,
+      ] = await Promise.all([
+        getCustomerDashboard(),
+        getDashboardSummaryV2(query),
+        listDashboardOverdue({ ...query, limit: 6 }),
+        listDashboardUpcoming({ ...query, limit: 6 }),
+        listDashboardRecentPayments({ ...query, limit: 6 }),
+        listDashboardWinners({ ...query, limit: 4 }),
+      ]);
+      setLegacy(legacyPayload);
+      setCanonical(canonicalPayload);
+      setOverdue(overduePayload);
+      setUpcoming(upcomingPayload);
+      setRecentPayments(recentPaymentsPayload);
+      setWinnerItems(winnersPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      setData(null);
+      setLegacy(null);
+      setCanonical(null);
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -187,68 +160,27 @@ export default function CustomerDashboardPage() {
 
   useEffect(() => {
     void loadPage("initial");
-  }, []);
+  }, [windowPreset, startDate, endDate]);
 
-  const summaryCards = useMemo(() => {
-    if (!data) return [];
-
-    return [
-      {
-        label: "Paid",
-        value: money(data.summary.total_paid_amount),
-        subtext: `${data.summary.paid_emis} EMI settled through recorded payments`,
-        tone: "success" as const,
-        icon: <Wallet className="h-5 w-5" />,
-      },
-      {
-        label: "Remaining",
-        value: money(data.summary.remaining_amount ?? data.summary.outstanding_amount),
-        subtext: `${money(data.summary.total_pending_amount)} still open across current contracts`,
-        tone:
-          Number(data.summary.remaining_amount ?? data.summary.outstanding_amount ?? 0) > 0
-            ? ("info" as const)
-            : ("success" as const),
-        icon: <CreditCard className="h-5 w-5" />,
-      },
-      {
-        label: "Overdue EMI",
-        value: String(data.summary.overdue_emis ?? 0),
-        subtext: `${money(data.summary.overdue_amount)} currently past due`,
-        tone:
-          Number(data.summary.overdue_emis ?? 0) > 0
-            ? ("warning" as const)
-            : ("default" as const),
-        icon: <AlertTriangle className="h-5 w-5" />,
-      },
-      {
-        label: "Upcoming EMI",
-        value: String(data.summary.upcoming_emis ?? 0),
-        subtext:
-          data.summary.next_due_date && data.summary.next_due_amount
-            ? `${money(data.summary.next_due_amount)} next on ${formatDate(
-                data.summary.next_due_date
-              )}`
-            : "No upcoming EMI currently visible",
-        tone: "default" as const,
-        icon: <CalendarClock className="h-5 w-5" />,
-      },
-    ];
-  }, [data]);
-
-  const settlementPosture = useMemo(() => {
-    if (!data) return null;
-    return buildSettlementPosture(data.summary);
-  }, [data]);
-
-  const winnerPosture = useMemo(() => {
-    if (!data) return null;
-    return buildWinnerPosture(data.summary);
-  }, [data]);
-
-  const spotlightSubscriptions = useMemo(() => {
-    if (!data) return [];
-
-    return [...data.subscriptions]
+  const summary =
+    canonical?.summary ??
+    (legacy?.summary
+      ? normalizeDashboardSummary(
+          legacy.summary as unknown as Record<string, unknown>
+        )
+      : undefined);
+  const winnerSurface = canonical?.winner_surface;
+  const settlementPosture = summary ? buildSettlementPosture(summary) : null;
+  const winnerPosture = buildWinnerPosture(winnerSurface, summary);
+  const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
+    0,
+    6
+  );
+  const paymentRows = recentPayments?.results ?? [];
+  const winnerRows = winnerItems?.results ?? [];
+  const spotlightSubscriptions =
+    legacy?.subscriptions
+      ?.slice()
       .sort((left, right) => {
         const priorityDelta = statusPriority(left) - statusPriority(right);
         if (priorityDelta !== 0) return priorityDelta;
@@ -268,8 +200,7 @@ export default function CustomerDashboardPage() {
 
         return rightOutstanding - leftOutstanding;
       })
-      .slice(0, 3);
-  }, [data]);
+      .slice(0, 3) ?? [];
 
   const quickLinks: QuickLink[] = [
     {
@@ -305,6 +236,16 @@ export default function CustomerDashboardPage() {
         }
       />
 
+      <DashboardTimeWindowSelector
+        value={windowPreset}
+        startDate={startDate}
+        endDate={endDate}
+        loading={loading || refreshing}
+        onWindowChange={setWindowPreset}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
+
       {loading ? <LoadingBlock label="Loading customer workspace..." /> : null}
 
       {!loading && error ? (
@@ -315,7 +256,7 @@ export default function CustomerDashboardPage() {
         />
       ) : null}
 
-      {!loading && !error && data ? (
+      {!loading && !error && legacy && summary ? (
         <>
           <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
             <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
@@ -328,12 +269,12 @@ export default function CustomerDashboardPage() {
                   Financial alignment
                 </div>
                 <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                  {data.customer.name || "Customer"}
+                  {legacy.customer.name || "Customer"}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
                   Paid, remaining, overdue, and winner-related figures here come
-                  from the same subscription financial snapshot used by your
-                  contract detail, so settlement and waiver posture stay aligned.
+                  from the same canonical summary-v2 flow now shared across all
+                  dashboards, so settlement and waiver posture stay aligned.
                 </p>
               </div>
 
@@ -343,7 +284,7 @@ export default function CustomerDashboardPage() {
                     KYC status
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.customer.kyc_status || "PENDING"}
+                    {legacy.customer.kyc_status || "PENDING"}
                   </div>
                 </div>
                 <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
@@ -351,7 +292,7 @@ export default function CustomerDashboardPage() {
                     Phone
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.customer.phone || "—"}
+                    {legacy.customer.phone || "—"}
                   </div>
                 </div>
                 <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
@@ -359,7 +300,7 @@ export default function CustomerDashboardPage() {
                     Contracts
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.summary.subscription_count ?? data.subscriptions.length} total
+                    {summary.subscription_count ?? legacy.subscriptions.length} total
                   </div>
                 </div>
                 <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
@@ -367,8 +308,8 @@ export default function CustomerDashboardPage() {
                     Winner history
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.summary.winner_subscriptions ?? 0} subscription
-                    {(data.summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
+                    {summary.winner_subscriptions ?? 0} subscription
+                    {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
                   </div>
                 </div>
               </div>
@@ -376,16 +317,44 @@ export default function CustomerDashboardPage() {
           </section>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {summaryCards.map((card) => (
-              <StatCard
-                key={card.label}
-                label={card.label}
-                value={card.value}
-                subtext={card.subtext}
-                tone={card.tone}
-                icon={card.icon}
-              />
-            ))}
+            <StatCard
+              label="Paid"
+              value={money(summary.total_paid_amount)}
+              subtext={`${summary.paid_emis} EMI settled through recorded payments`}
+              tone="success"
+              icon={<Wallet className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Remaining"
+              value={money(summary.remaining_amount ?? summary.outstanding_amount)}
+              subtext={`${money(summary.total_pending_amount)} still open across current contracts`}
+              tone={
+                Number(summary.remaining_amount ?? summary.outstanding_amount ?? 0) > 0
+                  ? "info"
+                  : "success"
+              }
+              icon={<CreditCard className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Overdue EMI"
+              value={String(summary.overdue_emis ?? 0)}
+              subtext={`${money(summary.overdue_amount)} currently past due`}
+              tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
+              icon={<AlertTriangle className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Upcoming EMI"
+              value={String(summary.upcoming_emis ?? 0)}
+              subtext={
+                summary.next_due_date && summary.next_due_amount
+                  ? `${money(summary.next_due_amount)} next on ${formatDate(
+                      summary.next_due_date
+                    )}`
+                  : "No upcoming EMI currently visible"
+              }
+              tone="default"
+              icon={<CalendarClock className="h-5 w-5" />}
+            />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -418,14 +387,14 @@ export default function CustomerDashboardPage() {
                     Next payment due
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.summary.next_due_date
-                      ? `${money(data.summary.next_due_amount)} on ${formatDate(
-                          data.summary.next_due_date
+                    {summary.next_due_date
+                      ? `${money(summary.next_due_amount)} on ${formatDate(
+                          summary.next_due_date
                         )}`
                       : "No pending EMI"}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {data.summary.next_due_subscription_number || "No contract pending"}
+                    {summary.next_due_subscription_number || "No contract pending"}
                   </div>
                 </div>
                 <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
@@ -433,10 +402,10 @@ export default function CustomerDashboardPage() {
                     Active contracts
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.summary.active_subscriptions}
+                    {summary.active_subscriptions}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {data.summary.completed_subscriptions ?? 0} completed
+                    {summary.completed_subscriptions ?? 0} completed
                   </div>
                 </div>
                 <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
@@ -444,7 +413,7 @@ export default function CustomerDashboardPage() {
                     Payment adjustments
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {data.summary.has_payment_adjustments ? "Recorded" : "None"}
+                    {summary.has_payment_adjustments ? "Recorded" : "None"}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
                     Settled totals already reflect any reversal history.
@@ -453,72 +422,141 @@ export default function CustomerDashboardPage() {
               </div>
             </section>
 
-            <section className="rounded-[1.8rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.52)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Winner benefit and waiver posture
-                  </p>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-950">
-                    {winnerPosture?.title}
-                  </h3>
-                </div>
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${winnerPosture?.badgeClass}`}
-                >
-                  {winnerPosture?.badgeLabel}
-                </span>
-              </div>
-
-              <p className="mt-4 text-sm leading-7 text-slate-600">
-                {winnerPosture?.description}
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <WorkspaceSection
+              title={winnerPosture.title}
+              description={winnerPosture.description}
+              className="h-full rounded-[1.8rem]"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
                 <StatCard
                   label="Waived by benefit"
-                  value={money(data.summary.total_waived_amount)}
-                  subtext={`${data.summary.waived_emis ?? 0} EMI rows already marked waived`}
-                  tone={
-                    Number(data.summary.total_waived_amount ?? 0) > 0
-                      ? "info"
-                      : "default"
-                  }
+                  value={money(
+                    winnerSurface?.total_waived_amount ?? summary.total_waived_amount
+                  )}
+                  subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
+                  tone="info"
                   icon={<BadgeCheck className="h-5 w-5" />}
-                  className="h-full"
                 />
                 <StatCard
                   label="Contracts in view"
-                  value={String(
-                    data.summary.subscription_count ?? data.subscriptions.length
-                  )}
-                  subtext={`${data.summary.winner_subscriptions ?? 0} with winner history`}
+                  value={String(summary.subscription_count ?? legacy.subscriptions.length)}
+                  subtext={`${summary.winner_subscriptions ?? 0} with winner history`}
                   tone="default"
                   icon={<Layers3 className="h-5 w-5" />}
-                  className="h-full"
                 />
               </div>
-            </section>
+              {winnerRows.length > 0 ? (
+                <div className="mt-4 grid gap-2">
+                  {winnerRows.map((row) => (
+                    <div
+                      key={row.subscription_id}
+                      className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                    >
+                      <div className="font-semibold text-slate-950">
+                        {row.subscription_number}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {row.customer_name || "Unknown customer"}
+                        {row.waived_amount ? ` • Waived ${money(row.waived_amount)}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </WorkspaceSection>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <WorkspaceSection
+              title="Due collection queue"
+              description="Your next-due rows and overdue rows now come from the same canonical surface layer used across every dashboard."
+              actionHref={ROUTES.customer.subscriptions}
+              actionLabel="Open subscriptions"
+            >
+              {dueRows.length > 0 ? (
+                <div className="grid gap-3">
+                  {dueRows.map((item) => (
+                    <div
+                      key={`${item.subscription_id ?? item.id}-${item.emi_id ?? "na"}`}
+                      className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                    >
+                      <div className="text-sm font-semibold text-foreground">
+                        {item.subscription_number || `SUB-${String(item.subscription_id ?? item.id)}`}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {item.product_name || "Linked product"} · Batch {item.batch_code || "—"} · Lucky{" "}
+                        {item.lucky_number ?? "—"}
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Due {formatDate(item.due_date)} · Pending {money(item.pending_amount)}
+                        {item.is_overdue && item.overdue_days
+                          ? ` · ${item.overdue_days} day(s) overdue`
+                          : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No due contracts in this window"
+                  description="The selected drilldown window is not currently returning any next-due or overdue rows."
+                />
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Recent payment surface"
+              description="Recent recorded payment rows from the canonical recent-payments surface."
+              actionHref={ROUTES.customer.payments}
+              actionLabel="Open payments"
+            >
+              {paymentRows.length > 0 ? (
+                <div className="grid gap-3">
+                  {paymentRows.map((item) => (
+                    <div
+                      key={item.payment_id}
+                      className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {item.subscription_number || `Payment #${item.payment_id}`}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {item.method || "—"}
+                            {item.reference_no ? ` · Ref ${item.reference_no}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">
+                            {money(item.amount)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(item.payment_date)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No recent payments in this window"
+                  description="No recorded payment rows are visible for the selected drilldown window."
+                />
+              )}
+            </WorkspaceSection>
           </div>
 
           <section className="space-y-4">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Subscription overview
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Priority contracts are surfaced here with their linked product,
-                  current remaining amount, and winner posture.
-                </p>
-              </div>
-              <Link
-                href={ROUTES.customer.subscriptions}
-                className="inline-flex items-center gap-2 text-sm font-medium text-slate-900"
-              >
-                Open all subscriptions
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Subscription overview
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Priority contracts are surfaced here with their linked product,
+                current remaining amount, and winner posture.
+              </p>
             </div>
 
             {spotlightSubscriptions.length > 0 ? (
@@ -542,9 +580,7 @@ export default function CustomerDashboardPage() {
 
           <section className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Go next
-              </h2>
+              <h2 className="text-lg font-semibold text-foreground">Go next</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Open the next customer workflow without leaving this financial overview.
               </p>
@@ -559,7 +595,7 @@ export default function CustomerDashboardPage() {
         </>
       ) : null}
 
-      {!loading && !error && !data ? (
+      {!loading && !error && !legacy ? (
         <EmptyState
           title="No customer workspace data"
           description="Customer dashboard data is not currently available."

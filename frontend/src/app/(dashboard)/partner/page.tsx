@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
+import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -27,8 +28,27 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import { getPartnerDashboard } from "@/services/partner";
+import {
+  getDashboardSummaryV2,
+  listDashboardOverdue,
+  listDashboardRecentPayments,
+  listDashboardReconciliationExceptions,
+  listDashboardUpcoming,
+  listDashboardWinners,
+  normalizeDashboardSummary,
+} from "@/services/dashboards";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
-type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
+type LegacyDashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
+type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
+type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
+type DashboardPaymentsPayload = Awaited<
+  ReturnType<typeof listDashboardRecentPayments>
+>;
+type DashboardReconciliationPayload = Awaited<
+  ReturnType<typeof listDashboardReconciliationExceptions>
+>;
+type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -38,22 +58,69 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function PartnerDashboardPage() {
-  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
+  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
+  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
+  const [recentPayments, setRecentPayments] =
+    useState<DashboardPaymentsPayload | null>(null);
+  const [reconciliationItems, setReconciliationItems] =
+    useState<DashboardReconciliationPayload | null>(null);
+  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [windowPreset, setWindowPreset] =
+    useState<DashboardWindowPreset>("DEFAULT");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const payload = await getPartnerDashboard();
-      setData(payload);
+      const query =
+        windowPreset === "CUSTOM"
+          ? {
+              window: windowPreset,
+              start_date: startDate || undefined,
+              end_date: endDate || undefined,
+            }
+          : { window: windowPreset };
+
+      const [
+        legacyPayload,
+        canonicalPayload,
+        overduePayload,
+        upcomingPayload,
+        recentPaymentsPayload,
+        reconciliationPayload,
+        winnersPayload,
+      ] = await Promise.all([
+        getPartnerDashboard(),
+        getDashboardSummaryV2(query),
+        listDashboardOverdue({ ...query, limit: 6 }),
+        listDashboardUpcoming({ ...query, limit: 6 }),
+        listDashboardRecentPayments({ ...query, limit: 6 }),
+        listDashboardReconciliationExceptions({ ...query, limit: 4 }),
+        listDashboardWinners({ ...query, limit: 4 }),
+      ]);
+
+      setLegacy(legacyPayload);
+      setCanonical(canonicalPayload);
+      setOverdue(overduePayload);
+      setUpcoming(upcomingPayload);
+      setRecentPayments(recentPaymentsPayload);
+      setReconciliationItems(reconciliationPayload);
+      setWinnerItems(winnersPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      setData(null);
+      setLegacy(null);
+      setCanonical(null);
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -62,12 +129,30 @@ export default function PartnerDashboardPage() {
 
   useEffect(() => {
     void loadPage("initial");
-  }, []);
+  }, [windowPreset, startDate, endDate]);
 
-  const summary = data?.summary;
+  const summary =
+    canonical?.summary ??
+    (legacy?.summary
+      ? normalizeDashboardSummary(
+          legacy.summary as unknown as Record<string, unknown>
+        )
+      : undefined);
+  const winnerSurface = canonical?.winner_surface ?? legacy?.winner_surface;
+  const reconciliationSurface =
+    canonical?.reconciliation ?? legacy?.reconciliation;
   const settlementPosture = summary ? buildSettlementPosture(summary) : null;
-  const winnerPosture = buildWinnerPosture(data?.winner_surface, summary);
-  const reconciliationPosture = buildReconciliationPosture(data?.reconciliation);
+  const winnerPosture = buildWinnerPosture(winnerSurface, summary);
+  const reconciliationPosture = buildReconciliationPosture(
+    reconciliationSurface
+  );
+  const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
+    0,
+    8
+  );
+  const paymentRows = recentPayments?.results ?? [];
+  const flaggedRows = reconciliationItems?.results ?? [];
+  const winnerRows = winnerItems?.results ?? [];
 
   return (
     <PortalPage
@@ -92,25 +177,25 @@ export default function PartnerDashboardPage() {
         },
       ]}
       stats={
-        data
+        legacy
           ? [
               {
                 label: "Customers In Scope",
-                value: String(data.summary.total_customers ?? 0),
+                value: String(legacy.summary.total_customers ?? 0),
                 tone: "info",
               },
               {
                 label: "Subscriptions",
-                value: String(data.summary.total_subscriptions ?? 0),
+                value: String(legacy.summary.total_subscriptions ?? 0),
               },
               {
                 label: "Collected",
-                value: money(data.summary.total_revenue_collected),
+                value: money(legacy.summary.total_revenue_collected),
                 tone: "success",
               },
               {
                 label: "Pending Commission",
-                value: money(data.summary.pending_commission),
+                value: money(legacy.summary.pending_commission),
                 tone: "warning",
               },
             ]
@@ -131,6 +216,16 @@ export default function PartnerDashboardPage() {
           </button>
         </div>
 
+        <DashboardTimeWindowSelector
+          value={windowPreset}
+          startDate={startDate}
+          endDate={endDate}
+          loading={loading || refreshing}
+          onWindowChange={setWindowPreset}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+        />
+
         {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
 
         {!loading && error ? (
@@ -141,12 +236,12 @@ export default function PartnerDashboardPage() {
           />
         ) : null}
 
-        {!loading && !error && data && summary ? (
+        {!loading && !error && legacy && summary ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Paid"
-                value={money(summary.total_paid_amount ?? summary.total_revenue_collected)}
+                value={money(summary.total_paid_amount)}
                 subtext={`${summary.paid_emis} EMI already reflected in partner-visible settlement truth`}
                 tone="success"
                 icon={<CircleDollarSign className="h-5 w-5" />}
@@ -229,11 +324,11 @@ export default function PartnerDashboardPage() {
                       Collection pipeline
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {data.summary.under_review_collection_requests ?? 0} under review
+                      {legacy.summary.under_review_collection_requests ?? 0} under review
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {data.summary.submitted_collection_requests ?? 0} submitted,{" "}
-                      {data.summary.approved_collection_requests ?? 0} approved
+                      {legacy.summary.submitted_collection_requests ?? 0} submitted,{" "}
+                      {legacy.summary.approved_collection_requests ?? 0} approved
                     </div>
                   </div>
                   <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
@@ -241,10 +336,10 @@ export default function PartnerDashboardPage() {
                       Commission posture
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {money(data.summary.pending_commission)}
+                      {money(legacy.summary.pending_commission)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {money(data.summary.settled_commission)} already settled
+                      {money(legacy.summary.settled_commission)} already settled
                     </div>
                   </div>
                 </div>
@@ -260,18 +355,18 @@ export default function PartnerDashboardPage() {
                     <StatCard
                       label="Winner subscriptions"
                       value={String(
-                        data.winner_surface?.winner_subscriptions ??
+                        winnerSurface?.winner_subscriptions ??
                           summary.winner_subscriptions ??
                           0
                       )}
-                      subtext={`${data.winner_surface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
+                      subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
                       tone="info"
                       icon={<BadgeCheck className="h-5 w-5" />}
                     />
                     <StatCard
                       label="Waived value"
                       value={money(
-                        data.winner_surface?.total_waived_amount ??
+                        winnerSurface?.total_waived_amount ??
                           summary.total_waived_amount
                       )}
                       subtext={winnerPosture.badgeLabel}
@@ -279,6 +374,26 @@ export default function PartnerDashboardPage() {
                       icon={<Users className="h-5 w-5" />}
                     />
                   </div>
+                  {winnerRows.length > 0 ? (
+                    <div className="mt-4 grid gap-2">
+                      {winnerRows.map((row) => (
+                        <div
+                          key={row.subscription_id}
+                          className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                        >
+                          <div className="font-semibold text-slate-950">
+                            {row.subscription_number}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {row.customer_name || "Unknown customer"}
+                            {row.waived_amount
+                              ? ` • Waived ${money(row.waived_amount)}`
+                              : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </WorkspaceSection>
 
                 <WorkspaceSection
@@ -291,16 +406,16 @@ export default function PartnerDashboardPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
                       label="Checked"
-                      value={String(data.reconciliation?.checked_count ?? 0)}
+                      value={String(reconciliationSurface?.checked_count ?? 0)}
                       subtext="Subscriptions checked in this partner scope"
                       tone="default"
                     />
                     <StatCard
                       label="Flagged"
-                      value={String(data.reconciliation?.flagged_count ?? 0)}
+                      value={String(reconciliationSurface?.flagged_count ?? 0)}
                       subtext="Rows needing follow-up"
                       tone={
-                        (data.reconciliation?.flagged_count ?? 0) > 0
+                        (reconciliationSurface?.flagged_count ?? 0) > 0
                           ? "warning"
                           : "success"
                       }
@@ -312,13 +427,13 @@ export default function PartnerDashboardPage() {
 
             <WorkspaceSection
               title="Due collection queue"
-              description="Partner-scoped next-due contracts ordered by urgency, sourced from the canonical subscription snapshot."
+              description="Partner-scoped next-due contracts ordered by urgency, sourced from the canonical surface endpoints."
               actionHref="/partner/subscriptions"
               actionLabel="Open subscriptions"
             >
-              {data.due_subscriptions && data.due_subscriptions.length > 0 ? (
+              {dueRows.length > 0 ? (
                 <div className="grid gap-3">
-                  {data.due_subscriptions.slice(0, 8).map((item) => {
+                  {dueRows.map((item) => {
                     const subscriptionId = item.subscription_id ?? item.id;
                     return (
                       <div
@@ -370,10 +485,10 @@ export default function PartnerDashboardPage() {
                 actionHref="/partner/collections"
                 actionLabel="Open queue"
               >
-                {data.recent_collection_requests &&
-                data.recent_collection_requests.length > 0 ? (
+                {legacy.recent_collection_requests &&
+                legacy.recent_collection_requests.length > 0 ? (
                   <div className="grid gap-3">
-                    {data.recent_collection_requests.slice(0, 6).map((item) => (
+                    {legacy.recent_collection_requests.slice(0, 6).map((item) => (
                       <div
                         key={String(item.id)}
                         className="rounded-2xl border border-white/75 bg-white/75 p-4"
@@ -410,16 +525,15 @@ export default function PartnerDashboardPage() {
 
               <WorkspaceSection
                 title="Recent verified payments"
-                description="Verified payment rows remain partner-visible, but broader admin finance controls stay out of this dashboard."
+                description="Verified payment rows now come from the shared canonical recent-payments surface while broader admin finance controls stay out of this dashboard."
                 actionHref="/partner/payments"
                 actionLabel="Open payments"
               >
-                {data.recent_verified_payments &&
-                data.recent_verified_payments.length > 0 ? (
+                {paymentRows.length > 0 ? (
                   <div className="grid gap-3">
-                    {data.recent_verified_payments.slice(0, 6).map((item) => (
+                    {paymentRows.map((item) => (
                       <div
-                        key={String(item.id)}
+                        key={item.payment_id}
                         className="rounded-2xl border border-white/75 bg-white/75 p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -453,13 +567,6 @@ export default function PartnerDashboardPage() {
               </WorkspaceSection>
             </div>
           </>
-        ) : null}
-
-        {!loading && !error && !data ? (
-          <EmptyState
-            title="No partner dashboard data"
-            description="Partner dashboard data is not currently available."
-          />
         ) : null}
       </div>
     </PortalPage>

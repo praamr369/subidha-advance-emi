@@ -12,10 +12,10 @@ import {
   Percent,
   RefreshCw,
   ShieldAlert,
-  ShieldCheck,
   Wallet,
 } from "lucide-react";
 
+import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -37,8 +37,27 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getAdminDashboard } from "@/services/admin";
+import {
+  getDashboardSummaryV2,
+  listDashboardOverdue,
+  listDashboardRecentPayments,
+  listDashboardReconciliationExceptions,
+  listDashboardUpcoming,
+  listDashboardWinners,
+  normalizeDashboardSummary,
+} from "@/services/dashboards";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
-type DashboardPayload = Awaited<ReturnType<typeof getAdminDashboard>>;
+type LegacyDashboardPayload = Awaited<ReturnType<typeof getAdminDashboard>>;
+type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
+type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
+type DashboardPaymentsPayload = Awaited<
+  ReturnType<typeof listDashboardRecentPayments>
+>;
+type DashboardReconciliationPayload = Awaited<
+  ReturnType<typeof listDashboardReconciliationExceptions>
+>;
+type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -61,22 +80,71 @@ function formatDateTime(value?: string | null): string {
 }
 
 export default function AdminDashboardPage() {
-  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
+  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
+  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
+  const [recentPayments, setRecentPayments] =
+    useState<DashboardPaymentsPayload | null>(null);
+  const [reconciliationItems, setReconciliationItems] =
+    useState<DashboardReconciliationPayload | null>(null);
+  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [windowPreset, setWindowPreset] =
+    useState<DashboardWindowPreset>("DEFAULT");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   async function loadDashboard(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const payload = await getAdminDashboard();
-      setData(payload);
+      const query =
+        windowPreset === "CUSTOM"
+          ? {
+              window: windowPreset,
+              start_date: startDate || undefined,
+              end_date: endDate || undefined,
+            }
+          : { window: windowPreset };
+
+      const [
+        legacyPayload,
+        canonicalPayload,
+        overduePayload,
+        upcomingPayload,
+        recentPaymentsPayload,
+        reconciliationPayload,
+        winnerPayload,
+      ] = await Promise.all([
+        getAdminDashboard(),
+        getDashboardSummaryV2(query),
+        listDashboardOverdue({ ...query, limit: 6 }),
+        listDashboardUpcoming({ ...query, limit: 6 }),
+        listDashboardRecentPayments({ ...query, limit: 8 }),
+        listDashboardReconciliationExceptions({ ...query, limit: 4 }),
+        listDashboardWinners({ ...query, limit: 4 }),
+      ]);
+
+      setLegacy(legacyPayload);
+      setCanonical(canonicalPayload);
+      setOverdue(overduePayload);
+      setUpcoming(upcomingPayload);
+      setRecentPayments(recentPaymentsPayload);
+      setReconciliationItems(reconciliationPayload);
+      setWinnerItems(winnerPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      if (mode === "initial") setData(null);
+      if (mode === "initial") {
+        setLegacy(null);
+        setCanonical(null);
+      }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -85,14 +153,30 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     void loadDashboard("initial");
-  }, []);
+  }, [windowPreset, startDate, endDate]);
 
-  const summary = data?.summary;
+  const summary =
+    canonical?.summary ??
+    (legacy?.summary
+      ? normalizeDashboardSummary(
+          legacy.summary as unknown as Record<string, unknown>
+        )
+      : undefined);
+  const winnerSurface = canonical?.winner_surface ?? legacy?.winner_surface;
+  const reconciliationSurface =
+    canonical?.reconciliation ?? legacy?.reconciliation;
   const settlementPosture = summary ? buildSettlementPosture(summary) : null;
-  const winnerPosture = buildWinnerPosture(data?.winner_surface, summary);
-  const reconciliationPosture = buildReconciliationPosture(data?.reconciliation);
-  const flaggedRows = data?.reconciliation?.results.slice(0, 4) ?? [];
-  const dueRows = data?.due_subscriptions?.slice(0, 8) ?? [];
+  const winnerPosture = buildWinnerPosture(winnerSurface, summary);
+  const reconciliationPosture = buildReconciliationPosture(
+    reconciliationSurface
+  );
+  const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
+    0,
+    8
+  );
+  const paymentRows = recentPayments?.results ?? [];
+  const flaggedRows = reconciliationItems?.results ?? [];
+  const winnerRows = winnerItems?.results ?? [];
 
   return (
     <PortalPage
@@ -117,26 +201,26 @@ export default function AdminDashboardPage() {
         },
       ]}
       stats={
-        data
+        legacy && summary
           ? [
               {
                 label: "Customers",
-                value: String(data.subscription_kpis?.total_customers ?? 0),
+                value: String(legacy.subscription_kpis?.total_customers ?? 0),
               },
               {
                 label: "Active Contracts",
-                value: String(summary?.active_subscriptions ?? 0),
+                value: String(summary.active_subscriptions ?? 0),
               },
               {
                 label: "Collected Today",
-                value: money(data.collections?.today_net_amount),
+                value: money(legacy.collections?.today_net_amount),
                 tone: "success",
               },
               {
                 label: "Flagged Reconciliation",
-                value: String(data.reconciliation?.flagged_count ?? 0),
+                value: String(reconciliationSurface?.flagged_count ?? 0),
                 tone:
-                  (data.reconciliation?.flagged_count ?? 0) > 0
+                  (reconciliationSurface?.flagged_count ?? 0) > 0
                     ? "warning"
                     : "info",
               },
@@ -163,6 +247,16 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
+        <DashboardTimeWindowSelector
+          value={windowPreset}
+          startDate={startDate}
+          endDate={endDate}
+          loading={loading || refreshing}
+          onWindowChange={setWindowPreset}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+        />
+
         {loading ? <LoadingBlock label="Loading admin dashboard..." /> : null}
 
         {!loading && error ? (
@@ -173,7 +267,7 @@ export default function AdminDashboardPage() {
           />
         ) : null}
 
-        {!loading && !error && data && summary ? (
+        {!loading && !error && legacy && summary ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
@@ -256,43 +350,41 @@ export default function AdminDashboardPage() {
                         : "No pending EMI visible"}
                     </div>
                   </div>
-
                   <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Collections today
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {money(data.collections?.today_net_amount)}
+                      {money(legacy.collections?.today_net_amount)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {data.collections?.today_transaction_count ?? 0} transactions,{" "}
-                      {data.collections?.today_reversed_payments ?? 0} reversed
+                      {legacy.collections?.today_transaction_count ?? 0} transactions
                     </div>
                   </div>
-
                   <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Contract footprint
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {data.subscription_kpis?.total_subscriptions ?? summary.subscription_count} contracts
+                      {legacy.subscription_kpis?.total_subscriptions ??
+                        summary.subscription_count}{" "}
+                      contracts
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {data.subscription_kpis?.total_customers ?? 0} customers in total
+                      {legacy.subscription_kpis?.total_customers ?? 0} customers in total
                     </div>
                   </div>
-
                   <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Next draw
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {data.batches.next_draw_batch?.batch_code ?? "No live batch"}
+                      {legacy.batches.next_draw_batch?.batch_code ?? "No live batch"}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {data.batches.next_draw_batch?.draw_date
-                        ? `${data.batches.next_draw_batch.days_until_draw ?? 0} days to ${formatDate(
-                            data.batches.next_draw_batch.draw_date
+                      {legacy.batches.next_draw_batch?.draw_date
+                        ? `${legacy.batches.next_draw_batch.days_until_draw ?? 0} days to ${formatDate(
+                            legacy.batches.next_draw_batch.draw_date
                           )}`
                         : "No draw currently scheduled"}
                     </div>
@@ -310,24 +402,47 @@ export default function AdminDashboardPage() {
                     <StatCard
                       label="Winner subscriptions"
                       value={String(
-                        data.winner_surface?.winner_subscriptions ??
+                        winnerSurface?.winner_subscriptions ??
                           summary.winner_subscriptions ??
                           0
                       )}
-                      subtext={`${data.winner_surface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
+                      subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
                       tone="info"
                       icon={<BadgeCheck className="h-5 w-5" />}
                     />
                     <StatCard
                       label="Waived value"
                       value={money(
-                        data.winner_surface?.total_waived_amount ??
+                        winnerSurface?.total_waived_amount ??
                           summary.total_waived_amount
                       )}
                       subtext={winnerPosture.badgeLabel}
                       tone="default"
                     />
                   </div>
+                  {winnerRows.length > 0 ? (
+                    <div className="mt-4 grid gap-2">
+                      {winnerRows.map((row) => (
+                        <div
+                          key={row.subscription_id}
+                          className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                        >
+                          <div className="font-semibold text-slate-950">
+                            {row.subscription_number}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {row.customer_name || "Unknown customer"}
+                            {row.draw_revealed_at
+                              ? ` • Revealed ${formatDate(row.draw_revealed_at)}`
+                              : ""}
+                            {row.waived_amount
+                              ? ` • Waived ${money(row.waived_amount)}`
+                              : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </WorkspaceSection>
 
                 <WorkspaceSection
@@ -340,16 +455,16 @@ export default function AdminDashboardPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
                       label="Checked"
-                      value={String(data.reconciliation?.checked_count ?? 0)}
+                      value={String(reconciliationSurface?.checked_count ?? 0)}
                       subtext="Subscriptions checked in admin scope"
                       tone="default"
                     />
                     <StatCard
                       label="Flagged"
-                      value={String(data.reconciliation?.flagged_count ?? 0)}
+                      value={String(reconciliationSurface?.flagged_count ?? 0)}
                       subtext="Rows needing controlled finance review"
                       tone={
-                        (data.reconciliation?.flagged_count ?? 0) > 0
+                        (reconciliationSurface?.flagged_count ?? 0) > 0
                           ? "warning"
                           : "success"
                       }
@@ -362,195 +477,150 @@ export default function AdminDashboardPage() {
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
                 title="Collections and commissions"
-                description="Operational collection throughput stays separate from partner commission settlement, but both are rendered from real backend summary lanes."
+                description="Operational collection throughput stays separate from partner commission settlement, but all shared finance posture now comes from the same canonical summary-v2 flow."
                 actionHref={ROUTES.admin.financeCommissions}
                 actionLabel="Open commission finance"
               >
                 <div className="grid gap-3 md:grid-cols-2">
                   <StatCard
                     label="Gross Today"
-                    value={money(data.collections?.today_gross_amount)}
-                    subtext={`${data.collections?.today_active_payments ?? 0} active payment rows`}
+                    value={money(legacy.collections?.today_gross_amount)}
+                    subtext={`${legacy.collections?.today_active_payments ?? 0} active payment rows`}
                     tone="default"
                     icon={<Wallet className="h-5 w-5" />}
                   />
                   <StatCard
                     label="Net Today"
-                    value={money(data.collections?.today_net_amount)}
-                    subtext={`${data.collections?.today_reversed_payments ?? 0} reversed rows excluded`}
+                    value={money(legacy.collections?.today_net_amount)}
+                    subtext={`${legacy.collections?.today_reversed_payments ?? 0} reversed rows excluded`}
                     tone="success"
                     icon={<CircleDollarSign className="h-5 w-5" />}
                   />
                   <StatCard
                     label="Pending Commission"
-                    value={money(data.commission_summary?.pending_commission)}
-                    subtext={`${data.commission_summary?.pending_count ?? 0} rows waiting settlement`}
+                    value={money(legacy.commission_summary?.pending_commission)}
+                    subtext={`${legacy.commission_summary?.pending_count ?? 0} rows waiting settlement`}
                     tone="warning"
                     icon={<Percent className="h-5 w-5" />}
                   />
                   <StatCard
-                    label="Settled Commission"
-                    value={money(data.commission_summary?.settled_commission)}
-                    subtext={`${data.commission_summary?.settled_count ?? 0} rows already settled`}
-                    tone="info"
+                    label="Defaulted"
+                    value={String(legacy.risk.defaulted)}
+                    subtext={`${legacy.risk.default_rate.toFixed(2)}% default rate`}
+                    tone={legacy.risk.defaulted > 0 ? "warning" : "success"}
+                    icon={<ShieldAlert className="h-5 w-5" />}
                   />
                 </div>
               </WorkspaceSection>
 
               <WorkspaceSection
-                title="Risk and batch pressure"
-                description="These lanes stay role-specific, but they now read against the same canonical subscription summary instead of separate dashboard arithmetic."
-                actionHref={ROUTES.admin.batches}
-                actionLabel="Open batches"
+                title="Due collection queue"
+                description="Canonical next-due subscription rows, ordered by urgency for the selected drilldown window."
+                actionHref={ROUTES.admin.subscriptions}
+                actionLabel="Open subscriptions"
               >
-                <div className="grid gap-3 md:grid-cols-2">
-                  <StatCard
-                    label="Defaulted"
-                    value={String(data.risk.defaulted)}
-                    subtext={`${data.risk.default_rate.toFixed(2)}% default rate`}
-                    tone={data.risk.defaulted > 0 ? "warning" : "success"}
-                    icon={<ShieldAlert className="h-5 w-5" />}
+                {dueRows.length > 0 ? (
+                  <div className="grid gap-3">
+                    {dueRows.map((row) => (
+                      <div
+                        key={`${row.subscription_id ?? row.id}-${row.emi_id ?? "na"}`}
+                        className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={buildAdminSubscriptionRoute(
+                                row.subscription_id ?? row.id
+                              )}
+                              className="text-sm font-semibold text-slate-950 transition hover:text-sky-700"
+                            >
+                              {row.subscription_number ||
+                                `Subscription ${row.subscription_id ?? row.id}`}
+                            </Link>
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                row.is_overdue
+                                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                                  : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}
+                            >
+                              {row.is_overdue
+                                ? `${row.overdue_days ?? 0} days overdue`
+                                : "Upcoming"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {row.customer_name || "Unknown customer"}
+                            {row.product_name ? ` • ${row.product_name}` : ""}
+                            {row.batch_code ? ` • Batch ${row.batch_code}` : ""}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Due {formatDate(row.due_date)}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-2 text-sm text-slate-700">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Monthly amount
+                            </div>
+                            <div className="mt-1 font-semibold text-slate-950">
+                              {money(row.monthly_amount)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Pending amount
+                            </div>
+                            <div className="mt-1 font-semibold text-slate-950">
+                              {money(row.pending_amount)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center md:justify-end">
+                          <Link
+                            href={buildAdminSubscriptionRoute(row.subscription_id ?? row.id)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
+                          >
+                            Open
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No contracts are waiting in the due queue"
+                    description="The selected drilldown window is not currently returning any upcoming or overdue rows."
                   />
-                  <StatCard
-                    label="At Risk"
-                    value={String(data.risk.at_risk)}
-                    subtext={`${data.risk.high_risk} high-risk contracts require follow-up`}
-                    tone={data.risk.at_risk > 0 || data.risk.high_risk > 0 ? "warning" : "default"}
-                  />
-                  <StatCard
-                    label="Open Batches"
-                    value={String(data.batches.open_batches ?? 0)}
-                    subtext={`${data.batches.live_batches ?? 0} live batches with draw exposure`}
-                    tone="info"
-                    icon={<ShieldCheck className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Won Contracts"
-                    value={String(summary.winner_subscriptions ?? 0)}
-                    subtext={`${summary.waived_emis ?? 0} waived EMI rows in canonical truth`}
-                    tone="default"
-                  />
-                </div>
+                )}
               </WorkspaceSection>
             </div>
-
-            <WorkspaceSection
-              title="Due collection queue"
-              description="Canonical next-due subscription rows, ordered by urgency. Admin drill-down stays on the live subscription record instead of duplicated dashboard state."
-              actionHref={ROUTES.admin.subscriptions}
-              actionLabel="Open subscriptions"
-            >
-              {dueRows.length > 0 ? (
-                <div className="grid gap-3">
-                  {dueRows.map((row) => (
-                    <div
-                      key={row.id}
-                      className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={buildAdminSubscriptionRoute(
-                              row.subscription_id ?? row.id
-                            )}
-                            className="text-sm font-semibold text-slate-950 transition hover:text-sky-700"
-                          >
-                            {row.subscription_number || `Subscription ${row.subscription_id ?? row.id}`}
-                          </Link>
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                              row.is_overdue
-                                ? "border-amber-200 bg-amber-50 text-amber-700"
-                                : "border-slate-200 bg-slate-50 text-slate-600"
-                            }`}
-                          >
-                            {row.is_overdue
-                              ? `${row.overdue_days ?? 0} days overdue`
-                              : "Upcoming"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-700">
-                          {row.customer_name || "Unknown customer"}
-                          {row.product_name ? ` • ${row.product_name}` : ""}
-                          {row.batch_code ? ` • Batch ${row.batch_code}` : ""}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Due {formatDate(row.due_date)}
-                          {row.lucky_number !== undefined &&
-                          row.lucky_number !== null &&
-                          row.lucky_number !== ""
-                            ? ` • Lucky ID ${row.lucky_number}`
-                            : ""}
-                        </p>
-                      </div>
-
-                      <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2 md:grid-cols-1">
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Monthly amount
-                          </div>
-                          <div className="mt-1 font-semibold text-slate-950">
-                            {money(row.monthly_amount)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Pending amount
-                          </div>
-                          <div className="mt-1 font-semibold text-slate-950">
-                            {money(row.pending_amount)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center md:justify-end">
-                        <Link
-                          href={buildAdminSubscriptionRoute(row.subscription_id ?? row.id)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
-                        >
-                          Open
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No contracts are waiting in the due queue"
-                  description="The canonical scope is not currently returning any upcoming or overdue rows for admin follow-up."
-                />
-              )}
-            </WorkspaceSection>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
               <WorkspaceSection
                 title="Recent payment activity"
-                description="Latest admin-visible payment rows from today, including reversals, rendered directly from the admin dashboard payload."
+                description="Latest admin-visible payment rows from the Phase-2 canonical drilldown surface."
                 actionHref={ROUTES.admin.payments}
                 actionLabel="Open payments"
               >
-                {data.recent_activity && data.recent_activity.length > 0 ? (
+                {paymentRows.length > 0 ? (
                   <div className="grid gap-3">
-                    {data.recent_activity.map((row, index) => (
+                    {paymentRows.map((row) => (
                       <div
-                        key={`${row.payment_id ?? "payment"}-${index}`}
+                        key={row.payment_id}
                         className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            {row.payment_id ? (
-                              <Link
-                                href={buildAdminPaymentRoute(row.payment_id)}
-                                className="text-sm font-semibold text-slate-950 transition hover:text-sky-700"
-                              >
-                                Payment #{row.payment_id}
-                              </Link>
-                            ) : (
-                              <span className="text-sm font-semibold text-slate-950">
-                                Payment activity
-                              </span>
-                            )}
+                            <Link
+                              href={buildAdminPaymentRoute(row.payment_id)}
+                              className="text-sm font-semibold text-slate-950 transition hover:text-sky-700"
+                            >
+                              Payment #{row.payment_id}
+                            </Link>
                             <span
                               className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                                 row.is_reversed
@@ -563,9 +633,7 @@ export default function AdminDashboardPage() {
                           </div>
                           <p className="mt-2 text-sm text-slate-700">
                             {row.customer_name || "Unknown customer"}
-                            {row.subscription_number
-                              ? ` • ${row.subscription_number}`
-                              : ""}
+                            {row.subscription_number ? ` • ${row.subscription_number}` : ""}
                             {row.batch_code ? ` • Batch ${row.batch_code}` : ""}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
@@ -574,7 +642,6 @@ export default function AdminDashboardPage() {
                             {row.reference_no ? ` • Ref ${row.reference_no}` : ""}
                           </p>
                         </div>
-
                         <div className="grid gap-2 text-sm text-slate-700">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -593,17 +660,14 @@ export default function AdminDashboardPage() {
                             </div>
                           </div>
                         </div>
-
                         <div className="flex items-center md:justify-end">
-                          {row.payment_id ? (
-                            <Link
-                              href={buildAdminPaymentRoute(row.payment_id)}
-                              className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
-                            >
-                              View
-                              <ArrowRight className="h-4 w-4" />
-                            </Link>
-                          ) : null}
+                          <Link
+                            href={buildAdminPaymentRoute(row.payment_id)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
+                          >
+                            View
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
                         </div>
                       </div>
                     ))}
@@ -611,14 +675,14 @@ export default function AdminDashboardPage() {
                 ) : (
                   <EmptyState
                     title="No payment activity in the current window"
-                    description="The admin dashboard did not return any recent payment rows for today."
+                    description="No recent payment rows are visible for the selected drilldown window."
                   />
                 )}
               </WorkspaceSection>
 
               <WorkspaceSection
                 title="Reconciliation attention"
-                description="Top flagged subscriptions surfaced from the canonical reconciliation lane. This keeps the review list consistent with the underlying admin summary endpoint."
+                description="Top flagged subscriptions surfaced from the canonical reconciliation lane for the selected drilldown window."
                 actionHref={buildAdminReconciliationRoute({ flagged: true })}
                 actionLabel="Open flagged rows"
               >
@@ -685,7 +749,7 @@ export default function AdminDashboardPage() {
 
             <WorkspaceSection
               title="Control actions"
-              description="Administrative drill-down routes that preserve the existing operating model while the dashboards now consume the same canonical financial summary."
+              description="Administrative drill-down routes that preserve the existing operating model while the shared finance surfaces now come from the canonical summary-v2 and surface endpoints."
               contentClassName="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
             >
               <Link
@@ -701,7 +765,11 @@ export default function AdminDashboardPage() {
                 Review flagged reconciliation
               </Link>
               <Link
-                href={data.batches.next_draw_batch ? buildAdminBatchRoute(data.batches.next_draw_batch.id) : ROUTES.admin.batches}
+                href={
+                  legacy.batches.next_draw_batch
+                    ? buildAdminBatchRoute(legacy.batches.next_draw_batch.id)
+                    : ROUTES.admin.batches
+                }
                 className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
               >
                 Open next draw batch

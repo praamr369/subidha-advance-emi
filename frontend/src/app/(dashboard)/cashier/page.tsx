@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -25,13 +26,30 @@ import {
   formatDate,
   money,
 } from "@/lib/dashboard-summary";
+import { getCashierDashboard } from "@/services/cashier";
 import {
-  getCashierDashboard,
-  type CashierDashboardResponse,
-  type CashierTransaction,
-} from "@/services/cashier";
+  getDashboardSummaryV2,
+  listDashboardOverdue,
+  listDashboardRecentPayments,
+  listDashboardReconciliationExceptions,
+  listDashboardUpcoming,
+  listDashboardWinners,
+  normalizeDashboardSummary,
+} from "@/services/dashboards";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
-function formatDateTime(value?: string): string {
+type LegacyDashboardPayload = Awaited<ReturnType<typeof getCashierDashboard>>;
+type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
+type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
+type DashboardPaymentsPayload = Awaited<
+  ReturnType<typeof listDashboardRecentPayments>
+>;
+type DashboardReconciliationPayload = Awaited<
+  ReturnType<typeof listDashboardReconciliationExceptions>
+>;
+type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
+
+function formatDateTime(value?: string | null): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
@@ -52,22 +70,71 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function CashierDashboardPage() {
-  const [data, setData] = useState<CashierDashboardResponse | null>(null);
+  const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
+  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
+  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
+  const [recentPayments, setRecentPayments] =
+    useState<DashboardPaymentsPayload | null>(null);
+  const [reconciliationItems, setReconciliationItems] =
+    useState<DashboardReconciliationPayload | null>(null);
+  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [windowPreset, setWindowPreset] =
+    useState<DashboardWindowPreset>("DEFAULT");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   async function loadDashboard(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const payload = await getCashierDashboard();
-      setData(payload);
+      const query =
+        windowPreset === "CUSTOM"
+          ? {
+              window: windowPreset,
+              start_date: startDate || undefined,
+              end_date: endDate || undefined,
+            }
+          : { window: windowPreset };
+
+      const [
+        legacyPayload,
+        canonicalPayload,
+        overduePayload,
+        upcomingPayload,
+        recentPaymentsPayload,
+        reconciliationPayload,
+        winnersPayload,
+      ] = await Promise.all([
+        getCashierDashboard(),
+        getDashboardSummaryV2(query),
+        listDashboardOverdue({ ...query, limit: 6 }),
+        listDashboardUpcoming({ ...query, limit: 6 }),
+        listDashboardRecentPayments({ ...query, limit: 12 }),
+        listDashboardReconciliationExceptions({ ...query, limit: 4 }),
+        listDashboardWinners({ ...query, limit: 4 }),
+      ]);
+
+      setLegacy(legacyPayload);
+      setCanonical(canonicalPayload);
+      setOverdue(overduePayload);
+      setUpcoming(upcomingPayload);
+      setRecentPayments(recentPaymentsPayload);
+      setReconciliationItems(reconciliationPayload);
+      setWinnerItems(winnersPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      if (mode === "initial") setData(null);
+      if (mode === "initial") {
+        setLegacy(null);
+        setCanonical(null);
+      }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -76,17 +143,32 @@ export default function CashierDashboardPage() {
 
   useEffect(() => {
     void loadDashboard("initial");
-  }, []);
+  }, [windowPreset, startDate, endDate]);
 
-  const summary = data?.summary;
-  const transactions: CashierTransaction[] = data?.today_transactions ?? [];
+  const summary =
+    canonical?.summary ??
+    (legacy?.summary
+      ? normalizeDashboardSummary(
+          legacy.summary as unknown as Record<string, unknown>
+        )
+      : undefined);
+  const winnerSurface = canonical?.winner_surface ?? legacy?.winner_surface;
+  const reconciliationSurface =
+    canonical?.reconciliation ?? legacy?.reconciliation;
   const settlementPosture = summary ? buildSettlementPosture(summary) : null;
-  const winnerPosture = buildWinnerPosture(data?.winner_surface, summary);
-  const reconciliationPosture = buildReconciliationPosture(data?.reconciliation);
-
+  const winnerPosture = buildWinnerPosture(winnerSurface, summary);
+  const reconciliationPosture = buildReconciliationPosture(
+    reconciliationSurface
+  );
+  const paymentRows = recentPayments?.results ?? [];
+  const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
+    0,
+    8
+  );
+  const winnerRows = winnerItems?.results ?? [];
   const averageTicketValue =
-    data && data.today_transaction_count > 0
-      ? money(Number(data.today_total_collected) / data.today_transaction_count)
+    legacy && legacy.today_transaction_count > 0
+      ? money(Number(legacy.today_total_collected) / legacy.today_transaction_count)
       : "₹0.00";
 
   return (
@@ -107,24 +189,24 @@ export default function CashierDashboardPage() {
         },
       ]}
       stats={
-        data
+        legacy
           ? [
               {
                 label: "Collected Today",
-                value: money(data.today_total_collected),
+                value: money(legacy.today_total_collected),
                 tone: "success",
               },
               {
                 label: "Today Transactions",
-                value: String(data.today_transaction_count),
+                value: String(legacy.today_transaction_count),
               },
               {
                 label: "Cash Today",
-                value: money(data.today_cash_total),
+                value: money(legacy.today_cash_total),
               },
               {
                 label: "Digital Today",
-                value: money(data.today_digital_total),
+                value: money(legacy.today_digital_total),
                 tone: "info",
               },
             ]
@@ -145,6 +227,16 @@ export default function CashierDashboardPage() {
           </button>
         </div>
 
+        <DashboardTimeWindowSelector
+          value={windowPreset}
+          startDate={startDate}
+          endDate={endDate}
+          loading={loading || refreshing}
+          onWindowChange={setWindowPreset}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+        />
+
         {loading ? <LoadingBlock label="Loading cashier dashboard..." /> : null}
 
         {!loading && error ? (
@@ -155,7 +247,7 @@ export default function CashierDashboardPage() {
           />
         ) : null}
 
-        {!loading && !error && data && summary ? (
+        {!loading && !error && legacy && summary ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
@@ -243,7 +335,7 @@ export default function CashierDashboardPage() {
                       Today throughput
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {data.today_transaction_count} transactions
+                      {legacy.today_transaction_count} transactions
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
                       Average ticket {averageTicketValue}
@@ -254,10 +346,10 @@ export default function CashierDashboardPage() {
                       Winner / waiver
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {data.winner_surface?.winner_subscriptions ?? 0} subscriptions
+                      {winnerSurface?.winner_subscriptions ?? 0} subscriptions
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {money(data.winner_surface?.total_waived_amount)}
+                      {money(winnerSurface?.total_waived_amount)}
                     </div>
                   </div>
                 </div>
@@ -273,24 +365,44 @@ export default function CashierDashboardPage() {
                     <StatCard
                       label="Winner subscriptions"
                       value={String(
-                        data.winner_surface?.winner_subscriptions ??
+                        winnerSurface?.winner_subscriptions ??
                           summary.winner_subscriptions ??
                           0
                       )}
-                      subtext={`${data.winner_surface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
+                      subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
                       tone="info"
                       icon={<BadgeCheck className="h-5 w-5" />}
                     />
                     <StatCard
                       label="Waived value"
                       value={money(
-                        data.winner_surface?.total_waived_amount ??
+                        winnerSurface?.total_waived_amount ??
                           summary.total_waived_amount
                       )}
                       subtext={winnerPosture.badgeLabel}
                       tone="default"
                     />
                   </div>
+                  {winnerRows.length > 0 ? (
+                    <div className="mt-4 grid gap-2">
+                      {winnerRows.map((row) => (
+                        <div
+                          key={row.subscription_id}
+                          className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                        >
+                          <div className="font-semibold text-slate-950">
+                            {row.subscription_number}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {row.customer_name || "Unknown customer"}
+                            {row.waived_amount
+                              ? ` • Waived ${money(row.waived_amount)}`
+                              : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </WorkspaceSection>
 
                 <WorkspaceSection
@@ -303,16 +415,16 @@ export default function CashierDashboardPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
                       label="Checked"
-                      value={String(data.reconciliation?.checked_count ?? 0)}
+                      value={String(reconciliationSurface?.checked_count ?? 0)}
                       subtext="Subscriptions checked in cashier scope"
                       tone="default"
                     />
                     <StatCard
                       label="Flagged"
-                      value={String(data.reconciliation?.flagged_count ?? 0)}
+                      value={String(reconciliationSurface?.flagged_count ?? 0)}
                       subtext="Rows needing admin finance review"
                       tone={
-                        (data.reconciliation?.flagged_count ?? 0) > 0
+                        (reconciliationSurface?.flagged_count ?? 0) > 0
                           ? "warning"
                           : "success"
                       }
@@ -324,13 +436,13 @@ export default function CashierDashboardPage() {
 
             <WorkspaceSection
               title="Due collection queue"
-              description="Next-due contracts ordered by urgency, sourced from the canonical scope rollup."
+              description="Next-due contracts ordered by urgency, sourced from the canonical surface endpoints."
               actionHref="/cashier/collect"
               actionLabel="Open collection workspace"
             >
-              {data.due_subscriptions && data.due_subscriptions.length > 0 ? (
+              {dueRows.length > 0 ? (
                 <div className="grid gap-3">
-                  {data.due_subscriptions.slice(0, 8).map((item) => {
+                  {dueRows.map((item) => {
                     const subscriptionId = item.subscription_id ?? item.id;
                     return (
                       <div
@@ -377,11 +489,11 @@ export default function CashierDashboardPage() {
 
             <WorkspaceSection
               title="Today's transactions"
-              description="Counter-posted payment rows for the current business day."
+              description="Counter-posted payment rows surfaced through the shared canonical recent-payments endpoint."
               actionHref="/cashier/payments"
               actionLabel="Open payment history"
             >
-              {transactions.length > 0 ? (
+              {paymentRows.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
@@ -404,11 +516,11 @@ export default function CashierDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.slice(0, 12).map((payment) => (
-                        <tr key={payment.id} className="align-top">
+                      {paymentRows.map((payment) => (
+                        <tr key={payment.payment_id} className="align-top">
                           <td className="border-b border-border/70 px-4 py-3">
                             <div className="text-sm font-semibold text-foreground">
-                              #{payment.id}
+                              #{payment.payment_id}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               {payment.method || "—"} · {payment.reference_no || "No ref"}
@@ -425,7 +537,7 @@ export default function CashierDashboardPage() {
                           <td className="border-b border-border/70 px-4 py-3">
                             <div className="text-sm font-medium text-foreground">
                               {payment.subscription_number ||
-                                `SUB-${payment.subscription ?? "—"}`}
+                                `SUB-${payment.subscription_id ?? "—"}`}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               Batch {payment.batch_code || "—"} · Lucky{" "}
@@ -455,19 +567,12 @@ export default function CashierDashboardPage() {
                 </div>
               ) : (
                 <EmptyState
-                  title="No transactions recorded today"
+                  title="No transactions recorded in this window"
                   description="After posting a payment, use Refresh to reload the dashboard totals and transaction list."
                 />
               )}
             </WorkspaceSection>
           </>
-        ) : null}
-
-        {!loading && !error && !data ? (
-          <EmptyState
-            title="No cashier workspace data"
-            description="Cashier dashboard data is not currently available."
-          />
         ) : null}
       </div>
     </PortalPage>
