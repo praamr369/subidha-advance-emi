@@ -8,7 +8,6 @@ import {
   BadgeCheck,
   CalendarClock,
   CreditCard,
-  Receipt,
   RefreshCw,
   Wallet,
 } from "lucide-react";
