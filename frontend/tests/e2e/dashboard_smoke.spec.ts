@@ -50,6 +50,6 @@ test.describe("customer dashboard smoke", () => {
       page.getByRole("heading", { name: "Customer Workspace" })
     ).toBeVisible();
     await expect(page.locator("body")).toContainText("Financial alignment");
-    await expect(page.locator("body")).toContainText("Winner benefit");
+    await expect(page.locator("body")).toContainText("Waived by benefit");
   });
 });

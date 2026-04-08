@@ -5,7 +5,7 @@ import { authStatePath } from "./helpers/smoke-data";
 test.use({ storageState: authStatePath("admin") });
 
 function shellHeading(page: Page, name: string) {
-  return page.getByRole("heading", { name });
+  return page.getByRole("heading", { name }).first();
 }
 
 test("admin accounting phase-2 routes load", async ({ page }) => {

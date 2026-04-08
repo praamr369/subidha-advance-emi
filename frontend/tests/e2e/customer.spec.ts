@@ -194,9 +194,7 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
   await expect(page.locator("body")).toContainText("Financial alignment");
   await expect(page.locator("body")).toContainText("Overdue EMI");
   await expect(page.locator("body")).toContainText("Upcoming EMI");
-  await expect(page.locator("body")).toContainText(
-    "Winner benefit is already reflected in contract totals"
-  );
+  await expect(page.locator("body")).toContainText("Waived by benefit");
   await expect(page.locator("body")).toContainText("Settled totals already reflect any reversal history.");
   await expect(page.locator("body")).toContainText("Aurora Sofa");
   await expect(page.locator("body")).toContainText("Winner Sofa");
