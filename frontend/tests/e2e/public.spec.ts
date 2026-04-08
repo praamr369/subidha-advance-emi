@@ -108,6 +108,6 @@ test("latest winner widget shows loading then empty state cleanly", async ({
   });
 
   await page.goto("/");
-  await expect(page.getByText("Loading latest winner...")).toBeVisible();
+  await expect(page.getByText("Loading latest winner...").first()).toBeVisible();
   await expect(page.getByText("No winner published yet")).toBeVisible();
 });
