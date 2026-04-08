@@ -1,6 +1,7 @@
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -19,6 +20,7 @@ from tests.helpers import (
 
 class CashierApiTests(APITestCase):
     def setUp(self):
+        today = timezone.localdate()
         self.admin = create_admin_user(username="cash_admin", phone="9000000101")
         self.cashier = create_user(
             username="cashier_test",
@@ -57,13 +59,13 @@ class CashierApiTests(APITestCase):
             subscription=self.subscription,
             month_no=1,
             amount=Decimal("190.00"),
-            due_date=date(2026, 3, 7),
+            due_date=today - timedelta(days=1),
         )
         self.future_emi = create_emi(
             subscription=self.subscription,
             month_no=2,
             amount=Decimal("190.00"),
-            due_date=date(2026, 4, 7),
+            due_date=today + timedelta(days=1),
         )
 
     def test_cashier_dashboard_allowed_for_admin(self):

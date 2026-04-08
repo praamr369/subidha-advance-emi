@@ -37,10 +37,10 @@ class OnboardingValidationCommandTests(TestCase):
             phone="9100000002",
         )
         csv_path = self._write_csv(
-            "name,phone\n"
-            "Valid Customer,9100000001\n"
-            ",9100000003\n"
-            "Duplicate Existing,9100000002\n"
+            "name,phone,email\n"
+            "Valid Customer,9100000001,valid.customer@example.com\n"
+            ",9100000003,missing.name@example.com\n"
+            "Duplicate Existing,9100000002,duplicate.existing@example.com\n"
         )
 
         out = StringIO()
@@ -54,7 +54,10 @@ class OnboardingValidationCommandTests(TestCase):
         self.assertIn("customer with this phone already exists", output)
 
     def test_validate_customer_import_csv_fail_on_errors_exits_non_zero(self):
-        csv_path = self._write_csv("name,phone\n,9100000100\n")
+        csv_path = self._write_csv(
+            "name,phone,email\n"
+            ",9100000100,invalid.customer@example.com\n"
+        )
         out = StringIO()
 
         with self.assertRaisesMessage(CommandError, "Customer CSV failed validation."):
