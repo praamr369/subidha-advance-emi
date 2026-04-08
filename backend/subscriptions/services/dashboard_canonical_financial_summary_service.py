@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
@@ -36,12 +36,87 @@ from subscriptions.services.subscription_financial_service import (
 )
 
 
+WINDOW_DEFAULT = "DEFAULT"
+WINDOW_THIS_MONTH = "THIS_MONTH"
+WINDOW_LAST_30_DAYS = "LAST_30_DAYS"
+WINDOW_CUSTOM = "CUSTOM"
+WINDOW_CHOICES = {
+    WINDOW_DEFAULT,
+    WINDOW_THIS_MONTH,
+    WINDOW_LAST_30_DAYS,
+    WINDOW_CUSTOM,
+}
+
+
 def _money(value) -> str:
     return f"{Decimal(str(value or MONEY_ZERO)).quantize(Decimal('0.01')):.2f}"
 
 
 def _date(value) -> str | None:
     return value.isoformat() if value else None
+
+
+@dataclass(frozen=True)
+class DashboardWindowParams:
+    window: str = WINDOW_DEFAULT
+    as_of: date | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+
+    @property
+    def reference_date(self) -> date:
+        return self.as_of or self.end_date or timezone.localdate()
+
+    @property
+    def has_surface_filter(self) -> bool:
+        return bool(
+            self.as_of is not None
+            or self.start_date is not None
+            or self.end_date is not None
+            or self.window != WINDOW_DEFAULT
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "window": self.window,
+            "as_of": _date(self.as_of),
+            "start_date": _date(self.start_date),
+            "end_date": _date(self.end_date),
+        }
+
+
+def resolve_dashboard_window(
+    *,
+    window: str | None = None,
+    as_of: date | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> DashboardWindowParams:
+    normalized_window = (window or WINDOW_DEFAULT).strip().upper()
+    if normalized_window not in WINDOW_CHOICES:
+        normalized_window = WINDOW_DEFAULT
+
+    today = timezone.localdate()
+    resolved_start = start_date
+    resolved_end = end_date
+    resolved_as_of = as_of
+
+    if normalized_window == WINDOW_THIS_MONTH:
+        resolved_start = today.replace(day=1)
+        resolved_end = today
+    elif normalized_window == WINDOW_LAST_30_DAYS:
+        resolved_start = today - timedelta(days=29)
+        resolved_end = today
+
+    if resolved_start and resolved_end and resolved_start > resolved_end:
+        resolved_start, resolved_end = resolved_end, resolved_start
+
+    return DashboardWindowParams(
+        window=normalized_window,
+        as_of=resolved_as_of,
+        start_date=resolved_start,
+        end_date=resolved_end,
+    )
 
 
 def _payment_queryset():
@@ -96,7 +171,11 @@ def _pending_emi_sort_key(row: dict) -> tuple[date, int, int]:
     )
 
 
-def _days_overdue(due_date_raw: str | None) -> int:
+def _days_overdue(
+    due_date_raw: str | None,
+    *,
+    reference_date: date | None = None,
+) -> int:
     if not due_date_raw:
         return 0
 
@@ -105,11 +184,59 @@ def _days_overdue(due_date_raw: str | None) -> int:
     except (TypeError, ValueError):
         return 0
 
-    return max((timezone.localdate() - due_date).days, 0)
+    effective_reference_date = reference_date or timezone.localdate()
+    return max((effective_reference_date - due_date).days, 0)
 
 
-def _build_due_subscription_rows(subscriptions) -> list[dict[str, object]]:
+def _matches_due_window(
+    *,
+    due_date_raw: str | None,
+    window_params: DashboardWindowParams,
+) -> bool:
+    if not (window_params.start_date or window_params.end_date):
+        return True
+
+    if not due_date_raw:
+        return False
+
+    try:
+        due_date = date.fromisoformat(str(due_date_raw))
+    except (TypeError, ValueError):
+        return False
+
+    if window_params.start_date and due_date < window_params.start_date:
+        return False
+    if window_params.end_date and due_date > window_params.end_date:
+        return False
+    return True
+
+
+def _is_pending_row_overdue(
+    pending_row: dict[str, object],
+    *,
+    reference_date: date,
+) -> bool:
+    due_date_raw = pending_row.get("due_date")
+    if not due_date_raw:
+        return False
+
+    try:
+        due_date = date.fromisoformat(str(due_date_raw))
+    except (TypeError, ValueError):
+        return False
+
+    return due_date < reference_date
+
+
+def _build_due_subscription_rows(
+    subscriptions,
+    *,
+    window_params: DashboardWindowParams | None = None,
+    only_state: str | None = None,
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
+    effective_window = window_params or resolve_dashboard_window()
+    reference_date = effective_window.reference_date
 
     for subscription in subscriptions:
         snapshot = getattr(subscription, "_subscription_financial_snapshot", None) or {}
@@ -121,7 +248,32 @@ def _build_due_subscription_rows(subscriptions) -> list[dict[str, object]]:
         if not pending_rows:
             continue
 
-        next_due = min(pending_rows, key=_pending_emi_sort_key)
+        filtered_pending_rows = [
+            row
+            for row in pending_rows
+            if _matches_due_window(
+                due_date_raw=row.get("due_date"),
+                window_params=effective_window,
+            )
+        ]
+        if only_state == "OVERDUE":
+            filtered_pending_rows = [
+                row
+                for row in filtered_pending_rows
+                if _is_pending_row_overdue(row, reference_date=reference_date)
+            ]
+        elif only_state == "UPCOMING":
+            filtered_pending_rows = [
+                row
+                for row in filtered_pending_rows
+                if not _is_pending_row_overdue(row, reference_date=reference_date)
+            ]
+
+        if not filtered_pending_rows:
+            continue
+
+        next_due = min(filtered_pending_rows, key=_pending_emi_sort_key)
+        is_overdue = _is_pending_row_overdue(next_due, reference_date=reference_date)
         rows.append(
             {
                 "id": subscription.id,
@@ -136,10 +288,13 @@ def _build_due_subscription_rows(subscriptions) -> list[dict[str, object]]:
                 "due_date": next_due.get("due_date"),
                 "monthly_amount": _money(getattr(subscription, "monthly_amount", MONEY_ZERO)),
                 "pending_amount": _money(next_due.get("balance_amount")),
-                "overdue_days": _days_overdue(next_due.get("due_date"))
-                if next_due.get("is_overdue")
+                "overdue_days": _days_overdue(
+                    next_due.get("due_date"),
+                    reference_date=reference_date,
+                )
+                if is_overdue
                 else 0,
-                "is_overdue": bool(next_due.get("is_overdue")),
+                "is_overdue": is_overdue,
                 "emi_id": next_due.get("id"),
                 "month_no": next_due.get("month_no"),
             }
@@ -257,10 +412,49 @@ def _build_admin_batch_surface(today: date) -> dict[str, object]:
     }
 
 
+def _apply_activity_window(queryset, window_params: DashboardWindowParams):
+    if not window_params.has_surface_filter:
+        return queryset
+
+    if window_params.start_date and window_params.end_date:
+        return queryset.filter(
+            Q(created_at__date__range=(window_params.start_date, window_params.end_date))
+            | Q(start_date__range=(window_params.start_date, window_params.end_date))
+            | Q(emis__due_date__range=(window_params.start_date, window_params.end_date))
+            | Q(payments__payment_date__range=(window_params.start_date, window_params.end_date))
+        ).distinct()
+
+    reference_date = window_params.reference_date
+    return queryset.filter(
+        Q(created_at__date__lte=reference_date)
+        | Q(start_date__lte=reference_date)
+        | Q(emis__due_date__lte=reference_date)
+        | Q(payments__payment_date__lte=reference_date)
+    ).distinct()
+
+
+def _apply_date_window_to_queryset(
+    queryset,
+    *,
+    field_name: str,
+    window_params: DashboardWindowParams,
+):
+    if window_params.start_date and window_params.end_date:
+        return queryset.filter(
+            **{f"{field_name}__range": (window_params.start_date, window_params.end_date)}
+        )
+    if window_params.as_of:
+        return queryset.filter(**{f"{field_name}__lte": window_params.as_of})
+    if window_params.end_date:
+        return queryset.filter(**{f"{field_name}__lte": window_params.end_date})
+    return queryset
+
+
 @dataclass
 class DashboardSummaryDTO:
     scope: DashboardScope
     summary: dict[str, object]
+    filters: dict[str, object] = field(default_factory=dict)
     subscriptions: list = field(default_factory=list)
     identity: dict[str, object] = field(default_factory=dict)
     due_subscriptions: list[dict[str, object]] = field(default_factory=list)
@@ -272,13 +466,23 @@ class DashboardSummaryDTO:
     follow_up_rows: list = field(default_factory=list)
 
 
-def get_dashboard_summary(scope: DashboardScope, actor_user) -> DashboardSummaryDTO:
+def get_dashboard_summary(
+    scope: DashboardScope,
+    actor_user,
+    window_params: DashboardWindowParams | None = None,
+) -> DashboardSummaryDTO:
+    effective_window = window_params or resolve_dashboard_window()
     queryset = scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id")
     subscriptions = list(queryset)
     summary = build_customer_dashboard_summary(subscriptions)
-    due_subscriptions = _build_due_subscription_rows(subscriptions)
+    due_subscriptions = _build_due_subscription_rows(
+        subscriptions,
+        window_params=effective_window,
+    )
     winner_surface = _build_winner_surface(summary, scope=scope)
-    reconciliation = _build_reconciliation_surface(queryset)
+    reconciliation = _build_reconciliation_surface(
+        _apply_activity_window(queryset, effective_window)
+    )
     identity = scope.get_identity_payload(actor_user)
 
     metrics: dict[str, object] = {}
@@ -347,7 +551,13 @@ def get_dashboard_summary(scope: DashboardScope, actor_user) -> DashboardSummary
             },
             "financial_health": system_financial_health(),
         }
-        payment_rows = list(today_payment_queryset.order_by("-created_at", "-id")[:5])
+        payment_rows = list(
+            _apply_date_window_to_queryset(
+                _payment_queryset().order_by("-created_at", "-id"),
+                field_name="payment_date",
+                window_params=effective_window,
+            )[:10]
+        )
 
     elif isinstance(scope, PartnerScope):
         partner = actor_user
@@ -411,22 +621,36 @@ def get_dashboard_summary(scope: DashboardScope, actor_user) -> DashboardSummary
             "verified_payment_count": active_payments.count(),
             "all_payment_rows_count": all_payments.count(),
         }
-        payment_rows = list(active_payments[:10])
+        payment_rows = list(
+            _apply_date_window_to_queryset(
+                active_payments,
+                field_name="payment_date",
+                window_params=effective_window,
+            )[:10]
+        )
         collection_request_rows = list(
-            collection_requests.filter(
-                status__in=[
-                    PartnerCollectionRequestStatus.SUBMITTED,
-                    PartnerCollectionRequestStatus.UNDER_REVIEW,
-                    PartnerCollectionRequestStatus.APPROVED,
-                ]
+            _apply_date_window_to_queryset(
+                collection_requests.filter(
+                    status__in=[
+                        PartnerCollectionRequestStatus.SUBMITTED,
+                        PartnerCollectionRequestStatus.UNDER_REVIEW,
+                        PartnerCollectionRequestStatus.APPROVED,
+                    ]
+                ),
+                field_name="created_at__date",
+                window_params=effective_window,
             )[:10]
         )
         follow_up_rows = list(
-            collection_requests.filter(
-                status__in=[
-                    PartnerCollectionRequestStatus.REJECTED,
-                    PartnerCollectionRequestStatus.CANCELLED,
-                ]
+            _apply_date_window_to_queryset(
+                collection_requests.filter(
+                    status__in=[
+                        PartnerCollectionRequestStatus.REJECTED,
+                        PartnerCollectionRequestStatus.CANCELLED,
+                    ]
+                ),
+                field_name="created_at__date",
+                window_params=effective_window,
             )[:10]
         )
 
@@ -449,14 +673,34 @@ def get_dashboard_summary(scope: DashboardScope, actor_user) -> DashboardSummary
                 ]
             ),
         }
-        payment_rows = list(today_payments)
+        payment_rows = list(
+            _apply_date_window_to_queryset(
+                _cashier_visible_payments_queryset().order_by("-created_at", "-id"),
+                field_name="created_at__date",
+                window_params=effective_window,
+            )[:12]
+        )
 
     elif isinstance(scope, CustomerScope):
+        customer = getattr(actor_user, "customer_profile", None)
+        customer_payments = (
+            _payment_queryset()
+            .filter(customer=customer)
+            .order_by("-payment_date", "-id")
+        )
         metrics = {}
+        payment_rows = list(
+            _apply_date_window_to_queryset(
+                customer_payments,
+                field_name="payment_date",
+                window_params=effective_window,
+            )[:10]
+        )
 
     return DashboardSummaryDTO(
         scope=scope,
         summary=summary,
+        filters=effective_window.to_payload(),
         subscriptions=subscriptions,
         identity=identity,
         due_subscriptions=due_subscriptions,
