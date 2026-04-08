@@ -153,6 +153,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "finance",
         },
         {
+          label: "Accounting",
+          href: ROUTES.admin.accounting,
+          icon: "finance",
+        },
+        {
           label: "Commission Reconciliation",
           href: ROUTES.admin.financeReconciliation,
           icon: "reconciliation",

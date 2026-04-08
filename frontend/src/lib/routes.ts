@@ -36,6 +36,12 @@ export const ROUTES = {
     partners: "/admin/partners",
 
     finance: "/admin/finance",
+    accounting: "/admin/accounting",
+    accountingChartOfAccounts: "/admin/accounting/chart-of-accounts",
+    accountingExpenses: "/admin/accounting/expenses",
+    accountingSalary: "/admin/accounting/salary",
+    accountingBooks: "/admin/accounting/books",
+    accountingJournals: "/admin/accounting/journals",
     financeReconciliation: "/admin/finance/reconciliation",
     paymentReconciliation: "/admin/payments/reconciliation",
     financeCommissions: "/admin/finance/commissions",
