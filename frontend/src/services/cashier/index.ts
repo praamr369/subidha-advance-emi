@@ -1,4 +1,10 @@
 import { apiFetch } from "@/lib/api";
+import type {
+  CanonicalDashboardSummary,
+  DashboardDueSubscription,
+  DashboardReconciliationSurface,
+  DashboardWinnerSurface,
+} from "@/services/dashboard-types";
 
 export type CashierTransaction = {
   id: number;
@@ -30,6 +36,10 @@ export type CashierTransaction = {
 };
 
 export type CashierDashboardResponse = {
+  summary: CanonicalDashboardSummary;
+  winner_surface?: DashboardWinnerSurface;
+  reconciliation?: DashboardReconciliationSurface;
+  due_subscriptions?: DashboardDueSubscription[];
   total_pending_emis: number;
   total_pending_amount: string;
   today_total_collected: string;
@@ -167,15 +177,165 @@ function toMoneyString(value: unknown): string {
   return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
 }
 
-function toNumber(value: unknown): number {
+function toNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function asNullableString(value: unknown): string | null | undefined {
   if (typeof value === "string") return value;
   if (value === null) return null;
   return undefined;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeCanonicalDashboardSummary(
+  payload: Record<string, unknown>
+): CanonicalDashboardSummary {
+  return {
+    subscription_count: toNumber(payload.subscription_count, 0),
+    active_subscriptions: toNumber(payload.active_subscriptions, 0),
+    completed_subscriptions: toNumber(payload.completed_subscriptions, 0),
+    winner_subscriptions: toNumber(payload.winner_subscriptions, 0),
+    pending_emis: toNumber(payload.pending_emis, 0),
+    upcoming_emis: toNumber(payload.upcoming_emis, 0),
+    overdue_emis: toNumber(payload.overdue_emis, 0),
+    paid_emis: toNumber(payload.paid_emis, 0),
+    waived_emis: toNumber(payload.waived_emis, 0),
+    total_paid_amount: toMoneyString(payload.total_paid_amount),
+    total_pending_amount: toMoneyString(payload.total_pending_amount),
+    total_waived_amount: toMoneyString(payload.total_waived_amount),
+    remaining_amount: toMoneyString(payload.remaining_amount),
+    outstanding_amount: toMoneyString(payload.outstanding_amount),
+    overdue_amount: toMoneyString(payload.overdue_amount),
+    upcoming_amount: toMoneyString(payload.upcoming_amount),
+    next_due_amount:
+      payload.next_due_amount === null || payload.next_due_amount === undefined
+        ? null
+        : toMoneyString(payload.next_due_amount),
+    next_due_date: asNullableString(payload.next_due_date) ?? null,
+    next_due_is_overdue: toBoolean(payload.next_due_is_overdue, false),
+    next_due_subscription_id:
+      payload.next_due_subscription_id === null ||
+      payload.next_due_subscription_id === undefined
+        ? null
+        : toNumber(payload.next_due_subscription_id),
+    next_due_subscription_number:
+      asNullableString(payload.next_due_subscription_number) ?? null,
+    next_due_product_name: asNullableString(payload.next_due_product_name) ?? null,
+    next_due_lucky_number:
+      payload.next_due_lucky_number === null ||
+      payload.next_due_lucky_number === undefined
+        ? null
+        : toNumber(payload.next_due_lucky_number),
+    has_payment_adjustments: toBoolean(payload.has_payment_adjustments, false),
+  };
+}
+
+function normalizeWinnerSurface(input: unknown): DashboardWinnerSurface | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const row = input as Record<string, unknown>;
+  return {
+    winner_subscriptions: toNumber(row.winner_subscriptions, 0),
+    waived_emis: toNumber(row.waived_emis, 0),
+    total_waived_amount: toMoneyString(row.total_waived_amount),
+    note: typeof row.note === "string" ? row.note : "",
+  };
+}
+
+function normalizeReconciliationSurface(
+  input: unknown
+): DashboardReconciliationSurface | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const row = input as Record<string, unknown>;
+  const rawResults = Array.isArray(row.results) ? row.results : [];
+
+  return {
+    checked_count: toNumber(row.checked_count, 0),
+    flagged_count: toNumber(row.flagged_count, 0),
+    results: rawResults.map((item) => {
+      const result = (item ?? {}) as Record<string, unknown>;
+      return {
+        subscription_id: toNumber(result.subscription_id, 0),
+        subscription_number:
+          typeof result.subscription_number === "string"
+            ? result.subscription_number
+            : "",
+        customer_name:
+          typeof result.customer_name === "string"
+            ? result.customer_name
+            : undefined,
+        total_amount: toMoneyString(result.total_amount),
+        paid_amount: toMoneyString(result.paid_amount),
+        waived_amount: toMoneyString(result.waived_amount),
+        pending_outstanding: toMoneyString(result.pending_outstanding),
+        computed_outstanding: toMoneyString(result.computed_outstanding),
+        delta: toMoneyString(result.delta),
+      };
+    }),
+    note: typeof row.note === "string" ? row.note : undefined,
+  };
+}
+
+function normalizeDueSubscription(item: unknown): DashboardDueSubscription {
+  const row = (item ?? {}) as Record<string, unknown>;
+
+  return {
+    id: row.id !== undefined && row.id !== null ? String(row.id) : "",
+    subscription_id:
+      row.subscription_id !== undefined && row.subscription_id !== null
+        ? String(row.subscription_id)
+        : undefined,
+    subscription_number:
+      typeof row.subscription_number === "string"
+        ? row.subscription_number
+        : undefined,
+    customer_id:
+      row.customer_id !== undefined && row.customer_id !== null
+        ? String(row.customer_id)
+        : undefined,
+    customer_name:
+      typeof row.customer_name === "string" ? row.customer_name : undefined,
+    customer_phone:
+      typeof row.customer_phone === "string" ? row.customer_phone : undefined,
+    product_name:
+      typeof row.product_name === "string" ? row.product_name : undefined,
+    batch_code: asNullableString(row.batch_code),
+    lucky_number:
+      typeof row.lucky_number === "number"
+        ? row.lucky_number
+        : typeof row.lucky_number === "string"
+        ? row.lucky_number
+        : undefined,
+    due_date: asNullableString(row.due_date),
+    monthly_amount:
+      row.monthly_amount === null || row.monthly_amount === undefined
+        ? undefined
+        : toMoneyString(row.monthly_amount),
+    pending_amount:
+      row.pending_amount === null || row.pending_amount === undefined
+        ? undefined
+        : toMoneyString(row.pending_amount),
+    overdue_days: toNumber(row.overdue_days, 0),
+    is_overdue: toBoolean(row.is_overdue, false),
+    emi_id:
+      row.emi_id === null || row.emi_id === undefined
+        ? null
+        : toNumber(row.emi_id),
+    month_no:
+      row.month_no === null || row.month_no === undefined
+        ? null
+        : toNumber(row.month_no),
+  };
 }
 
 function normalizeTransaction(row: Record<string, unknown>): CashierTransaction {
@@ -315,12 +475,22 @@ function normalizeCollectibleSearchResult(
 
 export async function getCashierDashboard(): Promise<CashierDashboardResponse> {
   const payload = await apiFetch<Record<string, unknown>>("/cashier/dashboard/");
+  const rawSummary =
+    payload.summary && typeof payload.summary === "object"
+      ? (payload.summary as Record<string, unknown>)
+      : {};
 
   const rawTransactions = Array.isArray(payload.today_transactions)
     ? payload.today_transactions
     : [];
 
   return {
+    summary: normalizeCanonicalDashboardSummary(rawSummary),
+    winner_surface: normalizeWinnerSurface(payload.winner_surface),
+    reconciliation: normalizeReconciliationSurface(payload.reconciliation),
+    due_subscriptions: Array.isArray(payload.due_subscriptions)
+      ? payload.due_subscriptions.map(normalizeDueSubscription)
+      : [],
     total_pending_emis: toNumber(payload.total_pending_emis),
     total_pending_amount: toMoneyString(payload.total_pending_amount),
     today_total_collected: toMoneyString(payload.today_total_collected),

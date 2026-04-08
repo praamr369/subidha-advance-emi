@@ -1,4 +1,10 @@
 import { apiFetch } from "@/lib/api";
+import type {
+  CanonicalDashboardSummary,
+  DashboardDueSubscription,
+  DashboardReconciliationSurface,
+  DashboardWinnerSurface,
+} from "@/services/dashboard-types";
 
 export type PartnerCustomer = {
   id: number;
@@ -197,20 +203,7 @@ export type PartnerPaymentDetailResponse = {
   status_label: string;
 };
 
-export type PartnerDueSubscription = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  product_name?: string;
-  batch_code?: string;
-  lucky_number?: number | string;
-  due_date?: string;
-  monthly_amount?: number | string;
-  pending_amount?: number | string;
-  overdue_days?: number;
-};
+export type PartnerDueSubscription = DashboardDueSubscription;
 
 export type PartnerCollectionRequest = {
   id: number | string;
@@ -250,6 +243,22 @@ export type PartnerFollowUpItem = {
   pending_amount?: number | string;
 };
 
+export type PartnerDashboardSummary = CanonicalDashboardSummary & {
+  total_subscriptions: number;
+  won_subscriptions: number;
+  total_revenue_collected: number | string;
+  total_customers?: number;
+  pending_commission?: number | string;
+  settled_commission?: number | string;
+  defaulted_subscriptions?: number;
+  total_commission?: number | string;
+  submitted_collection_requests?: number;
+  under_review_collection_requests?: number;
+  approved_collection_requests?: number;
+  rejected_collection_requests?: number;
+  cancelled_collection_requests?: number;
+};
+
 export type PartnerDashboardResponse = {
   partner: {
     id: number;
@@ -258,27 +267,10 @@ export type PartnerDashboardResponse = {
     email?: string;
     role?: string;
   };
-  summary: {
-    total_subscriptions: number;
-    active_subscriptions: number;
-    completed_subscriptions: number;
-    won_subscriptions: number;
-    pending_emis: number;
-    paid_emis: number;
-    total_revenue_collected: number | string;
-    total_customers?: number;
-    pending_commission?: number | string;
-    settled_commission?: number | string;
-    defaulted_subscriptions?: number;
-    waived_emis?: number;
-    total_commission?: number | string;
-    submitted_collection_requests?: number;
-    under_review_collection_requests?: number;
-    approved_collection_requests?: number;
-    rejected_collection_requests?: number;
-    overdue_emis?: number;
-  };
+  summary: PartnerDashboardSummary;
   due_subscriptions?: PartnerDueSubscription[];
+  winner_surface?: DashboardWinnerSurface;
+  reconciliation?: DashboardReconciliationSurface;
   recent_collection_requests?: PartnerCollectionRequest[];
   recent_verified_payments?: PartnerPayment[];
   follow_up_queue?: PartnerFollowUpItem[];
@@ -343,6 +335,100 @@ function toMoneyString(value: unknown, fallback = "0.00"): string {
 
 function toStringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeCanonicalDashboardSummary(
+  input: Record<string, unknown>
+): CanonicalDashboardSummary {
+  return {
+    subscription_count: toNumber(input.subscription_count, 0),
+    active_subscriptions: toNumber(input.active_subscriptions, 0),
+    completed_subscriptions: toNumber(input.completed_subscriptions, 0),
+    winner_subscriptions: toNumber(input.winner_subscriptions, 0),
+    pending_emis: toNumber(input.pending_emis, 0),
+    upcoming_emis: toNumber(input.upcoming_emis, 0),
+    overdue_emis: toNumber(input.overdue_emis, 0),
+    paid_emis: toNumber(input.paid_emis, 0),
+    waived_emis: toNumber(input.waived_emis, 0),
+    total_paid_amount: toMoneyString(input.total_paid_amount),
+    total_pending_amount: toMoneyString(input.total_pending_amount),
+    total_waived_amount: toMoneyString(input.total_waived_amount),
+    remaining_amount: toMoneyString(input.remaining_amount),
+    outstanding_amount: toMoneyString(input.outstanding_amount),
+    overdue_amount: toMoneyString(input.overdue_amount),
+    upcoming_amount: toMoneyString(input.upcoming_amount),
+    next_due_amount:
+      input.next_due_amount === null || input.next_due_amount === undefined
+        ? null
+        : toMoneyString(input.next_due_amount),
+    next_due_date: toStringOrUndefined(input.next_due_date) ?? null,
+    next_due_is_overdue: toBoolean(input.next_due_is_overdue, false),
+    next_due_subscription_id:
+      input.next_due_subscription_id === null ||
+      input.next_due_subscription_id === undefined
+        ? null
+        : toNumber(input.next_due_subscription_id),
+    next_due_subscription_number:
+      toStringOrUndefined(input.next_due_subscription_number) ?? null,
+    next_due_product_name:
+      toStringOrUndefined(input.next_due_product_name) ?? null,
+    next_due_lucky_number:
+      input.next_due_lucky_number === null ||
+      input.next_due_lucky_number === undefined
+        ? null
+        : toNumber(input.next_due_lucky_number),
+    has_payment_adjustments: toBoolean(input.has_payment_adjustments, false),
+  };
+}
+
+function normalizeWinnerSurface(input: unknown): DashboardWinnerSurface | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const row = input as Record<string, unknown>;
+  return {
+    winner_subscriptions: toNumber(row.winner_subscriptions, 0),
+    waived_emis: toNumber(row.waived_emis, 0),
+    total_waived_amount: toMoneyString(row.total_waived_amount),
+    note: toStringOrUndefined(row.note) ?? "",
+  };
+}
+
+function normalizeReconciliationSurface(
+  input: unknown
+): DashboardReconciliationSurface | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const row = input as Record<string, unknown>;
+  const rawResults = Array.isArray(row.results) ? row.results : [];
+
+  return {
+    checked_count: toNumber(row.checked_count, 0),
+    flagged_count: toNumber(row.flagged_count, 0),
+    results: rawResults.map((item) => {
+      const result = (item ?? {}) as Record<string, unknown>;
+      return {
+        subscription_id: toNumber(result.subscription_id, 0),
+        subscription_number:
+          toStringOrUndefined(result.subscription_number) ?? "",
+        customer_name: toStringOrUndefined(result.customer_name),
+        total_amount: toMoneyString(result.total_amount),
+        paid_amount: toMoneyString(result.paid_amount),
+        waived_amount: toMoneyString(result.waived_amount),
+        pending_outstanding: toMoneyString(result.pending_outstanding),
+        computed_outstanding: toMoneyString(result.computed_outstanding),
+        delta: toMoneyString(result.delta),
+      };
+    }),
+    note: toStringOrUndefined(row.note),
+  };
 }
 
 function normalizePartnerPayment(item: unknown): PartnerPayment {
@@ -690,6 +776,7 @@ function normalizeDashboardResponse(payload: unknown): PartnerDashboardResponse 
   const root = (payload ?? {}) as Record<string, unknown>;
   const rawPartner = ((root.partner ?? {}) as Record<string, unknown>) || {};
   const rawSummary = ((root.summary ?? {}) as Record<string, unknown>) || {};
+  const canonicalSummary = normalizeCanonicalDashboardSummary(rawSummary);
 
   return {
     partner: {
@@ -701,21 +788,41 @@ function normalizeDashboardResponse(payload: unknown): PartnerDashboardResponse 
     },
     summary: {
       total_subscriptions: toNumber(rawSummary.total_subscriptions, 0),
-      active_subscriptions: toNumber(rawSummary.active_subscriptions, 0),
-      completed_subscriptions: toNumber(rawSummary.completed_subscriptions, 0),
+      active_subscriptions: canonicalSummary.active_subscriptions,
+      completed_subscriptions: canonicalSummary.completed_subscriptions ?? 0,
       won_subscriptions: toNumber(rawSummary.won_subscriptions, 0),
-      pending_emis: toNumber(rawSummary.pending_emis, 0),
-      paid_emis: toNumber(rawSummary.paid_emis, 0),
+      winner_subscriptions: canonicalSummary.winner_subscriptions,
+      subscription_count: canonicalSummary.subscription_count,
+      pending_emis: canonicalSummary.pending_emis,
+      upcoming_emis: canonicalSummary.upcoming_emis,
+      overdue_emis: canonicalSummary.overdue_emis,
+      paid_emis: canonicalSummary.paid_emis,
       total_revenue_collected: toMoneyString(
         rawSummary.total_revenue_collected,
         "0.00"
       ),
+      total_paid_amount: canonicalSummary.total_paid_amount,
       total_customers: toNumber(rawSummary.total_customers, 0),
       pending_commission: toMoneyString(rawSummary.pending_commission, "0.00"),
       settled_commission: toMoneyString(rawSummary.settled_commission, "0.00"),
       defaulted_subscriptions: toNumber(rawSummary.defaulted_subscriptions, 0),
-      waived_emis: toNumber(rawSummary.waived_emis, 0),
+      waived_emis: canonicalSummary.waived_emis,
       total_commission: toMoneyString(rawSummary.total_commission, "0.00"),
+      total_pending_amount: canonicalSummary.total_pending_amount,
+      total_waived_amount: canonicalSummary.total_waived_amount,
+      remaining_amount: canonicalSummary.remaining_amount,
+      outstanding_amount: canonicalSummary.outstanding_amount,
+      overdue_amount: canonicalSummary.overdue_amount,
+      upcoming_amount: canonicalSummary.upcoming_amount,
+      next_due_amount: canonicalSummary.next_due_amount,
+      next_due_date: canonicalSummary.next_due_date,
+      next_due_is_overdue: canonicalSummary.next_due_is_overdue,
+      next_due_subscription_id: canonicalSummary.next_due_subscription_id,
+      next_due_subscription_number:
+        canonicalSummary.next_due_subscription_number,
+      next_due_product_name: canonicalSummary.next_due_product_name,
+      next_due_lucky_number: canonicalSummary.next_due_lucky_number,
+      has_payment_adjustments: canonicalSummary.has_payment_adjustments,
       submitted_collection_requests: toNumber(
         rawSummary.submitted_collection_requests,
         0
@@ -732,11 +839,16 @@ function normalizeDashboardResponse(payload: unknown): PartnerDashboardResponse 
         rawSummary.rejected_collection_requests,
         0
       ),
-      overdue_emis: toNumber(rawSummary.overdue_emis, 0),
+      cancelled_collection_requests: toNumber(
+        rawSummary.cancelled_collection_requests,
+        0
+      ),
     },
     due_subscriptions: toArray(root.due_subscriptions).map(
       normalizeDueSubscription
     ),
+    winner_surface: normalizeWinnerSurface(root.winner_surface),
+    reconciliation: normalizeReconciliationSurface(root.reconciliation),
     recent_collection_requests: toArray(root.recent_collection_requests).map(
       normalizeCollectionRequest
     ),

@@ -1,27 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BadgeCheck,
+  CalendarClock,
+  CreditCard,
+  Receipt,
+  RefreshCw,
+  Wallet,
+} from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
+import { WorkspaceSection } from "@/components/ui/workspace";
+import {
+  buildReconciliationPosture,
+  buildSettlementPosture,
+  buildWinnerPosture,
+  formatDate,
+  money,
+} from "@/lib/dashboard-summary";
 import {
   getCashierDashboard,
   type CashierDashboardResponse,
   type CashierTransaction,
 } from "@/services/cashier";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
-
 function formatDateTime(value?: string): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString();
+  return new Date(parsed).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function toErrorMessage(error: unknown): string {
@@ -31,26 +52,6 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load cashier dashboard.";
 }
 
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
 export default function CashierDashboardPage() {
   const [data, setData] = useState<CashierDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +59,8 @@ export default function CashierDashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function loadDashboard(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
 
     try {
       const payload = await getCashierDashboard();
@@ -70,15 +68,10 @@ export default function CashierDashboardPage() {
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setData(null);
-      }
+      if (mode === "initial") setData(null);
     } finally {
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setRefreshing(false);
-      }
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
     }
   }
 
@@ -86,22 +79,21 @@ export default function CashierDashboardPage() {
     void loadDashboard("initial");
   }, []);
 
-  const transactions = useMemo<CashierTransaction[]>(
-    () => data?.today_transactions ?? [],
-    [data]
-  );
+  const summary = data?.summary;
+  const transactions: CashierTransaction[] = data?.today_transactions ?? [];
+  const settlementPosture = summary ? buildSettlementPosture(summary) : null;
+  const winnerPosture = buildWinnerPosture(data?.winner_surface, summary);
+  const reconciliationPosture = buildReconciliationPosture(data?.reconciliation);
 
-  const averageTicketValue = useMemo(() => {
-    const total = Number(data?.today_total_collected ?? 0);
-    const count = Number(data?.today_transaction_count ?? 0);
-    if (!count) return "₹0.00";
-    return money(total / count);
-  }, [data]);
+  const averageTicketValue =
+    data && data.today_transaction_count > 0
+      ? money(Number(data.today_total_collected) / data.today_transaction_count)
+      : "₹0.00";
 
   return (
     <PortalPage
       title="Cashier Dashboard"
-      subtitle="Daily cashier workspace for collections, pending EMI visibility, and today’s posted transaction activity."
+      subtitle="Daily counter workspace with canonical financial scope visibility on top, while keeping collection posting and receipt lookup fast for shop operations."
       breadcrumbs={[{ label: "Cashier" }]}
       actions={[
         {
@@ -114,49 +106,45 @@ export default function CashierDashboardPage() {
           label: "Payment History",
           variant: "secondary",
         },
-        {
-          href: "/logout",
-          label: "Logout",
-          variant: "secondary",
-        },
       ]}
-      stats={[
-        {
-          label: "Pending EMI Count",
-          value: String(data?.total_pending_emis ?? 0),
-          tone: "warning",
-        },
-        {
-          label: "Pending Amount",
-          value: money(data?.total_pending_amount),
-          tone: "warning",
-        },
-        {
-          label: "Collected Today",
-          value: money(data?.today_total_collected),
-          tone: "success",
-        },
-        {
-          label: "Today Transactions",
-          value: String(data?.today_transaction_count ?? 0),
-        },
-      ]}
-      statusBadge={{
-        label: "Cashier Operations",
-        tone: "info",
-      }}
+      stats={
+        data
+          ? [
+              {
+                label: "Collected Today",
+                value: money(data.today_total_collected),
+                tone: "success",
+              },
+              {
+                label: "Today Transactions",
+                value: String(data.today_transaction_count),
+              },
+              {
+                label: "Cash Today",
+                value: money(data.today_cash_total),
+              },
+              {
+                label: "Digital Today",
+                value: money(data.today_digital_total),
+                tone: "info",
+              },
+            ]
+          : []
+      }
+      statusBadge={{ label: "Cashier Operations", tone: "info" }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end">
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => void loadDashboard("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
-        </section>
+        </div>
 
         {loading ? <LoadingBlock label="Loading cashier dashboard..." /> : null}
 
@@ -168,87 +156,233 @@ export default function CashierDashboardPage() {
           />
         ) : null}
 
-        {!loading && !error && data ? (
+        {!loading && !error && data && summary ? (
           <>
-            <section className="grid gap-4 lg:grid-cols-4">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Cash collections today
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-foreground">
-                  {money(data.today_cash_total)}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Collections posted with cash method during the current business day.
-                </p>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Paid"
+                value={money(summary.total_paid_amount)}
+                subtext={`${summary.paid_emis} EMI already settled across the visible scope`}
+                tone="success"
+                icon={<Wallet className="h-5 w-5" />}
+              />
+              <StatCard
+                label="Remaining"
+                value={money(summary.remaining_amount ?? summary.outstanding_amount)}
+                subtext={`${money(summary.total_pending_amount)} still pending in the current scope`}
+                tone={
+                  Number(summary.remaining_amount ?? summary.outstanding_amount ?? 0) > 0
+                    ? "info"
+                    : "success"
+                }
+                icon={<CreditCard className="h-5 w-5" />}
+              />
+              <StatCard
+                label="Overdue EMI"
+                value={String(summary.overdue_emis ?? 0)}
+                subtext={`${money(summary.overdue_amount)} currently overdue`}
+                tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
+                icon={<AlertTriangle className="h-5 w-5" />}
+              />
+              <StatCard
+                label="Upcoming EMI"
+                value={String(summary.upcoming_emis ?? 0)}
+                subtext={
+                  summary.next_due_date && summary.next_due_amount
+                    ? `${money(summary.next_due_amount)} next on ${formatDate(
+                        summary.next_due_date
+                      )}`
+                    : "No next due row is currently visible"
+                }
+                tone="default"
+                icon={<CalendarClock className="h-5 w-5" />}
+              />
+            </div>
 
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Digital collections today
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-foreground">
-                  {money(data.today_digital_total)}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  UPI and bank collections posted by cashier operations today.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Average ticket value
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-foreground">
-                  {averageTicketValue}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Average amount per posted cashier transaction today.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Workflow guidance
-                </div>
-                <div className="mt-2 text-sm text-foreground">
-                  Search collectible EMI rows, post the collection, open the receipt, and use history when a customer needs quick payment proof at the counter.
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    href="/cashier/collect"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <section
+                className={`rounded-[1.8rem] border p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.52)] ${settlementPosture?.tone}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Settlement posture
+                    </p>
+                    <h2 className="mt-3 text-xl font-semibold text-slate-950">
+                      {settlementPosture?.title}
+                    </h2>
+                  </div>
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${settlementPosture?.badgeClass}`}
                   >
-                    Open Collection Workspace
-                  </Link>
-
-                  <Link
-                    href="/cashier/payments"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    Open Payment History
-                  </Link>
-
-                  <Link
-                    href="/logout"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    Logout
-                  </Link>
+                    {settlementPosture?.badgeLabel}
+                  </span>
                 </div>
-              </div>
-            </section>
 
-            <SectionCard
-              title="Today’s Transactions"
-              description="This list reflects cashier collections posted today. Open any row to view receipt-safe proof details."
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-700">
+                  {settlementPosture?.description}
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Next due
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {summary.next_due_subscription_number || "No pending EMI"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {summary.next_due_date
+                        ? `${money(summary.next_due_amount)} on ${formatDate(
+                            summary.next_due_date
+                          )}`
+                        : "No pending EMI"}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Today throughput
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {data.today_transaction_count} transactions
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Average ticket {averageTicketValue}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Winner / waiver
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {data.winner_surface?.winner_subscriptions ?? 0} subscriptions
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {money(data.winner_surface?.total_waived_amount)}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid gap-4">
+                <WorkspaceSection
+                  title={winnerPosture.title}
+                  description={winnerPosture.description}
+                  className="h-full"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatCard
+                      label="Winner subscriptions"
+                      value={String(
+                        data.winner_surface?.winner_subscriptions ??
+                          summary.winner_subscriptions ??
+                          0
+                      )}
+                      subtext={`${data.winner_surface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
+                      tone="info"
+                      icon={<BadgeCheck className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Waived value"
+                      value={money(
+                        data.winner_surface?.total_waived_amount ??
+                          summary.total_waived_amount
+                      )}
+                      subtext={winnerPosture.badgeLabel}
+                      tone="default"
+                    />
+                  </div>
+                </WorkspaceSection>
+
+                <WorkspaceSection
+                  title={reconciliationPosture.title}
+                  description={reconciliationPosture.description}
+                  className={reconciliationPosture.tone}
+                  actionHref="/cashier/payments"
+                  actionLabel="Open history"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatCard
+                      label="Checked"
+                      value={String(data.reconciliation?.checked_count ?? 0)}
+                      subtext="Subscriptions checked in cashier scope"
+                      tone="default"
+                    />
+                    <StatCard
+                      label="Flagged"
+                      value={String(data.reconciliation?.flagged_count ?? 0)}
+                      subtext="Rows needing admin finance review"
+                      tone={
+                        (data.reconciliation?.flagged_count ?? 0) > 0
+                          ? "warning"
+                          : "success"
+                      }
+                    />
+                  </div>
+                </WorkspaceSection>
+              </div>
+            </div>
+
+            <WorkspaceSection
+              title="Collection queue"
+              description="Next-due contracts ordered by urgency, sourced from the canonical scope rollup."
+              actionHref="/cashier/collect"
+              actionLabel="Open collection workspace"
             >
-              {transactions.length === 0 ? (
-                <EmptyState
-                  title="No transactions recorded today"
-                  description="No cashier collection entries were returned for today. After posting a payment, use Refresh to reload the dashboard totals and transaction list."
-                />
+              {data.due_subscriptions && data.due_subscriptions.length > 0 ? (
+                <div className="grid gap-3">
+                  {data.due_subscriptions.slice(0, 8).map((item) => {
+                    const subscriptionId = item.subscription_id ?? item.id;
+                    return (
+                      <div
+                        key={`${subscriptionId}-${item.emi_id ?? "na"}`}
+                        className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {item.customer_name || "Unknown customer"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {item.subscription_number || `SUB-${String(subscriptionId)}`} ·{" "}
+                              {item.product_name || "Linked product"} · Batch{" "}
+                              {item.batch_code || "—"} · Lucky {item.lucky_number ?? "—"}
+                            </div>
+                            <div className="mt-2 text-sm text-muted-foreground">
+                              Due {formatDate(item.due_date)} · Pending{" "}
+                              {money(item.pending_amount)}
+                              {item.is_overdue && item.overdue_days
+                                ? ` · ${item.overdue_days} day(s) overdue`
+                                : ""}
+                            </div>
+                          </div>
+                          <Link
+                            href="/cashier/collect"
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                          >
+                            Open collect
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
+                <EmptyState
+                  title="No due contracts"
+                  description="There are no current next-due rows in the cashier scope."
+                />
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Today's transactions"
+              description="Counter-posted payment rows for the current business day."
+              actionHref="/cashier/payments"
+              actionLabel="Open payment history"
+            >
+              {transactions.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
@@ -263,88 +397,78 @@ export default function CashierDashboardPage() {
                           Subscription
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Method
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
                           Amount
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Reference
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Posted
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Actions
+                          Time
                         </th>
                       </tr>
                     </thead>
-
                     <tbody>
-                      {transactions.map((row) => (
-                        <tr key={row.id} className="align-top">
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">#{row.id}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              EMI {row.emi ?? "—"}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
-                              {row.customer_name || "Unknown customer"}
+                      {transactions.slice(0, 12).map((payment) => (
+                        <tr key={payment.id} className="align-top">
+                          <td className="border-b border-border/70 px-4 py-3">
+                            <div className="text-sm font-semibold text-foreground">
+                              #{payment.id}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              {row.customer_phone || "No phone"}
+                              {payment.method || "—"} · {payment.reference_no || "No ref"}
                             </div>
                           </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
-                              {row.subscription_number || "—"}
+                          <td className="border-b border-border/70 px-4 py-3">
+                            <div className="text-sm font-medium text-foreground">
+                              {payment.customer_name || "Unknown customer"}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              {row.batch_code || "No batch"}
-                              {typeof row.lucky_number === "number"
-                                ? ` · Lucky #${row.lucky_number}`
-                                : ""}
+                              {payment.customer_phone || "—"}
                             </div>
                           </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                              {row.method || "—"}
-                            </span>
+                          <td className="border-b border-border/70 px-4 py-3">
+                            <div className="text-sm font-medium text-foreground">
+                              {payment.subscription_number ||
+                                `SUB-${payment.subscription ?? "—"}`}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Batch {payment.batch_code || "—"} · Lucky{" "}
+                              {payment.lucky_number ?? "—"}
+                            </div>
                           </td>
-
-                          <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                            {money(row.amount)}
+                          <td className="border-b border-border/70 px-4 py-3">
+                            <div className="text-sm font-semibold text-foreground">
+                              {money(payment.amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {payment.is_reversed ? "Reversed" : "Recorded"}
+                            </div>
                           </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {row.reference_no || "—"}
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            {formatDateTime(row.created_at || row.payment_date)}
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <Link
-                              href={`/cashier/payments/${row.id}`}
-                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              View Receipt
-                            </Link>
+                          <td className="border-b border-border/70 px-4 py-3">
+                            <div className="text-sm text-foreground">
+                              {formatDateTime(payment.created_at)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(payment.payment_date)}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              ) : (
+                <EmptyState
+                  title="No transactions recorded today"
+                  description="After posting a payment, use Refresh to reload the dashboard totals and transaction list."
+                />
               )}
-            </SectionCard>
+            </WorkspaceSection>
           </>
+        ) : null}
+
+        {!loading && !error && !data ? (
+          <EmptyState
+            title="No cashier workspace data"
+            description="Cashier dashboard data is not currently available."
+          />
         ) : null}
       </div>
     </PortalPage>

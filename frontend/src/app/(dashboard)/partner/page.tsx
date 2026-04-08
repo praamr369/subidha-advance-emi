@@ -1,175 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  BadgeCheck,
+  CalendarClock,
   CircleDollarSign,
-  Clock3,
-  FileCheck2,
+  CreditCard,
   RefreshCw,
   Users,
 } from "lucide-react";
 
+import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import { WorkspaceSection } from "@/components/ui/workspace";
+import {
+  buildReconciliationPosture,
+  buildSettlementPosture,
+  buildWinnerPosture,
+  formatDate,
+  money,
+} from "@/lib/dashboard-summary";
 import { getPartnerDashboard } from "@/services/partner";
 
 type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
-
-type Summary = {
-  total_customers?: number;
-  active_subscriptions?: number;
-  pending_emis?: number;
-  overdue_emis?: number;
-  total_revenue_collected?: string | number;
-  pending_commission?: string | number;
-  settled_commission?: string | number;
-  submitted_collection_requests?: number;
-  under_review_collection_requests?: number;
-  approved_collection_requests?: number;
-  rejected_collection_requests?: number;
-};
-
-type DueSubscription = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  product_name?: string;
-  batch_code?: string;
-  lucky_number?: string | number;
-  due_date?: string;
-  monthly_amount?: string | number;
-  overdue_days?: number;
-  pending_amount?: string | number;
-};
-
-type RecentCollectionRequest = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  customer_name?: string;
-  amount?: string | number;
-  method?: string;
-  payment_date?: string;
-  submitted_at?: string;
-  status?: string;
-  reference_no?: string;
-};
-
-type RecentVerifiedPayment = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  customer_name?: string;
-  amount?: string | number;
-  method?: string;
-  paid_at?: string;
-};
-
-type FollowUpItem = {
-  id: number | string;
-  subscription_id?: number | string;
-  subscription_number?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  reason?: string;
-  overdue_days?: number;
-  pending_amount?: string | number;
-};
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
   return "Failed to load partner dashboard.";
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null): string {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon,
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {title}
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-card-foreground">
-            {value}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-background p-2 text-muted-foreground">
-          {icon}
-        </div>
-      </div>
-      <p className="text-sm text-muted-foreground">{subtitle}</p>
-    </div>
-  );
-}
-
-function EmptyPanel({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-sm text-muted-foreground">
-      <p className="font-medium text-foreground">{title}</p>
-      <p className="mt-1">{description}</p>
-    </div>
-  );
 }
 
 export default function PartnerDashboardPage() {
@@ -199,57 +64,16 @@ export default function PartnerDashboardPage() {
     void loadPage("initial");
   }, []);
 
-  const summary: Summary = useMemo(() => {
-    return (data?.summary as Summary | undefined) ?? {};
-  }, [data]);
-
-  const dueSubscriptions = useMemo(
-    () => asArray<DueSubscription>(data?.due_subscriptions),
-    [data]
-  );
-
-  const recentCollectionRequests = useMemo(
-    () => asArray<RecentCollectionRequest>(data?.recent_collection_requests),
-    [data]
-  );
-
-  const recentVerifiedPayments = useMemo(
-    () => asArray<RecentVerifiedPayment>(data?.recent_verified_payments),
-    [data]
-  );
-
-  const followUpQueue = useMemo(
-    () => asArray<FollowUpItem>(data?.follow_up_queue),
-    [data]
-  );
-
-  const stats = useMemo(() => {
-    return [
-      {
-        label: "Active Customers",
-        value: summary.total_customers ?? 0,
-      },
-      {
-        label: "Active Subscriptions",
-        value: summary.active_subscriptions ?? 0,
-      },
-      {
-        label: "Verified Collections",
-        value: money(summary.total_revenue_collected ?? 0),
-      },
-      {
-        label: "Pending Commission",
-        value: money(summary.pending_commission ?? 0),
-      },
-    ];
-  }, [summary]);
+  const summary = data?.summary;
+  const settlementPosture = summary ? buildSettlementPosture(summary) : null;
+  const winnerPosture = buildWinnerPosture(data?.winner_surface, summary);
+  const reconciliationPosture = buildReconciliationPosture(data?.reconciliation);
 
   return (
     <PortalPage
       title="Partner Dashboard"
-      subtitle="Track field collections, pending verification, commissions, and customer follow-up from one operational workspace."
+      subtitle="Partner-scoped collection truth aligned to the canonical subscription rollup, with separate operational visibility for request workflow and commission status."
       breadcrumbs={[{ label: "Partner" }]}
-      stats={stats}
       actions={[
         {
           href: "/partner/collections/create",
@@ -257,327 +81,273 @@ export default function PartnerDashboardPage() {
           variant: "primary",
         },
         {
-          href: "/partner/subscription-requests",
-          label: "Subscription Requests",
+          href: "/partner/collections",
+          label: "Collection Queue",
           variant: "secondary",
         },
         {
-          href: "/partner/collections",
-          label: "Open Collection Queue",
+          href: "/partner/reports",
+          label: "Reports",
+          variant: "secondary",
         },
       ]}
+      stats={
+        data
+          ? [
+              {
+                label: "Customers In Scope",
+                value: String(data.summary.total_customers ?? 0),
+                tone: "info",
+              },
+              {
+                label: "Subscriptions",
+                value: String(data.summary.total_subscriptions ?? 0),
+              },
+              {
+                label: "Collected",
+                value: money(data.summary.total_revenue_collected),
+                tone: "success",
+              },
+              {
+                label: "Pending Commission",
+                value: money(data.summary.pending_commission),
+                tone: "warning",
+              },
+            ]
+          : []
+      }
+      statusBadge={{ label: "Partner Scope", tone: "info" }}
     >
-      {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
+      <div className="space-y-6">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void loadPage("refresh")}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
 
-      {!loading && error ? (
-        <ErrorState
-          title="Unable to load partner dashboard"
-          description={error}
-          onRetry={() => void loadPage("initial")}
-        />
-      ) : null}
+        {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
 
-      {!loading && !error && data ? (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Field Operations Summary
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Partner-side progress can be visible immediately, but EMI is
-                financially treated as paid only after admin verification.
-              </p>
-            </div>
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load partner dashboard"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
 
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+        {!loading && !error && data && summary ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Paid"
+                value={money(summary.total_paid_amount ?? summary.total_revenue_collected)}
+                subtext={`${summary.paid_emis} EMI already reflected in partner-visible settlement truth`}
+                tone="success"
+                icon={<CircleDollarSign className="h-5 w-5" />}
               />
-              Refresh
-            </button>
-          </div>
+              <StatCard
+                label="Remaining"
+                value={money(summary.remaining_amount ?? summary.outstanding_amount)}
+                subtext={`${money(summary.total_pending_amount)} still open inside this partner scope`}
+                tone={
+                  Number(summary.remaining_amount ?? summary.outstanding_amount ?? 0) > 0
+                    ? "info"
+                    : "success"
+                }
+                icon={<CreditCard className="h-5 w-5" />}
+              />
+              <StatCard
+                label="Overdue EMI"
+                value={String(summary.overdue_emis ?? 0)}
+                subtext={`${money(summary.overdue_amount)} currently overdue in partner scope`}
+                tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
+                icon={<AlertTriangle className="h-5 w-5" />}
+              />
+              <StatCard
+                label="Upcoming EMI"
+                value={String(summary.upcoming_emis ?? 0)}
+                subtext={
+                  summary.next_due_date && summary.next_due_amount
+                    ? `${money(summary.next_due_amount)} next on ${formatDate(
+                        summary.next_due_date
+                      )}`
+                    : "No next due row is currently visible"
+                }
+                tone="default"
+                icon={<CalendarClock className="h-5 w-5" />}
+              />
+            </div>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              title="Due EMI"
-              value={summary.pending_emis ?? 0}
-              subtitle="Subscriptions currently needing collection follow-up."
-              icon={<Clock3 className="h-5 w-5" />}
-            />
-            <StatCard
-              title="Overdue EMI"
-              value={summary.overdue_emis ?? 0}
-              subtitle="Accounts needing urgent field recovery attention."
-              icon={<AlertTriangle className="h-5 w-5" />}
-            />
-            <StatCard
-              title="Under Verification"
-              value={summary.under_review_collection_requests ?? 0}
-              subtitle="Collection requests awaiting admin review."
-              icon={<FileCheck2 className="h-5 w-5" />}
-            />
-            <StatCard
-              title="Settled Commission"
-              value={money(summary.settled_commission ?? 0)}
-              subtitle="Commission already approved and settled."
-              icon={<CircleDollarSign className="h-5 w-5" />}
-            />
-          </section>
-
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-2">
-                <Clock3 className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-card-foreground">
-                  Collection Pipeline
-                </h3>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Submitted</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {summary.submitted_collection_requests ?? 0}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <section
+                className={`rounded-[1.8rem] border p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.52)] ${settlementPosture?.tone}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Settlement posture
+                    </p>
+                    <h2 className="mt-3 text-xl font-semibold text-slate-950">
+                      {settlementPosture?.title}
+                    </h2>
+                  </div>
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${settlementPosture?.badgeClass}`}
+                  >
+                    {settlementPosture?.badgeLabel}
                   </span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                  <span className="text-sm text-muted-foreground">
-                    Under Review
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {summary.under_review_collection_requests ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Approved</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {summary.approved_collection_requests ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Rejected</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {summary.rejected_collection_requests ?? 0}
-                  </span>
-                </div>
-              </div>
 
-              <div className="mt-4">
-                <Link
-                  href="/partner/collections"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:underline"
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-700">
+                  {settlementPosture?.description}
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Next due contract
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {summary.next_due_subscription_number || "No due contract"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {summary.next_due_date
+                        ? `${money(summary.next_due_amount)} on ${formatDate(
+                            summary.next_due_date
+                          )}`
+                        : "No pending EMI"}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Collection pipeline
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {data.summary.under_review_collection_requests ?? 0} under review
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {data.summary.submitted_collection_requests ?? 0} submitted,{" "}
+                      {data.summary.approved_collection_requests ?? 0} approved
+                    </div>
+                  </div>
+                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Commission posture
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {money(data.summary.pending_commission)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {money(data.summary.settled_commission)} already settled
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid gap-4">
+                <WorkspaceSection
+                  title={winnerPosture.title}
+                  description={winnerPosture.description}
+                  className="h-full"
                 >
-                  View full queue
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatCard
+                      label="Winner subscriptions"
+                      value={String(
+                        data.winner_surface?.winner_subscriptions ??
+                          summary.winner_subscriptions ??
+                          0
+                      )}
+                      subtext={`${data.winner_surface?.waived_emis ?? summary.waived_emis ?? 0} waived EMI rows`}
+                      tone="info"
+                      icon={<BadgeCheck className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Waived value"
+                      value={money(
+                        data.winner_surface?.total_waived_amount ??
+                          summary.total_waived_amount
+                      )}
+                      subtext={winnerPosture.badgeLabel}
+                      tone="default"
+                      icon={<Users className="h-5 w-5" />}
+                    />
+                  </div>
+                </WorkspaceSection>
+
+                <WorkspaceSection
+                  title={reconciliationPosture.title}
+                  description={reconciliationPosture.description}
+                  className={reconciliationPosture.tone}
+                  actionHref="/partner/reports"
+                  actionLabel="Open reports"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatCard
+                      label="Checked"
+                      value={String(data.reconciliation?.checked_count ?? 0)}
+                      subtext="Subscriptions checked in this partner scope"
+                      tone="default"
+                    />
+                    <StatCard
+                      label="Flagged"
+                      value={String(data.reconciliation?.flagged_count ?? 0)}
+                      subtext="Rows needing follow-up"
+                      tone={
+                        (data.reconciliation?.flagged_count ?? 0) > 0
+                          ? "warning"
+                          : "success"
+                      }
+                    />
+                  </div>
+                </WorkspaceSection>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm xl:col-span-3">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Due Collection Queue
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Prioritize these subscriptions for field collection.
-                  </p>
-                </div>
-
-                <Link
-                  href="/partner/subscriptions"
-                  className="inline-flex items-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                >
-                  Open Subscriptions
-                </Link>
-              </div>
-
-              {dueSubscriptions.length === 0 ? (
-                <EmptyPanel
-                  title="No due subscriptions"
-                  description="There are no active due collection items in the current dashboard payload."
-                />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-muted-foreground">
-                        <th className="px-3 py-3 font-medium">Customer</th>
-                        <th className="px-3 py-3 font-medium">Subscription</th>
-                        <th className="px-3 py-3 font-medium">Product</th>
-                        <th className="px-3 py-3 font-medium">Due Date</th>
-                        <th className="px-3 py-3 font-medium">Amount</th>
-                        <th className="px-3 py-3 font-medium">Overdue</th>
-                        <th className="px-3 py-3 font-medium">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dueSubscriptions.slice(0, 8).map((item) => {
-                        const subscriptionId =
-                          item.subscription_id ?? item.id ?? "";
-                        const subscriptionLabel =
-                          item.subscription_number ||
-                          `SUB-${String(subscriptionId)}`;
-
-                        return (
-                          <tr
-                            key={`${subscriptionId}-${item.due_date ?? "na"}`}
-                            className="border-b border-border/70 align-top"
-                          >
-                            <td className="px-3 py-3">
-                              <div className="font-medium text-foreground">
-                                {item.customer_name || "—"}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {item.customer_phone || "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="font-medium text-foreground">
-                                {subscriptionLabel}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Batch {item.batch_code || "—"} · Lucky{" "}
-                                {item.lucky_number ?? "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3 text-foreground">
-                              {item.product_name || "—"}
-                            </td>
-                            <td className="px-3 py-3 text-foreground">
-                              {formatDate(item.due_date)}
-                            </td>
-                            <td className="px-3 py-3 font-medium text-foreground">
-                              {money(
-                                item.pending_amount ?? item.monthly_amount ?? 0
-                              )}
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                                {item.overdue_days && item.overdue_days > 0
-                                  ? `${item.overdue_days} days`
-                                  : "Current"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <Link
-                                href={`/partner/collections/create?subscription=${subscriptionId}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Collect
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Recent Collection Requests
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Operational progress visible before admin financial
-                    verification.
-                  </p>
-                </div>
-
-                <Link
-                  href="/partner/collections"
-                  className="inline-flex items-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                >
-                  View All
-                </Link>
-              </div>
-
-              {recentCollectionRequests.length === 0 ? (
-                <EmptyPanel
-                  title="No recent requests"
-                  description="No recent partner collection requests are currently visible."
-                />
-              ) : (
-                <div className="space-y-3">
-                  {recentCollectionRequests.slice(0, 6).map((item) => {
-                    const subscriptionId = item.subscription_id ?? "na";
-
+            <WorkspaceSection
+              title="Due collection queue"
+              description="Partner-scoped next-due contracts ordered by urgency, sourced from the canonical subscription snapshot."
+              actionHref="/partner/subscriptions"
+              actionLabel="Open subscriptions"
+            >
+              {data.due_subscriptions && data.due_subscriptions.length > 0 ? (
+                <div className="grid gap-3">
+                  {data.due_subscriptions.slice(0, 8).map((item) => {
+                    const subscriptionId = item.subscription_id ?? item.id;
                     return (
                       <div
-                        key={String(item.id)}
-                        className="rounded-xl border border-border bg-background p-4"
+                        key={`${subscriptionId}-${item.emi_id ?? "na"}`}
+                        className="rounded-2xl border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
-                            <div className="font-medium text-foreground">
-                              {item.customer_name || "—"}
+                            <div className="text-sm font-semibold text-foreground">
+                              {item.customer_name || "Unknown customer"}
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.subscription_number ||
-                                `SUB-${String(subscriptionId)}`}
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {item.subscription_number || `SUB-${String(subscriptionId)}`} ·{" "}
+                              {item.product_name || "Linked product"} · Batch{" "}
+                              {item.batch_code || "—"} · Lucky {item.lucky_number ?? "—"}
+                            </div>
+                            <div className="mt-2 text-sm text-muted-foreground">
+                              Due {formatDate(item.due_date)} · Pending{" "}
+                              {money(item.pending_amount)}
+                              {item.is_overdue && item.overdue_days
+                                ? ` · ${item.overdue_days} day(s) overdue`
+                                : ""}
                             </div>
                           </div>
-
-                          <StatusBadge status={item.status} />
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Amount
-                            </p>
-                            <p className="font-medium text-foreground">
-                              {money(item.amount ?? 0)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Method
-                            </p>
-                            <p className="font-medium text-foreground">
-                              {item.method || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Payment Date
-                            </p>
-                            <p className="font-medium text-foreground">
-                              {formatDate(item.payment_date)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Submitted
-                            </p>
-                            <p className="font-medium text-foreground">
-                              {formatDateTime(item.submitted_at)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-xs text-muted-foreground">
-                            Ref: {item.reference_no || "—"}
-                          </p>
-
                           <Link
-                            href={`/partner/collections/${String(item.id)}`}
-                            className="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:underline"
+                            href={`/partner/collections/create?subscription=${String(subscriptionId)}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
                           >
-                            Open request
+                            Collect
                             <ArrowRight className="h-4 w-4" />
                           </Link>
                         </div>
@@ -585,185 +355,113 @@ export default function PartnerDashboardPage() {
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Verified Payment Activity
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Only admin-verified payments should appear in financial
-                    history.
-                  </p>
-                </div>
-
-                <Link
-                  href="/partner/payments"
-                  className="inline-flex items-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                >
-                  Open Payments
-                </Link>
-              </div>
-
-              {recentVerifiedPayments.length === 0 ? (
-                <EmptyPanel
-                  title="No verified payments yet"
-                  description="No verified partner-visible payment rows are currently available."
-                />
               ) : (
-                <div className="space-y-3">
-                  {recentVerifiedPayments.slice(0, 6).map((item) => (
-                    <div
-                      key={String(item.id)}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-background p-4"
-                    >
-                      <div>
-                        <div className="font-medium text-foreground">
-                          {item.customer_name || "—"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.subscription_number ||
-                            `SUB-${String(item.subscription_id ?? item.id)}`}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {item.method || "—"} · {formatDateTime(item.paid_at)}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <StatusBadge status="VERIFIED" />
-                        <p className="mt-2 font-semibold text-foreground">
-                          {money(item.amount ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm xl:col-span-2">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Follow-up Queue
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Accounts that need partner attention due to overdue EMI or
-                    request correction.
-                  </p>
-                </div>
-
-                <Link
-                  href="/partner/customers"
-                  className="inline-flex items-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                >
-                  Open Customers
-                </Link>
-              </div>
-
-              {followUpQueue.length === 0 ? (
-                <EmptyPanel
-                  title="No follow-up items"
-                  description="No overdue or collection rework items currently require partner action."
+                <EmptyState
+                  title="No due subscriptions"
+                  description="There are no current next-due rows inside this partner scope."
                 />
-              ) : (
-                <div className="space-y-3">
-                  {followUpQueue.slice(0, 6).map((item) => (
-                    <div
-                      key={String(item.id)}
-                      className="rounded-xl border border-border bg-background p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {item.customer_name || "—"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.subscription_number ||
-                              `SUB-${String(item.subscription_id ?? item.id)}`}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {item.customer_phone || "—"}
-                          </p>
-                        </div>
-
-                        <div className="text-right text-sm">
-                          <p className="font-medium text-foreground">
-                            {money(item.pending_amount ?? 0)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.overdue_days && item.overdue_days > 0
-                              ? `${item.overdue_days} overdue days`
-                              : "Follow-up required"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                        {item.reason || "Pending follow-up action required."}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               )}
+            </WorkspaceSection>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <WorkspaceSection
+                title="Recent collection requests"
+                description="Request workflow visibility stays operational only and does not redefine settlement truth."
+                actionHref="/partner/collections"
+                actionLabel="Open queue"
+              >
+                {data.recent_collection_requests &&
+                data.recent_collection_requests.length > 0 ? (
+                  <div className="grid gap-3">
+                    {data.recent_collection_requests.slice(0, 6).map((item) => (
+                      <div
+                        key={String(item.id)}
+                        className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {item.subscription_number || "Subscription pending"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {item.customer_name || "Unknown customer"} ·{" "}
+                              {money(item.amount)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                              {item.status || "SUBMITTED"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(item.payment_date)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No recent requests"
+                    description="No recent partner collection requests are currently visible."
+                  />
+                )}
+              </WorkspaceSection>
+
+              <WorkspaceSection
+                title="Recent verified payments"
+                description="Verified payment rows remain partner-visible, but broader admin finance controls stay out of this dashboard."
+                actionHref="/partner/payments"
+                actionLabel="Open payments"
+              >
+                {data.recent_verified_payments &&
+                data.recent_verified_payments.length > 0 ? (
+                  <div className="grid gap-3">
+                    {data.recent_verified_payments.slice(0, 6).map((item) => (
+                      <div
+                        key={String(item.id)}
+                        className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {item.customer_name || "Unknown customer"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {item.subscription_number || "Subscription pending"} ·{" "}
+                              {item.method || "—"}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-foreground">
+                              {money(item.amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(item.payment_date)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No verified payments"
+                    description="No verified partner-visible payment rows are currently visible."
+                  />
+                )}
+              </WorkspaceSection>
             </div>
+          </>
+        ) : null}
 
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-card-foreground">
-                  Operational Actions
-                </h3>
-              </div>
-
-              <div className="space-y-3">
-                <Link
-                  href="/partner/collections/create"
-                  className="block rounded-xl border border-border bg-background p-4 transition hover:bg-muted"
-                >
-                  <p className="font-medium text-foreground">
-                    Submit New Collection
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Record a field collection request for admin verification.
-                  </p>
-                </Link>
-
-                <Link
-                  href="/partner/collections"
-                  className="block rounded-xl border border-border bg-background p-4 transition hover:bg-muted"
-                >
-                  <p className="font-medium text-foreground">
-                    Track Request Status
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Review submitted, under-review, approved, and rejected
-                    requests.
-                  </p>
-                </Link>
-
-                <Link
-                  href="/partner/commissions"
-                  className="block rounded-xl border border-border bg-background p-4 transition hover:bg-muted"
-                >
-                  <p className="font-medium text-foreground">
-                    Monitor Commission
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Check pending and settled earning status.
-                  </p>
-                </Link>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
+        {!loading && !error && !data ? (
+          <EmptyState
+            title="No partner dashboard data"
+            description="Partner dashboard data is not currently available."
+          />
+        ) : null}
+      </div>
     </PortalPage>
   );
 }
