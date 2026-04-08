@@ -35,3 +35,14 @@ class DashboardWindowQuerySerializer(serializers.Serializer):
 
 class DashboardSurfaceQuerySerializer(DashboardWindowQuerySerializer):
     limit = serializers.IntegerField(required=False, min_value=1, max_value=50, default=10)
+    page = serializers.IntegerField(required=False, min_value=1, default=1)
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100)
+    ordering = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        limit = attrs.get("limit")
+        page_size = attrs.get("page_size")
+        attrs["page_size"] = page_size or limit or 10
+        attrs["ordering"] = (attrs.get("ordering") or "").strip()
+        return attrs

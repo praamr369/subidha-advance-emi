@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -88,21 +90,20 @@ export default function CashierDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const dashboardQuery =
+    windowPreset === "CUSTOM"
+      ? {
+          window: windowPreset,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        }
+      : { window: windowPreset };
 
   async function loadDashboard(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const query =
-        windowPreset === "CUSTOM"
-          ? {
-              window: windowPreset,
-              start_date: startDate || undefined,
-              end_date: endDate || undefined,
-            }
-          : { window: windowPreset };
-
       const [
         legacyPayload,
         canonicalPayload,
@@ -113,12 +114,12 @@ export default function CashierDashboardPage() {
         winnersPayload,
       ] = await Promise.all([
         getCashierDashboard(),
-        getDashboardSummaryV2(query),
-        listDashboardOverdue({ ...query, limit: 6 }),
-        listDashboardUpcoming({ ...query, limit: 6 }),
-        listDashboardRecentPayments({ ...query, limit: 12 }),
-        listDashboardReconciliationExceptions({ ...query, limit: 4 }),
-        listDashboardWinners({ ...query, limit: 4 }),
+        getDashboardSummaryV2(dashboardQuery),
+        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+        listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
+        listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
+        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
       ]);
 
       setLegacy(legacyPayload);
@@ -360,6 +361,12 @@ export default function CashierDashboardPage() {
                   title={winnerPosture.title}
                   description={winnerPosture.description}
                   className="h-full"
+                  action={
+                    <DashboardSurfaceExportActions
+                      query={dashboardQuery}
+                      actions={[{ surface: "winners", label: "Export CSV" }]}
+                    />
+                  }
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
@@ -409,8 +416,26 @@ export default function CashierDashboardPage() {
                   title={reconciliationPosture.title}
                   description={reconciliationPosture.description}
                   className={reconciliationPosture.tone}
-                  actionHref="/cashier/payments"
-                  actionLabel="Open history"
+                  action={
+                    <>
+                      <ActionButton
+                        href="/cashier/payments"
+                        variant="secondary"
+                        className="h-9 px-3 text-xs"
+                      >
+                        Open history
+                      </ActionButton>
+                      <DashboardSurfaceExportActions
+                        query={dashboardQuery}
+                        actions={[
+                          {
+                            surface: "reconciliation-exceptions",
+                            label: "Export CSV",
+                          },
+                        ]}
+                      />
+                    </>
+                  }
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
@@ -437,8 +462,24 @@ export default function CashierDashboardPage() {
             <WorkspaceSection
               title="Due collection queue"
               description="Next-due contracts ordered by urgency, sourced from the canonical surface endpoints."
-              actionHref="/cashier/collect"
-              actionLabel="Open collection workspace"
+              action={
+                <>
+                  <ActionButton
+                    href="/cashier/collect"
+                    variant="secondary"
+                    className="h-9 px-3 text-xs"
+                  >
+                    Open collection workspace
+                  </ActionButton>
+                  <DashboardSurfaceExportActions
+                    query={dashboardQuery}
+                    actions={[
+                      { surface: "upcoming", label: "Export upcoming" },
+                      { surface: "overdue", label: "Export overdue" },
+                    ]}
+                  />
+                </>
+              }
             >
               {dueRows.length > 0 ? (
                 <div className="grid gap-3">
@@ -490,8 +531,26 @@ export default function CashierDashboardPage() {
             <WorkspaceSection
               title="Today's transactions"
               description="Counter-posted payment rows surfaced through the shared canonical recent-payments endpoint."
-              actionHref="/cashier/payments"
-              actionLabel="Open payment history"
+              action={
+                <>
+                  <ActionButton
+                    href="/cashier/payments"
+                    variant="secondary"
+                    className="h-9 px-3 text-xs"
+                  >
+                    Open payment history
+                  </ActionButton>
+                  <DashboardSurfaceExportActions
+                    query={dashboardQuery}
+                    actions={[
+                      {
+                        surface: "recent-payments",
+                        label: "Export CSV",
+                      },
+                    ]}
+                  />
+                </>
+              }
             >
               {paymentRows.length > 0 ? (
                 <div className="overflow-x-auto">

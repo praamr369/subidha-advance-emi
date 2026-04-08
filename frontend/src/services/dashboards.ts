@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import type {
   CanonicalDashboardSummary,
   DashboardDueSubscription,
@@ -12,6 +13,13 @@ import type {
   DashboardWinnerItem,
   DashboardWinnerSurface,
 } from "@/services/dashboard-types";
+
+export type DashboardSurfaceKind =
+  | "upcoming"
+  | "overdue"
+  | "recent-payments"
+  | "winners"
+  | "reconciliation-exceptions";
 
 function toNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
@@ -331,6 +339,20 @@ async function getSurface<T>(
         : undefined
     ),
     count: toNumber(payload.count, rawResults.length),
+    page:
+      payload.page === null || payload.page === undefined
+        ? undefined
+        : toNumber(payload.page, 1),
+    page_size:
+      payload.page_size === null || payload.page_size === undefined
+        ? undefined
+        : toNumber(payload.page_size, rawResults.length),
+    total_pages:
+      payload.total_pages === null || payload.total_pages === undefined
+        ? undefined
+        : toNumber(payload.total_pages, 0),
+    ordering:
+      typeof payload.ordering === "string" ? payload.ordering : undefined,
     results: rawResults.map(normalizer),
   };
 }
@@ -358,5 +380,15 @@ export function listDashboardReconciliationExceptions(
     "surfaces/reconciliation-exceptions",
     params,
     normalizeReconciliationRow
+  );
+}
+
+export function downloadDashboardSurfaceCsv(
+  surface: DashboardSurfaceKind,
+  params: DashboardQuery = {}
+) {
+  return downloadAuthenticatedFile(
+    `/dashboards/surfaces/${surface}/export.csv${buildQuery(params)}`,
+    `dashboard-${surface}.csv`
   );
 }

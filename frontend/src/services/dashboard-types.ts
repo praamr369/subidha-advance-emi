@@ -37,6 +37,9 @@ export type DashboardQuery = {
   start_date?: string | null;
   end_date?: string | null;
   limit?: number;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
 };
 
 export type DashboardWinnerSurface = {
@@ -150,5 +153,9 @@ export type DashboardSurfaceResponse<T> = {
   role: string;
   filters: DashboardFilters;
   count: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
+  ordering?: string;
   results: T[];
 };

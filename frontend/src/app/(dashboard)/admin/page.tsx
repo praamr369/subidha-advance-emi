@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -98,21 +100,20 @@ export default function AdminDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const dashboardQuery =
+    windowPreset === "CUSTOM"
+      ? {
+          window: windowPreset,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        }
+      : { window: windowPreset };
 
   async function loadDashboard(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const query =
-        windowPreset === "CUSTOM"
-          ? {
-              window: windowPreset,
-              start_date: startDate || undefined,
-              end_date: endDate || undefined,
-            }
-          : { window: windowPreset };
-
       const [
         legacyPayload,
         canonicalPayload,
@@ -123,12 +124,12 @@ export default function AdminDashboardPage() {
         winnerPayload,
       ] = await Promise.all([
         getAdminDashboard(),
-        getDashboardSummaryV2(query),
-        listDashboardOverdue({ ...query, limit: 6 }),
-        listDashboardUpcoming({ ...query, limit: 6 }),
-        listDashboardRecentPayments({ ...query, limit: 8 }),
-        listDashboardReconciliationExceptions({ ...query, limit: 4 }),
-        listDashboardWinners({ ...query, limit: 4 }),
+        getDashboardSummaryV2(dashboardQuery),
+        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+        listDashboardRecentPayments({ ...dashboardQuery, limit: 8 }),
+        listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
+        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
       ]);
 
       setLegacy(legacyPayload);
@@ -397,6 +398,12 @@ export default function AdminDashboardPage() {
                   title={winnerPosture.title}
                   description={winnerPosture.description}
                   className="h-full"
+                  action={
+                    <DashboardSurfaceExportActions
+                      query={dashboardQuery}
+                      actions={[{ surface: "winners", label: "Export CSV" }]}
+                    />
+                  }
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
@@ -449,8 +456,26 @@ export default function AdminDashboardPage() {
                   title={reconciliationPosture.title}
                   description={reconciliationPosture.description}
                   className={reconciliationPosture.tone}
-                  actionHref={buildAdminReconciliationRoute({ flagged: true })}
-                  actionLabel="Open reconciliation"
+                  action={
+                    <>
+                      <ActionButton
+                        href={buildAdminReconciliationRoute({ flagged: true })}
+                        variant="secondary"
+                        className="h-9 px-3 text-xs"
+                      >
+                        Open reconciliation
+                      </ActionButton>
+                      <DashboardSurfaceExportActions
+                        query={dashboardQuery}
+                        actions={[
+                          {
+                            surface: "reconciliation-exceptions",
+                            label: "Export CSV",
+                          },
+                        ]}
+                      />
+                    </>
+                  }
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
@@ -516,8 +541,24 @@ export default function AdminDashboardPage() {
               <WorkspaceSection
                 title="Due collection queue"
                 description="Canonical next-due subscription rows, ordered by urgency for the selected drilldown window."
-                actionHref={ROUTES.admin.subscriptions}
-                actionLabel="Open subscriptions"
+                action={
+                  <>
+                    <ActionButton
+                      href={ROUTES.admin.subscriptions}
+                      variant="secondary"
+                      className="h-9 px-3 text-xs"
+                    >
+                      Open subscriptions
+                    </ActionButton>
+                    <DashboardSurfaceExportActions
+                      query={dashboardQuery}
+                      actions={[
+                        { surface: "upcoming", label: "Export upcoming" },
+                        { surface: "overdue", label: "Export overdue" },
+                      ]}
+                    />
+                  </>
+                }
               >
                 {dueRows.length > 0 ? (
                   <div className="grid gap-3">
@@ -603,8 +644,26 @@ export default function AdminDashboardPage() {
               <WorkspaceSection
                 title="Recent payment activity"
                 description="Latest admin-visible payment rows from the Phase-2 canonical drilldown surface."
-                actionHref={ROUTES.admin.payments}
-                actionLabel="Open payments"
+                action={
+                  <>
+                    <ActionButton
+                      href={ROUTES.admin.payments}
+                      variant="secondary"
+                      className="h-9 px-3 text-xs"
+                    >
+                      Open payments
+                    </ActionButton>
+                    <DashboardSurfaceExportActions
+                      query={dashboardQuery}
+                      actions={[
+                        {
+                          surface: "recent-payments",
+                          label: "Export CSV",
+                        },
+                      ]}
+                    />
+                  </>
+                }
               >
                 {paymentRows.length > 0 ? (
                   <div className="grid gap-3">

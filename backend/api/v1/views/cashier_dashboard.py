@@ -94,7 +94,7 @@ def _serialize_cashier_search_result(emi: Emi):
         "status": emi.status,
         "is_overdue": emi.is_overdue(),
         "overdue_days": max(
-            (timezone.now().date() - emi.due_date).days,
+            (timezone.localdate() - emi.due_date).days,
             0,
         )
         if emi.is_overdue()

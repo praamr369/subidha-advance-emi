@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -111,21 +113,20 @@ export default function CustomerDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const dashboardQuery =
+    windowPreset === "CUSTOM"
+      ? {
+          window: windowPreset,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        }
+      : { window: windowPreset };
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const query =
-        windowPreset === "CUSTOM"
-          ? {
-              window: windowPreset,
-              start_date: startDate || undefined,
-              end_date: endDate || undefined,
-            }
-          : { window: windowPreset };
-
       const [
         legacyPayload,
         canonicalPayload,
@@ -135,11 +136,11 @@ export default function CustomerDashboardPage() {
         winnersPayload,
       ] = await Promise.all([
         getCustomerDashboard(),
-        getDashboardSummaryV2(query),
-        listDashboardOverdue({ ...query, limit: 6 }),
-        listDashboardUpcoming({ ...query, limit: 6 }),
-        listDashboardRecentPayments({ ...query, limit: 6 }),
-        listDashboardWinners({ ...query, limit: 4 }),
+        getDashboardSummaryV2(dashboardQuery),
+        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+        listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
       ]);
       setLegacy(legacyPayload);
       setCanonical(canonicalPayload);
@@ -426,6 +427,12 @@ export default function CustomerDashboardPage() {
               title={winnerPosture.title}
               description={winnerPosture.description}
               className="h-full rounded-[1.8rem]"
+              action={
+                <DashboardSurfaceExportActions
+                  query={dashboardQuery}
+                  actions={[{ surface: "winners", label: "Export CSV" }]}
+                />
+              }
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 <StatCard
@@ -470,8 +477,24 @@ export default function CustomerDashboardPage() {
             <WorkspaceSection
               title="Due collection queue"
               description="Your next-due rows and overdue rows now come from the same canonical surface layer used across every dashboard."
-              actionHref={ROUTES.customer.subscriptions}
-              actionLabel="Open subscriptions"
+              action={
+                <>
+                  <ActionButton
+                    href={ROUTES.customer.subscriptions}
+                    variant="secondary"
+                    className="h-9 px-3 text-xs"
+                  >
+                    Open subscriptions
+                  </ActionButton>
+                  <DashboardSurfaceExportActions
+                    query={dashboardQuery}
+                    actions={[
+                      { surface: "upcoming", label: "Export upcoming" },
+                      { surface: "overdue", label: "Export overdue" },
+                    ]}
+                  />
+                </>
+              }
             >
               {dueRows.length > 0 ? (
                 <div className="grid gap-3">
@@ -507,8 +530,26 @@ export default function CustomerDashboardPage() {
             <WorkspaceSection
               title="Recent payment surface"
               description="Recent recorded payment rows from the canonical recent-payments surface."
-              actionHref={ROUTES.customer.payments}
-              actionLabel="Open payments"
+              action={
+                <>
+                  <ActionButton
+                    href={ROUTES.customer.payments}
+                    variant="secondary"
+                    className="h-9 px-3 text-xs"
+                  >
+                    Open payments
+                  </ActionButton>
+                  <DashboardSurfaceExportActions
+                    query={dashboardQuery}
+                    actions={[
+                      {
+                        surface: "recent-payments",
+                        label: "Export CSV",
+                      },
+                    ]}
+                  />
+                </>
+              }
             >
               {paymentRows.length > 0 ? (
                 <div className="grid gap-3">

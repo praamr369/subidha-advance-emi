@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import ceil
 from typing import Any
 
 from subscriptions.models import Payment
@@ -26,6 +27,135 @@ from subscriptions.services.winner_state_service import (
     get_revealed_winning_draw,
     winner_history_q,
 )
+
+SURFACE_UPCOMING = "upcoming"
+SURFACE_OVERDUE = "overdue"
+SURFACE_RECENT_PAYMENTS = "recent-payments"
+SURFACE_WINNERS = "winners"
+SURFACE_RECONCILIATION_EXCEPTIONS = "reconciliation-exceptions"
+
+SURFACE_DEFAULT_ORDERING: dict[str, str] = {
+    SURFACE_UPCOMING: "due_date",
+    SURFACE_OVERDUE: "due_date",
+    SURFACE_RECENT_PAYMENTS: "-payment_date",
+    SURFACE_WINNERS: "-draw_revealed_at",
+    SURFACE_RECONCILIATION_EXCEPTIONS: "-delta",
+}
+
+SURFACE_ORDERING_ALLOWLIST: dict[str, set[str]] = {
+    SURFACE_UPCOMING: {
+        "due_date",
+        "pending_amount",
+        "monthly_amount",
+        "customer_name",
+        "product_name",
+        "subscription_number",
+    },
+    SURFACE_OVERDUE: {
+        "due_date",
+        "pending_amount",
+        "monthly_amount",
+        "customer_name",
+        "overdue_days",
+        "subscription_number",
+    },
+    SURFACE_RECENT_PAYMENTS: {
+        "payment_date",
+        "created_at",
+        "amount",
+        "customer_name",
+        "subscription_number",
+        "method",
+    },
+    SURFACE_WINNERS: {
+        "draw_revealed_at",
+        "waived_amount",
+        "remaining_amount",
+        "customer_name",
+        "subscription_number",
+        "winner_month",
+    },
+    SURFACE_RECONCILIATION_EXCEPTIONS: {
+        "delta",
+        "computed_outstanding",
+        "pending_outstanding",
+        "paid_amount",
+        "customer_name",
+        "subscription_number",
+    },
+}
+
+
+def resolve_surface_ordering(surface_code: str, requested_ordering: str | None = None) -> str:
+    default_ordering = SURFACE_DEFAULT_ORDERING[surface_code]
+    if not requested_ordering:
+        return default_ordering
+
+    candidate = requested_ordering.strip()
+    reverse = candidate.startswith("-")
+    field_name = candidate[1:] if reverse else candidate
+    if field_name not in SURFACE_ORDERING_ALLOWLIST[surface_code]:
+        return default_ordering
+    return f"-{field_name}" if reverse else field_name
+
+
+def paginate_surface_rows(rows: list[dict[str, Any]], *, page: int, page_size: int) -> dict[str, Any]:
+    total_count = len(rows)
+    if total_count == 0:
+        return {
+            "count": 0,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": 0,
+            "results": [],
+        }
+
+    total_pages = ceil(total_count / page_size)
+    safe_page = min(page, total_pages)
+    start = (safe_page - 1) * page_size
+    end = start + page_size
+    return {
+        "count": total_count,
+        "page": safe_page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "results": rows[start:end],
+    }
+
+
+def _sortable_value(value: Any):
+    if value is None:
+        return (1, "")
+    if isinstance(value, bool):
+        return (0, int(value))
+    if isinstance(value, (int, float)):
+        return (0, value)
+    if isinstance(value, str):
+        try:
+            return (0, float(value))
+        except ValueError:
+            return (0, value.lower())
+    return (0, str(value).lower())
+
+
+def _apply_row_ordering(
+    rows: list[dict[str, Any]],
+    *,
+    surface_code: str,
+    ordering: str | None = None,
+) -> list[dict[str, Any]]:
+    resolved_ordering = resolve_surface_ordering(surface_code, ordering)
+    default_ordering = SURFACE_DEFAULT_ORDERING[surface_code]
+    if resolved_ordering == default_ordering:
+        return rows
+
+    reverse = resolved_ordering.startswith("-")
+    field_name = resolved_ordering[1:] if reverse else resolved_ordering
+    return sorted(
+        rows,
+        key=lambda row: _sortable_value(row.get(field_name)),
+        reverse=reverse,
+    )
 
 
 def _serialize_payment(payment: Payment) -> dict[str, Any]:
@@ -84,16 +214,19 @@ def list_upcoming_items(
     scope: DashboardScope,
     actor_user,
     window_params: DashboardWindowParams | None = None,
-    limit: int = 10,
+    limit: int | None = 10,
+    ordering: str | None = None,
 ) -> list[dict[str, Any]]:
     effective_window = window_params or resolve_dashboard_window()
     subscriptions = list(scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id"))
     build_customer_dashboard_summary(subscriptions)
-    return _build_due_subscription_rows(
+    rows = _build_due_subscription_rows(
         subscriptions,
         window_params=effective_window,
         only_state="UPCOMING",
-    )[:limit]
+    )
+    rows = _apply_row_ordering(rows, surface_code=SURFACE_UPCOMING, ordering=ordering)
+    return rows if limit is None else rows[:limit]
 
 
 def list_overdue_items(
@@ -101,16 +234,19 @@ def list_overdue_items(
     scope: DashboardScope,
     actor_user,
     window_params: DashboardWindowParams | None = None,
-    limit: int = 10,
+    limit: int | None = 10,
+    ordering: str | None = None,
 ) -> list[dict[str, Any]]:
     effective_window = window_params or resolve_dashboard_window()
     subscriptions = list(scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id"))
     build_customer_dashboard_summary(subscriptions)
-    return _build_due_subscription_rows(
+    rows = _build_due_subscription_rows(
         subscriptions,
         window_params=effective_window,
         only_state="OVERDUE",
-    )[:limit]
+    )
+    rows = _apply_row_ordering(rows, surface_code=SURFACE_OVERDUE, ordering=ordering)
+    return rows if limit is None else rows[:limit]
 
 
 def list_recent_payments(
@@ -118,7 +254,8 @@ def list_recent_payments(
     scope: DashboardScope,
     actor_user,
     window_params: DashboardWindowParams | None = None,
-    limit: int = 10,
+    limit: int | None = 10,
+    ordering: str | None = None,
 ) -> list[dict[str, Any]]:
     effective_window = window_params or resolve_dashboard_window()
     queryset = _scoped_payment_queryset(scope, actor_user)
@@ -134,7 +271,13 @@ def list_recent_payments(
             field_name="payment_date",
             window_params=effective_window,
         )
-    return [_serialize_payment(payment) for payment in queryset[:limit]]
+    rows = [_serialize_payment(payment) for payment in queryset]
+    rows = _apply_row_ordering(
+        rows,
+        surface_code=SURFACE_RECENT_PAYMENTS,
+        ordering=ordering,
+    )
+    return rows if limit is None else rows[:limit]
 
 
 def list_winners(
@@ -142,7 +285,8 @@ def list_winners(
     scope: DashboardScope,
     actor_user,
     window_params: DashboardWindowParams | None = None,
-    limit: int = 10,
+    limit: int | None = 10,
+    ordering: str | None = None,
 ) -> list[dict[str, Any]]:
     effective_window = window_params or resolve_dashboard_window()
     queryset = scope.get_subscription_queryset(actor_user).filter(winner_history_q()).distinct()
@@ -190,7 +334,8 @@ def list_winners(
         ),
         reverse=True,
     )
-    return rows[:limit]
+    rows = _apply_row_ordering(rows, surface_code=SURFACE_WINNERS, ordering=ordering)
+    return rows if limit is None else rows[:limit]
 
 
 def list_reconciliation_exceptions(
@@ -198,11 +343,18 @@ def list_reconciliation_exceptions(
     scope: DashboardScope,
     actor_user,
     window_params: DashboardWindowParams | None = None,
-    limit: int = 10,
+    limit: int | None = 10,
+    ordering: str | None = None,
 ) -> list[dict[str, Any]]:
     effective_window = window_params or resolve_dashboard_window()
     queryset = _apply_activity_window(
         scope.get_subscription_queryset(actor_user),
         effective_window,
     )
-    return _build_reconciliation_surface(queryset)["results"][:limit]
+    rows = _build_reconciliation_surface(queryset)["results"]
+    rows = _apply_row_ordering(
+        rows,
+        surface_code=SURFACE_RECONCILIATION_EXCEPTIONS,
+        ordering=ordering,
+    )
+    return rows if limit is None else rows[:limit]

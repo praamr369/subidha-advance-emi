@@ -470,7 +470,7 @@ class EmiAdminSerializer(serializers.ModelSerializer):
     def get_overdue_days(self, obj):
         if not obj.is_overdue():
             return 0
-        return max((timezone.now().date() - obj.due_date).days, 0)
+        return max((timezone.localdate() - obj.due_date).days, 0)
 
     def validate(self, attrs):
         data = {}

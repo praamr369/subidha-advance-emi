@@ -1338,7 +1338,7 @@ class Emi(TimeStampedModel):
         return self.balance_amount() <= MONEY_ZERO
 
     def is_overdue(self) -> bool:
-        return self.status == EmiStatus.PENDING and self.due_date < timezone.now().date()
+        return self.status == EmiStatus.PENDING and self.due_date < timezone.localdate()
 
     def __str__(self):
         return f"EMI #{self.month_no} - Subscription {self.subscription_id}"
