@@ -4,8 +4,9 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from accounting.models import AccountingBridgePosting
-from accounting.services.bridge_run_service import run_bridge_postings
+from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.services.bridge_run_service import run_bridge_postings, run_emi_payment_bridges
+from billing.models import ReceiptDocument, ReceiptType
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
@@ -100,3 +101,36 @@ class BridgeRunServiceIdempotentTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_emi_payment_bridge_creates_single_receipt_document(self):
+        cash_chart = ChartOfAccount.objects.create(
+            code="BRIDGE-EMI-CASH-001",
+            name="Bridge EMI Cash",
+            account_type=ChartOfAccountType.ASSET,
+        )
+        FinanceAccount.objects.create(
+            name="Bridge EMI Cash Counter",
+            kind=FinanceAccountKind.CASH,
+            chart_account=cash_chart,
+            opening_balance=Decimal("0.00"),
+        )
+
+        first_run = run_emi_payment_bridges(
+            start_date=self.today - timedelta(days=7),
+            end_date=self.today,
+            dry_run=False,
+            performed_by=self.admin,
+        )
+        second_run = run_emi_payment_bridges(
+            start_date=self.today - timedelta(days=7),
+            end_date=self.today,
+            dry_run=False,
+            performed_by=self.admin,
+        )
+
+        self.assertEqual(first_run["created_count"], 1)
+        self.assertEqual(first_run["existing_count"], 0)
+        self.assertEqual(second_run["created_count"], 0)
+        self.assertEqual(second_run["existing_count"], 1)
+        receipt = ReceiptDocument.objects.get(payment_id=self.payment["payment"].id)
+        self.assertEqual(receipt.receipt_type, ReceiptType.EMI_PAYMENT_RECEIPT)
