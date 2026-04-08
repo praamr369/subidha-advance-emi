@@ -394,6 +394,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "api",
+    "accounting",
     "subscriptions",
     "django_extensions",
 ]
