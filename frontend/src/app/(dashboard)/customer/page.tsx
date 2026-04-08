@@ -457,7 +457,7 @@ export default function CustomerDashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Winner and waiver posture
+                    Winner benefit and waiver posture
                   </p>
                   <h3 className="mt-3 text-xl font-semibold text-slate-950">
                     {winnerPosture?.title}

@@ -324,7 +324,7 @@ export default function CashierDashboardPage() {
             </div>
 
             <WorkspaceSection
-              title="Collection queue"
+              title="Due collection queue"
               description="Next-due contracts ordered by urgency, sourced from the canonical scope rollup."
               actionHref="/cashier/collect"
               actionLabel="Open collection workspace"

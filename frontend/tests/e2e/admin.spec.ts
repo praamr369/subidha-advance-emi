@@ -43,7 +43,7 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
 
   await page.goto("/admin");
   await expect(
-    page.getByRole("heading", { name: "Admin Operations" })
+    page.getByRole("heading", { name: "Admin Dashboard" })
   ).toBeVisible();
 
   await page.goto(
