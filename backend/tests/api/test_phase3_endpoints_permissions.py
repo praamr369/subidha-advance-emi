@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -86,8 +87,11 @@ class Phase3EndpointsPermissionsTests(APITestCase):
     def test_inventory_and_billing_registers_are_admin_only(self):
         endpoints = [
             "/api/v1/inventory/items/",
+            "/api/v1/inventory/locations/",
             "/api/v1/billing/invoices/",
+            "/api/v1/billing/profiles/",
             "/api/v1/accounting/periods/",
+            "/api/v1/accounting/bridge-postings/",
         ]
         for user in [self.cashier, self.partner, self.customer_user]:
             self.client.force_authenticate(user=user)
@@ -97,6 +101,93 @@ class Phase3EndpointsPermissionsTests(APITestCase):
                     response.status_code,
                     status.HTTP_403_FORBIDDEN,
                     msg=f"Unexpected access for {user.role} on {endpoint}",
+                )
+
+    def test_opening_stock_import_endpoints_are_admin_only(self):
+        csv_payload = b"product_code,quantity\nPHASE3-001,1.000\n"
+
+        for user in [self.cashier, self.partner, self.customer_user]:
+            self.client.force_authenticate(user=user)
+            preview_response = self.client.post(
+                "/api/v1/inventory/opening-stock/preview/",
+                {
+                    "file": SimpleUploadedFile(
+                        "opening-stock.csv",
+                        csv_payload,
+                        content_type="text/csv",
+                    )
+                },
+                format="multipart",
+            )
+            post_response = self.client.post(
+                "/api/v1/inventory/opening-stock/post/",
+                {
+                    "file": SimpleUploadedFile(
+                        "opening-stock.csv",
+                        csv_payload,
+                        content_type="text/csv",
+                    ),
+                    "as_of_date": "2026-04-09",
+                },
+                format="multipart",
+            )
+            self.assertEqual(preview_response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(post_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_accounting_master_import_endpoints_are_admin_only(self):
+        csv_payload = b"code,name,account_type\nAST-100,Imported Cash,ASSET\n"
+
+        for user in [self.cashier, self.partner, self.customer_user]:
+            self.client.force_authenticate(user=user)
+            preview_response = self.client.post(
+                "/api/v1/accounting/imports/chart-of-accounts/preview/",
+                {
+                    "file": SimpleUploadedFile(
+                        "chart-of-accounts.csv",
+                        csv_payload,
+                        content_type="text/csv",
+                    )
+                },
+                format="multipart",
+            )
+            post_response = self.client.post(
+                "/api/v1/accounting/imports/chart-of-accounts/post/",
+                {
+                    "file": SimpleUploadedFile(
+                        "chart-of-accounts.csv",
+                        csv_payload,
+                        content_type="text/csv",
+                    )
+                },
+                format="multipart",
+            )
+            self.assertEqual(preview_response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(post_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_accounting_bridge_run_endpoints_are_admin_only(self):
+        payload = {
+            "start_date": "2026-04-01",
+            "end_date": "2026-04-09",
+            "dry_run": True,
+        }
+        endpoints = [
+            "/api/v1/accounting/bridges/run-retail-sale/",
+            "/api/v1/accounting/bridges/run-inventory-posting/",
+            "/api/v1/accounting/bridges/run-emi-subscription/",
+            "/api/v1/accounting/bridges/run-emi-payment/",
+            "/api/v1/accounting/bridges/run-emi-waiver/",
+            "/api/v1/accounting/bridges/run-commission-settlement/",
+            "/api/v1/accounting/bridges/run-payout-batch/",
+        ]
+
+        for user in [self.cashier, self.partner, self.customer_user]:
+            self.client.force_authenticate(user=user)
+            for endpoint in endpoints:
+                response = self.client.post(endpoint, payload, format="json")
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_403_FORBIDDEN,
+                    msg=f"Unexpected bridge run access for {user.role} on {endpoint}",
                 )
 
     def test_reminder_register_is_visible_to_cashier_but_mutation_is_admin_only(self):

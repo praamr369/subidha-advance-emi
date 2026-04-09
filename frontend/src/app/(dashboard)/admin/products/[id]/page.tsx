@@ -11,17 +11,22 @@ import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
+import { prepareProductInventoryProfile } from "@/services/products";
 
 type ProductDetailRecord = {
   id: number;
   name: string;
   product_code?: string | null;
+  sku?: string | null;
+  unit_of_measure?: string | null;
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
   base_price: string;
   image?: string | null;
   created_at?: string | null;
+  inventory_profile_id?: number | null;
+  inventory_ready?: boolean;
   is_active?: boolean;
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
@@ -129,6 +134,8 @@ function normalizeProductDetail(
     product_code:
       toNullableString(raw.product_code) ??
       toNullableString(raw.code),
+    sku: toNullableString(raw.sku),
+    unit_of_measure: toNullableString(raw.unit_of_measure),
     category: toNullableString(raw.category),
     subcategory:
       toNullableString(raw.subcategory) ??
@@ -141,6 +148,13 @@ function normalizeProductDetail(
           toNullableString(raw.image_url)
       ) ?? null,
     created_at: toNullableString(raw.created_at),
+    inventory_profile_id:
+      typeof raw.inventory_profile_id === "number"
+        ? raw.inventory_profile_id
+        : raw.inventory_profile_id === null
+          ? null
+          : undefined,
+    inventory_ready: toBoolean(raw.inventory_ready, false),
     is_active: toBoolean(raw.is_active, true),
     is_emi_enabled: toBoolean(raw.is_emi_enabled, true),
     is_rent_enabled: toBoolean(raw.is_rent_enabled, false),
@@ -234,7 +248,9 @@ export default function AdminProductDetailPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [inventoryPreparing, setInventoryPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inventoryMessage, setInventoryMessage] = useState<string | null>(null);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -289,6 +305,7 @@ export default function AdminProductDetailPage() {
         setSubscriptions(nextSubscriptions);
         setWarnings(nextWarnings);
         setError(null);
+        setInventoryMessage(null);
       } catch (err) {
         setError(toErrorMessage(err));
         if (mode === "initial") {
@@ -327,6 +344,38 @@ export default function AdminProductDetailPage() {
     [subscriptions]
   );
 
+  async function handlePrepareInventoryProfile() {
+    if (!product) return;
+    setInventoryPreparing(true);
+    setInventoryMessage(null);
+    try {
+      const payload = await prepareProductInventoryProfile(product.id, {
+        stock_tracking_enabled: true,
+      });
+      setProduct((current) =>
+        current
+          ? {
+              ...current,
+              inventory_profile_id: payload.inventory_profile.id,
+              inventory_ready: true,
+              sku: payload.inventory_profile.sku ?? current.sku,
+              unit_of_measure:
+                payload.inventory_profile.unit_of_measure || current.unit_of_measure,
+            }
+          : current
+      );
+      setInventoryMessage(
+        payload.created
+          ? "Inventory profile prepared from product master."
+          : "Inventory profile already existed and was resynced from product master."
+      );
+    } catch (err) {
+      setInventoryMessage(toErrorMessage(err));
+    } finally {
+      setInventoryPreparing(false);
+    }
+  }
+
   const actions = useMemo(() => {
     const nextActions: Array<{
       href: string;
@@ -346,6 +395,11 @@ export default function AdminProductDetailPage() {
       {
         href: "/admin/products/create",
         label: "Create Product",
+        variant: "secondary",
+      },
+      {
+        href: "/admin/products/masters",
+        label: "Manage Masters",
         variant: "secondary",
       },
       {
@@ -386,6 +440,11 @@ export default function AdminProductDetailPage() {
         {
           label: "Contract Value",
           value: money(totalContractValue),
+        },
+        {
+          label: "Inventory",
+          value: product?.inventory_ready ? "Ready" : "Pending",
+          tone: product?.inventory_ready ? "success" : "warning",
         },
       ]}
       statusBadge={{
@@ -467,6 +526,22 @@ export default function AdminProductDetailPage() {
                     value={product.subcategory || "—"}
                   />
                   <DetailValue
+                    label="SKU"
+                    value={product.sku || "—"}
+                  />
+                  <DetailValue
+                    label="Unit"
+                    value={product.unit_of_measure || "PCS"}
+                  />
+                  <DetailValue
+                    label="Inventory Profile"
+                    value={
+                      product.inventory_profile_id
+                        ? `#${product.inventory_profile_id}`
+                        : "Not prepared"
+                    }
+                  />
+                  <DetailValue
                     label="Created At"
                     value={formatDateTime(product.created_at)}
                   />
@@ -478,6 +553,65 @@ export default function AdminProductDetailPage() {
                         : "No usage yet"
                     }
                   />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Inventory readiness"
+                description="Prepare a stock profile only when this product should participate in inventory workflows. This keeps product master truth shared while leaving delivery, EMI, and payment behavior unchanged."
+              >
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DetailValue
+                      label="Status"
+                      value={
+                        product.inventory_ready
+                          ? "Inventory profile ready"
+                          : "Needs product-to-stock preparation"
+                      }
+                    />
+                    <DetailValue
+                      label="Stock Tracking"
+                      value={
+                        product.inventory_ready
+                          ? "Enabled in inventory module"
+                          : "Not yet activated"
+                      }
+                    />
+                  </div>
+
+                  {inventoryMessage ? (
+                    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+                      {inventoryMessage}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handlePrepareInventoryProfile()}
+                      disabled={inventoryPreparing}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {inventoryPreparing
+                        ? "Preparing..."
+                        : product.inventory_ready
+                          ? "Sync Inventory Profile"
+                          : "Prepare Inventory Profile"}
+                    </button>
+                    <Link
+                      href="/admin/products/masters"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Manage Product Masters
+                    </Link>
+                    <Link
+                      href="/admin/inventory/items"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open Inventory
+                    </Link>
+                  </div>
                 </div>
               </SectionCard>
 

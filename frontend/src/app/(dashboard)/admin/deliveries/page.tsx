@@ -9,6 +9,11 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import {
+  buildAdminBillingRegisterRoute,
+  buildAdminReconciliationRoute,
+} from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
+import {
   createAdminDelivery,
   listAdminDeliveries,
   type DeliveryBucket,
@@ -267,13 +272,24 @@ export default function AdminDeliveriesPage() {
       subtitle="Create, track, and transition subscription-linked delivery records while keeping fulfillment summary and audit history consistent."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
+        { label: "Fulfillment", href: ROUTES.admin.deliveries },
         { label: "Deliveries" },
       ]}
       actions={[
         {
-          href: "/admin/subscriptions",
-          label: "Subscriptions",
+          href: ROUTES.admin.subscriptions,
+          label: "Subscription Register",
           variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.collections,
+          label: "Collections Workspace",
+          variant: "secondary",
+        },
+        {
+          href: buildAdminReconciliationRoute({ flagged: true }),
+          label: "Flagged Reconciliation",
+          variant: "ghost",
         },
       ]}
       stats={[
@@ -533,12 +549,24 @@ export default function AdminDeliveriesPage() {
                         </div>
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
-                        <Link
-                          href={`/admin/deliveries/${row.id}${queryString ? `?${queryString}` : ""}`}
-                          className="text-primary underline-offset-4 hover:underline"
-                        >
-                          View Detail
-                        </Link>
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            href={`/admin/deliveries/${row.id}${queryString ? `?${queryString}` : ""}`}
+                            className="text-primary underline-offset-4 hover:underline"
+                          >
+                            View Detail
+                          </Link>
+                          {row.subscription_id ? (
+                            <Link
+                              href={buildAdminBillingRegisterRoute({
+                                subscription: row.subscription_id,
+                              })}
+                              className="text-primary underline-offset-4 hover:underline"
+                            >
+                              Billing Docs
+                            </Link>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

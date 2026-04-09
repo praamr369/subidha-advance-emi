@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import {
+  buildAdminBillingRegisterRoute,
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
@@ -380,6 +381,24 @@ export default function AdminPaymentDetailRoutePage() {
         href: buildAdminSubscriptionRoute(resolvedPayment.subscription),
         label: "Open Subscription",
         variant: "primary",
+      });
+      links.push({
+        href: `/admin/billing/contracts?subscription=${resolvedPayment.subscription}`,
+        label: "Billing Contract",
+        variant: "secondary",
+      });
+      links.push({
+        href: buildAdminBillingRegisterRoute({
+          subscription: resolvedPayment.subscription,
+          payment: paymentId,
+        }),
+        label: "Billing Register",
+        variant: "secondary",
+      });
+      links.push({
+        href: `/admin/billing/receipts?payment=${paymentId}`,
+        label: "Receipts",
+        variant: "secondary",
       });
     }
 

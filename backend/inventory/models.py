@@ -47,10 +47,24 @@ class InventoryValuationMethod(models.TextChoices):
     AVG = "AVG", "Average"
 
 
+class InventoryItemType(models.TextChoices):
+    FINISHED_GOOD = "FINISHED_GOOD", "Finished Good"
+    ACCESSORY = "ACCESSORY", "Accessory"
+    RAW_MATERIAL = "RAW_MATERIAL", "Raw Material"
+
+
+class StockLocationType(models.TextChoices):
+    STORE = "STORE", "Store"
+    WAREHOUSE = "WAREHOUSE", "Warehouse"
+    SHOWROOM = "SHOWROOM", "Showroom"
+
+
 class StockMovementType(models.TextChoices):
+    OPENING_BALANCE_IN = "OPENING_BALANCE_IN", "Opening Balance In"
     PURCHASE_IN = "PURCHASE_IN", "Purchase In"
     SALE_OUT = "SALE_OUT", "Sale Out"
     EMI_DELIVERY_OUT = "EMI_DELIVERY_OUT", "EMI Delivery Out"
+    EMI_RETURN_IN = "EMI_RETURN_IN", "EMI Return In"
     SALE_RETURN_IN = "SALE_RETURN_IN", "Sale Return In"
     PURCHASE_RETURN_OUT = "PURCHASE_RETURN_OUT", "Purchase Return Out"
     ADJUSTMENT_IN = "ADJUSTMENT_IN", "Adjustment In"
@@ -78,6 +92,36 @@ class PurchaseTaxMode(models.TextChoices):
     NON_GST = "NON_GST", "Non-GST"
 
 
+class StockLocation(InventoryTimeStampedModel):
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    name = models.CharField(max_length=120, unique=True)
+    location_type = models.CharField(
+        max_length=20,
+        choices=StockLocationType.choices,
+        default=StockLocationType.STORE,
+        db_index=True,
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_stock_locations"
+        ordering = ["name", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "location_type"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
 class InventoryItem(InventoryTimeStampedModel):
     product = models.OneToOneField(
         Product,
@@ -86,7 +130,21 @@ class InventoryItem(InventoryTimeStampedModel):
     )
     sku = models.CharField(max_length=60, unique=True, null=True, blank=True, db_index=True)
     unit_of_measure = models.CharField(max_length=30, default="PCS")
+    default_stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="inventory_items",
+        null=True,
+        blank=True,
+    )
     stock_tracking_enabled = models.BooleanField(default=True, db_index=True)
+    stock_item_type = models.CharField(
+        max_length=20,
+        choices=InventoryItemType.choices,
+        default=InventoryItemType.FINISHED_GOOD,
+        db_index=True,
+    )
+    delivery_stock_bridge_enabled = models.BooleanField(default=True, db_index=True)
     opening_stock_qty = models.DecimalField(
         max_digits=12,
         decimal_places=3,
@@ -122,10 +180,24 @@ class InventoryItem(InventoryTimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-        self.sku = (self.sku or "").strip().upper() or None
-        self.unit_of_measure = (self.unit_of_measure or "PCS").strip().upper()
+        product_sku = ((getattr(self.product, "sku", None) or "")).strip().upper() or None
+        product_uom = ((getattr(self.product, "unit_of_measure", None) or "PCS")).strip().upper()
+        self.sku = ((self.sku or product_sku or "").strip().upper()) or None
+        self.unit_of_measure = (self.unit_of_measure or product_uom or "PCS").strip().upper()
         self.full_clean()
         super().save(*args, **kwargs)
+
+        product_updates: list[str] = []
+        if self.sku and getattr(self.product, "sku", None) != self.sku:
+            self.product.sku = self.sku
+            product_updates.append("sku")
+        if getattr(self.product, "unit_of_measure", None) != self.unit_of_measure:
+            self.product.unit_of_measure = self.unit_of_measure
+            product_updates.append("unit_of_measure")
+        if product_updates:
+            Product.objects.filter(pk=self.product_id).update(
+                **{field: getattr(self.product, field) for field in product_updates}
+            )
 
     def current_stock_quantity(self) -> Decimal:
         aggregate = self.stock_ledger.aggregate(
@@ -164,6 +236,13 @@ class StockLedger(InventoryTimeStampedModel):
         validators=[MinValueValidator(QUANTITY_ZERO)],
     )
     movement_date = models.DateField(db_index=True)
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="stock_ledger_entries",
+        null=True,
+        blank=True,
+    )
     reference_model = models.CharField(max_length=100, db_index=True)
     reference_id = models.CharField(max_length=100, db_index=True)
     warehouse_name = models.CharField(max_length=120, blank=True, default="")
@@ -209,6 +288,7 @@ class StockLedger(InventoryTimeStampedModel):
         ]
         indexes = [
             models.Index(fields=["inventory_item", "movement_date", "movement_type"]),
+            models.Index(fields=["stock_location", "movement_date", "movement_type"]),
             models.Index(fields=["reference_model", "reference_id"]),
         ]
 
@@ -249,6 +329,13 @@ class StockAdjustment(InventoryTimeStampedModel):
         db_index=True,
     )
     reason = models.TextField(blank=True, default="")
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="stock_adjustments",
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -360,6 +447,13 @@ class PurchaseBill(InventoryTimeStampedModel):
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_bills",
+    )
     finance_account = models.ForeignKey(
         FinanceAccount,
         on_delete=models.PROTECT,

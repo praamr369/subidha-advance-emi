@@ -681,6 +681,16 @@ export default function AdminSubscriptionDetailPage() {
                 label: "Delivery Workspace",
                 variant: "secondary" as const,
               },
+              {
+                href: `/admin/billing/contracts?subscription=${subscription.id}`,
+                label: "Billing Contract",
+                variant: "secondary" as const,
+              },
+              {
+                href: `/admin/billing/register?subscription=${subscription.id}`,
+                label: "Billing Docs",
+                variant: "secondary" as const,
+              },
             ]
           : []),
         ...(subscription?.customer_id != null

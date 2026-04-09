@@ -62,6 +62,16 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
     ordering_fields = ["name", "kind", "created_at"]
     ordering = ["name", "id"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        kind = self.request.query_params.get("kind")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
+        if kind:
+            queryset = queryset.filter(kind=kind.strip().upper())
+        return queryset
+
 
 class JournalEntryViewSet(AdminAccountingModelViewSet):
     queryset = JournalEntry.objects.prefetch_related("lines", "lines__chart_account").all()
@@ -69,6 +79,19 @@ class JournalEntryViewSet(AdminAccountingModelViewSet):
     search_fields = ["entry_no", "memo", "source_model", "source_id"]
     ordering_fields = ["entry_date", "created_at", "entry_no"]
     ordering = ["-entry_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        source_type = self.request.query_params.get("source_type")
+        voucher_type = self.request.query_params.get("voucher_type")
+        status_value = self.request.query_params.get("status")
+        if source_type:
+            queryset = queryset.filter(source_type=source_type.strip().upper())
+        if voucher_type:
+            queryset = queryset.filter(voucher_type=voucher_type.strip().upper())
+        if status_value:
+            queryset = queryset.filter(status=status_value.strip().upper())
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "post_entry":
@@ -261,4 +284,3 @@ class MoneyMovementViewSet(AdminAccountingModelViewSet):
 
         payload = MoneyMovementSerializer(movement, context=self.get_serializer_context())
         return Response({"updated": updated, "money_movement": payload.data}, status=status.HTTP_200_OK)
-

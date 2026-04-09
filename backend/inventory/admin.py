@@ -7,14 +7,22 @@ from inventory.models import (
     StockAdjustment,
     StockAdjustmentLine,
     StockLedger,
+    StockLocation,
 )
 
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
-    list_display = ("product", "sku", "stock_tracking_enabled", "is_active")
-    list_filter = ("stock_tracking_enabled", "is_active", "valuation_method")
+    list_display = ("product", "sku", "stock_item_type", "stock_tracking_enabled", "delivery_stock_bridge_enabled", "is_active")
+    list_filter = ("stock_item_type", "stock_tracking_enabled", "delivery_stock_bridge_enabled", "is_active", "valuation_method")
     search_fields = ("product__name", "product__product_code", "sku")
+
+
+@admin.register(StockLocation)
+class StockLocationAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "location_type", "is_active")
+    list_filter = ("location_type", "is_active")
+    search_fields = ("code", "name")
 
 
 class StockAdjustmentLineInline(admin.TabularInline):
@@ -61,4 +69,3 @@ class StockLedgerAdmin(admin.ModelAdmin):
         "reference_model",
         "reference_id",
     )
-

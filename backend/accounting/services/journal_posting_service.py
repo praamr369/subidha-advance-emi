@@ -95,6 +95,9 @@ def create_journal_entry(
     memo: str = "",
     source_model: str | None = None,
     source_id: str | None = None,
+    voucher_type: str | None = None,
+    source_type: str | None = None,
+    source_reference: str | None = None,
     lines: list[dict] | None = None,
 ) -> JournalEntry:
     if lines:
@@ -106,6 +109,9 @@ def create_journal_entry(
         memo=memo,
         source_model=source_model,
         source_id=str(source_id) if source_id is not None else None,
+        voucher_type=voucher_type,
+        source_type=source_type,
+        source_reference=source_reference,
     )
 
     if lines:

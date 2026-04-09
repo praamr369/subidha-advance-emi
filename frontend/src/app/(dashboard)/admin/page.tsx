@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -15,6 +15,8 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { listAdminLeads } from "@/services/admin-leads";
+import { listAdminSupportRequests } from "@/services/admin-support-requests";
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import EmptyState from "@/components/feedback/EmptyState";
@@ -24,6 +26,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { ADMIN_ENTERPRISE_MODULES } from "@/config/admin-enterprise";
 import {
   buildReconciliationPosture,
   buildSettlementPosture,
@@ -32,13 +35,18 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import {
-  buildAdminBatchRoute,
+  buildAdminCollectionsRoute,
+  buildAdminDeliveriesRoute,
+  buildAdminLeadsRoute,
   buildAdminPaymentRoute,
   buildAdminReconciliationRoute,
+  buildAdminSubscriptionRequestsRoute,
   buildAdminSubscriptionRoute,
+  buildAdminSupportRequestsRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getAdminDashboard } from "@/services/admin";
+import { getAdminDeliverySummary } from "@/services/deliveries";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -49,6 +57,7 @@ import {
   normalizeDashboardSummary,
 } from "@/services/dashboards";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import { listSubscriptionRequests } from "@/services/subscription-requests";
 
 type LegacyDashboardPayload = Awaited<ReturnType<typeof getAdminDashboard>>;
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
@@ -60,6 +69,10 @@ type DashboardReconciliationPayload = Awaited<
   ReturnType<typeof listDashboardReconciliationExceptions>
 >;
 type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
+type DeliverySummaryPayload = Awaited<ReturnType<typeof getAdminDeliverySummary>>;
+type SupportQueuePayload = Awaited<ReturnType<typeof listAdminSupportRequests>>;
+type LeadQueuePayload = Awaited<ReturnType<typeof listAdminLeads>>;
+type RequestQueuePayload = Awaited<ReturnType<typeof listSubscriptionRequests>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -81,6 +94,66 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function ActionBucketCard({
+  eyebrow,
+  title,
+  value,
+  detail,
+  primaryHref,
+  primaryLabel,
+  secondaryHref,
+  secondaryLabel,
+  tone = "default",
+}: {
+  eyebrow: string;
+  title: string;
+  value: string;
+  detail: string;
+  primaryHref: string;
+  primaryLabel: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
+  tone?: "default" | "warning" | "success" | "info";
+}) {
+  const toneClassName =
+    tone === "warning"
+      ? "border-amber-200 bg-amber-50/80"
+      : tone === "success"
+      ? "border-emerald-200 bg-emerald-50/80"
+      : tone === "info"
+      ? "border-sky-200 bg-sky-50/80"
+      : "border-white/75 bg-white/80";
+
+  return (
+    <article
+      className={`rounded-[1.5rem] border p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.52)] ${toneClassName}`}
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {eyebrow}
+      </div>
+      <h3 className="mt-2 text-base font-semibold text-slate-950">{title}</h3>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        {value}
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-700">{detail}</p>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <ActionButton href={primaryHref} variant="primary" className="h-9 px-3 text-xs">
+          {primaryLabel}
+        </ActionButton>
+        {secondaryHref && secondaryLabel ? (
+          <ActionButton
+            href={secondaryHref}
+            variant="secondary"
+            className="h-9 px-3 text-xs"
+          >
+            {secondaryLabel}
+          </ActionButton>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 export default function AdminDashboardPage() {
   const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
@@ -93,6 +166,11 @@ export default function AdminDashboardPage() {
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
+  const [deliverySummary, setDeliverySummary] =
+    useState<DeliverySummaryPayload | null>(null);
+  const [supportQueue, setSupportQueue] = useState<SupportQueuePayload | null>(null);
+  const [leadQueue, setLeadQueue] = useState<LeadQueuePayload | null>(null);
+  const [requestQueue, setRequestQueue] = useState<RequestQueuePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,16 +178,19 @@ export default function AdminDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const dashboardQuery =
-    windowPreset === "CUSTOM"
-      ? {
-          window: windowPreset,
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-        }
-      : { window: windowPreset };
+  const dashboardQuery = useMemo(
+    () =>
+      windowPreset === "CUSTOM"
+        ? {
+            window: windowPreset,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          }
+        : { window: windowPreset },
+    [endDate, startDate, windowPreset]
+  );
 
-  async function loadDashboard(mode: "initial" | "refresh" = "initial") {
+  const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
@@ -122,6 +203,10 @@ export default function AdminDashboardPage() {
         recentPaymentsPayload,
         reconciliationPayload,
         winnerPayload,
+        deliverySummaryPayload,
+        supportQueuePayload,
+        leadQueuePayload,
+        requestQueuePayload,
       ] = await Promise.all([
         getAdminDashboard(),
         getDashboardSummaryV2(dashboardQuery),
@@ -130,6 +215,14 @@ export default function AdminDashboardPage() {
         listDashboardRecentPayments({ ...dashboardQuery, limit: 8 }),
         listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
         listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+        getAdminDeliverySummary(),
+        listAdminSupportRequests({ status: "SUBMITTED" }),
+        listAdminLeads({ status: "NEW" }),
+        listSubscriptionRequests("admin", {
+          status: "SUBMITTED",
+          page: 1,
+          pageSize: 1,
+        }),
       ]);
 
       setLegacy(legacyPayload);
@@ -139,22 +232,30 @@ export default function AdminDashboardPage() {
       setRecentPayments(recentPaymentsPayload);
       setReconciliationItems(reconciliationPayload);
       setWinnerItems(winnerPayload);
+      setDeliverySummary(deliverySummaryPayload);
+      setSupportQueue(supportQueuePayload);
+      setLeadQueue(leadQueuePayload);
+      setRequestQueue(requestQueuePayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
       if (mode === "initial") {
         setLegacy(null);
         setCanonical(null);
+        setDeliverySummary(null);
+        setSupportQueue(null);
+        setLeadQueue(null);
+        setRequestQueue(null);
       }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }
+  }, [dashboardQuery]);
 
   useEffect(() => {
     void loadDashboard("initial");
-  }, [windowPreset, startDate, endDate]);
+  }, [loadDashboard]);
 
   const summary =
     canonical?.summary ??
@@ -171,6 +272,18 @@ export default function AdminDashboardPage() {
   const reconciliationPosture = buildReconciliationPosture(
     reconciliationSurface
   );
+  const overdueFollowUpHref = ROUTES.admin.emisOverdue;
+  const flaggedPaymentQueueHref = buildAdminReconciliationRoute({
+    view: "payments",
+    flagged: true,
+  });
+  const dueCollectionWorkspaceHref = buildAdminCollectionsRoute();
+  const deliveryQueueHref = buildAdminDeliveriesRoute({ bucket: "PENDING" });
+  const supportQueueHref = buildAdminSupportRequestsRoute({ status: "SUBMITTED" });
+  const onboardingRequestsHref = buildAdminSubscriptionRequestsRoute({
+    status: "SUBMITTED",
+  });
+  const newLeadQueueHref = buildAdminLeadsRoute({ status: "NEW" });
   const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
     0,
     8
@@ -178,27 +291,39 @@ export default function AdminDashboardPage() {
   const paymentRows = recentPayments?.results ?? [];
   const flaggedRows = reconciliationItems?.results ?? [];
   const winnerRows = winnerItems?.results ?? [];
+  const deliveryActionCount = deliverySummary
+    ? deliverySummary.pending +
+      deliverySummary.scheduled +
+      deliverySummary.in_transit
+    : 0;
+  const supportActionCount = supportQueue?.count ?? 0;
+  const onboardingActionCount = (requestQueue?.count ?? 0) + (leadQueue?.count ?? 0);
 
   return (
     <PortalPage
       title="Admin Dashboard"
-      subtitle="Canonical finance truth for store operations, recovery pressure, waiver exposure, commission posture, and reconciliation attention without separate dashboard math per role."
+      subtitle="Unified admin workspace for EMI operations, retail-ready billing, inventory control, partner finance, and governance, with canonical customer-backed finance truth preserved underneath."
       breadcrumbs={[{ label: "Admin" }]}
       actions={[
         {
-          href: ROUTES.admin.collections,
-          label: "Collections",
+          href: ROUTES.admin.paymentsCreate,
+          label: "Collect Payment",
           variant: "primary",
         },
         {
-          href: ROUTES.admin.subscriptions,
-          label: "Subscriptions",
+          href: overdueFollowUpHref,
+          label: "Review Overdue EMI",
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.financeCommissions,
-          label: "Commissions",
+          href: flaggedPaymentQueueHref,
+          label: "Flagged Reconciliation",
           variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.subscriptionsCreate,
+          label: "New Contract",
+          variant: "ghost",
         },
       ]}
       stats={
@@ -270,6 +395,87 @@ export default function AdminDashboardPage() {
 
         {!loading && !error && legacy && summary ? (
           <>
+            <WorkspaceSection
+              title="Daily action buckets"
+              description="Each bucket opens the existing canonical operational workspace with live filters applied, so admin can move directly from summary posture into the real queue."
+              contentClassName="grid gap-4 lg:grid-cols-2 xl:grid-cols-3"
+            >
+              <ActionBucketCard
+                eyebrow="Collections & EMI"
+                title="Overdue EMI follow-up"
+                value={String(summary.overdue_emis ?? 0)}
+                detail={`${money(summary.overdue_amount)} is currently overdue in canonical scope. Open the overdue lane or jump to the collections workspace.`}
+                primaryHref={overdueFollowUpHref}
+                primaryLabel="Open overdue queue"
+                secondaryHref={dueCollectionWorkspaceHref}
+                secondaryLabel="Open collections"
+                tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "success"}
+              />
+              <ActionBucketCard
+                eyebrow="Collections & EMI"
+                title="Flagged payment reconciliation"
+                value={String(reconciliationSurface?.flagged_count ?? 0)}
+                detail={`${reconciliationSurface?.checked_count ?? 0} rows were checked in the current scope. Open the flagged payment queue for controlled follow-up.`}
+                primaryHref={flaggedPaymentQueueHref}
+                primaryLabel="Open payment queue"
+                secondaryHref={buildAdminReconciliationRoute({ flagged: true })}
+                secondaryLabel="Subscription attention"
+                tone={
+                  (reconciliationSurface?.flagged_count ?? 0) > 0
+                    ? "warning"
+                    : "success"
+                }
+              />
+              <ActionBucketCard
+                eyebrow="Fulfillment"
+                title="Pending delivery actions"
+                value={String(deliveryActionCount)}
+                detail={`${deliverySummary?.pending ?? 0} pending, ${deliverySummary?.scheduled ?? 0} scheduled, and ${deliverySummary?.in_transit ?? 0} in transit. Open the canonical delivery register.`}
+                primaryHref={deliveryQueueHref}
+                primaryLabel="Open delivery queue"
+                secondaryHref={ROUTES.admin.deliveries}
+                secondaryLabel="All deliveries"
+                tone={deliveryActionCount > 0 ? "warning" : "success"}
+              />
+              <ActionBucketCard
+                eyebrow="Control Center"
+                title="Pending support issues"
+                value={String(supportActionCount)}
+                detail={`${supportQueue?.summary.unassigned ?? 0} are currently unassigned in the submitted support queue. Open the live admin support workspace.`}
+                primaryHref={supportQueueHref}
+                primaryLabel="Open support queue"
+                secondaryHref={ROUTES.admin.supportRequests}
+                secondaryLabel="All support"
+                tone={supportActionCount > 0 ? "warning" : "success"}
+              />
+              <ActionBucketCard
+                eyebrow="Partner Finance"
+                title="Commission and payout actions"
+                value={String(legacy.commission_summary?.pending_count ?? 0)}
+                detail={`${money(legacy.commission_summary?.pending_commission)} is waiting settlement. Open commission finance or the payout queue without leaving the canonical routes.`}
+                primaryHref={ROUTES.admin.financeCommissions}
+                primaryLabel="Open commissions"
+                secondaryHref={ROUTES.admin.financeSettledCommissions}
+                secondaryLabel="Open payout queue"
+                tone={
+                  (legacy.commission_summary?.pending_count ?? 0) > 0
+                    ? "warning"
+                    : "info"
+                }
+              />
+              <ActionBucketCard
+                eyebrow="Sales & Onboarding"
+                title="Onboarding handoff"
+                value={String(onboardingActionCount)}
+                detail={`${requestQueue?.count ?? 0} submitted subscription request(s) and ${leadQueue?.count ?? 0} new lead(s) still need operator handoff into real customer or contract records.`}
+                primaryHref={onboardingRequestsHref}
+                primaryLabel="Open request queue"
+                secondaryHref={newLeadQueueHref}
+                secondaryLabel="Open new leads"
+                tone={onboardingActionCount > 0 ? "info" : "success"}
+              />
+            </WorkspaceSection>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Paid"
@@ -807,38 +1013,65 @@ export default function AdminDashboardPage() {
             </div>
 
             <WorkspaceSection
-              title="Control actions"
-              description="Administrative drill-down routes that preserve the existing operating model while the shared finance surfaces now come from the canonical summary-v2 and surface endpoints."
-              contentClassName="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+              title="Enterprise module map"
+              description="The sidebar now exposes the ERP-ready admin information architecture only through canonical routes. Legacy paths remain compatibility-only while shared master data stays centered on product, inventory, billing mirror, and accounting boundaries."
+              contentClassName="grid gap-4 xl:grid-cols-2"
             >
-              <Link
-                href={ROUTES.admin.collections}
-                className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Open collections
-              </Link>
-              <Link
-                href={buildAdminReconciliationRoute({ flagged: true })}
-                className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Review flagged reconciliation
-              </Link>
-              <Link
-                href={
-                  legacy.batches.next_draw_batch
-                    ? buildAdminBatchRoute(legacy.batches.next_draw_batch.id)
-                    : ROUTES.admin.batches
-                }
-                className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Open next draw batch
-              </Link>
-              <Link
-                href={ROUTES.admin.financeCommissions}
-                className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Open commission finance
-              </Link>
+              {ADMIN_ENTERPRISE_MODULES.map((item) => (
+                <article
+                  key={item.key}
+                  className="rounded-[1.45rem] border border-white/75 bg-white/75 px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.52)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <Link
+                        href={item.href}
+                        className="text-base font-semibold text-slate-950 transition hover:text-sky-700"
+                      >
+                        {item.title}
+                      </Link>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {item.description}
+                      </p>
+                    </div>
+                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                      Canonical
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-[1.1rem] border border-white/80 bg-white/80 px-4 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Operational focus
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        {item.operationalFocus}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.1rem] border border-white/80 bg-white/80 px-4 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Master-data direction
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        {item.masterDataDirection}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {item.routes.map((route) => (
+                      <ActionButton
+                        key={`${item.key}-${route.href}`}
+                        href={route.href}
+                        variant="secondary"
+                        className="h-8 px-3 text-xs"
+                      >
+                        {route.label}
+                      </ActionButton>
+                    ))}
+                  </div>
+                </article>
+              ))}
             </WorkspaceSection>
           </>
         ) : null}

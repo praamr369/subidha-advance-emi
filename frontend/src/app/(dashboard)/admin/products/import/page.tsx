@@ -212,7 +212,7 @@ export default function AdminProductImportPage() {
   return (
     <PortalPage
       title="Import Products"
-      subtitle="Bulk import product master data with category, sub-category, description, and pricing while keeping current admin workflow intact."
+      subtitle="Bulk import product master data with category, sub-category, SKU, unit, description, and pricing while keeping product master as the shared catalog truth for subscriptions and future inventory."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Products", href: "/admin/products" },
@@ -261,7 +261,9 @@ export default function AdminProductImportPage() {
               <p className="mt-1 text-sm leading-6 text-slate-600">
                 Import products using CSV. This page is structured for the real
                 product catalog fields used in daily operations: name, category,
-                sub-category, description, and base price.
+                sub-category, SKU, unit of measure, description, and base price.
+                Imported catalog values stay aligned with the managed product
+                masters instead of creating a second product truth.
               </p>
             </div>
 
@@ -385,6 +387,8 @@ export default function AdminProductImportPage() {
                   "name",
                   "category",
                   "sub_category",
+                  "sku",
+                  "unit_of_measure",
                   "description",
                   "base_price",
                   "image",
@@ -400,9 +404,9 @@ export default function AdminProductImportPage() {
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 Category and sub-category should be included in the CSV so product
-                master data remains structured for filtering, reporting, and future
-                rental or leasing expansion. Base price remains the total contract
-                price.
+                master data remains structured for filtering, inventory, billing,
+                and future rental or leasing expansion. Base price remains the total
+                contract price.
               </p>
             </div>
 
@@ -468,6 +472,8 @@ export default function AdminProductImportPage() {
                 <th className="px-4 py-3">name</th>
                 <th className="px-4 py-3">category</th>
                 <th className="px-4 py-3">sub_category</th>
+                <th className="px-4 py-3">sku</th>
+                <th className="px-4 py-3">unit_of_measure</th>
                 <th className="px-4 py-3">description</th>
                 <th className="px-4 py-3">base_price</th>
                 <th className="px-4 py-3">image</th>
@@ -479,6 +485,8 @@ export default function AdminProductImportPage() {
                 <td className="px-4 py-3">Wooden King Bed</td>
                 <td className="px-4 py-3">Bed</td>
                 <td className="px-4 py-3">Wooden Carving Bed</td>
+                <td className="px-4 py-3">BED-KING-001</td>
+                <td className="px-4 py-3">PCS</td>
                 <td className="px-4 py-3">
                   Premium wooden carving king size bed
                 </td>
@@ -490,6 +498,8 @@ export default function AdminProductImportPage() {
                 <td className="px-4 py-3">Steel Almirah</td>
                 <td className="px-4 py-3">Almirah</td>
                 <td className="px-4 py-3">Steel Almirah</td>
+                <td className="px-4 py-3">ALM-STEEL-002</td>
+                <td className="px-4 py-3">PCS</td>
                 <td className="px-4 py-3">
                   Double door heavy gauge steel almirah
                 </td>

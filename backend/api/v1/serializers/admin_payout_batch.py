@@ -30,11 +30,14 @@ class PayoutBatchCreateSerializer(serializers.Serializer):
 
 class PayoutBatchActionSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
+    finance_account = serializers.IntegerField(required=False, min_value=1)
+    reference_no = serializers.CharField(required=False, allow_blank=True)
 
 
 class PayoutBatchListSerializer(serializers.ModelSerializer):
     processed_by_username = serializers.CharField(source="processed_by.username", read_only=True)
     line_count = serializers.IntegerField(source="lines.count", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
 
     class Meta:
         model = CommissionPayoutBatch
@@ -44,6 +47,9 @@ class PayoutBatchListSerializer(serializers.ModelSerializer):
             "payout_date",
             "status",
             "total_amount",
+            "finance_account",
+            "finance_account_name",
+            "reference_no",
             "processed_by",
             "processed_by_username",
             "line_count",
@@ -110,6 +116,7 @@ class PayoutBatchLineSerializer(serializers.ModelSerializer):
 
 class PayoutBatchDetailSerializer(serializers.ModelSerializer):
     processed_by_username = serializers.CharField(source="processed_by.username", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     lines = PayoutBatchLineSerializer(many=True, read_only=True)
 
     class Meta:
@@ -121,6 +128,9 @@ class PayoutBatchDetailSerializer(serializers.ModelSerializer):
             "status",
             "notes",
             "total_amount",
+            "finance_account",
+            "finance_account_name",
+            "reference_no",
             "processed_by",
             "processed_by_username",
             "created_at",

@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch } from "@/lib/api";
+import { buildAdminBillingRegisterRoute } from "@/lib/route-builders";
 import {
   cancelAdminDelivery,
   getAdminDelivery,
@@ -311,6 +312,17 @@ export default function AdminDeliveryDetailPage() {
               {
                 href: `/admin/customers/${delivery.customer_id}`,
                 label: "Open Customer",
+                variant: "secondary" as const,
+              },
+            ]
+          : []),
+        ...(delivery?.subscription_id
+          ? [
+              {
+                href: buildAdminBillingRegisterRoute({
+                  subscription: delivery.subscription_id,
+                }),
+                label: "Billing Docs",
                 variant: "secondary" as const,
               },
             ]

@@ -7,8 +7,23 @@ from billing.models import (
     BillingDebitNoteLine,
     BillingInvoice,
     BillingInvoiceLine,
+    DirectSale,
+    DirectSaleLine,
     ReceiptDocument,
 )
+
+
+class DirectSaleLineInline(admin.TabularInline):
+    model = DirectSaleLine
+    extra = 0
+
+
+@admin.register(DirectSale)
+class DirectSaleAdmin(admin.ModelAdmin):
+    list_display = ("sale_no", "sale_date", "status", "delivery_required", "grand_total")
+    list_filter = ("status", "delivery_required", "sale_date")
+    search_fields = ("sale_no", "customer_name_snapshot", "customer_phone_snapshot", "delivery_reference")
+    inlines = [DirectSaleLineInline]
 
 
 class BillingInvoiceLineInline(admin.TabularInline):
@@ -55,4 +70,3 @@ class ReceiptDocumentAdmin(admin.ModelAdmin):
     list_display = ("receipt_no", "receipt_date", "receipt_type", "status", "amount")
     list_filter = ("status", "receipt_type", "receipt_date")
     search_fields = ("receipt_no", "customer_name_snapshot", "customer_phone_snapshot")
-

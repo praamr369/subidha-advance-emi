@@ -20,3 +20,7 @@ SUBIDHA ADVANCE EMI follows a separated backend and frontend architecture.
 - auditability
 - operational simplicity
 - future rent/lease compatibility
+
+## Enterprise transition references
+- ERP module foundation: `docs/architecture/erp-transition-foundation.md`
+- Admin enterprise workspace guide: `docs/operations/admin-enterprise-workspace.md`

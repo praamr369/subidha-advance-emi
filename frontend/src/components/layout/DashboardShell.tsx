@@ -41,6 +41,7 @@ import {
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import {
   getNavigationGroupsForRole,
   normalizeRole,
@@ -69,6 +70,11 @@ type ShellNavItem = {
 type ShellNavGroup = {
   title: string;
   items: ShellNavItem[];
+};
+
+type ShellQuickAction = {
+  label: string;
+  href: string;
 };
 
 const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> = {
@@ -150,7 +156,7 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
 function getRoleWorkspaceLabel(role: NavigationRole) {
   switch (role) {
     case "ADMIN":
-      return "Lucky Plan EMI Control";
+      return "Admin Operations";
     case "PARTNER":
       return "Partner Operations";
     case "CUSTOMER":
@@ -165,7 +171,7 @@ function getRoleWorkspaceLabel(role: NavigationRole) {
 function getRoleWorkspaceDescription(role: NavigationRole) {
   switch (role) {
     case "ADMIN":
-      return "Collections, finance, Lucky Draw control, audit, and daily shop operations.";
+      return "Unified admin platform for EMI operations, retail-ready billing, inventory control, partner finance, accounting books, and governance.";
     case "PARTNER":
       return "Track customers, subscriptions, commissions, and collections.";
     case "CUSTOMER":
@@ -174,6 +180,40 @@ function getRoleWorkspaceDescription(role: NavigationRole) {
       return "Daily collection handling and payment entry workflow.";
     default:
       return "Role-based workspace.";
+  }
+}
+
+function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
+  switch (role) {
+    case "ADMIN":
+      return [
+        {
+          label: "Collect EMI",
+          href: ROUTES.admin.paymentsCreate,
+        },
+        {
+          label: "New Contract",
+          href: ROUTES.admin.subscriptionsCreate,
+        },
+        {
+          label: "New Product",
+          href: ROUTES.admin.productsCreate,
+        },
+        {
+          label: "Opening Stock",
+          href: ROUTES.admin.inventoryOpeningStock,
+        },
+        {
+          label: "Overdue EMI",
+          href: ROUTES.admin.emisOverdue,
+        },
+        {
+          label: "Flagged Recon",
+          href: buildAdminReconciliationRoute({ flagged: true }),
+        },
+      ];
+    default:
+      return [];
   }
 }
 
@@ -299,6 +339,7 @@ function Sidebar({
     () => mapNavGroups(getNavigationGroupsForRole(role)),
     [role]
   );
+  const quickActions = useMemo(() => getRoleQuickActions(role), [role]);
 
   const sidebarClasses = cn(
     isMobile
@@ -363,6 +404,24 @@ function Sidebar({
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {getRoleWorkspaceDescription(role)}
               </p>
+              {quickActions.length > 0 ? (
+                <div className="mt-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Quick Actions
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {quickActions.map((action) => (
+                      <Link
+                        key={action.href}
+                        href={action.href}
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sidebar-border bg-background px-3 text-center text-xs font-semibold text-foreground transition hover:bg-muted"
+                      >
+                        {action.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}

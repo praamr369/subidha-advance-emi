@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import { ROUTES } from "@/lib/routes";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
   listSubscriptionRequests,
@@ -139,17 +140,18 @@ export default function AdminSubscriptionRequestsPage() {
       title="Subscription Requests"
       subtitle="Admin review queue for customer and partner EMI subscription intake, with approval creating the real subscription through the canonical service path."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Sales & Onboarding", href: ROUTES.admin.subscriptionRequests },
         { label: "Subscription Requests" },
       ]}
       actions={[
         {
-          href: "/admin/subscriptions/create",
+          href: ROUTES.admin.subscriptionsCreate,
           label: "Direct Subscription Create",
           variant: "secondary",
         },
         {
-          href: "/admin/subscriptions",
+          href: ROUTES.admin.subscriptions,
           label: "Subscription Register",
           variant: "ghost",
         },

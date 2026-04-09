@@ -31,6 +31,7 @@ class StockAdjustmentPostingTests(TestCase):
         adjustment = StockAdjustment.objects.create(
             adjustment_no="ADJ-20260408-001",
             adjustment_date=date(2026, 4, 8),
+            reason="Counted stock shortage",
             created_by=self.admin,
         )
         StockAdjustmentLine.objects.create(
@@ -58,3 +59,21 @@ class StockAdjustmentPostingTests(TestCase):
             1,
         )
 
+    def test_stock_adjustment_approval_requires_reason(self):
+        adjustment = StockAdjustment.objects.create(
+            adjustment_no="ADJ-20260408-002",
+            adjustment_date=date(2026, 4, 8),
+            created_by=self.admin,
+        )
+        StockAdjustmentLine.objects.create(
+            stock_adjustment=adjustment,
+            inventory_item=self.item,
+            quantity_delta=Decimal("1.000"),
+            notes="Counted surplus",
+        )
+
+        with self.assertRaisesMessage(ValueError, "Reason is required before approving a stock adjustment."):
+            approve_stock_adjustment(
+                stock_adjustment_id=adjustment.id,
+                approved_by=self.admin,
+            )

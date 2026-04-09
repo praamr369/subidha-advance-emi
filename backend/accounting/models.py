@@ -435,6 +435,9 @@ class JournalEntry(AccountingTimeStampedModel):
     memo = models.TextField(blank=True, default="")
     source_model = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     source_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    voucher_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    source_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    source_reference = models.CharField(max_length=120, null=True, blank=True, db_index=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -459,6 +462,7 @@ class JournalEntry(AccountingTimeStampedModel):
         indexes = [
             models.Index(fields=["entry_type", "status"]),
             models.Index(fields=["source_model", "source_id"]),
+            models.Index(fields=["voucher_type", "source_type"]),
             models.Index(fields=["status", "entry_date"]),
         ]
 
@@ -482,6 +486,9 @@ class JournalEntry(AccountingTimeStampedModel):
         self.memo = (self.memo or "").strip()
         self.source_model = (self.source_model or "").strip() or None
         self.source_id = (self.source_id or "").strip() or None
+        self.voucher_type = (self.voucher_type or "").strip().upper() or None
+        self.source_type = (self.source_type or "").strip().upper() or None
+        self.source_reference = (self.source_reference or "").strip() or None
         self.void_reason = (self.void_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
@@ -1254,6 +1261,12 @@ class AccountingBridgePosting(AccountingTimeStampedModel):
     source_model = models.CharField(max_length=100, db_index=True)
     source_id = models.CharField(max_length=100, db_index=True)
     purpose = models.CharField(max_length=100, db_index=True)
+    voucher_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    source_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    source_document_no = models.CharField(max_length=80, blank=True, default="")
+    source_event_date = models.DateField(null=True, blank=True, db_index=True)
+    trace_metadata = models.JSONField(default=dict, blank=True)
     journal_entry = models.OneToOneField(
         JournalEntry,
         on_delete=models.PROTECT,
@@ -1269,11 +1282,19 @@ class AccountingBridgePosting(AccountingTimeStampedModel):
                 name="accounting_bridge_unique_source_purpose",
             ),
         ]
+        indexes = [
+            models.Index(fields=["purpose", "source_type", "source_event_date"]),
+            models.Index(fields=["voucher_type", "source_event_date"]),
+        ]
 
     def save(self, *args, **kwargs):
         self.source_model = (self.source_model or "").strip()
         self.source_id = (self.source_id or "").strip()
         self.purpose = (self.purpose or "").strip().upper()
+        self.voucher_type = (self.voucher_type or "").strip().upper() or None
+        self.source_type = (self.source_type or "").strip().upper() or None
+        self.source_reference = (self.source_reference or "").strip()
+        self.source_document_no = (self.source_document_no or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

@@ -240,13 +240,115 @@ class Customer(TimeStampedModel):
         return f"{self.name} ({self.phone})"
 
 
+class ProductCategoryMaster(TimeStampedModel):
+    name = models.CharField(max_length=120, unique=True)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "product_category_master"
+        ordering = ["name", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "name"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+class ProductSubcategoryMaster(TimeStampedModel):
+    category = models.ForeignKey(
+        ProductCategoryMaster,
+        on_delete=models.PROTECT,
+        related_name="subcategories",
+    )
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "product_subcategory_master"
+        ordering = ["category__name", "name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "name"],
+                name="uq_product_subcategory_per_category",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["category", "is_active", "name"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.category.name} / {self.name}"
+
+
+class ProductUnitOfMeasureMaster(TimeStampedModel):
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=80, unique=True)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "product_unit_of_measure_master"
+        ordering = ["code", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "code"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
 class Product(TimeStampedModel):
     product_code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)
     base_price = models.DecimalField(max_digits=12, decimal_places=2)
 
+    category_master = models.ForeignKey(
+        ProductCategoryMaster,
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
+    subcategory_master = models.ForeignKey(
+        ProductSubcategoryMaster,
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
     category = models.CharField(max_length=120, blank=True, default="", db_index=True)
     subcategory = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    sku = models.CharField(max_length=60, unique=True, null=True, blank=True, db_index=True)
+    unit_of_measure_master = models.ForeignKey(
+        ProductUnitOfMeasureMaster,
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
+    unit_of_measure = models.CharField(max_length=30, blank=True, default="PCS")
     description = models.TextField(blank=True, default="")
     image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
@@ -271,6 +373,8 @@ class Product(TimeStampedModel):
             models.Index(fields=["name"]),
             models.Index(fields=["category"]),
             models.Index(fields=["subcategory"]),
+            models.Index(fields=["sku"]),
+            models.Index(fields=["unit_of_measure"]),
             models.Index(fields=["is_active"]),
         ]
         constraints = [
@@ -289,6 +393,9 @@ class Product(TimeStampedModel):
             errors["name"] = "Product name is required."
         if self.base_price is None or self.base_price <= MONEY_ZERO:
             errors["base_price"] = "Base price must be greater than zero."
+        if self.subcategory_master_id and self.category_master_id:
+            if self.subcategory_master.category_id != self.category_master_id:
+                errors["subcategory_master"] = "Subcategory must belong to the selected category."
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
         if not any([self.is_emi_enabled, self.is_rent_enabled, self.is_lease_enabled]):
@@ -304,15 +411,27 @@ class Product(TimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        update_field_set = set(update_fields) if update_fields is not None else None
+
         self.product_code = (self.product_code or "").strip().upper()
         self.name = (self.name or "").strip()
-        self.category = (self.category or "").strip()
-        self.subcategory = (self.subcategory or "").strip()
         self.description = (self.description or "").strip()
+        from products.services.catalog_master_service import (
+            sync_inventory_product_master_fields,
+            sync_product_catalog_fields,
+        )
+
+        synced_fields = sync_product_catalog_fields(self)
         self.is_rent_ready = bool(self.is_rent_enabled)
         self.is_lease_ready = bool(self.is_lease_enabled)
+        if update_field_set is not None:
+            update_field_set.update(synced_fields)
+            update_field_set.update({"is_rent_ready", "is_lease_ready"})
+            kwargs["update_fields"] = sorted(update_field_set)
         self.full_clean()
         super().save(*args, **kwargs)
+        sync_inventory_product_master_fields(self)
 
     def __str__(self):
         return f"{self.product_code} - {self.name}"
@@ -1993,6 +2112,23 @@ class AuditLog(models.Model):
         )
         PAYMENT_RECONCILED = "PAYMENT_RECONCILED", "Payment Reconciled"
         PAYMENT_FLAGGED = "PAYMENT_FLAGGED", "Payment Flagged"
+        PRODUCT_INVENTORY_PROFILE_PREPARED = (
+            "PRODUCT_INVENTORY_PROFILE_PREPARED",
+            "Product Inventory Profile Prepared",
+        )
+        INVENTORY_ITEM_CREATED = "INVENTORY_ITEM_CREATED", "Inventory Item Created"
+        INVENTORY_ITEM_UPDATED = "INVENTORY_ITEM_UPDATED", "Inventory Item Updated"
+        STOCK_LOCATION_CREATED = "STOCK_LOCATION_CREATED", "Stock Location Created"
+        STOCK_LOCATION_UPDATED = "STOCK_LOCATION_UPDATED", "Stock Location Updated"
+        STOCK_ADJUSTMENT_CREATED = "STOCK_ADJUSTMENT_CREATED", "Stock Adjustment Created"
+        STOCK_ADJUSTMENT_UPDATED = "STOCK_ADJUSTMENT_UPDATED", "Stock Adjustment Updated"
+        STOCK_ADJUSTMENT_APPROVED = "STOCK_ADJUSTMENT_APPROVED", "Stock Adjustment Approved"
+        STOCK_ADJUSTMENT_POSTED = "STOCK_ADJUSTMENT_POSTED", "Stock Adjustment Posted"
+        OPENING_STOCK_IMPORTED = "OPENING_STOCK_IMPORTED", "Opening Stock Imported"
+        DELIVERY_INVENTORY_BRIDGE_SYNCED = (
+            "DELIVERY_INVENTORY_BRIDGE_SYNCED",
+            "Delivery Inventory Bridge Synced",
+        )
 
         PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED", "Password Reset Requested"
         PASSWORD_RESET_VERIFIED = "PASSWORD_RESET_VERIFIED", "Password Reset Verified"
@@ -2250,6 +2386,16 @@ class CommissionPayoutBatch(models.Model):
 
     payout_date = models.DateField(default=timezone.now)
 
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="commission_payout_batches",
+    )
+
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+
     processed_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -2272,6 +2418,11 @@ class CommissionPayoutBatch(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        self.batch_code = (self.batch_code or "").strip()
+        self.reference_no = (self.reference_no or "").strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.batch_code} ({self.status})"

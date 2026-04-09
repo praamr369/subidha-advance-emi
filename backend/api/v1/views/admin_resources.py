@@ -35,14 +35,23 @@ from api.v1.serializers.admin_resources import (
     PartnerAdminSerializer,
     PaymentAdminSerializer,
     ProductAdminSerializer,
+    ProductCategoryMasterSerializer,
+    ProductInventoryProfilePrepareSerializer,
+    ProductSubcategoryMasterSerializer,
+    ProductUnitOfMeasureMasterSerializer,
     CustomerKycDecisionSerializer,
 )
 from api.v1.serializers.admin_resources import (
     SubscriptionAdminSerializer,
     SubscriptionAdminDetailSerializer,
 )
+from api.v1.serializers.inventory import InventoryItemSerializer
 
 from api.v1.views import customer
+from products.services.catalog_master_service import (
+    build_product_catalog_options,
+    ensure_inventory_profile_for_product,
+)
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -60,6 +69,9 @@ from subscriptions.models import (
     Payment,
     PlanType,
     Product,
+    ProductCategoryMaster,
+    ProductSubcategoryMaster,
+    ProductUnitOfMeasureMaster,
     Subscription,
     SubscriptionStatus,
     KycStatus,
@@ -207,6 +219,10 @@ def _build_customer_preview_response(headers, validation_rows):
 
 class AdminOnlyModelViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+
+class AdminOnlyCatalogMasterViewSet(AdminOnlyModelViewSet):
+    http_method_names = ["get", "post", "patch", "head", "options"]
 
 
 # =====================================================
@@ -1649,7 +1665,14 @@ class PartnerAdminListViewSet(viewsets.ReadOnlyModelViewSet):
 # =====================================================
 
 class ProductAdminViewSet(AdminOnlyModelViewSet):
-    queryset = Product.objects.all().order_by("name")
+    queryset = (
+        Product.objects.select_related(
+            "category_master",
+            "subcategory_master",
+            "unit_of_measure_master",
+            "inventory_profile",
+        ).all().order_by("name")
+    )
     serializer_class = ProductAdminSerializer
 
     def get_queryset(self):
@@ -1657,13 +1680,17 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         q = self.request.query_params.get("q", "").strip()
         category = self.request.query_params.get("category", "").strip()
         subcategory = self.request.query_params.get("subcategory", "").strip()
+        unit_of_measure = self.request.query_params.get("unit_of_measure", "").strip()
 
         if q:
             queryset = queryset.filter(
                 Q(name__icontains=q)
                 | Q(product_code__icontains=q)
+                | Q(sku__icontains=q)
+                | Q(unit_of_measure__icontains=q)
                 | Q(category__icontains=q)
                 | Q(subcategory__icontains=q)
+                | Q(description__icontains=q)
             )
 
         if category:
@@ -1671,6 +1698,9 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
 
         if subcategory:
             queryset = queryset.filter(subcategory__icontains=subcategory)
+
+        if unit_of_measure:
+            queryset = queryset.filter(unit_of_measure__icontains=unit_of_measure)
 
         return queryset
 
@@ -1684,6 +1714,42 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
                 "count": len(serializer.data),
             }
         )
+
+    @action(detail=False, methods=["get"], url_path="catalog-options")
+    def catalog_options(self, request):
+        payload = build_product_catalog_options()
+        return Response(
+            {
+                "categories": payload.categories,
+                "subcategories": payload.subcategories,
+                "unit_of_measure_masters": payload.unit_of_measure_masters,
+                "unit_of_measure_options": payload.unit_of_measure_options,
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="prepare-inventory-profile")
+    def prepare_inventory_profile(self, request, pk=None):
+        serializer = ProductInventoryProfilePrepareSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        product = self.get_object()
+        inventory_profile, created = ensure_inventory_profile_for_product(
+            product,
+            default_stock_location=serializer.validated_data.get("default_stock_location"),
+            stock_tracking_enabled=serializer.validated_data.get("stock_tracking_enabled", True),
+        )
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.PRODUCT_INVENTORY_PROFILE_PREPARED,
+            model_name="InventoryItem",
+            object_id=inventory_profile.id,
+            performed_by=request.user,
+            metadata={
+                "event": "PRODUCT_INVENTORY_PROFILE_PREPARED",
+                "product_id": product.id,
+                "created": created,
+            },
+        )
+        payload = InventoryItemSerializer(inventory_profile, context={"request": request})
+        return Response({"created": created, "inventory_profile": payload.data})
 
     def _build_product_code(self, name: str) -> str:
         base = slugify(name).upper().replace("-", "")[:12] or "PRODUCT"
@@ -1754,6 +1820,10 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         name = self._clean_text(row.get("name"))
         category = self._clean_text(row.get("category"))
         subcategory = self._row_subcategory(row)
+        sku = self._clean_text(row.get("sku")).upper()
+        unit_of_measure = self._clean_text(
+            row.get("unit_of_measure") or row.get("uom") or row.get("unit")
+        ).upper()
         description = self._clean_text(row.get("description"))
         image_value = self._row_image(row)
 
@@ -1764,6 +1834,12 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
             "category": category if category else (existing.category if existing else ""),
             "subcategory": (
                 subcategory if subcategory else (existing.subcategory if existing else "")
+            ),
+            "sku": sku if sku else (existing.sku if existing else None),
+            "unit_of_measure": (
+                unit_of_measure
+                if unit_of_measure
+                else (existing.unit_of_measure if existing else "PCS")
             ),
             "description": (
                 description if description else (existing.description if existing else "")
@@ -1792,7 +1868,7 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
             return False, (
                 "CSV must include at least these headers: "
                 "name, base_price. Optional headers: "
-                "product_code, category, sub_category, description, image."
+                "product_code, category, sub_category, sku, unit_of_measure, description, image."
             )
         return True, None
 
@@ -1844,6 +1920,10 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
                             "name": name,
                             "category": category,
                             "sub_category": subcategory,
+                            "sku": self._clean_text(row.get("sku")).upper(),
+                            "unit_of_measure": self._clean_text(
+                                row.get("unit_of_measure") or row.get("uom") or row.get("unit")
+                            ).upper(),
                             "description": description,
                             "base_price": str(price),
                             "image": image_value,
@@ -1904,6 +1984,51 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
                 {"message": f"CSV import failed: {exc}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class ProductCategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):
+    queryset = ProductCategoryMaster.objects.all().order_by("name", "id")
+    serializer_class = ProductCategoryMasterSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = (self.request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        return queryset
+
+
+class ProductSubcategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):
+    queryset = ProductSubcategoryMaster.objects.select_related("category").all().order_by("category__name", "name", "id")
+    serializer_class = ProductSubcategoryMasterSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = (self.request.query_params.get("q") or "").strip()
+        category_id = (self.request.query_params.get("category") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(name__icontains=q)
+                | Q(description__icontains=q)
+                | Q(category__name__icontains=q)
+            )
+        if category_id.isdigit():
+            queryset = queryset.filter(category_id=int(category_id))
+        return queryset
+
+
+class ProductUnitOfMeasureMasterViewSet(AdminOnlyCatalogMasterViewSet):
+    queryset = ProductUnitOfMeasureMaster.objects.all().order_by("code", "id")
+    serializer_class = ProductUnitOfMeasureMasterSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = (self.request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(code__icontains=q) | Q(name__icontains=q) | Q(description__icontains=q)
+            )
+        return queryset
 
 
 # =====================================================

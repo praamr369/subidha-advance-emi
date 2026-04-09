@@ -226,6 +226,29 @@ def _reconcile_after_payment(subscription: Subscription, emi: Emi):
     _refresh_subscription_status(subscription)
 
 
+def _sync_billing_best_effort(
+    *,
+    subscription: Subscription,
+    actor,
+    source_model: str,
+    source_id,
+    event_type: str,
+):
+    try:
+        from billing.services.billing_sync_service import sync_subscription_billing_profile
+
+        sync_subscription_billing_profile(
+            subscription_id=subscription.id,
+            source_model=source_model,
+            source_id=str(source_id),
+            event_type=event_type,
+            performed_by=actor,
+            idempotency_key=f"{source_model.upper()}:{source_id}:{event_type}",
+        )
+    except Exception:  # pragma: no cover - best-effort mirror sync
+        return
+
+
 @transaction.atomic
 def record_emi_payment(
     *,
@@ -321,6 +344,13 @@ def record_emi_payment(
     )
 
     _reconcile_after_payment(subscription, emi)
+    _sync_billing_best_effort(
+        subscription=subscription,
+        actor=collected_by,
+        source_model="Payment",
+        source_id=payment.id,
+        event_type="PAYMENT_POSTED",
+    )
 
     return {
         "payment": payment,
@@ -504,6 +534,13 @@ def reverse_payment_for_admin(
     )
 
     _reconcile_after_payment(subscription, emi)
+    _sync_billing_best_effort(
+        subscription=subscription,
+        actor=reversed_by,
+        source_model="Payment",
+        source_id=payment.id,
+        event_type="PAYMENT_REVERSED",
+    )
 
     return {
         "detail": "Payment reversed successfully.",

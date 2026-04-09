@@ -17,6 +17,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+import { listFinanceAccounts } from "@/services/accounting";
 
 type BatchStatus = "DRAFT" | "FINALIZED" | "CANCELLED";
 
@@ -25,6 +26,9 @@ type PayoutBatchMeta = {
   status: BatchStatus;
   total_amount: string;
   commission_count: number;
+  finance_account?: number | null;
+  finance_account_name?: string | null;
+  reference_no?: string | null;
   created_at?: string;
   finalized_at?: string | null;
   cancelled_at?: string | null;
@@ -53,6 +57,12 @@ type BatchActionResponse = {
   detail?: string;
   message?: string;
   status?: string;
+};
+
+type FinanceAccountOption = {
+  id: number;
+  name: string;
+  kind?: string;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -129,6 +139,9 @@ function normalizeBatchMeta(source: Record<string, unknown>): PayoutBatchMeta {
         source.total_items ??
         source.row_count
     ),
+    finance_account: toNullableNumber(source.finance_account),
+    finance_account_name: toNullableString(source.finance_account_name),
+    reference_no: toNullableString(source.reference_no),
     created_at: toStringValue(source.created_at) || undefined,
     finalized_at: toNullableString(source.finalized_at),
     cancelled_at: toNullableString(source.cancelled_at),
@@ -244,6 +257,7 @@ export default function AdminPayoutBatchDetailPage() {
 
   const [batch, setBatch] = useState<PayoutBatchMeta | null>(null);
   const [rows, setRows] = useState<BatchCommissionRow[]>([]);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing] = useState(false);
@@ -251,6 +265,8 @@ export default function AdminPayoutBatchDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState("");
+  const [selectedFinanceAccount, setSelectedFinanceAccount] = useState("");
+  const [referenceNo, setReferenceNo] = useState("");
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -264,8 +280,13 @@ export default function AdminPayoutBatchDetailPage() {
           `/admin/commission-payout-batches/${batchId}/`
         );
 
-        setBatch(extractBatchMeta(payload));
+        const meta = extractBatchMeta(payload);
+        setBatch(meta);
         setRows(extractCommissionRows(payload));
+        setSelectedFinanceAccount((current) =>
+          current || (meta.finance_account ? String(meta.finance_account) : "")
+        );
+        setReferenceNo((current) => current || meta.reference_no || "");
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -285,6 +306,31 @@ export default function AdminPayoutBatchDetailPage() {
     void loadPage("initial");
   }, [loadPage]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFinanceAccountOptions() {
+      try {
+        const payload = await listFinanceAccounts({ is_active: 1 });
+        if (cancelled) return;
+        setFinanceAccounts(
+          payload.results.map((account) => ({
+            id: account.id,
+            name: account.name,
+            kind: account.kind,
+          }))
+        );
+      } catch {
+        if (!cancelled) setFinanceAccounts([]);
+      }
+    }
+
+    void loadFinanceAccountOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function runAction(action: "finalize" | "cancel") {
     if (!batchId || !batch) return;
 
@@ -300,7 +346,13 @@ export default function AdminPayoutBatchDetailPage() {
 
     try {
       const body =
-        actionNote.trim().length > 0
+        action === "finalize"
+          ? {
+              ...(actionNote.trim().length > 0 ? { note: actionNote.trim(), reason: actionNote.trim() } : {}),
+              ...(selectedFinanceAccount ? { finance_account: Number(selectedFinanceAccount) } : {}),
+              ...(referenceNo.trim().length > 0 ? { reference_no: referenceNo.trim() } : {}),
+            }
+          : actionNote.trim().length > 0
           ? { note: actionNote.trim(), reason: actionNote.trim() }
           : {};
 
@@ -318,6 +370,9 @@ export default function AdminPayoutBatchDetailPage() {
           `Payout batch ${verb}d successfully.`
       );
       setActionNote("");
+      if (action === "finalize" && !selectedFinanceAccount && batch?.finance_account) {
+        setSelectedFinanceAccount(String(batch.finance_account));
+      }
       await loadPage("refresh");
     } catch (err) {
       setActionError(toErrorMessage(err));
@@ -492,6 +547,14 @@ export default function AdminPayoutBatchDetailPage() {
                     value={money(batch.total_amount)}
                   />
                   <DetailValue
+                    label="Finance Account"
+                    value={batch.finance_account_name || "Not assigned"}
+                  />
+                  <DetailValue
+                    label="Reference No"
+                    value={batch.reference_no || "—"}
+                  />
+                  <DetailValue
                     label="Commission Rows"
                     value={String(batch.commission_count)}
                   />
@@ -550,7 +613,7 @@ export default function AdminPayoutBatchDetailPage() {
                 {isDraft ? (
                   <div className="space-y-5">
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Draft batches may still be finalized or cancelled. Both actions are explicit and audited.
+                      Draft batches may still be finalized or cancelled. Both actions are explicit and audited. Assign a finance account before finalization if the payout should later flow into cash, bank, or UPI books.
                     </div>
 
                     <div>
@@ -569,6 +632,50 @@ export default function AdminPayoutBatchDetailPage() {
                         className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
                         disabled={acting}
                       />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="batch-finance-account"
+                          className="mb-2 block text-sm font-medium text-foreground"
+                        >
+                          Finance account
+                        </label>
+                        <select
+                          id="batch-finance-account"
+                          value={selectedFinanceAccount}
+                          onChange={(event) => setSelectedFinanceAccount(event.target.value)}
+                          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                          disabled={acting}
+                        >
+                          <option value="">Leave unassigned</option>
+                          {financeAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.name}
+                              {account.kind ? ` (${account.kind})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="batch-reference-no"
+                          className="mb-2 block text-sm font-medium text-foreground"
+                        >
+                          Reference no
+                        </label>
+                        <input
+                          id="batch-reference-no"
+                          type="text"
+                          value={referenceNo}
+                          onChange={(event) => setReferenceNo(event.target.value)}
+                          placeholder="Transfer, bank, or UPI reference"
+                          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                          disabled={acting}
+                        />
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-3">

@@ -1,15 +1,33 @@
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounting.models import AccountingPeriod, Asset, AssetCategory, DepreciationRun, PostingLock, VendorSettlement
+from accounting.models import (
+    AccountingBridgePosting,
+    AccountingPeriod,
+    Asset,
+    AssetCategory,
+    DepreciationRun,
+    PostingLock,
+    VendorSettlement,
+)
 from accounting.services.bridge_run_service import (
+    run_commission_settlement_bridges,
     run_emi_payment_bridges,
     run_emi_subscription_bridges,
+    run_emi_waiver_bridges,
     run_inventory_posting_bridges,
+    run_payout_batch_bridges,
     run_retail_sale_bridges,
+)
+from accounting.services.master_import_service import (
+    post_chart_of_accounts_import,
+    post_vendor_import,
+    preview_chart_of_accounts_import,
+    preview_vendor_import,
 )
 from accounting.services.depreciation_service import (
     cancel_depreciation_run,
@@ -39,11 +57,13 @@ from accounting.services.vendor_settlement_service import (
 from inventory.models import PurchaseBill
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting_phase3 import (
+    AccountingBridgePostingSerializer,
     AccountingBookQuerySerializer,
     AccountingPeriodSerializer,
     AssetCategorySerializer,
     AssetSerializer,
     DepreciationRunSerializer,
+    MasterImportActionSerializer,
     PostingLockSerializer,
     PeriodActionSerializer,
     Phase3BridgeRunSerializer,
@@ -126,6 +146,34 @@ class PostingLockViewSet(AdminAccountingPhase3ViewSet):
         )
         payload = PostingLockSerializer(posting_lock, context=self.get_serializer_context())
         return Response(payload.data, status=status.HTTP_200_OK)
+
+
+class AccountingBridgePostingViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    queryset = AccountingBridgePosting.objects.select_related("journal_entry").all()
+    serializer_class = AccountingBridgePostingSerializer
+    search_fields = ["source_model", "source_id", "purpose", "journal_entry__entry_no"]
+    ordering_fields = ["created_at", "purpose", "source_model"]
+    ordering = ["-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        purpose = self.request.query_params.get("purpose")
+        source_model = self.request.query_params.get("source_model")
+        source_id = self.request.query_params.get("source_id")
+        source_type = self.request.query_params.get("source_type")
+        voucher_type = self.request.query_params.get("voucher_type")
+        if purpose:
+            queryset = queryset.filter(purpose=purpose.strip().upper())
+        if source_model:
+            queryset = queryset.filter(source_model=source_model.strip())
+        if source_id:
+            queryset = queryset.filter(source_id=source_id.strip())
+        if source_type:
+            queryset = queryset.filter(source_type=source_type.strip().upper())
+        if voucher_type:
+            queryset = queryset.filter(voucher_type=voucher_type.strip().upper())
+        return queryset
 
 
 class AssetCategoryViewSet(AdminAccountingPhase3ViewSet):
@@ -312,6 +360,59 @@ class PurchaseBookView(AdminAccountingPhase3ReportView):
         return Response(build_purchase_book(**serializer.validated_data))
 
 
+class _AccountingImportView(AdminAccountingPhase3ReportView):
+    parser_classes = [MultiPartParser, FormParser]
+    serializer_class = MasterImportActionSerializer
+
+    def _uploaded_file(self, request):
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            raise ValidationError({"file": "CSV file is required."})
+        return uploaded
+
+
+class ChartOfAccountsImportPreviewView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(preview_chart_of_accounts_import(self._uploaded_file(request)))
+
+
+class ChartOfAccountsImportPostView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = post_chart_of_accounts_import(
+                self._uploaded_file(request),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class VendorImportPreviewView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(preview_vendor_import(self._uploaded_file(request)))
+
+
+class VendorImportPostView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = post_vendor_import(
+                self._uploaded_file(request),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(payload, status=status.HTTP_200_OK)
+
+
 class _BridgeRunView(AdminAccountingPhase3ReportView):
     service = None
 
@@ -342,3 +443,15 @@ class EmiSubscriptionBridgeRunView(_BridgeRunView):
 
 class EmiPaymentBridgeRunView(_BridgeRunView):
     service = staticmethod(run_emi_payment_bridges)
+
+
+class EmiWaiverBridgeRunView(_BridgeRunView):
+    service = staticmethod(run_emi_waiver_bridges)
+
+
+class CommissionSettlementBridgeRunView(_BridgeRunView):
+    service = staticmethod(run_commission_settlement_bridges)
+
+
+class PayoutBatchBridgeRunView(_BridgeRunView):
+    service = staticmethod(run_payout_batch_bridges)

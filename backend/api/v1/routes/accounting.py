@@ -27,21 +27,29 @@ from api.v1.views.accounting_phase2 import (
     TrialBalanceReportView,
 )
 from api.v1.views.accounting_phase3 import (
+    AccountingBridgePostingViewSet,
     AccountingPeriodViewSet,
     AccountingPurchaseBillViewSet,
     AssetCategoryViewSet,
     AssetViewSet,
     BankBookView,
     CashBookView,
+    ChartOfAccountsImportPostView,
+    ChartOfAccountsImportPreviewView,
+    CommissionSettlementBridgeRunView,
     DepreciationRunViewSet,
     EmiPaymentBridgeRunView,
     EmiSubscriptionBridgeRunView,
+    EmiWaiverBridgeRunView,
     InventoryBridgeRunView,
+    PayoutBatchBridgeRunView,
     PostingLockViewSet,
     PurchaseBookView,
     RetailSaleBridgeRunView,
     SalesBookView,
     UpiBookView,
+    VendorImportPostView,
+    VendorImportPreviewView,
     VendorSettlementViewSet,
 )
 
@@ -59,6 +67,7 @@ router.register(r"credit-notes", CreditNoteViewSet, basename="accounting-credit-
 router.register(r"debit-notes", DebitNoteViewSet, basename="accounting-debit-notes")
 router.register(r"periods", AccountingPeriodViewSet, basename="accounting-periods")
 router.register(r"locks", PostingLockViewSet, basename="accounting-locks")
+router.register(r"bridge-postings", AccountingBridgePostingViewSet, basename="accounting-bridge-postings")
 router.register(r"assets/categories", AssetCategoryViewSet, basename="accounting-asset-categories")
 router.register(r"assets", AssetViewSet, basename="accounting-assets")
 router.register(r"depreciation/runs", DepreciationRunViewSet, basename="accounting-depreciation-runs")
@@ -80,10 +89,17 @@ urlpatterns = [
     path("exports/itr-pack/<int:pk>/", ItrExportPackDetailView.as_view()),
     path("exports/itr-pack/<int:pk>/download/", ItrExportPackDownloadView.as_view()),
     path("exports/gst-pack/", GstExportPackListCreateView.as_view()),
+    path("imports/chart-of-accounts/preview/", ChartOfAccountsImportPreviewView.as_view()),
+    path("imports/chart-of-accounts/post/", ChartOfAccountsImportPostView.as_view()),
+    path("imports/vendors/preview/", VendorImportPreviewView.as_view()),
+    path("imports/vendors/post/", VendorImportPostView.as_view()),
     path("bridges/run/", BridgeRunView.as_view()),
     path("bridges/run-retail-sale/", RetailSaleBridgeRunView.as_view()),
     path("bridges/run-inventory-posting/", InventoryBridgeRunView.as_view()),
     path("bridges/run-emi-subscription/", EmiSubscriptionBridgeRunView.as_view()),
     path("bridges/run-emi-payment/", EmiPaymentBridgeRunView.as_view()),
+    path("bridges/run-emi-waiver/", EmiWaiverBridgeRunView.as_view()),
+    path("bridges/run-commission-settlement/", CommissionSettlementBridgeRunView.as_view()),
+    path("bridges/run-payout-batch/", PayoutBatchBridgeRunView.as_view()),
     path("", include(router.urls)),
 ]

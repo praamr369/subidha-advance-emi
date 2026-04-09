@@ -28,12 +28,15 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
 type CreatedProductResponse = {
   id: number;
   product_code?: string | null;
   name?: string;
   base_price?: string;
+  sku?: string | null;
+  unit_of_measure?: string | null;
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
@@ -50,6 +53,8 @@ type FieldErrors = Partial<
     | "product_code"
     | "name"
     | "base_price"
+    | "sku"
+    | "unit_of_measure"
     | "category"
     | "subcategory"
     | "description"
@@ -138,6 +143,8 @@ function parseFieldErrors(error: unknown): FieldErrors {
     pick("product_code");
     pick("name");
     pick("base_price");
+    pick("sku");
+    pick("unit_of_measure");
     pick("category");
     pick("subcategory");
     pick("description");
@@ -252,9 +259,17 @@ export default function AdminProductCreatePage() {
   const [productCode, setProductCode] = useState("");
   const [name, setName] = useState("");
   const [basePrice, setBasePrice] = useState("");
+  const [sku, setSku] = useState("");
+  const [unitOfMeasure, setUnitOfMeasure] = useState("PCS");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [description, setDescription] = useState("");
+  const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({
+    categories: [],
+    subcategories: [],
+    unit_of_measure_masters: [],
+    unit_of_measure_options: ["PCS"],
+  });
 
   const [isActive, setIsActive] = useState(true);
   const [isEmiEnabled, setIsEmiEnabled] = useState(true);
@@ -273,6 +288,34 @@ export default function AdminProductCreatePage() {
   const [created, setCreated] = useState<CreatedProductResponse | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalogOptions() {
+      try {
+        const payload = await getProductCatalogOptions();
+        if (!cancelled) {
+          setCatalogOptions(payload);
+        }
+      } catch {
+        if (!cancelled) {
+          setCatalogOptions({
+            categories: [],
+            subcategories: [],
+            unit_of_measure_masters: [],
+            unit_of_measure_options: ["PCS"],
+          });
+        }
+      }
+    }
+
+    void loadCatalogOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedImageFile) {
       setSelectedImagePreview(null);
       return;
@@ -288,10 +331,42 @@ export default function AdminProductCreatePage() {
 
   const trimmedProductCode = productCode.trim().toUpperCase();
   const trimmedName = name.trim();
+  const trimmedSku = sku.trim().toUpperCase();
+  const trimmedUnitOfMeasure = unitOfMeasure.trim().toUpperCase() || "PCS";
   const trimmedCategory = category.trim();
   const trimmedSubcategory = subcategory.trim();
   const trimmedDescription = description.trim();
   const trimmedBasePrice = basePrice.trim();
+  const suggestedSubcategories = useMemo(
+    () =>
+      catalogOptions.subcategories.filter((item) =>
+        !trimmedCategory
+          ? true
+          : item.category_name.toLowerCase() === trimmedCategory.toLowerCase()
+      ),
+    [catalogOptions.subcategories, trimmedCategory]
+  );
+  const selectedCategoryMaster = useMemo(
+    () =>
+      catalogOptions.categories.find(
+        (item) => item.name.toLowerCase() === trimmedCategory.toLowerCase()
+      ) ?? null,
+    [catalogOptions.categories, trimmedCategory]
+  );
+  const selectedSubcategoryMaster = useMemo(
+    () =>
+      suggestedSubcategories.find(
+        (item) => item.name.toLowerCase() === trimmedSubcategory.toLowerCase()
+      ) ?? null,
+    [suggestedSubcategories, trimmedSubcategory]
+  );
+  const selectedUnitMaster = useMemo(
+    () =>
+      catalogOptions.unit_of_measure_masters.find(
+        (item) => item.code.toLowerCase() === trimmedUnitOfMeasure.toLowerCase()
+      ) ?? null,
+    [catalogOptions.unit_of_measure_masters, trimmedUnitOfMeasure]
+  );
 
   const currentPrice = useMemo(() => Number(trimmedBasePrice || 0), [trimmedBasePrice]);
 
@@ -309,6 +384,8 @@ export default function AdminProductCreatePage() {
     setProductCode("");
     setName("");
     setBasePrice("");
+    setSku("");
+    setUnitOfMeasure("PCS");
     setCategory("");
     setSubcategory("");
     setDescription("");
@@ -396,7 +473,18 @@ export default function AdminProductCreatePage() {
       formData.append("product_code", trimmedProductCode);
       formData.append("name", trimmedName);
       formData.append("base_price", trimmedBasePrice);
+      formData.append("sku", trimmedSku);
+      if (selectedUnitMaster) {
+        formData.append("unit_of_measure_master", String(selectedUnitMaster.id));
+      }
+      formData.append("unit_of_measure", trimmedUnitOfMeasure);
+      if (selectedCategoryMaster) {
+        formData.append("category_master", String(selectedCategoryMaster.id));
+      }
       formData.append("category", trimmedCategory);
+      if (selectedSubcategoryMaster) {
+        formData.append("subcategory_master", String(selectedSubcategoryMaster.id));
+      }
       formData.append("subcategory", trimmedSubcategory);
       formData.append("description", trimmedDescription);
       formData.append("is_active", String(isActive));
@@ -463,6 +551,11 @@ export default function AdminProductCreatePage() {
         {
           href: "/admin/products",
           label: "Back to Register",
+          variant: "secondary",
+        },
+        {
+          href: "/admin/products/masters",
+          label: "Manage Masters",
           variant: "secondary",
         },
         {
@@ -574,23 +667,93 @@ export default function AdminProductCreatePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label
+                    htmlFor="product-sku"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    SKU
+                  </label>
+                  <input
+                    id="product-sku"
+                    type="text"
+                    value={sku}
+                    onChange={(event) => {
+                      setSku(event.target.value.toUpperCase());
+                      setError(null);
+                    }}
+                    placeholder="e.g. BED-KING-001"
+                    disabled={saving}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm uppercase outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <FieldError message={fieldErrors.sku} />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="product-uom"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    Unit of Measure
+                  </label>
+                  <select
+                    id="product-uom"
+                    value={unitOfMeasure}
+                    onChange={(event) => {
+                      setUnitOfMeasure(event.target.value.toUpperCase());
+                      setError(null);
+                    }}
+                    disabled={saving}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm uppercase outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {catalogOptions.unit_of_measure_masters.map((option) => (
+                      <option key={option.id} value={option.code}>
+                        {option.code} · {option.name}
+                      </option>
+                    ))}
+                    {catalogOptions.unit_of_measure_masters.length === 0
+                      ? catalogOptions.unit_of_measure_options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))
+                      : null}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Maintain units from{" "}
+                    <Link href="/admin/products/masters" className="font-medium text-primary hover:underline">
+                      Product Masters
+                    </Link>
+                    .
+                  </p>
+                  <FieldError message={fieldErrors.unit_of_measure} />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label
                     htmlFor="product-category"
                     className="mb-2 block text-sm font-medium text-foreground"
                   >
                     Category
                   </label>
-                  <input
+                  <select
                     id="product-category"
-                    type="text"
                     value={category}
                     onChange={(event) => {
                       setCategory(event.target.value);
+                      setSubcategory("");
                       setError(null);
                     }}
-                    placeholder="e.g. Bed"
                     disabled={saving}
                     className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
+                  >
+                    <option value="">Select category</option>
+                    {catalogOptions.categories.map((option) => (
+                      <option key={option.id} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
                   <FieldError message={fieldErrors.category} />
                 </div>
 
@@ -601,18 +764,30 @@ export default function AdminProductCreatePage() {
                   >
                     Subcategory
                   </label>
-                  <input
+                  <select
                     id="product-subcategory"
-                    type="text"
                     value={subcategory}
                     onChange={(event) => {
                       setSubcategory(event.target.value);
                       setError(null);
                     }}
-                    placeholder="e.g. Wooden"
                     disabled={saving}
                     className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
+                  >
+                    <option value="">Select subcategory</option>
+                    {suggestedSubcategories.map((option) => (
+                      <option key={option.id} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    New category or subcategory needed? Add it in{" "}
+                    <Link href="/admin/products/masters" className="font-medium text-primary hover:underline">
+                      Product Masters
+                    </Link>
+                    .
+                  </p>
                   <FieldError message={fieldErrors.subcategory} />
                 </div>
               </div>
@@ -788,7 +963,7 @@ export default function AdminProductCreatePage() {
             title="Product created"
             description="The product master was created successfully and is ready for register, detail, and subscription workflows."
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
               <DetailValue label="Product ID" value={`#${created.id}`} />
               <DetailValue
                 label="Product Code"
@@ -801,6 +976,14 @@ export default function AdminProductCreatePage() {
               <DetailValue
                 label="Base Price"
                 value={money(created.base_price || trimmedBasePrice)}
+              />
+              <DetailValue
+                label="SKU"
+                value={created.sku || trimmedSku || "—"}
+              />
+              <DetailValue
+                label="Unit"
+                value={created.unit_of_measure || trimmedUnitOfMeasure}
               />
             </div>
 

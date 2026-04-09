@@ -50,10 +50,10 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: [
     {
-      title: "Overview",
+      title: "Control Center",
       items: [
         {
-          label: "Dashboard",
+          label: "Workspace",
           href: ROUTES.admin.dashboard,
           icon: "dashboard",
         },
@@ -62,28 +62,28 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.admin.analytics,
           icon: "analytics",
         },
-      ],
-    },
-    {
-      title: "Operations",
-      items: [
         {
-          label: "Collections",
-          href: ROUTES.admin.collections,
-          icon: "collections",
-        },
-        {
-          label: "Leads",
-          href: ROUTES.admin.leads,
-          icon: "leads",
+          label: "Operations Reports",
+          href: ROUTES.admin.reports,
+          icon: "reports",
         },
         {
           label: "Support Issues",
           href: ROUTES.admin.supportRequests,
           icon: "support",
         },
+      ],
+    },
+    {
+      title: "Sales & Onboarding",
+      items: [
         {
-          label: "Subscription Requests",
+          label: "Leads",
+          href: ROUTES.admin.leads,
+          icon: "leads",
+        },
+        {
+          label: "Contract Requests",
           href: ROUTES.admin.subscriptionRequests,
           icon: "subscriptions",
         },
@@ -93,19 +93,19 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "customers",
         },
         {
-          label: "Deliveries",
-          href: ROUTES.admin.deliveries,
-          icon: "deliveries",
-        },
-        {
-          label: "Products",
-          href: ROUTES.admin.products,
-          icon: "products",
-        },
-        {
           label: "Subscriptions",
           href: ROUTES.admin.subscriptions,
           icon: "subscriptions",
+        },
+      ],
+    },
+    {
+      title: "Collections & EMI",
+      items: [
+        {
+          label: "Collections",
+          href: ROUTES.admin.collections,
+          icon: "collections",
         },
         {
           label: "Payments",
@@ -113,25 +113,30 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "payments",
         },
         {
-          label: "EMI",
+          label: "EMI Register",
           href: ROUTES.admin.emis,
           icon: "emis",
         },
         {
-          label: "Batches",
-          href: ROUTES.admin.batches,
-          icon: "batches",
+          label: "Reminders",
+          href: ROUTES.admin.reminders,
+          icon: "support",
         },
         {
-          label: "Partners",
-          href: ROUTES.admin.partners,
-          icon: "partners",
+          label: "Reconciliation",
+          href: buildAdminReconciliationRoute(),
+          icon: "reconciliation",
         },
       ],
     },
     {
-      title: "Lucky Plan Control",
+      title: "Fulfillment",
       items: [
+        {
+          label: "Deliveries",
+          href: ROUTES.admin.deliveries,
+          icon: "deliveries",
+        },
         {
           label: "Lucky IDs",
           href: ROUTES.admin.luckyIds,
@@ -145,47 +150,42 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Finance",
+      title: "Catalog & Inventory",
       items: [
         {
-          label: "Finance Overview",
-          href: ROUTES.admin.finance,
-          icon: "finance",
+          label: "Product Master",
+          href: ROUTES.admin.products,
+          icon: "products",
         },
         {
-          label: "Accounting",
-          href: ROUTES.admin.accounting,
-          icon: "finance",
-        },
-        {
-          label: "Billing",
-          href: ROUTES.admin.billing,
-          icon: "payments",
-        },
-        {
-          label: "Inventory",
+          label: "Inventory Control",
           href: ROUTES.admin.inventory,
           icon: "products",
         },
         {
-          label: "Reminders",
-          href: ROUTES.admin.reminders,
-          icon: "support",
+          label: "Batch Control",
+          href: ROUTES.admin.batches,
+          icon: "batches",
         },
+      ],
+    },
+    {
+      title: "Partner Finance",
+      items: [
         {
-          label: "Commission Reconciliation",
-          href: ROUTES.admin.financeReconciliation,
-          icon: "reconciliation",
-        },
-        {
-          label: "Payment Reconciliation",
-          href: buildAdminReconciliationRoute({ view: "payments" }),
-          icon: "payments",
+          label: "Partners",
+          href: ROUTES.admin.partners,
+          icon: "partners",
         },
         {
           label: "Commission Finance",
           href: ROUTES.admin.financeCommissions,
           icon: "commissions",
+        },
+        {
+          label: "Commission Reconciliation",
+          href: ROUTES.admin.financeReconciliation,
+          icon: "reconciliation",
         },
         {
           label: "Payout Queue",
@@ -200,7 +200,22 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Controls",
+      title: "Billing & Accounting",
+      items: [
+        {
+          label: "Billing Documents",
+          href: ROUTES.admin.billing,
+          icon: "payments",
+        },
+        {
+          label: "Books & Accounting",
+          href: ROUTES.admin.accounting,
+          icon: "finance",
+        },
+      ],
+    },
+    {
+      title: "Governance",
       items: [
         {
           label: "Audit Logs",
@@ -208,12 +223,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "auditLogs",
         },
         {
-          label: "Reports",
-          href: ROUTES.admin.reports,
-          icon: "reports",
-        },
-        {
-          label: "Settings",
+          label: "Settings & Controls",
           href: ROUTES.admin.settings,
           icon: "settings",
         },

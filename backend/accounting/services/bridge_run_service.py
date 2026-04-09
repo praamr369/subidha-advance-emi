@@ -1,20 +1,59 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
 from django.db import transaction
 
-from accounting.models import AccountingBridgePosting, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import (
+    AccountingBridgePosting,
+    ChartOfAccountType,
+    FinanceAccount,
+    FinanceAccountKind,
+)
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.gst_document_posting_service import _ensure_system_account
 from accounting.services.journal_posting_service import _log_accounting_event
-from billing.models import BillingInvoice
+from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from billing.models import BillingDocumentStatus, BillingInvoice
 from billing.services.billing_service import generate_emi_payment_receipt, post_billing_invoice
 from inventory.models import PurchaseBill, StockAdjustment
 from inventory.services.stock_service import post_purchase_bill, post_stock_adjustment
-from subscriptions.models import Payment
+from subscriptions.models import (
+    AuditLog,
+    Commission,
+    CommissionPayoutBatch,
+    CommissionStatus,
+    Payment,
+)
 
-SUPPORTED_BRIDGE_PURPOSES = {"PAYMENT_COLLECTION"}
+SUPPORTED_BRIDGE_PURPOSES = {
+    "PAYMENT_COLLECTION",
+    "PAYMENT_REVERSAL",
+}
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def _bridge_exists(*, source_model: str, source_id: str, purpose: str) -> bool:
+    return AccountingBridgePosting.objects.filter(
+        source_model=source_model,
+        source_id=str(source_id),
+        purpose=purpose,
+    ).exists()
+
+
+def _iso_to_date(value, *, fallback: date | None = None) -> date | None:
+    if isinstance(value, date):
+        return value
+    if not value:
+        return fallback
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _method_chart_account(payment: Payment):
@@ -65,6 +104,229 @@ def _finance_account_for_payment_method(method: str):
     return None
 
 
+def _payment_reversal_date(payment: Payment) -> date:
+    reversal = ((payment.allocation_metadata or {}).get("reversal") or {})
+    return _iso_to_date(
+        reversal.get("reversed_at"),
+        fallback=payment.payment_date,
+    ) or payment.payment_date
+
+
+def _payment_reversal_reason(payment: Payment) -> str:
+    reversal = ((payment.allocation_metadata or {}).get("reversal") or {})
+    return str(reversal.get("reason") or "").strip()
+
+
+def _post_payment_reversal_bridge(*, payment: Payment, performed_by=None):
+    accounts = ensure_phase3_system_accounts()
+    lines: list[dict] = []
+    trace_metadata = {
+        "payment_id": payment.id,
+        "reference_no": payment.reference_no or "",
+        "reason": _payment_reversal_reason(payment),
+    }
+
+    if _bridge_exists(
+        source_model="Payment",
+        source_id=str(payment.id),
+        purpose="PAYMENT_COLLECTION",
+    ):
+        lines.extend(
+            [
+                {
+                    "chart_account": _collection_clearing_account(),
+                    "description": f"Payment reversal {payment.reference_no or payment.id}",
+                    "debit_amount": payment.amount,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": _method_chart_account(payment),
+                    "description": f"Payment reversal {payment.method or 'CASH'}",
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": payment.amount,
+                },
+            ]
+        )
+        trace_metadata["payment_collection_bridge_reversed"] = True
+    else:
+        trace_metadata["payment_collection_bridge_reversed"] = False
+
+    try:
+        receipt = payment.receipt_document
+    except Exception:  # pragma: no cover - reverse one-to-one convenience
+        receipt = None
+    if (
+        receipt is not None
+        and receipt.status == BillingDocumentStatus.POSTED
+        and receipt.finance_account_id
+    ):
+        lines.extend(
+            [
+                {
+                    "chart_account": accounts["EMI_COLLECTION_CLEARING"],
+                    "description": receipt.receipt_no or f"Receipt {receipt.id}",
+                    "debit_amount": receipt.amount,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": receipt.finance_account.chart_account,
+                    "description": receipt.receipt_no or f"Receipt {receipt.id}",
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": receipt.amount,
+                },
+            ]
+        )
+        trace_metadata["receipt_document_id"] = receipt.id
+        trace_metadata["receipt_no"] = receipt.receipt_no or ""
+
+    if not lines:
+        return None, False, "NO_ACCOUNTING_SOURCE_TO_REVERSE"
+
+    journal_entry, created = post_bridge_entry(
+        source_instance=payment,
+        purpose="PAYMENT_REVERSAL",
+        entry_date=_payment_reversal_date(payment),
+        memo=f"Payment reversal {payment.reference_no or payment.id}",
+        lines=lines,
+        voucher_type="PAYMENT_REVERSAL",
+        source_type="PAYMENT",
+        source_reference=payment.reference_no or f"PAY-{payment.id}",
+        trace_metadata=trace_metadata,
+        posted_by=performed_by,
+    )
+    return journal_entry, created, None
+
+
+def _post_commission_settlement_bridge(*, commission: Commission, performed_by=None):
+    accounts = ensure_phase3_system_accounts()
+    payment = getattr(commission, "payment", None)
+    source_reference = (
+        getattr(payment, "reference_no", None)
+        or getattr(commission, "id", None)
+    )
+    return post_bridge_entry(
+        source_instance=commission,
+        purpose="COMMISSION_SETTLEMENT",
+        entry_date=commission.settlement_date or commission.created_at.date(),
+        memo=f"Commission settlement {commission.id}",
+        lines=[
+            {
+                "chart_account": accounts["PARTNER_COMMISSION_EXPENSE"],
+                "description": getattr(commission.partner, "username", "") or f"Commission {commission.id}",
+                "debit_amount": commission.commission_amount,
+                "credit_amount": Decimal("0.00"),
+            },
+            {
+                "chart_account": accounts["PARTNER_COMMISSION_PAYABLE"],
+                "description": getattr(commission.partner, "username", "") or f"Commission {commission.id}",
+                "debit_amount": Decimal("0.00"),
+                "credit_amount": commission.commission_amount,
+            },
+        ],
+        voucher_type="COMMISSION_ACCRUAL",
+        source_type="COMMISSION",
+        source_reference=str(source_reference),
+        trace_metadata={
+            "commission_id": commission.id,
+            "partner_id": commission.partner_id,
+            "payment_id": commission.payment_id,
+            "subscription_id": commission.subscription_id,
+            "emi_id": commission.emi_id,
+        },
+        posted_by=performed_by,
+    )
+
+
+def _post_payout_batch_bridge(*, payout_batch: CommissionPayoutBatch, performed_by=None):
+    accounts = ensure_phase3_system_accounts()
+    if payout_batch.finance_account_id is None:
+        raise ValueError("Payout batch is missing finance account.")
+
+    return post_bridge_entry(
+        source_instance=payout_batch,
+        purpose="COMMISSION_PAYOUT_BATCH",
+        entry_date=payout_batch.payout_date,
+        memo=f"Commission payout batch {payout_batch.batch_code}",
+        lines=[
+            {
+                "chart_account": accounts["PARTNER_COMMISSION_PAYABLE"],
+                "description": payout_batch.batch_code,
+                "debit_amount": payout_batch.total_amount,
+                "credit_amount": Decimal("0.00"),
+            },
+            {
+                "chart_account": payout_batch.finance_account.chart_account,
+                "description": payout_batch.reference_no or payout_batch.batch_code,
+                "debit_amount": Decimal("0.00"),
+                "credit_amount": payout_batch.total_amount,
+            },
+        ],
+        voucher_type="PAYOUT_BATCH",
+        source_type="PAYOUT_BATCH",
+        source_reference=payout_batch.reference_no or payout_batch.batch_code,
+        trace_metadata={
+            "payout_batch_id": payout_batch.id,
+            "batch_code": payout_batch.batch_code,
+            "finance_account_id": payout_batch.finance_account_id,
+            "reference_no": payout_batch.reference_no or "",
+            "line_count": payout_batch.lines.count(),
+        },
+        posted_by=performed_by,
+    )
+
+
+def _waiver_amount_from_audit(audit: AuditLog) -> Decimal:
+    metadata = audit.metadata if isinstance(audit.metadata, dict) else {}
+    for key in ("newly_waived_amount", "waived_amount", "amount"):
+        amount = _money(metadata.get(key))
+        if amount > Decimal("0.00"):
+            return amount
+    return Decimal("0.00")
+
+
+def _post_waiver_bridge(*, audit: AuditLog, performed_by=None):
+    accounts = ensure_phase3_system_accounts()
+    amount = _waiver_amount_from_audit(audit)
+    if amount <= Decimal("0.00"):
+        raise ValueError("Winner waiver amount is required for bridge posting.")
+
+    metadata = audit.metadata if isinstance(audit.metadata, dict) else {}
+    subscription_id = metadata.get("subscription_id") or audit.object_id
+    source_reference = metadata.get("winner_subscription_number") or f"SUB-{subscription_id}"
+    return post_bridge_entry(
+        source_instance=audit,
+        purpose="EMI_WAIVER",
+        entry_date=audit.created_at.date(),
+        memo=f"EMI waiver event {audit.id}",
+        lines=[
+            {
+                "chart_account": accounts["EMI_WAIVER_EXPENSE"],
+                "description": str(source_reference),
+                "debit_amount": amount,
+                "credit_amount": Decimal("0.00"),
+            },
+            {
+                "chart_account": accounts["EMI_WAIVER_RESERVE"],
+                "description": str(source_reference),
+                "debit_amount": Decimal("0.00"),
+                "credit_amount": amount,
+            },
+        ],
+        voucher_type="EMI_WAIVER",
+        source_type="WINNER_WAIVER",
+        source_reference=str(source_reference),
+        trace_metadata={
+            "audit_id": audit.id,
+            "subscription_id": subscription_id,
+            "winner_month": metadata.get("winner_month"),
+            "waived_emi_count": metadata.get("waived_emi_count"),
+            "waiver_scope": metadata.get("waiver_scope"),
+            "waived_amount": f"{amount:.2f}",
+        },
+        posted_by=performed_by,
+    )
+
+
 @transaction.atomic
 def run_bridge_postings(
     *,
@@ -113,11 +375,11 @@ def run_bridge_postings(
                 first_payment = payment
 
             purpose = "PAYMENT_COLLECTION"
-            if AccountingBridgePosting.objects.filter(
+            if _bridge_exists(
                 source_model="Payment",
                 source_id=str(payment.id),
                 purpose=purpose,
-            ).exists():
+            ):
                 existing_count += 1
                 continue
 
@@ -144,6 +406,14 @@ def run_bridge_postings(
                         "credit_amount": payment.amount,
                     },
                 ],
+                voucher_type="PAYMENT_COLLECTION",
+                source_type="PAYMENT",
+                source_reference=payment.reference_no or f"PAY-{payment.id}",
+                trace_metadata={
+                    "payment_id": payment.id,
+                    "subscription_id": payment.subscription_id,
+                    "emi_id": payment.emi_id,
+                },
                 posted_by=performed_by,
             )
             created_count += 1
@@ -171,6 +441,60 @@ def run_bridge_postings(
                 "created_count": created_count,
                 "existing_count": existing_count,
                 "dry_run": dry_run,
+            }
+        )
+
+    if "PAYMENT_REVERSAL" in selected_purposes:
+        reversal_candidates = []
+        for payment in Payment.objects.select_related(
+            "receipt_document",
+            "receipt_document__finance_account",
+            "receipt_document__finance_account__chart_account",
+        ).filter(
+            allocation_metadata__reversal__is_reversed=True
+        ).order_by("payment_date", "id"):
+            reversal_date = _payment_reversal_date(payment)
+            if start_date <= reversal_date <= end_date:
+                reversal_candidates.append(payment)
+
+        created_count = 0
+        existing_count = 0
+        skipped = []
+        for payment in reversal_candidates:
+            if _bridge_exists(
+                source_model="Payment",
+                source_id=str(payment.id),
+                purpose="PAYMENT_REVERSAL",
+            ):
+                existing_count += 1
+                continue
+
+            if dry_run:
+                continue
+
+            _, created, skip_reason = _post_payment_reversal_bridge(
+                payment=payment,
+                performed_by=performed_by,
+            )
+            if skip_reason:
+                skipped.append(
+                    {
+                        "payment_id": payment.id,
+                        "reason": skip_reason,
+                    }
+                )
+                continue
+            created_count += 1 if created else 0
+            existing_count += 0 if created else 1
+
+        results.append(
+            {
+                "purpose": "PAYMENT_REVERSAL",
+                "candidates": len(reversal_candidates),
+                "created_count": created_count,
+                "existing_count": existing_count,
+                "dry_run": dry_run,
+                "skipped": skipped,
             }
         )
 
@@ -225,7 +549,7 @@ def run_inventory_posting_bridges(*, start_date: date, end_date: date, dry_run: 
     purchase_created = 0
     purchase_existing = 0
     for purchase_bill in purchase_qs:
-        if purchase_bill.status == "POSTED":
+        if purchase_bill.posted_journal_entry_id:
             purchase_existing += 1
             continue
         if dry_run:
@@ -237,7 +561,7 @@ def run_inventory_posting_bridges(*, start_date: date, end_date: date, dry_run: 
     adjustment_created = 0
     adjustment_existing = 0
     for adjustment in adjustment_qs:
-        if adjustment.status == "POSTED":
+        if adjustment.posted_journal_entry_id:
             adjustment_existing += 1
             continue
         if dry_run:
@@ -351,5 +675,217 @@ def run_emi_payment_bridges(*, start_date: date, end_date: date, dry_run: bool =
         "candidates": payments.count(),
         "created_count": created_count,
         "existing_count": existing_count,
+        "skipped": skipped,
+    }
+
+
+@transaction.atomic
+def run_emi_waiver_bridges(*, start_date: date, end_date: date, dry_run: bool = False, performed_by=None) -> dict:
+    waiver_audits = AuditLog.objects.filter(
+        action_type=AuditLog.ActionType.WINNER_WAIVER_APPLIED,
+        created_at__date__range=(start_date, end_date),
+        model_name="Subscription",
+    ).order_by("created_at", "id")
+    created_count = 0
+    existing_count = 0
+    skipped = []
+    for audit in waiver_audits:
+        if _bridge_exists(
+            source_model="AuditLog",
+            source_id=str(audit.id),
+            purpose="EMI_WAIVER",
+        ):
+            existing_count += 1
+            continue
+
+        amount = _waiver_amount_from_audit(audit)
+        if amount <= Decimal("0.00"):
+            skipped.append(
+                {
+                    "audit_id": audit.id,
+                    "reason": "ZERO_WAIVER_AMOUNT",
+                }
+            )
+            continue
+
+        if dry_run:
+            continue
+
+        _, created = _post_waiver_bridge(audit=audit, performed_by=performed_by)
+        created_count += 1 if created else 0
+        existing_count += 0 if created else 1
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "dry_run": dry_run,
+        "purpose": "EMI_WAIVER",
+        "candidates": waiver_audits.count(),
+        "created_count": created_count,
+        "existing_count": existing_count,
+        "skipped": skipped,
+    }
+
+
+@transaction.atomic
+def run_commission_settlement_bridges(*, start_date: date, end_date: date, dry_run: bool = False, performed_by=None) -> dict:
+    commissions = Commission.objects.select_related(
+        "partner",
+        "payment",
+        "subscription",
+        "subscription__batch",
+        "subscription__lucky_id",
+    ).filter(
+        status=CommissionStatus.SETTLED,
+        settlement_date__range=(start_date, end_date),
+    ).order_by("settlement_date", "id")
+    created_count = 0
+    existing_count = 0
+    skipped = []
+    for commission in commissions:
+        if _bridge_exists(
+            source_model="Commission",
+            source_id=str(commission.id),
+            purpose="COMMISSION_SETTLEMENT",
+        ):
+            existing_count += 1
+            continue
+
+        if _money(commission.commission_amount) <= Decimal("0.00"):
+            skipped.append(
+                {
+                    "commission_id": commission.id,
+                    "reason": "ZERO_COMMISSION_AMOUNT",
+                }
+            )
+            continue
+
+        if dry_run:
+            continue
+
+        _, created = _post_commission_settlement_bridge(
+            commission=commission,
+            performed_by=performed_by,
+        )
+        created_count += 1 if created else 0
+        existing_count += 0 if created else 1
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "dry_run": dry_run,
+        "purpose": "COMMISSION_SETTLEMENT",
+        "candidates": commissions.count(),
+        "created_count": created_count,
+        "existing_count": existing_count,
+        "skipped": skipped,
+    }
+
+
+@transaction.atomic
+def run_payout_batch_bridges(*, start_date: date, end_date: date, dry_run: bool = False, performed_by=None) -> dict:
+    batches = CommissionPayoutBatch.objects.select_related(
+        "processed_by",
+        "finance_account",
+        "finance_account__chart_account",
+    ).prefetch_related(
+        "lines__commission",
+        "lines__commission__partner",
+        "lines__commission__payment",
+        "lines__commission__subscription",
+    ).filter(
+        status=CommissionPayoutBatch.Status.FINALIZED,
+        payout_date__range=(start_date, end_date),
+    ).order_by("payout_date", "id")
+
+    created_count = 0
+    existing_count = 0
+    settlement_created_count = 0
+    settlement_existing_count = 0
+    skipped = []
+
+    for payout_batch in batches:
+        if _bridge_exists(
+            source_model="CommissionPayoutBatch",
+            source_id=str(payout_batch.id),
+            purpose="COMMISSION_PAYOUT_BATCH",
+        ):
+            existing_count += 1
+            continue
+
+        lines = list(
+            payout_batch.lines.select_related(
+                "commission",
+                "commission__partner",
+                "commission__payment",
+                "commission__subscription",
+            ).order_by("id")
+        )
+        if not lines:
+            skipped.append(
+                {
+                    "payout_batch_id": payout_batch.id,
+                    "reason": "EMPTY_PAYOUT_BATCH",
+                }
+            )
+            continue
+
+        if payout_batch.finance_account_id is None:
+            skipped.append(
+                {
+                    "payout_batch_id": payout_batch.id,
+                    "reason": "MISSING_FINANCE_ACCOUNT",
+                }
+            )
+            continue
+
+        if _money(payout_batch.total_amount) <= Decimal("0.00"):
+            skipped.append(
+                {
+                    "payout_batch_id": payout_batch.id,
+                    "reason": "NON_POSITIVE_PAYOUT_TOTAL",
+                }
+            )
+            continue
+
+        for line in lines:
+            if _bridge_exists(
+                source_model="Commission",
+                source_id=str(line.commission_id),
+                purpose="COMMISSION_SETTLEMENT",
+            ):
+                settlement_existing_count += 1
+                continue
+
+            if dry_run:
+                continue
+
+            _, settlement_created = _post_commission_settlement_bridge(
+                commission=line.commission,
+                performed_by=performed_by,
+            )
+            settlement_created_count += 1 if settlement_created else 0
+            settlement_existing_count += 0 if settlement_created else 1
+
+        if dry_run:
+            continue
+
+        _, created = _post_payout_batch_bridge(
+            payout_batch=payout_batch,
+            performed_by=performed_by,
+        )
+        created_count += 1 if created else 0
+        existing_count += 0 if created else 1
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "dry_run": dry_run,
+        "purpose": "COMMISSION_PAYOUT_BATCH",
+        "candidates": batches.count(),
+        "created_count": created_count,
+        "existing_count": existing_count,
+        "settlement_created_count": settlement_created_count,
+        "settlement_existing_count": settlement_existing_count,
         "skipped": skipped,
     }

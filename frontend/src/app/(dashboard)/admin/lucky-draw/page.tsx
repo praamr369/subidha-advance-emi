@@ -1,5 +1,7 @@
-import AdminLuckyDrawListPage from "@/domains/lucky-draw/pages/AdminLuckyDrawListPage";
+import { redirect } from "next/navigation";
 
-export default function AdminLuckyDrawRoute() {
-  return <AdminLuckyDrawListPage />;
+import { ROUTES } from "@/lib/routes";
+
+export default function LegacyAdminLuckyDrawRedirectPage() {
+  redirect(ROUTES.admin.luckyDraws);
 }

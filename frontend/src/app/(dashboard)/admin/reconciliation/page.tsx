@@ -16,6 +16,7 @@ import {
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import {
   flagReconciliation,
   listReconciliations,
@@ -442,18 +443,24 @@ export default function AdminReconciliationPage() {
       subtitle="Canonical daily-operations reconciliation workspace for subscription attention and payment-level follow-up."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
+        { label: "Collections & EMI", href: ROUTES.admin.collections },
         { label: "Reconciliation" },
       ]}
       actions={[
         {
-          href: "/admin/payments",
-          label: "Open Payments",
+          href: ROUTES.admin.collections,
+          label: "Collections Workspace",
           variant: "secondary",
         },
         {
-          href: "/admin/finance/reconciliation",
-          label: "Commission Reconciliation",
+          href: ROUTES.admin.payments,
+          label: "Payments Register",
           variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.financeReconciliation,
+          label: "Commission Reconciliation",
+          variant: "ghost",
         },
       ]}
       stats={[

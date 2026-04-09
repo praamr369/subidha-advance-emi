@@ -279,7 +279,13 @@ def create_commission_payout_batch(
 
 
 @transaction.atomic
-def finalize_commission_payout_batch(*, batch_id: int, processed_by):
+def finalize_commission_payout_batch(
+    *,
+    batch_id: int,
+    processed_by,
+    finance_account_id: int | None = None,
+    reference_no: str | None = None,
+):
     if not batch_id:
         raise ValueError("batch_id is required.")
 
@@ -304,6 +310,20 @@ def finalize_commission_payout_batch(*, batch_id: int, processed_by):
 
     if payout_batch.status != CommissionPayoutBatch.Status.DRAFT:
         raise ValueError(f"Invalid payout batch state: {payout_batch.status}")
+
+    if finance_account_id is not None:
+        from accounting.models import FinanceAccount
+
+        finance_account = FinanceAccount.objects.filter(
+            pk=finance_account_id,
+            is_active=True,
+        ).first()
+        if finance_account is None:
+            raise ValueError("Active finance account is required for payout finalization.")
+        payout_batch.finance_account = finance_account
+
+    if reference_no is not None:
+        payout_batch.reference_no = (reference_no or "").strip()
 
     lines = list(
         payout_batch.lines.select_related("commission", "commission__payment").order_by("id")
@@ -353,7 +373,7 @@ def finalize_commission_payout_batch(*, batch_id: int, processed_by):
             settled_count += 1
 
     payout_batch.status = CommissionPayoutBatch.Status.FINALIZED
-    payout_batch.save(update_fields=["status", "updated_at"])
+    payout_batch.save(update_fields=["finance_account", "reference_no", "status", "updated_at"])
 
     _create_payout_batch_audit_log(
         action_type=AuditLog.ActionType.COMMISSION_PAYOUT_BATCH_FINALIZED,
@@ -364,6 +384,8 @@ def finalize_commission_payout_batch(*, batch_id: int, processed_by):
             "line_count": len(lines),
             "settled_count": settled_count,
             "status": payout_batch.status,
+            "finance_account_id": payout_batch.finance_account_id,
+            "reference_no": payout_batch.reference_no,
             "commission_ids": commission_ids,
         },
     )

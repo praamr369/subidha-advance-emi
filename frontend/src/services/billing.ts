@@ -38,15 +38,98 @@ export type BillingInvoiceLine = {
   hsn_sac_code?: string;
 };
 
+export type DirectSaleLine = {
+  id?: number;
+  product: number;
+  product_code?: string;
+  inventory_item?: number | null;
+  inventory_item_sku?: string;
+  description: string;
+  quantity: string;
+  unit_price: string;
+  discount_amount: string;
+  taxable_value: string;
+  gst_rate?: string | null;
+  cgst_amount: string;
+  sgst_amount: string;
+  igst_amount: string;
+  line_total: string;
+  product_code_snapshot?: string;
+  sku_snapshot?: string;
+  unit_of_measure_snapshot?: string;
+  hsn_sac_code?: string;
+};
+
+export type DirectSale = {
+  id: number;
+  sale_no?: string | null;
+  sale_date: string;
+  financial_year: string;
+  customer?: number | null;
+  customer_name?: string | null;
+  status: "DRAFT" | "CONFIRMED" | "DELIVERED" | "INVOICED" | "CANCELLED";
+  tax_mode: "GST" | "NON_GST";
+  finance_account?: number | null;
+  finance_account_name?: string | null;
+  delivery_required: boolean;
+  delivery_reference?: string;
+  delivered_at?: string | null;
+  confirmed_by?: number | null;
+  confirmed_by_username?: string | null;
+  confirmed_at?: string | null;
+  invoiced_at?: string | null;
+  subtotal: string;
+  discount_total: string;
+  taxable_total: string;
+  tax_total: string;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+  customer_name_snapshot?: string;
+  customer_phone_snapshot?: string;
+  customer_gstin?: string | null;
+  notes?: string;
+  billing_invoice_id?: number | null;
+  billing_invoice_no?: string | null;
+  billing_invoice_status?: string | null;
+  lines: DirectSaleLine[];
+};
+
+export type DirectSalePayload = {
+  sale_date: string;
+  customer?: number | null;
+  tax_mode?: "GST" | "NON_GST";
+  finance_account?: number | null;
+  delivery_required?: boolean;
+  delivery_reference?: string;
+  subtotal: string;
+  discount_total: string;
+  taxable_total: string;
+  tax_total: string;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+  customer_name_snapshot?: string;
+  customer_phone_snapshot?: string;
+  customer_gstin?: string | null;
+  notes?: string;
+  lines: DirectSaleLine[];
+};
+
 export type BillingInvoice = {
   id: number;
   document_no?: string | null;
   invoice_date: string;
   financial_year: string;
+  document_type?: "INVOICE" | "PROFORMA" | "DEMAND_NOTE";
   customer?: number | null;
   customer_name?: string | null;
   subscription?: number | null;
+  direct_sale?: number | null;
+  direct_sale_no?: string | null;
   billing_channel: string;
+  source_type?: string;
+  source_reference?: string;
   tax_mode: string;
   status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID";
   finance_account?: number | null;
@@ -107,15 +190,85 @@ export type ReceiptDocument = {
   finance_account?: number | null;
   finance_account_name?: string | null;
   billing_invoice?: number | null;
+  direct_sale?: number | null;
+  direct_sale_no?: string | null;
   customer?: number | null;
   subscription?: number | null;
   payment?: number | null;
+  source_type?: string;
+  source_reference?: string;
   amount: string;
   customer_name_snapshot?: string;
   customer_phone_snapshot?: string;
   notes?: string;
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
+};
+
+export type BillingInstallmentMirror = {
+  id: number;
+  billing_profile: number;
+  subscription_id: number;
+  customer_id: number;
+  product_id: number;
+  emi: number;
+  month_no: number;
+  due_date: string;
+  amount: string;
+  status_snapshot: string;
+  paid_amount_snapshot: string;
+  waived_amount_snapshot: string;
+  outstanding_amount_snapshot: string;
+  payment_count_snapshot: number;
+  last_payment_date?: string | null;
+};
+
+export type BillingSyncEvent = {
+  id: number;
+  billing_profile: number;
+  source_model: string;
+  source_id: string;
+  event_type: string;
+  status: "SYNCED" | "SKIPPED" | "FAILED";
+  idempotency_key?: string | null;
+  payload: Record<string, unknown>;
+  synced_at: string;
+  performed_by?: number | null;
+  performed_by_username?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BillingProfile = {
+  id: number;
+  subscription: number;
+  customer: number;
+  customer_name?: string;
+  product: number;
+  product_name?: string;
+  product_code?: string;
+  activation_state: "PENDING_DELIVERY" | "READY" | "ACTIVE" | "RETURN_HOLD" | "COMPLETED" | "CANCELLED";
+  activation_state_label?: string;
+  delivery_gate_required: boolean;
+  delivery_gate_status: string;
+  invoice_eligible: boolean;
+  contract_reference_snapshot?: string;
+  contract_start_date: string;
+  tenure_months: number;
+  contract_total: string;
+  monthly_amount: string;
+  paid_amount_snapshot: string;
+  waived_amount_snapshot: string;
+  remaining_amount_snapshot: string;
+  next_due_date?: string | null;
+  next_due_amount: string;
+  product_code_snapshot?: string;
+  product_name_snapshot?: string;
+  activated_at?: string | null;
+  last_synced_at: string;
+  last_synced_event?: string;
+  latest_sync_event?: BillingSyncEvent | null;
+  installments: BillingInstallmentMirror[];
 };
 
 export type BillingDailyBookRow = {
@@ -161,6 +314,48 @@ export type BillingCashBookReport = {
 
 export function listBillingInvoices(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<BillingInvoice>>(`/billing/invoices/${buildQuery(params)}`);
+}
+
+export function getBillingInvoice(id: number | string) {
+  return apiFetch<BillingInvoice>(`/billing/invoices/${id}/`);
+}
+
+export function listDirectSales(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<DirectSale>>(`/billing/direct-sales/${buildQuery(params)}`);
+}
+
+export function createDirectSale(payload: DirectSalePayload) {
+  return apiFetch<DirectSale>("/billing/direct-sales/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDirectSale(id: number, payload: Partial<DirectSalePayload>) {
+  return apiFetch<DirectSale>(`/billing/direct-sales/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmDirectSale(id: number) {
+  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(
+    `/billing/direct-sales/${id}/confirm/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function markDirectSaleDelivered(id: number, delivery_reference = "") {
+  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(
+    `/billing/direct-sales/${id}/mark-delivered/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ delivery_reference }),
+    }
+  );
 }
 
 export function approveBillingInvoice(id: number) {
@@ -237,6 +432,43 @@ export function postBillingDebitNote(id: number) {
 
 export function listReceiptDocuments(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<ReceiptDocument>>(`/billing/receipts/${buildQuery(params)}`);
+}
+
+export function listBillingProfiles(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<BillingProfile>>(`/billing/profiles/${buildQuery(params)}`);
+}
+
+export function listBillingInstallments(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<BillingInstallmentMirror>>(
+    `/billing/installments/${buildQuery(params)}`
+  );
+}
+
+export function listBillingSyncEvents(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<BillingSyncEvent>>(`/billing/sync-events/${buildQuery(params)}`);
+}
+
+export function syncBillingProfile(id: number) {
+  return apiFetch<{
+    updated: boolean;
+    event_created: boolean;
+    billing_profile: BillingProfile;
+    billing_sync_event_id: number;
+  }>(`/billing/profiles/${id}/sync/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function syncBillingPayment(paymentId: number) {
+  return apiFetch<{
+    created: boolean;
+    billing_profile: BillingProfile;
+    billing_sync_event_id: number;
+  }>(`/billing/payments/${paymentId}/sync/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export function generateEmiReceipt(paymentId: number, financeAccountId: number) {

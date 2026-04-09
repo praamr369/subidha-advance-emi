@@ -9,6 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import { ROUTES } from "@/lib/routes";
 import {
   listAdminSupportRequests,
   type AdminSupportRequest,
@@ -230,17 +231,18 @@ export default function AdminSupportRequestsPage() {
       title="Support Requests"
       subtitle="Customer-submitted support and dispute intake with receipt and subscription context."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Control Center", href: ROUTES.admin.dashboard },
         { label: "Support Requests" },
       ]}
       actions={[
         {
-          href: "/admin/customers",
+          href: ROUTES.admin.customers,
           label: "Customers",
           variant: "secondary",
         },
         {
-          href: "/admin/payments",
+          href: ROUTES.admin.payments,
           label: "Payments",
           variant: "secondary",
         },

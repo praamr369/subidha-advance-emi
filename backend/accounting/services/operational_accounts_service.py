@@ -48,6 +48,18 @@ def ensure_phase3_system_accounts():
             name="EMI Collection Clearing",
             account_type=ChartOfAccountType.LIABILITY,
         ),
+        "EMI_WAIVER_EXPENSE": _ensure_system_account(
+            system_code="EMI_WAIVER_EXPENSE",
+            code="EMI-5200",
+            name="EMI Winner Waiver Expense",
+            account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "EMI_WAIVER_RESERVE": _ensure_system_account(
+            system_code="EMI_WAIVER_RESERVE",
+            code="EMI-2200",
+            name="EMI Winner Waiver Reserve",
+            account_type=ChartOfAccountType.LIABILITY,
+        ),
         "INVENTORY_ASSET": _ensure_system_account(
             system_code="INVENTORY_ASSET",
             code="INV-1200",
@@ -65,6 +77,18 @@ def ensure_phase3_system_accounts():
             code="PUR-5000",
             name="Purchase Expense",
             account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "PARTNER_COMMISSION_EXPENSE": _ensure_system_account(
+            system_code="PARTNER_COMMISSION_EXPENSE",
+            code="COM-5100",
+            name="Partner Commission Expense",
+            account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "PARTNER_COMMISSION_PAYABLE": _ensure_system_account(
+            system_code="PARTNER_COMMISSION_PAYABLE",
+            code="COM-2100",
+            name="Partner Commission Payable",
+            account_type=ChartOfAccountType.LIABILITY,
         ),
         "DEPRECIATION_EXPENSE": _ensure_system_account(
             system_code="DEPRECIATION_EXPENSE",

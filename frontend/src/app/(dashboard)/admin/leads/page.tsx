@@ -15,6 +15,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import { ROUTES } from "@/lib/routes";
 import {
   listAdminLeads,
   type AdminLeadListQuery,
@@ -274,12 +275,17 @@ export default function AdminLeadsPage() {
       title="Lead Inbox"
       subtitle="Operational intake workspace for public apply submissions, assignment, follow-up, and controlled handoff into customer and subscription creation."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Sales & Onboarding", href: ROUTES.admin.leads },
         { label: "Leads" },
       ]}
       actions={[
         { href: "/apply", label: "Open Public Apply", variant: "secondary" },
-        { href: "/admin/customers/create", label: "Create Customer", variant: "secondary" },
+        {
+          href: `${ROUTES.admin.customers}/create`,
+          label: "Create Customer",
+          variant: "secondary",
+        },
       ]}
       stats={stats}
       statusBadge={{ label: "Public Lead Operations", tone: "info" }}

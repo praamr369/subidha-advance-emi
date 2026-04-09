@@ -26,6 +26,8 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -863,18 +865,26 @@ export default function AdminCollectionsPage() {
       subtitle="Daily collections control center for due-today follow-up, posted payment verification, and overdue preview."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
+        { label: "Collections & EMI", href: ROUTES.admin.collections },
         { label: "Collections" },
       ]}
       actions={[
         {
-          href: "/admin/emis/overdue",
-          label: "Open Full Overdue Queue",
+          href: subscriptionFilter
+            ? `${ROUTES.admin.payments}?subscription=${subscriptionFilter}`
+            : ROUTES.admin.payments,
+          label: "Open Payments",
+          variant: "primary",
+        },
+        {
+          href: ROUTES.admin.emisOverdue,
+          label: "Open Overdue EMI",
           variant: "secondary",
         },
         {
-          href: subscriptionFilter ? `/admin/payments?subscription=${subscriptionFilter}` : "/admin/payments",
-          label: "Open Payments",
-          variant: "primary",
+          href: buildAdminReconciliationRoute({ flagged: true }),
+          label: "Flagged Reconciliation",
+          variant: "ghost",
         },
       ]}
       stats={[]} // We'll replace with our own KPI row

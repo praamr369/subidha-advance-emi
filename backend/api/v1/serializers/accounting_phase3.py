@@ -3,6 +3,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from accounting.models import (
+    AccountingBridgePosting,
     AccountingPeriod,
     Asset,
     AssetCategory,
@@ -63,6 +64,10 @@ class AccountingBookQuerySerializer(serializers.Serializer):
 
 class Phase3BridgeRunSerializer(AccountingBookQuerySerializer):
     dry_run = serializers.BooleanField(required=False, default=False)
+
+
+class MasterImportActionSerializer(serializers.Serializer):
+    pass
 
 
 class PostingLockSerializer(serializers.ModelSerializer):
@@ -244,3 +249,33 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class AccountingBridgePostingSerializer(serializers.ModelSerializer):
+    journal_entry_no = serializers.CharField(source="journal_entry.entry_no", read_only=True)
+    journal_entry_status = serializers.CharField(source="journal_entry.status", read_only=True)
+    journal_entry_date = serializers.DateField(source="journal_entry.entry_date", read_only=True)
+    journal_entry_memo = serializers.CharField(source="journal_entry.memo", read_only=True)
+
+    class Meta:
+        model = AccountingBridgePosting
+        fields = [
+            "id",
+            "source_model",
+            "source_id",
+            "purpose",
+            "voucher_type",
+            "source_type",
+            "source_reference",
+            "source_document_no",
+            "source_event_date",
+            "trace_metadata",
+            "journal_entry",
+            "journal_entry_no",
+            "journal_entry_status",
+            "journal_entry_date",
+            "journal_entry_memo",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields

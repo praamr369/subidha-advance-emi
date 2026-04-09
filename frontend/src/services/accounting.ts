@@ -55,6 +55,9 @@ export type JournalEntry = {
   entry_type: "MANUAL" | "EXPENSE" | "SALARY" | "MONEY_MOVEMENT" | "SYSTEM_BRIDGE";
   status: "DRAFT" | "POSTED" | "VOID";
   memo?: string;
+  voucher_type?: string | null;
+  source_type?: string | null;
+  source_reference?: string | null;
   source_model?: string | null;
   source_id?: string | null;
   approved_by?: number | null;
@@ -219,6 +222,9 @@ export type GeneralLedgerRow = {
   entry_no: string;
   entry_date: string;
   entry_type: string;
+  voucher_type?: string | null;
+  source_type?: string | null;
+  source_reference?: string | null;
   memo?: string | null;
   source_model?: string | null;
   source_id?: string | null;
@@ -447,6 +453,26 @@ export type VendorSettlement = {
   posted_journal_entry_no?: string | null;
 };
 
+export type AccountingBridgePosting = {
+  id: number;
+  source_model: string;
+  source_id: string;
+  purpose: string;
+  voucher_type?: string | null;
+  source_type?: string | null;
+  source_reference?: string | null;
+  source_document_no?: string | null;
+  source_event_date?: string | null;
+  trace_metadata?: Record<string, unknown>;
+  journal_entry: number;
+  journal_entry_no?: string | null;
+  journal_entry_status?: string | null;
+  journal_entry_date?: string | null;
+  journal_entry_memo?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type FinanceBookRow = {
   finance_account_id: number;
   finance_account_name: string;
@@ -454,6 +480,9 @@ export type FinanceBookRow = {
   journal_entry_id: number;
   entry_no: string;
   entry_date: string;
+  voucher_type?: string | null;
+  source_type?: string | null;
+  source_reference?: string | null;
   memo?: string | null;
   source_model?: string | null;
   source_id?: string | null;
@@ -528,6 +557,8 @@ export type Phase3BridgeRunResponse = {
   adjustment_candidates?: number;
   adjustment_created?: number;
   adjustment_existing?: number;
+  settlement_created_count?: number;
+  settlement_existing_count?: number;
   skipped?: Array<Record<string, unknown>>;
 };
 
@@ -1008,6 +1039,12 @@ export function listPostingLocks(params: Record<string, string | number | undefi
   );
 }
 
+export function listAccountingBridgePostings(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<AccountingBridgePosting>>(
+    `/accounting/bridge-postings/${buildQuery(params)}`
+  );
+}
+
 export function createPostingLock(payload: { lock_date: string; reason?: string }) {
   return apiFetch<PostingLock>("/accounting/locks/", {
     method: "POST",
@@ -1218,6 +1255,39 @@ export function runEmiPaymentBridge(payload: {
   dry_run?: boolean;
 }) {
   return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-emi-payment/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runEmiWaiverBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-emi-waiver/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runCommissionSettlementBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-commission-settlement/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runPayoutBatchBridge(payload: {
+  start_date: string;
+  end_date: string;
+  dry_run?: boolean;
+}) {
+  return apiFetch<Phase3BridgeRunResponse>("/accounting/bridges/run-payout-batch/", {
     method: "POST",
     body: JSON.stringify(payload),
   });

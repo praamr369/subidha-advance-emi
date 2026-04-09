@@ -18,11 +18,14 @@ import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
+import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
 type ProductDetailRecord = {
   id: number;
   name: string;
   product_code?: string | null;
+  sku?: string | null;
+  unit_of_measure?: string | null;
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
@@ -35,6 +38,8 @@ type UpdateProductResponse = {
   id: number;
   name?: string;
   product_code?: string | null;
+  sku?: string | null;
+  unit_of_measure?: string | null;
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
@@ -46,6 +51,8 @@ type FieldErrors = Partial<
   Record<
     | "name"
     | "product_code"
+    | "sku"
+    | "unit_of_measure"
     | "category"
     | "subcategory"
     | "description"
@@ -86,6 +93,8 @@ function normalizeProductDetail(
     id: toNumber(raw.id),
     name: toStringValue(raw.name) || "Unnamed product",
     product_code: toNullableString(raw.product_code) ?? toNullableString(raw.code),
+    sku: toNullableString(raw.sku),
+    unit_of_measure: toNullableString(raw.unit_of_measure),
     category: toNullableString(raw.category),
     subcategory:
       toNullableString(raw.subcategory) ?? toNullableString(raw.sub_category),
@@ -128,6 +137,8 @@ function parseFieldErrors(error: unknown): FieldErrors {
 
     pick("name");
     pick("product_code", ["product_code", "code"]);
+    pick("sku");
+    pick("unit_of_measure");
     pick("category");
     pick("subcategory", ["subcategory", "sub_category"]);
     pick("description");
@@ -196,9 +207,17 @@ export default function AdminProductEditPage() {
 
   const [name, setName] = useState("");
   const [productCode, setProductCode] = useState("");
+  const [sku, setSku] = useState("");
+  const [unitOfMeasure, setUnitOfMeasure] = useState("PCS");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [description, setDescription] = useState("");
+  const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({
+    categories: [],
+    subcategories: [],
+    unit_of_measure_masters: [],
+    unit_of_measure_options: ["PCS"],
+  });
   const [basePrice, setBasePrice] = useState("");
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
@@ -213,6 +232,34 @@ export default function AdminProductEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalogOptions() {
+      try {
+        const payload = await getProductCatalogOptions();
+        if (!cancelled) {
+          setCatalogOptions(payload);
+        }
+      } catch {
+        if (!cancelled) {
+          setCatalogOptions({
+            categories: [],
+            subcategories: [],
+            unit_of_measure_masters: [],
+            unit_of_measure_options: ["PCS"],
+          });
+        }
+      }
+    }
+
+    void loadCatalogOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -230,6 +277,8 @@ export default function AdminProductEditPage() {
         setProduct(normalized);
         setName(normalized.name || "");
         setProductCode(normalized.product_code || "");
+        setSku(normalized.sku || "");
+        setUnitOfMeasure(normalized.unit_of_measure || "PCS");
         setCategory(normalized.category || "");
         setSubcategory(normalized.subcategory || "");
         setDescription(normalized.description || "");
@@ -273,10 +322,42 @@ export default function AdminProductEditPage() {
 
   const trimmedName = name.trim();
   const trimmedProductCode = productCode.trim();
+  const trimmedSku = sku.trim().toUpperCase();
+  const trimmedUnitOfMeasure = unitOfMeasure.trim().toUpperCase() || "PCS";
   const trimmedCategory = category.trim();
   const trimmedSubcategory = subcategory.trim();
   const trimmedDescription = description.trim();
   const trimmedBasePrice = basePrice.trim();
+  const suggestedSubcategories = useMemo(
+    () =>
+      catalogOptions.subcategories.filter((item) =>
+        !trimmedCategory
+          ? true
+          : item.category_name.toLowerCase() === trimmedCategory.toLowerCase()
+      ),
+    [catalogOptions.subcategories, trimmedCategory]
+  );
+  const selectedCategoryMaster = useMemo(
+    () =>
+      catalogOptions.categories.find(
+        (item) => item.name.toLowerCase() === trimmedCategory.toLowerCase()
+      ) ?? null,
+    [catalogOptions.categories, trimmedCategory]
+  );
+  const selectedSubcategoryMaster = useMemo(
+    () =>
+      suggestedSubcategories.find(
+        (item) => item.name.toLowerCase() === trimmedSubcategory.toLowerCase()
+      ) ?? null,
+    [suggestedSubcategories, trimmedSubcategory]
+  );
+  const selectedUnitMaster = useMemo(
+    () =>
+      catalogOptions.unit_of_measure_masters.find(
+        (item) => item.code.toLowerCase() === trimmedUnitOfMeasure.toLowerCase()
+      ) ?? null,
+    [catalogOptions.unit_of_measure_masters, trimmedUnitOfMeasure]
+  );
 
   const effectiveImagePreview = removeExistingImage
     ? selectedImagePreview
@@ -297,6 +378,8 @@ export default function AdminProductEditPage() {
 
     setName(product.name || "");
     setProductCode(product.product_code || "");
+    setSku(product.sku || "");
+    setUnitOfMeasure(product.unit_of_measure || "PCS");
     setCategory(product.category || "");
     setSubcategory(product.subcategory || "");
     setDescription(product.description || "");
@@ -374,7 +457,18 @@ export default function AdminProductEditPage() {
       const formData = new FormData();
       formData.append("name", trimmedName);
       formData.append("product_code", trimmedProductCode);
+      formData.append("sku", trimmedSku);
+      if (selectedUnitMaster) {
+        formData.append("unit_of_measure_master", String(selectedUnitMaster.id));
+      }
+      formData.append("unit_of_measure", trimmedUnitOfMeasure);
+      if (selectedCategoryMaster) {
+        formData.append("category_master", String(selectedCategoryMaster.id));
+      }
       formData.append("category", trimmedCategory);
+      if (selectedSubcategoryMaster) {
+        formData.append("subcategory_master", String(selectedSubcategoryMaster.id));
+      }
       formData.append("subcategory", trimmedSubcategory);
       formData.append("description", trimmedDescription);
       formData.append("base_price", trimmedBasePrice);
@@ -402,6 +496,8 @@ export default function AdminProductEditPage() {
             id: Number(productId),
             name: trimmedName,
             product_code: trimmedProductCode,
+            sku: trimmedSku,
+            unit_of_measure: trimmedUnitOfMeasure,
             category: trimmedCategory,
             subcategory: trimmedSubcategory,
             description: trimmedDescription,
@@ -417,6 +513,11 @@ export default function AdminProductEditPage() {
             updated.product_code !== undefined
               ? updated.product_code
               : trimmedProductCode,
+          sku: updated.sku !== undefined ? updated.sku : trimmedSku,
+          unit_of_measure:
+            updated.unit_of_measure !== undefined
+              ? updated.unit_of_measure
+              : trimmedUnitOfMeasure,
           category:
             updated.category !== undefined ? updated.category : trimmedCategory,
           subcategory:
@@ -477,6 +578,11 @@ export default function AdminProductEditPage() {
           variant: "secondary",
         },
         {
+          href: "/admin/products/masters",
+          label: "Manage Masters",
+          variant: "secondary",
+        },
+        {
           href: "/admin/products",
           label: "Back to Register",
           variant: "secondary",
@@ -495,6 +601,10 @@ export default function AdminProductEditPage() {
         {
           label: "Subcategory",
           value: subcategory.trim() || "—",
+        },
+        {
+          label: "SKU",
+          value: sku.trim() || "—",
         },
         {
           label: "Image",
@@ -608,24 +718,96 @@ export default function AdminProductEditPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label
+                        htmlFor="product-sku"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        SKU
+                      </label>
+                      <input
+                        id="product-sku"
+                        type="text"
+                        value={sku}
+                        onChange={(event) => {
+                          setSku(event.target.value.toUpperCase());
+                          setError(null);
+                          setSaveSuccess(null);
+                        }}
+                        placeholder="e.g. BED-KING-001"
+                        disabled={saving}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm uppercase outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <FieldError message={fieldErrors.sku} />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="product-uom"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Unit of Measure
+                      </label>
+                      <select
+                        id="product-uom"
+                        value={unitOfMeasure}
+                        onChange={(event) => {
+                          setUnitOfMeasure(event.target.value.toUpperCase());
+                          setError(null);
+                          setSaveSuccess(null);
+                        }}
+                        disabled={saving}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm uppercase outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {catalogOptions.unit_of_measure_masters.map((option) => (
+                          <option key={option.id} value={option.code}>
+                            {option.code} · {option.name}
+                          </option>
+                        ))}
+                        {catalogOptions.unit_of_measure_masters.length === 0
+                          ? catalogOptions.unit_of_measure_options.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))
+                          : null}
+                      </select>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Maintain unit master values from{" "}
+                        <Link href="/admin/products/masters" className="font-medium text-primary hover:underline">
+                          Product Masters
+                        </Link>
+                        .
+                      </p>
+                      <FieldError message={fieldErrors.unit_of_measure} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label
                         htmlFor="product-category"
                         className="mb-2 block text-sm font-medium text-foreground"
                       >
                         Category
                       </label>
-                      <input
+                      <select
                         id="product-category"
-                        type="text"
                         value={category}
                         onChange={(event) => {
                           setCategory(event.target.value);
+                          setSubcategory("");
                           setError(null);
                           setSaveSuccess(null);
                         }}
-                        placeholder="e.g. Bed"
                         disabled={saving}
                         className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
-                      />
+                      >
+                        <option value="">Select category</option>
+                        {catalogOptions.categories.map((option) => (
+                          <option key={option.id} value={option.name}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
                       <FieldError message={fieldErrors.category} />
                     </div>
 
@@ -636,19 +818,31 @@ export default function AdminProductEditPage() {
                       >
                         Subcategory
                       </label>
-                      <input
+                      <select
                         id="product-subcategory"
-                        type="text"
                         value={subcategory}
                         onChange={(event) => {
                           setSubcategory(event.target.value);
                           setError(null);
                           setSaveSuccess(null);
                         }}
-                        placeholder="e.g. Wooden"
                         disabled={saving}
                         className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
-                      />
+                      >
+                        <option value="">Select subcategory</option>
+                        {suggestedSubcategories.map((option) => (
+                          <option key={option.id} value={option.name}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        New category or subcategory needed? Add it in{" "}
+                        <Link href="/admin/products/masters" className="font-medium text-primary hover:underline">
+                          Product Masters
+                        </Link>
+                        .
+                      </p>
                       <FieldError message={fieldErrors.subcategory} />
                     </div>
                   </div>

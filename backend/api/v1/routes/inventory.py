@@ -4,7 +4,10 @@ from rest_framework.routers import DefaultRouter
 from api.v1.views.inventory import (
     InventoryItemViewSet,
     InventoryValuationView,
+    OpeningStockImportPostView,
+    OpeningStockImportPreviewView,
     PurchaseBillViewSet,
+    StockLocationViewSet,
     StockAdjustmentViewSet,
     StockLedgerViewSet,
     StockSummaryView,
@@ -12,6 +15,7 @@ from api.v1.views.inventory import (
 
 router = DefaultRouter()
 router.register(r"items", InventoryItemViewSet, basename="inventory-items")
+router.register(r"locations", StockLocationViewSet, basename="inventory-locations")
 router.register(r"movements", StockLedgerViewSet, basename="inventory-movements")
 router.register(r"stock-adjustments", StockAdjustmentViewSet, basename="inventory-stock-adjustments")
 router.register(r"purchase-bills", PurchaseBillViewSet, basename="inventory-purchase-bills")
@@ -20,5 +24,7 @@ router.register(r"stock-ledger", StockLedgerViewSet, basename="inventory-stock-l
 urlpatterns = [
     path("stock-summary/", StockSummaryView.as_view()),
     path("valuation/", InventoryValuationView.as_view()),
+    path("opening-stock/preview/", OpeningStockImportPreviewView.as_view()),
+    path("opening-stock/post/", OpeningStockImportPostView.as_view()),
     path("", include(router.urls)),
 ]

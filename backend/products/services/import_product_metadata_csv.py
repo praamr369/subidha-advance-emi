@@ -15,12 +15,16 @@ NAME_HEADERS = ("name",)
 CATEGORY_HEADERS = ("category",)
 SUBCATEGORY_HEADERS = ("subcategory", "sub_category")
 DESCRIPTION_HEADERS = ("description",)
+SKU_HEADERS = ("sku",)
+UNIT_HEADERS = ("unit_of_measure", "uom", "unit")
 
 ALLOWED_HEADERS = {
     *PRODUCT_CODE_HEADERS,
     *NAME_HEADERS,
     *CATEGORY_HEADERS,
     *SUBCATEGORY_HEADERS,
+    *SKU_HEADERS,
+    *UNIT_HEADERS,
     *DESCRIPTION_HEADERS,
 }
 
@@ -81,12 +85,16 @@ def _build_changes(product: Product, row: dict[str, Any]) -> dict[str, dict[str,
 
     csv_category = _pick_first(row, CATEGORY_HEADERS)
     csv_subcategory = _pick_first(row, SUBCATEGORY_HEADERS)
+    csv_sku = _pick_first(row, SKU_HEADERS).upper()
+    csv_unit = _pick_first(row, UNIT_HEADERS).upper()
     csv_description = _pick_first(row, DESCRIPTION_HEADERS)
 
     current_category = _clean_text(getattr(product, "category", None))
     current_subcategory = _clean_text(
         getattr(product, "subcategory", None) or getattr(product, "sub_category", None)
     )
+    current_sku = _clean_text(getattr(product, "sku", None)).upper()
+    current_unit = _clean_text(getattr(product, "unit_of_measure", None)).upper()
     current_description = _clean_text(getattr(product, "description", None))
 
     # Blank CSV value means "leave unchanged" for production safety.
@@ -100,6 +108,18 @@ def _build_changes(product: Product, row: dict[str, Any]) -> dict[str, dict[str,
         changes["subcategory"] = {
             "from": current_subcategory or None,
             "to": csv_subcategory,
+        }
+
+    if csv_sku and csv_sku != current_sku:
+        changes["sku"] = {
+            "from": current_sku or None,
+            "to": csv_sku,
+        }
+
+    if csv_unit and csv_unit != current_unit:
+        changes["unit_of_measure"] = {
+            "from": current_unit or None,
+            "to": csv_unit,
         }
 
     if csv_description and csv_description != current_description:
@@ -133,6 +153,14 @@ def _apply_changes(product: Product, changes: dict[str, dict[str, str | None]]) 
                 "Product model does not expose 'subcategory' or 'sub_category'."
             )
 
+    if "sku" in changes and hasattr(product, "sku"):
+        product.sku = changes["sku"]["to"]
+        update_fields.append("sku")
+
+    if "unit_of_measure" in changes and hasattr(product, "unit_of_measure"):
+        product.unit_of_measure = changes["unit_of_measure"]["to"]
+        update_fields.append("unit_of_measure")
+
     if "description" in changes:
         product.description = changes["description"]["to"]
         update_fields.append("description")
@@ -148,17 +176,18 @@ def import_product_metadata_csv(file_or_text: Any, dry_run: bool = True) -> dict
     Safe rules:
     - Matches by product_code first.
     - Falls back to name only when product_code is missing.
-    - Updates ONLY category, subcategory, description.
+    - Updates ONLY category, subcategory, sku, unit_of_measure, description.
     - Blank CSV metadata values do NOT clear existing values.
     - Does NOT create products.
     - Does NOT modify base_price or any financial field.
 
     Expected CSV headers:
-    - product_code,name,category,subcategory,description
+    - product_code,name,category,subcategory,sku,unit_of_measure,description
 
     Accepted aliases:
     - code -> product_code
     - sub_category -> subcategory
+    - uom/unit -> unit_of_measure
     """
     text = _read_csv_text(file_or_text)
     reader = csv.DictReader(io.StringIO(text))

@@ -56,4 +56,14 @@ def waive_emis_for_winning_subscription(*, subscription, performed_by):
         subscription.lucky_id.status = "WON"
         subscription.lucky_id.save(update_fields=["status"])
 
+    try:
+        from billing.services.billing_sync_service import sync_waiver_into_billing
+
+        sync_waiver_into_billing(
+            subscription_id=subscription.id,
+            performed_by=performed_by,
+        )
+    except Exception:  # pragma: no cover - best-effort mirror sync
+        pass
+
     

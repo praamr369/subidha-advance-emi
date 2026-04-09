@@ -494,6 +494,24 @@ def transition_subscription_delivery_status(
         },
     )
 
+    if next_status in {DeliveryStatus.DELIVERED, DeliveryStatus.RETURNED}:
+        from inventory.services.delivery_bridge_service import sync_delivery_inventory_bridge
+
+        sync_delivery_inventory_bridge(
+            delivery=delivery,
+            performed_by=performed_by,
+        )
+
+    try:
+        from billing.services.billing_sync_service import sync_delivery_into_billing
+
+        sync_delivery_into_billing(
+            delivery=delivery,
+            performed_by=performed_by,
+        )
+    except Exception:  # pragma: no cover - best-effort mirror sync
+        pass
+
     return delivery
 
 

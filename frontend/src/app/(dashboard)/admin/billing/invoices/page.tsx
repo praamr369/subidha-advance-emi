@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -15,15 +17,23 @@ import {
   listBillingInvoices,
   postBillingInvoice,
 } from "@/services/billing";
+import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
 
 export default function BillingInvoicesPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function loadPage() {
     try {
-      const payload = await listBillingInvoices();
+      const payload = await listBillingInvoices({
+        subscription: searchParams.get("subscription") || undefined,
+        customer: searchParams.get("customer") || undefined,
+        direct_sale: searchParams.get("direct_sale") || undefined,
+        source_type: searchParams.get("source_type") || undefined,
+        status: searchParams.get("status") || undefined,
+      });
       setRows(payload.results);
       setError(null);
     } catch (err) {
@@ -36,7 +46,7 @@ export default function BillingInvoicesPage() {
 
   useEffect(() => {
     void loadPage();
-  }, []);
+  }, [searchParams]);
 
   const columns: EnterpriseColumnDef<BillingInvoice>[] = [
     { key: "invoice_date", header: "Date", render: (row) => accountingDate(row.invoice_date) },
@@ -74,6 +84,12 @@ export default function BillingInvoicesPage() {
               variant="primary"
             />
           ) : null}
+          <Link
+            href={buildAdminBillingDocumentRoute(row.id)}
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Detail
+          </Link>
         </div>
       ),
     },
@@ -89,6 +105,10 @@ export default function BillingInvoicesPage() {
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
         { label: "Invoices" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "secondary" },
+        { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
     >
       <EnterpriseDataTable
@@ -121,4 +141,3 @@ export default function BillingInvoicesPage() {
     </PortalPage>
   );
 }
-

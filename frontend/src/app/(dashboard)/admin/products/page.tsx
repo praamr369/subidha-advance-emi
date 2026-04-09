@@ -29,6 +29,10 @@ type ProductRow = {
   id: number;
   name: string;
   product_code?: string | null;
+  sku?: string | null;
+  unit_of_measure?: string | null;
+  inventory_profile_id?: number | null;
+  inventory_ready?: boolean;
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
@@ -99,6 +103,15 @@ function normalizeProductRow(raw: Record<string, unknown>): ProductRow {
     id: toNumber(raw.id),
     name: toStringValue(raw.name) || "Unnamed product",
     product_code: toNullableString(raw.product_code) ?? toNullableString(raw.code),
+    sku: toNullableString(raw.sku),
+    unit_of_measure: toNullableString(raw.unit_of_measure),
+    inventory_profile_id:
+      typeof raw.inventory_profile_id === "number"
+        ? raw.inventory_profile_id
+        : raw.inventory_profile_id === null
+          ? null
+          : undefined,
+    inventory_ready: typeof raw.inventory_ready === "boolean" ? raw.inventory_ready : false,
     category: toNullableString(raw.category),
     subcategory: toNullableString(raw.subcategory) ?? toNullableString(raw.sub_category),
     description: toNullableString(raw.description),
@@ -293,6 +306,10 @@ export default function AdminProductsPage() {
     () => rows.filter((row) => Boolean((row.image || "").trim())).length,
     [rows]
   );
+  const inventoryReadyCount = useMemo(
+    () => rows.filter((row) => row.inventory_ready).length,
+    [rows]
+  );
 
   const visibleBaseValue = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.base_price || 0), 0),
@@ -349,6 +366,8 @@ export default function AdminProductsPage() {
         id: row.id,
         name: row.name,
         product_code: row.product_code ?? "",
+        sku: row.sku ?? "",
+        unit_of_measure: row.unit_of_measure ?? "",
         category: row.category ?? "",
         subcategory: row.subcategory ?? "",
         description: row.description ?? "",
@@ -395,6 +414,17 @@ export default function AdminProductsPage() {
         ),
       },
       {
+        key: "sku",
+        title: "SKU / Unit",
+        sortable: true,
+        render: (row) => (
+          <div className="space-y-1 text-sm text-foreground">
+            <div>{row.sku || "SKU pending"}</div>
+            <div className="text-xs text-muted-foreground">{row.unit_of_measure || "PCS"}</div>
+          </div>
+        ),
+      },
+      {
         key: "description",
         title: "Description",
         render: (row) => (
@@ -429,6 +459,10 @@ export default function AdminProductsPage() {
               status={row.category ? "ASSIGNED" : "PENDING"}
               label={row.category ? "Cataloged" : "Needs Catalog"}
             />
+            <StatusBadge
+              status={row.inventory_ready ? "AVAILABLE" : "PENDING"}
+              label={row.inventory_ready ? "Inventory Ready" : "Stock Profile Pending"}
+            />
           </div>
         ),
       },
@@ -446,6 +480,7 @@ export default function AdminProductsPage() {
       ]}
       actions={[
         { href: "/admin/products/create", label: "Create Product", variant: "primary" },
+        { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
         {
           href: "/admin/subscriptions/create",
           label: "Create Subscription",
@@ -456,6 +491,7 @@ export default function AdminProductsPage() {
         { label: "Visible Products", value: rows.length },
         { label: "Categories", value: distinctCategories },
         { label: "Catalog Gaps", value: uncategorizedCount, tone: uncategorizedCount > 0 ? "warning" : undefined },
+        { label: "Inventory Ready", value: inventoryReadyCount, tone: inventoryReadyCount > 0 ? "success" : undefined },
         { label: "Image Coverage", value: `${imageCoverage}%`, tone: imageCoverage < 60 ? "warning" : "success" },
       ]}
       statusBadge={{ label: "Product Operations", tone: "info" }}
@@ -492,9 +528,15 @@ export default function AdminProductsPage() {
 
         <WorkspaceSection
           title="Catalog workflow"
-          description="Use server-backed search and catalog filters to keep product lookup fast, export the current view for offline review, and route directly into product or subscription work."
+          description="Use server-backed search and catalog filters to keep product lookup fast, export the current view for offline review, manage category/subcategory/unit masters from one workspace, and route directly into product or subscription work."
           action={
             <div className="flex flex-wrap gap-2">
+              <Link
+                href="/admin/products/masters"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                Manage Masters
+              </Link>
               <button
                 type="button"
                 onClick={() => void loadPage("refresh")}
@@ -514,6 +556,8 @@ export default function AdminProductsPage() {
                       { key: "id", header: "id" },
                       { key: "name", header: "name" },
                       { key: "product_code", header: "product_code" },
+                      { key: "sku", header: "sku" },
+                      { key: "unit_of_measure", header: "unit_of_measure" },
                       { key: "category", header: "category" },
                       { key: "subcategory", header: "subcategory" },
                       { key: "description", header: "description" },
@@ -560,7 +604,7 @@ export default function AdminProductsPage() {
                   type="text"
                   value={queryInput}
                   onChange={(event) => setQueryInput(event.target.value)}
-                  placeholder="Search by name, code, or description"
+                  placeholder="Search by name, code, SKU, or description"
                   className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
                 />
               </label>

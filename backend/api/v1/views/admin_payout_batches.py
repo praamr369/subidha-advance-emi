@@ -88,7 +88,8 @@ class AdminPayoutBatchListView(APIView):
 
     def get(self, request):
         queryset = CommissionPayoutBatch.objects.select_related(
-            "processed_by"
+            "processed_by",
+            "finance_account",
         ).prefetch_related("lines").order_by("-created_at")
 
         status_filter = request.query_params.get("status")
@@ -120,7 +121,8 @@ class AdminPayoutBatchDetailView(APIView):
     def get(self, request, pk: int):
         try:
             batch = CommissionPayoutBatch.objects.select_related(
-                "processed_by"
+                "processed_by",
+                "finance_account",
             ).prefetch_related(
                 "lines__partner",
                 "lines__commission__subscription__customer",
@@ -223,10 +225,14 @@ class AdminPayoutBatchFinalizeView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request, pk: int):
+        serializer = PayoutBatchActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         try:
             result = finalize_commission_payout_batch(
                 batch_id=pk,
                 processed_by=request.user,
+                finance_account_id=serializer.validated_data.get("finance_account"),
+                reference_no=serializer.validated_data.get("reference_no"),
             )
         except CommissionPayoutBatch.DoesNotExist:
             return Response(
@@ -254,6 +260,8 @@ class AdminPayoutBatchFinalizeView(APIView):
                     "batch_code": batch.batch_code,
                     "status": batch.status,
                     "total_amount": str(batch.total_amount),
+                    "finance_account": batch.finance_account_id,
+                    "reference_no": batch.reference_no,
                     "payout_date": batch.payout_date.isoformat() if batch.payout_date else None,
                     "updated_at": batch.updated_at.isoformat() if batch.updated_at else None,
                 },

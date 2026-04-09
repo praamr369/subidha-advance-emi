@@ -9,6 +9,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import type { AdminCommissionSummaryResponse } from "@/types/commission";
 
 type PayoutBatchRow = {
@@ -235,17 +236,18 @@ export default function AdminFinancePage() {
       title="Finance Control Center"
       subtitle="Monitor commission exposure, settled payout preparation, and payout batch lifecycle from one finance workspace."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Partner Finance", href: ROUTES.admin.financeCommissions },
         { label: "Finance" },
       ]}
       actions={[
         {
-          href: "/admin/finance/commissions",
+          href: ROUTES.admin.financeCommissions,
           label: "Open Commissions",
           variant: "primary",
         },
         {
-          href: "/admin/finance/payout-batches",
+          href: ROUTES.admin.financePayoutBatches,
           label: "Open Payout Batches",
           variant: "secondary",
         },

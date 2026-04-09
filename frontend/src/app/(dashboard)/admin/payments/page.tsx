@@ -30,6 +30,7 @@ import {
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -521,18 +522,24 @@ export default function AdminPaymentsPage() {
       subtitle="Operational payment register for admin review, verification, reversal visibility, and reconciliation handoff."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
+        { label: "Collections & EMI", href: ROUTES.admin.collections },
         { label: "Payments" },
       ]}
       actions={[
         {
           href: adminCollectionHref,
-          label: "Admin Collection",
-          variant: "primary",
+          label: "Collections Workspace",
+          variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.emisOverdue,
+          label: "Open Overdue EMI",
+          variant: "secondary",
         },
         {
           href: buildAdminReconciliationRoute({ view: "payments" }),
           label: "Payment Reconciliation",
-          variant: "secondary",
+          variant: "primary",
         },
       ]}
       stats={[

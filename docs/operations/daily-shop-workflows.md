@@ -2,6 +2,11 @@
 
 This is the current store-operations guide for daily use of SUBIDHA CORE.
 
+For the canonical admin module layout and route grouping, also see:
+
+- `docs/architecture/erp-transition-foundation.md`
+- `docs/operations/admin-enterprise-workspace.md`
+
 ## 1. Start of day
 
 1. Confirm backend readiness and frontend login page are reachable.
@@ -37,7 +42,26 @@ Recommended order:
 2. After product CSV import, review the product record to confirm `is_active`, `is_emi_enabled`, `is_rent_enabled`, and `is_lease_enabled`.
 3. Treat imported descriptions and categories as metadata only; base price remains financially significant.
 
-## 4. Batch preparation
+## 4. Inventory foundation and stock control
+
+Primary routes:
+
+- Admin inventory hub: `/admin/inventory`
+- Admin stock locations: `/admin/inventory/locations`
+- Admin inventory items: `/admin/inventory/items`
+- Admin opening stock import: `/admin/inventory/opening-stock`
+- Admin stock adjustments: `/admin/inventory/adjustments`
+
+Recommended order:
+
+1. Prepare the inventory profile from the product detail only for stock-tracked products.
+2. Maintain stock locations before posting opening balances or counted adjustments.
+3. Use opening stock import for the initial on-hand baseline only; it posts explicit opening-balance movements into the stock ledger.
+4. Use inventory item governance for default location, reorder level, stock item type, and delivery bridge participation.
+5. Use stock adjustments for counted shortages or surpluses instead of editing product or subscription records.
+6. Review `/admin/inventory/ledger` or `/admin/inventory/movements` when reconciling stock activity.
+
+## 5. Batch preparation
 
 Primary routes:
 
@@ -52,7 +76,7 @@ Recommended order:
 3. Confirm lucky IDs exist and are available for sale.
 4. Start selling only from batches that are operationally ready and `OPEN`.
 
-## 5. Subscription sale
+## 6. Subscription sale
 
 Primary routes:
 
@@ -68,7 +92,24 @@ Recommended order:
 5. Confirm tenure matches batch duration for EMI before submission.
 6. After create, verify the subscription detail page and EMI schedule before collecting any money.
 
-## 6. Cashier payment collection
+## 7. Direct retail sale and billing
+
+Primary routes:
+
+- Admin billing overview: `/admin/billing`
+- Admin direct sales: `/admin/billing/direct-sales`
+- Admin billing document register: `/admin/billing/register`
+
+Recommended order:
+
+1. Use direct sales only for non-EMI furniture sales; do not create a Lucky Plan subscription for walk-in retail billing.
+2. Select the canonical product and, when stock-tracked, the linked inventory profile.
+3. Capture the customer or walk-in snapshot and decide whether delivery must happen before the final invoice is posted.
+4. Confirm the direct sale, then review the linked billing invoice draft from the billing detail screen.
+5. If delivery is required, mark the direct sale delivered before posting the final retail invoice.
+6. Let invoice posting issue stock and generate the receipt trail explicitly; do not edit stock or receipt state by hand.
+
+## 8. Cashier payment collection
 
 Primary routes:
 
@@ -84,7 +125,7 @@ Recommended order:
 4. Open the receipt immediately after payment and confirm the history row exists.
 5. If a mistake occurred, escalate to admin reversal instead of re-entering or deleting records.
 
-## 7. Partner-originated collections
+## 9. Partner-originated collections
 
 Primary routes:
 
@@ -98,7 +139,7 @@ Recommended order:
 3. Admin approves or rejects inside the admin workflow.
 4. Treat partner collection requests as pending operational input until approved.
 
-## 8. Lucky draw operations
+## 10. Lucky draw operations
 
 Primary routes:
 
@@ -112,9 +153,18 @@ Recommended order:
 3. Validate winner visibility and post-draw subscription state after reveal.
 4. Do not attempt to assign or remove winner state through generic subscription edit paths.
 
-## 9. End of day
+## 11. End of day
 
 1. Review cashier payment activity and receipt history.
-2. Review admin reconciliation and revenue/reporting pages for anomalies.
-3. Review pending partner collection requests and unresolved support issues.
-4. If there was any reversal, waiver, or operational mismatch, record the incident and leave an auditable trail through admin workflows.
+2. Review the billing document register for direct retail invoices, receipts, and note adjustments.
+3. Run `/admin/accounting/bridges` for the approved bridge lanes that apply that day:
+   - payment collection and payment reversal
+   - EMI payment receipts
+   - retail sale posting
+   - inventory posting
+   - EMI waiver
+   - commission settlement
+   - payout batch posting
+4. Review trial balance, cash book, bank book, UPI book, and billing/accounting registers for anomalies.
+5. Review pending partner collection requests and unresolved support issues.
+6. If there was any reversal, waiver, or operational mismatch, record the incident and leave an auditable trail through admin workflows.

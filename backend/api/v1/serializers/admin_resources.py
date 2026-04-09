@@ -10,6 +10,7 @@ from rest_framework import serializers
 from accounts.models import User, UserRole
 from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
+from inventory.models import StockLocation
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -26,6 +27,9 @@ from subscriptions.models import (
     PaymentMethod,
     PlanType,
     Product,
+    ProductCategoryMaster,
+    ProductSubcategoryMaster,
+    ProductUnitOfMeasureMaster,
     Subscription,
     SubscriptionStatus,
     KycStatus,
@@ -952,6 +956,11 @@ class AdminPaymentReverseSerializer(serializers.Serializer):
 class ProductAdminSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(required=False, allow_null=True)
     clear_image = serializers.BooleanField(required=False, write_only=True, default=False)
+    category_master_name = serializers.CharField(source="category_master.name", read_only=True)
+    subcategory_master_name = serializers.CharField(source="subcategory_master.name", read_only=True)
+    unit_of_measure_master_name = serializers.CharField(source="unit_of_measure_master.name", read_only=True)
+    inventory_profile_id = serializers.SerializerMethodField()
+    inventory_ready = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -960,8 +969,16 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "product_code",
             "name",
             "base_price",
+            "category_master",
+            "category_master_name",
+            "subcategory_master",
+            "subcategory_master_name",
             "category",
             "subcategory",
+            "sku",
+            "unit_of_measure_master",
+            "unit_of_measure_master_name",
+            "unit_of_measure",
             "description",
             "image",
             "clear_image",
@@ -971,6 +988,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "is_lease_enabled",
             "is_rent_ready",
             "is_lease_ready",
+            "inventory_profile_id",
+            "inventory_ready",
             "created_at",
         ]
         read_only_fields = [
@@ -978,6 +997,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "created_at",
             "is_rent_ready",
             "is_lease_ready",
+            "inventory_profile_id",
+            "inventory_ready",
         ]
 
     def validate(self, data):
@@ -1002,6 +1023,26 @@ class ProductAdminSerializer(serializers.ModelSerializer):
         subcategory = data.get(
             "subcategory",
             instance.subcategory if instance else "",
+        )
+        sku = data.get(
+            "sku",
+            instance.sku if instance else None,
+        )
+        unit_of_measure = data.get(
+            "unit_of_measure",
+            instance.unit_of_measure if instance else "PCS",
+        )
+        unit_of_measure_master = data.get(
+            "unit_of_measure_master",
+            instance.unit_of_measure_master if instance else None,
+        )
+        category_master = data.get(
+            "category_master",
+            instance.category_master if instance else None,
+        )
+        subcategory_master = data.get(
+            "subcategory_master",
+            instance.subcategory_master if instance else None,
         )
         description = data.get(
             "description",
@@ -1042,8 +1083,13 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             product_code=product_code,
             name=name,
             base_price=base_price,
+            category_master=category_master,
+            subcategory_master=subcategory_master,
             category=category,
             subcategory=subcategory,
+            sku=sku,
+            unit_of_measure_master=unit_of_measure_master,
+            unit_of_measure=unit_of_measure,
             description=description,
             image=image,
             is_active=is_active,
@@ -1065,6 +1111,78 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc.message_dict)
 
         return data
+
+    def get_inventory_profile_id(self, obj):
+        try:
+            return obj.inventory_profile.id
+        except Exception:
+            return None
+
+    def get_inventory_ready(self, obj):
+        return self.get_inventory_profile_id(obj) is not None
+
+    def create(self, validated_data):
+        validated_data.pop("clear_image", None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        clear_image = bool(validated_data.pop("clear_image", False))
+        if clear_image:
+            validated_data["image"] = None
+        return super().update(instance, validated_data)
+
+
+class ProductCategoryMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductCategoryMaster
+        fields = [
+            "id",
+            "name",
+            "description",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class ProductSubcategoryMasterSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = ProductSubcategoryMaster
+        fields = [
+            "id",
+            "category",
+            "category_name",
+            "name",
+            "description",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at", "category_name"]
+
+
+class ProductUnitOfMeasureMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductUnitOfMeasureMaster
+        fields = [
+            "id",
+            "code",
+            "name",
+            "description",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class ProductInventoryProfilePrepareSerializer(serializers.Serializer):
+    default_stock_location = serializers.PrimaryKeyRelatedField(
+        queryset=StockLocation.objects.filter(is_active=True).order_by("name", "id"),
+        required=False,
+        allow_null=True,
+    )
+    stock_tracking_enabled = serializers.BooleanField(required=False, default=True)
 
     def update(self, instance, validated_data):
         clear_image = validated_data.pop("clear_image", False)

@@ -112,6 +112,9 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "entry_type",
             "status",
             "memo",
+            "voucher_type",
+            "source_type",
+            "source_reference",
             "source_model",
             "source_id",
             "approved_by",
@@ -373,4 +376,3 @@ class MoneyMovementSerializer(serializers.ModelSerializer):
         if instance and instance.status == MoneyMovementStatus.POSTED:
             raise serializers.ValidationError("Posted money movements cannot be edited.")
         return attrs
-

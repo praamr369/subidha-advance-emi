@@ -14,6 +14,8 @@ import {
   listBillingCreditNotes,
   listBillingDebitNotes,
   listBillingInvoices,
+  listBillingProfiles,
+  listDirectSales,
   listReceiptDocuments,
   type BillingInvoice,
 } from "@/services/billing";
@@ -26,23 +28,29 @@ export default function BillingOverviewPage() {
   const [creditCount, setCreditCount] = useState(0);
   const [debitCount, setDebitCount] = useState(0);
   const [receiptCount, setReceiptCount] = useState(0);
+  const [contractCount, setContractCount] = useState(0);
+  const [directSaleCount, setDirectSaleCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     async function loadPage() {
       setLoading(true);
       try {
-        const [invoicePayload, creditPayload, debitPayload, receiptPayload] = await Promise.all([
+        const [invoicePayload, creditPayload, debitPayload, receiptPayload, contractPayload, directSalePayload] = await Promise.all([
           listBillingInvoices(),
           listBillingCreditNotes(),
           listBillingDebitNotes(),
           listReceiptDocuments(),
+          listBillingProfiles(),
+          listDirectSales(),
         ]);
         if (cancelled) return;
         setInvoices(invoicePayload.results);
         setCreditCount(creditPayload.count);
         setDebitCount(debitPayload.count);
         setReceiptCount(receiptPayload.count);
+        setContractCount(contractPayload.count);
+        setDirectSaleCount(directSalePayload.count);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -72,7 +80,10 @@ export default function BillingOverviewPage() {
       ]}
       statusBadge={{ label: "Admin Controlled", tone: "info" }}
       actions={[
-        { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "primary" },
+        { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "primary" },
+        { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
+        { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
+        { href: ROUTES.admin.billingContracts, label: "Contracts", variant: "secondary" },
         { href: ROUTES.admin.billingCreditNotes, label: "Credit Notes", variant: "secondary" },
         { href: ROUTES.admin.billingDebitNotes, label: "Debit Notes", variant: "secondary" },
         { href: ROUTES.admin.billingReceipts, label: "Receipts", variant: "secondary" },
@@ -81,6 +92,8 @@ export default function BillingOverviewPage() {
       ]}
       stats={[
         { label: "Invoices", value: String(invoices.length), tone: "info" },
+        { label: "Direct Sales", value: String(directSaleCount), tone: "info" },
+        { label: "Contracts", value: String(contractCount), tone: "info" },
         { label: "Credit Notes", value: String(creditCount), tone: creditCount > 0 ? "warning" : "default" },
         { label: "Debit Notes", value: String(debitCount), tone: debitCount > 0 ? "info" : "default" },
         { label: "Receipts", value: String(receiptCount), tone: "success" },
@@ -107,6 +120,13 @@ export default function BillingOverviewPage() {
               icon={<FileBadge2 className="h-5 w-5" />}
             />
             <StatCard
+              label="Direct Sales"
+              value={String(directSaleCount)}
+              subtext="Separate operational retail orders feeding the billing engine without overloading EMI tables."
+              tone={directSaleCount > 0 ? "info" : "default"}
+              icon={<FileText className="h-5 w-5" />}
+            />
+            <StatCard
               label="Receipt Register"
               value={String(receiptCount)}
               subtext="Retail and EMI payment receipts are tracked separately from payment posting."
@@ -114,10 +134,10 @@ export default function BillingOverviewPage() {
               icon={<Receipt className="h-5 w-5" />}
             />
             <StatCard
-              label="Credit Adjustments"
-              value={String(creditCount)}
-              subtext="Returns and allowances flow through controlled credit note posting."
-              tone={creditCount > 0 ? "info" : "default"}
+              label="Billing Contracts"
+              value={String(contractCount)}
+              subtext="Contract mirrors trace delivery-gated invoice eligibility and next-due EMI context."
+              tone={contractCount > 0 ? "info" : "default"}
               icon={<RotateCcw className="h-5 w-5" />}
             />
           </div>

@@ -2,6 +2,8 @@ import { ROUTES } from "@/lib/routes";
 
 export type AdminReconciliationView = "subscriptions" | "payments";
 
+type QueryParamPrimitive = string | number | boolean | null | undefined;
+
 type AdminReconciliationRouteParams = {
   view?: AdminReconciliationView;
   subscription?: number | string | null;
@@ -12,10 +14,72 @@ type AdminReconciliationRouteParams = {
   q?: string | null;
 };
 
+type AdminCollectionsRouteParams = {
+  subscription?: number | string | null;
+  customer?: number | string | null;
+  batch?: number | string | null;
+  q?: string | null;
+};
+
+type AdminPaymentsRouteParams = {
+  q?: string | null;
+  method?: string | null;
+  reversal_state?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  subscription?: number | string | null;
+  customer?: number | string | null;
+  batch?: number | string | null;
+  partner?: number | string | null;
+  emi?: number | string | null;
+};
+
+type AdminDeliveriesRouteParams = {
+  q?: string | null;
+  status?: string | null;
+  customer?: number | string | null;
+  subscription?: number | string | null;
+  batch?: number | string | null;
+  bucket?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+};
+
+type AdminSupportRequestsRouteParams = {
+  q?: string | null;
+  status?: string | null;
+  category?: string | null;
+};
+
+type AdminBillingRouteParams = {
+  subscription?: number | string | null;
+  customer?: number | string | null;
+  direct_sale?: number | string | null;
+  payment?: number | string | null;
+  billing_invoice?: number | string | null;
+  source_type?: string | null;
+  status?: string | null;
+};
+
+type AdminSubscriptionRequestsRouteParams = {
+  status?: string | null;
+  requester_role?: string | null;
+  q?: string | null;
+  page?: number | string | null;
+};
+
+type AdminLeadsRouteParams = {
+  q?: string | null;
+  status?: string | null;
+  assignee?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+};
+
 function appendQueryValue(
   search: URLSearchParams,
   key: string,
-  value: string | number | boolean | null | undefined
+  value: QueryParamPrimitive
 ) {
   if (value === null || value === undefined) {
     return;
@@ -28,24 +92,86 @@ function appendQueryValue(
   search.set(key, String(value));
 }
 
+function buildRouteWithQuery(
+  destination: string,
+  params: Record<string, QueryParamPrimitive>
+) {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    appendQueryValue(search, key, value);
+  }
+
+  const query = search.toString();
+  return query ? `${destination}?${query}` : destination;
+}
+
 export function buildAdminReconciliationRoute(
   params: AdminReconciliationRouteParams = {}
 ): string {
-  const search = new URLSearchParams();
+  return buildRouteWithQuery(ROUTES.admin.reconciliation, {
+    view: params.view === "payments" ? "payments" : null,
+    subscription: params.subscription,
+    payment: params.payment,
+    status: params.status,
+    flagged: params.flagged,
+    locked: params.locked,
+    q: params.q,
+  });
+}
 
-  if (params.view === "payments") {
-    search.set("view", "payments");
-  }
+export function buildAdminCollectionsRoute(
+  params: AdminCollectionsRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.collections, params);
+}
 
-  appendQueryValue(search, "subscription", params.subscription);
-  appendQueryValue(search, "payment", params.payment);
-  appendQueryValue(search, "status", params.status);
-  appendQueryValue(search, "flagged", params.flagged);
-  appendQueryValue(search, "locked", params.locked);
-  appendQueryValue(search, "q", params.q);
+export function buildAdminPaymentsRoute(
+  params: AdminPaymentsRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.payments, params);
+}
 
-  const query = search.toString();
-  return query ? `${ROUTES.admin.reconciliation}?${query}` : ROUTES.admin.reconciliation;
+export function buildAdminDeliveriesRoute(
+  params: AdminDeliveriesRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.deliveries, params);
+}
+
+export function buildAdminSupportRequestsRoute(
+  params: AdminSupportRequestsRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.supportRequests, params);
+}
+
+export function buildAdminSubscriptionRequestsRoute(
+  params: AdminSubscriptionRequestsRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.subscriptionRequests, params);
+}
+
+export function buildAdminLeadsRoute(
+  params: AdminLeadsRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.leads, params);
+}
+
+export function buildAdminBillingRegisterRoute(
+  params: AdminBillingRouteParams = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.billingRegister, params);
+}
+
+export function buildAdminBillingInvoicesRoute(
+  params: Omit<AdminBillingRouteParams, "payment" | "billing_invoice"> = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.billingInvoices, params);
+}
+
+export function buildAdminBillingReceiptsRoute(
+  params: Pick<AdminBillingRouteParams, "payment" | "billing_invoice" | "direct_sale" | "subscription" | "customer" | "source_type"> = {}
+): string {
+  return buildRouteWithQuery(ROUTES.admin.billingReceipts, params);
 }
 
 export function buildAdminSubscriptionRoute(id: number | string): string {
@@ -70,4 +196,8 @@ export function buildAdminLuckyIdRoute(id: number | string): string {
 
 export function buildAdminDeliveryRoute(id: number | string): string {
   return `${ROUTES.admin.deliveries}/${id}`;
+}
+
+export function buildAdminBillingDocumentRoute(id: number | string): string {
+  return `${ROUTES.admin.billingDocuments}/${id}`;
 }
