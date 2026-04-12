@@ -590,6 +590,8 @@ def post_billing_invoice(*, invoice_id: int, posted_by):
             direct_sale_id=invoice.direct_sale_id,
             customer_id=invoice.customer_id,
             subscription_id=invoice.subscription_id,
+            branch_id=invoice.branch_id,
+            cash_counter_id=getattr(invoice.direct_sale, "cash_counter_id", None),
             notes=f"Auto-generated from posted invoice {invoice.document_no or invoice.id}",
             source_type=invoice.source_type,
             source_reference=invoice.source_reference or invoice.document_no or str(invoice.id),
@@ -648,6 +650,8 @@ def _create_receipt_journal(*, receipt, offset_account, posted_by):
         trace_metadata={
             "receipt_id": receipt.id,
             "receipt_type": receipt.receipt_type,
+            "branch_id": receipt.branch_id,
+            "cash_counter_id": receipt.cash_counter_id,
             "billing_invoice_id": receipt.billing_invoice_id,
             "direct_sale_id": receipt.direct_sale_id,
             "payment_id": receipt.payment_id,
@@ -673,6 +677,8 @@ def create_manual_receipt(
     notes: str = "",
     source_type: str | None = None,
     source_reference: str = "",
+    branch_id: int | None = None,
+    cash_counter_id: int | None = None,
     created_by=None,
 ):
     from accounting.models import FinanceAccount
@@ -710,6 +716,13 @@ def create_manual_receipt(
         receipt_type=receipt_type,
         status=BillingDocumentStatus.DRAFT,
         receipt_date=receipt_date,
+        branch_id=branch_id
+        or getattr(payment, "branch_id", None)
+        or getattr(direct_sale, "branch_id", None)
+        or getattr(billing_invoice, "branch_id", None),
+        cash_counter_id=cash_counter_id
+        or getattr(payment, "cash_counter_id", None)
+        or getattr(direct_sale, "cash_counter_id", None),
         finance_account=finance_account,
         billing_invoice_id=billing_invoice_id,
         direct_sale=direct_sale,
@@ -874,6 +887,23 @@ def _approve_note(note, *, approved_by, sequence_factory, event_name: str):
     return note, True
 
 
+def _compact_journal_lines(lines: list[dict]) -> list[dict]:
+    compacted: list[dict] = []
+    for line in lines:
+        debit_amount = _money(line.get("debit_amount"))
+        credit_amount = _money(line.get("credit_amount"))
+        if debit_amount <= Decimal("0.00") and credit_amount <= Decimal("0.00"):
+            continue
+        compacted.append(
+            {
+                **line,
+                "debit_amount": debit_amount,
+                "credit_amount": credit_amount,
+            }
+        )
+    return compacted
+
+
 @transaction.atomic
 def approve_billing_credit_note(*, credit_note_id: int, approved_by):
     note = BillingCreditNote.objects.select_for_update().get(pk=credit_note_id)
@@ -910,26 +940,28 @@ def post_billing_credit_note(*, credit_note_id: int, posted_by):
         purpose="RETAIL_CREDIT_NOTE",
         entry_date=note.note_date,
         memo=f"Billing credit note {note.note_no or note.id}",
-        lines=[
-            {
-                "chart_account": accounts["SALES_RETURNS"],
-                "description": note.note_no or str(note.id),
-                "debit_amount": note.taxable_adjustment,
-                "credit_amount": Decimal("0.00"),
-            },
-            {
-                "chart_account": accounts["OUTPUT_GST"],
-                "description": f"GST reversal {note.note_no or note.id}",
-                "debit_amount": note.tax_adjustment,
-                "credit_amount": Decimal("0.00"),
-            },
-            {
-                "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
-                "description": note.note_no or str(note.id),
-                "debit_amount": Decimal("0.00"),
-                "credit_amount": note.total_adjustment,
-            },
-        ],
+        lines=_compact_journal_lines(
+            [
+                {
+                    "chart_account": accounts["SALES_RETURNS"],
+                    "description": note.note_no or str(note.id),
+                    "debit_amount": note.taxable_adjustment,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": accounts["OUTPUT_GST"],
+                    "description": f"GST reversal {note.note_no or note.id}",
+                    "debit_amount": note.tax_adjustment,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
+                    "description": note.note_no or str(note.id),
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": note.total_adjustment,
+                },
+            ]
+        ),
         posted_by=posted_by,
     )
     note.posted_journal_entry = posted_journal
@@ -964,26 +996,28 @@ def post_billing_debit_note(*, debit_note_id: int, posted_by):
         purpose="RETAIL_DEBIT_NOTE",
         entry_date=note.note_date,
         memo=f"Billing debit note {note.note_no or note.id}",
-        lines=[
-            {
-                "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
-                "description": note.note_no or str(note.id),
-                "debit_amount": note.total_adjustment,
-                "credit_amount": Decimal("0.00"),
-            },
-            {
-                "chart_account": accounts["SALES_REVENUE"],
-                "description": note.note_no or str(note.id),
-                "debit_amount": Decimal("0.00"),
-                "credit_amount": note.taxable_adjustment,
-            },
-            {
-                "chart_account": accounts["OUTPUT_GST"],
-                "description": f"GST increase {note.note_no or note.id}",
-                "debit_amount": Decimal("0.00"),
-                "credit_amount": note.tax_adjustment,
-            },
-        ],
+        lines=_compact_journal_lines(
+            [
+                {
+                    "chart_account": accounts["ACCOUNTS_RECEIVABLE"],
+                    "description": note.note_no or str(note.id),
+                    "debit_amount": note.total_adjustment,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": accounts["SALES_REVENUE"],
+                    "description": note.note_no or str(note.id),
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": note.taxable_adjustment,
+                },
+                {
+                    "chart_account": accounts["OUTPUT_GST"],
+                    "description": f"GST increase {note.note_no or note.id}",
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": note.tax_adjustment,
+                },
+            ]
+        ),
         posted_by=posted_by,
     )
     note.posted_journal_entry = posted_journal

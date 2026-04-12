@@ -10,8 +10,12 @@ import {
 } from "react";
 
 import PortalPage from "@/components/ui/PortalPage";
-import { request } from "@/services/api";
 import { normalizeApiError } from "@/services/api/errors";
+import {
+  postProductImport,
+  previewProductImport,
+  type ImportPreviewResponse,
+} from "@/services/import-hub";
 
 type ProductImportResponse = {
   created?: number;
@@ -59,11 +63,12 @@ export default function AdminProductImportPage() {
   const [dragActive, setDragActive] = useState(false);
 
   const [isUploading, setIsUploading] = useState(false);
-  const [isServerImporting, setIsServerImporting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [result, setResult] = useState<ProductImportResponse | null>(null);
+  const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
 
   const selectedFileMeta = useMemo(() => {
     if (!file) return null;
@@ -89,6 +94,7 @@ export default function AdminProductImportPage() {
   function onSelectFile(nextFile: File | null) {
     resetMessages();
     setResult(null);
+    setPreview(null);
 
     if (!nextFile) {
       setFile(null);
@@ -139,21 +145,19 @@ export default function AdminProductImportPage() {
       setErrorMessage("Select a CSV file first.");
       return;
     }
+    if (!preview) {
+      setErrorMessage("Run preview first so the current file is validated before import.");
+      return;
+    }
+    if (preview.invalid_count > 0) {
+      setErrorMessage("Resolve preview errors before posting the product import.");
+      return;
+    }
 
     setIsUploading(true);
 
     try {
-      const form = new FormData();
-      form.append("file", file);
-
-      const response = await request<ProductImportResponse>(
-        "/admin/products/import-csv/",
-        {
-          method: "POST",
-          body: form,
-          retryCount: 0,
-        } as RequestInit
-      );
+      const response = await postProductImport(file);
 
       setResult(response);
       setSuccessMessage(
@@ -161,6 +165,7 @@ export default function AdminProductImportPage() {
           response.source ? ` (${response.source})` : ""
         }.`
       );
+      setPreview(null);
     } catch (error) {
       const normalized = normalizeApiError(error);
       setErrorMessage(normalized.message || "Failed to import products.");
@@ -169,39 +174,37 @@ export default function AdminProductImportPage() {
     }
   }
 
-  async function handleServerDefaultImport() {
+  async function handlePreviewImport() {
     resetMessages();
     setResult(null);
-    setIsServerImporting(true);
 
+    if (!file) {
+      setErrorMessage("Select a CSV file first.");
+      return;
+    }
+
+    setIsPreviewing(true);
     try {
-      const response = await request<ProductImportResponse>(
-        "/admin/products/import-csv/",
-        {
-          method: "POST",
-          retryCount: 0,
-        } as RequestInit
-      );
-
-      setResult(response);
+      const response = await previewProductImport(file);
+      setPreview(response);
       setSuccessMessage(
-        `Product import completed from server default CSV${
-          response.source ? ` (${response.source})` : ""
-        }.`
+        response.invalid_count > 0
+          ? "Preview generated. Resolve the invalid rows before importing."
+          : `Preview ready. ${response.valid_count} row${response.valid_count === 1 ? "" : "s"} can be posted safely.`
       );
     } catch (error) {
       const normalized = normalizeApiError(error);
-      setErrorMessage(
-        normalized.message || "Failed to import products from server default CSV."
-      );
+      setPreview(null);
+      setErrorMessage(normalized.message || "Failed to preview product import.");
     } finally {
-      setIsServerImporting(false);
+      setIsPreviewing(false);
     }
   }
 
   function handleClear() {
     setFile(null);
     setResult(null);
+    setPreview(null);
     resetMessages();
 
     if (inputRef.current) {
@@ -232,9 +235,9 @@ export default function AdminProductImportPage() {
       ]}
       stats={[
         {
-          label: "Selected file",
-          value: file ? "Ready" : "None",
-          tone: file ? "info" : "default",
+          label: "Preview ready",
+          value: preview ? "Yes" : "No",
+          tone: preview ? "info" : "default",
         },
         {
           label: "Created",
@@ -247,9 +250,9 @@ export default function AdminProductImportPage() {
           tone: (result?.updated ?? 0) > 0 ? "info" : "default",
         },
         {
-          label: "Skipped",
-          value: result?.skipped ?? 0,
-          tone: (result?.skipped ?? 0) > 0 ? "warning" : "default",
+          label: "Preview errors",
+          value: preview?.invalid_count ?? 0,
+          tone: (preview?.invalid_count ?? 0) > 0 ? "warning" : "default",
         },
       ]}
     >
@@ -323,8 +326,23 @@ export default function AdminProductImportPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
+                onClick={handlePreviewImport}
+                disabled={isPreviewing || isUploading || !file}
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPreviewing ? "Previewing..." : "Preview Uploaded CSV"}
+              </button>
+
+              <button
+                type="button"
                 onClick={handleUploadImport}
-                disabled={isUploading || isServerImporting || !file}
+                disabled={
+                  isUploading ||
+                  isPreviewing ||
+                  !file ||
+                  !preview ||
+                  preview.invalid_count > 0
+                }
                 className="inline-flex h-11 items-center rounded-xl bg-slate-900 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isUploading ? "Importing..." : "Import Uploaded CSV"}
@@ -332,17 +350,8 @@ export default function AdminProductImportPage() {
 
               <button
                 type="button"
-                onClick={handleServerDefaultImport}
-                disabled={isUploading || isServerImporting}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isServerImporting ? "Importing..." : "Use Server Default CSV"}
-              </button>
-
-              <button
-                type="button"
                 onClick={handleClear}
-                disabled={isUploading || isServerImporting}
+                disabled={isUploading || isPreviewing}
                 className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Clear
@@ -360,6 +369,10 @@ export default function AdminProductImportPage() {
                 {errorMessage}
               </div>
             ) : null}
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Uploaded CSV preview is now the governed operator path. The legacy server-default CSV shortcut remains backend-compatible for transition, but it is intentionally not exposed here for go-live use.
+            </div>
 
             {result?.errors?.length ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -408,14 +421,23 @@ export default function AdminProductImportPage() {
                 and future rental or leasing expansion. Base price remains the total
                 contract price.
               </p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Safe rollout rule: preview first, then import. The import will not
+                post if preview still shows invalid rows.
+              </p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Result summary
+                Preview and result summary
               </h3>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <StatCard
+                  label="Preview Valid"
+                  value={preview?.valid_count ?? 0}
+                  tone={(preview?.valid_count ?? 0) > 0 ? "info" : "default"}
+                />
                 <StatCard
                   label="Created"
                   value={result?.created ?? 0}
@@ -427,11 +449,29 @@ export default function AdminProductImportPage() {
                   tone={(result?.updated ?? 0) > 0 ? "info" : "default"}
                 />
                 <StatCard
-                  label="Skipped"
-                  value={result?.skipped ?? 0}
-                  tone={(result?.skipped ?? 0) > 0 ? "warning" : "default"}
+                  label="Preview Invalid"
+                  value={preview?.invalid_count ?? result?.skipped ?? 0}
+                  tone={(preview?.invalid_count ?? result?.skipped ?? 0) > 0 ? "warning" : "default"}
                 />
               </div>
+
+              {preview ? (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <div className="font-medium text-slate-900">
+                    Create candidates {preview.preview_rows.filter((row) => row.action === "create").length} ·
+                    Update candidates {preview.preview_rows.filter((row) => row.action === "update").length}
+                  </div>
+                  {preview.errors.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-amber-800">
+                      {preview.errors.slice(0, 5).map((item, index) => (
+                        <li key={`${item.row_number}-${index}`}>Row {item.row_number}: {item.errors.join(", ")}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-slate-600">No blocking preview errors detected.</p>
+                  )}
+                </div>
+              ) : null}
 
               {result?.source ? (
                 <p className="mt-4 text-sm text-slate-600">

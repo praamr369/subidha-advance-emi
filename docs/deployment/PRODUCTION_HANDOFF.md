@@ -156,3 +156,15 @@ Do not mark the deployment complete until all of the following are true:
 - frontend login page responds
 - admin login is verified
 - one customer, partner, and cashier read-only route check completes successfully
+
+## 9. Go-live operations references
+
+Use these documents alongside deployment:
+
+- `docs/operations/go-live-checklist.md`
+- `docs/operations/migration-rehearsal-checklist.md`
+- `docs/operations/first-week-operations-checklist.md`
+- `docs/operations/cashier-counter-opening-closing.md`
+- `docs/operations/branch-day-close-checklist.md`
+- `docs/operations/uat-checklist.md`
+- `docs/deployment/rollback-incident-handling.md`

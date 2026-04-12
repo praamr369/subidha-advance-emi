@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
-import Link from "next/link";
 
 import PortalPage from "@/components/ui/PortalPage";
+import ActionButton from "@/components/ui/ActionButton";
 import { ROUTES } from "@/lib/routes";
 import { submitPublicLead } from "@/services/public";
 
@@ -110,9 +110,11 @@ export default function ApplyPageClient() {
         { href: ROUTES.public.login, label: "Login", variant: "ghost" },
       ]}
       statusBadge={{ label: "Public Enquiry Flow", tone: "info" }}
+      helperNote="Submit with correct phone and product preference so branch follow-up can map directly to inventory and subscription workflow."
+      helperTone="info"
     >
       {hasProductContext ? (
-        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
+        <section className="surface-panel-elevated rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
             Selected Product Context
           </div>
@@ -139,7 +141,7 @@ export default function ApplyPageClient() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
         <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-medium text-foreground">Name</span>
@@ -216,20 +218,22 @@ export default function ApplyPageClient() {
           </label>
 
           <div className="lg:col-span-2 flex flex-wrap gap-3">
-            <button
+            <ActionButton
               type="submit"
-              disabled={loading}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="primary"
+              loading={loading}
+              size="lg"
             >
               {loading ? "Submitting..." : "Submit Application"}
-            </button>
+            </ActionButton>
 
-            <Link
+            <ActionButton
               href={ROUTES.public.products}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-medium text-foreground transition hover:bg-muted"
+              variant="outline"
+              size="lg"
             >
               Back to Products
-            </Link>
+            </ActionButton>
           </div>
         </form>
 

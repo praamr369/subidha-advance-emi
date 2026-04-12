@@ -116,8 +116,11 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         status_filter = (self.request.query_params.get("status") or "").strip().upper()
+        branch_id = self.request.query_params.get("branch")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        if branch_id:
+            queryset = queryset.filter(stock_location__branch_id=branch_id)
         return queryset
 
     def get_serializer_class(self):
@@ -187,11 +190,33 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
 
 
 class PurchaseBillViewSet(AdminInventoryModelViewSet):
-    queryset = PurchaseBill.objects.select_related("vendor", "finance_account", "posted_journal_entry").prefetch_related("lines").all()
+    queryset = PurchaseBill.objects.select_related(
+        "vendor",
+        "finance_account",
+        "posted_journal_entry",
+        "stock_location",
+    ).prefetch_related(
+        "lines",
+        "lines__inventory_item",
+        "lines__inventory_item__product",
+    ).all()
     serializer_class = PurchaseBillSerializer
     search_fields = ["bill_no", "vendor__name"]
     ordering_fields = ["bill_date", "created_at", "bill_no"]
     ordering = ["-bill_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        vendor_id = self.request.query_params.get("vendor")
+        branch_id = self.request.query_params.get("branch")
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
 
 
 class StockLocationViewSet(AdminInventoryModelViewSet):
@@ -205,10 +230,13 @@ class StockLocationViewSet(AdminInventoryModelViewSet):
         queryset = super().get_queryset()
         is_active = _parse_bool_query(self.request.query_params.get("is_active"))
         location_type = (self.request.query_params.get("location_type") or "").strip().upper()
+        branch_id = self.request.query_params.get("branch")
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
         if location_type:
             queryset = queryset.filter(location_type=location_type)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
         return queryset
 
     def perform_create(self, serializer):
@@ -254,6 +282,7 @@ class StockLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             end_date=request.query_params.get("end_date"),
             movement_type=request.query_params.get("movement_type"),
             reference_model=request.query_params.get("reference_model"),
+            branch_id=request.query_params.get("branch"),
         )
         return Response(payload)
 
@@ -265,6 +294,7 @@ class StockSummaryView(APIView):
         payload = build_stock_summary(
             item_id=request.query_params.get("item_id"),
             stock_item_type=request.query_params.get("stock_item_type"),
+            branch_id=request.query_params.get("branch"),
         )
         return Response(payload)
 

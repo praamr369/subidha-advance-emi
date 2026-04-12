@@ -15,24 +15,36 @@ import {
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  Bell,
+  BellRing,
+  Boxes,
+  Building2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleDollarSign,
   ClipboardList,
   CreditCard,
-  Gift,
-  HelpCircle,
+  Factory,
+  GaugeCircle,
+  Handshake,
   Home,
+  Landmark,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
   Package,
   Receipt,
+  ReceiptText,
   Search,
   Settings,
   ShieldCheck,
+  ShoppingCart,
+  Ticket,
+  Trophy,
+  Truck,
   UserCircle2,
+  UserCog,
   Users,
   Wallet,
   X,
@@ -41,7 +53,7 @@ import {
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
-import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { brandConfig } from "@/config/brand";
 import {
   getNavigationGroupsForRole,
   normalizeRole,
@@ -49,11 +61,7 @@ import {
   type NavIconKey,
   type NavigationRole,
 } from "@/config/navigation";
-
-// Simple cn utility
-function cn(...classes: (string | false | null | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
-}
+import { cn } from "@/lib/utils";
 
 const DashboardShellContext = createContext(false);
 
@@ -69,6 +77,7 @@ type ShellNavItem = {
 
 type ShellNavGroup = {
   title: string;
+  icon: React.ComponentType<{ className?: string }>;
   items: ShellNavItem[];
 };
 
@@ -78,33 +87,72 @@ type ShellQuickAction = {
 };
 
 const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> = {
+  operations: GaugeCircle,
+  crm: Handshake,
+  billing: ReceiptText,
+  inventory: Boxes,
+  procurement: ShoppingCart,
+  manufacturing: Factory,
+  serviceDesk: LifeBuoy,
+  accounting: Landmark,
+  payroll: UserCog,
+  branches: Building2,
+  governance: ShieldCheck,
+  reminders: BellRing,
+  cashCounter: CircleDollarSign,
   dashboard: LayoutDashboard,
   analytics: BarChart3,
   home: Home,
   customers: Users,
-  deliveries: Package,
+  deliveries: Truck,
   leads: Search,
-  products: Package,
+  products: Boxes,
   subscriptions: ClipboardList,
   payments: CreditCard,
   emis: Receipt,
   collections: Wallet,
-  batches: Wallet,
+  batches: Package,
   partners: Users,
-  finance: Wallet,
+  finance: Landmark,
   reconciliation: ShieldCheck,
   commissions: Wallet,
   settledCommissions: CreditCard,
-  payoutBatches: Receipt,
-  luckyIds: Gift,
-  luckyDraws: Gift,
+  payoutBatches: ReceiptText,
+  luckyIds: Ticket,
+  luckyDraws: Trophy,
   reports: BarChart3,
   settings: Settings,
   auditLogs: ShieldCheck,
   profile: UserCircle2,
-  support: ShieldCheck,
-  collectPayment: CreditCard,
+  support: LifeBuoy,
+  collectPayment: CircleDollarSign,
 };
+
+const SIDEBAR_COLLAPSED_KEY = "subidha:dashboard-sidebar-collapsed:v1";
+const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
+
+function readBooleanSetting(key: string, fallback: boolean) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function readExpandedGroups(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 function segmentToLabel(segment: string) {
   return segment.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -124,6 +172,14 @@ function buildPageTitle(pathname: string) {
 
 function isActivePath(pathname: string, href: string) {
   if (href === pathname) return true;
+  if (
+    href === ROUTES.admin.dashboard ||
+    href === ROUTES.partner.dashboard ||
+    href === ROUTES.customer.dashboard ||
+    href === ROUTES.cashier.dashboard
+  ) {
+    return false;
+  }
   return pathname.startsWith(`${href}/`);
 }
 
@@ -145,6 +201,7 @@ function getRoleBasePath(role: NavigationRole) {
 function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
   return groups.map((group) => ({
     title: group.title,
+    icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
     items: group.items.map((item) => ({
       label: item.label,
       href: item.href,
@@ -156,13 +213,13 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
 function getRoleWorkspaceLabel(role: NavigationRole) {
   switch (role) {
     case "ADMIN":
-      return "Admin Operations";
+      return "Admin Control Center";
     case "PARTNER":
       return "Partner Operations";
     case "CUSTOMER":
       return "Customer Workspace";
     case "CASHIER":
-      return "Cashier Workspace";
+      return "Cashier Counter";
     default:
       return "Workspace";
   }
@@ -171,16 +228,24 @@ function getRoleWorkspaceLabel(role: NavigationRole) {
 function getRoleWorkspaceDescription(role: NavigationRole) {
   switch (role) {
     case "ADMIN":
-      return "Unified admin platform for EMI operations, retail-ready billing, inventory control, partner finance, accounting books, and governance.";
+      return "Collections, billing, inventory, accounting, workforce, and branch governance in one controlled rail.";
     case "PARTNER":
-      return "Track customers, subscriptions, commissions, and collections.";
+      return "Track assigned customers, subscriptions, collections, and commission posture.";
     case "CUSTOMER":
-      return "View subscriptions, payments, and account activity.";
+      return "Monitor your subscriptions, payment history, delivery, and support records.";
     case "CASHIER":
-      return "Daily collection handling and payment entry workflow.";
+      return "Run counter collections with branch-safe posting and receipt flow.";
     default:
       return "Role-based workspace.";
   }
+}
+
+function formatRoleLabel(role: NavigationRole) {
+  if (role === "ADMIN") return "Admin";
+  if (role === "PARTNER") return "Partner";
+  if (role === "CUSTOMER") return "Customer";
+  if (role === "CASHIER") return "Cashier";
+  return "Workspace";
 }
 
 function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
@@ -188,28 +253,28 @@ function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
     case "ADMIN":
       return [
         {
+          label: "New Subscription",
+          href: ROUTES.admin.subscriptionsCreate,
+        },
+        {
           label: "Collect EMI",
           href: ROUTES.admin.paymentsCreate,
         },
         {
-          label: "New Contract",
-          href: ROUTES.admin.subscriptionsCreate,
+          label: "Direct Sale",
+          href: ROUTES.admin.billingDirectSales,
         },
         {
-          label: "New Product",
-          href: ROUTES.admin.productsCreate,
+          label: "Purchase Bill",
+          href: ROUTES.admin.accountingPurchaseBills,
         },
         {
-          label: "Opening Stock",
-          href: ROUTES.admin.inventoryOpeningStock,
+          label: "Stock Adjust",
+          href: ROUTES.admin.inventoryAdjustments,
         },
         {
-          label: "Overdue EMI",
-          href: ROUTES.admin.emisOverdue,
-        },
-        {
-          label: "Flagged Recon",
-          href: buildAdminReconciliationRoute({ flagged: true }),
+          label: "Branch Report",
+          href: ROUTES.admin.branchReporting,
         },
       ];
     default:
@@ -239,8 +304,12 @@ function getSettingsHref(role: NavigationRole) {
   }
 }
 
-// Enhanced User Dropdown with modern styling
-function UserDropdown({ displayName, role, onLogout, isLoggingOut }: {
+function UserDropdown({
+  displayName,
+  role,
+  onLogout,
+  isLoggingOut,
+}: {
   displayName: string;
   role: NavigationRole;
   onLogout: () => void;
@@ -265,60 +334,59 @@ function UserDropdown({ displayName, role, onLogout, isLoggingOut }: {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-surface)] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] transition hover:border-[var(--surface-border-strong)] hover:bg-white"
       >
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-sm font-semibold text-primary-foreground shadow-sm">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-xs font-semibold text-foreground">
           {displayName.charAt(0).toUpperCase()}
-        </div>
-        <div className="hidden text-left sm:block">
-          <div className="text-sm font-semibold text-foreground">{displayName}</div>
-          <div className="text-xs text-muted-foreground">{role}</div>
-        </div>
+        </span>
+        <span className="hidden min-w-0 text-left sm:block">
+          <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">
+            {displayName}
+          </span>
+          <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
+        </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card shadow-xl z-50 animate-in fade-in-0 zoom-in-95 duration-100">
-          <div className="p-2">
-            <div className="border-b border-border px-3 py-2">
-              <div className="text-sm font-medium text-foreground">{displayName}</div>
-              <div className="text-xs text-muted-foreground">{role}</div>
-            </div>
-            <Link
-              href={profileHref}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-              onClick={() => setIsOpen(false)}
-            >
-              <UserCircle2 className="h-4 w-4" />
-              Profile
-            </Link>
-            <Link
-              href={settingsHref}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-              onClick={() => setIsOpen(false)}
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onLogout();
-              }}
-              disabled={isLoggingOut}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-            >
-              <LogOut className="h-4 w-4" />
-              {isLoggingOut ? "Logging out..." : "Logout"}
-            </button>
+        <div className="absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl border border-[var(--surface-border-strong)] bg-white p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)] duration-100">
+          <div className="border-b border-border px-3 py-2">
+            <div className="text-sm font-semibold text-foreground">{displayName}</div>
+            <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
           </div>
+          <Link
+            href={profileHref}
+            className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-[var(--surface-muted)]"
+            onClick={() => setIsOpen(false)}
+          >
+            <UserCircle2 className="h-4 w-4" />
+            Profile
+          </Link>
+          <Link
+            href={settingsHref}
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-[var(--surface-muted)]"
+            onClick={() => setIsOpen(false)}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Link>
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              onLogout();
+            }}
+            disabled={isLoggingOut}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+          >
+            <LogOut className="h-4 w-4" />
+            {isLoggingOut ? "Logging out..." : "Logout"}
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// Sidebar Component (collapsible, with modern gradient background)
 function Sidebar({
   role,
   pathname,
@@ -335,59 +403,107 @@ function Sidebar({
   onClose?: () => void;
 }) {
   const isMobile = typeof onClose === "function";
-  const navGroups = useMemo(
-    () => mapNavGroups(getNavigationGroupsForRole(role)),
-    [role]
-  );
+  const navGroups = useMemo(() => mapNavGroups(getNavigationGroupsForRole(role)), [role]);
+  const activeHref = useMemo(() => {
+    const matches = navGroups
+      .flatMap((group) => group.items)
+      .filter((item) => isActivePath(pathname, item.href))
+      .sort((left, right) => right.href.length - left.href.length);
+    return matches[0]?.href ?? null;
+  }, [navGroups, pathname]);
   const quickActions = useMemo(() => getRoleQuickActions(role), [role]);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    () => readExpandedGroups()
+  );
+  const [navQuery, setNavQuery] = useState("");
+  const normalizedNavQuery = navQuery.trim().toLowerCase();
+  const visibleGroups = useMemo(() => {
+    if (!normalizedNavQuery) return navGroups;
+
+    return navGroups
+      .map((group) => {
+        const groupMatch = group.title.toLowerCase().includes(normalizedNavQuery);
+        if (groupMatch) return group;
+        return {
+          ...group,
+          items: group.items.filter((item) =>
+            item.label.toLowerCase().includes(normalizedNavQuery)
+          ),
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [navGroups, normalizedNavQuery]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(expandedGroups));
+    } catch {
+      // Enhancement-only persistence.
+    }
+  }, [expandedGroups]);
+
+  const toggleGroup = useCallback(
+    (title: string, defaultOpen: boolean) => {
+      if (collapsed && !isMobile) {
+        onToggleCollapse();
+        setExpandedGroups((current) => ({ ...current, [title]: true }));
+        return;
+      }
+      setExpandedGroups((current) => ({
+        ...current,
+        [title]: !(current[title] ?? defaultOpen),
+      }));
+    },
+    [collapsed, isMobile, onToggleCollapse]
+  );
 
   const sidebarClasses = cn(
-    isMobile
-      ? "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-gradient-to-b from-sidebar to-sidebar/95 text-sidebar-foreground transition-transform md:hidden"
-      : "flex h-screen flex-col border-r border-sidebar-border bg-gradient-to-b from-sidebar to-sidebar/95 text-sidebar-foreground transition-all duration-300",
-    isMobile ? (mobileOpen ? "translate-x-0" : "-translate-x-full") : (collapsed ? "w-20" : "w-72")
+    "dashboard-shell-chrome flex flex-col border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-all duration-300",
+    "bg-[linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
+    isMobile ? "fixed inset-y-0 left-0 z-50 md:hidden" : "h-screen",
+    isMobile ? (mobileOpen ? "translate-x-0" : "-translate-x-full") : collapsed ? "w-[5.8rem]" : "w-[19rem]"
   );
 
   return (
     <>
-      {isMobile && mobileOpen && (
+      {isMobile && mobileOpen ? (
         <div
-          className="dashboard-shell-chrome fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden"
+          className="dashboard-shell-chrome fixed inset-0 z-40 bg-slate-950/55 md:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
-      )}
-      <aside className={cn(sidebarClasses, "dashboard-shell-chrome")}>
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
-          {!collapsed && (
-            <div>
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                Subidha Furniture
+      ) : null}
+
+      <aside className={sidebarClasses}>
+        <div className="flex h-[4.75rem] items-center gap-3 border-b border-[var(--sidebar-rail-border)] px-4">
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
+            SC
+          </div>
+
+          {!collapsed ? (
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                {brandConfig.companyName}
               </div>
-              <div className="text-lg font-semibold tracking-tight">SUBIDHA CORE</div>
-            </div>
-          )}
-          {collapsed && (
-            <div className="mx-auto">
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                SC
+              <div className="truncate text-base font-semibold tracking-tight text-white">
+                {brandConfig.platformName}
               </div>
             </div>
-          )}
-          {!isMobile && (
+          ) : null}
+
+          {!isMobile ? (
             <button
               onClick={onToggleCollapse}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sidebar-border bg-background text-foreground transition hover:bg-muted"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
-          )}
-          {isMobile && (
+          ) : (
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-sidebar-border bg-background text-foreground"
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
               aria-label="Close sidebar"
             >
               <X className="h-4 w-4" />
@@ -395,95 +511,148 @@ function Sidebar({
           )}
         </div>
 
-        {!collapsed && (
-          <div className="border-b border-sidebar-border px-5 py-4">
-            <div className="rounded-xl border border-sidebar-border bg-card/10 p-4 backdrop-blur-sm">
-              <div className="text-sm font-semibold text-card-foreground">
+        {!collapsed ? (
+          <div className="border-b border-[var(--sidebar-rail-border)] px-4 py-4">
+            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] p-3.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
                 {getRoleWorkspaceLabel(role)}
               </div>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">
                 {getRoleWorkspaceDescription(role)}
               </p>
-              {quickActions.length > 0 ? (
-                <div className="mt-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Quick Actions
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {quickActions.map((action) => (
-                      <Link
-                        key={action.href}
-                        href={action.href}
-                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sidebar-border bg-background px-3 text-center text-xs font-semibold text-foreground transition hover:bg-muted"
-                      >
-                        {action.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
-          </div>
-        )}
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-6">
-            {navGroups.map((group) => (
-              <div key={group.title}>
-                {!collapsed && (
-                  <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {group.title}
-                  </div>
-                )}
-                <div className="space-y-1">
-                  {group.items.map((item) => {
-                    const active = isActivePath(pathname, item.href);
-                    const Icon = item.icon;
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={isMobile ? onClose : undefined}
-                        className={cn(
-                          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                          active
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          collapsed && "justify-center"
-                        )}
-                      >
-                        <Icon
-                          className={cn(
-                            "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
-                            active
-                              ? "text-sidebar-primary-foreground"
-                              : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
-                          )}
-                        />
-                        {!collapsed && <span>{item.label}</span>}
-                      </Link>
-                    );
-                  })}
+            {quickActions.length > 0 ? (
+              <div className="mt-3.5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                  Fast Actions
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] px-2 text-center text-[11px] font-semibold text-[var(--sidebar-foreground)] transition hover:border-[var(--sidebar-item-active-border)] hover:bg-[var(--sidebar-item-hover)]"
+                    >
+                      {action.label}
+                    </Link>
+                  ))}
                 </div>
               </div>
-            ))}
+            ) : null}
+
+            <div className="mt-3.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                Navigate
+              </label>
+              <div className="relative mt-2">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
+                <input
+                  type="search"
+                  value={navQuery}
+                  onChange={(event) => setNavQuery(event.target.value)}
+                  placeholder="Filter modules"
+                  className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-3 text-xs font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-2.5">
+            {visibleGroups.length === 0 && !collapsed ? (
+              <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
+                No navigation matches for &quot;{navQuery.trim()}&quot;.
+              </div>
+            ) : null}
+            {visibleGroups.map((group, index) => {
+              const GroupIcon = group.icon;
+              const groupActive = group.items.some((item) => item.href === activeHref);
+              const defaultOpen = role === "ADMIN" ? index === 0 : true;
+              const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
+
+              return (
+                <section key={group.title} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.title, defaultOpen)}
+                    className={cn(
+                      "group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition",
+                      collapsed ? "justify-center" : "",
+                      groupActive
+                        ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                        : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                    )}
+                    aria-expanded={groupOpen}
+                    title={collapsed ? group.title : undefined}
+                  >
+                    <GroupIcon className={cn("h-4 w-4 shrink-0", groupActive ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white")} />
+                    {!collapsed ? (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.01em]">
+                          {group.title}
+                        </span>
+                        <span className="rounded-full border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sidebar-item-muted)]">
+                          {group.items.length}
+                        </span>
+                        {groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </>
+                    ) : null}
+                  </button>
+
+                  {groupOpen ? (
+                    <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/80 pl-3">
+                      {group.items.map((item) => {
+                        const active = item.href === activeHref;
+                        const Icon = item.icon;
+
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={isMobile ? onClose : undefined}
+                            className={cn(
+                              "group flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
+                              active
+                                ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                                : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+                              )}
+                            />
+                            <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         </nav>
 
-        {!collapsed && (
-          <div className="border-t border-sidebar-border p-4">
-            <div className="rounded-xl border border-sidebar-border bg-muted/10 p-4 backdrop-blur-sm">
-              <div className="text-sm font-semibold">Production Mode</div>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Stable daily operation with backward-compatible structure for future growth.
+        {!collapsed ? (
+          <div className="border-t border-[var(--sidebar-rail-border)] p-4">
+            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                Operational Mode
+              </div>
+              <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">
+                Live enterprise workspace. Finance, stock, billing, and service flows remain source-linked and auditable.
               </p>
             </div>
           </div>
-        )}
-        {collapsed && (
-          <div className="border-t border-sidebar-border p-4 text-center">
-            <div className="text-xs font-semibold text-muted-foreground">PM</div>
+        ) : (
+          <div className="border-t border-[var(--sidebar-rail-border)] p-4 text-center">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+              Live
+            </span>
           </div>
         )}
       </aside>
@@ -491,7 +660,6 @@ function Sidebar({
   );
 }
 
-// Topbar Component with modern shadow and hover effects
 function Topbar({
   title,
   role,
@@ -508,69 +676,30 @@ function Topbar({
   isLoggingOut: boolean;
 }) {
   return (
-    <header className="dashboard-shell-chrome sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 shadow-sm">
-      <div className="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="dashboard-shell-chrome sticky top-0 z-30 border-b border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-surface)_92%,white_8%)] backdrop-blur-xl">
+      <div className="flex min-h-[4.4rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-foreground transition hover:bg-muted hover:shadow-sm md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white md:hidden"
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
           </button>
+
           <div className="min-w-0">
-            <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              {role}
-            </div>
-            <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">
-              {title}
-            </h1>
+            <div className="enterprise-eyebrow">{formatRoleLabel(role)} Workspace</div>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">{title}</h1>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
-          {/* Global Search */}
-          <div className="hidden md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="h-10 w-64 rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring lg:w-80"
-              />
-            </div>
-          </div>
-
-          {/* Notifications */}
-          <button
-            type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground hover:shadow-sm"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              3
-            </span>
-          </button>
-
-          {/* Help */}
-          <button
-            type="button"
-            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground hover:shadow-sm md:flex"
-            aria-label="Help"
-          >
-            <HelpCircle className="h-5 w-5" />
-          </button>
-
-          {/* User Dropdown */}
-          <UserDropdown
-            displayName={displayName}
-            role={role}
-            onLogout={onLogout}
-            isLoggingOut={isLoggingOut}
-          />
-        </div>
+        <UserDropdown
+          displayName={displayName}
+          role={role}
+          onLogout={onLogout}
+          isLoggingOut={isLoggingOut}
+        />
       </div>
     </header>
   );
@@ -580,13 +709,23 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readBooleanSetting(SIDEBAR_COLLAPSED_KEY, false)
+  );
   const [session, setSession] = useState(() => getStoredSession());
   const { logout, isLoggingOut } = useLogout();
 
   const toggleSidebarCollapse = useCallback(() => {
     setSidebarCollapsed((prev) => !prev);
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+    } catch {
+      // Non-critical preference persistence.
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     function handleStorage() {
@@ -602,14 +741,12 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const role = normalizeRole(session?.role);
   const displayName = session?.name || "User";
-  const title =
-    pathname === getRoleBasePath(role) ? "Dashboard" : buildPageTitle(pathname);
+  const title = pathname === getRoleBasePath(role) ? "Dashboard" : buildPageTitle(pathname);
 
   return (
     <DashboardShellContext.Provider value={true}>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="dashboard-app text-foreground">
         <div className="flex min-h-screen">
-          {/* Desktop Sidebar */}
           <div className="hidden md:block">
             <Sidebar
               role={role}
@@ -619,8 +756,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             />
           </div>
 
-          {/* Mobile Sidebar (drawer) */}
-          {mobileOpen && (
+          {mobileOpen ? (
             <Sidebar
               role={role}
               pathname={pathname}
@@ -629,7 +765,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               mobileOpen={mobileOpen}
               onClose={() => setMobileOpen(false)}
             />
-          )}
+          ) : null}
 
           <div className="flex min-w-0 flex-1 flex-col">
             <Topbar
@@ -642,7 +778,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             />
 
             <main className="flex-1">
-              <div className="mx-auto w-full max-w-[1600px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+              <div className="mx-auto w-full max-w-[1760px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
                 {children}
               </div>
             </main>

@@ -2,16 +2,24 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from accounting.models import (
     ChartOfAccount,
+    EmployeeAttendance,
+    EmployeeExpenseClaim,
+    EmployeeExpenseClaimPayment,
+    EmployeeProfile,
     ExpenseVoucher,
     FinanceAccount,
     JournalEntry,
+    LeaveRequest,
+    LeaveType,
     MoneyMovement,
+    PayrollPeriod,
+    SalaryPayment,
     SalarySheet,
     Vendor,
-    EmployeeProfile,
 )
 from accounting.services.expense_posting_service import (
     approve_expense_voucher,
@@ -26,9 +34,24 @@ from accounting.services.salary_posting_service import (
     approve_salary_sheet,
     post_salary_sheet,
 )
+from accounting.services.workforce_service import (
+    approve_employee_expense_claim,
+    approve_leave_request,
+    build_attendance_calendar,
+    build_staff_ledger,
+    cancel_leave_request,
+    close_payroll_period,
+    post_employee_expense_claim,
+    reject_employee_expense_claim,
+    reject_leave_request,
+)
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
     ChartOfAccountSerializer,
+    EmployeeExpenseClaimActionSerializer,
+    EmployeeExpenseClaimPaymentSerializer,
+    EmployeeExpenseClaimSerializer,
+    EmployeeAttendanceSerializer,
     EmptyActionSerializer,
     EmployeeProfileSerializer,
     ExpenseVoucherSerializer,
@@ -36,7 +59,13 @@ from api.v1.serializers.accounting import (
     JournalEntryPostSerializer,
     JournalEntrySerializer,
     JournalEntryVoidSerializer,
+    LeaveRequestActionSerializer,
+    LeaveRequestSerializer,
+    LeaveTypeSerializer,
     MoneyMovementSerializer,
+    PayrollPeriodCloseSerializer,
+    PayrollPeriodSerializer,
+    SalaryPaymentSerializer,
     SalarySheetSerializer,
     VendorSerializer,
 )
@@ -66,10 +95,13 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
         queryset = super().get_queryset()
         is_active = self.request.query_params.get("is_active")
         kind = self.request.query_params.get("kind")
+        branch_id = self.request.query_params.get("branch")
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
         if kind:
             queryset = queryset.filter(kind=kind.strip().upper())
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
         return queryset
 
 
@@ -151,6 +183,13 @@ class VendorViewSet(AdminAccountingModelViewSet):
     ordering_fields = ["name", "created_at"]
     ordering = ["name", "id"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
+        return queryset
+
 
 class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
     queryset = ExpenseVoucher.objects.select_related(
@@ -163,6 +202,13 @@ class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
     search_fields = ["voucher_no", "vendor__name", "bill_no", "notes"]
     ordering_fields = ["expense_date", "created_at", "voucher_no"]
     ordering = ["-expense_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        branch_id = self.request.query_params.get("branch")
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
 
     def get_serializer_class(self):
         if self.action in {"approve", "post_expense"}:
@@ -201,22 +247,204 @@ class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
 
 
 class EmployeeProfileViewSet(AdminAccountingModelViewSet):
-    queryset = EmployeeProfile.objects.all()
+    queryset = EmployeeProfile.objects.prefetch_related("compensation_components").all()
     serializer_class = EmployeeProfileSerializer
-    search_fields = ["employee_code", "name"]
-    ordering_fields = ["employee_code", "name", "joining_date"]
+    search_fields = ["employee_code", "name", "phone", "designation", "department"]
+    ordering_fields = ["employee_code", "name", "joining_date", "department"]
     ordering = ["name", "id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        department = (self.request.query_params.get("department") or "").strip()
+        branch_id = self.request.query_params.get("branch")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
+        if department:
+            queryset = queryset.filter(department__iexact=department)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
+
+
+class EmployeeAttendanceViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    http_method_names = ["get", "post", "head", "options"]
+    queryset = EmployeeAttendance.objects.select_related("employee", "recorded_by", "leave_request").all()
+    serializer_class = EmployeeAttendanceSerializer
+    search_fields = ["employee__employee_code", "employee__name", "employee__department", "notes"]
+    ordering_fields = ["attendance_date", "created_at"]
+    ordering = ["-attendance_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        attendance_date = self.request.query_params.get("attendance_date")
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if attendance_date:
+            queryset = queryset.filter(attendance_date=attendance_date)
+        if date_from:
+            queryset = queryset.filter(attendance_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(attendance_date__lte=date_to)
+        return queryset
+
+
+class PayrollPeriodViewSet(AdminAccountingModelViewSet):
+    queryset = PayrollPeriod.objects.select_related("closed_by").all()
+    serializer_class = PayrollPeriodSerializer
+    search_fields = ["code"]
+    ordering_fields = ["year", "month", "start_date"]
+    ordering = ["-year", "-month", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "close_period":
+            return PayrollPeriodCloseSerializer
+        return super().get_serializer_class()
+
+    @action(detail=True, methods=["post"], url_path="close")
+    def close_period(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payroll_period, updated = close_payroll_period(
+                payroll_period_id=int(pk),
+                close_reason=serializer.validated_data.get("close_reason", ""),
+                closed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = PayrollPeriodSerializer(payroll_period, context=self.get_serializer_context())
+        return Response({"updated": updated, "payroll_period": payload.data}, status=status.HTTP_200_OK)
+
+
+class LeaveTypeViewSet(AdminAccountingModelViewSet):
+    queryset = LeaveType.objects.all()
+    serializer_class = LeaveTypeSerializer
+    search_fields = ["code", "name"]
+    ordering_fields = ["code", "name", "created_at"]
+    ordering = ["code", "id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
+        return queryset
+
+
+class LeaveRequestViewSet(AdminAccountingModelViewSet):
+    queryset = LeaveRequest.objects.select_related(
+        "employee",
+        "leave_type",
+        "approved_by",
+        "rejected_by",
+        "cancelled_by",
+    ).all()
+    serializer_class = LeaveRequestSerializer
+    search_fields = ["request_no", "employee__employee_code", "employee__name", "reason", "notes"]
+    ordering_fields = ["start_date", "end_date", "created_at"]
+    ordering = ["-start_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        leave_type_id = self.request.query_params.get("leave_type")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if leave_type_id:
+            queryset = queryset.filter(leave_type_id=leave_type_id)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action in {"approve", "reject", "cancel_request"}:
+            return LeaveRequestActionSerializer
+        return super().get_serializer_class()
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            leave_request, updated = approve_leave_request(
+                leave_request_id=int(pk),
+                approved_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = LeaveRequestSerializer(leave_request, context=self.get_serializer_context())
+        return Response({"updated": updated, "leave_request": payload.data}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            leave_request, updated = reject_leave_request(
+                leave_request_id=int(pk),
+                rejection_reason=serializer.validated_data.get("reason", ""),
+                rejected_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = LeaveRequestSerializer(leave_request, context=self.get_serializer_context())
+        return Response({"updated": updated, "leave_request": payload.data}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_request(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            leave_request, updated = cancel_leave_request(
+                leave_request_id=int(pk),
+                cancel_reason=serializer.validated_data.get("reason", ""),
+                cancelled_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = LeaveRequestSerializer(leave_request, context=self.get_serializer_context())
+        return Response({"updated": updated, "leave_request": payload.data}, status=status.HTTP_200_OK)
 
 
 class SalarySheetViewSet(AdminAccountingModelViewSet):
     queryset = SalarySheet.objects.select_related(
         "employee",
         "posted_journal_entry",
-    ).prefetch_related("salary_payments").all()
+        "payroll_period",
+    ).prefetch_related("salary_payments", "lines").all()
     serializer_class = SalarySheetSerializer
     search_fields = ["employee__employee_code", "employee__name"]
     ordering_fields = ["year", "month", "created_at"]
     ordering = ["-year", "-month", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        payroll_period_id = self.request.query_params.get("payroll_period")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if payroll_period_id:
+            queryset = queryset.filter(payroll_period_id=payroll_period_id)
+        return queryset
 
     def get_serializer_class(self):
         if self.action in {"approve", "post_salary"}:
@@ -252,6 +480,173 @@ class SalarySheetViewSet(AdminAccountingModelViewSet):
 
         payload = SalarySheetSerializer(salary_sheet, context=self.get_serializer_context())
         return Response({"updated": updated, "salary_sheet": payload.data}, status=status.HTTP_200_OK)
+
+
+class SalaryPaymentViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    http_method_names = ["get", "post", "head", "options"]
+    queryset = SalaryPayment.objects.select_related(
+        "salary_sheet",
+        "salary_sheet__employee",
+        "finance_account",
+        "posted_journal_entry",
+    ).all()
+    serializer_class = SalaryPaymentSerializer
+    search_fields = ["salary_sheet__employee__employee_code", "salary_sheet__employee__name", "reference_no"]
+    ordering_fields = ["payment_date", "created_at"]
+    ordering = ["-payment_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        salary_sheet_id = self.request.query_params.get("salary_sheet")
+        finance_account_id = self.request.query_params.get("finance_account")
+        branch_id = self.request.query_params.get("branch")
+        if salary_sheet_id:
+            queryset = queryset.filter(salary_sheet_id=salary_sheet_id)
+        employee_id = self.request.query_params.get("employee")
+        if employee_id:
+            queryset = queryset.filter(salary_sheet__employee_id=employee_id)
+        if finance_account_id:
+            queryset = queryset.filter(finance_account_id=finance_account_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
+
+
+class EmployeeExpenseClaimViewSet(AdminAccountingModelViewSet):
+    queryset = EmployeeExpenseClaim.objects.select_related(
+        "employee",
+        "expense_account",
+        "posted_journal_entry",
+        "approved_by",
+        "rejected_by",
+    ).prefetch_related("payments").all()
+    serializer_class = EmployeeExpenseClaimSerializer
+    search_fields = ["claim_no", "employee__employee_code", "employee__name", "bill_no", "notes"]
+    ordering_fields = ["claim_date", "expense_date", "created_at"]
+    ordering = ["-claim_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        branch_id = self.request.query_params.get("branch")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action in {"approve", "reject", "post_claim"}:
+            return EmployeeExpenseClaimActionSerializer
+        return super().get_serializer_class()
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            claim, updated = approve_employee_expense_claim(
+                expense_claim_id=int(pk),
+                approved_amount=serializer.validated_data.get("approved_amount"),
+                approved_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = EmployeeExpenseClaimSerializer(claim, context=self.get_serializer_context())
+        return Response({"updated": updated, "expense_claim": payload.data}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            claim, updated = reject_employee_expense_claim(
+                expense_claim_id=int(pk),
+                rejection_reason=serializer.validated_data.get("reason", ""),
+                rejected_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = EmployeeExpenseClaimSerializer(claim, context=self.get_serializer_context())
+        return Response({"updated": updated, "expense_claim": payload.data}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="post")
+    def post_claim(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            claim, updated = post_employee_expense_claim(
+                expense_claim_id=int(pk),
+                posted_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = EmployeeExpenseClaimSerializer(claim, context=self.get_serializer_context())
+        return Response({"updated": updated, "expense_claim": payload.data}, status=status.HTTP_200_OK)
+
+
+class EmployeeExpenseClaimPaymentViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    http_method_names = ["get", "post", "head", "options"]
+    queryset = EmployeeExpenseClaimPayment.objects.select_related(
+        "expense_claim",
+        "expense_claim__employee",
+        "finance_account",
+        "posted_journal_entry",
+    ).all()
+    serializer_class = EmployeeExpenseClaimPaymentSerializer
+    search_fields = ["expense_claim__claim_no", "expense_claim__employee__name", "reference_no"]
+    ordering_fields = ["payment_date", "created_at"]
+    ordering = ["-payment_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        expense_claim_id = self.request.query_params.get("expense_claim")
+        employee_id = self.request.query_params.get("employee")
+        branch_id = self.request.query_params.get("branch")
+        if expense_claim_id:
+            queryset = queryset.filter(expense_claim_id=expense_claim_id)
+        if employee_id:
+            queryset = queryset.filter(expense_claim__employee_id=employee_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
+
+
+class AttendanceCalendarView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        employee_id = request.query_params.get("employee")
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
+        if not employee_id or not year or not month:
+            raise ValidationError({"detail": "employee, year, and month are required."})
+        return Response(
+            build_attendance_calendar(
+                employee_id=int(employee_id),
+                year=int(year),
+                month=int(month),
+            )
+        )
+
+
+class StaffLedgerView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        employee_id = request.query_params.get("employee")
+        branch_id = request.query_params.get("branch")
+        return Response(
+            build_staff_ledger(
+                employee_id=int(employee_id) if employee_id else None,
+                branch_id=int(branch_id) if branch_id else None,
+            )
+        )
 
 
 class MoneyMovementViewSet(AdminAccountingModelViewSet):

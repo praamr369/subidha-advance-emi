@@ -131,17 +131,17 @@ export default function EnterpriseListPage<T extends GenericRecord>({
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="surface-panel-elevated mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Total records</p>
-            <p className="text-2xl font-semibold text-slate-900">{total}</p>
+            <p className="enterprise-eyebrow">Total records</p>
+            <p className="enterprise-metric mt-1 text-foreground">{total}</p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               Filter
               <select
-                className="rounded-md border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-2 py-1 text-foreground"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
@@ -154,7 +154,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
             </label>
             <button
               type="button"
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
               disabled={rows.length === 0}
               onClick={() =>
                 downloadCsv(
@@ -170,7 +170,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
         </div>
 
         {resourcePath === "/admin/products/" ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
             <input
               type="file"
               accept=".csv,text/csv"
@@ -178,19 +178,19 @@ export default function EnterpriseListPage<T extends GenericRecord>({
             />
             <button
               type="button"
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
               onClick={handleProductImport}
               disabled={importing}
             >
               {importing ? "Importing..." : "Import Products CSV"}
             </button>
-            {importMessage ? <span className="text-xs text-slate-600">{importMessage}</span> : null}
+            {importMessage ? <span className="text-xs text-muted-foreground">{importMessage}</span> : null}
           </div>
         ) : null}
 
         {resourcePath === "/admin/customers/" ? (
-          <div className="mt-3 border-t border-slate-200 pt-3">
-            <p className="mb-2 text-sm font-medium text-slate-700">Customer Bulk Import Preview</p>
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="mb-2 text-sm font-semibold text-foreground">Customer Bulk Import Preview</p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="file"
@@ -202,7 +202,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
               />
               <button
                 type="button"
-                className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-500"
+                className="rounded-lg border border-border bg-[var(--surface-muted)] px-3 py-1 text-sm font-semibold text-muted-foreground"
                 disabled
                 title="Customer confirm-import endpoint is not available"
               >
@@ -210,33 +210,33 @@ export default function EnterpriseListPage<T extends GenericRecord>({
               </button>
             </div>
 
-            {customerImportMessage ? <p className="mt-2 text-xs text-slate-600">{customerImportMessage}</p> : null}
+            {customerImportMessage ? <p className="mt-2 text-xs text-muted-foreground">{customerImportMessage}</p> : null}
 
             {customerImportPreview ? (
-              <div className="mt-3 rounded border border-slate-200 p-2 text-xs">
-                <p className="mb-1 text-slate-700">
+              <div className="mt-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3 text-xs">
+                <p className="mb-1 text-foreground">
                   Valid rows: <b>{customerImportPreview.valid_count}</b> · Invalid rows: <b>{customerImportPreview.invalid_count}</b>
                 </p>
-                <p className="mb-2 text-slate-700">Detected columns: {customerImportPreview.columns.join(", ") || "-"}</p>
+                <p className="mb-2 text-muted-foreground">Detected columns: {customerImportPreview.columns.join(", ") || "-"}</p>
                 <div className="overflow-auto">
                   <table className="min-w-full border-collapse">
                     <thead>
                       <tr>
                         {customerImportPreview.columns.map((header) => (
-                          <th key={header} className="border px-2 py-1 text-left">{header}</th>
+                          <th key={header} className="border border-border px-2 py-1 text-left">{header}</th>
                         ))}
-                        <th className="border px-2 py-1 text-left">valid</th>
+                        <th className="border border-border px-2 py-1 text-left">valid</th>
                       </tr>
                     </thead>
                     <tbody>
                       {customerImportPreview.preview_rows.map((row) => (
                         <tr key={row.row_number}>
                           {customerImportPreview.columns.map((header) => (
-                            <td key={`${row.row_number}-${header}`} className="border px-2 py-1">
+                            <td key={`${row.row_number}-${header}`} className="border border-border px-2 py-1">
                               {header === "name" ? row.name : header === "phone" ? row.phone : ""}
                             </td>
                           ))}
-                          <td className="border px-2 py-1">{row.valid ? "yes" : "no"}</td>
+                          <td className="border border-border px-2 py-1">{row.valid ? "yes" : "no"}</td>
                         </tr>
                       ))}
                     </tbody>

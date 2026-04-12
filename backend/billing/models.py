@@ -17,6 +17,15 @@ MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
 
 
+def _default_branch():
+    try:
+        from branch_control.services.branch_service import default_branch_for_model
+
+        return default_branch_for_model()
+    except Exception:
+        return None
+
+
 def _status_transition_blocked(previous_status: str | None, next_status: str | None, *, allowed: set[tuple[str, str]]) -> bool:
     if previous_status is None:
         return False
@@ -122,6 +131,20 @@ class DirectSale(BillingTimeStampedModel):
         blank=True,
         related_name="direct_sales",
     )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="direct_sales",
+    )
+    cash_counter = models.ForeignKey(
+        "branch_control.CashCounter",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="direct_sales",
+    )
     status = models.CharField(
         max_length=16,
         choices=DirectSaleStatus.choices,
@@ -171,6 +194,7 @@ class DirectSale(BillingTimeStampedModel):
         indexes = [
             models.Index(fields=["sale_date", "status", "customer"]),
             models.Index(fields=["delivery_required", "status"]),
+            models.Index(fields=["branch", "sale_date", "status"]),
         ]
 
     def clean(self):
@@ -184,6 +208,14 @@ class DirectSale(BillingTimeStampedModel):
             errors["balance_total"] = "Balance total must equal grand total minus received total."
         if not self.customer_id and not (self.customer_name_snapshot or "").strip():
             errors["customer_name_snapshot"] = "Walk-in or customer name is required."
+        if self.cash_counter_id:
+            counter_branch_id = getattr(self.cash_counter, "branch_id", None)
+            if self.branch_id and counter_branch_id and self.branch_id != counter_branch_id:
+                errors["cash_counter"] = "Selected cash counter must belong to the same branch."
+        if self.finance_account_id:
+            finance_branch_id = getattr(self.finance_account, "branch_id", None)
+            if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
+                errors["finance_account"] = "Selected finance account must belong to the sale branch."
         if self.delivery_required and self.status in {
             DirectSaleStatus.DELIVERED,
             DirectSaleStatus.INVOICED,
@@ -206,6 +238,12 @@ class DirectSale(BillingTimeStampedModel):
         self.customer_phone_snapshot = (self.customer_phone_snapshot or "").strip()
         self.customer_gstin = (self.customer_gstin or "").strip().upper() or None
         self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.cash_counter, "branch", None)
+                or getattr(self.finance_account, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -320,6 +358,13 @@ class BillingInvoice(BillingTimeStampedModel):
         blank=True,
         related_name="billing_invoices",
     )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="billing_invoices",
+    )
     billing_channel = models.CharField(
         max_length=20,
         choices=BillingChannel.choices,
@@ -391,6 +436,7 @@ class BillingInvoice(BillingTimeStampedModel):
             models.Index(fields=["billing_channel", "status"]),
             models.Index(fields=["source_type", "invoice_date"]),
             models.Index(fields=["direct_sale", "status"]),
+            models.Index(fields=["branch", "invoice_date", "status"]),
         ]
 
     def clean(self):
@@ -408,6 +454,8 @@ class BillingInvoice(BillingTimeStampedModel):
             errors["subscription"] = "Direct-sale billing documents cannot also link to EMI subscriptions."
         if self.direct_sale_id and self.billing_channel != BillingChannel.RETAIL:
             errors["billing_channel"] = "Direct-sale billing documents must use the retail billing channel."
+        if self.direct_sale_id and self.branch_id and self.direct_sale.branch_id and self.branch_id != self.direct_sale.branch_id:
+            errors["branch"] = "Invoice branch must match the linked direct sale branch."
         if (
             self.direct_sale_id
             and self.customer_id
@@ -444,6 +492,13 @@ class BillingInvoice(BillingTimeStampedModel):
         self.place_of_supply_state_code = (self.place_of_supply_state_code or "").strip().upper()
         self.notes = (self.notes or "").strip()
         self.terms = (self.terms or "").strip()
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.direct_sale, "branch", None)
+                or getattr(self.finance_account, "branch", None)
+                or getattr(self.subscription, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -875,6 +930,20 @@ class ReceiptDocument(BillingTimeStampedModel):
         db_index=True,
     )
     receipt_date = models.DateField(db_index=True)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="receipt_documents",
+    )
+    cash_counter = models.ForeignKey(
+        "branch_control.CashCounter",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="receipt_documents",
+    )
     finance_account = models.ForeignKey(
         FinanceAccount,
         on_delete=models.PROTECT,
@@ -946,22 +1015,30 @@ class ReceiptDocument(BillingTimeStampedModel):
             models.Index(fields=["status", "receipt_date"]),
             models.Index(fields=["source_type", "receipt_date"]),
             models.Index(fields=["direct_sale", "receipt_date"]),
+            models.Index(fields=["branch", "receipt_date", "status"]),
         ]
 
     def clean(self):
+        errors = {}
         if self.amount is None or self.amount <= MONEY_ZERO:
-            raise ValidationError({"amount": "Receipt amount must be greater than zero."})
+            errors["amount"] = "Receipt amount must be greater than zero."
         if self.payment_id and self.receipt_type != ReceiptType.EMI_PAYMENT_RECEIPT:
-            raise ValidationError({"receipt_type": "Payment-linked receipts must use EMI payment receipt type."})
+            errors["receipt_type"] = "Payment-linked receipts must use EMI payment receipt type."
         if (
             self.billing_invoice_id
             and self.direct_sale_id
             and self.billing_invoice.direct_sale_id
             and self.billing_invoice.direct_sale_id != self.direct_sale_id
         ):
-            raise ValidationError({"direct_sale": "Receipt direct sale must match the linked invoice source."})
+            errors["direct_sale"] = "Receipt direct sale must match the linked invoice source."
+        if self.cash_counter_id:
+            counter_branch_id = getattr(self.cash_counter, "branch_id", None)
+            if self.branch_id and counter_branch_id and self.branch_id != counter_branch_id:
+                errors["cash_counter"] = "Selected cash counter must belong to the receipt branch."
         if self.status in {BillingDocumentStatus.POSTED, BillingDocumentStatus.VOID} and not self.posted_journal_entry_id:
-            raise ValidationError({"posted_journal_entry": "Posted receipts must store a journal entry."})
+            errors["posted_journal_entry"] = "Posted receipts must store a journal entry."
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         _immutable_status_guard(
@@ -974,6 +1051,16 @@ class ReceiptDocument(BillingTimeStampedModel):
         self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
         self.customer_phone_snapshot = (self.customer_phone_snapshot or "").strip()
         self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.cash_counter, "branch", None)
+                or getattr(self.finance_account, "branch", None)
+                or getattr(self.payment, "branch", None)
+                or getattr(self.direct_sale, "branch", None)
+                or getattr(self.billing_invoice, "branch", None)
+                or getattr(self.subscription, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 

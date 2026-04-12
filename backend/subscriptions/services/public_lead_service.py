@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User, UserRole
+from crm.services.party_service import sync_party_for_customer, sync_party_for_lead
 from subscriptions.models import (
     AuditLog,
     Customer,
@@ -109,6 +110,7 @@ def create_public_lead(
             "interested_product": lead.interested_product,
         },
     )
+    sync_party_for_lead(lead)
 
     return lead
 
@@ -141,11 +143,13 @@ def update_public_lead_status(
 
     if next_status == PublicLeadStatus.CONVERTED:
         has_conversion_link = bool(
-            lead.converted_customer_id or lead.converted_subscription_id
+            lead.converted_customer_id
+            or lead.converted_subscription_id
+            or lead.converted_direct_sale_id
         )
         if not has_conversion_link:
             raise ValueError(
-                "Use the lead conversion workflow to link the real customer or subscription before marking this lead converted."
+                "Use the lead conversion workflow to link the real customer, subscription, or direct sale before marking this lead converted."
             )
 
     update_fields = ["status"]
@@ -180,6 +184,7 @@ def update_public_lead_status(
             "new_status": next_status,
         },
     )
+    sync_party_for_lead(lead, performed_by=performed_by)
 
     return lead
 
@@ -190,11 +195,12 @@ def complete_public_lead_conversion(
     lead: PublicLead,
     customer: Customer | None,
     subscription: Subscription | None,
+    direct_sale=None,
     performed_by=None,
 ):
-    if customer is None and subscription is None:
+    if customer is None and subscription is None and direct_sale is None:
         raise ValueError(
-            "Select the created customer or subscription before completing lead conversion."
+            "Select the created customer, subscription, or direct sale before completing lead conversion."
         )
 
     resolved_customer = customer
@@ -207,18 +213,38 @@ def complete_public_lead_conversion(
                 "Selected subscription does not belong to the selected customer."
             )
 
+    if direct_sale is not None and direct_sale.customer_id:
+        direct_sale_customer = direct_sale.customer
+        if resolved_customer is None:
+            resolved_customer = direct_sale_customer
+        elif direct_sale.customer_id != resolved_customer.id:
+            raise ValueError(
+                "Selected direct sale does not belong to the selected customer."
+            )
+
     previous_status = lead.status
     previous_customer = lead.converted_customer
     previous_subscription = lead.converted_subscription
+    previous_direct_sale = lead.converted_direct_sale
     update_fields: list[str] = []
+    lead_party = sync_party_for_lead(lead, performed_by=performed_by)
 
     if resolved_customer is not None and lead.converted_customer_id != resolved_customer.id:
         lead.converted_customer = resolved_customer
         update_fields.append("converted_customer")
+        sync_party_for_customer(
+            resolved_customer,
+            party=lead_party,
+            performed_by=performed_by,
+        )
 
     if subscription is not None and lead.converted_subscription_id != subscription.id:
         lead.converted_subscription = subscription
         update_fields.append("converted_subscription")
+
+    if direct_sale is not None and lead.converted_direct_sale_id != direct_sale.id:
+        lead.converted_direct_sale = direct_sale
+        update_fields.append("converted_direct_sale")
 
     now = timezone.now()
     if lead.status != PublicLeadStatus.CONVERTED:
@@ -272,6 +298,18 @@ def complete_public_lead_conversion(
             },
         )
 
+    if previous_direct_sale != lead.converted_direct_sale:
+        log_audit(
+            action_type=AuditLog.ActionType.LEAD_DIRECT_SALE_LINKED,
+            instance=lead,
+            performed_by=performed_by,
+            metadata={
+                "event": "LEAD_DIRECT_SALE_LINKED",
+                "previous_direct_sale_id": previous_direct_sale.id if previous_direct_sale else None,
+                "next_direct_sale_id": lead.converted_direct_sale_id,
+            },
+        )
+
     if previous_status != PublicLeadStatus.CONVERTED:
         log_audit(
             action_type=AuditLog.ActionType.LEAD_CONVERTED,
@@ -282,9 +320,12 @@ def complete_public_lead_conversion(
                 "previous_status": previous_status,
                 "converted_customer_id": lead.converted_customer_id,
                 "converted_subscription_id": lead.converted_subscription_id,
+                "converted_direct_sale_id": lead.converted_direct_sale_id,
                 "converted_by_id": lead.converted_by_id,
             },
         )
+
+    sync_party_for_lead(lead, performed_by=performed_by)
 
     return lead
 

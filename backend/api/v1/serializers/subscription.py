@@ -63,6 +63,9 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     subscription_number = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
     fulfillment_status = serializers.CharField(read_only=True)
+    branch_id = serializers.IntegerField(source="branch.id", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
 
     customer_id = serializers.IntegerField(source="customer.id", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
@@ -107,6 +110,9 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "subscription_number",
+            "branch_id",
+            "branch_code",
+            "branch_name",
             "customer",
             "customer_id",
             "customer_name",

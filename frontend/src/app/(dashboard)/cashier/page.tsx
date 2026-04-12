@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -33,7 +33,6 @@ import {
   getDashboardSummaryV2,
   listDashboardOverdue,
   listDashboardRecentPayments,
-  listDashboardReconciliationExceptions,
   listDashboardUpcoming,
   listDashboardWinners,
   normalizeDashboardSummary,
@@ -45,9 +44,6 @@ type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2
 type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
 type DashboardPaymentsPayload = Awaited<
   ReturnType<typeof listDashboardRecentPayments>
->;
-type DashboardReconciliationPayload = Awaited<
-  ReturnType<typeof listDashboardReconciliationExceptions>
 >;
 type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
 
@@ -78,8 +74,6 @@ export default function CashierDashboardPage() {
   const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
   const [recentPayments, setRecentPayments] =
     useState<DashboardPaymentsPayload | null>(null);
-  const [reconciliationItems, setReconciliationItems] =
-    useState<DashboardReconciliationPayload | null>(null);
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
@@ -90,61 +84,64 @@ export default function CashierDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const dashboardQuery =
-    windowPreset === "CUSTOM"
-      ? {
-          window: windowPreset,
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
+  const dashboardQuery = useMemo(
+    () =>
+      windowPreset === "CUSTOM"
+        ? {
+            window: windowPreset,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          }
+        : { window: windowPreset },
+    [endDate, startDate, windowPreset]
+  );
+
+  const loadDashboard = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
+      try {
+        const [
+          legacyPayload,
+          canonicalPayload,
+          overduePayload,
+          upcomingPayload,
+          recentPaymentsPayload,
+          winnersPayload,
+        ] = await Promise.all([
+          getCashierDashboard(),
+          getDashboardSummaryV2(dashboardQuery),
+          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+          listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
+          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+        ]);
+
+        setLegacy(legacyPayload);
+        setCanonical(canonicalPayload);
+        setOverdue(overduePayload);
+        setUpcoming(upcomingPayload);
+        setRecentPayments(recentPaymentsPayload);
+        setWinnerItems(winnersPayload);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") {
+          setLegacy(null);
+          setCanonical(null);
         }
-      : { window: windowPreset };
-
-  async function loadDashboard(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
-      const [
-        legacyPayload,
-        canonicalPayload,
-        overduePayload,
-        upcomingPayload,
-        recentPaymentsPayload,
-        reconciliationPayload,
-        winnersPayload,
-      ] = await Promise.all([
-        getCashierDashboard(),
-        getDashboardSummaryV2(dashboardQuery),
-        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-        listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
-        listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
-        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-      ]);
-
-      setLegacy(legacyPayload);
-      setCanonical(canonicalPayload);
-      setOverdue(overduePayload);
-      setUpcoming(upcomingPayload);
-      setRecentPayments(recentPaymentsPayload);
-      setReconciliationItems(reconciliationPayload);
-      setWinnerItems(winnersPayload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setLegacy(null);
-        setCanonical(null);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+    },
+    [dashboardQuery]
+  );
 
   useEffect(() => {
     void loadDashboard("initial");
-  }, [windowPreset, startDate, endDate]);
+  }, [loadDashboard]);
 
   const summary =
     canonical?.summary ??
@@ -176,6 +173,8 @@ export default function CashierDashboardPage() {
     <PortalPage
       title="Cashier Dashboard"
       subtitle="Daily counter workspace with canonical financial scope visibility on top, while keeping collection posting and receipt lookup fast for shop operations."
+      helperNote="Counter actions here remain branch-safe and traceable; collection posting and receipt generation continue using the existing audited payment flow."
+      helperTone="info"
       breadcrumbs={[{ label: "Cashier" }]}
       actions={[
         {
@@ -217,15 +216,14 @@ export default function CashierDashboardPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <button
-            type="button"
+          <ActionButton
+            variant="outline"
             onClick={() => void loadDashboard("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         </div>
 
         <DashboardTimeWindowSelector
@@ -316,7 +314,7 @@ export default function CashierDashboardPage() {
                 </p>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-slate-200 bg-white p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Next due
                     </div>
@@ -331,7 +329,7 @@ export default function CashierDashboardPage() {
                         : "No pending EMI"}
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-slate-200 bg-white p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Today throughput
                     </div>
@@ -342,7 +340,7 @@ export default function CashierDashboardPage() {
                       Average ticket {averageTicketValue}
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-slate-200 bg-white p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Winner / waiver
                     </div>
@@ -395,7 +393,7 @@ export default function CashierDashboardPage() {
                       {winnerRows.map((row) => (
                         <div
                           key={row.subscription_id}
-                          className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                          className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
                         >
                           <div className="font-semibold text-slate-950">
                             {row.subscription_number}
@@ -488,19 +486,19 @@ export default function CashierDashboardPage() {
                     return (
                       <div
                         key={`${subscriptionId}-${item.emi_id ?? "na"}`}
-                        className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
                             <div className="text-sm font-semibold text-foreground">
                               {item.customer_name || "Unknown customer"}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               {item.subscription_number || `SUB-${String(subscriptionId)}`} ·{" "}
                               {item.product_name || "Linked product"} · Batch{" "}
                               {item.batch_code || "—"} · Lucky {item.lucky_number ?? "—"}
                             </div>
-                            <div className="mt-2 text-sm text-muted-foreground">
+                            <div className="mt-2 text-sm text-slate-600">
                               Due {formatDate(item.due_date)} · Pending{" "}
                               {money(item.pending_amount)}
                               {item.is_overdue && item.overdue_days
@@ -510,7 +508,7 @@ export default function CashierDashboardPage() {
                           </div>
                           <Link
                             href="/cashier/collect"
-                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                           >
                             Open collect
                             <ArrowRight className="h-4 w-4" />
@@ -557,19 +555,19 @@ export default function CashierDashboardPage() {
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Payment
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Customer
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Subscription
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Amount
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Time
                         </th>
                       </tr>
@@ -577,45 +575,45 @@ export default function CashierDashboardPage() {
                     <tbody>
                       {paymentRows.map((payment) => (
                         <tr key={payment.payment_id} className="align-top">
-                          <td className="border-b border-border/70 px-4 py-3">
+                          <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm font-semibold text-foreground">
                               #{payment.payment_id}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               {payment.method || "—"} · {payment.reference_no || "No ref"}
                             </div>
                           </td>
-                          <td className="border-b border-border/70 px-4 py-3">
+                          <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm font-medium text-foreground">
                               {payment.customer_name || "Unknown customer"}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               {payment.customer_phone || "—"}
                             </div>
                           </td>
-                          <td className="border-b border-border/70 px-4 py-3">
+                          <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm font-medium text-foreground">
                               {payment.subscription_number ||
                                 `SUB-${payment.subscription_id ?? "—"}`}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               Batch {payment.batch_code || "—"} · Lucky{" "}
                               {payment.lucky_number ?? "—"}
                             </div>
                           </td>
-                          <td className="border-b border-border/70 px-4 py-3">
+                          <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm font-semibold text-foreground">
                               {money(payment.amount)}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               {payment.is_reversed ? "Reversed" : "Recorded"}
                             </div>
                           </td>
-                          <td className="border-b border-border/70 px-4 py-3">
+                          <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm text-foreground">
                               {formatDateTime(payment.created_at)}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               {formatDate(payment.payment_date)}
                             </div>
                           </td>

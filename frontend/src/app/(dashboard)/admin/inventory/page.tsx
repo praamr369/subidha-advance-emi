@@ -135,6 +135,8 @@ export default function AdminInventoryPage() {
     <PortalPage
       title="Inventory Operations"
       subtitle="Operate stock as a separate ledger-backed module while keeping product master canonical and leaving EMI, payment, draw, waiver, and reconciliation truth unchanged."
+      helperNote="Stock movement, delivery bridge, and adjustment queues stay explicit so inventory remains auditable and finance-safe."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory" },

@@ -46,10 +46,12 @@ export default function FormActions({
 
   const renderAction = (action: FormActionButton, variant: "secondary" | "danger") => {
     const baseClasses =
-      "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60";
+      "inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition disabled:cursor-not-allowed disabled:opacity-60";
     const variantClasses = {
-      secondary: "border-border bg-background text-foreground hover:bg-muted",
-      danger: "border-destructive/30 bg-background text-destructive hover:bg-destructive/10",
+      secondary:
+        "border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+      danger:
+        "border-red-300 bg-red-50 text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:border-red-400 hover:bg-red-100",
     };
 
     if (action.href) {
@@ -79,7 +81,8 @@ export default function FormActions({
     <div
       className={cn(
         "mt-6",
-        sticky && "sticky bottom-0 bg-background/90 backdrop-blur",
+      sticky &&
+          "sticky bottom-0 z-10 rounded-xl border border-border bg-[color-mix(in_oklab,var(--surface-card-elevated)_95%,transparent)] px-4 pb-3 shadow-[0_-16px_28px_-20px_rgba(15,23,42,0.28)] backdrop-blur",
         sticky && "pt-4"
       )}
     >
@@ -95,16 +98,19 @@ export default function FormActions({
           {cancel && renderAction(cancel, "secondary")}
           <button
             type="submit"
-            onClick={onSubmitClick}
-            disabled={submitting || submitDisabled}
-            className={cn(
-              "inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60",
-              submitDisabled && "opacity-60"
-            )}
-          >
-            {submitting ? submitLoadingLabel : submitLabel}
-          </button>
-        </div>
+              onClick={onSubmitClick}
+              disabled={submitting || submitDisabled}
+              className={cn(
+                "inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/80 bg-primary px-4 text-sm font-semibold tracking-[0.01em] text-primary-foreground shadow-[0_16px_35px_-22px_rgba(30,64,175,0.68)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] disabled:cursor-not-allowed disabled:opacity-60",
+                submitDisabled && "opacity-60"
+              )}
+            >
+              {submitting ? (
+                <span className="inline-flex h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+              ) : null}
+              {submitting ? submitLoadingLabel : submitLabel}
+            </button>
+          </div>
       </div>
     </div>
   );

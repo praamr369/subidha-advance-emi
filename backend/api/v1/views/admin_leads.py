@@ -1,5 +1,6 @@
-from django.db.models import Q
+from django.db.models import Count, Min, Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +14,8 @@ from api.v1.serializers.admin_leads import (
     AdminLeadNoteUpdateSerializer,
     AdminLeadStatusUpdateSerializer,
 )
+from crm.models import PartyInteraction, PartyInteractionStatus, PartyLink, PartyLinkRole
+from crm.services.party_service import seed_missing_party_links
 from subscriptions.models import PublicLead, PublicLeadStatus
 from subscriptions.services.public_lead_service import (
     assign_public_lead,
@@ -29,6 +32,7 @@ def _lead_queryset():
             "assigned_to",
             "converted_customer",
             "converted_subscription",
+            "converted_direct_sale",
             "converted_by",
         )
         .order_by("-created_at", "-id")
@@ -70,6 +74,7 @@ def _apply_filters(queryset, request):
             | Q(assigned_to__username__icontains=q)
             | Q(assigned_to__first_name__icontains=q)
             | Q(assigned_to__last_name__icontains=q)
+            | Q(converted_direct_sale__sale_no__icontains=q)
         )
 
         if q.isdigit():
@@ -78,6 +83,63 @@ def _apply_filters(queryset, request):
         queryset = queryset.filter(filters)
 
     return queryset
+
+
+def _crm_serializer_context(request, leads):
+    lead_ids = [lead.id for lead in leads if getattr(lead, "id", None)]
+    if not lead_ids:
+        return {"request": request}
+
+    seed_missing_party_links()
+    now = timezone.now()
+
+    links = list(
+        PartyLink.objects.select_related("party")
+        .filter(
+            role_type=PartyLinkRole.LEAD,
+            source_model="PublicLead",
+            source_pk__in=lead_ids,
+        )
+        .order_by("id")
+    )
+    party_ids = [link.party_id for link in links]
+    follow_up_rows = {
+        row["party_id"]: row
+        for row in PartyInteraction.objects.filter(
+            party_id__in=party_ids,
+            status=PartyInteractionStatus.OPEN,
+        )
+        .values("party_id")
+        .annotate(
+            open_follow_up_count=Count("id"),
+            next_follow_up_at=Min("next_follow_up_at"),
+        )
+    }
+
+    lead_crm_map = {}
+    for link in links:
+        follow_up = follow_up_rows.get(link.party_id, {})
+        next_follow_up_at = follow_up.get("next_follow_up_at")
+        if next_follow_up_at is None:
+            follow_up_state = "NONE"
+        elif next_follow_up_at <= now:
+            follow_up_state = "DUE"
+        else:
+            follow_up_state = "SCHEDULED"
+
+        lead_crm_map[link.source_pk] = {
+            "party_id": link.party_id,
+            "party_no": link.party.party_no,
+            "party_display_name": link.party.display_name,
+            "next_follow_up_at": next_follow_up_at,
+            "follow_up_state": follow_up_state,
+            "open_follow_up_count": follow_up.get("open_follow_up_count", 0),
+        }
+
+    return {
+        "request": request,
+        "lead_crm_map": lead_crm_map,
+    }
 
 
 def _summary_for_queryset(queryset):
@@ -98,7 +160,12 @@ class AdminLeadListView(APIView):
 
     def get(self, request):
         queryset = _apply_filters(_lead_queryset(), request)
-        serializer = AdminLeadListSerializer(queryset[:200], many=True)
+        leads = list(queryset[:200])
+        serializer = AdminLeadListSerializer(
+            leads,
+            many=True,
+            context=_crm_serializer_context(request, leads),
+        )
 
         return Response(
             {
@@ -114,7 +181,10 @@ class AdminLeadDetailView(APIView):
 
     def get(self, request, pk):
         lead = get_object_or_404(_lead_queryset(), pk=pk)
-        serializer = AdminLeadDetailSerializer(lead)
+        serializer = AdminLeadDetailSerializer(
+            lead,
+            context=_crm_serializer_context(request, [lead]),
+        )
         return Response(serializer.data)
 
 
@@ -135,7 +205,12 @@ class AdminLeadStatusUpdateView(APIView):
         except ValueError as exc:
             raise serializers.ValidationError({"status": str(exc)}) from exc
 
-        return Response(AdminLeadDetailSerializer(lead).data)
+        return Response(
+            AdminLeadDetailSerializer(
+                lead,
+                context=_crm_serializer_context(request, [lead]),
+            ).data
+        )
 
 
 class AdminLeadAssignView(APIView):
@@ -155,7 +230,12 @@ class AdminLeadAssignView(APIView):
         except ValueError as exc:
             raise serializers.ValidationError({"assigned_to": str(exc)}) from exc
 
-        return Response(AdminLeadDetailSerializer(lead).data)
+        return Response(
+            AdminLeadDetailSerializer(
+                lead,
+                context=_crm_serializer_context(request, [lead]),
+            ).data
+        )
 
 
 class AdminLeadNoteUpdateView(APIView):
@@ -176,7 +256,12 @@ class AdminLeadNoteUpdateView(APIView):
         except ValueError as exc:
             raise serializers.ValidationError({"note": str(exc)}) from exc
 
-        return Response(AdminLeadDetailSerializer(lead).data)
+        return Response(
+            AdminLeadDetailSerializer(
+                lead,
+                context=_crm_serializer_context(request, [lead]),
+            ).data
+        )
 
 
 class AdminLeadConversionCompleteView(APIView):
@@ -192,9 +277,15 @@ class AdminLeadConversionCompleteView(APIView):
                 lead=lead,
                 customer=serializer.validated_data.get("customer_id"),
                 subscription=serializer.validated_data.get("subscription_id"),
+                direct_sale=serializer.validated_data.get("direct_sale_id"),
                 performed_by=request.user,
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
-        return Response(AdminLeadDetailSerializer(lead).data)
+        return Response(
+            AdminLeadDetailSerializer(
+                lead,
+                context=_crm_serializer_context(request, [lead]),
+            ).data
+        )

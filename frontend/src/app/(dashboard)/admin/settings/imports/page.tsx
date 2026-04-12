@@ -9,15 +9,21 @@ import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
+  postBranchImport,
+  postCounterImport,
   postChartOfAccountsImport,
+  postEmployeeImport,
   postVendorImport,
+  previewBranchImport,
+  previewCounterImport,
   previewChartOfAccountsImport,
+  previewEmployeeImport,
   previewVendorImport,
   type ImportPostResponse,
   type ImportPreviewResponse,
 } from "@/services/import-hub";
 
-type ImportKey = "chartOfAccounts" | "vendors";
+type ImportKey = "chartOfAccounts" | "vendors" | "employees" | "branches" | "counters";
 
 function UploadPanel({
   title,
@@ -40,6 +46,8 @@ function UploadPanel({
   onPreview: () => void;
   onPost: () => void;
 }) {
+  const readyToPost = Boolean(file && preview && preview.invalid_count === 0);
+
   return (
     <div className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm">
       <div className="text-base font-semibold text-foreground">{title}</div>
@@ -57,13 +65,35 @@ function UploadPanel({
           <ActionButton variant="secondary" onClick={onPreview} loading={loading} disabled={!file}>
             Preview
           </ActionButton>
-          <ActionButton variant="primary" onClick={onPost} loading={loading} disabled={!file}>
+          <ActionButton
+            variant="primary"
+            onClick={onPost}
+            loading={loading}
+            disabled={!readyToPost}
+          >
             Post Import
           </ActionButton>
         </div>
+        {!preview ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Preview is required before posting this import.
+          </div>
+        ) : null}
         {preview ? (
           <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             Valid {preview.valid_count} • Invalid {preview.invalid_count}
+          </div>
+        ) : null}
+        {preview?.errors.length ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="font-medium">Preview errors</div>
+            <ul className="mt-2 space-y-1">
+              {preview.errors.slice(0, 5).map((row, index) => (
+                <li key={`${row.row_number}-${index}`}>
+                  Row {row.row_number ?? "header"}: {row.errors.join(", ")}
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
         {result ? (
@@ -82,15 +112,31 @@ export default function AdminSettingsImportsPage() {
   const [files, setFiles] = useState<Record<ImportKey, File | null>>({
     chartOfAccounts: null,
     vendors: null,
+    employees: null,
+    branches: null,
+    counters: null,
   });
   const [previews, setPreviews] = useState<Record<ImportKey, ImportPreviewResponse | null>>({
     chartOfAccounts: null,
     vendors: null,
+    employees: null,
+    branches: null,
+    counters: null,
   });
   const [results, setResults] = useState<Record<ImportKey, ImportPostResponse | null>>({
     chartOfAccounts: null,
     vendors: null,
+    employees: null,
+    branches: null,
+    counters: null,
   });
+
+  function setSelectedFile(key: ImportKey, file: File | null) {
+    setFiles((current) => ({ ...current, [key]: file }));
+    setPreviews((current) => ({ ...current, [key]: null }));
+    setResults((current) => ({ ...current, [key]: null }));
+    setError(null);
+  }
 
   async function handlePreview(key: ImportKey) {
     const file = files[key];
@@ -100,7 +146,13 @@ export default function AdminSettingsImportsPage() {
       const payload =
         key === "chartOfAccounts"
           ? await previewChartOfAccountsImport(file)
-          : await previewVendorImport(file);
+          : key === "vendors"
+            ? await previewVendorImport(file)
+            : key === "employees"
+              ? await previewEmployeeImport(file)
+              : key === "branches"
+                ? await previewBranchImport(file)
+                : await previewCounterImport(file);
       setPreviews((current) => ({ ...current, [key]: payload }));
       setResults((current) => ({ ...current, [key]: null }));
       setError(null);
@@ -114,12 +166,27 @@ export default function AdminSettingsImportsPage() {
   async function handlePost(key: ImportKey) {
     const file = files[key];
     if (!file) return;
+    const preview = previews[key];
+    if (!preview) {
+      setError("Run preview first so the current file is validated before posting.");
+      return;
+    }
+    if (preview.invalid_count > 0) {
+      setError("Resolve preview errors before posting the import.");
+      return;
+    }
     setLoadingKey(key);
     try {
       const payload =
         key === "chartOfAccounts"
           ? await postChartOfAccountsImport(file)
-          : await postVendorImport(file);
+          : key === "vendors"
+            ? await postVendorImport(file)
+            : key === "employees"
+              ? await postEmployeeImport(file)
+              : key === "branches"
+                ? await postBranchImport(file)
+                : await postCounterImport(file);
       setResults((current) => ({ ...current, [key]: payload }));
       setError(null);
     } catch (err) {
@@ -143,8 +210,8 @@ export default function AdminSettingsImportsPage() {
         { href: ROUTES.admin.inventoryOpeningStock, label: "Opening Stock", variant: "secondary" },
       ]}
       stats={[
-        { label: "Live Import Panels", value: "4", tone: "info" },
-        { label: "Master CSV Imports", value: "2", tone: "info" },
+        { label: "Live Import Panels", value: "8", tone: "info" },
+        { label: "Preview-First Masters", value: "5", tone: "info" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
@@ -156,6 +223,15 @@ export default function AdminSettingsImportsPage() {
           description="These routes already exist in the repo and remain the canonical operator flows for product master and opening stock imports."
           contentClassName="grid gap-4 md:grid-cols-2"
         >
+          <Link
+            href="/admin/customers"
+            className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+          >
+            <div className="text-base font-semibold text-foreground">Customer import</div>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Preview and confirm customer profile preload from the customer workspace. Keep subscription onboarding separate and controlled.
+            </p>
+          </Link>
           <Link
             href="/admin/products/import"
             className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
@@ -188,9 +264,7 @@ export default function AdminSettingsImportsPage() {
             preview={previews.chartOfAccounts}
             result={results.chartOfAccounts}
             loading={loadingKey === "chartOfAccounts"}
-            onFileChange={(file) =>
-              setFiles((current) => ({ ...current, chartOfAccounts: file }))
-            }
+            onFileChange={(file) => setSelectedFile("chartOfAccounts", file)}
             onPreview={() => void handlePreview("chartOfAccounts")}
             onPost={() => void handlePost("chartOfAccounts")}
           />
@@ -202,14 +276,56 @@ export default function AdminSettingsImportsPage() {
             preview={previews.vendors}
             result={results.vendors}
             loading={loadingKey === "vendors"}
-            onFileChange={(file) => setFiles((current) => ({ ...current, vendors: file }))}
+            onFileChange={(file) => setSelectedFile("vendors", file)}
             onPreview={() => void handlePreview("vendors")}
             onPost={() => void handlePost("vendors")}
+          />
+
+          <UploadPanel
+            title="Staff master CSV"
+            description="Import or update employee master records with branch, joining date, salary baseline, and payroll-ready workforce metadata. This does not post salary, reimbursement, or attendance money events."
+            file={files.employees}
+            preview={previews.employees}
+            result={results.employees}
+            loading={loadingKey === "employees"}
+            onFileChange={(file) => setSelectedFile("employees", file)}
+            onPreview={() => void handlePreview("employees")}
+            onPost={() => void handlePost("employees")}
+          />
+        </WorkspaceSection>
+
+        <WorkspaceSection
+          title="Branch rollout imports"
+          description="Use these only for governed branch and counter setup. They create or update masters; they do not post collections, stock, or accounting history."
+          contentClassName="grid gap-4 xl:grid-cols-2"
+        >
+          <UploadPanel
+            title="Branch master CSV"
+            description="Import or update branch code, name, status, and primary-branch posture. Existing single-branch behavior remains backward-compatible through the primary branch."
+            file={files.branches}
+            preview={previews.branches}
+            result={results.branches}
+            loading={loadingKey === "branches"}
+            onFileChange={(file) => setSelectedFile("branches", file)}
+            onPreview={() => void handlePreview("branches")}
+            onPost={() => void handlePost("branches")}
+          />
+
+          <UploadPanel
+            title="Counter / cash-desk CSV"
+            description="Import or update counters with branch code, finance account mapping, and optional cashier username assignment. Counter import never posts payment rows."
+            file={files.counters}
+            preview={previews.counters}
+            result={results.counters}
+            loading={loadingKey === "counters"}
+            onFileChange={(file) => setSelectedFile("counters", file)}
+            onPreview={() => void handlePreview("counters")}
+            onPost={() => void handlePost("counters")}
           />
         </WorkspaceSection>
 
         <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-          Opening-balance bulk import is intentionally deferred here. Changing balances on finance accounts that already have posted activity would risk creating a second uncontrolled truth source, so that flow should stay controlled and case-by-case until an approved posting-safe policy exists.
+          Subscription bulk import remains intentionally unavailable here. Opening-balance bulk import is also deferred. Those flows would risk bypassing EMI, reconciliation, posting, or audit controls if they were reduced to unchecked CSV writes.
         </div>
       </div>
     </PortalPage>

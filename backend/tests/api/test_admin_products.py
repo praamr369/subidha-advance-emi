@@ -174,6 +174,34 @@ class AdminProductsApiTests(APITestCase):
         self.assertIsNotNone(product.category_master_id)
         self.assertIsNotNone(product.subcategory_master_id)
 
+    def test_product_import_preview_reports_create_and_update_candidates(self):
+        create_product(
+            name="Preview Existing Sofa",
+            product_code="PRV-SOF-001",
+            base_price=Decimal("18000.00"),
+        )
+        uploaded = SimpleUploadedFile(
+            "products-preview.csv",
+            (
+                "name,base_price,product_code,category,sub_category,sku,unit_of_measure,description\n"
+                "Preview Existing Sofa,19000.00,PRV-SOF-001,Sofa,Premium,PRV-SOF-001,PCS,Updated product\n"
+                "Preview New Bed,22000.00,,Bed,King,PRV-BED-001,PCS,New product\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            "/api/v1/admin/products/import-preview/",
+            {"file": uploaded},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["valid_count"], 2)
+        self.assertEqual(response.data["invalid_count"], 0)
+        self.assertEqual(response.data["update_candidates"], 1)
+        self.assertEqual(response.data["create_candidates"], 1)
+
     def test_product_partial_save_syncs_catalog_master_fields(self):
         product = create_product(
             name="Partial Sync Product",

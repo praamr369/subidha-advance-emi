@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
 import PortalPage from "@/components/ui/PortalPage";
 import DataTable from "@/components/ui/DataTable";
 import SearchSelect from "@/components/ui/SearchSelect";
@@ -23,6 +24,17 @@ const defaultForm: CreateForm = {
   tenure_months: "",
   start_date: new Date().toISOString().slice(0, 10),
 };
+
+function subscriptionStatusToneClassName(status: string): string {
+  const normalized = status.toUpperCase();
+  if (normalized === "COMPLETED" || normalized === "WON") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (normalized === "DEFAULTED" || normalized === "CANCELLED") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-slate-300 bg-slate-100 text-slate-800";
+}
 
 export default function AdminSubscriptionsPage() {
   const router = useRouter();
@@ -166,56 +178,8 @@ export default function AdminSubscriptionsPage() {
   }
 
   function handlePrintAcknowledgement(subscription: AdminSubscription): void {
-    const customer = customers.find((c) => c.id === subscription.customer);
-    const product = products.find((p) => p.id === subscription.product);
-    const batch = batches.find((b) => b.id === subscription.batch);
-    const partner = partners.find((p) => p.id === subscription.partner);
-
-    const popup = window.open("", "_blank", "width=900,height=700");
-    if (!popup) return;
-
-    popup.document.write(`
-      <html>
-        <head>
-          <title>Subscription Acknowledgement #${subscription.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { margin-bottom: 8px; }
-            .meta { margin-bottom: 20px; color: #444; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-            .row { margin: 8px 0; }
-            .label { font-weight: bold; display: inline-block; min-width: 180px; }
-          </style>
-        </head>
-        <body>
-          <h1>Subscription Acknowledgement</h1>
-          <div class="meta">Subidha Furniture - Lucky Plan EMI System</div>
-
-          <div class="card">
-            <div class="row"><span class="label">Subscription ID:</span> #${subscription.id}</div>
-            <div class="row"><span class="label">Customer:</span> ${customer?.name ?? "-"} (${customer?.phone ?? "-"})</div>
-            <div class="row"><span class="label">Product:</span> ${product?.name ?? "-"}</div>
-            <div class="row"><span class="label">Batch:</span> ${batch?.batch_code ?? "-"}</div>
-            <div class="row"><span class="label">Lucky ID:</span> ${subscription.lucky_id ? `#${subscription.lucky_id}` : "-"}</div>
-            <div class="row"><span class="label">Partner:</span> ${partner?.username ?? "-"}</div>
-            <div class="row"><span class="label">Plan Type:</span> ${subscription.plan_type}</div>
-            <div class="row"><span class="label">Tenure:</span> ${subscription.tenure_months} months</div>
-            <div class="row"><span class="label">Start Date:</span> ${subscription.start_date}</div>
-            <div class="row"><span class="label">Monthly Amount:</span> ₹${subscription.monthly_amount}</div>
-            <div class="row"><span class="label">Total Amount:</span> ₹${subscription.total_amount}</div>
-            <div class="row"><span class="label">Status:</span> ${subscription.status}</div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-
-    popup.document.close();
+    setSuccessSubscription(subscription);
+    window.print();
   }
 
   async function handleCreateSubscription(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -253,10 +217,12 @@ export default function AdminSubscriptionsPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Subscription Management"
       subtitle="Create subscriptions, review portfolio health, and operate daily Lucky Plan workflows."
     >
       <section
+        className="receipt-print-hide"
         style={{
           marginBottom: 16,
           display: "grid",
@@ -303,85 +269,170 @@ export default function AdminSubscriptionsPage() {
             padding: 16,
           }}
         >
-          <h3 style={{ marginTop: 0, marginBottom: 8, color: "#166534" }}>
-            Subscription created successfully
-          </h3>
+          <div className="receipt-print-hide">
+            <h3 style={{ marginTop: 0, marginBottom: 8, color: "#166534" }}>
+              Subscription created successfully
+            </h3>
 
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            <div>
-              <strong>Subscription ID:</strong> #{successSubscription.id}
+            <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+              <div>
+                <strong>Subscription ID:</strong> #{successSubscription.id}
+              </div>
+              <div>
+                <strong>Customer:</strong>{" "}
+                {customerMap[successSubscription.customer]
+                  ? `${customerMap[successSubscription.customer].name} (${customerMap[successSubscription.customer].phone})`
+                  : successSubscription.customer}
+              </div>
+              <div>
+                <strong>Product:</strong>{" "}
+                {productMap[successSubscription.product]?.name ?? successSubscription.product}
+              </div>
+              <div>
+                <strong>Batch:</strong>{" "}
+                {successSubscription.batch
+                  ? (batchMap[successSubscription.batch]?.batch_code ?? successSubscription.batch)
+                  : "-"}
+              </div>
+              <div>
+                <strong>Plan:</strong> {successSubscription.plan_type}
+              </div>
+              <div>
+                <strong>Monthly Amount:</strong> {formatCurrency(successSubscription.monthly_amount)}
+              </div>
+              <div>
+                <strong>Status:</strong> {successSubscription.status}
+              </div>
             </div>
-            <div>
-              <strong>Customer:</strong>{" "}
-              {customerMap[successSubscription.customer]
-                ? `${customerMap[successSubscription.customer].name} (${customerMap[successSubscription.customer].phone})`
-                : successSubscription.customer}
-            </div>
-            <div>
-              <strong>Product:</strong>{" "}
-              {productMap[successSubscription.product]?.name ?? successSubscription.product}
-            </div>
-            <div>
-              <strong>Batch:</strong>{" "}
-              {successSubscription.batch
-                ? (batchMap[successSubscription.batch]?.batch_code ?? successSubscription.batch)
-                : "-"}
-            </div>
-            <div>
-              <strong>Plan:</strong> {successSubscription.plan_type}
-            </div>
-            <div>
-              <strong>Monthly Amount:</strong> {formatCurrency(successSubscription.monthly_amount)}
-            </div>
-            <div>
-              <strong>Status:</strong> {successSubscription.status}
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/subscriptions/${successSubscription.id}`)}
+              >
+                View Subscription
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/payments/create?subscription=${successSubscription.id}`)}
+              >
+                Create Payment
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePrintAcknowledgement(successSubscription)}
+              >
+                Print Contract / Acknowledgement
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessSubscription(null);
+                  setForm(defaultForm);
+                  setStep(1);
+                }}
+              >
+                Create Another Subscription
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/customers/${successSubscription.customer}`)}
+              >
+                Go to Customer Profile
+              </button>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/subscriptions/${successSubscription.id}`)}
-            >
-              View Subscription
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/payments/create?subscription=${successSubscription.id}`)}
-            >
-              Create Payment
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handlePrintAcknowledgement(successSubscription)}
-            >
-              Print Receipt / Acknowledgement
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSuccessSubscription(null);
-                setForm(defaultForm);
-                setStep(1);
-              }}
-            >
-              Create Another Subscription
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push(`/admin/customers/${successSubscription.customer}`)}
-            >
-              Go to Customer Profile
-            </button>
-          </div>
+          <SubscriptionContractDocument
+            audienceLabel="Subscription acknowledgement snapshot for customer and shop counter use."
+            contractReference={`SUB-${successSubscription.id}`}
+            subscriptionId={successSubscription.id}
+            statusLabel={successSubscription.status}
+            statusToneClassName={subscriptionStatusToneClassName(successSubscription.status)}
+            customerFields={[
+              {
+                label: "Customer",
+                value: customerMap[successSubscription.customer]
+                  ? `${customerMap[successSubscription.customer].name}`
+                  : `Customer #${successSubscription.customer}`,
+                emphasize: true,
+              },
+              {
+                label: "Phone",
+                value: customerMap[successSubscription.customer]?.phone ?? "—",
+              },
+              {
+                label: "Product",
+                value:
+                  productMap[successSubscription.product]?.name ??
+                  `Product #${successSubscription.product}`,
+                emphasize: true,
+              },
+              {
+                label: "Product Code",
+                value: productMap[successSubscription.product]?.product_code ?? "—",
+              },
+            ]}
+            contractFields={[
+              { label: "Plan Type", value: successSubscription.plan_type },
+              {
+                label: "Tenure",
+                value: `${successSubscription.tenure_months} months`,
+              },
+              { label: "Start Date", value: successSubscription.start_date || "—" },
+              {
+                label: "Batch",
+                value: successSubscription.batch
+                  ? batchMap[successSubscription.batch]?.batch_code ??
+                    `Batch #${successSubscription.batch}`
+                  : "—",
+              },
+              {
+                label: "Lucky ID",
+                value: successSubscription.lucky_id
+                  ? `#${successSubscription.lucky_id}`
+                  : "Auto",
+              },
+              {
+                label: "Partner",
+                value: successSubscription.partner
+                  ? partnerMap[successSubscription.partner]?.username ??
+                    `Partner #${successSubscription.partner}`
+                  : "Auto / None",
+              },
+            ]}
+            financialFields={[
+              {
+                label: "Monthly EMI",
+                value: formatCurrency(successSubscription.monthly_amount),
+                emphasize: true,
+              },
+              {
+                label: "Total Contract Value",
+                value: formatCurrency(successSubscription.total_amount),
+                emphasize: true,
+              },
+              { label: "Contract Status", value: successSubscription.status },
+              {
+                label: "Lifecycle",
+                value: "Newly created contract",
+              },
+            ]}
+            terms={[
+              "Product base price is treated as total contract value for Lucky Plan EMI contracts.",
+              "Monthly EMI remains derived from tenure and contract value in canonical subscription records.",
+              "This acknowledgement does not modify payment, waiver, or winner history.",
+            ]}
+          />
         </section>
       ) : null}
 
-      <WizardShell step={step} totalSteps={3} title="Create Subscription Wizard">
+      <div className="receipt-print-hide">
+        <WizardShell step={step} totalSteps={3} title="Create Subscription Wizard">
         <form onSubmit={handleCreateSubscription} style={{ display: "grid", gap: 12 }}>
           {step === 1 ? (
             <>
@@ -541,27 +592,28 @@ export default function AdminSubscriptionsPage() {
         </form>
 
         {createError ? <p style={{ color: "#b91c1c", margin: 0 }}>{createError}</p> : null}
-      </WizardShell>
+        </WizardShell>
 
-      <DataTable<TableRow>
-        loading={loading}
-        error={error}
-        rows={tableRows}
-        columns={[
-          { key: "id", title: "ID" },
-          { key: "customer_name", title: "Customer" },
-          { key: "product_name", title: "Product" },
-          { key: "partner_name", title: "Partner" },
-          { key: "batch_code", title: "Batch" },
-          { key: "lucky_label", title: "Lucky ID" },
-          { key: "plan_type", title: "Plan" },
-          { key: "tenure_months", title: "Tenure" },
-          { key: "monthly_amount", title: "Monthly" },
-          { key: "total_amount", title: "Total" },
-          { key: "status", title: "Status" },
-          { key: "start_date", title: "Start Date" },
-        ]}
-      />
+        <DataTable<TableRow>
+          loading={loading}
+          error={error}
+          rows={tableRows}
+          columns={[
+            { key: "id", title: "ID" },
+            { key: "customer_name", title: "Customer" },
+            { key: "product_name", title: "Product" },
+            { key: "partner_name", title: "Partner" },
+            { key: "batch_code", title: "Batch" },
+            { key: "lucky_label", title: "Lucky ID" },
+            { key: "plan_type", title: "Plan" },
+            { key: "tenure_months", title: "Tenure" },
+            { key: "monthly_amount", title: "Monthly" },
+            { key: "total_amount", title: "Total" },
+            { key: "status", title: "Status" },
+            { key: "start_date", title: "Start Date" },
+          ]}
+        />
+      </div>
     </PortalPage>
   );
 }

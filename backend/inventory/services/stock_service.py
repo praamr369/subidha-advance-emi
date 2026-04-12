@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -14,6 +14,7 @@ from accounting.services.operational_accounts_service import ensure_phase3_syste
 from inventory.models import (
     InventoryItem,
     PurchaseBill,
+    PurchaseBillLine,
     PurchaseBillStatus,
     StockLocation,
     StockAdjustment,
@@ -29,6 +30,10 @@ def _quantity(value) -> Decimal:
     return Decimal(str(value or "0")).quantize(Decimal("0.001"))
 
 
+def _money(value) -> Decimal:
+    return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
 def generate_stock_adjustment_number(*, adjustment_date=None) -> str:
     effective_date = adjustment_date or timezone.localdate()
     date_part = effective_date.strftime("%Y%m%d")
@@ -36,6 +41,157 @@ def generate_stock_adjustment_number(*, adjustment_date=None) -> str:
         candidate = f"ADJ-{date_part}-{get_random_string(4).upper()}"
         if not StockAdjustment.objects.filter(adjustment_no=candidate).exists():
             return candidate
+
+
+def _normalize_purchase_bill_lines(*, lines: list[dict], tax_mode: str) -> list[dict]:
+    normalized_lines: list[dict] = []
+    if not lines:
+        raise ValueError("At least one purchase bill line is required.")
+
+    for line in lines:
+        inventory_item = line.get("inventory_item")
+        if not isinstance(inventory_item, InventoryItem):
+            raise ValueError("Each purchase bill line must reference an inventory item.")
+        if not inventory_item.stock_tracking_enabled:
+            raise ValueError("Purchase bill lines require stock-tracked inventory items.")
+
+        quantity = _quantity(line.get("quantity"))
+        if quantity <= Decimal("0.000"):
+            raise ValueError("Purchase bill quantity must be greater than zero.")
+
+        unit_cost = _money(line.get("unit_cost"))
+        taxable_value = _money(line.get("taxable_value"))
+        if taxable_value <= Decimal("0.00"):
+            taxable_value = _money(quantity * unit_cost)
+
+        tax_amount = Decimal("0.00") if tax_mode == "NON_GST" else _money(line.get("tax_amount"))
+        line_total = _money(line.get("line_total"))
+        computed_total = _money(taxable_value + tax_amount)
+        if line_total <= Decimal("0.00"):
+            line_total = computed_total
+        elif line_total != computed_total:
+            raise ValueError("Purchase bill line total must equal taxable value plus tax amount.")
+
+        normalized_lines.append(
+            {
+                "inventory_item": inventory_item,
+                "description": (
+                    str(line.get("description") or getattr(inventory_item.product, "name", "") or inventory_item.sku or "")
+                ).strip(),
+                "quantity": quantity,
+                "unit_cost": unit_cost,
+                "taxable_value": taxable_value,
+                "tax_amount": tax_amount,
+                "line_total": line_total,
+            }
+        )
+
+    return normalized_lines
+
+
+def _replace_purchase_bill_lines(*, purchase_bill: PurchaseBill, lines: list[dict]):
+    purchase_bill.lines.all().delete()
+    PurchaseBillLine.objects.bulk_create(
+        [
+            PurchaseBillLine(
+                purchase_bill=purchase_bill,
+                inventory_item=line["inventory_item"],
+                description=line.get("description", ""),
+                quantity=line["quantity"],
+                unit_cost=line["unit_cost"],
+                taxable_value=line["taxable_value"],
+                tax_amount=line["tax_amount"],
+                line_total=line["line_total"],
+            )
+            for line in lines
+        ]
+    )
+
+
+@transaction.atomic
+def upsert_purchase_bill_draft(
+    *,
+    bill_no: str,
+    bill_date,
+    vendor,
+    tax_mode: str,
+    branch=None,
+    stock_location=None,
+    finance_account=None,
+    notes: str = "",
+    lines: list[dict],
+    purchase_bill_id: int | None = None,
+    performed_by=None,
+):
+    normalized_lines = _normalize_purchase_bill_lines(lines=lines, tax_mode=str(tax_mode).strip().upper())
+    subtotal = sum((_money(line["taxable_value"]) for line in normalized_lines), Decimal("0.00"))
+    tax_total = sum((_money(line["tax_amount"]) for line in normalized_lines), Decimal("0.00"))
+    grand_total = sum((_money(line["line_total"]) for line in normalized_lines), Decimal("0.00"))
+
+    if purchase_bill_id is None:
+        purchase_bill = PurchaseBill(
+            bill_no=bill_no,
+            bill_date=bill_date,
+            vendor=vendor,
+            tax_mode=tax_mode,
+            branch=branch,
+            stock_location=stock_location,
+            finance_account=finance_account,
+            notes=notes,
+            subtotal=subtotal,
+            tax_total=tax_total,
+            grand_total=grand_total,
+        )
+        purchase_bill.save()
+        _replace_purchase_bill_lines(purchase_bill=purchase_bill, lines=normalized_lines)
+        _log_accounting_event(
+            event="INVENTORY_PURCHASE_BILL_CREATED",
+            instance=purchase_bill,
+            performed_by=performed_by,
+            metadata={
+                "purchase_bill_id": purchase_bill.id,
+                "bill_no": purchase_bill.bill_no,
+                "vendor_id": purchase_bill.vendor_id,
+                "branch_id": purchase_bill.branch_id,
+                "stock_location_id": purchase_bill.stock_location_id,
+                "line_count": len(normalized_lines),
+                "grand_total": f"{grand_total:.2f}",
+            },
+        )
+        return purchase_bill
+
+    purchase_bill = PurchaseBill.objects.select_for_update().get(pk=purchase_bill_id)
+    if purchase_bill.status != PurchaseBillStatus.DRAFT:
+        raise ValueError("Only draft purchase bills can be edited.")
+
+    purchase_bill.bill_no = bill_no
+    purchase_bill.bill_date = bill_date
+    purchase_bill.vendor = vendor
+    purchase_bill.tax_mode = tax_mode
+    purchase_bill.branch = branch
+    purchase_bill.stock_location = stock_location
+    purchase_bill.finance_account = finance_account
+    purchase_bill.notes = notes
+    purchase_bill.subtotal = subtotal
+    purchase_bill.tax_total = tax_total
+    purchase_bill.grand_total = grand_total
+    purchase_bill.save()
+    _replace_purchase_bill_lines(purchase_bill=purchase_bill, lines=normalized_lines)
+    _log_accounting_event(
+        event="INVENTORY_PURCHASE_BILL_UPDATED",
+        instance=purchase_bill,
+        performed_by=performed_by,
+        metadata={
+            "purchase_bill_id": purchase_bill.id,
+            "bill_no": purchase_bill.bill_no,
+            "vendor_id": purchase_bill.vendor_id,
+            "branch_id": purchase_bill.branch_id,
+            "stock_location_id": purchase_bill.stock_location_id,
+            "line_count": len(normalized_lines),
+            "grand_total": f"{grand_total:.2f}",
+        },
+    )
+    return purchase_bill
 
 
 def create_stock_ledger_entry(
@@ -412,12 +568,22 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
     return purchase_bill, True
 
 
-def build_stock_summary(*, item_id: int | None = None, stock_item_type: str | None = None):
+def build_stock_summary(
+    *,
+    item_id: int | None = None,
+    stock_item_type: str | None = None,
+    branch_id: int | None = None,
+):
     queryset = InventoryItem.objects.select_related("product", "default_stock_location").all()
     if item_id:
         queryset = queryset.filter(pk=item_id)
     if stock_item_type:
         queryset = queryset.filter(stock_item_type=stock_item_type)
+    if branch_id:
+        queryset = queryset.filter(
+            models.Q(default_stock_location__branch_id=branch_id)
+            | models.Q(stock_ledger__stock_location__branch_id=branch_id)
+        ).distinct()
     rows = []
     for item in queryset:
         on_hand = item.current_stock_quantity()
@@ -439,6 +605,7 @@ def build_stock_summary(*, item_id: int | None = None, stock_item_type: str | No
                 "default_stock_location_id": item.default_stock_location_id,
                 "default_stock_location_code": getattr(item.default_stock_location, "code", None),
                 "default_stock_location_name": getattr(item.default_stock_location, "name", None),
+                "branch_id": getattr(item.default_stock_location, "branch_id", None),
             }
         )
     return {"count": len(rows), "results": rows}
@@ -452,6 +619,7 @@ def build_stock_ledger(
     end_date=None,
     movement_type: str | None = None,
     reference_model: str | None = None,
+    branch_id: int | None = None,
 ):
     queryset = StockLedger.objects.select_related(
         "inventory_item",
@@ -467,6 +635,8 @@ def build_stock_ledger(
         queryset = queryset.filter(movement_date__lte=end_date)
     if location_id:
         queryset = queryset.filter(stock_location_id=location_id)
+    if branch_id:
+        queryset = queryset.filter(stock_location__branch_id=branch_id)
     if movement_type:
         movement_types = [value.strip().upper() for value in str(movement_type).split(",") if value.strip()]
         if movement_types:
@@ -489,6 +659,7 @@ def build_stock_ledger(
             "stock_location_id": row.stock_location_id,
             "stock_location_code": getattr(row.stock_location, "code", None),
             "stock_location_name": getattr(row.stock_location, "name", None),
+            "branch_id": getattr(row.stock_location, "branch_id", None),
             "reference_model": row.reference_model,
             "reference_id": row.reference_id,
             "notes": row.notes,

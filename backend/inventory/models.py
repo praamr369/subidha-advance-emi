@@ -16,6 +16,15 @@ MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
 
 
+def _default_branch():
+    try:
+        from branch_control.services.branch_service import default_branch_for_model
+
+        return default_branch_for_model()
+    except Exception:
+        return None
+
+
 def _status_locked(previous_status: str | None, next_status: str | None, *, allowed: set[tuple[str, str]]) -> bool:
     if previous_status is None:
         return False
@@ -66,6 +75,9 @@ class StockMovementType(models.TextChoices):
     EMI_DELIVERY_OUT = "EMI_DELIVERY_OUT", "EMI Delivery Out"
     EMI_RETURN_IN = "EMI_RETURN_IN", "EMI Return In"
     SALE_RETURN_IN = "SALE_RETURN_IN", "Sale Return In"
+    PRODUCTION_ISSUE_OUT = "PRODUCTION_ISSUE_OUT", "Production Issue Out"
+    PRODUCTION_RETURN_IN = "PRODUCTION_RETURN_IN", "Production Return In"
+    PRODUCTION_RECEIPT_IN = "PRODUCTION_RECEIPT_IN", "Production Receipt In"
     PURCHASE_RETURN_OUT = "PURCHASE_RETURN_OUT", "Purchase Return Out"
     ADJUSTMENT_IN = "ADJUSTMENT_IN", "Adjustment In"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT", "Adjustment Out"
@@ -95,6 +107,13 @@ class PurchaseTaxMode(models.TextChoices):
 class StockLocation(InventoryTimeStampedModel):
     code = models.CharField(max_length=30, unique=True, db_index=True)
     name = models.CharField(max_length=120, unique=True)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="stock_locations",
+    )
     location_type = models.CharField(
         max_length=20,
         choices=StockLocationType.choices,
@@ -109,12 +128,15 @@ class StockLocation(InventoryTimeStampedModel):
         ordering = ["name", "id"]
         indexes = [
             models.Index(fields=["is_active", "location_type"]),
+            models.Index(fields=["branch", "is_active"]),
         ]
 
     def save(self, *args, **kwargs):
         self.code = (self.code or "").strip().upper()
         self.name = (self.name or "").strip()
         self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = _default_branch()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -447,6 +469,13 @@ class PurchaseBill(InventoryTimeStampedModel):
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchase_bills",
+    )
     stock_location = models.ForeignKey(
         StockLocation,
         on_delete=models.PROTECT,
@@ -476,6 +505,7 @@ class PurchaseBill(InventoryTimeStampedModel):
         indexes = [
             models.Index(fields=["status", "bill_date"]),
             models.Index(fields=["vendor", "bill_date"]),
+            models.Index(fields=["branch", "bill_date"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -493,6 +523,12 @@ class PurchaseBill(InventoryTimeStampedModel):
         )
         self.bill_no = (self.bill_no or "").strip().upper()
         self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.stock_location, "branch", None)
+                or getattr(self.finance_account, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 

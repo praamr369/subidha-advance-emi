@@ -66,10 +66,22 @@ def ensure_phase3_system_accounts():
             name="Inventory Asset",
             account_type=ChartOfAccountType.ASSET,
         ),
+        "WIP_INVENTORY": _ensure_system_account(
+            system_code="WIP_INVENTORY",
+            code="INV-1210",
+            name="Work In Progress Inventory",
+            account_type=ChartOfAccountType.ASSET,
+        ),
         "INVENTORY_ADJUSTMENT": _ensure_system_account(
             system_code="INVENTORY_ADJUSTMENT",
             code="INV-5100",
             name="Inventory Adjustments",
+            account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "MANUFACTURING_SCRAP_EXPENSE": _ensure_system_account(
+            system_code="MANUFACTURING_SCRAP_EXPENSE",
+            code="MFG-5200",
+            name="Manufacturing Scrap Expense",
             account_type=ChartOfAccountType.EXPENSE,
         ),
         "PURCHASE_EXPENSE": _ensure_system_account(
@@ -77,6 +89,30 @@ def ensure_phase3_system_accounts():
             code="PUR-5000",
             name="Purchase Expense",
             account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "SALARY_EXPENSE": _ensure_system_account(
+            system_code="SALARY_EXPENSE",
+            code="PAY-5100",
+            name="Salary Expense",
+            account_type=ChartOfAccountType.EXPENSE,
+        ),
+        "SALARY_PAYABLE": _ensure_system_account(
+            system_code="SALARY_PAYABLE",
+            code="PAY-2100",
+            name="Salary Payable",
+            account_type=ChartOfAccountType.LIABILITY,
+        ),
+        "PAYROLL_DEDUCTIONS_CLEARING": _ensure_system_account(
+            system_code="PAYROLL_DEDUCTIONS_CLEARING",
+            code="PAY-2200",
+            name="Payroll Deductions Clearing",
+            account_type=ChartOfAccountType.LIABILITY,
+        ),
+        "EMPLOYEE_REIMBURSEMENT_PAYABLE": _ensure_system_account(
+            system_code="EMPLOYEE_REIMBURSEMENT_PAYABLE",
+            code="PAY-2300",
+            name="Employee Reimbursement Payable",
+            account_type=ChartOfAccountType.LIABILITY,
         ),
         "PARTNER_COMMISSION_EXPENSE": _ensure_system_account(
             system_code="PARTNER_COMMISSION_EXPENSE",

@@ -32,8 +32,11 @@ This handoff is for the current production-ready Lucky Plan EMI system after RC 
 
 | Data type | Current safe path | Notes |
 | --- | --- | --- |
-| Customer | Admin UI create or customer CSV import | CSV import is real, but it only accepts `name` and `phone` and generates credentials server-side |
-| Product | Admin UI create/edit or product CSV import | CSV import is real and supports controlled product create/update |
+| Customer | Admin UI create or customer CSV import | CSV import is real, requires `name`, `phone`, and `email`, and generates credentials server-side |
+| Product | Admin UI create/edit or product CSV import | CSV import is real and supports controlled product create/update with SKU and UOM |
+| Vendor | Admin settings import hub or vendor admin workspace | Preview-first import now exists |
+| Staff | Admin settings import hub or staff admin workspace | Preview-first import now exists |
+| Branch / Counter | Admin settings import hub or branch-control workspaces | Preview-first import now exists |
 | Subscription | Admin UI create or POST `/api/v1/admin/subscriptions/` | No confirmed bulk CSV subscription importer found in the current code |
 
 ## Important operational constraints
@@ -65,13 +68,24 @@ This handoff is for the current production-ready Lucky Plan EMI system after RC 
 
 - Customer import template: `docs/imports/customer-import-template.csv`
 - Product import template: `docs/imports/product-import-template.csv`
+- Vendor import template: `docs/imports/vendor-import-template.csv`
+- Employee import template: `docs/imports/employee-import-template.csv`
+- Branch import template: `docs/imports/branch-import-template.csv`
+- Counter import template: `docs/imports/counter-import-template.csv`
 - Subscription onboarding reference template: `docs/imports/subscription-import-template.csv`
 - Field mapping and behavior notes: `docs/imports/import-field-mapping.md`
+- Go-live checklist: `docs/operations/go-live-checklist.md`
+- Migration rehearsal checklist: `docs/operations/migration-rehearsal-checklist.md`
+- First-week checklist: `docs/operations/first-week-operations-checklist.md`
+- Counter opening/closing checklist: `docs/operations/cashier-counter-opening-closing.md`
+- Branch day-close checklist: `docs/operations/branch-day-close-checklist.md`
+- UAT checklist: `docs/operations/uat-checklist.md`
 - Daily process guide: `docs/operations/daily-shop-workflows.md`
 
 ## Known operational cautions
 
 - Customer CSV import generates a username automatically, but the generated password is not returned in the response. If imported customers need portal login, plan an immediate password-reset step or use the admin create-customer flow instead.
 - Product CSV import does not manage `is_active`, `is_emi_enabled`, `is_rent_enabled`, or `is_lease_enabled`. Review those flags in admin after import.
+- In real multi-branch mode, do not use cashier users without active counter assignment.
 - Subscription onboarding is currently a controlled create flow, not a confirmed bulk importer.
 - The active production settings contract is defined in `backend/core/settings/base.py`. Use the new production env template rather than older local examples when preparing deployment secrets.

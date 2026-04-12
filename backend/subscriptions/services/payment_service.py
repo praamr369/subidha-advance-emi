@@ -5,6 +5,13 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from branch_control.models import Branch
+from branch_control.services.branch_service import (
+    assigned_counter_for_user,
+    assert_user_branch_access,
+    assert_user_counter_access,
+    default_branch_for_model,
+)
 from subscriptions.models import (
     AuditLog,
     Emi,
@@ -249,6 +256,45 @@ def _sync_billing_best_effort(
         return
 
 
+def _resolve_branch_and_counter(
+    *,
+    actor,
+    subscription,
+    branch_id: int | None = None,
+    cash_counter_id: int | None = None,
+):
+    from branch_control.models import CashCounter
+
+    branch = None
+    counter = None
+
+    if cash_counter_id:
+        counter = (
+            CashCounter.objects.select_related("branch", "finance_account")
+            .filter(is_active=True)
+            .get(pk=cash_counter_id)
+        )
+        assert_user_counter_access(user=actor, counter=counter)
+        branch = counter.branch
+
+    if branch is None and branch_id:
+        branch = Branch.objects.get(pk=branch_id)
+        assert_user_branch_access(user=actor, branch_id=branch.id)
+
+    if branch is None and counter is None and getattr(actor, "role", "") == "CASHIER":
+        counter = assigned_counter_for_user(actor)
+        if counter is not None:
+            branch = counter.branch
+
+    if branch is None:
+        branch = getattr(subscription, "branch", None) or default_branch_for_model()
+
+    if branch is not None:
+        assert_user_branch_access(user=actor, branch_id=branch.id)
+
+    return branch, counter
+
+
 @transaction.atomic
 def record_emi_payment(
     *,
@@ -259,6 +305,8 @@ def record_emi_payment(
     reference_no: Optional[str] = None,
     note: Optional[str] = None,
     payment_date=None,
+    branch_id: int | None = None,
+    cash_counter_id: int | None = None,
 ):
     """
     Canonical payment collection entrypoint.
@@ -297,12 +345,20 @@ def record_emi_payment(
     subscription = emi.subscription
 
     _assert_payment_write_allowed(subscription, emi)
+    branch, cash_counter = _resolve_branch_and_counter(
+        actor=collected_by,
+        subscription=subscription,
+        branch_id=branch_id,
+        cash_counter_id=cash_counter_id,
+    )
 
     payment = Payment.objects.create(
         customer=subscription.customer,
         subscription=subscription,
         emi=emi,
         amount=amount,
+        branch=branch,
+        cash_counter=cash_counter,
         method=method,
         reference_no=reference_no,
         collected_by=collected_by,
@@ -332,6 +388,8 @@ def record_emi_payment(
             "payment_id": payment.id,
             "subscription_id": subscription.id,
             "emi_id": emi.id,
+            "branch_id": payment.branch_id,
+            "cash_counter_id": payment.cash_counter_id,
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
@@ -375,6 +433,8 @@ def collect_payment_for_admin(
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
     note: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    cash_counter_id: Optional[int] = None,
 ):
     """
     Backward-compatible admin wrapper.
@@ -409,6 +469,8 @@ def collect_payment_for_admin(
         reference_no=reference_no,
         note=resolved_note,
         payment_date=payment_date,
+        branch_id=branch_id,
+        cash_counter_id=cash_counter_id,
     )
 
 

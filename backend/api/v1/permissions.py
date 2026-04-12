@@ -40,9 +40,7 @@ class IsCashierOrAdmin(BasePermission):
     - ADMIN
     - PARTNER
     - CUSTOMER
-
-    This class still accepts CASHIER as a compatibility value in case
-    you add that role additively later or have transitional data/code.
+    - CASHIER
     """
 
     allowed_roles = ("CASHIER", "ADMIN")

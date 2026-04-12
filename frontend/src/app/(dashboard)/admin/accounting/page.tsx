@@ -273,16 +273,58 @@ export default function AdminAccountingPage() {
                   Chart of accounts and finance accounts
                 </Link>
                 <Link
+                  href={ROUTES.admin.accountingVendors}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Vendor register and procurement master data
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingPurchaseBills}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Purchase bills and stock inward drafts
+                </Link>
+                <Link
                   href={ROUTES.admin.accountingExpenses}
                   className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Expenses and vendor vouchers
                 </Link>
                 <Link
+                  href={ROUTES.admin.accountingStaff}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Staff register and attendance basics
+                </Link>
+                <Link
                   href={ROUTES.admin.accountingSalary}
                   className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
                 >
-                  Employees and salary accruals
+                  Salary accruals and salary payments
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingAttendance}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Attendance calendar and overtime capture
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingLeave}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Leave requests and payroll period locks
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingExpenseClaims}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Staff expense claims and reimbursements
+                </Link>
+                <Link
+                  href={ROUTES.admin.accountingStaffLedger}
+                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Staff payable and reimbursement ledger
                 </Link>
                 <Link
                   href={ROUTES.admin.accountingBooks}

@@ -15,9 +15,9 @@ const footerLinks = [
 
 export default function PublicFooter() {
   return (
-    <footer className="border-t border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8">
-        <div className="max-w-xl">
+    <footer className="border-t border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94))]">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.25fr_0.75fr_0.9fr] lg:px-8">
+        <div className="max-w-xl rounded-2xl border border-white/75 bg-white/82 p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <BrandLockup
             subtitle={`${brandConfig.publicProgramName} public catalogue, enquiry capture, and winner transparency`}
           />
@@ -28,21 +28,27 @@ export default function PublicFooter() {
           </p>
         </div>
 
-        <div className="grid gap-2 text-sm">
-          <div className="font-medium text-foreground">Quick links</div>
-          {footerLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-muted-foreground transition hover:text-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
+        <div className="rounded-2xl border border-white/75 bg-white/82 p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Quick links
+          </div>
+          <div className="mt-3 grid gap-2 text-sm">
+            {footerLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-lg px-2 py-1.5 text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="max-w-sm text-sm">
-          <div className="font-medium text-foreground">Visit the branch</div>
+        <div className="max-w-sm rounded-2xl border border-white/75 bg-white/82 p-4 text-sm shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Visit the branch
+          </div>
           <p className="mt-2 text-muted-foreground">
             {brandConfig.companyName}
             <br />

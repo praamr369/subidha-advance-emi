@@ -30,8 +30,10 @@ export default function HowItWorksPage() {
         { href: ROUTES.public.products, label: "Browse Products", variant: "secondary" },
         { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
       ]}
+      helperNote="Public flow visibility is intentionally simple: product interest, onboarding, recorded payments, and published draw outcomes."
+      helperTone="info"
     >
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
         <ol className="grid gap-3 text-sm leading-6 text-muted-foreground">
           {steps.map((step, index) => (
             <li key={step} className="rounded-xl border border-border bg-muted/30 px-4 py-3">

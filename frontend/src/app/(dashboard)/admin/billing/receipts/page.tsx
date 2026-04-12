@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
@@ -21,7 +22,8 @@ export default function BillingReceiptsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
+    setLoading(true);
     try {
       const payload = await listReceiptDocuments({
         payment: searchParams.get("payment") || undefined,
@@ -38,35 +40,11 @@ export default function BillingReceiptsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [searchParams]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadPageOnce() {
-      try {
-        const payload = await listReceiptDocuments({
-          payment: searchParams.get("payment") || undefined,
-          billing_invoice: searchParams.get("billing_invoice") || undefined,
-          direct_sale: searchParams.get("direct_sale") || undefined,
-          subscription: searchParams.get("subscription") || undefined,
-          source_type: searchParams.get("source_type") || undefined,
-        });
-        if (cancelled) return;
-        setRows(payload.results);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setRows([]);
-        setError(accountingErrorMessage(err, "Failed to load receipt register."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void loadPageOnce();
-    return () => {
-      cancelled = true;
-    };
-  }, [searchParams]);
+    void loadPage();
+  }, [loadPage]);
 
   const columns: EnterpriseColumnDef<ReceiptDocument>[] = [
     { key: "receipt_date", header: "Date", render: (row) => accountingDate(row.receipt_date) },
@@ -82,12 +60,9 @@ export default function BillingReceiptsPage() {
       render: (row) => (
         <div className="flex flex-wrap gap-2">
           {row.billing_invoice ? (
-            <Link
-              href={buildAdminBillingDocumentRoute(row.billing_invoice)}
-              className="text-sm text-primary underline-offset-4 hover:underline"
-            >
+            <ActionButton href={buildAdminBillingDocumentRoute(row.billing_invoice)} variant="outline">
               Billing Detail
-            </Link>
+            </ActionButton>
           ) : null}
           {row.status === "POSTED" ? (
             <ConfirmActionButton
@@ -112,6 +87,7 @@ export default function BillingReceiptsPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Receipt Register"
       subtitle="Retail receipts and EMI payment receipts remain separate printable documents with accounting provenance."
       breadcrumbs={[
@@ -124,31 +100,81 @@ export default function BillingReceiptsPage() {
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}
     >
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No receipts found"
-        emptyDescription="Generate retail or EMI receipts after the underlying operational event exists."
+      <div className="receipt-print-hide">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No receipts found"
+          emptyDescription="Generate retail or EMI receipts after the underlying operational event exists."
+        />
+      </div>
+
+      <PrintActionBanner
+        className="mb-4"
+        title="Receipt Print / PDF"
+        description="Print this posted receipt preview for customer handover or save it as PDF for records."
       />
 
       <BillingPrintDocument
         title={latestReceipt?.receipt_type === "EMI_PAYMENT_RECEIPT" ? "EMI Payment Receipt" : "Retail Receipt"}
-        subtitle="Printable receipt preview"
+        subtitle="Printable receipt preview sourced from posted receipt records."
         reference={latestReceipt?.receipt_no || "No receipt generated"}
         meta={latestReceipt ? `Customer ${latestReceipt.customer_name_snapshot || "—"}` : "Waiting for a generated receipt"}
+        statusLabel={latestReceipt?.status}
+        statusToneClassName={
+          latestReceipt?.status === "POSTED"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : latestReceipt?.status === "VOID"
+            ? "border-red-200 bg-red-50 text-red-700"
+            : "border-slate-300 bg-slate-100 text-slate-800"
+        }
+        partyFields={[
+          {
+            label: "Customer",
+            value: latestReceipt?.customer_name_snapshot || "Counter party",
+            emphasize: true,
+          },
+          { label: "Phone", value: latestReceipt?.customer_phone_snapshot || "—" },
+          {
+            label: "Branch",
+            value: latestReceipt?.branch_name || latestReceipt?.branch_code || "Primary",
+          },
+          {
+            label: "Counter",
+            value:
+              latestReceipt?.cash_counter_name ||
+              latestReceipt?.cash_counter_code ||
+              "—",
+          },
+        ]}
+        referenceFields={[
+          { label: "Receipt Date", value: latestReceipt?.receipt_date || "—" },
+          { label: "Receipt Type", value: latestReceipt?.receipt_type || "—" },
+          { label: "Source Type", value: latestReceipt?.source_type || "—" },
+          {
+            label: "Source Ref",
+            value:
+              latestReceipt?.source_reference ||
+              latestReceipt?.direct_sale_no ||
+              "—",
+          },
+        ]}
         summaryFields={[
-          { label: "Date", value: latestReceipt?.receipt_date || "—" },
-          { label: "Amount", value: accountingMoney(latestReceipt?.amount || 0) },
-          { label: "Type", value: latestReceipt?.receipt_type || "—" },
+          { label: "Amount", value: accountingMoney(latestReceipt?.amount || 0), emphasize: true },
           { label: "Finance Account", value: latestReceipt?.finance_account_name || "—" },
+          { label: "Linked Payment", value: latestReceipt?.payment ? `#${latestReceipt.payment}` : "—" },
+          {
+            label: "Linked Invoice",
+            value: latestReceipt?.billing_invoice ? `#${latestReceipt.billing_invoice}` : "—",
+          },
         ]}
         detailFields={[
-          { label: "Customer", value: latestReceipt?.customer_name_snapshot || "—" },
-          { label: "Phone", value: latestReceipt?.customer_phone_snapshot || "—" },
-          { label: "Notes", value: latestReceipt?.notes || "—" },
-          { label: "Journal", value: latestReceipt?.posted_journal_entry_no || "Pending" },
+          { label: "Document Status", value: latestReceipt?.status || "—" },
+          { label: "Direct Sale", value: latestReceipt?.direct_sale_no || "—" },
+          { label: "Journal Entry", value: latestReceipt?.posted_journal_entry_no || "Pending" },
+          { label: "Remarks", value: latestReceipt?.notes || "—" },
         ]}
       />
     </PortalPage>

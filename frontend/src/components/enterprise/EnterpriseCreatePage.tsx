@@ -68,17 +68,17 @@ export default function EnterpriseCreatePage({
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="surface-panel-elevated mx-auto max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-sm">
         <form className="space-y-4" onSubmit={onSubmit}>
           {fields.map((field) => (
             <div key={field.name}>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor={field.name}>
+              <label className="mb-1 block text-sm font-semibold text-foreground" htmlFor={field.name}>
                 {field.label}
               </label>
               <input
                 id={field.name}
                 type={field.type || "text"}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
                 value={values[field.name] ?? ""}
                 onChange={(e) => setValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
               />
@@ -89,7 +89,7 @@ export default function EnterpriseCreatePage({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-xl border border-primary/80 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_16px_32px_-22px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] disabled:opacity-50"
           >
             {isSubmitting ? "Saving..." : "Save"}
           </button>

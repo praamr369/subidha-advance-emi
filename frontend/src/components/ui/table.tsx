@@ -10,9 +10,9 @@ type TableProps = {
 
 export default function Table({ head, body, className }: TableProps) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-2xl border border-border bg-[var(--surface-card-elevated)]">
       <table className={cn("min-w-full border-collapse", className)}>
-        <thead className="border-b border-border bg-muted/30">{head}</thead>
+        <thead className="border-b border-border bg-[var(--surface-muted)]">{head}</thead>
         <tbody>{body}</tbody>
       </table>
     </div>

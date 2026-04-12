@@ -22,6 +22,8 @@ import {
   listInternalUsers,
   type InternalUserRecord,
 } from "@/services/internal-users";
+import { buildAdminCrmPartyRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 
 type AuditEntry = {
   id: number;
@@ -129,6 +131,12 @@ function summarizeAuditEntry(entry: AuditEntry): string {
     )}.`;
   }
 
+  if (entry.action_type === "LEAD_DIRECT_SALE_LINKED") {
+    return `Converted direct sale linked to #${String(
+      metadata.next_direct_sale_id || "—"
+    )}.`;
+  }
+
   if (entry.action_type === "LEAD_CONVERTED") {
     return "Lead conversion was completed against real created records.";
   }
@@ -168,6 +176,24 @@ function buildSubscriptionCreateHref(
   return `/admin/subscriptions/create?${params.toString()}`;
 }
 
+function buildDirectSaleCreateHref(
+  lead: AdminLeadDetail,
+  preferredCustomerId?: number | null
+): string {
+  const params = new URLSearchParams();
+  params.set("lead", String(lead.id));
+  params.set("lead_name", lead.name || "");
+  params.set("lead_phone", lead.phone || "");
+  if (preferredCustomerId) params.set("customer", String(preferredCustomerId));
+  if (lead.city) params.set("lead_city", lead.city);
+  if (lead.submitted_notes) params.set("lead_notes", lead.submitted_notes);
+  if (lead.interested_product) params.set("interested_product", lead.interested_product);
+  if (lead.product_id) params.set("product", String(lead.product_id));
+  if (lead.product_name) params.set("product_name", lead.product_name);
+  if (lead.product_code) params.set("product_code", lead.product_code);
+  return `${ROUTES.admin.billingDirectSales}?${params.toString()}`;
+}
+
 function DetailValue({
   label,
   value,
@@ -205,6 +231,7 @@ export default function AdminLeadDetailPage() {
   const [noteMode, setNoteMode] = useState<"append" | "replace">("append");
   const [conversionCustomerInput, setConversionCustomerInput] = useState("");
   const [conversionSubscriptionInput, setConversionSubscriptionInput] = useState("");
+  const [conversionDirectSaleInput, setConversionDirectSaleInput] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadPage = useCallback(
@@ -260,9 +287,13 @@ export default function AdminLeadDetailPage() {
     const prefilledSubscription =
       searchParams.get("converted_subscription") ||
       (lead.converted_subscription_id ? String(lead.converted_subscription_id) : "");
+    const prefilledDirectSale =
+      searchParams.get("converted_direct_sale") ||
+      (lead.converted_direct_sale_id ? String(lead.converted_direct_sale_id) : "");
 
     setConversionCustomerInput(prefilledCustomer);
     setConversionSubscriptionInput(prefilledSubscription);
+    setConversionDirectSaleInput(prefilledDirectSale);
   }, [lead, searchParamKey, searchParams]);
 
   const customerCreateHref = useMemo(
@@ -276,6 +307,14 @@ export default function AdminLeadDetailPage() {
       lead.converted_customer_id ||
       null;
     return buildSubscriptionCreateHref(lead, candidateCustomerId);
+  }, [lead, searchParams]);
+  const directSaleCreateHref = useMemo(() => {
+    if (!lead) return ROUTES.admin.billingDirectSales;
+    const candidateCustomerId =
+      parsePositiveInteger(searchParams.get("converted_customer") || "") ||
+      lead.converted_customer_id ||
+      null;
+    return buildDirectSaleCreateHref(lead, candidateCustomerId);
   }, [lead, searchParams]);
 
   async function handleStatusUpdate() {
@@ -347,6 +386,7 @@ export default function AdminLeadDetailPage() {
       const updated = await completeAdminLeadConversion(lead.id, {
         customer_id: parsePositiveInteger(conversionCustomerInput),
         subscription_id: parsePositiveInteger(conversionSubscriptionInput),
+        direct_sale_id: parsePositiveInteger(conversionDirectSaleInput),
       });
       setLead(updated);
       setStatusInput(updated.status);
@@ -357,6 +397,9 @@ export default function AdminLeadDetailPage() {
         updated.converted_subscription_id
           ? String(updated.converted_subscription_id)
           : ""
+      );
+      setConversionDirectSaleInput(
+        updated.converted_direct_sale_id ? String(updated.converted_direct_sale_id) : ""
       );
       setMessage("Lead conversion linked to the selected live records.");
       await loadPage("refresh");
@@ -370,15 +413,16 @@ export default function AdminLeadDetailPage() {
   return (
     <PortalPage
       title={lead ? `Lead #${lead.id}` : "Lead Detail"}
-      subtitle="Review the submitted enquiry, update the intake lifecycle, assign ownership, and hand the lead off into customer or subscription creation without silent mutation."
+      subtitle="Review the submitted enquiry, update the intake lifecycle, and hand the lead off into real customer, direct-sale, or subscription records without silent mutation."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
-        { label: "Leads", href: "/admin/leads" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Leads", href: ROUTES.admin.leads },
         { label: lead ? `Lead #${lead.id}` : "Detail" },
       ]}
       actions={[
-        { href: "/admin/leads", label: "Back to Inbox", variant: "secondary" },
+        { href: ROUTES.admin.leads, label: "Back to Inbox", variant: "secondary" },
         { href: customerCreateHref, label: "Create Customer", variant: "secondary" },
+        { href: directSaleCreateHref, label: "Create Direct Sale", variant: "secondary" },
         { href: subscriptionCreateHref, label: "Create Subscription", variant: "primary" },
       ]}
       stats={[
@@ -398,6 +442,11 @@ export default function AdminLeadDetailPage() {
         {
           label: "Timeline Events",
           value: String(timeline.length),
+        },
+        {
+          label: "Open Follow-Ups",
+          value: String(lead?.open_follow_up_count ?? 0),
+          tone: (lead?.open_follow_up_count ?? 0) > 0 ? "warning" : "success",
         },
       ]}
       statusBadge={{ label: "Lead Triage", tone: "info" }}
@@ -524,8 +573,43 @@ export default function AdminLeadDetailPage() {
                       )
                     }
                   />
+                  <DetailValue
+                    label="Linked Direct Sale"
+                    value={
+                      lead.converted_direct_sale_id ? (
+                        <Link
+                          href={`${ROUTES.admin.billingDirectSales}?focus_sale=${lead.converted_direct_sale_id}`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {lead.converted_direct_sale_no ||
+                            `Direct Sale #${lead.converted_direct_sale_id}`}
+                        </Link>
+                      ) : (
+                        "Not linked yet"
+                      )
+                    }
+                  />
+                  <DetailValue
+                    label="CRM Party"
+                    value={
+                      lead.party_id ? (
+                        <Link
+                          href={buildAdminCrmPartyRoute(lead.party_id)}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {lead.party_no || lead.party_display_name || `Party #${lead.party_id}`}
+                        </Link>
+                      ) : (
+                        "Not linked yet"
+                      )
+                    }
+                  />
                   <DetailValue label="Assigned At" value={formatDateTime(lead.assigned_at)} />
                   <DetailValue label="Contacted At" value={formatDateTime(lead.contacted_at)} />
+                  <DetailValue
+                    label="Follow-Up State"
+                    value={`${lead.follow_up_state || "NONE"} · ${lead.open_follow_up_count ?? 0} open`}
+                  />
                   <DetailValue
                     label="Converted By"
                     value={
@@ -649,7 +733,9 @@ export default function AdminLeadDetailPage() {
                   Continue manually into the live admin customer or subscription workflows with context preserved in the URL.
                 </p>
 
-                {searchParams.get("converted_customer") || searchParams.get("converted_subscription") ? (
+                {searchParams.get("converted_customer") ||
+                searchParams.get("converted_subscription") ||
+                searchParams.get("converted_direct_sale") ? (
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                     Recent create flow returned with conversion candidates prefilled below. Review the ids, then complete the conversion explicitly.
                   </div>
@@ -683,14 +769,27 @@ export default function AdminLeadDetailPage() {
                   </div>
 
                   <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="text-sm font-semibold text-foreground">Create Direct Sale</div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Preserves lead and product context for a non-EMI retail sale without touching subscription truth.
+                    </p>
+                    <Link
+                      href={directSaleCreateHref}
+                      className="mt-4 inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open Direct Sale Create
+                    </Link>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-background p-4">
                     <div className="text-sm font-semibold text-foreground">
                       Complete Conversion
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Link this lead to the real created customer or subscription. This action is auditable and marks the lead converted on the backend.
+                      Link this lead to the real created customer, direct sale, or subscription. This action is auditable and marks the lead converted on the backend.
                     </p>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">
                           Converted Customer ID
@@ -718,6 +817,20 @@ export default function AdminLeadDetailPage() {
                           className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Converted Direct Sale ID
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={conversionDirectSaleInput}
+                          onChange={(event) => setConversionDirectSaleInput(event.target.value)}
+                          placeholder="Enter created direct sale id"
+                          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        />
+                      </div>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -727,7 +840,8 @@ export default function AdminLeadDetailPage() {
                         disabled={
                           actionLoading === "convert" ||
                           (!conversionCustomerInput.trim() &&
-                            !conversionSubscriptionInput.trim())
+                            !conversionSubscriptionInput.trim() &&
+                            !conversionDirectSaleInput.trim())
                         }
                         className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -751,6 +865,24 @@ export default function AdminLeadDetailPage() {
                           className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                         >
                           Open Linked Subscription
+                        </Link>
+                      ) : null}
+
+                      {lead.converted_direct_sale_id ? (
+                        <Link
+                          href={`${ROUTES.admin.billingDirectSales}?focus_sale=${lead.converted_direct_sale_id}`}
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                        >
+                          Open Linked Direct Sale
+                        </Link>
+                      ) : null}
+
+                      {lead.party_id ? (
+                        <Link
+                          href={buildAdminCrmPartyRoute(lead.party_id)}
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                        >
+                          Open Party Timeline
                         </Link>
                       ) : null}
                     </div>

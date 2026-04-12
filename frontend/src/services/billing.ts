@@ -67,6 +67,12 @@ export type DirectSale = {
   financial_year: string;
   customer?: number | null;
   customer_name?: string | null;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter?: number | null;
+  cash_counter_code?: string | null;
+  cash_counter_name?: string | null;
   status: "DRAFT" | "CONFIRMED" | "DELIVERED" | "INVOICED" | "CANCELLED";
   tax_mode: "GST" | "NON_GST";
   finance_account?: number | null;
@@ -98,6 +104,8 @@ export type DirectSale = {
 export type DirectSalePayload = {
   sale_date: string;
   customer?: number | null;
+  branch?: number | null;
+  cash_counter?: number | null;
   tax_mode?: "GST" | "NON_GST";
   finance_account?: number | null;
   delivery_required?: boolean;
@@ -124,6 +132,9 @@ export type BillingInvoice = {
   document_type?: "INVOICE" | "PROFORMA" | "DEMAND_NOTE";
   customer?: number | null;
   customer_name?: string | null;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   subscription?: number | null;
   direct_sale?: number | null;
   direct_sale_no?: string | null;
@@ -187,6 +198,12 @@ export type ReceiptDocument = {
   receipt_type: "RETAIL_RECEIPT" | "EMI_PAYMENT_RECEIPT";
   status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID";
   receipt_date: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter?: number | null;
+  cash_counter_code?: string | null;
+  cash_counter_name?: string | null;
   finance_account?: number | null;
   finance_account_name?: string | null;
   billing_invoice?: number | null;

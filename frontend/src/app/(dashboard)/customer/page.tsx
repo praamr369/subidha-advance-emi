@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -9,6 +9,7 @@ import {
   CalendarClock,
   CreditCard,
   Layers3,
+  RefreshCw,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -113,55 +114,61 @@ export default function CustomerDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const dashboardQuery =
-    windowPreset === "CUSTOM"
-      ? {
-          window: windowPreset,
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-        }
-      : { window: windowPreset };
+  const dashboardQuery = useMemo(
+    () =>
+      windowPreset === "CUSTOM"
+        ? {
+            window: windowPreset,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          }
+        : { window: windowPreset },
+    [endDate, startDate, windowPreset]
+  );
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
-    try {
-      const [
-        legacyPayload,
-        canonicalPayload,
-        overduePayload,
-        upcomingPayload,
-        recentPaymentsPayload,
-        winnersPayload,
-      ] = await Promise.all([
-        getCustomerDashboard(),
-        getDashboardSummaryV2(dashboardQuery),
-        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-        listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
-        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-      ]);
-      setLegacy(legacyPayload);
-      setCanonical(canonicalPayload);
-      setOverdue(overduePayload);
-      setUpcoming(upcomingPayload);
-      setRecentPayments(recentPaymentsPayload);
-      setWinnerItems(winnersPayload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setLegacy(null);
-      setCanonical(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      try {
+        const [
+          legacyPayload,
+          canonicalPayload,
+          overduePayload,
+          upcomingPayload,
+          recentPaymentsPayload,
+          winnersPayload,
+        ] = await Promise.all([
+          getCustomerDashboard(),
+          getDashboardSummaryV2(dashboardQuery),
+          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+          listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+        ]);
+        setLegacy(legacyPayload);
+        setCanonical(canonicalPayload);
+        setOverdue(overduePayload);
+        setUpcoming(upcomingPayload);
+        setRecentPayments(recentPaymentsPayload);
+        setWinnerItems(winnersPayload);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        setLegacy(null);
+        setCanonical(null);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
+    },
+    [dashboardQuery]
+  );
 
   useEffect(() => {
     void loadPage("initial");
-  }, [windowPreset, startDate, endDate]);
+  }, [loadPage]);
 
   const summary =
     canonical?.summary ??
@@ -224,16 +231,19 @@ export default function CustomerDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Customer Operations"
         title="Customer Workspace"
         description="View subscriptions, payment records, profile information, and support resources."
+        helperNote="Figures and statuses below come from your live subscription and payment records, including due and winner posture."
+        helperTone="info"
         actions={
-          <button
-            type="button"
+          <ActionButton
+            variant="outline"
             onClick={() => void loadPage("refresh")}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         }
       />
 

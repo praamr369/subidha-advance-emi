@@ -2,13 +2,22 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from api.v1.views.accounting import (
+    AttendanceCalendarView,
     ChartOfAccountViewSet,
+    EmployeeExpenseClaimPaymentViewSet,
+    EmployeeExpenseClaimViewSet,
+    EmployeeAttendanceViewSet,
     EmployeeProfileViewSet,
     ExpenseVoucherViewSet,
     FinanceAccountViewSet,
     JournalEntryViewSet,
+    LeaveRequestViewSet,
+    LeaveTypeViewSet,
     MoneyMovementViewSet,
+    PayrollPeriodViewSet,
+    SalaryPaymentViewSet,
     SalarySheetViewSet,
+    StaffLedgerView,
     VendorViewSet,
 )
 from api.v1.views.accounting_phase2 import (
@@ -38,6 +47,8 @@ from api.v1.views.accounting_phase3 import (
     ChartOfAccountsImportPreviewView,
     CommissionSettlementBridgeRunView,
     DepreciationRunViewSet,
+    EmployeeImportPostView,
+    EmployeeImportPreviewView,
     EmiPaymentBridgeRunView,
     EmiSubscriptionBridgeRunView,
     EmiWaiverBridgeRunView,
@@ -61,7 +72,14 @@ router.register(r"money-movements", MoneyMovementViewSet, basename="accounting-m
 router.register(r"vendors", VendorViewSet, basename="accounting-vendors")
 router.register(r"expenses", ExpenseVoucherViewSet, basename="accounting-expenses")
 router.register(r"employees", EmployeeProfileViewSet, basename="accounting-employees")
+router.register(r"attendance", EmployeeAttendanceViewSet, basename="accounting-attendance")
+router.register(r"payroll-periods", PayrollPeriodViewSet, basename="accounting-payroll-periods")
+router.register(r"leave-types", LeaveTypeViewSet, basename="accounting-leave-types")
+router.register(r"leave-requests", LeaveRequestViewSet, basename="accounting-leave-requests")
 router.register(r"salary-sheets", SalarySheetViewSet, basename="accounting-salary-sheets")
+router.register(r"salary-payments", SalaryPaymentViewSet, basename="accounting-salary-payments")
+router.register(r"expense-claims", EmployeeExpenseClaimViewSet, basename="accounting-expense-claims")
+router.register(r"expense-claim-payments", EmployeeExpenseClaimPaymentViewSet, basename="accounting-expense-claim-payments")
 router.register(r"tax-invoices", TaxInvoiceViewSet, basename="accounting-tax-invoices")
 router.register(r"credit-notes", CreditNoteViewSet, basename="accounting-credit-notes")
 router.register(r"debit-notes", DebitNoteViewSet, basename="accounting-debit-notes")
@@ -75,6 +93,8 @@ router.register(r"purchase-bills", AccountingPurchaseBillViewSet, basename="acco
 router.register(r"vendor-settlements", VendorSettlementViewSet, basename="accounting-vendor-settlements")
 
 urlpatterns = [
+    path("reports/attendance-calendar/", AttendanceCalendarView.as_view()),
+    path("reports/staff-ledger/", StaffLedgerView.as_view()),
     path("reports/trial-balance/", TrialBalanceReportView.as_view()),
     path("reports/profit-loss/", ProfitLossReportView.as_view()),
     path("reports/balance-sheet/", BalanceSheetReportView.as_view()),
@@ -91,6 +111,8 @@ urlpatterns = [
     path("exports/gst-pack/", GstExportPackListCreateView.as_view()),
     path("imports/chart-of-accounts/preview/", ChartOfAccountsImportPreviewView.as_view()),
     path("imports/chart-of-accounts/post/", ChartOfAccountsImportPostView.as_view()),
+    path("imports/employees/preview/", EmployeeImportPreviewView.as_view()),
+    path("imports/employees/post/", EmployeeImportPostView.as_view()),
     path("imports/vendors/preview/", VendorImportPreviewView.as_view()),
     path("imports/vendors/post/", VendorImportPostView.as_view()),
     path("bridges/run/", BridgeRunView.as_view()),

@@ -29,21 +29,58 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     routes: [
       { label: "Dashboard", href: ROUTES.admin.dashboard },
       { label: "Analytics", href: ROUTES.admin.analytics },
+      { label: "Branch Reporting", href: ROUTES.admin.branchReporting },
       { label: "Reports", href: ROUTES.admin.reports },
       { label: "Support", href: ROUTES.admin.supportRequests },
+      { label: "Service Desk", href: ROUTES.admin.serviceDesk },
+    ],
+  },
+  {
+    key: "branch-control",
+    title: "Branch Control",
+    href: ROUTES.admin.branches,
+    description:
+      "Shared branch, warehouse, and counter governance for multi-branch stock, collection, and reporting control.",
+    operationalFocus:
+      "Define branches, assign counters to finance books, and keep branch-wise visibility explicit across collection, stock, and branch reporting.",
+    masterDataDirection:
+      "Acts as a shared governance layer above inventory locations, finance accounts, payments, billing, workforce, and reporting without replacing those source records.",
+    routes: [
+      { label: "Branches", href: ROUTES.admin.branches },
+      { label: "Counters", href: ROUTES.admin.counters },
+      { label: "Branch Reporting", href: ROUTES.admin.branchReporting },
+    ],
+  },
+  {
+    key: "after-sales-service",
+    title: "After-Sales & Service",
+    href: ROUTES.admin.serviceDesk,
+    description:
+      "Complaint escalation, furniture returns, exchanges, and after-sales service operations with explicit stock and finance orchestration.",
+    operationalFocus:
+      "Run return approval, delivery return, service work, and note posting without free-editing invoices, stock, or journals.",
+    masterDataDirection:
+      "Consumes party, billing, delivery, product, and inventory references while leaving those source modules authoritative.",
+    routes: [
+      { label: "Service Desk", href: ROUTES.admin.serviceDesk },
+      { label: "Complaints", href: ROUTES.admin.serviceDeskComplaints },
+      { label: "Returns", href: ROUTES.admin.serviceDeskReturns },
+      { label: "Service Tickets", href: ROUTES.admin.serviceDeskTickets },
     ],
   },
   {
     key: "sales-onboarding",
     title: "Sales & Onboarding",
-    href: ROUTES.admin.subscriptionRequests,
+    href: ROUTES.admin.crm,
     description:
-      "Lead intake, contract requests, customer onboarding, and subscription creation.",
+      "Lead intake, party continuity, contract requests, customer onboarding, and subscription creation.",
     operationalFocus:
-      "Move demand safely from lead or request into a real customer and contract record.",
+      "Keep lead-to-party continuity intact while moving demand safely into real customer, direct-sale, or contract records.",
     masterDataDirection:
-      "Reuses the shared customer and product master; does not duplicate pricing or contract math.",
+      "CRM reuses the shared customer, vendor, partner, staff, and product masters without replacing their source records.",
     routes: [
+      { label: "CRM", href: ROUTES.admin.crm },
+      { label: "Party Directory", href: ROUTES.admin.crmParties },
       { label: "Leads", href: ROUTES.admin.leads },
       {
         label: "Subscription Requests",
@@ -99,9 +136,26 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     routes: [
       { label: "Products", href: ROUTES.admin.products },
       { label: "Inventory", href: ROUTES.admin.inventory },
+      { label: "Manufacturing", href: ROUTES.admin.manufacturing },
       { label: "Locations", href: ROUTES.admin.inventoryLocations },
       { label: "Opening Stock", href: ROUTES.admin.inventoryOpeningStock },
       { label: "Batches", href: ROUTES.admin.batches },
+    ],
+  },
+  {
+    key: "manufacturing-operations",
+    title: "Manufacturing",
+    href: ROUTES.admin.manufacturing,
+    description:
+      "BOM governance, production jobs, raw-material issue, WIP tracking, finished-goods receipt, and scrap capture through explicit operational posting.",
+    operationalFocus:
+      "Run furniture production without free-editing stock or journals; every issue and receipt stays source-linked to a production job.",
+    masterDataDirection:
+      "Consumes product master and inventory profiles for raw materials and finished goods while leaving stock ledger and accounting bridge as separate truths.",
+    routes: [
+      { label: "Overview", href: ROUTES.admin.manufacturing },
+      { label: "BOM Register", href: ROUTES.admin.manufacturingBoms },
+      { label: "Production Jobs", href: ROUTES.admin.manufacturingJobs },
     ],
   },
   {
@@ -126,18 +180,28 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     title: "Billing & Accounting",
     href: ROUTES.admin.billing,
     description:
-      "Separate billing documents, accounting books, GST-ready registers, and bridge controls.",
+      "Separate billing documents, procurement, expense, workforce, accounting books, and bridge controls.",
     operationalFocus:
-      "Extend the platform beyond EMI-only operations without creating a second uncontrolled truth source.",
+      "Extend the platform beyond EMI-only operations without creating a second uncontrolled truth source for billing, procurement, salary, or books.",
     masterDataDirection:
-      "Billing mirrors contract state and accounting consumes approved source events through controlled bridges only.",
+      "Billing mirrors contract state, while procurement, expense, and payroll source events flow into accounting through controlled bridges only.",
     routes: [
       { label: "Billing", href: ROUTES.admin.billing },
       { label: "Document Register", href: ROUTES.admin.billingRegister },
       { label: "Direct Sales", href: ROUTES.admin.billingDirectSales },
       { label: "Contracts", href: ROUTES.admin.billingContracts },
+      { label: "Vendors", href: ROUTES.admin.accountingVendors },
+      { label: "Purchase Bills", href: ROUTES.admin.accountingPurchaseBills },
+      { label: "Expenses", href: ROUTES.admin.accountingExpenses },
+      { label: "Staff", href: ROUTES.admin.accountingStaff },
+      { label: "Attendance", href: ROUTES.admin.accountingAttendance },
+      { label: "Leave", href: ROUTES.admin.accountingLeave },
+      { label: "Salary", href: ROUTES.admin.accountingSalary },
+      { label: "Expense Claims", href: ROUTES.admin.accountingExpenseClaims },
+      { label: "Staff Ledger", href: ROUTES.admin.accountingStaffLedger },
       { label: "Accounting", href: ROUTES.admin.accounting },
       { label: "Books", href: ROUTES.admin.accountingBooks },
+      { label: "Bridges", href: ROUTES.admin.accountingBridges },
     ],
   },
   {
@@ -173,6 +237,12 @@ export const ADMIN_MASTER_DATA_LANES = [
     href: ROUTES.admin.inventoryItems,
   },
   {
+    title: "Manufacturing BOMs",
+    description:
+      "Manufacturing BOMs and production jobs consume the shared inventory master without creating a duplicate item catalog.",
+    href: ROUTES.admin.manufacturingBoms,
+  },
+  {
     title: "Billing mirrors",
     description:
       "Billing contracts and documents mirror subscription and delivery state without rewriting EMI truth.",
@@ -181,7 +251,25 @@ export const ADMIN_MASTER_DATA_LANES = [
   {
     title: "Finance masters",
     description:
-      "Chart of accounts, finance accounts, vendors, and periods stay inside the separate accounting subsystem.",
+      "Chart of accounts, finance accounts, vendors, branch counters, and periods stay inside the controlled finance and branch-governance layers.",
     href: ROUTES.admin.accountingChartOfAccounts,
+  },
+  {
+    title: "Branch governance",
+    description:
+      "Branches and counters add shared operational ownership across stock locations, collections, billing, and reporting without collapsing those modules into one table.",
+    href: ROUTES.admin.branches,
+  },
+  {
+    title: "Workforce master",
+    description:
+      "Staff profiles and attendance stay in the workforce register and feed salary operations without changing auth or subscription truth.",
+    href: ROUTES.admin.accountingStaff,
+  },
+  {
+    title: "Party directory",
+    description:
+      "CRM party master links leads, customers, partners, vendors, and staff without replacing the role-specific source records.",
+    href: ROUTES.admin.crmParties,
   },
 ];

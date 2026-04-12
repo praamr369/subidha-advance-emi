@@ -7,12 +7,12 @@ from accounting.services.reporting_service import (
 )
 
 
-def build_daily_billing_book(*, start_date=None, end_date=None):
-    return build_sales_book(start_date=start_date, end_date=end_date)
+def build_daily_billing_book(*, start_date=None, end_date=None, branch_id=None):
+    return build_sales_book(start_date=start_date, end_date=end_date, branch_id=branch_id)
 
 
-def build_cash_book(*, start_date=None, end_date=None, finance_account_id=None):
-    payload = build_finance_book(kinds=["CASH"], start_date=start_date, end_date=end_date)
+def build_cash_book(*, start_date=None, end_date=None, finance_account_id=None, branch_id=None):
+    payload = build_finance_book(kinds=["CASH"], start_date=start_date, end_date=end_date, branch_id=branch_id)
     if finance_account_id is None:
         return payload
 
@@ -27,5 +27,5 @@ def build_cash_book(*, start_date=None, end_date=None, finance_account_id=None):
     }
 
 
-def build_purchase_register(*, start_date=None, end_date=None):
-    return build_purchase_book(start_date=start_date, end_date=end_date)
+def build_purchase_register(*, start_date=None, end_date=None, branch_id=None):
+    return build_purchase_book(start_date=start_date, end_date=end_date, branch_id=branch_id)

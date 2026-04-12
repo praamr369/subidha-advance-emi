@@ -75,13 +75,14 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
   const pageInfo = `Page ${safePageIndex + 1} of ${pageCount}`;
   const showData = !loading && !error && filteredRows.length > 0;
   const clickableRows = typeof onRowClick === "function";
+  const hasActiveFilter = Boolean(globalFilterInput.trim());
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <section className="surface-panel-elevated overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="border-b border-border px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
+            <h3 className="enterprise-section-title text-lg">
               {title || "Records"}
             </h3>
             {subtitle ? (
@@ -93,7 +94,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
             <div className="relative min-w-0 sm:w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
-                className="h-10 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
+                className="h-10 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
                 value={globalFilterInput}
                 onChange={(e) => {
                   setGlobalFilterInput(e.target.value);
@@ -105,6 +106,16 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
 
             {toolbar ? <div className="flex flex-wrap items-center gap-2">{toolbar}</div> : null}
           </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-xs font-semibold text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
+            {filteredRows.length} record{filteredRows.length === 1 ? "" : "s"}
+          </span>
+          {hasActiveFilter ? (
+            <span className="rounded-full border border-sky-200/80 bg-sky-50/80 px-3 py-1 text-xs font-semibold text-sky-900">
+              Filter: {globalFilterInput.trim()}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -130,12 +141,12 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
         <>
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
-              <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
+              <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--surface-muted)_95%,transparent)] backdrop-blur">
                 <tr className="border-b border-border">
                   {columns.map((column) => (
                     <th
                       key={String(column.key)}
-                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground"
                     >
                       {column.header}
                     </th>
@@ -156,8 +167,10 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                       key={resolvedKey}
                       onClick={clickableRows ? () => onRowClick(row) : undefined}
                       className={[
-                        "border-b border-border align-top transition",
-                        clickableRows ? "cursor-pointer hover:bg-muted/40" : "hover:bg-muted/20",
+                        "border-b border-border/80 align-top transition",
+                        clickableRows
+                          ? "cursor-pointer hover:bg-[color-mix(in_oklab,var(--surface-muted)_78%,transparent)]"
+                          : "hover:bg-[color-mix(in_oklab,var(--surface-muted)_58%,transparent)]",
                       ].join(" ")}
                     >
                       {columns.map((column) => (
@@ -180,7 +193,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
           <div className="flex flex-col gap-3 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="text-sm text-muted-foreground">
               {pageInfo} ·{" "}
-              <span className="font-medium text-foreground">
+              <span className="font-semibold text-foreground">
                 {filteredRows.length}
               </span>{" "}
               total result{filteredRows.length === 1 ? "" : "s"}
@@ -188,7 +201,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
 
             <div className="flex items-center gap-2">
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
                 disabled={safePageIndex <= 0}
                 type="button"
@@ -198,7 +211,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
               </button>
 
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => setPageIndex((prev) => Math.min(pageCount - 1, prev + 1))}
                 disabled={safePageIndex >= pageCount - 1}
                 type="button"

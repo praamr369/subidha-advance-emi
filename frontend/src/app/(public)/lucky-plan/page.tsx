@@ -29,8 +29,10 @@ export default function LuckyPlanPage() {
         { href: ROUTES.public.howItWorks, label: "How It Works", variant: "secondary" },
         { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
       ]}
+      helperNote="These are operationally accurate public-facing rules; branch-level eligibility and pricing validation still happen during onboarding."
+      helperTone="info"
     >
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
         <ul className="grid gap-3 text-sm leading-6 text-muted-foreground">
           {rules.map((rule) => (
             <li key={rule} className="rounded-xl border border-border bg-muted/30 px-4 py-3">

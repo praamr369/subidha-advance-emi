@@ -92,10 +92,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -132,27 +132,27 @@ function FinanceLaneCard({
       ? "border-amber-200 bg-amber-50"
       : tone === "success"
       ? "border-emerald-200 bg-emerald-50"
-      : "border-border bg-card";
+      : "border-slate-200 bg-white";
 
   return (
     <section className={`rounded-2xl border p-5 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
         {eyebrow}
       </div>
-      <h2 className="mt-2 text-lg font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+      <h2 className="mt-2 text-lg font-semibold text-slate-900">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{description}</p>
 
       <div className="mt-4 space-y-1">
-        <div className="text-2xl font-semibold text-foreground">{value}</div>
+        <div className="text-2xl font-semibold text-slate-900">{value}</div>
         {secondaryValue ? (
-          <div className="text-sm text-muted-foreground">{secondaryValue}</div>
+          <div className="text-sm text-slate-600">{secondaryValue}</div>
         ) : null}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
         <Link
           href={primaryHref}
-          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
         >
           {primaryLabel}
         </Link>
@@ -160,7 +160,7 @@ function FinanceLaneCard({
         {secondaryHref && secondaryLabel ? (
           <Link
             href={secondaryHref}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+            className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
           >
             {secondaryLabel}
           </Link>
@@ -283,7 +283,7 @@ export default function AdminFinancePage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -367,28 +367,28 @@ export default function AdminFinancePage() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/admin/finance/commissions"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Open Commission Register
                 </Link>
 
                 <Link
                   href="/admin/finance/commissions/settled"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Open Payout Queue
                 </Link>
 
                 <Link
                   href="/admin/finance/reconciliation"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Open Commission Reconciliation
                 </Link>
 
                 <Link
                   href="/admin/finance/payout-batches"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Open Payout Batches
                 </Link>
@@ -409,17 +409,17 @@ export default function AdminFinancePage() {
                   {recentBatches.map((row) => (
                     <div
                       key={row.id}
-                      className="rounded-xl border border-border bg-muted/40 p-4"
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="font-medium text-foreground">
                             Batch #{row.id}
                           </div>
-                          <div className="mt-1 text-sm text-muted-foreground">
+                          <div className="mt-1 text-sm text-slate-600">
                             {row.status} · {row.commission_count} commission rows
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
+                          <div className="mt-1 text-xs text-slate-600">
                             Created {formatDateTime(row.created_at)} · Finalized{" "}
                             {formatDateTime(row.finalized_at)} · Cancelled{" "}
                             {formatDateTime(row.cancelled_at)}
@@ -431,14 +431,14 @@ export default function AdminFinancePage() {
                             <div className="text-sm font-semibold text-foreground">
                               {money(row.total_amount)}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-slate-600">
                               Batch total
                             </div>
                           </div>
 
                           <Link
                             href={`/admin/finance/payout-batches/${row.id}`}
-                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                            className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                           >
                             Open Batch
                           </Link>

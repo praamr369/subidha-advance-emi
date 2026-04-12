@@ -7,6 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import ActionButton from "@/components/ui/ActionButton";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import {
@@ -102,6 +103,11 @@ const SEARCH_MODE_CONFIG: Record<
       "Use EMI search when the counter staff already has the exact installment row id from an earlier lookup.",
   },
 };
+
+const FIELD_CLASS_NAME =
+  "h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35";
+const SECONDARY_BUTTON_CLASS_NAME =
+  "inline-flex h-11 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function CashierCollectPage() {
   const [searchMode, setSearchMode] = useState<CashierSearchMode>("phone");
@@ -344,6 +350,8 @@ export default function CashierCollectPage() {
     <PortalPage
       title="Collect Payment"
       subtitle="Search collectible EMI rows, select the exact installment, and post a cashier collection with immediate proof visibility."
+      helperNote="Search first, verify the exact EMI row, then post once. This counter flow stays aligned with existing payment audit and reconciliation rules."
+      helperTone="info"
       breadcrumbs={[
         { label: "Cashier", href: "/cashier" },
         { label: "Collect Payment" },
@@ -426,7 +434,7 @@ export default function CashierCollectPage() {
                   setSuccess(null);
                 }}
                 disabled={lookupLoading || searchingMatches || collecting}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className={FIELD_CLASS_NAME}
               >
                 {Object.entries(SEARCH_MODE_CONFIG).map(([value, config]) => (
                   <option key={value} value={value}>
@@ -449,21 +457,23 @@ export default function CashierCollectPage() {
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder={activeSearchConfig.placeholder}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className={FIELD_CLASS_NAME}
                 disabled={lookupLoading || searchingMatches || collecting}
               />
             </div>
 
-            <button
+            <ActionButton
               type="submit"
+              variant="primary"
+              size="lg"
               disabled={lookupLoading || searchingMatches || collecting}
-              className="inline-flex h-11 items-center justify-center self-end rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="self-end"
             >
               {lookupLoading || searchingMatches ? "Searching..." : "Search"}
-            </button>
+            </ActionButton>
           </form>
 
-          <div className="mt-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
             {activeSearchConfig.help}
           </div>
         </SectionCard>
@@ -501,7 +511,7 @@ export default function CashierCollectPage() {
                     key={result.emi_id}
                     type="button"
                     onClick={() => void handleSearchResultSelect(result)}
-                    className="w-full rounded-2xl border border-border bg-background p-4 text-left shadow-sm transition hover:border-slate-300"
+                    className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="space-y-1">
@@ -511,7 +521,7 @@ export default function CashierCollectPage() {
                             ? ` · ${result.customer_phone}`
                             : ""}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-slate-600">
                           {result.subscription_number ||
                             (result.subscription_id
                               ? `SUB-${result.subscription_id}`
@@ -520,14 +530,14 @@ export default function CashierCollectPage() {
                             ? ` · Ref ${result.contract_reference}`
                             : ""}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-slate-600">
                           EMI #{result.emi_id}
                           {typeof result.month_no === "number"
                             ? ` · Month ${result.month_no}`
                             : ""}
                           {result.due_date ? ` · Due ${formatDate(result.due_date)}` : ""}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-slate-600">
                           {result.batch_code || "No batch"}
                           {typeof result.lucky_number === "number"
                             ? ` · Lucky #${result.lucky_number}`
@@ -536,16 +546,16 @@ export default function CashierCollectPage() {
                       </div>
 
                       <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[260px]">
-                        <div className="rounded-xl border border-border bg-card px-3 py-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                             EMI Amount
                           </div>
                           <div className="mt-1 text-sm font-semibold text-foreground">
                             {money(result.amount)}
                           </div>
                         </div>
-                        <div className="rounded-xl border border-border bg-card px-3 py-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                             Balance
                           </div>
                           <div className="mt-1 text-sm font-semibold text-foreground">
@@ -579,7 +589,7 @@ export default function CashierCollectPage() {
             >
               <div className="grid gap-4 md:grid-cols-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Customer
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
@@ -587,7 +597,7 @@ export default function CashierCollectPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Phone
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
@@ -595,7 +605,7 @@ export default function CashierCollectPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Pending amount
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
@@ -603,7 +613,7 @@ export default function CashierCollectPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Overdue load
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
@@ -612,7 +622,7 @@ export default function CashierCollectPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge
                     status={(lookup?.overdue_emi_count ?? 0) > 0 ? "OVERDUE" : "PENDING"}
@@ -622,7 +632,7 @@ export default function CashierCollectPage() {
                         : "Current due queue"
                     }
                   />
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-slate-600">
                     Next due EMI:{" "}
                     {lookup?.next_due_date
                       ? `${formatDate(lookup.next_due_date)} · ${money(lookup?.next_due_amount)}`
@@ -655,7 +665,7 @@ export default function CashierCollectPage() {
                           "w-full rounded-2xl border p-4 text-left shadow-sm transition",
                           isSelected
                             ? "border-primary bg-primary/5"
-                            : "border-border bg-background hover:border-slate-300",
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
                         ].join(" ")}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -668,14 +678,14 @@ export default function CashierCollectPage() {
                                 status={emi.status}
                                 isOverdue={isEmiOverdue(emi)}
                               />
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-sm text-slate-600">
                                 Due {formatDate(emi.due_date)} · {overdueLabel(emi)}
                               </span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-slate-600">
                               Customer {emi.customer_name || "—"}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-slate-600">
                               Batch {emi.batch_code || "—"}
                               {typeof emi.lucky_number === "number"
                                 ? ` · Lucky #${emi.lucky_number}`
@@ -684,24 +694,24 @@ export default function CashierCollectPage() {
                           </div>
 
                           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
-                            <div className="rounded-xl border border-border bg-card px-3 py-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                                 EMI Amount
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
                                 {money(emi.amount)}
                               </div>
                             </div>
-                            <div className="rounded-xl border border-border bg-card px-3 py-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                                 Paid
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
                                 {money(emi.total_paid)}
                               </div>
                             </div>
-                            <div className="rounded-xl border border-border bg-card px-3 py-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                                 Balance
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
@@ -781,10 +791,10 @@ export default function CashierCollectPage() {
                 />
               ) : (
                 <form onSubmit={handleCollect} className="space-y-4">
-                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Subscription
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
@@ -792,7 +802,7 @@ export default function CashierCollectPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                           EMI Month
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
@@ -800,7 +810,7 @@ export default function CashierCollectPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Due Date
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
@@ -808,7 +818,7 @@ export default function CashierCollectPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Balance
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
@@ -839,7 +849,7 @@ export default function CashierCollectPage() {
                         step="0.01"
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        className={FIELD_CLASS_NAME}
                         disabled={collecting}
                       />
                     </div>
@@ -857,7 +867,7 @@ export default function CashierCollectPage() {
                         onChange={(event) =>
                           setMethod(event.target.value as PaymentMethod)
                         }
-                        className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        className={FIELD_CLASS_NAME}
                         disabled={collecting}
                       >
                         <option value="CASH">Cash</option>
@@ -885,10 +895,10 @@ export default function CashierCollectPage() {
                             ? "Optional for cash"
                             : "Required for UPI / bank"
                         }
-                        className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        className={FIELD_CLASS_NAME}
                         disabled={collecting}
                       />
-                      <p className="mt-2 text-xs text-muted-foreground">
+                      <p className="mt-2 text-xs text-slate-600">
                         Reusing the same reference returns the existing payment instead of posting a duplicate collection.
                       </p>
                     </div>
@@ -906,40 +916,42 @@ export default function CashierCollectPage() {
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
                         placeholder="Optional note"
-                        className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        className={FIELD_CLASS_NAME}
                         disabled={collecting}
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button
+                    <ActionButton
                       type="submit"
+                      variant="primary"
+                      size="lg"
+                      loading={collecting}
                       disabled={collecting}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {collecting ? "Posting collection..." : "Collect Payment"}
-                    </button>
+                    </ActionButton>
 
                     <button
                       type="button"
                       onClick={resetCurrentCustomerSelection}
                       disabled={collecting}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      className={SECONDARY_BUTTON_CLASS_NAME}
                     >
                       Reset Selection
                     </button>
 
                     <Link
                       href="/cashier/payments"
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                      className={SECONDARY_BUTTON_CLASS_NAME}
                     >
                       Payment History
                     </Link>
 
                     <Link
                       href="/cashier"
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                      className={SECONDARY_BUTTON_CLASS_NAME}
                     >
                       Back to Dashboard
                     </Link>

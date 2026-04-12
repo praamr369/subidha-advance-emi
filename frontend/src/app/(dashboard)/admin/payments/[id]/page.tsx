@@ -556,6 +556,7 @@ export default function AdminPaymentDetailRoutePage() {
           <>
             <PaymentReceiptDocument
               audienceLabel="Admin-visible payment proof sourced from the live payment detail record."
+              documentTitle="EMI Collection Receipt"
               receiptReference={receiptReference}
               paymentId={resolvedPayment.id}
               statusLabel={statusLabel}
@@ -567,9 +568,29 @@ export default function AdminPaymentDetailRoutePage() {
                   </div>
                 ) : undefined
               }
+              partyFields={[
+                {
+                  label: "Customer",
+                  value:
+                    resolvedPayment.customer_name ||
+                    (resolvedPayment.customer
+                      ? `Customer #${resolvedPayment.customer}`
+                      : "—"),
+                  emphasize: true,
+                },
+                { label: "Phone", value: resolvedPayment.customer_phone || "—" },
+                { label: "Subscription", value: subscriptionLabel, emphasize: true },
+                { label: "Subscription Status", value: resolvedPayment.subscription_status || "—" },
+              ]}
+              referenceFields={[
+                { label: "Receipt Reference", value: receiptReference, emphasize: true },
+                { label: "Payment Date", value: formatDate(resolvedPayment.payment_date) },
+                { label: "Method", value: resolvedPayment.method || "—" },
+                { label: "EMI Context", value: emiContext },
+              ]}
               summaryFields={[
                 {
-                  label: "Recorded At",
+                  label: "Paid On",
                   value: formatDateTime(
                     resolvedPayment.created_at || resolvedPayment.payment_date
                   ),
@@ -581,41 +602,16 @@ export default function AdminPaymentDetailRoutePage() {
                   emphasize: true,
                 },
                 {
-                  label: "Customer",
-                  value:
-                    resolvedPayment.customer_name ||
-                    (resolvedPayment.customer
-                      ? `Customer #${resolvedPayment.customer}`
-                      : "—"),
-                  emphasize: true,
-                },
-                {
-                  label: "Subscription",
-                  value: subscriptionLabel,
-                  emphasize: true,
-                },
-              ]}
-              detailFields={[
-                { label: "Method", value: resolvedPayment.method || "—" },
-                { label: "Status", value: statusLabel },
-                { label: "Phone", value: resolvedPayment.customer_phone || "—" },
-                {
-                  label: "Collected By",
+                  label: "Collector",
                   value: resolvedPayment.collected_by_username || "—",
                 },
                 {
-                  label: "Verified By",
+                  label: "Verifier",
                   value: resolvedPayment.verified_by_username || "—",
                 },
-                {
-                  label: "Subscription Status",
-                  value: resolvedPayment.subscription_status || "—",
-                },
-                { label: "EMI", value: emiContext },
-                {
-                  label: "Payment Date",
-                  value: formatDate(resolvedPayment.payment_date),
-                },
+              ]}
+              detailFields={[
+                { label: "Receipt Status", value: statusLabel },
                 { label: "Batch", value: resolvedPayment.batch_code || "—" },
                 {
                   label: "Lucky Number",
@@ -626,7 +622,7 @@ export default function AdminPaymentDetailRoutePage() {
                       : "—",
                 },
                 {
-                  label: "Reference",
+                  label: "Reference Number",
                   value: resolvedPayment.reference_no || "—",
                 },
               ]}

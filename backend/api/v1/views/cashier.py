@@ -38,6 +38,8 @@ class CashierCollectPayment(APIView):
         emi_id = data.get("emi_id")
         amount_raw = data.get("amount")
         method = (data.get("method") or data.get("payment_method") or "CASH").strip().upper()
+        branch_id = data.get("branch_id")
+        cash_counter_id = data.get("cash_counter_id")
         reference_no = (data.get("reference_no") or "").strip()
         note = (data.get("note") or data.get("notes") or "").strip()
 
@@ -77,6 +79,8 @@ class CashierCollectPayment(APIView):
                 method=method,
                 reference_no=reference_no or None,
                 note=note or None,
+                branch_id=int(branch_id) if branch_id not in (None, "") else None,
+                cash_counter_id=int(cash_counter_id) if cash_counter_id not in (None, "") else None,
             )
         except ValueError as exc:
             return Response(
@@ -115,6 +119,8 @@ class CashierCollectPayment(APIView):
                     "payment_date": getattr(payment, "payment_date", None),
                     "created_at": getattr(payment, "created_at", None),
                     "customer_id": getattr(payment, "customer_id", None),
+                    "branch_id": getattr(payment, "branch_id", None),
+                    "cash_counter_id": getattr(payment, "cash_counter_id", None),
                     "subscription_id": getattr(payment, "subscription_id", None),
                     "emi_id": getattr(payment, "emi_id", None),
                     "collected_by_id": getattr(payment, "collected_by_id", None),

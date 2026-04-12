@@ -7,8 +7,6 @@ import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lu
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-// ... (rest of the file remains as is, but we can add cn usage)
-
 type PortalAction = {
   href: string;
   label: string;
@@ -34,6 +32,8 @@ type PortalStatusBadge = {
 type PortalPageProps = {
   title: string;
   subtitle?: string;
+  helperNote?: string;
+  helperTone?: "default" | "info" | "warning";
   actions?: ReadonlyArray<PortalAction>;
   breadcrumbs?: ReadonlyArray<PortalBreadcrumb>;
   stats?: ReadonlyArray<PortalStat>;
@@ -46,14 +46,14 @@ type PortalPageProps = {
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
   switch (variant) {
     case "primary":
-      return "border-primary/80 bg-foreground text-background shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-28px_rgba(15,23,42,0.9)]";
+      return "border-primary/80 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]";
     case "danger":
       return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)] hover:-translate-y-0.5";
     case "ghost":
-      return "border-dashed border-slate-300 bg-transparent text-slate-900 hover:bg-slate-100 hover:text-slate-950";
+      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]";
     case "secondary":
     default:
-      return "border-slate-200 bg-slate-100 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] hover:-translate-y-0.5 hover:bg-slate-200";
+      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
   }
 }
 
@@ -69,7 +69,7 @@ function getToneClassName(tone: PortalStat["tone"] | PortalStatusBadge["tone"] =
       return "border-sky-200/80 bg-sky-50/90 text-sky-900";
     case "default":
     default:
-      return "border-white/70 bg-white/75 text-foreground";
+      return "border-slate-300 bg-slate-100 text-foreground";
   }
 }
 
@@ -94,6 +94,8 @@ function getToneIcon(
 export default function PortalPage({
   title,
   subtitle,
+  helperNote,
+  helperTone = "default",
   actions = [],
   breadcrumbs = [],
   stats = [],
@@ -129,7 +131,7 @@ export default function PortalPage({
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
-                    className="inline-flex items-center rounded-full border border-white/70 bg-white/60 px-3 py-1 text-xs font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:bg-white/90 hover:text-foreground"
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:bg-slate-100 hover:text-foreground"
                   >
                     {crumb.label}
                   </Link>
@@ -138,8 +140,8 @@ export default function PortalPage({
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1 text-xs",
                       isLast
-                        ? "border-slate-900/10 bg-slate-900 text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)]"
-                        : "border-white/70 bg-white/60 font-medium text-foreground"
+                        ? "border-primary/60 bg-primary text-primary-foreground shadow-[0_12px_28px_-20px_rgba(30,64,175,0.72)]"
+                        : "border-border bg-[var(--surface-card-elevated)] font-medium text-foreground"
                     )}
                   >
                     {crumb.label}
@@ -155,22 +157,23 @@ export default function PortalPage({
         </nav>
       ) : null}
 
-      <section className="portal-page-header relative overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.22),transparent_28%),radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_28px_80px_-48px_rgba(15,23,42,0.68)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.24),transparent_45%)]" />
-        <div className="pointer-events-none absolute -right-16 top-0 h-44 w-44 rounded-full bg-sky-200/25 blur-3xl" />
-        <div className="pointer-events-none absolute left-0 top-16 h-36 w-36 rounded-full bg-amber-200/20 blur-3xl" />
+      <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_28px_70px_-48px_rgba(15,23,42,0.52)]">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.26),transparent_44%)]" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
+        <div className="pointer-events-none absolute -right-12 top-0 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-[color-mix(in_oklab,var(--accent)_25%,transparent)] blur-3xl" />
         <div className="relative flex flex-col gap-6 p-5 sm:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight text-card-foreground sm:text-3xl lg:text-[2rem]">
+                <h1 className="enterprise-title">
                   {title}
                 </h1>
 
                 {statusBadge ? (
                   <span
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur",
+                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
                       getToneClassName(statusBadge.tone)
                     )}
                   >
@@ -188,16 +191,31 @@ export default function PortalPage({
                   {subtitle}
                 </p>
               ) : null}
+
+              {helperNote ? (
+                <div
+                  className={cn(
+                    "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
+                    helperTone === "warning"
+                      ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                      : helperTone === "info"
+                        ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
+                        : "border-border bg-[var(--surface-muted)] text-foreground"
+                  )}
+                >
+                  {helperNote}
+                </div>
+              ) : null}
             </div>
 
             {actions.length > 0 ? (
-              <div className="portal-page-actions flex flex-wrap items-center gap-2 xl:justify-end">
+              <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
                 {actions.map((action) => (
                   <Link
                     key={`${action.href}-${action.label}`}
                     href={action.href}
                     className={cn(
-                      "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-medium transition duration-200",
+                      "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
                       getActionClassName(action.variant)
                     )}
                   >
@@ -213,15 +231,15 @@ export default function PortalPage({
               {stats.map((stat, index) => (
                 <div
                   key={`${stat.label}-${index}`}
-                  className="rounded-[1.4rem] border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_45px_-36px_rgba(15,23,42,0.58)] backdrop-blur"
+                  className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_45px_-36px_rgba(15,23,42,0.48)]"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="enterprise-eyebrow">
                     {stat.label}
                   </div>
 
                   <div
                     className={cn(
-                      "mt-2 text-2xl font-semibold tracking-tight",
+                      "enterprise-metric mt-2",
                       stat.tone === "success"
                         ? "text-emerald-800"
                         : stat.tone === "warning"

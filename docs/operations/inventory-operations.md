@@ -28,6 +28,9 @@ It is based on the live code paths in:
 - `/admin/inventory/adjustments`
 - `/admin/inventory/opening-stock`
 - `/admin/inventory/valuation`
+- `/admin/manufacturing`
+- `/admin/manufacturing/boms`
+- `/admin/manufacturing/jobs`
 
 ## Daily operating sequence
 
@@ -56,7 +59,8 @@ It is based on the live code paths in:
 - Do not reduce stock by editing subscription, delivery, or billing records directly.
 - Use opening stock import for initial baseline loading.
 - Use stock adjustments for counted corrections.
-- Keep raw-material readiness at the inventory-profile layer through stock item type classification; do not build manufacturing or BOM logic in this pass.
+- Keep raw-material, accessory, and finished-good classification correct at the inventory-profile layer so procurement and manufacturing can consume the same stock master safely.
+- Manufacturing stock movements must come from explicit production-job issue, return, and receipt actions rather than manual page edits.
 
 ## Auditability
 
@@ -69,3 +73,13 @@ The current pass emits audit records for:
 - delivery inventory bridge sync
 
 This keeps stock operations visible without weakening existing Lucky Plan financial audit trails.
+
+## Manufacturing bridge note
+
+Manufacturing now consumes and produces stock through explicit job posting:
+
+- raw-material issue reduces stock with `PRODUCTION_ISSUE_OUT`
+- raw-material correction return increases stock with `PRODUCTION_RETURN_IN`
+- finished-goods receipt increases stock with `PRODUCTION_RECEIPT_IN`
+
+Inventory remains the stock ledger of record. Manufacturing is the operational orchestration layer above it.

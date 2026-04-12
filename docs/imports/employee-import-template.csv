@@ -1,0 +1,2 @@
+employee_code,name,phone,branch_code,designation,department,joining_date,base_salary,standard_daily_hours,overtime_rate_per_hour,is_active,notes
+EMP-TPL-001,Template Staff,01720000001,MAIN,Sales Executive,Sales,2026-04-01,15000.00,8.00,120.00,true,Template workforce import row

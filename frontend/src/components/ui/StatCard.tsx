@@ -22,33 +22,33 @@ type StatCardProps = {
 const toneColors = {
   default: {
     shell:
-      "border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]",
-    icon: "bg-slate-950/5 text-slate-600",
-    accent: "bg-slate-400/70",
+      "border-border bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card)_84%,var(--surface-muted)_16%))]",
+    icon: "bg-[var(--surface-strong)] text-slate-700",
+    accent: "bg-slate-400/55",
   },
   success: {
     shell:
-      "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(220,252,231,0.84))]",
+      "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.97),rgba(220,252,231,0.86))]",
     icon: "bg-emerald-500/10 text-emerald-700",
-    accent: "bg-emerald-500/75",
+    accent: "bg-emerald-500/70",
   },
   warning: {
     shell:
-      "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.84))]",
+      "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.88))]",
     icon: "bg-amber-500/10 text-amber-700",
-    accent: "bg-amber-500/75",
+    accent: "bg-amber-500/72",
   },
   danger: {
     shell:
-      "border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.84))]",
+      "border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.86))]",
     icon: "bg-red-500/10 text-red-700",
-    accent: "bg-red-500/75",
+    accent: "bg-red-500/72",
   },
   info: {
     shell:
-      "border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.84))]",
+      "border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.88))]",
     icon: "bg-sky-500/10 text-sky-700",
-    accent: "bg-sky-500/75",
+    accent: "bg-sky-500/72",
   },
 };
 
@@ -70,7 +70,7 @@ export default function StatCard({
   const card = (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-[1.6rem] border p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.58)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.62)]",
+        "group relative overflow-hidden rounded-[1.6rem] border p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.46)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.56)]",
         toneStyle.shell,
         className
       )}
@@ -79,10 +79,10 @@ export default function StatCard({
       <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-white/40 blur-2xl" />
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="enterprise-eyebrow">
             {label}
           </div>
-          <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
+          <div className="enterprise-metric mt-3 text-foreground">
             {value}
           </div>
           {subtext && (
@@ -94,7 +94,7 @@ export default function StatCard({
         {icon ? (
           <div
             className={cn(
-              "rounded-2xl border border-white/70 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]",
+              "rounded-2xl border border-slate-300 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]",
               toneStyle.icon
             )}
           >

@@ -13,6 +13,15 @@ from django.utils import timezone
 
 
 MONEY_ZERO = Decimal("0.00")
+
+
+def _default_branch():
+    try:
+        from branch_control.services.branch_service import default_branch_for_model
+
+        return default_branch_for_model()
+    except Exception:
+        return None
 HUNDRED = Decimal("100.00")
 
 
@@ -485,6 +494,13 @@ class PublicLead(TimeStampedModel):
         null=True,
         blank=True,
     )
+    converted_direct_sale = models.ForeignKey(
+        "billing.DirectSale",
+        on_delete=models.SET_NULL,
+        related_name="converted_public_leads",
+        null=True,
+        blank=True,
+    )
     converted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -507,6 +523,7 @@ class PublicLead(TimeStampedModel):
             models.Index(fields=["created_at"]),
             models.Index(fields=["converted_customer", "created_at"]),
             models.Index(fields=["converted_subscription", "created_at"]),
+            models.Index(fields=["converted_direct_sale", "created_at"]),
         ]
 
     def clean(self):
@@ -985,6 +1002,13 @@ class Subscription(TimeStampedModel):
     plan_type = models.CharField(max_length=10, choices=PlanType.choices, db_index=True)
     tenure_months = models.PositiveIntegerField()
     start_date = models.DateField()
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="subscriptions",
+    )
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(
@@ -1019,6 +1043,7 @@ class Subscription(TimeStampedModel):
             models.Index(fields=["plan_type"]),
             models.Index(fields=["partner"]),
             models.Index(fields=["start_date"]),
+            models.Index(fields=["branch", "status"]),
         ]
         constraints = [
             models.CheckConstraint(
@@ -1118,6 +1143,9 @@ class Subscription(TimeStampedModel):
                 "monthly_amount": str(self.monthly_amount),
                 "total_amount": str(self.total_amount),
             }
+
+        if self.branch_id is None:
+            self.branch = _default_branch()
 
         self.full_clean()
 
@@ -1486,6 +1514,20 @@ class Payment(TimeStampedModel):
         related_name="payments",
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
+    cash_counter = models.ForeignKey(
+        "branch_control.CashCounter",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
     method = models.CharField(max_length=10, choices=PaymentMethod.choices, db_index=True)
     reference_no = models.CharField(
         max_length=100,
@@ -1527,6 +1569,8 @@ class Payment(TimeStampedModel):
             models.Index(fields=["subscription"]),
             models.Index(fields=["customer"]),
             models.Index(fields=["emi"]),
+            models.Index(fields=["branch", "payment_date"]),
+            models.Index(fields=["cash_counter", "payment_date"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -1558,6 +1602,10 @@ class Payment(TimeStampedModel):
                 errors["emi"] = "Selected EMI does not belong to the selected subscription."
             if self.customer_id and self.emi.subscription.customer_id != self.customer_id:
                 errors["emi"] = "Selected EMI does not belong to the selected customer."
+        if self.cash_counter_id:
+            counter_branch_id = getattr(self.cash_counter, "branch_id", None)
+            if self.branch_id and counter_branch_id and self.branch_id != counter_branch_id:
+                errors["cash_counter"] = "Selected counter must belong to the payment branch."
 
         if self.reference_no is not None:
             self.reference_no = self.reference_no.strip() or None
@@ -1569,6 +1617,12 @@ class Payment(TimeStampedModel):
         self.reference_no = (self.reference_no or "").strip() or None
         if not self.plan_type_hint and self.subscription_id:
             self.plan_type_hint = self.subscription.plan_type
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.cash_counter, "branch", None)
+                or getattr(self.subscription, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -2053,7 +2107,12 @@ class AuditLog(models.Model):
         LEAD_NOTE_UPDATED = "LEAD_NOTE_UPDATED", "Lead Notes Updated"
         LEAD_CUSTOMER_LINKED = "LEAD_CUSTOMER_LINKED", "Lead Customer Linked"
         LEAD_SUBSCRIPTION_LINKED = "LEAD_SUBSCRIPTION_LINKED", "Lead Subscription Linked"
+        LEAD_DIRECT_SALE_LINKED = "LEAD_DIRECT_SALE_LINKED", "Lead Direct Sale Linked"
         LEAD_CONVERTED = "LEAD_CONVERTED", "Lead Converted"
+        CRM_PARTY_CREATED = "CRM_PARTY_CREATED", "CRM Party Created"
+        CRM_PARTY_LINKED = "CRM_PARTY_LINKED", "CRM Party Linked"
+        CRM_INTERACTION_CREATED = "CRM_INTERACTION_CREATED", "CRM Interaction Created"
+        CRM_INTERACTION_UPDATED = "CRM_INTERACTION_UPDATED", "CRM Interaction Updated"
         SUPPORT_REQUEST_CREATED = "SUPPORT_REQUEST_CREATED", "Support Request Created"
         SUPPORT_REQUEST_STATUS_UPDATED = "SUPPORT_REQUEST_STATUS_UPDATED", "Support Request Status Updated"
         SUPPORT_REQUEST_ASSIGNED = "SUPPORT_REQUEST_ASSIGNED", "Support Request Assigned"
@@ -2062,6 +2121,29 @@ class AuditLog(models.Model):
         SUPPORT_REQUEST_RESOLUTION_RECORDED = (
             "SUPPORT_REQUEST_RESOLUTION_RECORDED",
             "Support Request Resolution Recorded",
+        )
+        SERVICE_DESK_CASE_CREATED = "SERVICE_DESK_CASE_CREATED", "Service Desk Case Created"
+        SERVICE_DESK_CASE_UPDATED = "SERVICE_DESK_CASE_UPDATED", "Service Desk Case Updated"
+        SERVICE_DESK_CASE_STATUS_UPDATED = "SERVICE_DESK_CASE_STATUS_UPDATED", "Service Desk Case Status Updated"
+        SERVICE_DESK_CASE_DELIVERY_RETURN_REQUESTED = (
+            "SERVICE_DESK_CASE_DELIVERY_RETURN_REQUESTED",
+            "Service Desk Case Delivery Return Requested",
+        )
+        SERVICE_DESK_CASE_DELIVERY_RETURNED = (
+            "SERVICE_DESK_CASE_DELIVERY_RETURNED",
+            "Service Desk Case Delivery Returned",
+        )
+        SERVICE_DESK_CASE_CREDIT_NOTE_POSTED = (
+            "SERVICE_DESK_CASE_CREDIT_NOTE_POSTED",
+            "Service Desk Case Credit Note Posted",
+        )
+        SERVICE_DESK_CASE_DEBIT_NOTE_POSTED = (
+            "SERVICE_DESK_CASE_DEBIT_NOTE_POSTED",
+            "Service Desk Case Debit Note Posted",
+        )
+        SERVICE_DESK_CASE_REPLACEMENT_LINKED = (
+            "SERVICE_DESK_CASE_REPLACEMENT_LINKED",
+            "Service Desk Case Replacement Linked",
         )
         DELIVERY_CREATED = "DELIVERY_CREATED", "Delivery Created"
         DELIVERY_UPDATED = "DELIVERY_UPDATED", "Delivery Updated"
@@ -2129,6 +2211,23 @@ class AuditLog(models.Model):
             "DELIVERY_INVENTORY_BRIDGE_SYNCED",
             "Delivery Inventory Bridge Synced",
         )
+        MANUFACTURING_BOM_CREATED = "MANUFACTURING_BOM_CREATED", "Manufacturing BOM Created"
+        MANUFACTURING_BOM_UPDATED = "MANUFACTURING_BOM_UPDATED", "Manufacturing BOM Updated"
+        MANUFACTURING_BOM_STATUS_UPDATED = (
+            "MANUFACTURING_BOM_STATUS_UPDATED",
+            "Manufacturing BOM Status Updated",
+        )
+        PRODUCTION_JOB_CREATED = "PRODUCTION_JOB_CREATED", "Production Job Created"
+        PRODUCTION_JOB_UPDATED = "PRODUCTION_JOB_UPDATED", "Production Job Updated"
+        PRODUCTION_JOB_STATUS_UPDATED = (
+            "PRODUCTION_JOB_STATUS_UPDATED",
+            "Production Job Status Updated",
+        )
+        PRODUCTION_MATERIAL_MOVEMENT_POSTED = (
+            "PRODUCTION_MATERIAL_MOVEMENT_POSTED",
+            "Production Material Movement Posted",
+        )
+        PRODUCTION_OUTPUT_POSTED = "PRODUCTION_OUTPUT_POSTED", "Production Output Posted"
 
         PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED", "Password Reset Requested"
         PASSWORD_RESET_VERIFIED = "PASSWORD_RESET_VERIFIED", "Password Reset Verified"

@@ -21,12 +21,25 @@ def _normalize_trace_metadata(metadata) -> dict:
     return metadata if isinstance(metadata, dict) else {}
 
 
+def _source_branch_trace(source_instance) -> dict:
+    payload: dict[str, object] = {}
+    branch_id = getattr(source_instance, "branch_id", None)
+    cash_counter_id = getattr(source_instance, "cash_counter_id", None)
+    if branch_id:
+        payload["branch_id"] = branch_id
+    if cash_counter_id:
+        payload["cash_counter_id"] = cash_counter_id
+    return payload
+
+
 def _infer_source_reference(source_instance) -> str | None:
     for attribute in (
         "document_no",
         "receipt_no",
         "note_no",
         "bill_no",
+        "claim_no",
+        "request_no",
         "sale_no",
         "settlement_no",
         "movement_no",
@@ -96,7 +109,10 @@ def post_bridge_entry(
         source_instance,
         entry_date,
     )
-    resolved_trace_metadata = _normalize_trace_metadata(trace_metadata)
+    resolved_trace_metadata = {
+        **_source_branch_trace(source_instance),
+        **_normalize_trace_metadata(trace_metadata),
+    }
 
     existing = AccountingBridgePosting.objects.select_for_update().filter(
         source_model=source_model,

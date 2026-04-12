@@ -53,6 +53,7 @@ export type StockLedgerRow = {
   stock_location_id?: number | null;
   stock_location_code?: string | null;
   stock_location_name?: string | null;
+  branch_id?: number | null;
   reference_model: string;
   reference_id: string;
   notes?: string;
@@ -77,12 +78,16 @@ export type StockSummaryRow = {
   default_stock_location_id?: number | null;
   default_stock_location_code?: string | null;
   default_stock_location_name?: string | null;
+  branch_id?: number | null;
 };
 
 export type StockLocation = {
   id: number;
   code: string;
   name: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   location_type: "STORE" | "WAREHOUSE" | "SHOWROOM";
   is_active: boolean;
   notes?: string;
@@ -163,6 +168,7 @@ export type StockAdjustment = {
 export type StockLocationPayload = {
   code: string;
   name: string;
+  branch?: number | null;
   location_type: "STORE" | "WAREHOUSE" | "SHOWROOM";
   is_active: boolean;
   notes?: string;

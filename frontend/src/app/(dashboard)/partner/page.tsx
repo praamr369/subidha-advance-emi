@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -34,7 +34,6 @@ import {
   getDashboardSummaryV2,
   listDashboardOverdue,
   listDashboardRecentPayments,
-  listDashboardReconciliationExceptions,
   listDashboardUpcoming,
   listDashboardWinners,
   normalizeDashboardSummary,
@@ -46,9 +45,6 @@ type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2
 type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
 type DashboardPaymentsPayload = Awaited<
   ReturnType<typeof listDashboardRecentPayments>
->;
-type DashboardReconciliationPayload = Awaited<
-  ReturnType<typeof listDashboardReconciliationExceptions>
 >;
 type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
 
@@ -66,8 +62,6 @@ export default function PartnerDashboardPage() {
   const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
   const [recentPayments, setRecentPayments] =
     useState<DashboardPaymentsPayload | null>(null);
-  const [reconciliationItems, setReconciliationItems] =
-    useState<DashboardReconciliationPayload | null>(null);
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
@@ -78,59 +72,62 @@ export default function PartnerDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const dashboardQuery =
-    windowPreset === "CUSTOM"
-      ? {
-          window: windowPreset,
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-        }
-      : { window: windowPreset };
+  const dashboardQuery = useMemo(
+    () =>
+      windowPreset === "CUSTOM"
+        ? {
+            window: windowPreset,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          }
+        : { window: windowPreset },
+    [endDate, startDate, windowPreset]
+  );
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
-    try {
-      const [
-        legacyPayload,
-        canonicalPayload,
-        overduePayload,
-        upcomingPayload,
-        recentPaymentsPayload,
-        reconciliationPayload,
-        winnersPayload,
-      ] = await Promise.all([
-        getPartnerDashboard(),
-        getDashboardSummaryV2(dashboardQuery),
-        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-        listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
-        listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
-        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-      ]);
+      try {
+        const [
+          legacyPayload,
+          canonicalPayload,
+          overduePayload,
+          upcomingPayload,
+          recentPaymentsPayload,
+          winnersPayload,
+        ] = await Promise.all([
+          getPartnerDashboard(),
+          getDashboardSummaryV2(dashboardQuery),
+          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+          listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+        ]);
 
-      setLegacy(legacyPayload);
-      setCanonical(canonicalPayload);
-      setOverdue(overduePayload);
-      setUpcoming(upcomingPayload);
-      setRecentPayments(recentPaymentsPayload);
-      setReconciliationItems(reconciliationPayload);
-      setWinnerItems(winnersPayload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setLegacy(null);
-      setCanonical(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+        setLegacy(legacyPayload);
+        setCanonical(canonicalPayload);
+        setOverdue(overduePayload);
+        setUpcoming(upcomingPayload);
+        setRecentPayments(recentPaymentsPayload);
+        setWinnerItems(winnersPayload);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        setLegacy(null);
+        setCanonical(null);
+      } finally {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
+    },
+    [dashboardQuery]
+  );
 
   useEffect(() => {
     void loadPage("initial");
-  }, [windowPreset, startDate, endDate]);
+  }, [loadPage]);
 
   const summary =
     canonical?.summary ??
@@ -152,13 +149,14 @@ export default function PartnerDashboardPage() {
     8
   );
   const paymentRows = recentPayments?.results ?? [];
-  const flaggedRows = reconciliationItems?.results ?? [];
   const winnerRows = winnerItems?.results ?? [];
 
   return (
     <PortalPage
       title="Partner Dashboard"
       subtitle="Partner-scoped collection truth aligned to the canonical subscription rollup, with separate operational visibility for request workflow and commission status."
+      helperNote="This workspace is partner-scoped and audit-linked; collection and commission rows here are filtered from live operational records."
+      helperTone="info"
       breadcrumbs={[{ label: "Partner" }]}
       actions={[
         {
@@ -206,15 +204,14 @@ export default function PartnerDashboardPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <button
-            type="button"
+          <ActionButton
+            variant="outline"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         </div>
 
         <DashboardTimeWindowSelector

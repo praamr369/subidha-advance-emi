@@ -1,2 +1,2 @@
-name,phone
-Template Customer One,9100000001
+name,phone,email
+Template Customer One,9100000001,customer.one@example.com

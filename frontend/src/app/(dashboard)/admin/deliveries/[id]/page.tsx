@@ -98,10 +98,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -110,8 +110,8 @@ function SectionCard({
 
 function DetailValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
         {label}
       </div>
       <div className="mt-1 text-sm text-foreground">{value}</div>
@@ -350,7 +350,7 @@ export default function AdminDeliveryDetailPage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -436,44 +436,44 @@ export default function AdminDeliveryDetailPage() {
                   type="date"
                   value={scheduledDate}
                   onChange={(event) => setScheduledDate(event.target.value)}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                 />
                 <input
                   value={receiverName}
                   onChange={(event) => setReceiverName(event.target.value)}
                   placeholder="Receiver name"
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                 />
                 <input
                   value={receiverPhone}
                   onChange={(event) => setReceiverPhone(event.target.value)}
                   placeholder="Receiver phone"
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                 />
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="Failure / cancellation reason"
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                 />
                 <textarea
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   placeholder="Delivery address snapshot"
-                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 lg:col-span-2"
                 />
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Operational notes"
-                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 lg:col-span-2"
                 />
                 <div className="lg:col-span-2">
                   <button
                     type="button"
                     onClick={() => void handleMetadataSave()}
                     disabled={actionLoading === "metadata"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "metadata" ? "Saving..." : "Save Metadata"}
                   </button>
@@ -486,7 +486,7 @@ export default function AdminDeliveryDetailPage() {
               description="Only valid next actions are shown. Failed and cancelled actions require a reason."
             >
               {availableActions.length === 0 ? (
-                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   This delivery is in a terminal state. No further lifecycle transition is available from here.
                 </div>
               ) : (
@@ -497,7 +497,7 @@ export default function AdminDeliveryDetailPage() {
                       type="button"
                       onClick={() => void handleTransition(action)}
                       disabled={actionLoading === action}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {actionLoading === action
                         ? "Working..."
@@ -525,15 +525,15 @@ export default function AdminDeliveryDetailPage() {
                   {timeline.map((entry) => (
                     <div
                       key={entry.id}
-                      className="rounded-xl border border-border bg-background px-4 py-3"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                     >
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                         {entry.action_type}
                       </div>
                       <div className="mt-1 text-sm text-foreground">
                         {summarizeAudit(entry)}
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
+                      <div className="mt-2 text-xs text-slate-600">
                         {formatDateTime(entry.created_at)} · {entry.performed_by_username || "System"}
                       </div>
                     </div>

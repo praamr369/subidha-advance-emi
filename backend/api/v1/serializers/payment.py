@@ -7,6 +7,12 @@ class PaymentSerializer(serializers.ModelSerializer):
     customer_id = serializers.IntegerField(source="customer.id", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_phone = serializers.CharField(source="customer.phone", read_only=True)
+    branch_id = serializers.IntegerField(source="branch.id", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    cash_counter_id = serializers.IntegerField(source="cash_counter.id", read_only=True)
+    cash_counter_code = serializers.CharField(source="cash_counter.code", read_only=True)
+    cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True)
 
     subscription_id = serializers.IntegerField(source="subscription.id", read_only=True)
     subscription_number = serializers.SerializerMethodField()
@@ -55,6 +61,12 @@ class PaymentSerializer(serializers.ModelSerializer):
             "customer_id",
             "customer_name",
             "customer_phone",
+            "branch_id",
+            "branch_code",
+            "branch_name",
+            "cash_counter_id",
+            "cash_counter_code",
+            "cash_counter_name",
             "subscription",
             "subscription_id",
             "subscription_number",

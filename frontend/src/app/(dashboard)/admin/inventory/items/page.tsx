@@ -55,7 +55,7 @@ export default function InventoryItemsPage() {
     try {
       const [itemsPayload, locationPayload] = await Promise.all([
         listInventoryItems(),
-        listStockLocations({ is_active: true }),
+        listStockLocations({ is_active: 1 }),
       ]);
       setRows(itemsPayload.results);
       setLocations(locationPayload.results);

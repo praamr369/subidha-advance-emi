@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 
 import { useSubscriptionDetailData } from "@/domains/subscriptions/hooks";
@@ -78,91 +80,137 @@ export default function AdminSubscriptionDetailPage() {
 
   function handlePrint(): void {
     if (!subscription) return;
-
-    const popup = window.open("", "_blank", "width=900,height=700");
-    if (!popup) return;
-
-    popup.document.write(`
-      <html>
-        <head>
-          <title>Subscription #${subscription.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { margin-bottom: 8px; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-            .row { margin: 8px 0; }
-            .label { font-weight: bold; display: inline-block; min-width: 180px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>Subscription Details</h1>
-          <div class="card">
-            <div class="row"><span class="label">Subscription ID:</span> #${subscription.id}</div>
-            <div class="row"><span class="label">Customer:</span> ${customer?.name ?? "-"} (${customer?.phone ?? "-"})</div>
-            <div class="row"><span class="label">Product:</span> ${product?.name ?? "-"}</div>
-            <div class="row"><span class="label">Batch:</span> ${batch?.batch_code ?? "-"}</div>
-            <div class="row"><span class="label">Lucky ID:</span> ${luckyId ? `#${String(luckyId.lucky_number).padStart(2, "0")}` : "-"}</div>
-            <div class="row"><span class="label">Partner:</span> ${partner?.username ?? "-"}</div>
-            <div class="row"><span class="label">Plan:</span> ${subscription.plan_type}</div>
-            <div class="row"><span class="label">Tenure:</span> ${subscription.tenure_months} months</div>
-            <div class="row"><span class="label">Monthly Amount:</span> ${formatCurrency(subscription.monthly_amount)}</div>
-            <div class="row"><span class="label">Total Amount:</span> ${formatCurrency(subscription.total_amount)}</div>
-            <div class="row"><span class="label">Paid So Far:</span> ${formatCurrency(totalPaid)}</div>
-            <div class="row"><span class="label">Status:</span> ${subscription.status}</div>
-          </div>
-          <script>window.onload = function(){ window.print(); };</script>
-        </body>
-      </html>
-    `);
-
-    popup.document.close();
+    window.print();
   }
+
+  const contractStatusToneClassName = useMemo(() => {
+    const status = String(subscription?.status || "").toUpperCase();
+    if (status === "COMPLETED" || status === "WON") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+    if (status === "DEFAULTED" || status === "CANCELLED") {
+      return "border-red-200 bg-red-50 text-red-700";
+    }
+    return "border-slate-300 bg-slate-100 text-slate-800";
+  }, [subscription?.status]);
+
+  const remainingAmount = useMemo(
+    () =>
+      Math.max(
+        Number(subscription?.total_amount || 0) -
+          totalPaid -
+          Number(subscription?.waived_amount || 0),
+        0
+      ),
+    [subscription?.total_amount, subscription?.waived_amount, totalPaid]
+  );
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"}
       subtitle="Track EMI schedule, reconciliation checkpoints, and Lucky Plan allocation details."
     >
       <section
-        style={{
-          marginBottom: 16,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
+        className="receipt-print-hide"
+        style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 10 }}
       >
-        <button type="button" onClick={() => router.push("/admin/subscriptions")}>
+        <ActionButton type="button" variant="secondary" onClick={() => router.push("/admin/subscriptions")}>
           Back to Subscriptions
-        </button>
+        </ActionButton>
         {subscription ? (
           <>
-            <button
+            <ActionButton
               type="button"
+              variant="primary"
               onClick={() => router.push(`/admin/payments/create?subscription=${subscription.id}`)}
             >
               Collect EMI
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="button"
+              variant="outline"
               onClick={() => router.push(`/admin/customers/${subscription.customer}`)}
             >
               View Customer
-            </button>
-            <button type="button" onClick={handlePrint}>
-              Print Details
-            </button>
+            </ActionButton>
+            <ActionButton type="button" variant="secondary" onClick={handlePrint}>
+              Print / Save PDF
+            </ActionButton>
           </>
         ) : null}
       </section>
 
-      {loading ? <p>Loading subscription details...</p> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+      {loading ? (
+        <div className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Loading subscription details...
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
 
       {!loading && !error && subscription ? (
         <>
+          <SubscriptionContractDocument
+            audienceLabel="Contract summary for customer handover and shop operations."
+            contractReference={`SUB-${subscription.id}`}
+            subscriptionId={subscription.id}
+            statusLabel={subscription.status}
+            statusToneClassName={contractStatusToneClassName}
+            customerFields={[
+              { label: "Customer", value: customer?.name ?? "-", emphasize: true },
+              { label: "Phone", value: customer?.phone ?? "-" },
+              { label: "Product", value: product?.name ?? "-", emphasize: true },
+              { label: "Product Code", value: product?.product_code ?? "-" },
+            ]}
+            contractFields={[
+              { label: "Plan Type", value: subscription.plan_type },
+              { label: "Tenure", value: `${subscription.tenure_months} months` },
+              { label: "Start Date", value: subscription.start_date || "—" },
+              { label: "Batch", value: batch?.batch_code ?? "-" },
+              {
+                label: "Lucky Number",
+                value: luckyId
+                  ? `#${String(luckyId.lucky_number).padStart(2, "0")}`
+                  : "—",
+              },
+              { label: "Partner", value: partner?.username ?? "—" },
+            ]}
+            financialFields={[
+              {
+                label: "Monthly EMI",
+                value: formatCurrency(subscription.monthly_amount),
+                emphasize: true,
+              },
+              {
+                label: "Total Contract Value",
+                value: formatCurrency(subscription.total_amount),
+                emphasize: true,
+              },
+              { label: "Paid Amount", value: formatCurrency(totalPaid) },
+              { label: "Waived Amount", value: formatCurrency(subscription.waived_amount) },
+              {
+                label: "Remaining Exposure",
+                value: formatCurrency(remainingAmount),
+                emphasize: true,
+              },
+              {
+                label: "EMI Coverage",
+                value: `${paidEmiCount} paid · ${pendingEmiCount} pending · ${waivedEmiCount} waived`,
+              },
+            ]}
+            terms={[
+              "Product base price is treated as total contract value in this workflow.",
+              "Monthly EMI is derived from contract value and tenure months in canonical records.",
+              "Winner benefits, when applicable, waive future eligible EMI rows only.",
+            ]}
+          />
+
           <section
+            className="receipt-print-hide"
             style={{
               marginBottom: 16,
               display: "grid",
@@ -197,6 +245,7 @@ export default function AdminSubscriptionDetailPage() {
           </section>
 
           <section
+            className="receipt-print-hide"
             style={{
               marginBottom: 16,
               display: "grid",
@@ -228,7 +277,10 @@ export default function AdminSubscriptionDetailPage() {
             </div>
           </section>
 
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
+          <section
+            className="receipt-print-hide"
+            style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}
+          >
             <h3 style={{ marginTop: 0 }}>EMI Schedule</h3>
 
             {subscriptionEmis.length === 0 ? (
@@ -260,7 +312,10 @@ export default function AdminSubscriptionDetailPage() {
             )}
           </section>
 
-          <section style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
+          <section
+            className="receipt-print-hide"
+            style={{ marginBottom: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}
+          >
             <h3 style={{ marginTop: 0 }}>Payment Ledger</h3>
 
             {subscriptionPayments.length === 0 ? (

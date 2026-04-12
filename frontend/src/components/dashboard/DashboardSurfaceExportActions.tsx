@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 
 import ActionButton from "@/components/ui/ActionButton";
 import type { DashboardQuery } from "@/services/dashboard-types";
@@ -50,7 +51,8 @@ export default function DashboardSurfaceExportActions({
           variant="outline"
           loading={loadingSurface === action.surface}
           onClick={() => void handleDownload(action.surface)}
-          className="h-9 px-3 text-xs"
+          size="sm"
+          leftIcon={<Download className="h-3.5 w-3.5" />}
         >
           {action.label}
         </ActionButton>

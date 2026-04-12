@@ -9,6 +9,8 @@ import type {
 export type CashierTransaction = {
   id: number;
   amount: string;
+  branch_id?: number | null;
+  cash_counter_id?: number | null;
   payment_date?: string;
   created_at?: string;
   method?: string;
@@ -119,6 +121,8 @@ export type CashierCollectPaymentPayload = {
   emi_id: number;
   amount: number;
   method: "CASH" | "UPI" | "BANK";
+  branch_id?: number;
+  cash_counter_id?: number;
   reference_no?: string;
   note?: string;
 };
@@ -130,6 +134,8 @@ export type CashierCollectPaymentResponse = {
     id: number;
     amount: string;
     method?: string;
+    branch_id?: number | null;
+    cash_counter_id?: number | null;
     reference_no?: string | null;
     payment_date?: string;
     created_at?: string;
@@ -356,6 +362,10 @@ function normalizeTransaction(row: Record<string, unknown>): CashierTransaction 
   return {
     id: toNumber(row.id),
     amount: toMoneyString(row.amount),
+    branch_id:
+      typeof row.branch_id === "number" ? row.branch_id : undefined,
+    cash_counter_id:
+      typeof row.cash_counter_id === "number" ? row.cash_counter_id : undefined,
     payment_date: typeof row.payment_date === "string" ? row.payment_date : undefined,
     created_at: typeof row.created_at === "string" ? row.created_at : undefined,
     method: typeof row.method === "string" ? row.method : undefined,

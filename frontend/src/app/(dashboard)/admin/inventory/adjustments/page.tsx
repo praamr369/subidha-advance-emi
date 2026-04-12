@@ -73,8 +73,8 @@ export default function InventoryAdjustmentsPage() {
     try {
       const [adjustmentPayload, itemPayload, locationPayload] = await Promise.all([
         listStockAdjustments(),
-        listInventoryItems({ is_active: true }),
-        listStockLocations({ is_active: true }),
+        listInventoryItems({ is_active: 1 }),
+        listStockLocations({ is_active: 1 }),
       ]);
       setRows(adjustmentPayload.results);
       setItems(itemPayload.results);

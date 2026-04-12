@@ -3,12 +3,15 @@
 import type { ReactNode } from "react";
 
 import DocumentHeader from "@/components/print/DocumentHeader";
+import {
+  PrintFieldGrid,
+  PrintFooter,
+  PrintNote,
+  PrintStatusBadge,
+  type PrintField,
+} from "@/components/print/DocumentPrimitives";
 
-export type ReceiptField = {
-  label: string;
-  value: ReactNode;
-  emphasize?: boolean;
-};
+export type ReceiptField = PrintField;
 
 type PaymentReceiptDocumentProps = {
   audienceLabel: string;
@@ -19,26 +22,11 @@ type PaymentReceiptDocumentProps = {
   statusNote?: ReactNode;
   summaryFields: ReceiptField[];
   detailFields: ReceiptField[];
+  partyFields?: ReceiptField[];
+  referenceFields?: ReceiptField[];
+  documentTitle?: string;
   footerNote?: string;
 };
-
-function ReceiptFieldCard({ label, value, emphasize = false }: ReceiptField) {
-  return (
-    <div className="rounded-xl border border-border bg-background px-4 py-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className={[
-          "mt-1 text-sm text-foreground",
-          emphasize ? "font-semibold" : "font-medium",
-        ].join(" ")}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
 
 export default function PaymentReceiptDocument({
   audienceLabel,
@@ -49,48 +37,74 @@ export default function PaymentReceiptDocument({
   statusNote,
   summaryFields,
   detailFields,
-  footerNote = "Use browser print to keep a paper copy or save this receipt as PDF.",
+  partyFields = [],
+  referenceFields = [],
+  documentTitle = "Payment Receipt",
+  footerNote = "Generated from live SUBIDHA CORE payment records. Print or save as PDF for business filing.",
 }: PaymentReceiptDocumentProps) {
   return (
-    <section className="receipt-document rounded-3xl border border-border bg-card shadow-sm">
-      <div className="space-y-6 p-5 sm:p-6">
-        <div className="flex flex-col gap-5 border-b border-border pb-5 lg:flex-row lg:items-start lg:justify-between">
-          <DocumentHeader
-            title="Lucky Plan EMI Receipt"
-            subtitle={audienceLabel}
-            reference={`Receipt ref ${receiptReference}`}
-            meta={`Payment #${paymentId}`}
+    <section className="receipt-document print-doc-shell rounded-[1.6rem] border border-slate-300">
+      <div className="space-y-4 p-4 sm:p-5">
+        <DocumentHeader
+          title={documentTitle}
+          subtitle={audienceLabel}
+          metaRows={[
+            { label: "Receipt Ref", value: receiptReference },
+            { label: "Payment ID", value: `#${paymentId}` },
+            { label: "Status", value: statusLabel },
+          ]}
+        />
+
+        <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
+          <div className="flex flex-wrap items-center gap-2">
+            <PrintStatusBadge
+              label={statusLabel}
+              toneClassName={statusToneClassName}
+            />
+            <span className="text-[11px] text-slate-600">
+              This receipt is generated from posted payment records.
+            </span>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              Receipt Reference
+            </div>
+            <div className="print-doc-amount text-[13px] font-semibold text-slate-900">
+              {receiptReference}
+            </div>
+          </div>
+        </div>
+
+        {statusNote ? <div className="print-doc-section">{statusNote}</div> : null}
+
+        <div className="grid gap-3 xl:grid-cols-2">
+          <PrintFieldGrid
+            title="Party Information"
+            fields={partyFields}
+            columns="sm:grid-cols-2"
+          />
+          <PrintFieldGrid
+            title="Reference Information"
+            fields={referenceFields}
+            columns="sm:grid-cols-2"
           />
         </div>
 
-        {statusNote ? <div>{statusNote}</div> : null}
+        <PrintFieldGrid
+          title="Payment Summary"
+          fields={summaryFields}
+          columns="md:grid-cols-2 xl:grid-cols-4"
+        />
 
-        <div>
-          <span
-            className={[
-              "inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-              statusToneClassName,
-            ].join(" ")}
-          >
-            {statusLabel}
-          </span>
-        </div>
+        <PrintFieldGrid
+          title="Transaction Details"
+          fields={detailFields}
+          columns="md:grid-cols-2 xl:grid-cols-3"
+        />
 
-        <div className="receipt-document-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {summaryFields.map((field) => (
-            <ReceiptFieldCard key={field.label} {...field} />
-          ))}
-        </div>
+        <PrintNote>{footerNote}</PrintNote>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {detailFields.map((field) => (
-            <ReceiptFieldCard key={field.label} {...field} />
-          ))}
-        </div>
-
-        <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          {footerNote}
-        </div>
+        <PrintFooter leftText="Prepared from SUBIDHA CORE payment records" />
       </div>
     </section>
   );

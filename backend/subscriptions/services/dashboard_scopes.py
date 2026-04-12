@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from branch_control.services.branch_service import scope_queryset_to_user_branches
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
@@ -58,7 +59,11 @@ class CashierScope(DashboardScope):
     label: str = "Cashier"
 
     def get_subscription_queryset(self, actor_user):
-        return get_subscription_detail_queryset()
+        return scope_queryset_to_user_branches(
+            get_subscription_detail_queryset(),
+            user=actor_user,
+            field_name="branch_id",
+        )
 
 
 @dataclass(frozen=True)

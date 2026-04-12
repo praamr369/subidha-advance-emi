@@ -1,0 +1,2 @@
+code,name,status,is_primary,phone,email,address,notes
+MAIN,Main Branch,ACTIVE,true,01730000001,branch@example.com,Template main branch address,Primary branch template row

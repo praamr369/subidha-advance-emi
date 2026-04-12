@@ -1009,6 +1009,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
     queryset = (
         Payment.objects.select_related(
             "customer",
+            "branch",
+            "cash_counter",
             "subscription",
             "subscription__product",
             "subscription__batch",
@@ -1059,6 +1061,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         batch_id = (self.request.query_params.get("batch") or "").strip()
         partner_id = (self.request.query_params.get("partner") or "").strip()
         emi_id = (self.request.query_params.get("emi") or "").strip()
+        branch_id = (self.request.query_params.get("branch") or "").strip()
+        cash_counter_id = (self.request.query_params.get("cash_counter") or "").strip()
         method = (self.request.query_params.get("method") or "").strip()
         date_from = (self.request.query_params.get("date_from") or "").strip()
         date_to = (self.request.query_params.get("date_to") or "").strip()
@@ -1096,6 +1100,18 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         if emi_id:
             if emi_id.isdigit():
                 queryset = queryset.filter(emi_id=int(emi_id))
+            else:
+                queryset = queryset.none()
+
+        if branch_id:
+            if branch_id.isdigit():
+                queryset = queryset.filter(branch_id=int(branch_id))
+            else:
+                queryset = queryset.none()
+
+        if cash_counter_id:
+            if cash_counter_id.isdigit():
+                queryset = queryset.filter(cash_counter_id=int(cash_counter_id))
             else:
                 queryset = queryset.none()
 
@@ -1209,6 +1225,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         emi_obj = validated["emi"]
         amount = validated["amount"]
         payment_method = validated["payment_method"]
+        branch_id = validated.get("branch_id")
+        cash_counter_id = validated.get("cash_counter_id")
         reference_no = validated.get("reference_no")
         notes = validated.get("notes")
 
@@ -1220,6 +1238,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
                 method=payment_method,
                 reference_no=reference_no or None,
                 note=notes or None,
+                branch_id=branch_id,
+                cash_counter_id=cash_counter_id,
             )
         except ValidationError as exc:
             message = (
@@ -1953,6 +1973,80 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
             "message": "Product CSV import completed.",
         }
 
+    def _preview_rows(self, reader):
+        fieldnames = getattr(reader, "fieldnames", None)
+        is_valid, header_error = self._validate_csv_headers(fieldnames)
+        if not is_valid:
+            raise ValueError(header_error)
+
+        preview_rows = []
+        errors = []
+
+        for index, row in enumerate(reader, start=2):
+            name = self._clean_text(row.get("name"))
+            price_raw = self._clean_text(row.get("base_price") or row.get("price"))
+            product_code = self._clean_text(row.get("product_code")).upper()
+            existing = self._resolve_existing_product(product_code, name)
+            row_errors = []
+
+            if not name:
+                row_errors.append("name is required")
+
+            price = self._clean_decimal(price_raw)
+            if price is None:
+                row_errors.append(f"invalid base_price '{price_raw or ''}'")
+
+            resolved_code = product_code
+            if not resolved_code and not row_errors:
+                resolved_code = existing.product_code if existing else self._build_product_code(name)
+
+            payload = {
+                "row_number": index,
+                "name": name,
+                "input_product_code": product_code,
+                "resolved_product_code": resolved_code,
+                "category": self._clean_text(row.get("category")),
+                "subcategory": self._row_subcategory(row),
+                "sku": self._clean_text(row.get("sku")).upper(),
+                "unit_of_measure": self._clean_text(
+                    row.get("unit_of_measure") or row.get("uom") or row.get("unit")
+                ).upper(),
+                "base_price": price_raw,
+                "action": "update" if existing else "create",
+                "valid": not row_errors,
+                "errors": row_errors,
+            }
+            preview_rows.append(payload)
+            if row_errors:
+                errors.append(payload)
+
+        valid_rows = [row for row in preview_rows if row["valid"]]
+        return {
+            "columns": list(fieldnames or []),
+            "preview_rows": preview_rows[:25],
+            "errors": errors[:100],
+            "valid_count": len(valid_rows),
+            "invalid_count": len(preview_rows) - len(valid_rows),
+            "create_candidates": sum(1 for row in valid_rows if row["action"] == "create"),
+            "update_candidates": sum(1 for row in valid_rows if row["action"] == "update"),
+        }
+
+    @action(detail=False, methods=["post"], url_path="import-preview")
+    def import_preview(self, request):
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response({"detail": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded_text = uploaded.read().decode("utf-8-sig", errors="ignore")
+            reader = csv.DictReader(io.StringIO(decoded_text))
+            return Response(self._preview_rows(reader), status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response(
+                {"detail": f"CSV preview failed: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     @action(detail=False, methods=["post"], url_path="import-csv")
     def import_csv(self, request):
         uploaded = request.FILES.get("file")
@@ -2038,6 +2132,7 @@ class ProductUnitOfMeasureMasterViewSet(AdminOnlyCatalogMasterViewSet):
 class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     queryset = (
         Subscription.objects.select_related(
+            "branch",
             "customer",
             "product",
             "batch",
@@ -2125,6 +2220,11 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             or self.request.query_params.get("partner")
             or ""
         ).strip()
+        branch_param = (
+            self.request.query_params.get("branch_id")
+            or self.request.query_params.get("branch")
+            or ""
+        ).strip()
 
         status_filter = (self.request.query_params.get("status") or "").strip()
         plan_type_filter = (self.request.query_params.get("plan_type") or "").strip()
@@ -2151,6 +2251,12 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         if partner_param:
             if partner_param.isdigit():
                 queryset = queryset.filter(partner_id=int(partner_param))
+            else:
+                queryset = queryset.none()
+
+        if branch_param:
+            if branch_param.isdigit():
+                queryset = queryset.filter(branch_id=int(branch_param))
             else:
                 queryset = queryset.none()
 

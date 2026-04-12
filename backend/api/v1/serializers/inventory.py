@@ -15,6 +15,7 @@ from inventory.models import (
     StockLedger,
 )
 from inventory.services.stock_service import generate_stock_adjustment_number
+from inventory.services.stock_service import upsert_purchase_bill_draft
 
 
 def _quantity(value) -> Decimal:
@@ -202,6 +203,9 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
 
 class PurchaseBillLineSerializer(serializers.ModelSerializer):
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+    inventory_item_stock_item_type = serializers.CharField(source="inventory_item.stock_item_type", read_only=True)
+    inventory_item_unit_of_measure = serializers.CharField(source="inventory_item.unit_of_measure", read_only=True)
 
     class Meta:
         model = PurchaseBillLine
@@ -209,6 +213,9 @@ class PurchaseBillLineSerializer(serializers.ModelSerializer):
             "id",
             "inventory_item",
             "inventory_item_sku",
+            "inventory_item_product_name",
+            "inventory_item_stock_item_type",
+            "inventory_item_unit_of_measure",
             "description",
             "quantity",
             "unit_cost",
@@ -223,6 +230,8 @@ class PurchaseBillLineSerializer(serializers.ModelSerializer):
 
 class PurchaseBillSerializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
@@ -237,6 +246,9 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "bill_date",
             "vendor",
             "vendor_name",
+            "branch",
+            "branch_code",
+            "branch_name",
             "tax_mode",
             "status",
             "subtotal",
@@ -263,14 +275,68 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        if instance and instance.status != "DRAFT":
+            raise serializers.ValidationError("Only draft purchase bills can be edited.")
+        if not (attrs.get("lines") or (instance and self.initial_data.get("lines") is None)):
+            raise serializers.ValidationError({"lines": "At least one purchase bill line is required."})
+        return attrs
+
+    def create(self, validated_data):
+        lines = validated_data.pop("lines", [])
+        request = self.context.get("request")
+        return upsert_purchase_bill_draft(
+            lines=lines,
+            performed_by=getattr(request, "user", None),
+            **validated_data,
+        )
+
+    def update(self, instance, validated_data):
+        lines = validated_data.pop("lines", None)
+        payload = {
+            "bill_no": validated_data.get("bill_no", instance.bill_no),
+            "bill_date": validated_data.get("bill_date", instance.bill_date),
+            "vendor": validated_data.get("vendor", instance.vendor),
+            "branch": validated_data.get("branch", instance.branch),
+            "tax_mode": validated_data.get("tax_mode", instance.tax_mode),
+            "stock_location": validated_data.get("stock_location", instance.stock_location),
+            "finance_account": validated_data.get("finance_account", instance.finance_account),
+            "notes": validated_data.get("notes", instance.notes),
+            "lines": lines if lines is not None else list(instance.lines.select_related("inventory_item").all().values()),
+            "purchase_bill_id": instance.id,
+            "performed_by": getattr(self.context.get("request"), "user", None),
+        }
+        if lines is None:
+            payload["lines"] = [
+                {
+                    "inventory_item": line.inventory_item,
+                    "description": line.description,
+                    "quantity": line.quantity,
+                    "unit_cost": line.unit_cost,
+                    "taxable_value": line.taxable_value,
+                    "tax_amount": line.tax_amount,
+                    "line_total": line.line_total,
+                }
+                for line in instance.lines.select_related("inventory_item").all()
+            ]
+        return upsert_purchase_bill_draft(**payload)
+
 
 class StockLocationSerializer(serializers.ModelSerializer):
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+
     class Meta:
         model = StockLocation
         fields = [
             "id",
             "code",
             "name",
+            "branch",
+            "branch_code",
+            "branch_name",
             "location_type",
             "is_active",
             "notes",

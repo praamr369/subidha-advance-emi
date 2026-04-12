@@ -46,7 +46,7 @@ export default function EnterpriseDetailPage({ title, subtitle, resourcePath }: 
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
         {loading ? <LoadingBlock label="Loading detail..." /> : null}
         {!id ? <ErrorState title="Missing record id" description="Record identifier was not provided." /> : null}
         {error ? <ErrorState title="Failed to load detail" description={error} /> : null}
@@ -54,9 +54,9 @@ export default function EnterpriseDetailPage({ title, subtitle, resourcePath }: 
         {!loading && !error && record ? (
           <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {Object.entries(record).map(([key, value]) => (
-              <div key={key} className="rounded-md border border-slate-100 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">{key}</dt>
-                <dd className="mt-1 text-sm text-slate-900">{String(value ?? "-")}</dd>
+              <div key={key} className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3">
+                <dt className="enterprise-eyebrow">{key}</dt>
+                <dd className="mt-1 text-sm font-medium text-foreground">{String(value ?? "-")}</dd>
               </div>
             ))}
           </dl>

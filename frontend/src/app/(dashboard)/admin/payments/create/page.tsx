@@ -1,13 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 
 import PortalPage from "@/components/ui/PortalPage";
+import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { normalizeApiError } from "@/services/api/errors";
+import {
+  listBranches,
+  listCashCounters,
+  type BranchRecord,
+  type CashCounterRecord,
+} from "@/services/branch-control";
 import {
   collectPayment,
   getAdminSubscriptionForCollection,
@@ -23,6 +29,8 @@ type FormState = {
   subscription_id: string;
   emi_id: string;
   amount: string;
+  branch_id: string;
+  cash_counter_id: string;
   payment_method: PaymentMethod;
   payment_date: string;
   reference_no: string;
@@ -36,6 +44,10 @@ const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
   { value: "CARD", label: "Card" },
 ];
 
+const FIELD_CLASS_NAME =
+  "w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2.5 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35";
+const READ_ONLY_FIELD_CLASS_NAME =
+  "w-full rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-muted-foreground";
 function getTodayDateInputValue(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -58,6 +70,8 @@ function buildDefaultForm(): FormState {
     subscription_id: "",
     emi_id: "",
     amount: "",
+    branch_id: "",
+    cash_counter_id: "",
     payment_method: "CASH",
     payment_date: getTodayDateInputValue(),
     reference_no: "",
@@ -142,12 +156,12 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.3)]">
+      <div className="enterprise-eyebrow">
         {label}
       </div>
-      <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
-      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      <div className="mt-2 text-lg font-semibold text-foreground">{value}</div>
+      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -163,6 +177,8 @@ export default function PaymentRecordPage() {
   >([]);
   const [selectedSubscription, setSelectedSubscription] =
     useState<AdminSubscriptionCollectionCandidate | null>(null);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
+  const [counters, setCounters] = useState<CashCounterRecord[]>([]);
 
   const [emiOptions, setEmiOptions] = useState<AdminEmiCollectionCandidate[]>(
     []
@@ -185,6 +201,9 @@ export default function PaymentRecordPage() {
     PAYMENT_METHOD_OPTIONS.find(
       (option) => option.value === form.payment_method
     )?.label ?? form.payment_method;
+  const availableCounters = form.branch_id
+    ? counters.filter((counter) => String(counter.branch) === form.branch_id)
+    : counters;
 
   const updateField = useCallback(function updateField<K extends keyof FormState>(
     key: K,
@@ -208,6 +227,8 @@ export default function PaymentRecordPage() {
       subscription_id: "",
       emi_id: "",
       amount: "",
+      branch_id: "",
+      cash_counter_id: "",
       reference_no: "",
       notes: "",
     }));
@@ -288,6 +309,32 @@ export default function PaymentRecordPage() {
       setLoadingEmis(false);
     }
   }, [resetMessages, updateField]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBranchMasters() {
+      try {
+        const [branchPayload, counterPayload] = await Promise.all([
+          listBranches({ status: "ACTIVE" }),
+          listCashCounters({ is_active: "true" }),
+        ]);
+        if (!active) return;
+        setBranches(branchPayload.results);
+        setCounters(counterPayload.results);
+      } catch {
+        if (!active) return;
+        setBranches([]);
+        setCounters([]);
+      }
+    }
+
+    void loadBranchMasters();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const trimmed = subscriptionSearch.trim();
@@ -490,6 +537,10 @@ export default function PaymentRecordPage() {
         amount: form.amount,
         payment_method: form.payment_method,
         payment_date: form.payment_date,
+        branch_id: form.branch_id ? Number(form.branch_id) : undefined,
+        cash_counter_id: form.cash_counter_id
+          ? Number(form.cash_counter_id)
+          : undefined,
         reference_no: form.reference_no.trim() || undefined,
         notes: form.notes.trim() || undefined,
       });
@@ -516,6 +567,8 @@ export default function PaymentRecordPage() {
     <PortalPage
       title="Admin Collection Entry"
       subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
+      helperNote="This screen posts into the existing payment service path; no ledger, waiver, or reconciliation semantics are altered by UI input."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Payments", href: "/admin/payments" },
@@ -549,12 +602,12 @@ export default function PaymentRecordPage() {
       ]}
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="enterprise-section-title text-lg">
               Collection workflow
             </h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Counter staff should first select the subscription, then choose the EMI.
               Amount auto-fills from outstanding value so payment entry remains controlled
               and operationally fast.
@@ -562,10 +615,10 @@ export default function PaymentRecordPage() {
           </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="surface-subtle rounded-2xl p-4">
               <label
                 htmlFor="subscription-search"
-                className="mb-2 block text-sm font-medium text-slate-700"
+                className="mb-2 block text-sm font-semibold text-foreground"
               >
                 Search subscription
               </label>
@@ -574,27 +627,27 @@ export default function PaymentRecordPage() {
                 type="text"
                 value={subscriptionSearch}
                 onChange={(event) => setSubscriptionSearch(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                className={FIELD_CLASS_NAME}
                 placeholder="Search by subscription number, customer, or phone"
               />
 
               {searchingSubscriptions ? (
-                <p className="mt-2 text-xs text-slate-500">Searching subscriptions...</p>
+                <p className="mt-2 text-xs text-muted-foreground">Searching subscriptions...</p>
               ) : null}
 
               {subscriptionOptions.length > 0 ? (
-                <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-border bg-[var(--surface-card-elevated)]">
                   {subscriptionOptions.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => onSubscriptionPicked(item)}
-                      className="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm transition hover:bg-slate-50 last:border-b-0"
+                      className="block w-full border-b border-border/70 px-4 py-3 text-left text-sm transition hover:bg-[var(--surface-muted)] last:border-b-0"
                     >
-                      <div className="font-medium text-slate-900">
+                      <div className="font-semibold text-foreground">
                         {item.subscription_number || `SUB-${item.id}`}
                       </div>
-                      <div className="mt-1 text-slate-600">{getSubscriptionLabel(item)}</div>
+                      <div className="mt-1 text-muted-foreground">{getSubscriptionLabel(item)}</div>
                     </button>
                   ))}
                 </div>
@@ -605,7 +658,7 @@ export default function PaymentRecordPage() {
               <div>
                 <label
                   htmlFor="subscription_id"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Subscription ID
                 </label>
@@ -615,7 +668,7 @@ export default function PaymentRecordPage() {
                   type="text"
                   value={form.subscription_id}
                   readOnly
-                  className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-700"
+                  className={READ_ONLY_FIELD_CLASS_NAME}
                   placeholder="Auto-filled from selection"
                 />
               </div>
@@ -623,7 +676,7 @@ export default function PaymentRecordPage() {
               <div>
                 <label
                   htmlFor="emi_id"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   EMI selection <span className="text-red-600">*</span>
                 </label>
@@ -633,7 +686,7 @@ export default function PaymentRecordPage() {
                   value={form.emi_id}
                   onChange={onEmiChanged}
                   disabled={!selectedSubscription || loadingEmis || emiOptions.length === 0}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
+                  className={`${FIELD_CLASS_NAME} disabled:bg-[var(--surface-muted)]`}
                 >
                   <option value="">
                     {loadingEmis
@@ -653,7 +706,7 @@ export default function PaymentRecordPage() {
               <div>
                 <label
                   htmlFor="amount"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Amount <span className="text-red-600">*</span>
                 </label>
@@ -666,10 +719,10 @@ export default function PaymentRecordPage() {
                   required
                   value={form.amount}
                   onChange={onInputChange}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className={FIELD_CLASS_NAME}
                   placeholder="Auto-filled from outstanding amount"
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Auto-filled from selected EMI outstanding amount. Admin may edit only if
                   partial collection is permitted in your backend service.
                 </p>
@@ -678,7 +731,7 @@ export default function PaymentRecordPage() {
               <div>
                 <label
                   htmlFor="payment_date"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Payment date <span className="text-red-600">*</span>
                 </label>
@@ -689,14 +742,14 @@ export default function PaymentRecordPage() {
                   required
                   value={form.payment_date}
                   onChange={onInputChange}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className={FIELD_CLASS_NAME}
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="payment_method"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Payment method <span className="text-red-600">*</span>
                 </label>
@@ -705,7 +758,7 @@ export default function PaymentRecordPage() {
                   name="payment_method"
                   value={form.payment_method}
                   onChange={onInputChange}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className={FIELD_CLASS_NAME}
                 >
                   {PAYMENT_METHOD_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -717,8 +770,60 @@ export default function PaymentRecordPage() {
 
               <div>
                 <label
+                  htmlFor="branch_id"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  Branch
+                </label>
+                <select
+                  id="branch_id"
+                  name="branch_id"
+                  value={form.branch_id}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      branch_id: event.target.value,
+                      cash_counter_id: "",
+                    }))
+                  }
+                  className={FIELD_CLASS_NAME}
+                >
+                  <option value="">Primary/default branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.code} · {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="cash_counter_id"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  Counter / Cash Desk
+                </label>
+                <select
+                  id="cash_counter_id"
+                  name="cash_counter_id"
+                  value={form.cash_counter_id}
+                  onChange={onInputChange}
+                  className={FIELD_CLASS_NAME}
+                >
+                  <option value="">No explicit counter</option>
+                  {availableCounters.map((counter) => (
+                    <option key={counter.id} value={counter.id}>
+                      {counter.code} · {counter.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
                   htmlFor="reference_no"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Reference number
                   {form.payment_method !== "CASH" ? (
@@ -731,7 +836,7 @@ export default function PaymentRecordPage() {
                   type="text"
                   value={form.reference_no}
                   onChange={onInputChange}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className={FIELD_CLASS_NAME}
                   placeholder={
                     form.payment_method === "CASH"
                       ? "Optional receipt reference"
@@ -743,7 +848,7 @@ export default function PaymentRecordPage() {
               <div className="md:col-span-2">
                 <label
                   htmlFor="notes"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-foreground"
                 >
                   Notes
                 </label>
@@ -753,7 +858,7 @@ export default function PaymentRecordPage() {
                   rows={4}
                   value={form.notes}
                   onChange={onInputChange}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className={FIELD_CLASS_NAME}
                   placeholder="Counter note, collection remark, or exception detail"
                 />
               </div>
@@ -783,36 +888,40 @@ export default function PaymentRecordPage() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
+              <ActionButton
                 type="submit"
+                variant="primary"
+                size="lg"
+                loading={isSubmitting}
                 disabled={isSubmitting || loadingSubscription || loadingEmis}
-                className="inline-flex h-11 items-center rounded-xl bg-slate-900 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? "Saving..." : "Record Payment"}
-              </button>
+              </ActionButton>
 
-              <button
+              <ActionButton
                 type="button"
+                variant="outline"
+                size="lg"
                 onClick={resetForm}
                 disabled={isSubmitting}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Reset Form
-              </button>
+              </ActionButton>
 
-              <Link
+              <ActionButton
                 href="/admin/payments"
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                variant="outline"
+                size="lg"
               >
                 Cancel
-              </Link>
+              </ActionButton>
             </div>
           </form>
         </section>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <h3 className="enterprise-eyebrow text-sm">
               Selected subscription
             </h3>
 
@@ -848,8 +957,8 @@ export default function PaymentRecordPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <h3 className="enterprise-eyebrow text-sm">
               Selected EMI
             </h3>
 

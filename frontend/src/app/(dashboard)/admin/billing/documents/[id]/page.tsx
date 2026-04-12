@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,6 +8,8 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
@@ -163,6 +164,7 @@ export default function BillingDocumentDetailPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title={invoice?.document_no || (documentId ? `Billing Document ${documentId}` : "Billing Document")}
       subtitle="Billing detail stays document-first: the invoice mirrors retail or subscription source state, while receipts and notes remain separate additive documents."
       breadcrumbs={[
@@ -216,84 +218,139 @@ export default function BillingDocumentDetailPage() {
 
       {!loading && !error && invoice ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailValue label="Invoice Date" value={accountingDate(invoice.invoice_date)} />
-            <DetailValue label="Billing Channel" value={invoice.billing_channel} />
-            <DetailValue label="Source" value={invoice.direct_sale_no || invoice.source_reference || invoice.source_type || "Manual"} />
-            <DetailValue label="Status" value={invoice.status} />
-            <DetailValue label="Customer" value={invoice.customer_name_snapshot || invoice.customer_name || "Walk-in"} />
-            <DetailValue label="Phone" value={invoice.customer_phone_snapshot || "—"} />
-            <DetailValue label="Grand Total" value={accountingMoney(invoice.grand_total)} />
-            <DetailValue label="Balance" value={accountingMoney(invoice.balance_total)} />
+          <div className="receipt-print-hide space-y-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <DetailValue label="Invoice Date" value={accountingDate(invoice.invoice_date)} />
+              <DetailValue label="Billing Channel" value={invoice.billing_channel} />
+              <DetailValue label="Source" value={invoice.direct_sale_no || invoice.source_reference || invoice.source_type || "Manual"} />
+              <DetailValue label="Status" value={invoice.status} />
+              <DetailValue label="Customer" value={invoice.customer_name_snapshot || invoice.customer_name || "Walk-in"} />
+              <DetailValue label="Phone" value={invoice.customer_phone_snapshot || "—"} />
+              <DetailValue label="Grand Total" value={accountingMoney(invoice.grand_total)} />
+              <DetailValue label="Balance" value={accountingMoney(invoice.balance_total)} />
+            </div>
+
+            <WorkspaceSection
+              title="Document Trace"
+              description="The document keeps explicit source references so direct-sale, subscription, and receipt drill-downs remain auditable."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DetailValue label="Document Type" value={invoice.document_type || "INVOICE"} />
+                <DetailValue label="Source Type" value={invoice.source_type || "MANUAL"} />
+                <DetailValue label="Source Reference" value={invoice.source_reference || "—"} />
+                <DetailValue
+                  label="Linked Direct Sale"
+                  value={
+                    invoice.direct_sale ? (
+                      <ActionButton
+                        href={buildAdminBillingRegisterRoute({
+                          direct_sale: invoice.direct_sale,
+                        })}
+                        variant="outline"
+                        className="h-8 px-3 text-xs"
+                      >
+                        {invoice.direct_sale_no || `Direct Sale ${invoice.direct_sale}`}
+                      </ActionButton>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
+              </div>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Invoice Lines"
+              description="Product, SKU, and inventory references are reused from the shared product and stock masters."
+            >
+              <EnterpriseDataTable
+                data={invoice.lines}
+                columns={lineColumns}
+                emptyTitle="No invoice lines"
+                emptyDescription="This document does not have any line items."
+              />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Related Documents"
+              description="Receipts and note adjustments remain separate additive documents linked back to this billing record."
+            >
+              <EnterpriseDataTable
+                data={relatedRows}
+                columns={relatedColumns}
+                emptyTitle="No related documents"
+                emptyDescription="No receipts, credit notes, or debit notes are linked to this billing invoice yet."
+              />
+            </WorkspaceSection>
           </div>
 
-          <WorkspaceSection
-            title="Document Trace"
-            description="The document keeps explicit source references so direct-sale, subscription, and receipt drill-downs remain auditable."
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <DetailValue label="Document Type" value={invoice.document_type || "INVOICE"} />
-              <DetailValue label="Source Type" value={invoice.source_type || "MANUAL"} />
-              <DetailValue label="Source Reference" value={invoice.source_reference || "—"} />
-              <DetailValue
-                label="Linked Direct Sale"
-                value={
-                  invoice.direct_sale ? (
-                    <Link
-                      href={buildAdminBillingRegisterRoute({ direct_sale: invoice.direct_sale })}
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      {invoice.direct_sale_no || `Direct Sale ${invoice.direct_sale}`}
-                    </Link>
-                  ) : (
-                    "—"
-                  )
-                }
-              />
-            </div>
-          </WorkspaceSection>
-
-          <WorkspaceSection
-            title="Invoice Lines"
-            description="Product, SKU, and inventory references are reused from the shared product and stock masters."
-          >
-            <EnterpriseDataTable
-              data={invoice.lines}
-              columns={lineColumns}
-              emptyTitle="No invoice lines"
-              emptyDescription="This document does not have any line items."
-            />
-          </WorkspaceSection>
-
-          <WorkspaceSection
-            title="Related Documents"
-            description="Receipts and note adjustments remain separate additive documents linked back to this billing record."
-          >
-            <EnterpriseDataTable
-              data={relatedRows}
-              columns={relatedColumns}
-              emptyTitle="No related documents"
-              emptyDescription="No receipts, credit notes, or debit notes are linked to this billing invoice yet."
-            />
-          </WorkspaceSection>
+          <PrintActionBanner
+            className="mb-4"
+            title="Document Print / PDF"
+            description="Print this billing document preview for handover or archive-safe PDF filing."
+          />
 
           <BillingPrintDocument
             title={invoice.tax_mode === "GST" ? "GST Tax Invoice" : "Retail Invoice"}
-            subtitle={`${invoice.billing_channel} document detail`}
+            subtitle={`${invoice.billing_channel} document detail with source trace and linked documents.`}
             reference={invoice.document_no || `Invoice ${invoice.id}`}
             meta={`Customer ${invoice.customer_name_snapshot || invoice.customer_name || "Walk-in"}`}
-            summaryFields={[
+            statusLabel={invoice.status}
+            statusToneClassName={
+              invoice.status === "POSTED"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : invoice.status === "APPROVED"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-slate-300 bg-slate-100 text-slate-800"
+            }
+            partyFields={[
+              {
+                label: "Customer",
+                value: invoice.customer_name_snapshot || invoice.customer_name || "Walk-in",
+                emphasize: true,
+              },
+              { label: "Phone", value: invoice.customer_phone_snapshot || "—" },
+              { label: "GSTIN", value: invoice.customer_gstin || "—" },
+              {
+                label: "Branch",
+                value: invoice.branch_name || invoice.branch_code || "Primary",
+              },
+            ]}
+            referenceFields={[
               { label: "Invoice Date", value: invoice.invoice_date },
+              { label: "Billing Channel", value: invoice.billing_channel },
+              { label: "Tax Mode", value: invoice.tax_mode },
+              {
+                label: "Source Reference",
+                value:
+                  invoice.direct_sale_no ||
+                  invoice.source_reference ||
+                  invoice.source_type ||
+                  "Manual",
+              },
+            ]}
+            summaryFields={[
+              { label: "Sub Total", value: accountingMoney(invoice.subtotal) },
+              { label: "Tax Total", value: accountingMoney(invoice.tax_total) },
               { label: "Grand Total", value: accountingMoney(invoice.grand_total) },
               { label: "Received", value: accountingMoney(invoice.received_total) },
-              { label: "Balance", value: accountingMoney(invoice.balance_total) },
+              { label: "Balance Due", value: accountingMoney(invoice.balance_total), emphasize: true },
             ]}
             detailFields={[
-              { label: "Tax Mode", value: invoice.tax_mode },
-              { label: "Source", value: invoice.direct_sale_no || invoice.source_reference || "—" },
-              { label: "Journal", value: invoice.posted_journal_entry_no || "Pending" },
-              { label: "Status", value: invoice.status },
+              { label: "Document Type", value: invoice.document_type || "INVOICE" },
+              { label: "Finance Account", value: invoice.finance_account_name || "—" },
+              { label: "Journal Entry", value: invoice.posted_journal_entry_no || "Pending" },
+              { label: "Document Status", value: invoice.status },
+              { label: "Terms", value: invoice.terms || "—" },
+              { label: "Remarks", value: invoice.notes || "—" },
             ]}
+            lineItems={invoice.lines.slice(0, 12).map((line) => ({
+              description: line.description,
+              quantity: line.quantity,
+              unitPrice: accountingMoney(line.unit_price),
+              lineTotal: accountingMoney(line.line_total),
+              note: [line.product_code, line.inventory_item_sku].filter(Boolean).join(" • "),
+            }))}
           />
         </>
       ) : null}

@@ -93,10 +93,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -277,7 +277,7 @@ export default function AdminPayoutBatchesPage() {
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="Batch id, status, amount"
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
               />
             </div>
 
@@ -296,7 +296,7 @@ export default function AdminPayoutBatchesPage() {
                     event.target.value as "" | "DRAFT" | "FINALIZED" | "CANCELLED"
                   )
                 }
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
               >
                 <option value="">All</option>
                 <option value="DRAFT">Draft</option>
@@ -316,7 +316,7 @@ export default function AdminPayoutBatchesPage() {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
               >
                 Reset
               </button>
@@ -328,7 +328,7 @@ export default function AdminPayoutBatchesPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -384,22 +384,22 @@ export default function AdminPayoutBatchesPage() {
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Batch
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Status
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Amount
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Rows
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Lifecycle
                         </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Actions
                         </th>
                       </tr>
@@ -408,14 +408,14 @@ export default function AdminPayoutBatchesPage() {
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.id} className="align-top">
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
                             <div className="font-medium">Batch #{row.id}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               Created {formatDateTime(row.created_at)}
                             </div>
                           </td>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
                             <span
                               className={[
                                 "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -430,42 +430,42 @@ export default function AdminPayoutBatchesPage() {
                             </span>
                           </td>
 
-                          <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-right text-sm font-semibold text-foreground">
                             {money(row.total_amount)}
                           </td>
 
-                          <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-right text-sm text-foreground">
                             {row.commission_count}
                           </td>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="text-xs text-muted-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
+                            <div className="text-xs text-slate-600">
                               Finalized {formatDateTime(row.finalized_at)}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-xs text-slate-600">
                               Cancelled {formatDateTime(row.cancelled_at)}
                             </div>
                           </td>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                          <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
                             <div className="flex flex-col items-start gap-2">
                               <Link
                                 href={`/admin/finance/payout-batches/${row.id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                               >
                                 Open Batch
                               </Link>
 
                               {row.status === "DRAFT" ? (
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-slate-600">
                                   Finalize or cancel from detail page
                                 </span>
                               ) : row.status === "FINALIZED" ? (
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-slate-600">
                                   Finalized batch is read-only
                                 </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-slate-600">
                                   Cancelled batch kept for audit visibility
                                 </span>
                               )}
@@ -486,14 +486,14 @@ export default function AdminPayoutBatchesPage() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/admin/finance/commissions/settled"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Back to Payout Queue
                 </Link>
 
                 <Link
                   href="/admin/finance/commissions"
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Commission Register
                 </Link>

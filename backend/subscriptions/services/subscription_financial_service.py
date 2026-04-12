@@ -49,6 +49,7 @@ def _is_close(left: Decimal, right: Decimal) -> bool:
 
 def get_subscription_detail_queryset():
     return Subscription.objects.select_related(
+        "branch",
         "customer",
         "product",
         "batch",

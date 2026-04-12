@@ -340,12 +340,15 @@ def build_finance_book(
     kinds: list[str],
     start_date: date | None = None,
     end_date: date | None = None,
+    branch_id: int | None = None,
 ) -> dict:
     finance_accounts = list(
         FinanceAccount.objects.select_related("chart_account")
         .filter(kind__in=kinds)
         .order_by("name", "id")
     )
+    if branch_id is not None:
+        finance_accounts = [account for account in finance_accounts if account.branch_id == int(branch_id)]
     chart_account_ids = [account.chart_account_id for account in finance_accounts]
     finance_account_by_chart_account_id = {
         account.chart_account_id: account for account in finance_accounts
@@ -359,6 +362,7 @@ def build_finance_book(
             {
                 "finance_account_id": matched_account.id,
                 "finance_account_name": matched_account.name,
+                "branch_id": matched_account.branch_id,
                 "kind": matched_account.kind,
                 "journal_entry_id": line.journal_entry_id,
                 "entry_no": line.journal_entry.entry_no,
@@ -377,16 +381,19 @@ def build_finance_book(
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,
+        "branch_id": branch_id,
         "finance_account_kinds": kinds,
         "rows": rows,
     }
 
 
-def build_sales_book(*, start_date: date | None = None, end_date: date | None = None) -> dict:
+def build_sales_book(*, start_date: date | None = None, end_date: date | None = None, branch_id: int | None = None) -> dict:
     queryset = BillingInvoice.objects.select_related("posted_journal_entry").filter(
         status="POSTED",
         posted_journal_entry__isnull=False,
     )
+    if branch_id is not None:
+        queryset = queryset.filter(branch_id=branch_id)
     if start_date:
         queryset = queryset.filter(invoice_date__gte=start_date)
     if end_date:
@@ -396,6 +403,7 @@ def build_sales_book(*, start_date: date | None = None, end_date: date | None = 
             "invoice_id": invoice.id,
             "document_no": invoice.document_no,
             "invoice_date": invoice.invoice_date.isoformat(),
+            "branch_id": invoice.branch_id,
             "customer_name": invoice.customer_name_snapshot,
             "billing_channel": invoice.billing_channel,
             "tax_mode": invoice.tax_mode,
@@ -409,15 +417,18 @@ def build_sales_book(*, start_date: date | None = None, end_date: date | None = 
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,
+        "branch_id": branch_id,
         "rows": rows,
     }
 
 
-def build_purchase_book(*, start_date: date | None = None, end_date: date | None = None) -> dict:
+def build_purchase_book(*, start_date: date | None = None, end_date: date | None = None, branch_id: int | None = None) -> dict:
     queryset = PurchaseBill.objects.select_related("vendor", "posted_journal_entry").filter(
         status="POSTED",
         posted_journal_entry__isnull=False,
     )
+    if branch_id is not None:
+        queryset = queryset.filter(branch_id=branch_id)
     if start_date:
         queryset = queryset.filter(bill_date__gte=start_date)
     if end_date:
@@ -427,6 +438,7 @@ def build_purchase_book(*, start_date: date | None = None, end_date: date | None
             "purchase_bill_id": bill.id,
             "bill_no": bill.bill_no,
             "bill_date": bill.bill_date.isoformat(),
+            "branch_id": bill.branch_id,
             "vendor_name": bill.vendor.name,
             "tax_mode": bill.tax_mode,
             "grand_total": _money_string(bill.grand_total),
@@ -439,5 +451,6 @@ def build_purchase_book(*, start_date: date | None = None, end_date: date | None
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,
+        "branch_id": branch_id,
         "rows": rows,
     }

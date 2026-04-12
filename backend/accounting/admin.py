@@ -12,15 +12,23 @@ from accounting.models import (
     DebitNote,
     DocumentSequence,
     EmployeeProfile,
+    EmployeeCompensationComponent,
+    EmployeeAttendance,
+    EmployeeExpenseClaim,
+    EmployeeExpenseClaimPayment,
     ExpenseVoucher,
     ExportPackJob,
     FinanceAccount,
     JournalEntry,
     JournalEntryLine,
+    LeaveRequest,
+    LeaveType,
     MoneyMovement,
+    PayrollPeriod,
     PostingLock,
     SalaryPayment,
     SalarySheet,
+    SalarySheetLine,
     TaxInvoice,
     TaxInvoiceLine,
     Vendor,
@@ -76,17 +84,71 @@ class EmployeeProfileAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
 
 
+@admin.register(EmployeeCompensationComponent)
+class EmployeeCompensationComponentAdmin(admin.ModelAdmin):
+    list_display = ("employee", "component_name", "component_type", "amount", "is_active")
+    search_fields = ("employee__employee_code", "employee__name", "component_name")
+    list_filter = ("component_type", "is_active")
+
+
+@admin.register(EmployeeAttendance)
+class EmployeeAttendanceAdmin(admin.ModelAdmin):
+    list_display = ("employee", "attendance_date", "status", "worked_hours", "overtime_hours")
+    search_fields = ("employee__employee_code", "employee__name", "notes")
+    list_filter = ("status", "attendance_date")
+
+
+@admin.register(LeaveType)
+class LeaveTypeAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "is_paid", "is_active")
+    search_fields = ("code", "name")
+    list_filter = ("is_paid", "is_active")
+
+
+@admin.register(LeaveRequest)
+class LeaveRequestAdmin(admin.ModelAdmin):
+    list_display = ("request_no", "employee", "leave_type", "start_date", "end_date", "day_count", "status")
+    search_fields = ("request_no", "employee__employee_code", "employee__name", "reason")
+    list_filter = ("status", "leave_type")
+
+
+@admin.register(PayrollPeriod)
+class PayrollPeriodAdmin(admin.ModelAdmin):
+    list_display = ("code", "year", "month", "start_date", "end_date", "status")
+    search_fields = ("code",)
+    list_filter = ("status", "year")
+
+
+class SalarySheetLineInline(admin.TabularInline):
+    model = SalarySheetLine
+    extra = 0
+
+
 @admin.register(SalarySheet)
 class SalarySheetAdmin(admin.ModelAdmin):
     list_display = ("employee", "year", "month", "net_amount", "status")
     search_fields = ("employee__employee_code", "employee__name")
     list_filter = ("status", "year", "month")
+    inlines = [SalarySheetLineInline]
 
 
 @admin.register(SalaryPayment)
 class SalaryPaymentAdmin(admin.ModelAdmin):
     list_display = ("salary_sheet", "payment_date", "amount", "finance_account")
     search_fields = ("reference_no", "salary_sheet__employee__name")
+
+
+@admin.register(EmployeeExpenseClaim)
+class EmployeeExpenseClaimAdmin(admin.ModelAdmin):
+    list_display = ("claim_no", "employee", "expense_date", "approved_amount", "status")
+    search_fields = ("claim_no", "employee__employee_code", "employee__name", "bill_no")
+    list_filter = ("status",)
+
+
+@admin.register(EmployeeExpenseClaimPayment)
+class EmployeeExpenseClaimPaymentAdmin(admin.ModelAdmin):
+    list_display = ("expense_claim", "payment_date", "amount", "finance_account")
+    search_fields = ("reference_no", "expense_claim__claim_no", "expense_claim__employee__name")
 
 
 @admin.register(MoneyMovement)

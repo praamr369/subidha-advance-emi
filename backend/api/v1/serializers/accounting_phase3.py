@@ -50,6 +50,7 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
 
 
 class AccountingBookQuerySerializer(serializers.Serializer):
+    branch_id = serializers.IntegerField(required=False, min_value=1)
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
 
@@ -216,6 +217,8 @@ class DepreciationRunSerializer(serializers.ModelSerializer):
 
 class VendorSettlementSerializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     purchase_bill_no = serializers.CharField(source="purchase_bill.bill_no", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
@@ -229,6 +232,9 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
             "vendor_name",
             "settlement_date",
             "amount",
+            "branch",
+            "branch_code",
+            "branch_name",
             "finance_account",
             "finance_account_name",
             "reference_no",

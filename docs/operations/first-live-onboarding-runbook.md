@@ -12,6 +12,12 @@ It is intentionally conservative:
 
 Use this runbook to load products, customers, batches, and initial subscriptions without weakening auditability or financial controls.
 
+For the final rollout sequence, also use:
+
+- `docs/operations/go-live-checklist.md`
+- `docs/operations/migration-rehearsal-checklist.md`
+- `docs/operations/uat-checklist.md`
+
 ## 1. Confirm what is actually operational today
 
 ### Backend capabilities confirmed in code

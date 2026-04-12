@@ -12,9 +12,9 @@ type StatusBadgeProps = {
 
 const toneClassName = {
   default:
-    "border-white/80 bg-white/80 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-border bg-[var(--surface-muted)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   neutral:
-    "border-white/80 bg-white/80 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-border bg-[var(--surface-muted)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   success:
     "border-emerald-200/80 bg-emerald-50/90 text-emerald-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   warning:
@@ -42,7 +42,7 @@ export default function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border font-medium backdrop-blur",
+        "inline-flex items-center rounded-full border font-semibold tracking-[0.01em] shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
         size === "md" ? "gap-2 px-3.5 py-1.5 text-sm" : "gap-1.5 px-2.5 py-1 text-xs",
         toneClassName[presentation.tone],
         className

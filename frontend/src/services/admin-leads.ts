@@ -31,9 +31,17 @@ export type AdminLeadRow = {
   converted_customer_phone?: string | null;
   converted_subscription_id?: number | null;
   converted_subscription_number?: string | null;
+  converted_direct_sale_id?: number | null;
+  converted_direct_sale_no?: string | null;
   converted_by_id?: number | null;
   converted_by_username?: string | null;
   converted_by_full_name?: string | null;
+  party_id?: number | null;
+  party_no?: string | null;
+  party_display_name?: string | null;
+  next_follow_up_at?: string | null;
+  follow_up_state?: "NONE" | "DUE" | "SCHEDULED";
+  open_follow_up_count?: number;
   converted_at?: string | null;
   closed_at?: string | null;
   created_at?: string | null;
@@ -130,6 +138,7 @@ export async function completeAdminLeadConversion(
   payload: {
     customer_id?: number | null;
     subscription_id?: number | null;
+    direct_sale_id?: number | null;
   }
 ): Promise<AdminLeadDetail> {
   return apiFetch<AdminLeadDetail>(`/admin/leads/${id}/convert/`, {

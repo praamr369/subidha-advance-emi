@@ -27,3 +27,12 @@ See [PRODUCTION_HANDOFF.md](./PRODUCTION_HANDOFF.md) for the exact environment c
 - payment collection works
 - winner flow works
 - reports load correctly
+
+## Final handoff references
+- `docs/operations/go-live-checklist.md`
+- `docs/operations/migration-rehearsal-checklist.md`
+- `docs/operations/first-week-operations-checklist.md`
+- `docs/operations/cashier-counter-opening-closing.md`
+- `docs/operations/branch-day-close-checklist.md`
+- `docs/operations/uat-checklist.md`
+- `docs/deployment/rollback-incident-handling.md`

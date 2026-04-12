@@ -1,6 +1,11 @@
+from datetime import date
+from decimal import Decimal
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from billing.services.billing_service import create_direct_sale
+from inventory.models import InventoryItem
 from subscriptions.models import AuditLog, PublicLead, PublicLeadStatus
 from subscriptions.services.public_lead_service import create_public_lead
 from tests.helpers import (
@@ -298,3 +303,74 @@ class AdminLeadApiTests(APITestCase):
         lead.refresh_from_db()
         self.assertEqual(lead.converted_customer_id, customer.id)
         self.assertEqual(lead.converted_subscription_id, subscription.id)
+
+    def test_admin_lead_conversion_can_link_direct_sale_and_return_party_context(self):
+        lead = create_public_lead(
+            name="Retail Lead",
+            phone="9800000009",
+            interested_product="Dining Set",
+            product=self.product,
+        )
+        customer_user = create_customer_user(
+            username="lead_direct_sale_customer",
+            phone="9800000019",
+        )
+        customer = create_customer_profile(
+            user=customer_user,
+            name="Retail Customer",
+            phone="9800000019",
+        )
+        inventory_item = InventoryItem.objects.create(
+            product=self.product,
+            sku="LEAD-RETAIL-SKU-001",
+            opening_stock_qty=Decimal("4.000"),
+        )
+        direct_sale = create_direct_sale(
+            payload={
+                "sale_date": date(2026, 4, 10),
+                "customer": customer,
+                "delivery_required": False,
+                "received_total": Decimal("5000.00"),
+                "customer_name_snapshot": customer.name,
+                "customer_phone_snapshot": customer.phone,
+                "lines": [
+                    {
+                        "product": self.product,
+                        "inventory_item": inventory_item,
+                        "description": "Retail lead line",
+                        "quantity": "1.000",
+                        "unit_price": "5000.00",
+                        "discount_amount": "0.00",
+                        "taxable_value": "5000.00",
+                        "gst_rate": None,
+                        "cgst_amount": "0.00",
+                        "sgst_amount": "0.00",
+                        "igst_amount": "0.00",
+                        "line_total": "5000.00",
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            created_by=self.admin,
+        )
+
+        response = self.client.post(
+            f"/api/v1/admin/leads/{lead.id}/convert/",
+            {"direct_sale_id": direct_sale.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        lead.refresh_from_db()
+        self.assertEqual(lead.status, PublicLeadStatus.CONVERTED)
+        self.assertEqual(lead.converted_customer_id, customer.id)
+        self.assertEqual(lead.converted_direct_sale_id, direct_sale.id)
+        self.assertEqual(response.data["converted_direct_sale_id"], direct_sale.id)
+        self.assertTrue(response.data["party_id"])
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name="PublicLead",
+                object_id=lead.id,
+                action_type=AuditLog.ActionType.LEAD_DIRECT_SALE_LINKED,
+            ).exists()
+        )

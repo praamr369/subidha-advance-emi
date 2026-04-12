@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -8,7 +7,9 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import {
@@ -214,9 +215,12 @@ export default function BillingDocumentRegisterPage() {
       header: "Actions",
       render: (row) =>
         row.href ? (
-          <Link href={row.href} className="text-sm text-primary underline-offset-4 hover:underline">
-            Open detail
-          </Link>
+          <>
+            <ActionButton href={row.href} variant="outline" className="receipt-print-hide">
+              Open Detail
+            </ActionButton>
+            <span className="hidden print:inline">—</span>
+          </>
         ) : (
           "—"
         ),
@@ -227,6 +231,7 @@ export default function BillingDocumentRegisterPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Billing Document Register"
       subtitle="Unified invoice, receipt, credit-note, and debit-note register for staff drill-down without turning billing into a second EMI truth source."
       breadcrumbs={[
@@ -267,6 +272,12 @@ export default function BillingDocumentRegisterPage() {
               </div>
             )}
           </WorkspaceSection>
+
+          <PrintActionBanner
+            className="mb-4"
+            title="Register Print / PDF"
+            description="Print this filtered register for filing. Use filters to keep each printout concise and readable."
+          />
 
           <EnterpriseDataTable
             data={rows}

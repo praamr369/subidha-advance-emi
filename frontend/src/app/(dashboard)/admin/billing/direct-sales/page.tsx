@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -15,6 +16,13 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import { listCustomers, type CustomerRecord } from "@/services/customers";
+import { completeAdminLeadConversion } from "@/services/admin-leads";
+import {
+  listBranches,
+  listCashCounters,
+  type BranchRecord,
+  type CashCounterRecord,
+} from "@/services/branch-control";
 import { listInventoryItems, type InventoryItem } from "@/services/inventory";
 import { listProducts, type ProductRecord } from "@/services/products";
 import {
@@ -66,6 +74,14 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSaleLine {
   const quantity = Math.max(toNumber(line.quantity), 0);
   const unitPrice = Math.max(toNumber(line.unit_price), 0);
@@ -96,11 +112,14 @@ function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSa
 }
 
 export default function BillingDirectSalesPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<DirectSale[]>([]);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
+  const [counters, setCounters] = useState<CashCounterRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +127,8 @@ export default function BillingDirectSalesPage() {
   const [form, setForm] = useState({
     sale_date: new Date().toISOString().slice(0, 10),
     customer: "",
+    branch: "",
+    cash_counter: "",
     tax_mode: "NON_GST" as "GST" | "NON_GST",
     finance_account: "",
     delivery_required: false,
@@ -119,6 +140,8 @@ export default function BillingDirectSalesPage() {
     notes: "",
     lines: [DEFAULT_LINE],
   });
+  const leadId = parsePositiveInteger(searchParams.get("lead"));
+  const focusedSaleId = parsePositiveInteger(searchParams.get("focus_sale"));
 
   async function loadPage() {
     try {
@@ -128,21 +151,29 @@ export default function BillingDirectSalesPage() {
         productPayload,
         inventoryPayload,
         financePayload,
+        branchPayload,
+        counterPayload,
       ] = await Promise.all([
         listDirectSales(),
         listCustomers(),
         listProducts(),
         listInventoryItems(),
         listFinanceAccounts(),
+        listBranches({ status: "ACTIVE" }),
+        listCashCounters({ is_active: "true" }),
       ]);
       setRows(directSalesPayload.results);
       setCustomers(customerPayload.results);
       setProducts(productPayload);
       setInventoryItems(inventoryPayload.results);
       setFinanceAccounts(financePayload.results);
+      setBranches(branchPayload.results);
+      setCounters(counterPayload.results);
       setError(null);
     } catch (err) {
       setRows([]);
+      setBranches([]);
+      setCounters([]);
       setError(accountingErrorMessage(err, "Failed to load direct retail sales."));
     } finally {
       setLoading(false);
@@ -152,6 +183,42 @@ export default function BillingDirectSalesPage() {
   useEffect(() => {
     void loadPage();
   }, []);
+
+  useEffect(() => {
+    const prefillCustomerId = parsePositiveInteger(searchParams.get("customer"));
+    const prefillProductId = parsePositiveInteger(searchParams.get("product"));
+    const prefillProductName =
+      searchParams.get("product_name") ||
+      searchParams.get("interested_product") ||
+      "";
+    const prefillLeadName = searchParams.get("lead_name") || "";
+    const prefillLeadPhone = searchParams.get("lead_phone") || "";
+    const prefillLeadNotes = searchParams.get("lead_notes") || "";
+
+    if (!leadId && !prefillCustomerId && !prefillProductId && !prefillProductName) {
+      return;
+    }
+
+    setForm((current) => {
+      const nextLines = [...current.lines];
+      nextLines[0] = {
+        ...nextLines[0],
+        product: prefillProductId ? String(prefillProductId) : nextLines[0].product,
+        description: prefillProductName || nextLines[0].description,
+      };
+      return {
+        ...current,
+        customer: prefillCustomerId ? String(prefillCustomerId) : current.customer,
+        customer_name_snapshot: prefillLeadName || current.customer_name_snapshot,
+        customer_phone_snapshot: prefillLeadPhone || current.customer_phone_snapshot,
+        notes:
+          prefillLeadNotes && !current.notes.includes(prefillLeadNotes)
+            ? [current.notes, prefillLeadNotes].filter(Boolean).join("\n\n")
+            : current.notes,
+        lines: nextLines,
+      };
+    });
+  }, [leadId, searchParams]);
 
   const customerMap = useMemo(
     () => new Map(customers.map((customer) => [String(customer.id), customer])),
@@ -164,6 +231,17 @@ export default function BillingDirectSalesPage() {
     }
     return next;
   }, [inventoryItems]);
+  const countersForSelectedBranch = useMemo(() => {
+    if (!form.branch) return counters;
+    return counters.filter((counter) => String(counter.branch) === form.branch);
+  }, [counters, form.branch]);
+  const financeAccountsForSelectedBranch = useMemo(() => {
+    if (!form.branch) return financeAccounts;
+    return financeAccounts.filter((account) => {
+      const branchId = typeof account.branch === "number" ? account.branch : null;
+      return branchId === null || String(branchId) === form.branch;
+    });
+  }, [financeAccounts, form.branch]);
 
   const computedLines = useMemo(
     () =>
@@ -207,10 +285,22 @@ export default function BillingDirectSalesPage() {
     computedTotals.grand_total,
     Math.max(toNumber(form.received_total), 0)
   );
+  const visibleRows = useMemo(() => {
+    if (!focusedSaleId) return rows;
+    return rows.filter((row) => row.id === focusedSaleId);
+  }, [focusedSaleId, rows]);
 
   const columns: EnterpriseColumnDef<DirectSale>[] = [
     { key: "sale_date", header: "Date", render: (row) => accountingDate(row.sale_date) },
     { key: "sale_no", header: "Direct Sale" },
+    {
+      key: "branch_name",
+      header: "Branch / Counter",
+      render: (row) =>
+        [row.branch_code || row.branch_name, row.cash_counter_code || row.cash_counter_name]
+          .filter(Boolean)
+          .join(" · ") || "Primary default",
+    },
     { key: "customer_name_snapshot", header: "Customer" },
     {
       key: "delivery_required",
@@ -285,6 +375,8 @@ export default function BillingDirectSalesPage() {
     const payload = {
       sale_date: form.sale_date,
       customer: form.customer ? Number(form.customer) : null,
+      branch: form.branch ? Number(form.branch) : null,
+      cash_counter: form.cash_counter ? Number(form.cash_counter) : null,
       tax_mode: form.tax_mode,
       finance_account: form.finance_account ? Number(form.finance_account) : null,
       delivery_required: form.delivery_required,
@@ -307,11 +399,35 @@ export default function BillingDirectSalesPage() {
 
     try {
       setSubmitting(true);
-      await createDirectSale(payload);
-      setNotice("Direct sale created with a linked billing invoice draft.");
+      const created = await createDirectSale(payload);
+      if (leadId) {
+        try {
+          await completeAdminLeadConversion(leadId, {
+            customer_id: created.customer ?? null,
+            direct_sale_id: created.id,
+          });
+          setNotice(
+            `Direct sale created with a linked billing invoice draft and linked back to lead #${leadId}.`
+          );
+        } catch (linkError) {
+          setNotice(
+            `Direct sale ${created.sale_no || `#${created.id}`} was created, but lead #${leadId} still needs manual conversion linking.`
+          );
+          setError(
+            accountingErrorMessage(
+              linkError,
+              "The direct sale was created, but lead conversion linking failed."
+            )
+          );
+        }
+      } else {
+        setNotice("Direct sale created with a linked billing invoice draft.");
+      }
       setForm({
         sale_date: new Date().toISOString().slice(0, 10),
         customer: "",
+        branch: "",
+        cash_counter: "",
         tax_mode: "NON_GST",
         finance_account: "",
         delivery_required: false,
@@ -357,12 +473,18 @@ export default function BillingDirectSalesPage() {
         { label: "Delivery Hold", value: String(deliveryHoldCount), tone: deliveryHoldCount > 0 ? "warning" : "success" },
         { label: "Invoiced", value: String(invoicedCount), tone: invoicedCount > 0 ? "success" : "default" },
       ]}
+      statusBadge={leadId ? { label: `Lead Handoff #${leadId}`, tone: "info" } : undefined}
     >
       {loading ? <LoadingBlock label="Loading direct-sale operations..." /> : null}
       {!loading && error ? <ErrorState title="Direct sales load failed" description={error} /> : null}
 
       {!loading && !error ? (
         <>
+          {leadId ? (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              This draft was opened from lead handoff. Customer, product, and note context were prefilled without creating or converting anything silently.
+            </div>
+          ) : null}
           {notice ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               {notice}
@@ -453,6 +575,50 @@ export default function BillingDirectSalesPage() {
               </label>
 
               <label className="grid gap-2 text-sm">
+                <span>Branch</span>
+                <select
+                  value={form.branch}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      branch: event.target.value,
+                      cash_counter: "",
+                      finance_account: "",
+                    }))
+                  }
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                >
+                  <option value="">Primary default</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.code} · {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2 text-sm">
+                <span>Counter / Cash Desk</span>
+                <select
+                  value={form.cash_counter}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      cash_counter: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                >
+                  <option value="">No explicit counter</option>
+                  {countersForSelectedBranch.map((counter) => (
+                    <option key={counter.id} value={counter.id}>
+                      {counter.code} · {counter.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2 text-sm">
                 <span>Finance account</span>
                 <select
                   value={form.finance_account}
@@ -460,9 +626,10 @@ export default function BillingDirectSalesPage() {
                   className="rounded-xl border border-border bg-background px-3 py-2"
                 >
                   <option value="">Select account</option>
-                  {financeAccounts.map((account) => (
+                  {financeAccountsForSelectedBranch.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} · {account.kind}
+                      {account.branch_code ? ` · ${account.branch_code}` : ""}
                     </option>
                   ))}
                 </select>
@@ -793,7 +960,12 @@ export default function BillingDirectSalesPage() {
                 description="Create the first direct retail sale to open the billing and inventory-ready workflow."
               />
             ) : (
-              <EnterpriseDataTable data={rows} columns={columns} />
+              <EnterpriseDataTable
+                data={visibleRows}
+                columns={columns}
+                emptyTitle="No direct sales match the current focus"
+                emptyDescription="The focused direct sale could not be found in the current register slice."
+              />
             )}
           </WorkspaceSection>
         </>

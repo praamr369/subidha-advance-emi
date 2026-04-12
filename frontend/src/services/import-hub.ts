@@ -19,6 +19,8 @@ export type ImportPostResponse = {
   created: number;
   updated: number;
   skipped: number;
+  source?: string;
+  errors?: string[];
   message?: string;
 };
 
@@ -45,4 +47,36 @@ export function previewVendorImport(file: File) {
 
 export function postVendorImport(file: File) {
   return uploadForm<ImportPostResponse>("/accounting/imports/vendors/post/", file);
+}
+
+export function previewEmployeeImport(file: File) {
+  return uploadForm<ImportPreviewResponse>("/accounting/imports/employees/preview/", file);
+}
+
+export function postEmployeeImport(file: File) {
+  return uploadForm<ImportPostResponse>("/accounting/imports/employees/post/", file);
+}
+
+export function previewBranchImport(file: File) {
+  return uploadForm<ImportPreviewResponse>("/branch-control/imports/branches/preview/", file);
+}
+
+export function postBranchImport(file: File) {
+  return uploadForm<ImportPostResponse>("/branch-control/imports/branches/post/", file);
+}
+
+export function previewCounterImport(file: File) {
+  return uploadForm<ImportPreviewResponse>("/branch-control/imports/counters/preview/", file);
+}
+
+export function postCounterImport(file: File) {
+  return uploadForm<ImportPostResponse>("/branch-control/imports/counters/post/", file);
+}
+
+export function previewProductImport(file: File) {
+  return uploadForm<ImportPreviewResponse>("/admin/products/import-preview/", file);
+}
+
+export function postProductImport(file: File) {
+  return uploadForm<ImportPostResponse>("/admin/products/import-csv/", file);
 }

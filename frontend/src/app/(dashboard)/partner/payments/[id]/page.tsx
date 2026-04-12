@@ -200,7 +200,7 @@ export default function PartnerPaymentDetailPage() {
                 type="button"
                 onClick={() => void loadPage("refresh")}
                 disabled={loading || refreshing}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-70"
               >
                 <RefreshCw className="h-4 w-4" />
                 {refreshing ? "Refreshing..." : "Refresh"}
@@ -291,6 +291,7 @@ export default function PartnerPaymentDetailPage() {
 
             <PaymentReceiptDocument
               audienceLabel="Partner-scoped payment proof for a recorded transaction on subscriptions attributed to this partner."
+              documentTitle="Partner Payment Receipt"
               receiptReference={paymentReference}
               paymentId={payment.id}
               statusLabel={statusLabel}
@@ -302,6 +303,18 @@ export default function PartnerPaymentDetailPage() {
                   </div>
                 ) : undefined
               }
+              partyFields={[
+                { label: "Customer", value: payment.customer_name || "—", emphasize: true },
+                { label: "Phone", value: payment.customer_phone || "—" },
+                { label: "Subscription", value: subscriptionLabel, emphasize: true },
+                { label: "Product", value: payment.product_name || "—" },
+              ]}
+              referenceFields={[
+                { label: "Receipt Ref", value: paymentReference, emphasize: true },
+                { label: "Payment Date", value: formatDate(payment.payment_date) },
+                { label: "Method", value: payment.method || "—" },
+                { label: "EMI Context", value: emiContext },
+              ]}
               summaryFields={[
                 {
                   label: "Recorded At",
@@ -314,21 +327,13 @@ export default function PartnerPaymentDetailPage() {
                   emphasize: true,
                 },
                 {
-                  label: "Customer",
-                  value: payment.customer_name || "—",
-                  emphasize: true,
-                },
-                {
-                  label: "Subscription",
-                  value: subscriptionLabel,
-                  emphasize: true,
+                  label: "Collected By",
+                  value: payment.collected_by_username || "—",
                 },
               ]}
               detailFields={[
-                { label: "Method", value: payment.method || "—" },
-                { label: "Status", value: statusLabel },
-                { label: "Phone", value: payment.customer_phone || "—" },
-                { label: "Product", value: payment.product_name || "—" },
+                { label: "Receipt Status", value: statusLabel },
+                { label: "Product Code", value: payment.product_code || "—" },
                 {
                   label: "Subscription Status",
                   value: payment.subscription_status || "—",
@@ -337,7 +342,7 @@ export default function PartnerPaymentDetailPage() {
                   label: "Plan Type",
                   value: payment.subscription_plan_type || "—",
                 },
-                { label: "EMI", value: emiContext },
+                { label: "EMI Context", value: emiContext },
                 { label: "EMI Status", value: payment.emi_status || "—" },
                 { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
                 {
@@ -356,13 +361,10 @@ export default function PartnerPaymentDetailPage() {
                       : "—",
                 },
                 {
-                  label: "Collected By",
-                  value: payment.collected_by_username || "—",
-                },
-                {
                   label: "Verified By",
                   value: payment.verified_by_username || "—",
                 },
+                { label: "Reference Number", value: payment.reference_no || "—" },
               ]}
               footerNote="Use browser print to keep a paper copy or save this receipt as PDF. This view is sourced only from the partner-scoped payment record."
             />
@@ -420,7 +422,7 @@ export default function PartnerPaymentDetailPage() {
                   value={
                     <div>
                       <div>{payment.batch_code || "—"}</div>
-                      <div className="text-muted-foreground">
+                      <div className="text-slate-600">
                         {typeof payment.lucky_number === "number"
                           ? `Lucky #${payment.lucky_number}`
                           : "No lucky number"}
@@ -477,7 +479,7 @@ export default function PartnerPaymentDetailPage() {
 
                 <Link
                   href={backHref}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Back to payments
                 </Link>
@@ -485,7 +487,7 @@ export default function PartnerPaymentDetailPage() {
                 {payment.customer ? (
                   <Link
                     href={`/partner/customers/${payment.customer}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     Open customer
                   </Link>
@@ -494,7 +496,7 @@ export default function PartnerPaymentDetailPage() {
                 {payment.subscription ? (
                   <Link
                     href={`/partner/subscriptions/${payment.subscription}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     Open subscription
                   </Link>

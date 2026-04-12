@@ -8,6 +8,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
+import { listBranches, type BranchRecord } from "@/services/branch-control";
 import type { StockLocation } from "@/services/inventory";
 import {
   createStockLocation,
@@ -22,6 +23,7 @@ type LocationFormState = {
   id: number | null;
   code: string;
   name: string;
+  branch: string;
   location_type: StockLocation["location_type"];
   is_active: boolean;
   notes: string;
@@ -31,6 +33,7 @@ const EMPTY_FORM: LocationFormState = {
   id: null,
   code: "",
   name: "",
+  branch: "",
   location_type: "STORE",
   is_active: true,
   notes: "",
@@ -41,6 +44,7 @@ function toFormState(location: StockLocation): LocationFormState {
     id: location.id,
     code: location.code,
     name: location.name,
+    branch: location.branch ? String(location.branch) : "",
     location_type: location.location_type,
     is_active: location.is_active,
     notes: location.notes ?? "",
@@ -49,6 +53,7 @@ function toFormState(location: StockLocation): LocationFormState {
 
 export default function InventoryLocationsPage() {
   const [rows, setRows] = useState<StockLocation[]>([]);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [form, setForm] = useState<LocationFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,11 +63,16 @@ export default function InventoryLocationsPage() {
   async function loadPage() {
     setLoading(true);
     try {
-      const payload = await listStockLocations();
+      const [payload, branchPayload] = await Promise.all([
+        listStockLocations(),
+        listBranches({ status: "ACTIVE" }),
+      ]);
       setRows(payload.results);
+      setBranches(branchPayload.results);
       setError(null);
     } catch (err) {
       setRows([]);
+      setBranches([]);
       setError(accountingErrorMessage(err, "Failed to load stock locations."));
     } finally {
       setLoading(false);
@@ -76,6 +86,11 @@ export default function InventoryLocationsPage() {
   const columns: EnterpriseColumnDef<StockLocation>[] = [
     { key: "code", header: "Code" },
     { key: "name", header: "Name" },
+    {
+      key: "branch_name",
+      header: "Branch",
+      render: (row) => row.branch_code || row.branch_name || "Primary default",
+    },
     { key: "location_type", header: "Type" },
     {
       key: "is_active",
@@ -115,6 +130,7 @@ export default function InventoryLocationsPage() {
         await updateStockLocation(form.id, {
           code: form.code,
           name: form.name,
+          branch: form.branch ? Number(form.branch) : null,
           location_type: form.location_type,
           is_active: form.is_active,
           notes: form.notes,
@@ -124,6 +140,7 @@ export default function InventoryLocationsPage() {
         await createStockLocation({
           code: form.code,
           name: form.name,
+          branch: form.branch ? Number(form.branch) : null,
           location_type: form.location_type,
           is_active: form.is_active,
           notes: form.notes,
@@ -219,6 +236,24 @@ export default function InventoryLocationsPage() {
                 <option value="STORE">Store</option>
                 <option value="WAREHOUSE">Warehouse</option>
                 <option value="SHOWROOM">Showroom</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm text-foreground">
+              <span className="font-medium">Branch</span>
+              <select
+                value={form.branch}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, branch: event.target.value }))
+                }
+                disabled={saving}
+                className={FIELD_CLASS}
+              >
+                <option value="">Primary default</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.code} · {branch.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">

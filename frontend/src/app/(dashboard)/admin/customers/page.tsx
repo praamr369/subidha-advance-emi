@@ -21,6 +21,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
+import ActionButton from "@/components/ui/ActionButton";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   importCustomers,
@@ -507,6 +508,8 @@ export default function AdminCustomersPage() {
     <PortalPage
       title="Customer Register"
       subtitle="Search, review, and route customer records into KYC, subscription, and payment workflows with clear operational context."
+      helperNote="Customer rows here are source-linked for onboarding and collection operations. Use filters to narrow high-volume registers before action."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Customers" },
@@ -555,17 +558,16 @@ export default function AdminCustomersPage() {
           description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
           action={
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
+              <ActionButton
+                variant="outline"
                 onClick={() => void loadPage("refresh")}
                 disabled={refreshing || loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                leftIcon={<RefreshCw className="h-4 w-4" />}
               >
-                <RefreshCw className="h-4 w-4" />
                 {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
-              <button
-                type="button"
+              </ActionButton>
+              <ActionButton
+                variant="primary"
                 disabled={exportRows.length === 0 || loading}
                 onClick={() =>
                   downloadCsv(
@@ -586,15 +588,16 @@ export default function AdminCustomersPage() {
                     exportRows
                   )
                 }
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                leftIcon={<Download className="h-4 w-4" />}
               >
-                <Download className="h-4 w-4" />
                 Export Current View
-              </button>
+              </ActionButton>
             </div>
           }
         >
           <TableToolbar
+            title="Search and filter"
+            description="Use query, KYC, and account-state filters to narrow high-volume customer rows for collection and onboarding operations."
             footer={
               query || kycFilter || statusFilter ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -651,19 +654,19 @@ export default function AdminCustomersPage() {
               </select>
 
               <div className="flex flex-wrap gap-2">
-                <button
+                <ActionButton
                   type="submit"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                  variant="primary"
                 >
                   Apply
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="button"
                   onClick={handleResetFilters}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                  variant="outline"
                 >
                   Reset
-                </button>
+                </ActionButton>
               </div>
             </form>
           </TableToolbar>

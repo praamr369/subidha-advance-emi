@@ -26,6 +26,9 @@ export type ChartOfAccount = {
 export type FinanceAccount = {
   id: number;
   name: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   kind: "CASH" | "BANK" | "UPI";
   chart_account: number;
   chart_account_code?: string;
@@ -90,6 +93,9 @@ export type ExpenseVoucher = {
   id: number;
   voucher_no: string;
   expense_date: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   vendor?: number | null;
   vendor_name?: string | null;
   expense_account: number;
@@ -115,11 +121,127 @@ export type EmployeeProfile = {
   id: number;
   employee_code: string;
   name: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  phone?: string;
+  designation?: string;
+  department?: string;
   joining_date: string;
   base_salary?: string | null;
+  standard_daily_hours?: string;
+  overtime_rate_per_hour?: string | null;
   is_active: boolean;
+  notes?: string;
+  compensation_components?: EmployeeCompensationComponent[];
   created_at?: string;
   updated_at?: string;
+};
+
+export type EmployeeCompensationComponent = {
+  id?: number;
+  component_name: string;
+  component_type: "EARNING" | "DEDUCTION";
+  amount: string;
+  sort_order?: number;
+  is_active?: boolean;
+  notes?: string;
+};
+
+export type EmployeeAttendanceStatus =
+  | "PRESENT"
+  | "HALF_DAY"
+  | "ABSENT"
+  | "LEAVE";
+
+export type EmployeeAttendance = {
+  id: number;
+  employee: number;
+  employee_name?: string;
+  employee_code?: string;
+  employee_department?: string;
+  attendance_date: string;
+  status: EmployeeAttendanceStatus;
+  worked_hours?: string;
+  overtime_hours?: string;
+  leave_request?: number | null;
+  leave_request_no?: string | null;
+  notes?: string;
+  recorded_by?: number | null;
+  recorded_by_username?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PayrollPeriod = {
+  id: number;
+  code: string;
+  year: number;
+  month: number;
+  start_date: string;
+  end_date: string;
+  status: "OPEN" | "CLOSED";
+  closed_at?: string | null;
+  closed_by?: number | null;
+  closed_by_username?: string | null;
+  close_reason?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type LeaveType = {
+  id: number;
+  code: string;
+  name: string;
+  is_paid: boolean;
+  annual_allowance_days?: string | null;
+  is_active: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type LeaveRequest = {
+  id: number;
+  request_no: string;
+  employee: number;
+  employee_name?: string;
+  employee_code?: string;
+  leave_type: number;
+  leave_type_name?: string;
+  start_date: string;
+  end_date: string;
+  day_count: string;
+  status: "DRAFT" | "APPROVED" | "REJECTED" | "CANCELLED";
+  reason?: string;
+  notes?: string;
+  approved_by?: number | null;
+  approved_by_username?: string | null;
+  approved_at?: string | null;
+  rejected_by?: number | null;
+  rejected_by_username?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string;
+  cancelled_by?: number | null;
+  cancelled_by_username?: string | null;
+  cancelled_at?: string | null;
+  cancel_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type SalarySheetLine = {
+  id: number;
+  component_name: string;
+  component_type: "EARNING" | "DEDUCTION";
+  source_type: "BASE_SALARY" | "COMPONENT" | "OVERTIME" | "LEAVE_DEDUCTION" | "MANUAL";
+  source_reference?: string;
+  quantity?: string | null;
+  rate?: string | null;
+  amount: string;
+  sort_order?: number;
+  notes?: string;
 };
 
 export type SalarySheet = {
@@ -127,6 +249,12 @@ export type SalarySheet = {
   employee: number;
   employee_name?: string;
   employee_code?: string;
+  employee_phone?: string;
+  employee_designation?: string;
+  employee_department?: string;
+  payroll_period?: number | null;
+  payroll_period_code?: string | null;
+  payroll_period_status?: "OPEN" | "CLOSED" | null;
   year: number;
   month: number;
   gross_amount: string;
@@ -136,8 +264,136 @@ export type SalarySheet = {
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
   payment_total?: string;
+  outstanding_amount?: string;
+  lines?: SalarySheetLine[];
+  auto_generate?: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type SalaryPayment = {
+  id: number;
+  salary_sheet: number;
+  salary_sheet_employee_name?: string;
+  salary_sheet_employee_code?: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  payment_date: string;
+  amount: string;
+  finance_account: number;
+  finance_account_name?: string;
+  reference_no?: string | null;
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EmployeeExpenseClaim = {
+  id: number;
+  claim_no: string;
+  employee: number;
+  employee_name?: string;
+  employee_code?: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  claim_date: string;
+  expense_date: string;
+  category?: string;
+  expense_account: number;
+  expense_account_code?: string;
+  expense_account_name?: string;
+  claimed_amount: string;
+  approved_amount: string;
+  status: "DRAFT" | "APPROVED" | "POSTED" | "PAID_PARTIAL" | "PAID" | "REJECTED" | "CANCELLED";
+  bill_no?: string;
+  notes?: string;
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+  payment_total?: string;
+  outstanding_amount?: string;
+  payments?: EmployeeExpenseClaimPayment[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EmployeeExpenseClaimPayment = {
+  id: number;
+  expense_claim: number;
+  expense_claim_no?: string;
+  employee_name?: string;
+  employee_code?: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  payment_date: string;
+  amount: string;
+  finance_account: number;
+  finance_account_name?: string;
+  reference_no?: string | null;
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AttendanceCalendarReport = {
+  employee: {
+    id: number;
+    employee_code: string;
+    name: string;
+    department?: string;
+  };
+  year: number;
+  month: number;
+  days: Array<{
+    date: string;
+    status?: EmployeeAttendanceStatus | null;
+    worked_hours: string;
+    overtime_hours: string;
+    notes?: string;
+    leave_request_id?: number | null;
+  }>;
+  summary: {
+    present_count: number;
+    half_day_count: number;
+    absent_count: number;
+    leave_count: number;
+    worked_hours: string;
+    overtime_hours: string;
+  };
+};
+
+export type StaffLedgerRow = {
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  entry_date: string;
+  entry_kind: "SALARY_ACCRUAL" | "SALARY_PAYMENT" | "REIMBURSEMENT_ACCRUAL" | "REIMBURSEMENT_PAYMENT";
+  source_type: string;
+  source_reference: string;
+  document_no?: string | null;
+  debit_amount: string;
+  credit_amount: string;
+  notes?: string;
+  running_balance: string;
+  balance_side: "PAYABLE" | "RECEIVABLE";
+};
+
+export type StaffLedgerEmployeeSummary = {
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  closing_balance: string;
+  balance_side: "PAYABLE" | "RECEIVABLE";
+};
+
+export type StaffLedgerReport = {
+  employee_id?: number | null;
+  rows: StaffLedgerRow[];
+  employees: StaffLedgerEmployeeSummary[];
 };
 
 export type MoneyMovement = {
@@ -422,6 +678,9 @@ export type AccountingPurchaseBill = {
   id: number;
   bill_no: string;
   bill_date: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   vendor: number;
   vendor_name?: string;
   tax_mode: string;
@@ -429,11 +688,30 @@ export type AccountingPurchaseBill = {
   subtotal: string;
   tax_total: string;
   grand_total: string;
+  stock_location?: number | null;
+  stock_location_code?: string | null;
+  stock_location_name?: string | null;
   finance_account?: number | null;
   finance_account_name?: string | null;
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
   notes?: string;
+  lines?: AccountingPurchaseBillLine[];
+};
+
+export type AccountingPurchaseBillLine = {
+  id?: number;
+  inventory_item: number;
+  inventory_item_sku?: string | null;
+  inventory_item_product_name?: string | null;
+  inventory_item_stock_item_type?: string | null;
+  inventory_item_unit_of_measure?: string | null;
+  description?: string;
+  quantity: string;
+  unit_cost: string;
+  taxable_value?: string;
+  tax_amount?: string;
+  line_total?: string;
 };
 
 export type VendorSettlement = {
@@ -441,6 +719,9 @@ export type VendorSettlement = {
   settlement_no: string;
   vendor: number;
   vendor_name?: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
   settlement_date: string;
   amount: string;
   finance_account: number;
@@ -651,6 +932,13 @@ export function createVendor(payload: Partial<Vendor>) {
   });
 }
 
+export function updateVendor(id: number, payload: Partial<Vendor>) {
+  return apiFetch<Vendor>(`/accounting/vendors/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listExpenses(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<ExpenseVoucher>>(
     `/accounting/expenses/${buildQuery(params)}`
@@ -697,6 +985,108 @@ export function createEmployeeProfile(payload: Partial<EmployeeProfile>) {
   });
 }
 
+export function updateEmployeeProfile(id: number, payload: Partial<EmployeeProfile>) {
+  return apiFetch<EmployeeProfile>(`/accounting/employees/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listEmployeeAttendance(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<EmployeeAttendance>>(
+    `/accounting/attendance/${buildQuery(params)}`
+  );
+}
+
+export function recordEmployeeAttendance(payload: Partial<EmployeeAttendance>) {
+  return apiFetch<EmployeeAttendance>("/accounting/attendance/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAttendanceCalendar(params: {
+  employee: number;
+  year: number;
+  month: number;
+}) {
+  return apiFetch<AttendanceCalendarReport>(
+    `/accounting/reports/attendance-calendar/${buildQuery(params)}`
+  );
+}
+
+export function listPayrollPeriods(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<PayrollPeriod>>(
+    `/accounting/payroll-periods/${buildQuery(params)}`
+  );
+}
+
+export function closePayrollPeriod(id: number, close_reason = "") {
+  return apiFetch<AccountingActionResponse<{ payroll_period: PayrollPeriod }>>(
+    `/accounting/payroll-periods/${id}/close/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ close_reason }),
+    }
+  );
+}
+
+export function listLeaveTypes(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<LeaveType>>(
+    `/accounting/leave-types/${buildQuery(params)}`
+  );
+}
+
+export function createLeaveType(payload: Partial<LeaveType>) {
+  return apiFetch<LeaveType>("/accounting/leave-types/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listLeaveRequests(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<LeaveRequest>>(
+    `/accounting/leave-requests/${buildQuery(params)}`
+  );
+}
+
+export function createLeaveRequest(payload: Partial<LeaveRequest>) {
+  return apiFetch<LeaveRequest>("/accounting/leave-requests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function approveLeaveRequest(id: number) {
+  return apiFetch<AccountingActionResponse<{ leave_request: LeaveRequest }>>(
+    `/accounting/leave-requests/${id}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function rejectLeaveRequest(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ leave_request: LeaveRequest }>>(
+    `/accounting/leave-requests/${id}/reject/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function cancelLeaveRequest(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ leave_request: LeaveRequest }>>(
+    `/accounting/leave-requests/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
 export function listSalarySheets(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<SalarySheet>>(
     `/accounting/salary-sheets/${buildQuery(params)}`
@@ -708,6 +1098,10 @@ export function createSalarySheet(payload: Partial<SalarySheet>) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getSalarySheet(id: number) {
+  return apiFetch<SalarySheet>(`/accounting/salary-sheets/${id}/`);
 }
 
 export function approveSalarySheet(id: number) {
@@ -728,6 +1122,86 @@ export function postSalarySheet(id: number) {
       body: JSON.stringify({}),
     }
   );
+}
+
+export function listSalaryPayments(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<SalaryPayment>>(
+    `/accounting/salary-payments/${buildQuery(params)}`
+  );
+}
+
+export function createSalaryPayment(payload: Partial<SalaryPayment>) {
+  return apiFetch<SalaryPayment>("/accounting/salary-payments/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listExpenseClaims(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<EmployeeExpenseClaim>>(
+    `/accounting/expense-claims/${buildQuery(params)}`
+  );
+}
+
+export function createExpenseClaim(payload: Partial<EmployeeExpenseClaim>) {
+  return apiFetch<EmployeeExpenseClaim>("/accounting/expense-claims/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateExpenseClaim(id: number, payload: Partial<EmployeeExpenseClaim>) {
+  return apiFetch<EmployeeExpenseClaim>(`/accounting/expense-claims/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function approveExpenseClaim(id: number, approved_amount?: string) {
+  return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
+    `/accounting/expense-claims/${id}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify(approved_amount ? { approved_amount } : {}),
+    }
+  );
+}
+
+export function rejectExpenseClaim(id: number, reason: string) {
+  return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
+    `/accounting/expense-claims/${id}/reject/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export function postExpenseClaim(id: number) {
+  return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
+    `/accounting/expense-claims/${id}/post/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+export function listExpenseClaimPayments(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<EmployeeExpenseClaimPayment>>(
+    `/accounting/expense-claim-payments/${buildQuery(params)}`
+  );
+}
+
+export function createExpenseClaimPayment(payload: Partial<EmployeeExpenseClaimPayment>) {
+  return apiFetch<EmployeeExpenseClaimPayment>("/accounting/expense-claim-payments/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getStaffLedger(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<StaffLedgerReport>(`/accounting/reports/staff-ledger/${buildQuery(params)}`);
 }
 
 export function listMoneyMovements(params: Record<string, string | number | undefined | null> = {}) {
@@ -1131,6 +1605,20 @@ export function listPurchaseBills(params: Record<string, string | number | undef
   return apiFetch<AccountingPaginatedResponse<AccountingPurchaseBill>>(
     `/accounting/purchase-bills/${buildQuery(params)}`
   );
+}
+
+export function createPurchaseBill(payload: Partial<AccountingPurchaseBill>) {
+  return apiFetch<AccountingPurchaseBill>("/accounting/purchase-bills/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePurchaseBill(id: number, payload: Partial<AccountingPurchaseBill>) {
+  return apiFetch<AccountingPurchaseBill>(`/accounting/purchase-bills/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function approvePurchaseBill(id: number) {

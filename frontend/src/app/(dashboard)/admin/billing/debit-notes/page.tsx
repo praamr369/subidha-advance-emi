@@ -7,6 +7,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { BillingDebitNote } from "@/services/billing";
@@ -83,6 +84,7 @@ export default function BillingDebitNotesPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Billing Debit Notes"
       subtitle="Controlled upward invoice adjustments linked to original billing documents."
       breadcrumbs={[
@@ -91,33 +93,79 @@ export default function BillingDebitNotesPage() {
         { label: "Debit Notes" },
       ]}
     >
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No debit notes found"
-        emptyDescription="Create a debit note when you need a controlled additional billing adjustment."
+      <div className="receipt-print-hide">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No debit notes found"
+          emptyDescription="Create a debit note when you need a controlled additional billing adjustment."
+        />
+      </div>
+      <PrintActionBanner
+        className="mb-4"
+        title="Debit Note Print / PDF"
+        description="Print this posted debit-note preview for controlled adjustment documentation."
       />
       <BillingPrintDocument
         title="Debit Note"
-        subtitle="Printable debit note preview"
+        subtitle="Printable debit-note preview for controlled upward invoice adjustments."
         reference={latestPosted?.note_no || "No posted debit note"}
         meta={latestPosted ? `Original invoice ${latestPosted.original_invoice_no || latestPosted.original_invoice}` : "Waiting for a posted debit note"}
+        statusLabel={latestPosted?.status}
+        statusToneClassName={
+          latestPosted?.status === "POSTED"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : latestPosted?.status === "APPROVED"
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-slate-300 bg-slate-100 text-slate-800"
+        }
+        partyFields={[
+          {
+            label: "Adjusted Invoice",
+            value: latestPosted?.original_invoice_no || (latestPosted ? `#${latestPosted.original_invoice}` : "—"),
+            emphasize: true,
+          },
+          {
+            label: "Stock Effect",
+            value: latestPosted?.stock_effect ? "Yes" : "No",
+          },
+          {
+            label: "Status",
+            value: latestPosted?.status || "—",
+          },
+          {
+            label: "Journal Entry",
+            value: latestPosted?.posted_journal_entry_no || "Pending",
+          },
+        ]}
+        referenceFields={[
+          { label: "Note Date", value: latestPosted?.note_date || "—" },
+          { label: "Note Number", value: latestPosted?.note_no || "—" },
+          { label: "Note Type", value: "Debit Note" },
+          { label: "Posting State", value: latestPosted?.status || "—" },
+        ]}
         summaryFields={[
-          { label: "Date", value: latestPosted?.note_date || "—" },
-          { label: "Adjustment", value: accountingMoney(latestPosted?.total_adjustment || 0) },
+          { label: "Taxable Adjustment", value: accountingMoney(latestPosted?.taxable_adjustment || 0) },
           { label: "Tax Adjustment", value: accountingMoney(latestPosted?.tax_adjustment || 0) },
-          { label: "Stock Effect", value: latestPosted?.stock_effect ? "Yes" : "No" },
+          { label: "Total Adjustment", value: accountingMoney(latestPosted?.total_adjustment || 0), emphasize: true },
+          { label: "Line Count", value: String(latestPosted?.lines?.length || 0) },
         ]}
         detailFields={[
           { label: "Reason", value: latestPosted?.reason || "—" },
-          { label: "Invoice", value: latestPosted?.original_invoice_no || "—" },
-          { label: "Journal", value: latestPosted?.posted_journal_entry_no || "Pending" },
-          { label: "Status", value: latestPosted?.status || "—" },
+          { label: "Original Invoice", value: latestPosted?.original_invoice_no || "—" },
+          { label: "Journal Entry", value: latestPosted?.posted_journal_entry_no || "Pending" },
+          { label: "Document Status", value: latestPosted?.status || "—" },
         ]}
+        lineItems={(latestPosted?.lines || []).slice(0, 8).map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: accountingMoney(line.taxable_value),
+          lineTotal: accountingMoney(line.line_total),
+          note: line.inventory_item_sku || undefined,
+        }))}
       />
     </PortalPage>
   );
 }
-

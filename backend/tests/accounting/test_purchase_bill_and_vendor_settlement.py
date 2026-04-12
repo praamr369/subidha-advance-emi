@@ -13,7 +13,15 @@ from accounting.models import (
 )
 from accounting.services.purchase_bill_posting_service import approve_purchase_bill, post_purchase_bill_from_accounting
 from accounting.services.vendor_settlement_service import post_vendor_settlement
-from inventory.models import InventoryItem, PurchaseBill, PurchaseBillLine, PurchaseBillStatus, StockLedger, StockMovementType
+from inventory.models import (
+    InventoryItem,
+    InventoryItemType,
+    PurchaseBill,
+    PurchaseBillStatus,
+    StockLedger,
+    StockMovementType,
+)
+from inventory.services.stock_service import upsert_purchase_bill_draft
 from tests.helpers import create_admin_user, create_product
 
 
@@ -25,6 +33,7 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
         self.item = InventoryItem.objects.create(
             product=product,
             sku="PB-SKU-001",
+            stock_item_type=InventoryItemType.RAW_MATERIAL,
             opening_stock_qty=Decimal("2.000"),
             reorder_level_qty=Decimal("1.000"),
             standard_unit_cost=Decimal("700.00"),
@@ -43,26 +52,27 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
         )
 
     def test_purchase_bill_posting_and_vendor_settlement(self):
-        purchase_bill = PurchaseBill.objects.create(
+        purchase_bill = upsert_purchase_bill_draft(
             bill_no="PB-202604-001",
             bill_date=date(2026, 4, 20),
             vendor=self.vendor,
             tax_mode="GST",
-            subtotal=Decimal("1000.00"),
-            tax_total=Decimal("180.00"),
-            grand_total=Decimal("1180.00"),
             finance_account=self.cash_account,
+            lines=[
+                {
+                    "inventory_item": self.item,
+                    "description": "Purchase line",
+                    "quantity": Decimal("1.000"),
+                    "unit_cost": Decimal("1000.00"),
+                    "tax_amount": Decimal("180.00"),
+                }
+            ],
+            performed_by=self.admin,
         )
-        PurchaseBillLine.objects.create(
-            purchase_bill=purchase_bill,
-            inventory_item=self.item,
-            description="Purchase line",
-            quantity=Decimal("1.000"),
-            unit_cost=Decimal("1000.00"),
-            taxable_value=Decimal("1000.00"),
-            tax_amount=Decimal("180.00"),
-            line_total=Decimal("1180.00"),
-        )
+        self.assertEqual(purchase_bill.status, PurchaseBillStatus.DRAFT)
+        self.assertEqual(purchase_bill.subtotal, Decimal("1000.00"))
+        self.assertEqual(purchase_bill.tax_total, Decimal("180.00"))
+        self.assertEqual(purchase_bill.grand_total, Decimal("1180.00"))
 
         purchase_bill, approved = approve_purchase_bill(
             purchase_bill_id=purchase_bill.id,
@@ -103,4 +113,3 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
             sum(item.debit_amount for item in settlement.posted_journal_entry.lines.all()),
             sum(item.credit_amount for item in settlement.posted_journal_entry.lines.all()),
         )
-

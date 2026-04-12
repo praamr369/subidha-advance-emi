@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { BillingInvoice } from "@/services/billing";
@@ -25,7 +26,7 @@ export default function BillingInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
     try {
       const payload = await listBillingInvoices({
         subscription: searchParams.get("subscription") || undefined,
@@ -42,11 +43,11 @@ export default function BillingInvoicesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [searchParams]);
 
   useEffect(() => {
     void loadPage();
-  }, [searchParams]);
+  }, [loadPage]);
 
   const columns: EnterpriseColumnDef<BillingInvoice>[] = [
     { key: "invoice_date", header: "Date", render: (row) => accountingDate(row.invoice_date) },
@@ -84,12 +85,9 @@ export default function BillingInvoicesPage() {
               variant="primary"
             />
           ) : null}
-          <Link
-            href={buildAdminBillingDocumentRoute(row.id)}
-            className="text-sm text-primary underline-offset-4 hover:underline"
-          >
-            Detail
-          </Link>
+          <ActionButton href={buildAdminBillingDocumentRoute(row.id)} variant="outline">
+            Open Detail
+          </ActionButton>
         </div>
       ),
     },
@@ -99,6 +97,7 @@ export default function BillingInvoicesPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Billing Invoices"
       subtitle="Retail and EMI billing documents with controlled approve/post flows."
       breadcrumbs={[
@@ -111,32 +110,82 @@ export default function BillingInvoicesPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
     >
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No billing invoices found"
-        emptyDescription="Create a billing invoice to start the retail or EMI-linked billing flow."
+      <div className="receipt-print-hide">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No billing invoices found"
+          emptyDescription="Create a billing invoice to start the retail or EMI-linked billing flow."
+        />
+      </div>
+
+      <PrintActionBanner
+        className="mb-4"
+        title="Invoice Print / PDF"
+        description="Print this posted invoice preview for counter operations or save it as PDF for filing."
       />
 
       <BillingPrintDocument
         title={latestPosted?.tax_mode === "GST" ? "GST Tax Invoice" : "Retail Invoice"}
-        subtitle="Printable invoice preview"
+        subtitle="Printable invoice preview sourced from posted billing records."
         reference={latestPosted?.document_no || "No posted invoice"}
         meta={latestPosted ? `Customer ${latestPosted.customer_name_snapshot || "Walk-in"}` : "Waiting for a posted invoice"}
+        statusLabel={latestPosted?.status}
+        statusToneClassName={
+          latestPosted?.status === "POSTED"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : latestPosted?.status === "APPROVED"
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-slate-300 bg-slate-100 text-slate-800"
+        }
+        partyFields={[
+          {
+            label: "Customer",
+            value: latestPosted?.customer_name_snapshot || latestPosted?.customer_name || "Walk-in",
+            emphasize: true,
+          },
+          { label: "Phone", value: latestPosted?.customer_phone_snapshot || "—" },
+          { label: "GSTIN", value: latestPosted?.customer_gstin || "—" },
+          {
+            label: "Branch",
+            value: latestPosted?.branch_name || latestPosted?.branch_code || "Primary",
+          },
+        ]}
+        referenceFields={[
+          { label: "Invoice Date", value: latestPosted?.invoice_date || "—" },
+          { label: "Billing Channel", value: latestPosted?.billing_channel || "—" },
+          { label: "Tax Mode", value: latestPosted?.tax_mode || "—" },
+          {
+            label: "Source Ref",
+            value:
+              latestPosted?.direct_sale_no ||
+              latestPosted?.source_reference ||
+              latestPosted?.source_type ||
+              "Manual",
+          },
+        ]}
         summaryFields={[
-          { label: "Date", value: latestPosted?.invoice_date || "—" },
+          { label: "Sub Total", value: accountingMoney(latestPosted?.subtotal || 0) },
+          { label: "Tax Total", value: accountingMoney(latestPosted?.tax_total || 0) },
           { label: "Grand Total", value: accountingMoney(latestPosted?.grand_total || 0) },
           { label: "Received", value: accountingMoney(latestPosted?.received_total || 0) },
-          { label: "Balance", value: accountingMoney(latestPosted?.balance_total || 0) },
+          { label: "Balance Due", value: accountingMoney(latestPosted?.balance_total || 0) },
         ]}
         detailFields={[
-          { label: "Tax Mode", value: latestPosted?.tax_mode || "—" },
-          { label: "Billing Channel", value: latestPosted?.billing_channel || "—" },
-          { label: "Phone", value: latestPosted?.customer_phone_snapshot || "—" },
-          { label: "Journal", value: latestPosted?.posted_journal_entry_no || "Pending" },
+          { label: "Document Status", value: latestPosted?.status || "—" },
+          { label: "Finance Account", value: latestPosted?.finance_account_name || "—" },
+          { label: "Journal Entry", value: latestPosted?.posted_journal_entry_no || "Pending" },
+          { label: "Terms", value: latestPosted?.terms || "—" },
         ]}
+        lineItems={(latestPosted?.lines || []).slice(0, 8).map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: accountingMoney(line.unit_price),
+          lineTotal: accountingMoney(line.line_total),
+          note: [line.product_code, line.inventory_item_sku].filter(Boolean).join(" • "),
+        }))}
       />
     </PortalPage>
   );

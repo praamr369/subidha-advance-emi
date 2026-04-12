@@ -25,8 +25,10 @@ from accounting.services.bridge_run_service import (
 )
 from accounting.services.master_import_service import (
     post_chart_of_accounts_import,
+    post_employee_import,
     post_vendor_import,
     preview_chart_of_accounts_import,
+    preview_employee_import,
     preview_vendor_import,
 )
 from accounting.services.depreciation_service import (
@@ -234,11 +236,33 @@ class DepreciationRunViewSet(AdminAccountingPhase3ViewSet):
 
 
 class AccountingPurchaseBillViewSet(AdminAccountingPhase3ViewSet):
-    queryset = PurchaseBill.objects.select_related("vendor", "finance_account", "posted_journal_entry").prefetch_related("lines").all()
+    queryset = PurchaseBill.objects.select_related(
+        "vendor",
+        "finance_account",
+        "posted_journal_entry",
+        "stock_location",
+    ).prefetch_related(
+        "lines",
+        "lines__inventory_item",
+        "lines__inventory_item__product",
+    ).all()
     serializer_class = PurchaseBillSerializer
     search_fields = ["bill_no", "vendor__name"]
     ordering_fields = ["bill_date", "created_at", "bill_no"]
     ordering = ["-bill_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        vendor_id = self.request.query_params.get("vendor")
+        branch_id = self.request.query_params.get("branch")
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
 
     def get_serializer_class(self):
         if self.action in {"approve", "post_bill", "cancel"}:
@@ -291,6 +315,13 @@ class VendorSettlementViewSet(AdminAccountingPhase3ViewSet):
     search_fields = ["settlement_no", "vendor__name", "reference_no"]
     ordering_fields = ["settlement_date", "created_at", "settlement_no"]
     ordering = ["-settlement_date", "-created_at", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        branch_id = self.request.query_params.get("branch")
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        return queryset
 
     def get_serializer_class(self):
         if self.action in {"post_settlement", "cancel"}:
@@ -405,6 +436,27 @@ class VendorImportPostView(_AccountingImportView):
         serializer.is_valid(raise_exception=True)
         try:
             payload = post_vendor_import(
+                self._uploaded_file(request),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class EmployeeImportPreviewView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(preview_employee_import(self._uploaded_file(request)))
+
+
+class EmployeeImportPostView(_AccountingImportView):
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = post_employee_import(
                 self._uploaded_file(request),
                 performed_by=request.user,
             )

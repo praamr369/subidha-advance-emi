@@ -7,6 +7,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
+import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { BillingCreditNote } from "@/services/billing";
@@ -83,6 +84,7 @@ export default function BillingCreditNotesPage() {
 
   return (
     <PortalPage
+      className="receipt-print-page"
       title="Billing Credit Notes"
       subtitle="Returns and allowances linked back to original invoices with optional stock effect."
       breadcrumbs={[
@@ -91,33 +93,79 @@ export default function BillingCreditNotesPage() {
         { label: "Credit Notes" },
       ]}
     >
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No credit notes found"
-        emptyDescription="Create a credit note when you need a controlled return or allowance adjustment."
+      <div className="receipt-print-hide">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No credit notes found"
+          emptyDescription="Create a credit note when you need a controlled return or allowance adjustment."
+        />
+      </div>
+      <PrintActionBanner
+        className="mb-4"
+        title="Credit Note Print / PDF"
+        description="Print this posted credit-note preview for adjustment records or save it as PDF."
       />
       <BillingPrintDocument
         title="Credit Note"
-        subtitle="Printable credit note preview"
+        subtitle="Printable credit-note preview for approved return and allowance adjustments."
         reference={latestPosted?.note_no || "No posted credit note"}
         meta={latestPosted ? `Original invoice ${latestPosted.original_invoice_no || latestPosted.original_invoice}` : "Waiting for a posted credit note"}
+        statusLabel={latestPosted?.status}
+        statusToneClassName={
+          latestPosted?.status === "POSTED"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : latestPosted?.status === "APPROVED"
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-slate-300 bg-slate-100 text-slate-800"
+        }
+        partyFields={[
+          {
+            label: "Adjusted Invoice",
+            value: latestPosted?.original_invoice_no || (latestPosted ? `#${latestPosted.original_invoice}` : "—"),
+            emphasize: true,
+          },
+          {
+            label: "Stock Effect",
+            value: latestPosted?.stock_effect ? "Yes" : "No",
+          },
+          {
+            label: "Status",
+            value: latestPosted?.status || "—",
+          },
+          {
+            label: "Journal Entry",
+            value: latestPosted?.posted_journal_entry_no || "Pending",
+          },
+        ]}
+        referenceFields={[
+          { label: "Note Date", value: latestPosted?.note_date || "—" },
+          { label: "Note Number", value: latestPosted?.note_no || "—" },
+          { label: "Note Type", value: "Credit Note" },
+          { label: "Posting State", value: latestPosted?.status || "—" },
+        ]}
         summaryFields={[
-          { label: "Date", value: latestPosted?.note_date || "—" },
-          { label: "Adjustment", value: accountingMoney(latestPosted?.total_adjustment || 0) },
+          { label: "Taxable Adjustment", value: accountingMoney(latestPosted?.taxable_adjustment || 0) },
           { label: "Tax Adjustment", value: accountingMoney(latestPosted?.tax_adjustment || 0) },
-          { label: "Stock Effect", value: latestPosted?.stock_effect ? "Yes" : "No" },
+          { label: "Total Adjustment", value: accountingMoney(latestPosted?.total_adjustment || 0), emphasize: true },
+          { label: "Line Count", value: String(latestPosted?.lines?.length || 0) },
         ]}
         detailFields={[
           { label: "Reason", value: latestPosted?.reason || "—" },
-          { label: "Invoice", value: latestPosted?.original_invoice_no || "—" },
-          { label: "Journal", value: latestPosted?.posted_journal_entry_no || "Pending" },
-          { label: "Status", value: latestPosted?.status || "—" },
+          { label: "Original Invoice", value: latestPosted?.original_invoice_no || "—" },
+          { label: "Journal Entry", value: latestPosted?.posted_journal_entry_no || "Pending" },
+          { label: "Document Status", value: latestPosted?.status || "—" },
         ]}
+        lineItems={(latestPosted?.lines || []).slice(0, 8).map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: accountingMoney(line.taxable_value),
+          lineTotal: accountingMoney(line.line_total),
+          note: line.inventory_item_sku || undefined,
+        }))}
       />
     </PortalPage>
   );
 }
-

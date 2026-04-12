@@ -1,0 +1,2 @@
+name,phone,email,address,gstin,state_code,state_name,is_active
+Template Vendor,01710000001,vendor@example.com,Template Address,,WB,West Bengal,true

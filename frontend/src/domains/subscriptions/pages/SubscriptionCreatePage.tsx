@@ -8,6 +8,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
@@ -209,10 +210,10 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <h2 className="enterprise-section-title text-base">{title}</h2>
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -272,7 +273,7 @@ function SearchPanel<T>({
   emptyDescription?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-4">
+    <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <p className="text-xs text-muted-foreground">{description}</p>
@@ -291,30 +292,31 @@ function SearchPanel<T>({
           }}
           placeholder={placeholder}
           disabled={disabled || loading}
-          className="h-10 flex-1 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-10 flex-1 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
         />
 
-        <button
+        <ActionButton
           type="button"
+          variant="primary"
           onClick={onSearch}
           disabled={disabled || loading}
-          className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Searching..." : "Search"}
-        </button>
+        </ActionButton>
       </div>
 
       {selected ? (
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>{renderSelected(selected)}</div>
-            <button
+            <ActionButton
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClear}
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
             >
               Clear
-            </button>
+            </ActionButton>
           </div>
         </div>
       ) : null}
@@ -326,7 +328,7 @@ function SearchPanel<T>({
               key={index}
               type="button"
               onClick={() => onSelect(item)}
-              className="w-full rounded-xl border border-border bg-card p-4 text-left transition hover:border-slate-300 hover:bg-muted/40"
+              className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
             >
               {renderOption(item)}
             </button>
@@ -1030,6 +1032,8 @@ export default function SubscriptionCreatePage() {
     <PortalPage
       title="Create Subscription"
       subtitle="Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
+      helperNote="This flow preserves existing EMI, payment, waiver, draw, and audit semantics while adding safe contract onboarding controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Subscriptions", href: "/admin/subscriptions" },

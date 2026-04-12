@@ -8,6 +8,7 @@ import { ReactNode, useState } from "react";
 type FormSectionProps = {
   title?: string;
   description?: string;
+  note?: string;
   children: ReactNode;
   columns?: 1 | 2 | 3 | 4;
   collapsible?: boolean;
@@ -19,6 +20,7 @@ type FormSectionProps = {
 export default function FormSection({
   title,
   description,
+  note,
   children,
   columns = 2,
   collapsible = false,
@@ -36,7 +38,7 @@ export default function FormSection({
   };
 
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
+    <section className="surface-panel-elevated rounded-2xl border border-border bg-card shadow-sm">
       <div
         className={cn(
           "flex flex-wrap items-start justify-between gap-4 p-5",
@@ -44,10 +46,15 @@ export default function FormSection({
         )}
       >
         <div>
-          {title && <h3 className="text-lg font-semibold text-foreground">{title}</h3>}
+          {title && <h3 className="enterprise-section-title text-lg">{title}</h3>}
           {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
           )}
+          {note ? (
+            <div className="mt-2 inline-flex max-w-2xl rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs font-medium leading-6 text-foreground">
+              {note}
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {actions}
@@ -55,7 +62,7 @@ export default function FormSection({
             <button
               type="button"
               onClick={() => setOpen(!open)}
-              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] p-2 text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] hover:text-foreground"
             >
               {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>

@@ -14,6 +14,15 @@ from subscriptions.models import PaymentMethod
 MONEY_ZERO = Decimal("0.00")
 
 
+def _default_branch():
+    try:
+        from branch_control.services.branch_service import default_branch_for_model
+
+        return default_branch_for_model()
+    except Exception:
+        return None
+
+
 def _generate_reference(prefix: str) -> str:
     timestamp = timezone.now().strftime("%Y%m%d%H%M%S%f")
     return f"{prefix}-{timestamp}"
@@ -49,6 +58,14 @@ def generate_depreciation_run_code() -> str:
 
 def generate_vendor_settlement_no() -> str:
     return _generate_reference("VSET")
+
+
+def generate_leave_request_no() -> str:
+    return _generate_reference("LREQ")
+
+
+def generate_expense_claim_no() -> str:
+    return _generate_reference("ECL")
 
 
 def _transition_allowed(previous_status: str | None, next_status: str | None, allowed: set[tuple[str, str]]) -> bool:
@@ -144,6 +161,48 @@ class SalarySheetStatus(models.TextChoices):
     POSTED = "POSTED", "Posted"
     PAID_PARTIAL = "PAID_PARTIAL", "Paid Partial"
     PAID = "PAID", "Paid"
+
+
+class PayrollPeriodStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    CLOSED = "CLOSED", "Closed"
+
+
+class AttendanceStatus(models.TextChoices):
+    PRESENT = "PRESENT", "Present"
+    HALF_DAY = "HALF_DAY", "Half Day"
+    ABSENT = "ABSENT", "Absent"
+    LEAVE = "LEAVE", "Leave"
+
+
+class CompensationComponentType(models.TextChoices):
+    EARNING = "EARNING", "Earning"
+    DEDUCTION = "DEDUCTION", "Deduction"
+
+
+class LeaveRequestStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class ExpenseClaimStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    POSTED = "POSTED", "Posted"
+    PAID_PARTIAL = "PAID_PARTIAL", "Paid Partial"
+    PAID = "PAID", "Paid"
+    REJECTED = "REJECTED", "Rejected"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class SalaryLineSourceType(models.TextChoices):
+    BASE_SALARY = "BASE_SALARY", "Base Salary"
+    COMPONENT = "COMPONENT", "Component"
+    OVERTIME = "OVERTIME", "Overtime"
+    LEAVE_DEDUCTION = "LEAVE_DEDUCTION", "Leave Deduction"
+    MANUAL = "MANUAL", "Manual"
 
 
 class MoneyMovementStatus(models.TextChoices):
@@ -366,6 +425,13 @@ class ChartOfAccount(AccountingTimeStampedModel):
 
 class FinanceAccount(AccountingTimeStampedModel):
     name = models.CharField(max_length=120)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="finance_accounts",
+    )
     kind = models.CharField(
         max_length=10,
         choices=FinanceAccountKind.choices,
@@ -391,6 +457,7 @@ class FinanceAccount(AccountingTimeStampedModel):
         ordering = ["name", "id"]
         indexes = [
             models.Index(fields=["kind", "is_active"]),
+            models.Index(fields=["branch", "kind", "is_active"]),
         ]
 
     def clean(self):
@@ -406,6 +473,8 @@ class FinanceAccount(AccountingTimeStampedModel):
         self.name = (self.name or "").strip()
         self.bank_last4 = (self.bank_last4 or "").strip()
         self.upi_handle = (self.upi_handle or "").strip()
+        if self.branch_id is None:
+            self.branch = _default_branch()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -859,6 +928,13 @@ class ExpenseVoucher(AccountingTimeStampedModel):
         decimal_places=2,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="expense_vouchers",
+    )
     payment_mode = models.CharField(
         max_length=10,
         choices=PaymentMethod.choices,
@@ -893,6 +969,7 @@ class ExpenseVoucher(AccountingTimeStampedModel):
         ordering = ["-expense_date", "-created_at", "-id"]
         indexes = [
             models.Index(fields=["status", "expense_date"]),
+            models.Index(fields=["branch", "expense_date"]),
         ]
 
     def clean(self):
@@ -923,6 +1000,8 @@ class ExpenseVoucher(AccountingTimeStampedModel):
         self.voucher_no = (self.voucher_no or generate_voucher_no()).strip().upper()
         self.bill_no = (self.bill_no or "").strip()
         self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.finance_account, "branch", None) or _default_branch()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -938,6 +1017,16 @@ class EmployeeProfile(AccountingTimeStampedModel):
         default=generate_employee_code,
     )
     name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=20, blank=True, default="")
+    designation = models.CharField(max_length=80, blank=True, default="")
+    department = models.CharField(max_length=80, blank=True, default="")
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_profiles",
+    )
     joining_date = models.DateField(db_index=True)
     base_salary = models.DecimalField(
         max_digits=12,
@@ -946,17 +1035,41 @@ class EmployeeProfile(AccountingTimeStampedModel):
         blank=True,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    standard_daily_hours = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("8.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    overtime_rate_per_hour = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
     is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "accounting_employee_profiles"
         ordering = ["name", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "department"]),
+            models.Index(fields=["branch", "is_active"]),
+        ]
 
     def save(self, *args, **kwargs):
         self.employee_code = (
             self.employee_code or generate_employee_code()
         ).strip().upper()
         self.name = (self.name or "").strip()
+        self.phone = (self.phone or "").strip()
+        self.designation = (self.designation or "").strip()
+        self.department = (self.department or "").strip()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = _default_branch()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -964,10 +1077,351 @@ class EmployeeProfile(AccountingTimeStampedModel):
         return f"{self.employee_code} - {self.name}"
 
 
+class PayrollPeriod(AccountingTimeStampedModel):
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    year = models.PositiveIntegerField(
+        validators=[MinValueValidator(2000), MaxValueValidator(9999)],
+        db_index=True,
+    )
+    month = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+        db_index=True,
+    )
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=10,
+        choices=PayrollPeriodStatus.choices,
+        default=PayrollPeriodStatus.OPEN,
+        db_index=True,
+    )
+    closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="closed_payroll_periods",
+    )
+    close_reason = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_payroll_periods"
+        ordering = ["-year", "-month", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["year", "month"],
+                name="accounting_payroll_period_unique_year_month",
+            ),
+            models.CheckConstraint(
+                condition=Q(end_date__gte=models.F("start_date")),
+                name="accounting_payroll_period_end_after_start",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "start_date", "end_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.end_date and self.start_date and self.end_date < self.start_date:
+            errors["end_date"] = "End date cannot be earlier than start date."
+        if self.start_date and self.start_date.year != self.year:
+            errors["start_date"] = "Payroll period start date must fall inside the configured year."
+        if self.start_date and self.start_date.month != self.month:
+            errors["start_date"] = "Payroll period start date must fall inside the configured month."
+        if self.end_date and self.end_date.year != self.year:
+            errors["end_date"] = "Payroll period end date must fall inside the configured year."
+        if self.end_date and self.end_date.month != self.month:
+            errors["end_date"] = "Payroll period end date must fall inside the configured month."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={PayrollPeriodStatus.CLOSED},
+            label="payroll period",
+        )
+        self.code = (self.code or f"PAY-{self.year}-{self.month:02d}").strip().upper()
+        self.close_reason = (self.close_reason or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.code
+
+
+class EmployeeCompensationComponent(AccountingTimeStampedModel):
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="compensation_components",
+    )
+    component_name = models.CharField(max_length=120)
+    component_type = models.CharField(
+        max_length=12,
+        choices=CompensationComponentType.choices,
+        db_index=True,
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    sort_order = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_employee_compensation_components"
+        ordering = ["employee_id", "sort_order", "id"]
+        indexes = [
+            models.Index(fields=["employee", "is_active", "component_type"]),
+        ]
+
+    def clean(self):
+        if (self.amount or MONEY_ZERO) < MONEY_ZERO:
+            raise ValidationError({"amount": "Component amount cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.component_name = (self.component_name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.employee_code} - {self.component_name}"
+
+
+class LeaveType(AccountingTimeStampedModel):
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    name = models.CharField(max_length=80)
+    is_paid = models.BooleanField(default=True, db_index=True)
+    annual_allowance_days = models.DecimalField(
+        max_digits=6,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_leave_types"
+        ordering = ["code", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "is_paid"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.code
+
+
+class LeaveRequest(AccountingTimeStampedModel):
+    request_no = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        default=generate_leave_request_no,
+    )
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="leave_requests",
+    )
+    leave_type = models.ForeignKey(
+        LeaveType,
+        on_delete=models.PROTECT,
+        related_name="leave_requests",
+    )
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    day_count = models.DecimalField(
+        max_digits=6,
+        decimal_places=1,
+        validators=[MinValueValidator(Decimal("0.5"))],
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=LeaveRequestStatus.choices,
+        default=LeaveRequestStatus.DRAFT,
+        db_index=True,
+    )
+    reason = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_leave_requests",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rejected_leave_requests",
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_leave_requests",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancel_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_leave_requests"
+        ordering = ["-start_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["employee", "status", "start_date", "end_date"]),
+            models.Index(fields=["leave_type", "status"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.end_date and self.start_date and self.end_date < self.start_date:
+            errors["end_date"] = "Leave end date cannot be earlier than start date."
+        span_days = None
+        if self.start_date and self.end_date:
+            span_days = Decimal((self.end_date - self.start_date).days + 1)
+        if self.day_count and self.day_count <= MONEY_ZERO:
+            errors["day_count"] = "Leave days must be greater than zero."
+        if span_days is not None and self.day_count and self.day_count > span_days:
+            errors["day_count"] = "Leave days cannot exceed the inclusive date span."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={
+                LeaveRequestStatus.APPROVED,
+                LeaveRequestStatus.REJECTED,
+                LeaveRequestStatus.CANCELLED,
+            },
+            label="leave request",
+        )
+        self.request_no = (self.request_no or generate_leave_request_no()).strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.rejection_reason = (self.rejection_reason or "").strip()
+        self.cancel_reason = (self.cancel_reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.request_no
+
+
+class EmployeeAttendance(AccountingTimeStampedModel):
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="attendance_entries",
+    )
+    attendance_date = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=12,
+        choices=AttendanceStatus.choices,
+        default=AttendanceStatus.PRESENT,
+        db_index=True,
+    )
+    worked_hours = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    overtime_hours = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    leave_request = models.ForeignKey(
+        LeaveRequest,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="attendance_entries",
+    )
+    notes = models.TextField(blank=True, default="")
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recorded_employee_attendance",
+    )
+
+    class Meta:
+        db_table = "accounting_employee_attendance"
+        ordering = ["-attendance_date", "-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "attendance_date"],
+                name="accounting_employee_attendance_unique_employee_date",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["attendance_date", "status"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.status in {AttendanceStatus.ABSENT, AttendanceStatus.LEAVE}:
+            if (self.worked_hours or MONEY_ZERO) > MONEY_ZERO:
+                errors["worked_hours"] = "Absent or leave attendance cannot carry worked hours."
+            if (self.overtime_hours or MONEY_ZERO) > MONEY_ZERO:
+                errors["overtime_hours"] = "Absent or leave attendance cannot carry overtime hours."
+        if (self.overtime_hours or MONEY_ZERO) > MONEY_ZERO and self.status in {
+            AttendanceStatus.ABSENT,
+            AttendanceStatus.LEAVE,
+        }:
+            errors["overtime_hours"] = "Overtime is not allowed for absent or leave attendance."
+        if self.leave_request_id and self.status != AttendanceStatus.LEAVE:
+            errors["leave_request"] = "Leave-linked attendance rows must use LEAVE status."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.employee_code} {self.attendance_date}"
+
+
 class SalarySheet(AccountingTimeStampedModel):
     employee = models.ForeignKey(
         EmployeeProfile,
         on_delete=models.PROTECT,
+        related_name="salary_sheets",
+    )
+    payroll_period = models.ForeignKey(
+        PayrollPeriod,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="salary_sheets",
     )
     year = models.PositiveIntegerField(
@@ -1017,6 +1471,9 @@ class SalarySheet(AccountingTimeStampedModel):
                 name="accounting_salary_sheet_unique_employee_period",
             ),
         ]
+        indexes = [
+            models.Index(fields=["payroll_period", "status"]),
+        ]
 
     def clean(self):
         errors = {}
@@ -1029,6 +1486,9 @@ class SalarySheet(AccountingTimeStampedModel):
             errors["net_amount"] = "Net amount must equal gross amount minus deductions."
         if self.status in {SalarySheetStatus.POSTED, SalarySheetStatus.PAID, SalarySheetStatus.PAID_PARTIAL} and not self.posted_journal_entry_id:
             errors["posted_journal_entry"] = "Posted salary sheets must reference a journal entry."
+        if self.payroll_period_id:
+            if self.payroll_period.year != self.year or self.payroll_period.month != self.month:
+                errors["payroll_period"] = "Payroll period year and month must match the salary sheet period."
         if errors:
             raise ValidationError(errors)
 
@@ -1056,6 +1516,69 @@ class SalarySheet(AccountingTimeStampedModel):
         return f"{self.employee.employee_code} - {self.year}-{self.month:02d}"
 
 
+class SalarySheetLine(AccountingTimeStampedModel):
+    salary_sheet = models.ForeignKey(
+        SalarySheet,
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    component_name = models.CharField(max_length=120)
+    component_type = models.CharField(
+        max_length=12,
+        choices=CompensationComponentType.choices,
+        db_index=True,
+    )
+    source_type = models.CharField(
+        max_length=20,
+        choices=SalaryLineSourceType.choices,
+        default=SalaryLineSourceType.MANUAL,
+        db_index=True,
+    )
+    source_reference = models.CharField(max_length=120, blank=True, default="")
+    quantity = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    sort_order = models.PositiveIntegerField(default=1)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_salary_sheet_lines"
+        ordering = ["sort_order", "id"]
+        indexes = [
+            models.Index(fields=["salary_sheet", "component_type", "source_type"]),
+        ]
+
+    def clean(self):
+        if (self.amount or MONEY_ZERO) <= MONEY_ZERO:
+            raise ValidationError({"amount": "Salary line amount must be greater than zero."})
+
+    def save(self, *args, **kwargs):
+        self.component_name = (self.component_name or "").strip()
+        self.source_reference = (self.source_reference or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.salary_sheet_id} - {self.component_name}"
+
+
 class SalaryPayment(AccountingTimeStampedModel):
     salary_sheet = models.ForeignKey(
         SalarySheet,
@@ -1067,6 +1590,13 @@ class SalaryPayment(AccountingTimeStampedModel):
         max_digits=12,
         decimal_places=2,
         validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="salary_payments",
     )
     finance_account = models.ForeignKey(
         FinanceAccount,
@@ -1085,6 +1615,9 @@ class SalaryPayment(AccountingTimeStampedModel):
     class Meta:
         db_table = "accounting_salary_payments"
         ordering = ["-payment_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["branch", "payment_date"]),
+        ]
 
     def clean(self):
         errors = {}
@@ -1098,11 +1631,215 @@ class SalaryPayment(AccountingTimeStampedModel):
     def save(self, *args, **kwargs):
         _posted_reference_guard(self, label="salary payment")
         self.reference_no = (self.reference_no or "").strip() or None
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.finance_account, "branch", None)
+                or getattr(self.salary_sheet.employee, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Salary Payment {self.id or 'new'}"
+
+
+class EmployeeExpenseClaim(AccountingTimeStampedModel):
+    claim_no = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        default=generate_expense_claim_no,
+    )
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="expense_claims",
+    )
+    claim_date = models.DateField(db_index=True)
+    expense_date = models.DateField(db_index=True)
+    category = models.CharField(max_length=80, blank=True, default="")
+    expense_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="employee_expense_claims",
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_expense_claims",
+    )
+    claimed_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    approved_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    status = models.CharField(
+        max_length=15,
+        choices=ExpenseClaimStatus.choices,
+        default=ExpenseClaimStatus.DRAFT,
+        db_index=True,
+    )
+    bill_no = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    notes = models.TextField(blank=True, default="")
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_employee_expense_claims",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rejected_employee_expense_claims",
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    posted_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="posted_employee_expense_claim",
+    )
+
+    class Meta:
+        db_table = "accounting_employee_expense_claims"
+        ordering = ["-expense_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["employee", "status", "expense_date"]),
+            models.Index(fields=["claim_date", "status"]),
+            models.Index(fields=["branch", "expense_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.expense_account_id and self.expense_account.account_type != ChartOfAccountType.EXPENSE:
+            errors["expense_account"] = "Employee expense claims must use an EXPENSE chart account."
+        if (self.claimed_amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["claimed_amount"] = "Claimed amount must be greater than zero."
+        if (self.approved_amount or MONEY_ZERO) < MONEY_ZERO:
+            errors["approved_amount"] = "Approved amount cannot be negative."
+        if (self.approved_amount or MONEY_ZERO) > (self.claimed_amount or MONEY_ZERO):
+            errors["approved_amount"] = "Approved amount cannot exceed claimed amount."
+        if self.status in {
+            ExpenseClaimStatus.POSTED,
+            ExpenseClaimStatus.PAID_PARTIAL,
+            ExpenseClaimStatus.PAID,
+        } and not self.posted_journal_entry_id:
+            errors["posted_journal_entry"] = "Posted claims must reference a journal entry."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _immutable_status_guard(
+            self,
+            immutable_statuses={
+                ExpenseClaimStatus.APPROVED,
+                ExpenseClaimStatus.POSTED,
+                ExpenseClaimStatus.PAID_PARTIAL,
+                ExpenseClaimStatus.PAID,
+                ExpenseClaimStatus.REJECTED,
+                ExpenseClaimStatus.CANCELLED,
+            },
+            allowed_transitions={
+                (ExpenseClaimStatus.APPROVED, ExpenseClaimStatus.POSTED),
+                (ExpenseClaimStatus.POSTED, ExpenseClaimStatus.PAID_PARTIAL),
+                (ExpenseClaimStatus.POSTED, ExpenseClaimStatus.PAID),
+                (ExpenseClaimStatus.PAID_PARTIAL, ExpenseClaimStatus.PAID),
+            },
+            label="employee expense claim",
+        )
+        self.claim_no = (self.claim_no or generate_expense_claim_no()).strip().upper()
+        self.category = (self.category or "").strip()
+        self.bill_no = (self.bill_no or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.rejection_reason = (self.rejection_reason or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.employee, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.claim_no
+
+
+class EmployeeExpenseClaimPayment(AccountingTimeStampedModel):
+    expense_claim = models.ForeignKey(
+        EmployeeExpenseClaim,
+        on_delete=models.PROTECT,
+        related_name="payments",
+    )
+    payment_date = models.DateField(db_index=True)
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_expense_claim_payments",
+    )
+    finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        related_name="employee_expense_claim_payments",
+    )
+    reference_no = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    posted_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="posted_employee_expense_claim_payment",
+    )
+
+    class Meta:
+        db_table = "accounting_employee_expense_claim_payments"
+        ordering = ["-payment_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["expense_claim", "payment_date"]),
+            models.Index(fields=["branch", "payment_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if (self.amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["amount"] = "Claim payment amount must be greater than zero."
+        if self.finance_account_id and not self.finance_account.is_active:
+            errors["finance_account"] = "Finance account must be active."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _posted_reference_guard(self, label="employee expense claim payment")
+        self.reference_no = (self.reference_no or "").strip() or None
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.finance_account, "branch", None)
+                or getattr(self.expense_claim, "branch", None)
+                or _default_branch()
+            )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Claim Payment {self.id or 'new'}"
 
 
 class MoneyMovement(AccountingTimeStampedModel):
@@ -1196,6 +1933,13 @@ class VendorSettlement(AccountingTimeStampedModel):
         decimal_places=2,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="vendor_settlements",
+    )
     finance_account = models.ForeignKey(
         FinanceAccount,
         on_delete=models.PROTECT,
@@ -1229,6 +1973,7 @@ class VendorSettlement(AccountingTimeStampedModel):
         indexes = [
             models.Index(fields=["vendor", "settlement_date"]),
             models.Index(fields=["status", "settlement_date"]),
+            models.Index(fields=["branch", "settlement_date"]),
         ]
 
     def clean(self):
@@ -1250,6 +1995,12 @@ class VendorSettlement(AccountingTimeStampedModel):
             self.settlement_no or generate_vendor_settlement_no()
         ).strip().upper()
         self.reference_no = (self.reference_no or "").strip() or None
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.finance_account, "branch", None)
+                or getattr(self.purchase_bill, "branch", None)
+                or _default_branch()
+            )
         self.full_clean()
         super().save(*args, **kwargs)
 

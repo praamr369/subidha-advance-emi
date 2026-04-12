@@ -10,6 +10,7 @@ from rest_framework import serializers
 from accounts.models import User, UserRole
 from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
+from crm.services.party_service import sync_party_for_customer
 from inventory.models import StockLocation
 from subscriptions.models import (
     AuditLog,
@@ -336,6 +337,10 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                 "user_id": customer.user_id,
             },
         )
+        sync_party_for_customer(
+            customer,
+            performed_by=getattr(request, "user", None),
+        )
         return customer
 
     @transaction.atomic
@@ -379,6 +384,10 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
                 "origin": "ADMIN_CUSTOMER_WORKFLOW",
                 "user_id": instance.user_id,
             },
+        )
+        sync_party_for_customer(
+            instance,
+            performed_by=getattr(request, "user", None),
         )
 
         return instance
@@ -675,6 +684,12 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
     customer_id = serializers.IntegerField(source="customer.id", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_phone = serializers.CharField(source="customer.phone", read_only=True)
+    branch_id = serializers.IntegerField(source="branch.id", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    cash_counter_id = serializers.IntegerField(source="cash_counter.id", read_only=True)
+    cash_counter_code = serializers.CharField(source="cash_counter.code", read_only=True)
+    cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True)
 
     subscription_id = serializers.IntegerField(source="subscription.id", read_only=True)
     subscription_number = serializers.SerializerMethodField()
@@ -724,6 +739,12 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
             "customer_id",
             "customer_name",
             "customer_phone",
+            "branch_id",
+            "branch_code",
+            "branch_name",
+            "cash_counter_id",
+            "cash_counter_code",
+            "cash_counter_name",
             "subscription",
             "subscription_id",
             "subscription_number",
@@ -864,6 +885,8 @@ class AdminPaymentCollectSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
     payment_date = serializers.DateField()
+    branch_id = serializers.IntegerField(required=False, min_value=1)
+    cash_counter_id = serializers.IntegerField(required=False, min_value=1)
     reference_no = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -1209,6 +1232,9 @@ class ProductInventoryProfilePrepareSerializer(serializers.Serializer):
 
 
 class SubscriptionAdminSerializer(serializers.ModelSerializer):
+    branch_id = serializers.IntegerField(source="branch.id", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_phone = serializers.CharField(source="customer.phone", read_only=True)
 
@@ -1276,6 +1302,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = (
             "id",
+            "branch_id",
+            "branch_code",
+            "branch_name",
             "customer",
             "customer_name",
             "customer_phone",
@@ -1308,6 +1337,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "branch_id",
+            "branch_code",
+            "branch_name",
             "total_amount",
             "monthly_amount",
             "waived_amount",

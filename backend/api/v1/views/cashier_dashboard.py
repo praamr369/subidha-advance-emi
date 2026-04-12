@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from branch_control.services.branch_service import scope_queryset_to_user_branches
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.admin_resources import EmiAdminSerializer as EmiSerializer
 from api.v1.serializers.payment import PaymentSerializer
@@ -16,8 +17,8 @@ from subscriptions.services.dashboard_scopes import CashierScope
 from subscriptions.models import Customer, Emi, EmiStatus, Payment
 
 
-def _pending_emi_queryset():
-    return (
+def _pending_emi_queryset(*, user):
+    queryset = (
         Emi.objects.select_related(
             "subscription",
             "subscription__customer",
@@ -28,12 +29,19 @@ def _pending_emi_queryset():
         .filter(status=EmiStatus.PENDING)
         .order_by("due_date", "month_no", "id")
     )
+    return scope_queryset_to_user_branches(
+        queryset,
+        user=user,
+        field_name="subscription__branch_id",
+    )
 
 
-def _cashier_visible_payments_queryset():
-    return (
+def _cashier_visible_payments_queryset(*, user):
+    queryset = (
         Payment.objects.select_related(
             "customer",
+            "branch",
+            "cash_counter",
             "subscription",
             "subscription__product",
             "subscription__lucky_id",
@@ -45,6 +53,7 @@ def _cashier_visible_payments_queryset():
         .filter(collected_by__role="CASHIER")
         .order_by("-created_at", "-id")
     )
+    return scope_queryset_to_user_branches(queryset, user=user, field_name="branch_id")
 
 
 def _parse_positive_int(value):
@@ -200,7 +209,7 @@ class CashierPendingEmis(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        emis = _pending_emi_queryset().filter(subscription__customer=customer)
+        emis = _pending_emi_queryset(user=request.user).filter(subscription__customer=customer)
         emi_rows = list(emis)
 
         total_pending_amount = (
@@ -259,7 +268,7 @@ class CashierSearchEmiView(APIView):
         if not query:
             return Response({"count": 0, "results": []}, status=status.HTTP_200_OK)
 
-        queryset = _pending_emi_queryset()
+        queryset = _pending_emi_queryset(user=request.user)
         numeric_value = _parse_positive_int(query)
         subscription_id = _parse_subscription_identifier(query)
 
@@ -322,7 +331,7 @@ class CashierPaymentHistoryView(APIView):
         limit = _parse_positive_int(request.query_params.get("limit")) or 50
         limit = max(1, min(limit, 100))
 
-        queryset = _cashier_visible_payments_queryset()
+        queryset = _cashier_visible_payments_queryset(user=request.user)
         queryset = _filter_cashier_payment_queryset(queryset, query)
 
         total_count = queryset.count()
@@ -344,7 +353,7 @@ class CashierPaymentDetailView(APIView):
     permission_classes = [IsCashierOrAdmin]
 
     def get(self, request, pk):
-        payment = _cashier_visible_payments_queryset().filter(pk=pk).first()
+        payment = _cashier_visible_payments_queryset(user=request.user).filter(pk=pk).first()
         if not payment:
             return Response(
                 {"detail": "Cashier payment not found."},

@@ -94,7 +94,7 @@ export default function DataTable<T extends { id?: number | string }>({
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+      <div className="surface-panel flex h-64 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <span className="ml-2 text-muted-foreground">Loading data...</span>
       </div>
@@ -103,17 +103,17 @@ export default function DataTable<T extends { id?: number | string }>({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm">
+    <div className="surface-panel-elevated overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead className="bg-muted/30 border-b border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_90%,transparent)]">
             <tr>
               {columns.map((column) => {
                 const columnKey = String(column.key);
@@ -129,14 +129,20 @@ export default function DataTable<T extends { id?: number | string }>({
                     key={columnKey}
                     onClick={() => handleSort(columnKey, column.sortable)}
                     className={cn(
-                      "px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+                      "px-4 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground",
                       column.sortable && "cursor-pointer select-none hover:text-foreground",
                       column.align === "right" && "text-right",
                       column.align === "center" && "text-center"
                     )}
                     style={{ width: column.width }}
                   >
-                    <div className="flex items-center gap-1">
+                    <div
+                      className={cn(
+                        "flex items-center gap-1",
+                        column.align === "right" && "justify-end",
+                        column.align === "center" && "justify-center"
+                      )}
+                    >
                       {column.title}
                       {column.sortable && (
                         <SortIcon className="h-3.5 w-3.5" />
@@ -146,7 +152,7 @@ export default function DataTable<T extends { id?: number | string }>({
                 );
               })}
               {rowActions && (
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                   Actions
                 </th>
               )}
@@ -157,7 +163,7 @@ export default function DataTable<T extends { id?: number | string }>({
               <tr>
                 <td
                   colSpan={columns.length + (rowActions ? 1 : 0)}
-                  className="px-4 py-8 text-center text-sm text-muted-foreground"
+                  className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   {emptyText}
                 </td>
@@ -168,7 +174,7 @@ export default function DataTable<T extends { id?: number | string }>({
                   key={row.id ?? index}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    "border-b border-border transition-colors hover:bg-muted/30",
+                    "border-b border-border/80 transition-colors hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)]",
                     onRowClick && "cursor-pointer"
                   )}
                 >
@@ -182,7 +188,7 @@ export default function DataTable<T extends { id?: number | string }>({
                       <td
                         key={key}
                         className={cn(
-                          "px-4 py-3 text-sm text-foreground",
+                          "px-4 py-3.5 text-foreground",
                           column.align === "right" && "text-right",
                           column.align === "center" && "text-center"
                         )}
@@ -207,22 +213,24 @@ export default function DataTable<T extends { id?: number | string }>({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="text-muted-foreground">
-            Page {clampedPage} of {totalPages}
+            Showing page{" "}
+            <span className="font-semibold text-foreground">{clampedPage}</span> of{" "}
+            <span className="font-semibold text-foreground">{totalPages}</span>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={clampedPage === 1}
-              className="rounded-md border border-border px-3 py-1 text-foreground transition hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={clampedPage === totalPages}
-              className="rounded-md border border-border px-3 py-1 text-foreground transition hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Next
             </button>

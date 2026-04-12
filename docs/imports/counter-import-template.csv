@@ -1,0 +1,2 @@
+code,name,branch_code,finance_account_name,finance_chart_account_code,assigned_username,is_active,notes
+CTR-MAIN-01,Main Counter,MAIN,,CASH-MAIN-001,cashier_main,true,Template counter row

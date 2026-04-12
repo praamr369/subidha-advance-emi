@@ -157,6 +157,10 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     lines = DirectSaleLineSerializer(many=True)
     doc_series_code = serializers.CharField(source="doc_series.series_code", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    cash_counter_code = serializers.CharField(source="cash_counter.code", read_only=True)
+    cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     confirmed_by_username = serializers.CharField(source="confirmed_by.username", read_only=True)
     billing_invoice_id = serializers.SerializerMethodField()
@@ -174,6 +178,12 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "doc_series_code",
             "customer",
             "customer_name",
+            "branch",
+            "branch_code",
+            "branch_name",
+            "cash_counter",
+            "cash_counter_code",
+            "cash_counter_name",
             "status",
             "tax_mode",
             "finance_account",
@@ -274,6 +284,8 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     )
     doc_series_code = serializers.CharField(source="doc_series.series_code", read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
     direct_sale_no = serializers.CharField(source="direct_sale.sale_no", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
@@ -290,6 +302,9 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "doc_series_code",
             "customer",
             "customer_name",
+            "branch",
+            "branch_code",
+            "branch_name",
             "subscription",
             "direct_sale",
             "direct_sale_no",
@@ -563,6 +578,10 @@ class BillingDebitNoteSerializer(serializers.ModelSerializer):
 
 class ReceiptDocumentSerializer(serializers.ModelSerializer):
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    cash_counter_code = serializers.CharField(source="cash_counter.code", read_only=True)
+    cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     direct_sale_no = serializers.CharField(source="direct_sale.sale_no", read_only=True)
 
@@ -574,6 +593,12 @@ class ReceiptDocumentSerializer(serializers.ModelSerializer):
             "receipt_type",
             "status",
             "receipt_date",
+            "branch",
+            "branch_code",
+            "branch_name",
+            "cash_counter",
+            "cash_counter_code",
+            "cash_counter_name",
             "finance_account",
             "finance_account_name",
             "billing_invoice",
@@ -622,6 +647,8 @@ class ReceiptDocumentSerializer(serializers.ModelSerializer):
             customer_id=getattr(validated_data.get("customer"), "id", None),
             subscription_id=getattr(validated_data.get("subscription"), "id", None),
             payment_id=getattr(validated_data.get("payment"), "id", None),
+            branch_id=getattr(validated_data.get("branch"), "id", None),
+            cash_counter_id=getattr(validated_data.get("cash_counter"), "id", None),
             notes=validated_data.get("notes", ""),
             created_by=self.context["request"].user,
         )

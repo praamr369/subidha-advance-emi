@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";

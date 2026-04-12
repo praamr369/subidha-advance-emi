@@ -75,10 +75,16 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         customer_id = self.request.query_params.get("customer")
+        branch_id = self.request.query_params.get("branch")
+        cash_counter_id = self.request.query_params.get("cash_counter")
         status_value = self.request.query_params.get("status")
         delivery_required = self.request.query_params.get("delivery_required")
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        if cash_counter_id:
+            queryset = queryset.filter(cash_counter_id=cash_counter_id)
         if status_value:
             queryset = queryset.filter(status=status_value)
         if delivery_required in {"true", "false"}:
@@ -141,6 +147,7 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
         subscription_id = self.request.query_params.get("subscription")
         customer_id = self.request.query_params.get("customer")
         direct_sale_id = self.request.query_params.get("direct_sale")
+        branch_id = self.request.query_params.get("branch")
         billing_channel = self.request.query_params.get("billing_channel")
         status_value = self.request.query_params.get("status")
         source_type = self.request.query_params.get("source_type")
@@ -152,6 +159,8 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
             queryset = queryset.filter(customer_id=customer_id)
         if direct_sale_id:
             queryset = queryset.filter(direct_sale_id=direct_sale_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
         if billing_channel:
             queryset = queryset.filter(billing_channel=billing_channel)
         if status_value:
@@ -313,6 +322,8 @@ class ReceiptDocumentViewSet(AdminBillingModelViewSet):
         billing_invoice_id = self.request.query_params.get("billing_invoice")
         direct_sale_id = self.request.query_params.get("direct_sale")
         subscription_id = self.request.query_params.get("subscription")
+        branch_id = self.request.query_params.get("branch")
+        cash_counter_id = self.request.query_params.get("cash_counter")
         receipt_type = self.request.query_params.get("receipt_type")
         source_type = self.request.query_params.get("source_type")
 
@@ -324,6 +335,10 @@ class ReceiptDocumentViewSet(AdminBillingModelViewSet):
             queryset = queryset.filter(direct_sale_id=direct_sale_id)
         if subscription_id:
             queryset = queryset.filter(subscription_id=subscription_id)
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        if cash_counter_id:
+            queryset = queryset.filter(cash_counter_id=cash_counter_id)
         if receipt_type:
             queryset = queryset.filter(receipt_type=receipt_type)
         if source_type:
@@ -372,6 +387,7 @@ class BillingProfileViewSet(AdminBillingReadOnlyViewSet):
         subscription_id = self.request.query_params.get("subscription")
         customer_id = self.request.query_params.get("customer")
         product_id = self.request.query_params.get("product")
+        branch_id = self.request.query_params.get("branch")
         activation_state = self.request.query_params.get("activation_state")
         invoice_eligible = self.request.query_params.get("invoice_eligible")
 
@@ -381,6 +397,8 @@ class BillingProfileViewSet(AdminBillingReadOnlyViewSet):
             queryset = queryset.filter(customer_id=customer_id)
         if product_id:
             queryset = queryset.filter(product_id=product_id)
+        if branch_id:
+            queryset = queryset.filter(subscription__branch_id=branch_id)
         if activation_state:
             queryset = queryset.filter(activation_state=activation_state)
         if invoice_eligible in {"true", "false"}:

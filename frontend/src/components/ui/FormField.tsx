@@ -24,15 +24,15 @@ type FormFieldProps = {
 const getToneStyles = (tone: Tone) => {
   switch (tone) {
     case "danger":
-      return "border-destructive/50 bg-destructive/5 focus-within:ring-destructive";
+      return "border-red-300 bg-red-50/55 focus-within:border-red-400 focus-within:ring-red-400/35";
     case "success":
-      return "border-emerald-500/50 bg-emerald-50/20 focus-within:ring-emerald-500";
+      return "border-emerald-300 bg-emerald-50/50 focus-within:border-emerald-400 focus-within:ring-emerald-400/35";
     case "warning":
-      return "border-amber-500/50 bg-amber-50/20 focus-within:ring-amber-500";
+      return "border-amber-300 bg-amber-50/55 focus-within:border-amber-400 focus-within:ring-amber-400/35";
     case "info":
-      return "border-blue-500/50 bg-blue-50/20 focus-within:ring-blue-500";
+      return "border-sky-300 bg-sky-50/55 focus-within:border-sky-400 focus-within:ring-sky-400/35";
     default:
-      return "border-border bg-background focus-within:ring-ring";
+      return "border-border bg-[var(--surface-card-elevated)] focus-within:border-[var(--surface-border-strong)] focus-within:ring-[var(--ring)]/35";
   }
 };
 
@@ -46,7 +46,7 @@ export default function FormField({
   prefix,
   suffix,
   disabled = false,
-  
+  readOnly = false,
   tone = "default",
   direction = "column",
 }: FormFieldProps) {
@@ -57,22 +57,22 @@ export default function FormField({
       {label && (
         <label
           htmlFor={htmlFor}
-          className="mb-2 block text-sm font-medium text-foreground"
+          className="mb-2 block text-sm font-semibold tracking-[0.01em] text-foreground"
         >
           {label}
-          {required && <span className="ml-1 text-destructive">*</span>}
+          {required && <span className="ml-1 text-red-600">*</span>}
         </label>
       )}
       <div
         className={cn(
-          "flex items-stretch rounded-xl border transition focus-within:ring-2",
+          "flex items-stretch rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition focus-within:ring-2",
           getToneStyles(effectiveTone),
-          disabled && "bg-muted/50 opacity-70",
+          (disabled || readOnly) && "bg-[var(--surface-muted)] opacity-85",
           direction === "row" && "flex-row"
         )}
       >
         {prefix && (
-          <div className="flex items-center border-r border-border px-3 text-muted-foreground">
+          <div className="flex items-center border-r border-border bg-[var(--surface-muted)] px-3 text-muted-foreground">
             {prefix}
           </div>
         )}
@@ -80,13 +80,13 @@ export default function FormField({
           {children}
         </div>
         {suffix && (
-          <div className="flex items-center border-l border-border px-3 text-muted-foreground">
+          <div className="flex items-center border-l border-border bg-[var(--surface-muted)] px-3 text-muted-foreground">
             {suffix}
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-1 text-xs text-destructive">{error}</p>
+        <p className="mt-1 text-xs font-medium text-red-700">{error}</p>
       )}
       {helpText && !error && (
         <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>

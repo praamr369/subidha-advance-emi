@@ -1,17 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
+  Banknote,
+  BarChart3,
+  Building2,
   CalendarClock,
+  CheckCircle2,
   CircleDollarSign,
   CreditCard,
+  Factory,
+  PackageSearch,
   Percent,
   RefreshCw,
+  ShoppingCart,
   ShieldAlert,
+  Siren,
+  Truck,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -45,7 +55,20 @@ import {
   buildAdminSupportRequestsRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import {
+  getBranchReportingOverview,
+  type BranchReportingOverview,
+} from "@/services/branch-control";
 import { getAdminDashboard } from "@/services/admin";
+import {
+  listExpenseClaims,
+  listPurchaseBills,
+  listSalarySheets,
+  type AccountingPaginatedResponse,
+  type AccountingPurchaseBill,
+  type EmployeeExpenseClaim,
+  type SalarySheet,
+} from "@/services/accounting";
 import { getAdminDeliverySummary } from "@/services/deliveries";
 import {
   getDashboardSummaryV2,
@@ -57,6 +80,13 @@ import {
   normalizeDashboardSummary,
 } from "@/services/dashboards";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import { getStockSummary, type StockSummaryRow } from "@/services/inventory";
+import {
+  getServiceDeskOverview,
+  listServiceDeskCases,
+  type ServiceDeskOverview,
+} from "@/services/service-desk";
+import { listReminders } from "@/services/reminders";
 import { listSubscriptionRequests } from "@/services/subscription-requests";
 
 type LegacyDashboardPayload = Awaited<ReturnType<typeof getAdminDashboard>>;
@@ -73,6 +103,12 @@ type DeliverySummaryPayload = Awaited<ReturnType<typeof getAdminDeliverySummary>
 type SupportQueuePayload = Awaited<ReturnType<typeof listAdminSupportRequests>>;
 type LeadQueuePayload = Awaited<ReturnType<typeof listAdminLeads>>;
 type RequestQueuePayload = Awaited<ReturnType<typeof listSubscriptionRequests>>;
+type StockSummaryPayload = Awaited<ReturnType<typeof getStockSummary>>;
+type PurchaseBillListPayload = AccountingPaginatedResponse<AccountingPurchaseBill>;
+type ExpenseClaimListPayload = AccountingPaginatedResponse<EmployeeExpenseClaim>;
+type SalarySheetListPayload = AccountingPaginatedResponse<SalarySheet>;
+type ServiceDeskCasePayload = Awaited<ReturnType<typeof listServiceDeskCases>>;
+type ReminderQueuePayload = Awaited<ReturnType<typeof listReminders>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -92,6 +128,206 @@ function formatDateTime(value?: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function toNumber(value?: string | number | null): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function asPercent(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(100, (value / total) * 100));
+}
+
+function formatQuantity(value?: string | number | null): string {
+  return toNumber(value).toFixed(2);
+}
+
+function toneClasses(tone: "default" | "warning" | "success" | "info" | "danger") {
+  if (tone === "warning") return "border-amber-200 bg-amber-50/90 text-amber-900";
+  if (tone === "success") return "border-emerald-200 bg-emerald-50/90 text-emerald-900";
+  if (tone === "danger") return "border-red-200 bg-red-50/90 text-red-900";
+  if (tone === "info") return "border-sky-200 bg-sky-50/90 text-sky-900";
+  return "border-border bg-[var(--surface-muted)] text-foreground";
+}
+
+function DashboardKpiCard({
+  label,
+  value,
+  detail,
+  href,
+  icon,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  href: string;
+  icon: ReactNode;
+  tone?: "default" | "warning" | "success" | "info" | "danger";
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group rounded-[1.6rem] border p-5 shadow-[0_18px_45px_-36px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_-38px_rgba(15,23,42,0.6)] ${toneClasses(
+        tone
+      )}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="rounded-2xl border border-white/70 bg-white/75 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+          {icon}
+        </div>
+        <ArrowRight className="h-4 w-4 opacity-50 transition group-hover:translate-x-0.5 group-hover:opacity-80" />
+      </div>
+      <div className="enterprise-eyebrow mt-4 opacity-75">
+        {label}
+      </div>
+      <div className="enterprise-metric mt-2">{value}</div>
+      <p className="mt-2 text-sm leading-6 opacity-80">{detail}</p>
+    </Link>
+  );
+}
+
+function HorizontalBar({
+  label,
+  value,
+  total,
+  meta,
+  tone = "info",
+}: {
+  label: string;
+  value: number;
+  total: number;
+  meta: string;
+  tone?: "default" | "warning" | "success" | "info" | "danger";
+}) {
+  const fillClass =
+    tone === "warning"
+      ? "bg-amber-500"
+      : tone === "success"
+      ? "bg-emerald-500"
+      : tone === "danger"
+      ? "bg-red-500"
+      : tone === "default"
+      ? "bg-slate-500"
+      : "bg-primary";
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="font-semibold text-foreground">{label}</span>
+        <span className="text-xs font-semibold text-muted-foreground">{meta}</span>
+      </div>
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+        <div
+          className={`h-full rounded-full ${fillClass}`}
+          style={{ width: `${asPercent(value, total)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PaymentModeSplit({
+  cash,
+  bank,
+  upi,
+}: {
+  cash: number;
+  bank: number;
+  upi: number;
+}) {
+  const total = cash + bank + upi;
+  return (
+    <div>
+      <div className="flex h-3 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+        <div className="bg-emerald-500" style={{ width: `${asPercent(cash, total)}%` }} />
+        <div className="bg-primary" style={{ width: `${asPercent(bank, total)}%` }} />
+        <div className="bg-amber-500" style={{ width: `${asPercent(upi, total)}%` }} />
+      </div>
+      <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          Cash {money(cash)}
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          Bank {money(bank)}
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+          UPI {money(upi)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CockpitPanel({
+  title,
+  description,
+  actionHref,
+  actionLabel,
+  children,
+}: {
+  title: string;
+  description: string;
+  actionHref?: string;
+  actionLabel?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="surface-panel-elevated rounded-[1.7rem] border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="enterprise-section-title text-base">{title}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+        {actionHref && actionLabel ? (
+          <ActionButton href={actionHref} variant="secondary" className="h-9 px-3 text-xs">
+            {actionLabel}
+          </ActionButton>
+        ) : null}
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function AttentionRow({
+  title,
+  detail,
+  value,
+  href,
+  tone,
+}: {
+  title: string;
+  detail: string;
+  value: string;
+  href: string;
+  tone: "default" | "warning" | "success" | "info" | "danger";
+}) {
+  return (
+    <Link
+      href={href}
+      className="grid gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] md:grid-cols-[minmax(0,1fr)_auto]"
+    >
+      <div>
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p>
+      </div>
+      <span
+        className={`inline-flex h-9 items-center justify-center rounded-full border px-3 text-xs font-semibold ${toneClasses(
+          tone
+        )}`}
+      >
+        {value}
+      </span>
+    </Link>
+  );
 }
 
 function ActionBucketCard({
@@ -117,22 +353,22 @@ function ActionBucketCard({
 }) {
   const toneClassName =
     tone === "warning"
-      ? "border-amber-200 bg-amber-50/80"
+      ? "border-amber-200 bg-amber-50/88"
       : tone === "success"
-      ? "border-emerald-200 bg-emerald-50/80"
+      ? "border-emerald-200 bg-emerald-50/88"
       : tone === "info"
-      ? "border-sky-200 bg-sky-50/80"
-      : "border-white/75 bg-white/80";
+      ? "border-sky-200 bg-sky-50/88"
+      : "border-border bg-[var(--surface-card-elevated)]";
 
   return (
     <article
-      className={`rounded-[1.5rem] border p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.52)] ${toneClassName}`}
+      className={`rounded-[1.5rem] border p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.44)] ${toneClassName}`}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="enterprise-eyebrow">
         {eyebrow}
       </div>
-      <h3 className="mt-2 text-base font-semibold text-slate-950">{title}</h3>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+      <h3 className="mt-2 text-base font-semibold text-foreground">{title}</h3>
+      <div className="enterprise-metric mt-3 text-foreground">
         {value}
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-700">{detail}</p>
@@ -171,6 +407,28 @@ export default function AdminDashboardPage() {
   const [supportQueue, setSupportQueue] = useState<SupportQueuePayload | null>(null);
   const [leadQueue, setLeadQueue] = useState<LeadQueuePayload | null>(null);
   const [requestQueue, setRequestQueue] = useState<RequestQueuePayload | null>(null);
+  const [branchOverview, setBranchOverview] =
+    useState<BranchReportingOverview | null>(null);
+  const [branchBreakdowns, setBranchBreakdowns] = useState<
+    BranchReportingOverview[]
+  >([]);
+  const [stockSummary, setStockSummary] = useState<StockSummaryPayload | null>(null);
+  const [purchaseDrafts, setPurchaseDrafts] =
+    useState<PurchaseBillListPayload | null>(null);
+  const [purchaseApproved, setPurchaseApproved] =
+    useState<PurchaseBillListPayload | null>(null);
+  const [salaryPayables, setSalaryPayables] =
+    useState<SalarySheetListPayload | null>(null);
+  const [expenseClaimQueue, setExpenseClaimQueue] =
+    useState<ExpenseClaimListPayload | null>(null);
+  const [serviceDeskOverview, setServiceDeskOverview] =
+    useState<ServiceDeskOverview | null>(null);
+  const [openServiceCases, setOpenServiceCases] =
+    useState<ServiceDeskCasePayload | null>(null);
+  const [pendingReminderQueue, setPendingReminderQueue] =
+    useState<ReminderQueuePayload | null>(null);
+  const [failedReminderQueue, setFailedReminderQueue] =
+    useState<ReminderQueuePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +436,7 @@ export default function AdminDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState("");
   const dashboardQuery = useMemo(
     () =>
       windowPreset === "CUSTOM"
@@ -188,6 +447,21 @@ export default function AdminDashboardPage() {
           }
         : { window: windowPreset },
     [endDate, startDate, windowPreset]
+  );
+  const branchReportingQuery = useMemo(
+    () => ({
+      branch_id: selectedBranchId || undefined,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+    }),
+    [endDate, selectedBranchId, startDate]
+  );
+  const branchScopedQuery = useMemo(
+    () => ({
+      branch: selectedBranchId || undefined,
+      page_size: 1,
+    }),
+    [selectedBranchId]
   );
 
   const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
@@ -207,6 +481,16 @@ export default function AdminDashboardPage() {
         supportQueuePayload,
         leadQueuePayload,
         requestQueuePayload,
+        branchOverviewPayload,
+        stockSummaryPayload,
+        purchaseDraftPayload,
+        purchaseApprovedPayload,
+        salaryPayablePayload,
+        expenseClaimPayload,
+        serviceDeskOverviewPayload,
+        openServiceCasePayload,
+        pendingReminderPayload,
+        failedReminderPayload,
       ] = await Promise.all([
         getAdminDashboard(),
         getDashboardSummaryV2(dashboardQuery),
@@ -223,7 +507,51 @@ export default function AdminDashboardPage() {
           page: 1,
           pageSize: 1,
         }),
+        getBranchReportingOverview(branchReportingQuery),
+        getStockSummary({ branch: selectedBranchId || undefined }),
+        listPurchaseBills({
+          ...branchScopedQuery,
+          status: "DRAFT",
+        }),
+        listPurchaseBills({
+          ...branchScopedQuery,
+          status: "APPROVED",
+        }),
+        listSalarySheets({
+          ...branchScopedQuery,
+          status: "POSTED",
+        }),
+        listExpenseClaims({
+          ...branchScopedQuery,
+          status: "POSTED",
+        }),
+        getServiceDeskOverview(),
+        listServiceDeskCases({
+          ...branchScopedQuery,
+          status: "OPEN",
+        }),
+        listReminders({
+          status: "PENDING",
+          page_size: 1,
+        }),
+        listReminders({
+          status: "FAILED",
+          page_size: 1,
+        }),
       ]);
+      const branchMetricPayloads = selectedBranchId
+        ? [branchOverviewPayload]
+        : await Promise.all(
+            branchOverviewPayload.branches
+              .filter((branch) => branch.status === "ACTIVE")
+              .slice(0, 6)
+              .map((branch) =>
+                getBranchReportingOverview({
+                  ...branchReportingQuery,
+                  branch_id: branch.id,
+                })
+              )
+          );
 
       setLegacy(legacyPayload);
       setCanonical(canonicalPayload);
@@ -236,6 +564,17 @@ export default function AdminDashboardPage() {
       setSupportQueue(supportQueuePayload);
       setLeadQueue(leadQueuePayload);
       setRequestQueue(requestQueuePayload);
+      setBranchOverview(branchOverviewPayload);
+      setBranchBreakdowns(branchMetricPayloads);
+      setStockSummary(stockSummaryPayload);
+      setPurchaseDrafts(purchaseDraftPayload);
+      setPurchaseApproved(purchaseApprovedPayload);
+      setSalaryPayables(salaryPayablePayload);
+      setExpenseClaimQueue(expenseClaimPayload);
+      setServiceDeskOverview(serviceDeskOverviewPayload);
+      setOpenServiceCases(openServiceCasePayload);
+      setPendingReminderQueue(pendingReminderPayload);
+      setFailedReminderQueue(failedReminderPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -246,12 +585,23 @@ export default function AdminDashboardPage() {
         setSupportQueue(null);
         setLeadQueue(null);
         setRequestQueue(null);
+        setBranchOverview(null);
+        setBranchBreakdowns([]);
+        setStockSummary(null);
+        setPurchaseDrafts(null);
+        setPurchaseApproved(null);
+        setSalaryPayables(null);
+        setExpenseClaimQueue(null);
+        setServiceDeskOverview(null);
+        setOpenServiceCases(null);
+        setPendingReminderQueue(null);
+        setFailedReminderQueue(null);
       }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }, [dashboardQuery]);
+  }, [branchReportingQuery, branchScopedQuery, dashboardQuery, selectedBranchId]);
 
   useEffect(() => {
     void loadDashboard("initial");
@@ -298,31 +648,100 @@ export default function AdminDashboardPage() {
     : 0;
   const supportActionCount = supportQueue?.count ?? 0;
   const onboardingActionCount = (requestQueue?.count ?? 0) + (leadQueue?.count ?? 0);
+  const selectedBranch = selectedBranchId
+    ? branchOverview?.branches.find(
+        (branch) => String(branch.id) === selectedBranchId
+      )
+    : null;
+  const selectedBranchLabel = selectedBranch
+    ? `${selectedBranch.code} · ${selectedBranch.name}`
+    : "All branches";
+  const cashTotal = toNumber(branchOverview?.collections.cash_total);
+  const bankTotal = toNumber(branchOverview?.collections.bank_total);
+  const upiTotal = toNumber(branchOverview?.collections.upi_total);
+  const stockRows = stockSummary?.results ?? [];
+  const lowStockRows = stockRows.filter((row) => row.is_below_reorder);
+  const rawMaterialLowRows = lowStockRows.filter(
+    (row) => row.stock_item_type === "RAW_MATERIAL"
+  );
+  const purchaseActionCount =
+    (purchaseDrafts?.count ?? 0) + (purchaseApproved?.count ?? 0);
+  const payrollActionCount =
+    (salaryPayables?.count ?? 0) + (expenseClaimQueue?.count ?? 0);
+  const serviceDeskActionCount =
+    openServiceCases?.count ?? serviceDeskOverview?.summary.open_count ?? 0;
+  const reminderActionCount =
+    (pendingReminderQueue?.count ?? 0) + (failedReminderQueue?.count ?? 0);
+  const customerIssueActionCount = serviceDeskActionCount + supportActionCount;
+  const attentionQueueCount =
+    (summary?.overdue_emis ?? 0) +
+    (reconciliationSurface?.flagged_count ?? 0) +
+    deliveryActionCount +
+    customerIssueActionCount +
+    purchaseActionCount +
+    payrollActionCount +
+    reminderActionCount +
+    onboardingActionCount;
+  const activeContracts =
+    branchOverview?.subscriptions.active_contracts ??
+    summary?.active_subscriptions ??
+    0;
+  const overdueEmiCount =
+    branchOverview?.subscriptions.overdue_emi_count ?? summary?.overdue_emis ?? 0;
+  const subscriptionPostureTotal = Math.max(activeContracts + overdueEmiCount, 1);
+  const nextDrawBatch = legacy?.batches.next_draw_batch ?? null;
+  const batchTotalSlots = Number(nextDrawBatch?.total_slots ?? 0);
+  const batchAvailableSlots = Number(nextDrawBatch?.available_slots ?? 0);
+  const batchFilledSlots =
+    batchTotalSlots > 0
+      ? Math.max(0, batchTotalSlots - batchAvailableSlots)
+      : Number(nextDrawBatch?.subscription_count ?? 0);
+  const batchFillTotal = Math.max(batchTotalSlots, batchFilledSlots, 1);
+  const collectionTrendRows = Array.from(
+    paymentRows
+      .slice()
+      .reverse()
+      .reduce((rows, row) => {
+        const key = formatDate(row.payment_date || row.created_at);
+        rows.set(key, (rows.get(key) ?? 0) + toNumber(row.amount));
+        return rows;
+      }, new Map<string, number>())
+  ).slice(-6);
+  const collectionTrendMax = Math.max(
+    ...collectionTrendRows.map(([, amount]) => amount),
+    1
+  );
+  const branchCollectionMax = Math.max(
+    ...branchBreakdowns.map((item) => toNumber(item.collections.gross_amount)),
+    1
+  );
 
   return (
     <PortalPage
       title="Admin Dashboard"
-      subtitle="Unified admin workspace for EMI operations, retail-ready billing, inventory control, partner finance, and governance, with canonical customer-backed finance truth preserved underneath."
+      subtitle="Enterprise operations cockpit for collections, billing, inventory, delivery, service, accounting, workforce, and branch governance."
+      helperNote="All sections below use live module data only. No operational KPI here is synthetic or detached from source modules."
+      helperTone="info"
       breadcrumbs={[{ label: "Admin" }]}
       actions={[
         {
           href: ROUTES.admin.paymentsCreate,
-          label: "Collect Payment",
+          label: "Collect EMI",
           variant: "primary",
         },
         {
           href: overdueFollowUpHref,
-          label: "Review Overdue EMI",
+          label: "Overdue EMI Queue",
           variant: "secondary",
         },
         {
           href: flaggedPaymentQueueHref,
-          label: "Flagged Reconciliation",
+          label: "Reconciliation Flags",
           variant: "secondary",
         },
         {
           href: ROUTES.admin.subscriptionsCreate,
-          label: "New Contract",
+          label: "Create Subscription",
           variant: "ghost",
         },
       ]}
@@ -361,16 +780,39 @@ export default function AdminDashboardPage() {
       }}
     >
       <div className="space-y-6">
-        <div className="flex justify-end">
-          <button
-            type="button"
+        <div className="surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+          <label className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
+            <span className="enterprise-eyebrow mb-2 block">
+              Branch scope
+            </span>
+            <select
+              value={selectedBranchId}
+              onChange={(event) => setSelectedBranchId(event.target.value)}
+              disabled={loading || refreshing}
+              className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">All branches</option>
+              {(branchOverview?.branches ?? []).map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.code} · {branch.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="text-sm text-muted-foreground">
+            <div className="enterprise-eyebrow">
+              Active scope
+            </div>
+            <div className="mt-2 font-semibold text-foreground">{selectedBranchLabel}</div>
+          </div>
+          <ActionButton
+            variant="outline"
             onClick={() => void loadDashboard("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         </div>
 
         <DashboardTimeWindowSelector
@@ -395,6 +837,379 @@ export default function AdminDashboardPage() {
 
         {!loading && !error && legacy && summary ? (
           <>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <DashboardKpiCard
+                label="Collections (Selected Scope)"
+                value={money(branchOverview?.collections.gross_amount)}
+                detail={`${branchOverview?.collections.count ?? 0} payment rows · ${selectedBranchLabel}`}
+                href={ROUTES.admin.branchReporting}
+                tone="success"
+                icon={<Banknote className="h-5 w-5 text-emerald-700" />}
+              />
+              <DashboardKpiCard
+                label="Active Lucky Plan Contracts"
+                value={String(activeContracts)}
+                detail={`${overdueEmiCount} overdue EMI rows in the same branch posture`}
+                href={ROUTES.admin.subscriptions}
+                tone={overdueEmiCount > 0 ? "warning" : "info"}
+                icon={<Users className="h-5 w-5 text-sky-700" />}
+              />
+              <DashboardKpiCard
+                label="Immediate Action Queue"
+                value={String(attentionQueueCount)}
+                detail="Overdue EMI, finance flags, reminders, service, procurement, payroll, and onboarding exceptions"
+                href={overdueFollowUpHref}
+                tone={attentionQueueCount > 0 ? "warning" : "success"}
+                icon={<Siren className="h-5 w-5 text-amber-700" />}
+              />
+              <DashboardKpiCard
+                label="Stock Alert Queue"
+                value={String(lowStockRows.length)}
+                detail={`${rawMaterialLowRows.length} raw-material alert(s) from real inventory summary`}
+                href={ROUTES.admin.inventoryStockOnHand}
+                tone={lowStockRows.length > 0 ? "warning" : "success"}
+                icon={<PackageSearch className="h-5 w-5 text-slate-700" />}
+              />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+              <CockpitPanel
+                title="Needs Immediate Action"
+                description="Priority exceptions are listed first so operations teams can resolve overdue, reconciliation, reminder, service, and back-office queues before secondary analytics."
+                actionHref={overdueFollowUpHref}
+                actionLabel="Open overdue queue"
+              >
+                <div className="space-y-3">
+                  <AttentionRow
+                    title="Overdue EMI follow-up"
+                    detail={`${money(branchOverview?.subscriptions.overdue_emi_amount ?? summary.overdue_amount)} currently overdue.`}
+                    value={String(overdueEmiCount)}
+                    href={overdueFollowUpHref}
+                    tone={overdueEmiCount > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Finance reconciliation flags"
+                    detail="Controlled review queue for mismatched payment/subscription rows."
+                    value={String(reconciliationSurface?.flagged_count ?? 0)}
+                    href={flaggedPaymentQueueHref}
+                    tone={(reconciliationSurface?.flagged_count ?? 0) > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Reminder dispatch backlog"
+                    detail={`${pendingReminderQueue?.count ?? 0} pending and ${failedReminderQueue?.count ?? 0} failed reminder(s) need operator action.`}
+                    value={String(reminderActionCount)}
+                    href={ROUTES.admin.reminders}
+                    tone={reminderActionCount > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Delivery queue"
+                    detail="Pending, scheduled, and in-transit deliveries that still need action."
+                    value={String(deliveryActionCount)}
+                    href={deliveryQueueHref}
+                    tone={deliveryActionCount > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Service desk / complaint queue"
+                    detail={`${serviceDeskOverview?.summary.finance_pending_count ?? 0} finance-pending and ${serviceDeskOverview?.summary.stock_pending_count ?? 0} stock-pending service cases.`}
+                    value={String(customerIssueActionCount)}
+                    href={ROUTES.admin.serviceDesk}
+                    tone={customerIssueActionCount > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Purchase and payroll posture"
+                    detail={`${purchaseActionCount} purchase bill(s), ${payrollActionCount} salary/reimbursement item(s) need controlled follow-up.`}
+                    value={String(purchaseActionCount + payrollActionCount)}
+                    href={ROUTES.admin.accounting}
+                    tone={purchaseActionCount + payrollActionCount > 0 ? "warning" : "success"}
+                  />
+                  <AttentionRow
+                    title="Lead and onboarding follow-up"
+                    detail={`${requestQueue?.count ?? 0} subscription request(s) and ${leadQueue?.count ?? 0} lead(s) need conversion or closure.`}
+                    value={String(onboardingActionCount)}
+                    href={onboardingRequestsHref}
+                    tone={onboardingActionCount > 0 ? "warning" : "success"}
+                  />
+                </div>
+              </CockpitPanel>
+
+              <CockpitPanel
+                title="Collections cockpit"
+                description="Branch and payment-mode posture from actual payment rows in branch-control reporting."
+                actionHref={ROUTES.admin.branchReporting}
+                actionLabel="Open branch report"
+              >
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Payment mode split
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-slate-950">
+                      {money(cashTotal + bankTotal + upiTotal)}
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Cash, bank/card, and UPI totals for the selected branch/date scope.
+                    </p>
+                    <div className="mt-5">
+                      <PaymentModeSplit cash={cashTotal} bank={bankTotal} upi={upiTotal} />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Branch-wise collections
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Existing branch reporting endpoint sampled per active branch.
+                        </p>
+                      </div>
+                      <Building2 className="h-5 w-5 text-slate-400" />
+                    </div>
+                    {branchBreakdowns.length > 0 ? (
+                      <div className="space-y-3">
+                        {branchBreakdowns.map((branchPayload) => (
+                          <HorizontalBar
+                            key={branchPayload.branch?.id ?? "all"}
+                            label={
+                              branchPayload.branch
+                                ? `${branchPayload.branch.code} · ${branchPayload.branch.name}`
+                                : "All branches"
+                            }
+                            value={toNumber(branchPayload.collections.gross_amount)}
+                            total={branchCollectionMax}
+                            meta={money(branchPayload.collections.gross_amount)}
+                            tone="success"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="No branch collection rows"
+                        description="Branch reporting did not return active branch rows for this scope."
+                      />
+                    )}
+                  </div>
+                </div>
+              </CockpitPanel>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <CockpitPanel
+                title="Lucky Plan posture"
+                description="Active contracts, overdue pressure, and next batch readiness stay separate from billing/accounting truth."
+                actionHref={ROUTES.admin.batches}
+                actionLabel="Open batches"
+              >
+                <div className="space-y-5">
+                  <HorizontalBar
+                    label="Active contracts"
+                    value={activeContracts}
+                    total={subscriptionPostureTotal}
+                    meta={`${activeContracts} active`}
+                    tone="info"
+                  />
+                  <HorizontalBar
+                    label="Overdue EMI pressure"
+                    value={overdueEmiCount}
+                    total={subscriptionPostureTotal}
+                    meta={`${overdueEmiCount} overdue`}
+                    tone={overdueEmiCount > 0 ? "warning" : "success"}
+                  />
+                  <HorizontalBar
+                    label={nextDrawBatch?.batch_code ?? "Next draw batch"}
+                    value={batchFilledSlots}
+                    total={batchFillTotal}
+                    meta={
+                      batchTotalSlots > 0
+                        ? `${batchFilledSlots}/${batchTotalSlots} filled`
+                        : `${batchFilledSlots} subscriptions`
+                    }
+                    tone="success"
+                  />
+                </div>
+              </CockpitPanel>
+
+              <CockpitPanel
+                title="Inventory and raw materials"
+                description="Stock and reorder posture comes from product-backed inventory summary."
+                actionHref={ROUTES.admin.inventoryStockOnHand}
+                actionLabel="Open stock"
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <StatCard
+                    label="Stock Rows"
+                    value={String(stockSummary?.count ?? 0)}
+                    subtext={`${branchOverview?.stock.location_count ?? 0} stock locations in scope`}
+                    tone="default"
+                    className="rounded-2xl p-4"
+                  />
+                  <StatCard
+                    label="Below Reorder"
+                    value={String(lowStockRows.length)}
+                    subtext="Inventory items below reorder level"
+                    tone={lowStockRows.length > 0 ? "warning" : "success"}
+                    className="rounded-2xl p-4"
+                  />
+                  <StatCard
+                    label="Raw Alerts"
+                    value={String(rawMaterialLowRows.length)}
+                    subtext="Raw-material-compatible items"
+                    tone={rawMaterialLowRows.length > 0 ? "warning" : "success"}
+                    className="rounded-2xl p-4"
+                  />
+                </div>
+                {lowStockRows.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {lowStockRows.slice(0, 4).map((row: StockSummaryRow) => (
+                      <div
+                        key={row.item_id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-sm"
+                      >
+                        <span className="min-w-0 truncate font-medium text-amber-950">
+                          {row.product_code} · {row.product_name}
+                        </span>
+                        <span className="shrink-0 text-xs font-semibold text-amber-700">
+                          {formatQuantity(row.on_hand_qty)} / {formatQuantity(row.reorder_level_qty)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+                    No reorder alerts returned by the current stock summary.
+                  </div>
+                )}
+              </CockpitPanel>
+
+              <CockpitPanel
+                title="Back-office finance posture"
+                description="Procurement, salary, and reimbursement signals remain source-linked to accounting workflows."
+                actionHref={ROUTES.admin.accounting}
+                actionLabel="Open accounting"
+              >
+                <div className="grid gap-3">
+                  <StatCard
+                    label="Purchase Drafts"
+                    value={String(purchaseDrafts?.count ?? 0)}
+                    subtext={`${purchaseApproved?.count ?? 0} approved purchase bill(s) awaiting next step`}
+                    tone={(purchaseActionCount ?? 0) > 0 ? "warning" : "success"}
+                    icon={<ShoppingCart className="h-5 w-5" />}
+                    className="rounded-2xl p-4"
+                  />
+                  <StatCard
+                    label="Salary Payables"
+                    value={String(salaryPayables?.count ?? 0)}
+                    subtext={`${money(branchOverview?.people_costs.salary_paid_total)} salary paid in scope`}
+                    tone={(salaryPayables?.count ?? 0) > 0 ? "warning" : "success"}
+                    icon={<CreditCard className="h-5 w-5" />}
+                    className="rounded-2xl p-4"
+                  />
+                  <StatCard
+                    label="Reimbursements"
+                    value={String(expenseClaimQueue?.count ?? 0)}
+                    subtext={`${money(branchOverview?.people_costs.reimbursement_total)} reimbursed in scope`}
+                    tone={(expenseClaimQueue?.count ?? 0) > 0 ? "warning" : "success"}
+                    icon={<Wallet className="h-5 w-5" />}
+                    className="rounded-2xl p-4"
+                  />
+                </div>
+              </CockpitPanel>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <CockpitPanel
+                title="Recent collections trend"
+                description="Compact trend built from the real recent-payment surface in this dashboard window."
+                actionHref={ROUTES.admin.payments}
+                actionLabel="Open payments"
+              >
+                {collectionTrendRows.length > 0 ? (
+                  <div className="flex min-h-48 items-end gap-3">
+                    {collectionTrendRows.map(([label, amount]) => (
+                      <div key={label} className="flex flex-1 flex-col items-center gap-2">
+                        <div
+                          className="w-full rounded-t-xl bg-gradient-to-t from-emerald-600 to-emerald-300"
+                          style={{
+                            height: `${Math.max(12, asPercent(amount, collectionTrendMax) * 1.55)}px`,
+                          }}
+                          title={`${label}: ${money(amount)}`}
+                        />
+                        <div className="text-center text-[11px] font-medium text-slate-500">
+                          {label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No recent payment trend"
+                    description="The selected dashboard window has no recent payment rows to chart."
+                  />
+                )}
+              </CockpitPanel>
+
+              <CockpitPanel
+                title="Quick Operational Actions"
+                description="Open canonical workflows directly from the cockpit without duplicating operational posting logic."
+              >
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    {
+                      label: "Create subscription",
+                      href: ROUTES.admin.subscriptionsCreate,
+                      icon: <Users className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Collect EMI",
+                      href: ROUTES.admin.paymentsCreate,
+                      icon: <CreditCard className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Create direct sale",
+                      href: ROUTES.admin.billingDirectSales,
+                      icon: <ShoppingCart className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Invoice & receipt desk",
+                      href: ROUTES.admin.billingRegister,
+                      icon: <CheckCircle2 className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Create purchase bill",
+                      href: ROUTES.admin.accountingPurchaseBills,
+                      icon: <Factory className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Stock adjustment",
+                      href: ROUTES.admin.inventoryAdjustments,
+                      icon: <PackageSearch className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Branch dashboard",
+                      href: ROUTES.admin.branchReporting,
+                      icon: <BarChart3 className="h-4 w-4" />,
+                    },
+                    {
+                      label: "Delivery queue",
+                      href: deliveryQueueHref,
+                      icon: <Truck className="h-4 w-4" />,
+                    },
+                  ].map((action) => (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                    >
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-[var(--surface-muted)] text-muted-foreground">
+                        {action.icon}
+                      </span>
+                      {action.label}
+                    </Link>
+                  ))}
+                </div>
+              </CockpitPanel>
+            </div>
+
             <WorkspaceSection
               title="Daily action buckets"
               description="Each bucket opens the existing canonical operational workspace with live filters applied, so admin can move directly from summary posture into the real queue."
@@ -771,7 +1586,7 @@ export default function AdminDashboardPage() {
                     {dueRows.map((row) => (
                       <div
                         key={`${row.subscription_id ?? row.id}-${row.emi_id ?? "na"}`}
-                        className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
+                        className="grid gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -828,7 +1643,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center md:justify-end">
                           <Link
                             href={buildAdminSubscriptionRoute(row.subscription_id ?? row.id)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
                           >
                             Open
                             <ArrowRight className="h-4 w-4" />
@@ -876,7 +1691,7 @@ export default function AdminDashboardPage() {
                     {paymentRows.map((row) => (
                       <div
                         key={row.payment_id}
-                        className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
+                        className="grid gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -928,7 +1743,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center md:justify-end">
                           <Link
                             href={buildAdminPaymentRoute(row.payment_id)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
                           >
                             View
                             <ArrowRight className="h-4 w-4" />
@@ -956,7 +1771,7 @@ export default function AdminDashboardPage() {
                     {flaggedRows.map((row) => (
                       <div
                         key={row.subscription_id}
-                        className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
+                        className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)]"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -1020,7 +1835,7 @@ export default function AdminDashboardPage() {
               {ADMIN_ENTERPRISE_MODULES.map((item) => (
                 <article
                   key={item.key}
-                  className="rounded-[1.45rem] border border-white/75 bg-white/75 px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.52)]"
+                  className="rounded-[1.45rem] border border-border bg-[var(--surface-card-elevated)] px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -1034,13 +1849,13 @@ export default function AdminDashboardPage() {
                         {item.description}
                       </p>
                     </div>
-                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                    <span className="inline-flex rounded-full border border-border bg-[var(--surface-muted)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Canonical
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-[1.1rem] border border-white/80 bg-white/80 px-4 py-3">
+                    <div className="rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Operational focus
                       </div>
@@ -1048,7 +1863,7 @@ export default function AdminDashboardPage() {
                         {item.operationalFocus}
                       </div>
                     </div>
-                    <div className="rounded-[1.1rem] border border-white/80 bg-white/80 px-4 py-3">
+                    <div className="rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Master-data direction
                       </div>

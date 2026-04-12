@@ -18,8 +18,8 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     };
 
     const variantClasses = {
-      default: "border border-border bg-card shadow-sm",
-      bordered: "border border-border bg-card",
+      default: "surface-panel border border-border bg-card shadow-sm",
+      bordered: "surface-panel border border-border bg-card",
       ghost: "border-0 bg-transparent shadow-none",
     };
 

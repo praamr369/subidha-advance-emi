@@ -201,3 +201,19 @@ export function buildAdminDeliveryRoute(id: number | string): string {
 export function buildAdminBillingDocumentRoute(id: number | string): string {
   return `${ROUTES.admin.billingDocuments}/${id}`;
 }
+
+export function buildAdminCrmPartyRoute(id: number | string): string {
+  return `${ROUTES.admin.crmParties}/${id}`;
+}
+
+export function buildAdminServiceDeskCaseRoute(id: number | string): string {
+  return `${ROUTES.admin.serviceDeskCases}/${id}`;
+}
+
+export function buildAdminManufacturingJobRoute(id: number | string): string {
+  return `${ROUTES.admin.manufacturingJobs}/${id}`;
+}
+
+export function buildAdminSalarySheetRoute(id: number | string): string {
+  return `${ROUTES.admin.accountingSalary}/${id}`;
+}

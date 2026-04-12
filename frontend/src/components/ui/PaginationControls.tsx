@@ -29,15 +29,19 @@ export default function PaginationControls({
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-muted-foreground">
-        Showing {startRow}-{endRow} of {count} results · Page {safePage} of {safeNumPages}
+        Showing <span className="font-semibold text-foreground">{startRow}-{endRow}</span> of{" "}
+        <span className="font-semibold text-foreground">{count}</span> results
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-xs font-semibold text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+          Page {safePage} of {safeNumPages}
+        </span>
         <button
           type="button"
           onClick={onPrevious}
           disabled={disabled || !hasPrevious}
-          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Previous
         </button>
@@ -45,7 +49,7 @@ export default function PaginationControls({
           type="button"
           onClick={onNext}
           disabled={disabled || !hasNext}
-          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Next
         </button>

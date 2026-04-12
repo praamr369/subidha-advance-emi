@@ -7,6 +7,8 @@ export type PaymentCollectionPayload = {
   amount: string;
   payment_method: PaymentMethod;
   payment_date: string;
+  branch_id?: number;
+  cash_counter_id?: number;
   reference_no?: string;
   notes?: string;
 };
@@ -21,6 +23,12 @@ export type PaymentCollectionResult = {
     amount: string;
     method?: PaymentMethod;
     payment_method?: PaymentMethod;
+    branch_id?: number | null;
+    branch_code?: string | null;
+    branch_name?: string | null;
+    cash_counter_id?: number | null;
+    cash_counter_code?: string | null;
+    cash_counter_name?: string | null;
     payment_date: string;
     reference_no?: string | null;
     notes?: string | null;
@@ -81,6 +89,12 @@ export type AdminEmiCollectionCandidate = {
 export type PaymentRegisterRow = {
   id: number;
   amount: string;
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter_id?: number | null;
+  cash_counter_code?: string | null;
+  cash_counter_name?: string | null;
   method?: string;
   reference_no?: string | null;
   payment_date?: string;
@@ -123,6 +137,12 @@ export type PaymentRecord = {
   emi_month_no?: number | null;
   batch?: number | null;
   batch_code?: string | null;
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter_id?: number | null;
+  cash_counter_code?: string | null;
+  cash_counter_name?: string | null;
   lucky_number?: number | null;
   amount: string;
   method: string;
@@ -275,6 +295,24 @@ function normalizePaymentRegisterRow(row: RawPaymentRegisterRow): PaymentRegiste
   return {
     id: Number(row.id ?? 0),
     amount: String(row.amount ?? "0.00"),
+    branch_id: toNumberOrNull(row.branch_id),
+    branch_code:
+      typeof row.branch_code === "string" || row.branch_code === null
+        ? (row.branch_code as string | null)
+        : undefined,
+    branch_name:
+      typeof row.branch_name === "string" || row.branch_name === null
+        ? (row.branch_name as string | null)
+        : undefined,
+    cash_counter_id: toNumberOrNull(row.cash_counter_id),
+    cash_counter_code:
+      typeof row.cash_counter_code === "string" || row.cash_counter_code === null
+        ? (row.cash_counter_code as string | null)
+        : undefined,
+    cash_counter_name:
+      typeof row.cash_counter_name === "string" || row.cash_counter_name === null
+        ? (row.cash_counter_name as string | null)
+        : undefined,
     method: typeof row.method === "string" ? row.method : undefined,
     reference_no:
       typeof row.reference_no === "string" || row.reference_no === null
@@ -360,6 +398,24 @@ function normalizePaymentRecord(row: Record<string, unknown>): PaymentRecord {
     batch_code:
       typeof row.batch_code === "string" || row.batch_code === null
         ? (row.batch_code as string | null)
+        : undefined,
+    branch_id: toNumberOrNull(row.branch_id),
+    branch_code:
+      typeof row.branch_code === "string" || row.branch_code === null
+        ? (row.branch_code as string | null)
+        : undefined,
+    branch_name:
+      typeof row.branch_name === "string" || row.branch_name === null
+        ? (row.branch_name as string | null)
+        : undefined,
+    cash_counter_id: toNumberOrNull(row.cash_counter_id),
+    cash_counter_code:
+      typeof row.cash_counter_code === "string" || row.cash_counter_code === null
+        ? (row.cash_counter_code as string | null)
+        : undefined,
+    cash_counter_name:
+      typeof row.cash_counter_name === "string" || row.cash_counter_name === null
+        ? (row.cash_counter_name as string | null)
         : undefined,
     lucky_number: toNumberOrNull(row.lucky_number),
     amount: String(row.amount ?? "0.00"),
