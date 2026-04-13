@@ -1,9 +1,16 @@
 import Link from "next/link";
-import { LockKeyhole, ScrollText, ShieldCheck, UserPlus, Users, Wallet } from "lucide-react";
+import { Building2, LockKeyhole, ScrollText, ShieldCheck, UserPlus, Users, Wallet } from "lucide-react";
 
 import PageHeader from "@/components/ui/PageHeader";
 
 const controls = [
+  {
+    title: "Business setup",
+    description:
+      "Configure business profile, branches, finance accounts, cash desks, staff setup, and go-live readiness.",
+    href: "/admin/settings/business-setup",
+    icon: <Building2 className="h-5 w-5" />,
+  },
   {
     title: "Internal user list",
     description:

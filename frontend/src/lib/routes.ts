@@ -49,19 +49,18 @@ export const ROUTES = {
     settings: "/admin/settings",
     settingsUsers: "/admin/settings/users",
     settingsUsersCreate: "/admin/settings/users/create",
+    settingsBusinessSetup: "/admin/settings/business-setup",
+    settingsBusinessSetupProfile: "/admin/settings/business-setup/profile",
+    settingsBusinessSetupBranches: "/admin/settings/business-setup/branches",
+    settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
+    settingsBusinessSetupCashDesks: "/admin/settings/business-setup/cash-desks",
+    settingsBusinessSetupStaff: "/admin/settings/business-setup/staff",
+    settingsBusinessSetupChartAccounts: "/admin/settings/business-setup/chart-accounts",
+    settingsBusinessSetupChecklist: "/admin/settings/business-setup/checklist",
 
-    /**
-     * Compatibility aliases.
-     * Keep these temporarily so older imports do not break while the app is normalized.
-     */
     luckyDraw: "/admin/lucky-draws",
     reconciliation: "/admin/reconciliation",
 
-    /**
-     * Legacy paths that still exist in the app today.
-     * Keep legacy path constants explicit for compatibility pages while older
-     * helper names continue to resolve to canonical routes.
-     */
     legacyLuckyDraw: "/admin/lucky-draw",
     legacyLuckyDrawHistory: "/admin/lucky-draw/history",
     legacyFinanceReconciliation: "/admin/finance/reconciliation",
@@ -86,10 +85,6 @@ export const ROUTES = {
     deliveries: "/customer/deliveries",
     profile: "/customer/profile",
     support: "/customer/support",
-    /**
-     * Compatibility alias. The live EMI truth stays under subscriptions and
-     * subscription detail, so this route remains redirect-only for older links.
-     */
     emis: "/customer/emis",
     payments: "/customer/payments",
   },
