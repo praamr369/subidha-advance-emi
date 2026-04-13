@@ -1,6 +1,16 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from api.v1.views.admin_business_setup import (
+    AdminBusinessProfileView,
+    BranchAdminViewSet,
+    BusinessSetupChecklistView,
+    BusinessSetupResetPreviewView,
+    CashDeskAdminViewSet,
+    ChartAccountAdminViewSet,
+    FinanceAccountAdminViewSet,
+    StaffOperationalAssignmentAdminViewSet,
+)
 from api.v1.views.admin_commissions import (
     AdminCommissionBulkSettleView,
     AdminCommissionListView,
@@ -88,17 +98,25 @@ from api.v1.views.admin_support_requests import (
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
+router.register(r"branches", BranchAdminViewSet, basename="admin-branches")
+router.register(r"cash-desks", CashDeskAdminViewSet, basename="admin-cash-desks")
+router.register(r"chart-accounts", ChartAccountAdminViewSet, basename="admin-chart-accounts")
 router.register(r"customers", CustomerAdminViewSet, basename="admin-customers")
 router.register(r"emis", EmiAdminViewSet, basename="admin-emis")
+router.register(r"finance-accounts", FinanceAccountAdminViewSet, basename="admin-finance-accounts")
 router.register(r"lucky-draws", LuckyDrawAdminViewSet, basename="admin-lucky-draws")
 router.register(r"lucky-ids", LuckyIdAdminViewSet, basename="admin-lucky-ids")
 router.register(r"partners", PartnerAdminListViewSet, basename="admin-partners")
 router.register(r"payments", PaymentAdminViewSet, basename="admin-payments")
 router.register(r"products", ProductAdminViewSet, basename="admin-products")
+router.register(r"staff-operational-assignments", StaffOperationalAssignmentAdminViewSet, basename="admin-staff-operational-assignments")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("business-profile/", AdminBusinessProfileView.as_view()),
+    path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
+    path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("dashboard/", AdminDashboardView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
