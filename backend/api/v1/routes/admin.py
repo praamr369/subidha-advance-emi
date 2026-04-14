@@ -1,6 +1,16 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from api.v1.views.admin_business_setup import (
+    AdminBusinessProfileView,
+    BranchAdminViewSet,
+    BusinessSetupChecklistView,
+    BusinessSetupResetPreviewView,
+    CashDeskAdminViewSet,
+    ChartAccountAdminViewSet,
+    FinanceAccountAdminViewSet,
+    StaffOperationalAssignmentAdminViewSet,
+)
 from api.v1.views.admin_commissions import (
     AdminCommissionBulkSettleView,
     AdminCommissionListView,
@@ -62,9 +72,6 @@ from api.v1.views.admin_resources import (
     PartnerAdminListViewSet,
     PaymentAdminViewSet,
     ProductAdminViewSet,
-    ProductCategoryMasterViewSet,
-    ProductSubcategoryMasterViewSet,
-    ProductUnitOfMeasureMasterViewSet,
 )
 from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
@@ -80,17 +87,6 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
 )
-from api.v1.views.admin_otp_delivery import AdminOtpDeliveryReadinessView
-from api.v1.views.admin_reports import (
-    AdminBatchPerformanceAggregateView,
-    AdminBatchPerformanceSummaryView,
-    AdminEmiAggregateView,
-    AdminEmiSummaryView,
-    AdminPartnerAggregateView,
-    AdminReconciliationAttentionAggregateView,
-    AdminRevenueAggregateView,
-    AdminRevenueSummaryView,
-)
 from api.v1.views.admin_support_requests import (
     AdminSupportRequestAssignView,
     AdminSupportRequestDetailView,
@@ -99,39 +95,29 @@ from api.v1.views.admin_support_requests import (
     AdminSupportRequestResolveView,
     AdminSupportRequestStatusUpdateView,
 )
-from api.v1.views.subscription_requests import (
-    AdminSubscriptionRequestApproveView,
-    AdminSubscriptionRequestDetailView,
-    AdminSubscriptionRequestListView,
-    AdminSubscriptionRequestOptionsView,
-    AdminSubscriptionRequestRejectView,
-)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
+router.register(r"branches", BranchAdminViewSet, basename="admin-branches")
+router.register(r"cash-desks", CashDeskAdminViewSet, basename="admin-cash-desks")
+router.register(r"chart-accounts", ChartAccountAdminViewSet, basename="admin-chart-accounts")
 router.register(r"customers", CustomerAdminViewSet, basename="admin-customers")
 router.register(r"emis", EmiAdminViewSet, basename="admin-emis")
+router.register(r"finance-accounts", FinanceAccountAdminViewSet, basename="admin-finance-accounts")
 router.register(r"lucky-draws", LuckyDrawAdminViewSet, basename="admin-lucky-draws")
 router.register(r"lucky-ids", LuckyIdAdminViewSet, basename="admin-lucky-ids")
 router.register(r"partners", PartnerAdminListViewSet, basename="admin-partners")
 router.register(r"payments", PaymentAdminViewSet, basename="admin-payments")
 router.register(r"products", ProductAdminViewSet, basename="admin-products")
-router.register(r"product-categories", ProductCategoryMasterViewSet, basename="admin-product-categories")
-router.register(r"product-subcategories", ProductSubcategoryMasterViewSet, basename="admin-product-subcategories")
-router.register(r"product-units", ProductUnitOfMeasureMasterViewSet, basename="admin-product-units")
+router.register(r"staff-operational-assignments", StaffOperationalAssignmentAdminViewSet, basename="admin-staff-operational-assignments")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("business-profile/", AdminBusinessProfileView.as_view()),
+    path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
+    path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("dashboard/", AdminDashboardView.as_view()),
-    path("reports/revenue-aggregate/", AdminRevenueAggregateView.as_view()),
-    path("reports/revenue-summary/", AdminRevenueSummaryView.as_view()),
-    path("reports/emi-aggregate/", AdminEmiAggregateView.as_view()),
-    path("reports/emi-summary/", AdminEmiSummaryView.as_view()),
-    path("reports/batch-performance-aggregate/", AdminBatchPerformanceAggregateView.as_view()),
-    path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
-    path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
-    path("reports/partner-aggregate/", AdminPartnerAggregateView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
     path("deliveries/<int:pk>/", AdminDeliveryDetailView.as_view()),
@@ -153,11 +139,6 @@ urlpatterns = [
     path("support-requests/<int:pk>/assign/", AdminSupportRequestAssignView.as_view()),
     path("support-requests/<int:pk>/notes/", AdminSupportRequestNoteUpdateView.as_view()),
     path("support-requests/<int:pk>/resolve/", AdminSupportRequestResolveView.as_view()),
-    path("subscription-request-options/", AdminSubscriptionRequestOptionsView.as_view()),
-    path("subscription-requests/", AdminSubscriptionRequestListView.as_view()),
-    path("subscription-requests/<int:pk>/", AdminSubscriptionRequestDetailView.as_view()),
-    path("subscription-requests/<int:pk>/approve/", AdminSubscriptionRequestApproveView.as_view()),
-    path("subscription-requests/<int:pk>/reject/", AdminSubscriptionRequestRejectView.as_view()),
     path("internal-users/", AdminInternalUserListView.as_view()),
     path("internal-users/create/", AdminInternalUserCreateView.as_view()),
     path("internal-users/<int:pk>/", AdminInternalUserDetailView.as_view()),
@@ -165,7 +146,6 @@ urlpatterns = [
     path("internal-users/<int:pk>/deactivate/", AdminInternalUserDeactivateView.as_view()),
     path("internal-users/<int:pk>/reset-password/", AdminInternalUserPasswordResetView.as_view()),
     path("internal-users/<int:pk>/audit/", AdminInternalUserAuditView.as_view()),
-    path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
     path("", include("api.v1.routes.admin_password_reset_requests")),
     path("commissions/<int:pk>/settle/", AdminCommissionSettleView.as_view()),
     path("commissions/", AdminCommissionListView.as_view()),
