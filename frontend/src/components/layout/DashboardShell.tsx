@@ -199,15 +199,19 @@ function getRoleBasePath(role: NavigationRole) {
 }
 
 function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
-  return groups.map((group) => ({
-    title: group.title,
-    icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
-    items: group.items.map((item) => ({
-      label: item.label,
-      href: item.href,
-      icon: ICON_MAP[item.icon],
-    })),
-  }));
+  return groups
+    .map((group) => ({
+      title: group.title,
+      icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
+      items: group.items
+        .filter((item) => typeof item.href === "string" && item.href.trim().length > 0)
+        .map((item) => ({
+          label: item.label,
+          href: item.href,
+          icon: ICON_MAP[item.icon],
+        })),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 function getRoleWorkspaceLabel(role: NavigationRole) {
@@ -609,7 +613,7 @@ function Sidebar({
 
                         return (
                           <Link
-                            key={item.href}
+                            key={`${group.title}:${item.href}:${item.label}`}
                             href={item.href}
                             onClick={isMobile ? onClose : undefined}
                             className={cn(
