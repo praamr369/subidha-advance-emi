@@ -35,6 +35,20 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to save cash desk.";
 }
 
+function getDeskTypeDefaults(deskType: string) {
+  switch (deskType) {
+    case "BANK":
+      return { allow_cash_collection: false, allow_bank_collection: true, allow_upi_collection: false };
+    case "UPI":
+      return { allow_cash_collection: false, allow_bank_collection: false, allow_upi_collection: true };
+    case "MIXED":
+      return { allow_cash_collection: true, allow_bank_collection: false, allow_upi_collection: false };
+    case "CASH":
+    default:
+      return { allow_cash_collection: true, allow_bank_collection: false, allow_upi_collection: false };
+  }
+}
+
 export default function CashDesksPage() {
   const [records, setRecords] = useState<CashDeskRecord[]>([]);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
@@ -60,34 +74,43 @@ export default function CashDesksPage() {
   }
 
   useEffect(() => {
-    void loadData();
-  }, []);
+    let isMounted = true;
 
-  useEffect(() => {
-    if (form.desk_type === "CASH") {
-      setForm((current) => ({ ...current, allow_cash_collection: true }));
-    }
-    if (form.desk_type === "BANK") {
-      setForm((current) => ({ ...current, allow_bank_collection: true, allow_cash_collection: false, allow_upi_collection: false }));
-    }
-    if (form.desk_type === "UPI") {
-      setForm((current) => ({ ...current, allow_upi_collection: true, allow_cash_collection: false, allow_bank_collection: false }));
-    }
-  }, [form.desk_type]);
+    Promise.all([listCashDesks(), listBranches(), listFinanceAccounts()])
+      .then(([cashDesks, branchRecords, financeAccounts]) => {
+        if (!isMounted) {
+          return;
+        }
+        setRecords(cashDesks);
+        setBranches(branchRecords);
+        setAccounts(financeAccounts.filter((account) => account.is_active));
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setMessage(toErrorMessage(error));
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const target = event.target;
-    const value =
-      target instanceof HTMLInputElement && target.type === "checkbox"
-        ? target.checked
-        : target.value;
+    const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
+
+    if (target.name === "desk_type") {
+      const deskType = String(value);
+      setForm((current) => ({ ...current, desk_type: deskType, ...getDeskTypeDefaults(deskType) }));
+      return;
+    }
 
     setForm((current) => ({
       ...current,
-      [target.name]:
-        target.name === "branch" || target.name === "default_finance_account"
-          ? Number(value)
-          : value,
+      [target.name]: target.name === "branch" || target.name === "default_finance_account" ? Number(value) : value,
     }));
   }
 
@@ -118,17 +141,11 @@ export default function CashDesksPage() {
     }
   }
 
-  const activeAccounts = useMemo(
-    () => accounts.filter((account) => account.is_active),
-    [accounts]
-  );
+  const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Cash desks"
-        description="Map branch-level collection desks to active operational finance accounts."
-      />
+      <PageHeader title="Cash desks" description="Map branch-level collection desks to active operational finance accounts." />
       <BusinessSetupLinks />
       {message ? <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">{message}</div> : null}
 
@@ -140,9 +157,7 @@ export default function CashDesksPage() {
             <input name="name" value={form.name || ""} onChange={handleChange} placeholder="Name" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" />
             <select name="branch" value={form.branch || 0} onChange={handleChange} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
               <option value={0}>Select branch</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>{branch.name}</option>
-              ))}
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
             <select name="desk_type" value={form.desk_type || "CASH"} onChange={handleChange} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
               <option value="CASH">Cash</option>
@@ -152,9 +167,7 @@ export default function CashDesksPage() {
             </select>
             <select name="default_finance_account" value={form.default_finance_account || 0} onChange={handleChange} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
               <option value={0}>Select finance account</option>
-              {activeAccounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
+              {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
             <label className="flex items-center gap-3 text-sm"><input type="checkbox" name="allow_cash_collection" checked={Boolean(form.allow_cash_collection)} onChange={handleChange} />Allow cash collection</label>
             <label className="flex items-center gap-3 text-sm"><input type="checkbox" name="allow_bank_collection" checked={Boolean(form.allow_bank_collection)} onChange={handleChange} />Allow bank collection</label>

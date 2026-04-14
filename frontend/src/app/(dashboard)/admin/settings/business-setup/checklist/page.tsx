@@ -16,19 +16,28 @@ export default function BusinessSetupChecklistPage() {
   const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadData() {
-    try {
-      const [checklist, resetPreview] = await Promise.all([getSetupChecklist(), getResetPreview()]);
-      setData(checklist);
-      setPreview(resetPreview);
-      setError(null);
-    } catch (loadError) {
-      setError(toErrorMessage(loadError));
-    }
-  }
-
   useEffect(() => {
-    void loadData();
+    let isMounted = true;
+
+    Promise.all([getSetupChecklist(), getResetPreview()])
+      .then(([checklist, resetPreview]) => {
+        if (!isMounted) {
+          return;
+        }
+        setData(checklist);
+        setPreview(resetPreview);
+        setError(null);
+      })
+      .catch((loadError) => {
+        if (!isMounted) {
+          return;
+        }
+        setError(toErrorMessage(loadError));
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

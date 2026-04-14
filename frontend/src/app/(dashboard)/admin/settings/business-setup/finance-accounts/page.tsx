@@ -47,7 +47,26 @@ export default function FinanceAccountsPage() {
   }
 
   useEffect(() => {
-    void loadRecords();
+    let isMounted = true;
+
+    listFinanceAccounts()
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+        setRecords(data);
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setMessage(toErrorMessage(error));
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   function handleChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {

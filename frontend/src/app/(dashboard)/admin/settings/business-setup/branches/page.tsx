@@ -53,7 +53,26 @@ export default function BranchesPage() {
   }
 
   useEffect(() => {
-    void loadBranches();
+    let isMounted = true;
+
+    listBranches()
+      .then((records) => {
+        if (!isMounted) {
+          return;
+        }
+        setBranches(records);
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setMessage(toErrorMessage(error));
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   function handleChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {

@@ -68,7 +68,29 @@ export default function StaffSetupPage() {
   }
 
   useEffect(() => {
-    void loadData();
+    let isMounted = true;
+
+    Promise.all([listStaffAssignments(), listInternalUsers(), listBranches(), listCashDesks()])
+      .then(([assignmentRecords, internalUsers, branchRecords, deskRecords]) => {
+        if (!isMounted) {
+          return;
+        }
+        setRecords(assignmentRecords);
+        setUsers(internalUsers.results);
+        setBranches(branchRecords);
+        setCashDesks(deskRecords.filter((desk) => desk.is_active));
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setMessage(toErrorMessage(error));
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredCashDesks = useMemo(() => {

@@ -45,7 +45,26 @@ export default function ChartAccountsPage() {
   }
 
   useEffect(() => {
-    void loadData();
+    let isMounted = true;
+
+    listChartAccounts()
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+        setRecords(data);
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setMessage(toErrorMessage(error));
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   function handleChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
