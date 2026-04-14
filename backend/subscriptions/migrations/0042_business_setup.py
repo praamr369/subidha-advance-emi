@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("subscriptions", "0031_alter_auditlog_action_type"),
+        ("subscriptions", "0041_payment_branch_payment_cash_counter_and_more"),
     ]
 
     operations = [
