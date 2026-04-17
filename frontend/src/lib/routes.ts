@@ -10,6 +10,7 @@ export const ROUTES = {
     winners: "/winners",
     winnerHistory: "/winner-history",
     contact: "/contact",
+    blog: "/blog",
     login: "/login",
     register: "/register",
     unauthorized: "/unauthorized",
