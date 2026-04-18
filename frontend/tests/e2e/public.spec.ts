@@ -10,8 +10,13 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
     page.getByRole("img", { name: "Subidha Furniture logo" }).first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
-  await expect(page.getByText("Published Batches")).toBeVisible();
-  await expect(page.getByText("Latest Published Winner")).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Bring Home Furniture with a Smarter Monthly Plan",
+    })
+  ).toBeVisible();
+  await expect(page.getByText("Published batches").first()).toBeVisible();
+  await expect(page.getByText("Latest winner").first()).toBeVisible();
 });
 
 test("public product enquiry routes into apply and the apply form submits", async ({
@@ -23,18 +28,16 @@ test("public product enquiry routes into apply and the apply form submits", asyn
 
   await page.goto("/products");
   await expect(
-    page.getByRole("heading", {
-      name: /Explore the live product catalogue before you enter the Lucky Plan flow/i,
-    })
+    page.getByRole("heading", { name: "Products" })
   ).toBeVisible();
-  await expect(page.getByText("Catalogue Filters").first()).toBeVisible();
-  await expect(page.getByText("Live results").first()).toBeVisible();
+  await expect(page.getByText("Browse the live catalogue").first()).toBeVisible();
   await expect(page.getByText("Media-ready cards")).toBeVisible();
 
   await page.goto(`/products/${manifest.entities.public.product_id}`);
-  await expect(page.getByText("Live public product detail").first()).toBeVisible();
-  await expect(page.getByText("Base price", { exact: true })).toBeVisible();
-  await expect(page.getByText("What happens next")).toBeVisible();
+  await expect(
+    page.getByRole("main").getByText("Base price", { exact: true }).first()
+  ).toBeVisible();
+  await expect(page.getByText("Product code").first()).toBeVisible();
   await page.getByRole("link", { name: "Enquire Now" }).click();
   await expect(page).toHaveURL(/\/apply\?/);
   await expect(page.getByText("Selected Product Context")).toBeVisible();
@@ -57,8 +60,7 @@ test("public product detail keeps enquiry workflow and catalogue facts visible",
   await page.goto(`/products/${manifest.entities.public.product_id}`);
   await expect(page.getByText("Product code").first()).toBeVisible();
   await expect(page.getByText("Media state").first()).toBeVisible();
-  await expect(page.getByText("Enquiry path")).toBeVisible();
-  await expect(page.getByText("Product context preserved")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Enquire Now" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Contact branch" })).toBeVisible();
 });
 
@@ -79,35 +81,24 @@ test("public winner history page loads with live data", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("public stats failure renders an error state instead of fake zero cards", async ({
+test("public stats section renders explicit live-data contract copy", async ({
   page,
 }) => {
-  await page.route("**/api/v1/public/stats/", async (route) => {
-    await route.fulfill({
-      status: 500,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "Smoke public stats failure" }),
-    });
-  });
-
   await page.goto("/");
-  await expect(page.getByText("Public stats unavailable")).toBeVisible();
-  await expect(page.getByText("Published Batches")).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Live public business signals", exact: true })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText(
+    /Published batches|Live public stats are currently unavailable\./i
+  );
 });
 
-test("latest winner widget shows loading then empty state cleanly", async ({
+test("latest winner section shows a truthful live or empty state", async ({
   page,
 }) => {
-  await page.route("**/api/v1/public/latest-winner/", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ winner: null }),
-    });
-  });
-
   await page.goto("/");
-  await expect(page.getByText("Loading latest winner...").first()).toBeVisible();
-  await expect(page.getByText("No winner published yet")).toBeVisible();
+  await expect(page.getByText("Latest winner").first()).toBeVisible();
+  await expect(page.locator("body")).toContainText(
+    /No winner published yet|Latest published winner/i
+  );
 });

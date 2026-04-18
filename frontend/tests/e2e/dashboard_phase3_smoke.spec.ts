@@ -22,18 +22,18 @@ test.describe("admin dashboard phase-3 smoke", () => {
     const sidebar = page.getByRole("complementary");
     await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
     // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
-    await expect(sidebar.getByText("Lucky Plan Operations", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("CRM & Parties", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Direct Sales & Billing", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Inventory & Procurement", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Manufacturing", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Service Desk", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Accounting & Finance", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Payroll & Workforce", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Branches & Counters", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Reports & Governance", { exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Collect EMI" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "New Subscription" })).toBeVisible();
+    await expect(sidebar.getByText("Executive Overview", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("CRM & Leads", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Sales & Orders", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Subscriptions", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Finance & Accounts", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Reports & Analytics", { exact: true })).toBeVisible();
+    await expect(
+      sidebar.getByRole("link", { name: "Business Control Center", exact: true })
+    ).toBeVisible();
+    await expect(
+      sidebar.getByRole("link", { name: "Analytics", exact: true })
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Daily action buckets" })).toBeVisible();
     // Bucket titles may appear both as headings and inside linked cards; assert the heading to avoid strict-mode collisions.
     await expect(page.getByRole("heading", { name: "Overdue EMI follow-up" })).toBeVisible();

@@ -26,7 +26,11 @@ test.describe.serial("cashier smoke", () => {
     await page.locator("#cashier-search-input").fill(
       manifest.entities.cashier.customer_phone
     );
-    await page.getByRole("button", { name: "Search" }).click();
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#cashier-search-input") })
+      .getByRole("button", { name: "Search" })
+      .click();
 
     await expect(page.getByText("Customer summary")).toBeVisible();
     await expect(
@@ -37,7 +41,11 @@ test.describe.serial("cashier smoke", () => {
     await page.locator("#cashier-search-input").fill(
       manifest.entities.cashier.subscription_number
     );
-    await page.getByRole("button", { name: "Search" }).click();
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#cashier-search-input") })
+      .getByRole("button", { name: "Search" })
+      .click();
 
     await expect(page.getByText("Search matches")).toBeVisible();
     await expect(
@@ -56,7 +64,11 @@ test.describe.serial("cashier smoke", () => {
     await page.locator("#cashier-search-input").fill(
       manifest.entities.cashier.customer_phone
     );
-    await page.getByRole("button", { name: "Search" }).click();
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#cashier-search-input") })
+      .getByRole("button", { name: "Search" })
+      .click();
 
     await page.getByRole("button", { name: /EMI Month 2/i }).click();
     await expect(page.locator("#collect-amount")).toHaveValue("200.00");
@@ -77,7 +89,11 @@ test.describe.serial("cashier smoke", () => {
     await page.getByRole("link", { name: "Back to History" }).click();
     await expect(page).toHaveURL(/\/cashier\/payments$/);
     await page.locator("#cashier-payment-search").fill(paymentId);
-    await page.getByRole("button", { name: "Search" }).click();
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#cashier-payment-search") })
+      .getByRole("button", { name: "Search" })
+      .click();
     await expect(page.getByText(`#${paymentId}`, { exact: true }).first()).toBeVisible();
   });
 

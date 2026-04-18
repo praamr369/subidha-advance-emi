@@ -15,7 +15,7 @@ test("customer dashboard, subscription requests, subscriptions, and payments rou
 
   await page
     .getByRole("complementary")
-    .getByRole("link", { name: "Subscription Requests", exact: true })
+    .getByRole("link", { name: "Plan Requests", exact: true })
     .click();
   await expect(page).toHaveURL(/\/customer\/subscription-requests$/);
   await expect(

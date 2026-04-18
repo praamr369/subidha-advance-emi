@@ -494,11 +494,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.partner.subscriptions,
           icon: "subscriptions",
         },
-        {
-          label: "Subscription Requests",
-          href: ROUTES.partner.subscriptionRequests,
-          icon: "subscriptions",
-        },
       ],
     },
     {
@@ -529,9 +524,14 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Reports",
-      icon: "reports",
+      title: "Support",
+      icon: "support",
       items: [
+        {
+          label: "Subscription Requests",
+          href: ROUTES.partner.subscriptionRequests,
+          icon: "support",
+        },
         {
           label: "Reports",
           href: ROUTES.partner.reports,
@@ -562,11 +562,12 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.customer.subscriptions,
           icon: "subscriptions",
         },
-        {
-          label: "EMI Schedule",
-          href: ROUTES.customer.emis,
-          icon: "emis",
-        },
+      ],
+    },
+    {
+      title: "Payments",
+      icon: "payments",
+      items: [
         {
           label: "Payments",
           href: ROUTES.customer.payments,
@@ -575,14 +576,20 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Support & Profile",
-      icon: "support",
+      title: "Winner Status",
+      icon: "luckyDraws",
       items: [
         {
-          label: "Support",
-          href: ROUTES.customer.support,
-          icon: "support",
+          label: "Plan Requests",
+          href: ROUTES.customer.subscriptionRequests,
+          icon: "luckyDraws",
         },
+      ],
+    },
+    {
+      title: "Profile",
+      icon: "profile",
+      items: [
         {
           label: "Profile",
           href: ROUTES.customer.profile,
@@ -590,23 +597,46 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
         },
       ],
     },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
+        {
+          label: "Support",
+          href: ROUTES.customer.support,
+          icon: "support",
+        },
+      ],
+    },
   ],
 
   CASHIER: [
     {
-      title: "Counter Operations",
-      icon: "cashCounter",
+      title: "Dashboard",
+      icon: "dashboard",
       items: [
         {
           label: "Dashboard",
           href: ROUTES.cashier.dashboard,
           icon: "dashboard",
         },
+      ],
+    },
+    {
+      title: "Search EMI",
+      icon: "cashCounter",
+      items: [
         {
           label: "Collect Payment",
           href: ROUTES.cashier.collect,
           icon: "collectPayment",
         },
+      ],
+    },
+    {
+      title: "Receipts",
+      icon: "payments",
+      items: [
         {
           label: "Payment History",
           href: ROUTES.cashier.payments,

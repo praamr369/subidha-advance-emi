@@ -96,7 +96,10 @@ export default function WinnerHistoryTableClient({
       </div>
 
       <div className="hidden overflow-x-auto rounded-[2rem] border border-white/75 bg-white/82 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] lg:block">
-        <table className="min-w-full border-separate border-spacing-0">
+        <table
+          className="min-w-full border-separate border-spacing-0"
+          aria-label="Winner history records"
+        >
           <thead>
             <tr className="text-left">
               {[
@@ -183,4 +186,3 @@ export default function WinnerHistoryTableClient({
     </div>
   );
 }
-

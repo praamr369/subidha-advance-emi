@@ -818,7 +818,7 @@ export default function AdminDashboardPage() {
 
   return (
     <PortalPage
-      title="Business Control Center"
+      title="Admin Dashboard"
       subtitle="Executive operating console for finance, collections, CRM, subscriptions (EMI / RENT / LEASE), direct sales, inventory, branches, staff, and governance."
       helperNote="All sections below use live module data only. No operational KPI here is synthetic or detached from source modules."
       helperTone="info"

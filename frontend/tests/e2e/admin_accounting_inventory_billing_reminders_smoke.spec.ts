@@ -6,11 +6,15 @@ test.use({ storageState: authStatePath("admin") });
 
 test("phase-3 admin accounting, inventory, billing, and reminders pages load", async ({ page }) => {
   await page.goto("/admin/accounting/periods");
-  await expect(page.getByRole("heading", { name: "Accounting Periods" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Accounting Periods", level: 1 })
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Create Period" })).toBeVisible();
 
   await page.goto("/admin/inventory/movements");
-  await expect(page.getByRole("heading", { name: "Inventory Movements" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Inventory Movements", level: 1 })
+  ).toBeVisible();
 
   await page.goto("/admin/inventory/stock-on-hand");
   await expect(page.getByRole("heading", { name: "Stock On Hand" }).last()).toBeVisible();

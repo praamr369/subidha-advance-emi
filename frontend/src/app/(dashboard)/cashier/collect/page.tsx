@@ -463,11 +463,13 @@ export default function CashierCollectPage() {
             </div>
 
             <ActionButton
+              id="cashier-collect-search-submit"
               type="submit"
               variant="primary"
               size="lg"
               disabled={lookupLoading || searchingMatches || collecting}
               className="self-end"
+              aria-label="Search collectible EMI rows"
             >
               {lookupLoading || searchingMatches ? "Searching..." : "Search"}
             </ActionButton>

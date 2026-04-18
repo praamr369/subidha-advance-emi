@@ -47,17 +47,15 @@ test.describe("public release smoke", () => {
   test("public product catalogue and detail load", async ({ page }) => {
     await page.goto("/products");
     await expect(
-      page.getByRole("heading", {
-        name: /Explore the live product catalogue before you enter the Lucky Plan flow/i,
-      })
+      page.getByRole("heading", { name: "Products" })
     ).toBeVisible();
-    await expect(page.locator("body")).toContainText(/catalogue filters/i);
+    await expect(page.locator("body")).toContainText(/browse the live catalogue/i);
     await expect(page.locator("body")).toContainText(/media-ready cards/i);
 
     await page.goto(`/products/${manifest.entities.public.product_id}`);
-    await expect(page.locator("body")).toContainText(/live public product detail/i);
+    await expect(page.locator("body")).toContainText(/enquire now/i);
     await expect(page.locator("body")).toContainText(/media state/i);
-    await expect(page.locator("body")).toContainText(/what happens next/i);
+    await expect(page.locator("body")).toContainText(/base price/i);
   });
 });
 
