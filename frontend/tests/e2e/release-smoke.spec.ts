@@ -163,7 +163,7 @@ test.describe("cashier release smoke", () => {
     await page.goto("/cashier/collect");
     await expect(page.getByRole("heading", { name: /collect payment/i })).toBeVisible();
     await page.locator("#cashier-search-input").fill(target.customer_phone);
-    await page.getByRole("button", { name: /^search$/i }).click();
+    await page.locator("#cashier-collect-search-submit").click();
     await page
       .getByRole("button", {
         name: new RegExp(`Subscription #${target.subscription_id} · EMI Month`),
