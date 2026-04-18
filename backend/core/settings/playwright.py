@@ -3,6 +3,14 @@ from pathlib import Path
 
 os.environ["DJANGO_ENV"] = "development"
 os.environ.setdefault("DJANGO_DEBUG", "true")
+os.environ.setdefault(
+    "DJANGO_SECRET_KEY",
+    "playwright-smoke-only-django-secret-key-2026-not-for-production-7g3m2x9q",
+)
+os.environ.setdefault(
+    "JWT_SIGNING_KEY",
+    "playwright-smoke-only-jwt-signing-key-2026-not-for-production-4h8k1v",
+)
 
 from .development import *  # noqa
 
