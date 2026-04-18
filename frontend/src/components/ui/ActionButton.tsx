@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,10 @@ type ActionButtonVariant =
   | "outline"
   | "ghost";
 
-type ActionButtonProps = {
+type ActionButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children" | "type" | "disabled" | "onClick" | "className"
+> & {
   children: ReactNode;
   href?: string;
   type?: "button" | "submit" | "reset";
@@ -73,6 +76,7 @@ export default function ActionButton({
   ariaLabel,
   onClick,
   className,
+  ...nativeButtonProps
 }: ActionButtonProps) {
   const resolvedDisabled = disabled || loading;
   const content = (
@@ -108,10 +112,11 @@ export default function ActionButton({
 
   return (
     <button
+      {...nativeButtonProps}
       type={type}
       onClick={onClick}
       disabled={resolvedDisabled}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? nativeButtonProps["aria-label"]}
       aria-busy={loading}
       className={resolvedClassName}
     >
