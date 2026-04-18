@@ -1,14 +1,17 @@
 import type { ReactNode } from "react";
 
-import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFooter,
-  PrintKeyValueGrid,
-  PrintAmountSummary,
-  PrintNote,
-  PrintStatusBadge,
-  type PrintField,
-} from "@/components/print/DocumentPrimitives";
+  AmountSummary,
+  CustomerInfoBlock,
+  DocumentFooter,
+  DocumentHeader,
+  DocumentShell,
+  PrintablePaper,
+  ReceiptFieldGrid,
+  StatusBadge,
+  TermsBlock,
+  type DocumentField,
+} from "@/components/documents";
 
 type SubscriptionContractDocumentProps = {
   audienceLabel: string;
@@ -16,9 +19,9 @@ type SubscriptionContractDocumentProps = {
   subscriptionId: number;
   statusLabel: string;
   statusToneClassName: string;
-  customerFields: PrintField[];
-  contractFields: PrintField[];
-  financialFields: PrintField[];
+  customerFields: DocumentField[];
+  contractFields: DocumentField[];
+  financialFields: DocumentField[];
   terms?: string[];
   statusNote?: ReactNode;
   documentTitle?: string;
@@ -26,7 +29,7 @@ type SubscriptionContractDocumentProps = {
   footerNote?: string;
 };
 
-export type ContractField = PrintField;
+export type ContractField = DocumentField;
 
 export default function SubscriptionContractDocument({
   audienceLabel,
@@ -42,13 +45,23 @@ export default function SubscriptionContractDocument({
   issuedOn,
   footerNote = "This contract summary is generated from live subscription records. Payment, waiver, and draw histories remain auditable in canonical ledgers.",
 }: SubscriptionContractDocumentProps) {
+  const statusTone =
+    statusToneClassName.includes("red")
+      ? "danger"
+      : statusToneClassName.includes("amber")
+      ? "warning"
+      : statusToneClassName.includes("sky")
+      ? "info"
+      : "success";
+
   return (
-    <section className="receipt-document print-doc-shell rounded-[1.6rem] border border-slate-300">
-      <div className="space-y-4 p-4 sm:p-5">
+    <PrintablePaper>
+      <DocumentShell>
         <DocumentHeader
           title={documentTitle}
           subtitle={audienceLabel}
-          metaRows={[
+          status={<StatusBadge label={statusLabel} tone={statusTone} />}
+          metaFields={[
             { label: "Contract Ref", value: contractReference },
             { label: "Status", value: statusLabel },
             ...(issuedOn ? [{ label: "Issued On", value: issuedOn }] : []),
@@ -57,10 +70,7 @@ export default function SubscriptionContractDocument({
 
         <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
           <div className="flex flex-wrap items-center gap-2">
-            <PrintStatusBadge
-              label={statusLabel}
-              toneClassName={statusToneClassName}
-            />
+            <StatusBadge label={statusLabel} tone={statusTone} />
             <span className="text-[11px] text-slate-600">
               Contract snapshot for customer and shop operations.
             </span>
@@ -70,29 +80,20 @@ export default function SubscriptionContractDocument({
         {statusNote ? <div className="print-doc-section">{statusNote}</div> : null}
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintKeyValueGrid title="Customer Summary" rows={customerFields} columns="sm:grid-cols-2" />
-          <PrintKeyValueGrid title="Plan / Contract Context" rows={contractFields} columns="sm:grid-cols-2" />
+          <CustomerInfoBlock title="Customer Summary" fields={customerFields} />
+          <ReceiptFieldGrid title="Plan / Contract Context" fields={contractFields} columns="sm:grid-cols-2" />
         </div>
 
-        <PrintAmountSummary title="Financial Summary" rows={financialFields} />
+        <AmountSummary title="Financial Summary" rows={financialFields} />
 
-        {terms.length > 0 ? (
-          <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 px-3.5 py-3 text-slate-700">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-              Terms And Notes
-            </div>
-            <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] leading-5">
-              {terms.map((term, index) => (
-                <li key={`${term}-${index}`}>{term}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <TermsBlock terms={terms} />
 
-        <PrintNote>{footerNote}</PrintNote>
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+          {footerNote}
+        </div>
 
-        <PrintFooter leftText="Prepared from SUBIDHA CORE subscription records" />
-      </div>
-    </section>
+        <DocumentFooter leftText="Prepared from SUBIDHA CORE subscription records" />
+      </DocumentShell>
+    </PrintablePaper>
   );
 }

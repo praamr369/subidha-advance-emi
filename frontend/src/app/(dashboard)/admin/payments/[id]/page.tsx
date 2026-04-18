@@ -280,13 +280,47 @@ function metadataLines(
   if (!metadata) return [];
   return Object.entries(metadata).map(([key, value]) => ({
     key,
-    value:
-      value === null
-        ? "null"
-        : typeof value === "object"
-        ? JSON.stringify(value)
-        : String(value),
+    value: toStructuredDisplayValue(value),
   }));
+}
+
+function toStructuredDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value.trim() || "—";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+
+  if (Array.isArray(value)) {
+    const primitiveValues = value
+      .filter((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean")
+      .map((item) => String(item))
+      .filter((item) => item.trim())
+      .slice(0, 3);
+
+    if (primitiveValues.length > 0) return primitiveValues.join(", ");
+    return value.length > 0 ? `${value.length} item(s) recorded` : "No items";
+  }
+
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    return keys.length > 0 ? `Structured metadata (${keys.length} fields)` : "Structured metadata";
+  }
+
+  return "—";
+}
+
+function timelinePayloadRows(
+  payload: Record<string, unknown> | undefined
+): Array<{ label: string; value: string }> {
+  if (!payload) return [];
+
+  return Object.entries(payload)
+    .map(([key, value]) => ({
+      label: key.replaceAll("_", " "),
+      value: toStructuredDisplayValue(value),
+    }))
+    .filter((row) => row.value !== "—")
+    .slice(0, 10);
 }
 
 export default function AdminPaymentDetailRoutePage() {
@@ -941,23 +975,30 @@ export default function AdminPaymentDetailRoutePage() {
                         {formatDateTime(entry.timestamp)}
                       </div>
 
-                      {entry.payload ? (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          {Object.entries(entry.payload).map(([key, value]) => (
-                            <DetailValue
-                              key={`${entry.kind}-${key}`}
-                              label={key.replaceAll("_", " ")}
-                              value={
-                                value === null
-                                  ? "null"
-                                  : typeof value === "object"
-                                  ? JSON.stringify(value)
-                                  : String(value)
-                              }
-                            />
-                          ))}
-                        </div>
-                      ) : null}
+                      {entry.payload
+                        ? (() => {
+                            const payloadRows = timelinePayloadRows(entry.payload);
+                            if (payloadRows.length === 0) {
+                              return (
+                                <div className="mt-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                                  Structured timeline metadata recorded for this event.
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {payloadRows.map((row) => (
+                                  <DetailValue
+                                    key={`${entry.kind}-${row.label}`}
+                                    label={row.label}
+                                    value={row.value}
+                                  />
+                                ))}
+                              </div>
+                            );
+                          })()
+                        : null}
                     </div>
                   ))}
 

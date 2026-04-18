@@ -1,16 +1,21 @@
 import type { ReactNode } from "react";
 
-import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFooter,
-  PrintKeyValueGrid,
-  PrintAmountSummary,
-  PrintNote,
-  PrintStatusBadge,
-  type PrintField,
-} from "@/components/print/DocumentPrimitives";
+  AmountSummary,
+  BankQrBlock,
+  DocumentFooter,
+  DocumentHeader,
+  DocumentShell,
+  LineItemsTable,
+  PartyInfoBlock,
+  PaymentInfoBlock,
+  PrintablePaper,
+  ReceiptFieldGrid,
+  StatusBadge,
+  type DocumentField,
+} from "@/components/documents";
 
-export type BillingPrintField = PrintField;
+export type BillingPrintField = DocumentField;
 
 type PrintLineItem = {
   description: ReactNode;
@@ -31,61 +36,13 @@ type BillingPrintDocumentProps = {
   detailFields: BillingPrintField[];
   partyFields?: BillingPrintField[];
   referenceFields?: BillingPrintField[];
+  paymentFields?: BillingPrintField[];
+  bankFields?: BillingPrintField[];
+  qrLabel?: string;
+  qrReference?: string;
   lineItems?: PrintLineItem[];
   footerNote?: string;
 };
-
-function LineItemsSection({ lineItems }: { lineItems: PrintLineItem[] }) {
-  if (lineItems.length === 0) return null;
-
-  return (
-    <section className="print-doc-section space-y-2.5">
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-        Item Summary
-      </h3>
-      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white">
-        <table className="min-w-full border-collapse text-[12px] leading-5">
-          <thead className="print-doc-accent">
-            <tr>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Description
-              </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Qty
-              </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Unit Price
-              </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Line Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {lineItems.map((item, index) => (
-              <tr
-                key={`${index}-${String(item.description)}`}
-                className="border-t border-slate-200"
-              >
-                <td className="px-3 py-2 text-slate-900">
-                  <div className="font-medium">{item.description}</div>
-                  {item.note ? (
-                    <div className="mt-0.5 text-[11px] text-slate-600">{item.note}</div>
-                  ) : null}
-                </td>
-                <td className="px-3 py-2 text-right text-slate-700">{item.quantity ?? "—"}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{item.unitPrice ?? "—"}</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                  {item.lineTotal ?? "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
 
 export default function BillingPrintDocument({
   title,
@@ -98,55 +55,72 @@ export default function BillingPrintDocument({
   detailFields,
   partyFields = [],
   referenceFields = [],
+  paymentFields = [],
+  bankFields = [],
+  qrLabel,
+  qrReference,
   lineItems = [],
   footerNote = "Generated from live SUBIDHA CORE records. Print or save as PDF for business filing.",
 }: BillingPrintDocumentProps) {
+  const statusTone =
+    statusToneClassName?.includes("emerald")
+      ? "success"
+      : statusToneClassName?.includes("amber")
+      ? "warning"
+      : statusToneClassName?.includes("red")
+      ? "danger"
+      : statusToneClassName?.includes("sky")
+      ? "info"
+      : "default";
+
   return (
-    <section className="receipt-document print-doc-shell rounded-[1.6rem] border border-slate-300">
-      <div className="space-y-4 p-4 sm:p-5">
+    <PrintablePaper>
+      <DocumentShell>
         <DocumentHeader
           title={title}
           subtitle={subtitle}
-          reference={reference}
-          meta={meta}
-          metaRows={
-            reference || meta
-              ? [
-                  ...(reference ? [{ label: "Document Reference", value: reference }] : []),
-                  ...(meta ? [{ label: "Issuing Context", value: meta }] : []),
-                ]
-              : undefined
-          }
+          status={statusLabel ? <StatusBadge label={statusLabel} tone={statusTone} /> : undefined}
+          metaFields={[
+            ...(reference ? [{ label: "Document Reference", value: reference }] : []),
+            ...(meta ? [{ label: "Issuing Context", value: meta }] : []),
+          ]}
         />
 
-        {statusLabel ? (
-          <div className="print-doc-section flex items-center rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
-            <PrintStatusBadge
-              label={statusLabel}
-              toneClassName={statusToneClassName}
-            />
-          </div>
-        ) : null}
-
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintKeyValueGrid title="Bill To / Party" rows={partyFields} columns="sm:grid-cols-2" />
-          <PrintKeyValueGrid title="Document Metadata" rows={referenceFields} columns="sm:grid-cols-2" />
+          <PartyInfoBlock title="Bill To / Party" fields={partyFields} />
+          <ReceiptFieldGrid title="Document Metadata" fields={referenceFields} columns="sm:grid-cols-2" />
         </div>
 
-        <PrintAmountSummary title="Amount Summary" rows={summaryFields} />
+        <AmountSummary title="Amount Summary" rows={summaryFields} />
 
-        <LineItemsSection lineItems={lineItems} />
+        <div className="grid gap-3 xl:grid-cols-2">
+          <PaymentInfoBlock title="Payment / Collection Reference" fields={paymentFields} />
+          <BankQrBlock bankFields={bankFields} qrLabel={qrLabel} qrReference={qrReference} />
+        </div>
 
-        <PrintKeyValueGrid
+        <LineItemsTable
+          items={lineItems.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            rate: item.unitPrice,
+            amount: item.lineTotal,
+            note: item.note,
+          }))}
+          amountColumnLabel="Line Total"
+        />
+
+        <ReceiptFieldGrid
           title="Notes / Terms"
-          rows={detailFields}
+          fields={detailFields}
           columns="sm:grid-cols-2"
         />
 
-        <PrintNote>{footerNote}</PrintNote>
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+          {footerNote}
+        </div>
 
-        <PrintFooter leftText="Prepared from live SUBIDHA CORE records" />
-      </div>
-    </section>
+        <DocumentFooter leftText="Prepared from live SUBIDHA CORE records" />
+      </DocumentShell>
+    </PrintablePaper>
   );
 }

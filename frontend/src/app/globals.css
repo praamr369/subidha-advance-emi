@@ -420,30 +420,27 @@ button {
   color: color-mix(in oklab, var(--muted-foreground) 88%, var(--foreground) 12%);
 }
 
+.dashboard-app .document-workspace {
+  border-radius: 1.2rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--surface-muted) 72%, white 28%),
+    color-mix(in oklab, var(--surface-muted) 58%, white 42%)
+  );
+  border: 1px solid color-mix(in oklab, var(--border) 86%, white 14%);
+  padding: 0.85rem;
+}
+
 .dashboard-app .print-doc-shell {
-  background:
-    radial-gradient(
-      circle at 12% 0%,
-      color-mix(in oklab, var(--primary) 9%, transparent),
-      transparent 45%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, white 92%, var(--surface-muted) 8%),
-      color-mix(in oklab, white 86%, var(--surface-muted) 14%)
-    );
-  box-shadow: 0 20px 48px -34px rgba(15, 23, 42, 0.52);
+  background: white;
+  box-shadow: 0 20px 42px -34px rgba(15, 23, 42, 0.52);
 }
 
 .dashboard-app .print-doc-meta,
 .dashboard-app .print-doc-card,
 .dashboard-app .print-doc-note,
 .dashboard-app .print-doc-accent {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.97),
-    rgba(248, 250, 252, 0.9)
-  );
+  background: white;
 }
 
 .dashboard-app .print-doc-amount {
@@ -492,6 +489,17 @@ button {
 
   .receipt-print-page .portal-page-content {
     gap: 0 !important;
+  }
+
+  .receipt-print-page .document-workspace {
+    border: 0 !important;
+    background: white !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .receipt-print-page .document-workspace-inner {
+    max-width: 190mm !important;
   }
 
   .receipt-document {

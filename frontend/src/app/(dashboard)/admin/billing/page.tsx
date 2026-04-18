@@ -21,6 +21,7 @@ import {
 } from "@/services/billing";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
+import { toAmountInWordsINR } from "@/lib/print/formatters";
 
 export default function BillingOverviewPage() {
   const [loading, setLoading] = useState(true);
@@ -210,6 +211,17 @@ export default function BillingOverviewPage() {
                 ]}
                 detailFields={[
                   { label: "Document Status", value: latestPosted.status },
+                  {
+                    label: "Amount In Words",
+                    value: toAmountInWordsINR(latestPosted.grand_total),
+                  },
+                  {
+                    label: "Payment Reference",
+                    value:
+                      latestPosted.source_reference ||
+                      latestPosted.direct_sale_no ||
+                      "—",
+                  },
                   { label: "Terms", value: latestPosted.terms || "—" },
                   { label: "Notes", value: latestPosted.notes || "—" },
                 ]}

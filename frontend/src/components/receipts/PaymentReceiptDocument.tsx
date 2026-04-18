@@ -2,18 +2,21 @@
 
 import type { ReactNode } from "react";
 
-import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFooter,
-  PrintKeyValueGrid,
-  PrintAmountSummary,
-  PrintNote,
-  PrintSignatureBlock,
-  PrintStatusBadge,
-  type PrintField,
-} from "@/components/print/DocumentPrimitives";
+  AmountSummary,
+  CustomerInfoBlock,
+  DocumentFooter,
+  DocumentHeader,
+  DocumentShell,
+  PaymentInfoBlock,
+  PrintablePaper,
+  ReceiptFieldGrid,
+  SignatureBlock,
+  StatusBadge,
+  type DocumentField,
+} from "@/components/documents";
 
-export type ReceiptField = PrintField;
+export type ReceiptField = DocumentField;
 
 type PaymentReceiptDocumentProps = {
   audienceLabel: string;
@@ -43,13 +46,23 @@ export default function PaymentReceiptDocument({
   documentTitle = "Payment Receipt",
   footerNote = "Generated from live SUBIDHA CORE payment records. Print or save as PDF for business filing.",
 }: PaymentReceiptDocumentProps) {
+  const statusTone =
+    statusToneClassName.includes("red")
+      ? "danger"
+      : statusToneClassName.includes("amber")
+      ? "warning"
+      : statusToneClassName.includes("sky")
+      ? "info"
+      : "success";
+
   return (
-    <section className="receipt-document print-doc-shell rounded-[1.6rem] border border-slate-300">
-      <div className="space-y-4 p-4 sm:p-5">
+    <PrintablePaper>
+      <DocumentShell>
         <DocumentHeader
           title={documentTitle}
           subtitle={audienceLabel}
-          metaRows={[
+          status={<StatusBadge label={statusLabel} tone={statusTone} />}
+          metaFields={[
             { label: "Receipt Ref", value: receiptReference },
             { label: "Status", value: statusLabel },
           ]}
@@ -57,10 +70,7 @@ export default function PaymentReceiptDocument({
 
         <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
           <div className="flex flex-wrap items-center gap-2">
-            <PrintStatusBadge
-              label={statusLabel}
-              toneClassName={statusToneClassName}
-            />
+            <StatusBadge label={statusLabel} tone={statusTone} />
             <span className="text-[11px] text-slate-600">
               Receipt generated from posted payment records. Keep for your records.
             </span>
@@ -78,32 +88,32 @@ export default function PaymentReceiptDocument({
         {statusNote ? <div className="print-doc-section">{statusNote}</div> : null}
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintKeyValueGrid
+          <CustomerInfoBlock
             title="Customer / Party"
-            rows={partyFields}
-            columns="sm:grid-cols-2"
+            fields={partyFields}
           />
-          <PrintKeyValueGrid
+          <PaymentInfoBlock
             title="Payment Context"
-            rows={referenceFields}
-            columns="sm:grid-cols-2"
+            fields={referenceFields}
           />
         </div>
 
-        <PrintAmountSummary title="Payment Summary" rows={summaryFields} />
+        <AmountSummary title="Payment Summary" rows={summaryFields} />
 
-        <PrintKeyValueGrid
+        <ReceiptFieldGrid
           title="Transaction Details"
-          rows={detailFields}
+          fields={detailFields}
           columns="sm:grid-cols-2"
         />
 
-        <PrintSignatureBlock />
+        <SignatureBlock />
 
-        <PrintNote>{footerNote}</PrintNote>
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+          {footerNote}
+        </div>
 
-        <PrintFooter leftText="Prepared from SUBIDHA CORE payment records" />
-      </div>
-    </section>
+        <DocumentFooter leftText="Prepared from SUBIDHA CORE payment records" />
+      </DocumentShell>
+    </PrintablePaper>
   );
 }

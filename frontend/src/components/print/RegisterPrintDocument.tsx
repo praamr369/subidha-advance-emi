@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
-import DocumentHeader from "@/components/print/DocumentHeader";
-import { PrintFooter, PrintNote } from "@/components/print/DocumentPrimitives";
+import {
+  DocumentFooter,
+  DocumentHeader,
+  DocumentShell,
+  PrintablePaper,
+} from "@/components/documents";
 
 type RegisterPrintDocumentProps = {
   title: string;
@@ -21,13 +25,12 @@ export default function RegisterPrintDocument({
   footerNote = "This register is generated from posted records in the selected reporting scope for business filing.",
 }: RegisterPrintDocumentProps) {
   return (
-    <section className="receipt-document print-doc-shell rounded-[1.6rem] border border-slate-300">
-      <div className="space-y-3.5 p-4 sm:p-5">
+    <PrintablePaper>
+      <DocumentShell>
         <DocumentHeader
           title={title}
           subtitle={subtitle}
-          reference={reference}
-          metaRows={[
+          metaFields={[
             { label: "Scope", value: reference || "Current filter" },
             { label: "Rows", value: String(rows.length) },
           ]}
@@ -63,9 +66,11 @@ export default function RegisterPrintDocument({
           </table>
         </div>
 
-        <PrintNote>{footerNote}</PrintNote>
-        <PrintFooter leftText="Prepared from posted register rows" />
-      </div>
-    </section>
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+          {footerNote}
+        </div>
+        <DocumentFooter leftText="Prepared from posted register rows" />
+      </DocumentShell>
+    </PrintablePaper>
   );
 }

@@ -12,6 +12,7 @@ import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
+import { toAmountInWordsINR } from "@/lib/print/formatters";
 import type { BillingInvoice } from "@/services/billing";
 import {
   approveBillingInvoice,
@@ -175,6 +176,14 @@ export default function BillingInvoicesPage() {
         ]}
         detailFields={[
           { label: "Document Status", value: latestPosted?.status || "—" },
+          {
+            label: "Amount In Words",
+            value: toAmountInWordsINR(latestPosted?.grand_total || 0),
+          },
+          {
+            label: "Payment Reference",
+            value: latestPosted?.source_reference || latestPosted?.direct_sale_no || "—",
+          },
           { label: "Terms", value: latestPosted?.terms || "—" },
           { label: "Notes", value: latestPosted?.notes || "—" },
         ]}

@@ -31,6 +31,7 @@ import {
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { toAmountInWordsINR } from "@/lib/print/formatters";
 
 function DetailValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -338,6 +339,14 @@ export default function BillingDocumentDetailPage() {
             ]}
             detailFields={[
               { label: "Document Status", value: invoice.status },
+              {
+                label: "Amount In Words",
+                value: toAmountInWordsINR(invoice.grand_total),
+              },
+              {
+                label: "Payment Reference",
+                value: invoice.source_reference || invoice.direct_sale_no || "—",
+              },
               { label: "Terms", value: invoice.terms || "—" },
               { label: "Notes", value: invoice.notes || "—" },
             ]}
