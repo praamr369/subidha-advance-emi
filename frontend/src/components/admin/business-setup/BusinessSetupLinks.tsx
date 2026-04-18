@@ -4,9 +4,9 @@ const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
   { href: "/admin/settings/business-setup/branches", label: "Branches" },
-  { href: "/admin/settings/business-setup/finance-accounts", label: "Finance Accounts" },
-  { href: "/admin/settings/business-setup/cash-desks", label: "Cash Desks" },
-  { href: "/admin/settings/business-setup/staff", label: "Staff Setup" },
+  { href: "/admin/settings/business-setup/finance-accounts", label: "Accounting Setup" },
+  { href: "/admin/settings/business-setup/cash-desks", label: "Counters" },
+  { href: "/admin/settings/business-setup/staff", label: "Staff & Roles" },
   { href: "/admin/settings/business-setup/chart-accounts", label: "Chart Accounts" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
 ];

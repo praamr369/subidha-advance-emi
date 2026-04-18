@@ -6,23 +6,20 @@ import { useEffect, useState } from "react";
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
 import {
-  getBusinessProfile,
   getSetupChecklist,
-  listBranches,
-  listCashDesks,
-  listChartAccounts,
-  listFinanceAccounts,
-  listStaffAssignments,
   type SetupChecklist,
 } from "@/services/business-setup";
 
 type Counts = {
-  profileConfigured: boolean;
-  branches: number;
-  financeAccounts: number;
-  cashDesks: number;
-  staffAssignments: number;
-  chartAccounts: number;
+  businessProfileConfigured: boolean;
+  branchesActive: number;
+  branchesPrimaryConfigured: boolean;
+  cashCountersActive: number;
+  financeAccountsActive: number;
+  chartAccountsActive: number;
+  accountingPeriods: number;
+  products: number;
+  batches: number;
 };
 
 function toErrorMessage(error: unknown): string {
@@ -34,54 +31,57 @@ const cards = [
     title: "Business Profile",
     description: "Legal identity, contact data, address, and invoice defaults.",
     href: "/admin/settings/business-setup/profile",
-    countKey: "profileConfigured" as const,
+    countKey: "businessProfileConfigured" as const,
   },
   {
     title: "Branches",
-    description: "Operating location master for head office and collection points.",
-    href: "/admin/settings/business-setup/branches",
-    countKey: "branches" as const,
+    description: "Primary branch and operating locations for daily work.",
+    href: "/admin/branches",
+    countKey: "branchesActive" as const,
   },
   {
-    title: "Finance Accounts",
-    description: "Operational cash, bank, and UPI account masters.",
-    href: "/admin/settings/business-setup/finance-accounts",
-    countKey: "financeAccounts" as const,
+    title: "Counters",
+    description: "Collection counters mapped to finance accounts.",
+    href: "/admin/counters",
+    countKey: "cashCountersActive" as const,
   },
   {
-    title: "Cash Desks",
-    description: "Branch-level collection desks mapped to operational finance accounts.",
-    href: "/admin/settings/business-setup/cash-desks",
-    countKey: "cashDesks" as const,
+    title: "Accounting setup",
+    description: "Chart of accounts and finance accounts (cash/bank/UPI).",
+    href: "/admin/accounting/chart-of-accounts",
+    countKey: "chartAccountsActive" as const,
   },
   {
-    title: "Staff Setup",
-    description: "Operational assignment layer for admin, cashier, and finance control.",
-    href: "/admin/settings/business-setup/staff",
-    countKey: "staffAssignments" as const,
+    title: "Accounting periods",
+    description: "Define the current period for reporting and controlled posting.",
+    href: "/admin/accounting/periods",
+    countKey: "accountingPeriods" as const,
   },
   {
-    title: "Chart Accounts",
-    description: "Accounting classification master, kept separate from finance accounts.",
-    href: "/admin/settings/business-setup/chart-accounts",
-    countKey: "chartAccounts" as const,
+    title: "Products",
+    description: "Add at least one product before onboarding customers.",
+    href: "/admin/products",
+    countKey: "products" as const,
   },
   {
     title: "Checklist",
     description: "Computed readiness status and go-live blocking items.",
     href: "/admin/settings/business-setup/checklist",
-    countKey: "branches" as const,
+    countKey: "batches" as const,
   },
 ];
 
 export default function BusinessSetupOverviewPage() {
   const [counts, setCounts] = useState<Counts>({
-    profileConfigured: false,
-    branches: 0,
-    financeAccounts: 0,
-    cashDesks: 0,
-    staffAssignments: 0,
-    chartAccounts: 0,
+    businessProfileConfigured: false,
+    branchesActive: 0,
+    branchesPrimaryConfigured: false,
+    cashCountersActive: 0,
+    financeAccountsActive: 0,
+    chartAccountsActive: 0,
+    accountingPeriods: 0,
+    products: 0,
+    batches: 0,
   });
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,31 +90,18 @@ export default function BusinessSetupOverviewPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const [
-        profile,
-        branches,
-        financeAccounts,
-        cashDesks,
-        staffAssignments,
-        chartAccounts,
-        readiness,
-      ] = await Promise.all([
-        getBusinessProfile(),
-        listBranches(),
-        listFinanceAccounts(),
-        listCashDesks(),
-        listStaffAssignments(),
-        listChartAccounts(),
-        getSetupChecklist(),
-      ]);
+      const readiness = await getSetupChecklist();
 
       setCounts({
-        profileConfigured: Boolean(profile),
-        branches: branches.length,
-        financeAccounts: financeAccounts.length,
-        cashDesks: cashDesks.length,
-        staffAssignments: staffAssignments.length,
-        chartAccounts: chartAccounts.length,
+        businessProfileConfigured: Boolean(readiness.counts?.business_profile_configured),
+        branchesActive: Number(readiness.counts?.branches_active || 0),
+        branchesPrimaryConfigured: Boolean(readiness.counts?.branches_primary_configured),
+        cashCountersActive: Number(readiness.counts?.cash_counters_active || 0),
+        financeAccountsActive: Number(readiness.counts?.finance_accounts_active || 0),
+        chartAccountsActive: Number(readiness.counts?.chart_of_accounts_active || 0),
+        accountingPeriods: Number(readiness.counts?.accounting_periods || 0),
+        products: Number(readiness.counts?.products || 0),
+        batches: Number(readiness.counts?.batches || 0),
       });
       setChecklist(readiness);
       setError(null);
@@ -176,8 +163,8 @@ export default function BusinessSetupOverviewPage() {
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {loading
                 ? "…"
-                : card.countKey === "profileConfigured"
-                  ? counts.profileConfigured
+                : card.countKey === "businessProfileConfigured"
+                  ? counts.businessProfileConfigured
                     ? "Configured"
                     : "Missing"
                   : counts[card.countKey]}

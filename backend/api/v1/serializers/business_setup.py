@@ -1,14 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from subscriptions.models_business_setup import (
-    Branch,
-    BusinessProfile,
-    CashDesk,
-    ChartAccount,
-    FinanceAccount,
-    StaffOperationalAssignment,
-)
+from subscriptions.models_business_setup import BusinessProfile
 
 
 class BusinessSetupModelSerializer(serializers.ModelSerializer):
@@ -45,52 +38,32 @@ class BusinessProfileSerializer(BusinessSetupModelSerializer):
         fields = "__all__"
         read_only_fields = ("id", "created_at", "updated_at")
 
-
-class BranchSerializer(BusinessSetupModelSerializer):
-    class Meta:
-        model = Branch
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
-
-
-class FinanceAccountSerializer(BusinessSetupModelSerializer):
-    class Meta:
-        model = FinanceAccount
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
-
-
-class CashDeskSerializer(BusinessSetupModelSerializer):
-    branch_name = serializers.CharField(source="branch.name", read_only=True)
-    default_finance_account_name = serializers.CharField(source="default_finance_account.name", read_only=True)
-
-    class Meta:
-        model = CashDesk
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
-
-
-class StaffOperationalAssignmentSerializer(BusinessSetupModelSerializer):
-    username = serializers.CharField(source="user.username", read_only=True)
-    branch_name = serializers.CharField(source="branch.name", read_only=True)
-    default_cash_desk_name = serializers.CharField(source="default_cash_desk.name", read_only=True)
-
-    class Meta:
-        model = StaffOperationalAssignment
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
-
-
-class ChartAccountSerializer(BusinessSetupModelSerializer):
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
-
-    class Meta:
-        model = ChartAccount
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
-
-
 class SetupChecklistSerializer(serializers.Serializer):
     is_ready_for_go_live = serializers.BooleanField()
     percent_complete = serializers.IntegerField()
     items = serializers.ListField(child=serializers.DictField())
+    counts = serializers.DictField(required=False)
+
+
+class BusinessResetRequestSerializer(serializers.Serializer):
+    confirm = serializers.CharField()
+    preserve_username = serializers.CharField()
+    delete_non_preserved_users = serializers.BooleanField(default=True)
+    clear_auth_artifacts = serializers.BooleanField(default=True)
+    dry_run = serializers.BooleanField(default=False)
+
+    def validate_preserve_username(self, value: str) -> str:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Preserve username is required.")
+        return cleaned
+
+
+class BusinessResetResponseSerializer(serializers.Serializer):
+    mode = serializers.CharField()
+    confirmation_required = serializers.CharField()
+    options = serializers.DictField()
+    preserved_users = serializers.ListField(child=serializers.DictField())
+    deletable_user_count = serializers.IntegerField()
+    targets = serializers.DictField()
+    auth_artifacts = serializers.DictField()

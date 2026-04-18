@@ -1,22 +1,22 @@
 # Go-Live Reset Runbook
 
-## Current boundary
+Canonical reference:
+- `docs/operations/business-reset-runbook.md`
 
-The new business setup module includes a read-only reset preview surface. It reports counts for business setup masters without changing data.
+## Purpose
 
-This pass does not change the behavior of the existing `reset_business_data` command.
+Provide a controlled reset path that removes business data while preserving only the chosen admin login.
 
 ## Safe usage rule
 
 Use reset preview first. Review:
 
-- business profiles
-- branches
-- finance accounts
-- cash desks
-- staff operational assignments
+- core business counts (customers/subscriptions/payments)
+- accounting / branch control / inventory counts
 
-Do not assume that resetting transactional data should also delete finance setup masters.
+Then execute using:
+- the management command `reset_business_data`, or
+- the admin UI reset panel (`/admin/settings/business-setup/checklist`)
 
 ## Why this is conservative
 

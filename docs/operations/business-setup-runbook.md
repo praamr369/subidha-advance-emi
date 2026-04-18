@@ -2,31 +2,35 @@
 
 ## Purpose
 
-This module configures the operational business masters used before go-live:
+This runbook describes the minimal operational setup required before go-live, using the **existing** core modules in SUBIDHA CORE plus the additive Business Profile.
 
-- Business Profile: legal and identity data for the business
-- Branch: operating location master
-- Finance Account: operational money account master used to classify cash, bank, and UPI collection destinations
-- Cash Desk: branch-level collection counter or terminal
-- Staff Operational Assignment: sidecar operational setup for internal users
-- Chart Account: accounting classification head, separate from operational money accounts
+Canonical reference:
+- `docs/operations/first-run-business-setup.md`
+
+This setup should be completed from:
+- `/admin/settings/business-setup` (guided links + checklist)
+- existing modules:
+  - Branch Control (`/admin/branches`, `/admin/counters`)
+  - Accounting (`/admin/accounting/chart-of-accounts`, `/admin/accounting/periods`)
+  - Products (`/admin/products`)
+  - Internal users (`/admin/settings/users`)
 
 ## FinanceAccount vs ChartAccount
 
-FinanceAccount is the operational collection account master. It tells the system which real-world money destination is being used, such as cash in hand, bank account, or UPI handle.
+Finance accounts are the operational collection endpoints (cash/bank/UPI) used by counters and billing.
 
-ChartAccount is the accounting classification master. It groups balances and reporting heads such as cash, bank, revenue, commission, waiver, and expense. It is not a receipt collection endpoint.
+Chart of accounts is the accounting classification tree used for controlled posting and reporting. It is not a collection endpoint.
 
 ## First live setup order
 
 1. Create or update the Business Profile.
-2. Create the active head office branch.
-3. Create active finance accounts for:
+2. Create at least one active branch and mark one as primary.
+3. Create at least one active counter mapped to a finance account.
+4. Create active finance accounts for:
    - cash
    - at least one bank or UPI account
-4. Create the active cash desk for the operating branch.
-5. Create staff operational assignments for admin and cashier operators.
-6. Create the minimum chart of accounts classification heads.
+5. Create chart accounts as needed for accounting setup.
+6. Add at least one product.
 7. Review the checklist screen and confirm go-live readiness.
 
 ## Safe data practices
