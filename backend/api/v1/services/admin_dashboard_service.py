@@ -16,6 +16,9 @@ from subscriptions.models import (
     SubscriptionStatus,
     Batch,
     LuckyDraw,
+    PlanType,
+    PublicLead,
+    PublicLeadStatus,
 )
 from subscriptions.services.dashboard_canonical_financial_summary_service import (
     get_dashboard_summary,
@@ -216,6 +219,23 @@ def build_admin_dashboard(*, actor_user=None):
     # ------------------------------
     # 8️⃣ Assemble Final Response
     # ------------------------------
+    portfolio_mix_rows = (
+        Subscription.objects.values("plan_type")
+        .annotate(count=Count("id"))
+        .order_by("plan_type")
+    )
+    portfolio_mix = {row["plan_type"] or "EMI": row["count"] for row in portfolio_mix_rows}
+    for plan_type in PlanType.values:
+        portfolio_mix.setdefault(plan_type, 0)
+
+    lead_pipeline = {
+        "new": PublicLead.objects.filter(status=PublicLeadStatus.NEW).count(),
+        "in_progress": PublicLead.objects.filter(status=PublicLeadStatus.IN_PROGRESS).count(),
+        "contacted": PublicLead.objects.filter(status=PublicLeadStatus.CONTACTED).count(),
+        "converted": PublicLead.objects.filter(status=PublicLeadStatus.CONVERTED).count(),
+        "closed": PublicLead.objects.filter(status=PublicLeadStatus.CLOSED).count(),
+    }
+
     dashboard_data = {
 
         # 💰 Financial Layer
@@ -280,6 +300,15 @@ def build_admin_dashboard(*, actor_user=None):
             "active": active_subscriptions,
             "completed": completed_subscriptions,
             "won": won_subscriptions,
+        },
+        "portfolio_mix": {
+            "emi": portfolio_mix.get(PlanType.EMI, 0),
+            "rent": portfolio_mix.get(PlanType.RENT, 0),
+            "lease": portfolio_mix.get(PlanType.LEASE, 0),
+        },
+        "crm": {
+            "lead_pipeline": lead_pipeline,
+            "open_leads": lead_pipeline["new"] + lead_pipeline["in_progress"] + lead_pipeline["contacted"],
         },
 
         # 🎲 Batch Layer

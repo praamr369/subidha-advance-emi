@@ -159,7 +159,7 @@ export default function BillingOverviewPage() {
               <BillingPrintDocument
                 title={latestPosted.tax_mode === "GST" ? "GST Tax Invoice" : "Retail Invoice"}
                 subtitle={`${latestPosted.billing_channel} billing document preview for operator review`}
-                reference={latestPosted.document_no ?? `Invoice ${latestPosted.id}`}
+                reference={latestPosted.document_no ?? latestPosted.source_reference ?? "Invoice"}
                 meta={`Customer ${latestPosted.customer_name_snapshot || latestPosted.customer_name || "Walk-in"}`}
                 statusLabel={latestPosted.status}
                 statusToneClassName={
@@ -204,22 +204,20 @@ export default function BillingOverviewPage() {
                 summaryFields={[
                   { label: "Sub Total", value: accountingMoney(latestPosted.subtotal) },
                   { label: "Tax Total", value: accountingMoney(latestPosted.tax_total) },
-                  { label: "Grand Total", value: accountingMoney(latestPosted.grand_total) },
+                  { label: "Grand Total", value: accountingMoney(latestPosted.grand_total), emphasize: true },
                   { label: "Received", value: accountingMoney(latestPosted.received_total) },
-                  { label: "Balance Due", value: accountingMoney(latestPosted.balance_total) },
+                  { label: "Balance Due", value: accountingMoney(latestPosted.balance_total), emphasize: true },
                 ]}
                 detailFields={[
                   { label: "Document Status", value: latestPosted.status },
-                  { label: "Finance Account", value: latestPosted.finance_account_name || "—" },
-                  { label: "Journal Entry", value: latestPosted.posted_journal_entry_no || "Pending" },
-                  { label: "Remarks", value: latestPosted.notes || "—" },
+                  { label: "Terms", value: latestPosted.terms || "—" },
+                  { label: "Notes", value: latestPosted.notes || "—" },
                 ]}
-                lineItems={(latestPosted.lines || []).slice(0, 6).map((line) => ({
+                lineItems={(latestPosted.lines || []).map((line) => ({
                   description: line.description,
                   quantity: line.quantity,
                   unitPrice: accountingMoney(line.unit_price),
                   lineTotal: accountingMoney(line.line_total),
-                  note: [line.product_code, line.inventory_item_sku].filter(Boolean).join(" • "),
                 }))}
               />
             ) : (

@@ -162,19 +162,14 @@ export default function BillingReceiptsPage() {
           },
         ]}
         summaryFields={[
-          { label: "Amount", value: accountingMoney(latestReceipt?.amount || 0), emphasize: true },
-          { label: "Finance Account", value: latestReceipt?.finance_account_name || "—" },
-          { label: "Linked Payment", value: latestReceipt?.payment ? `#${latestReceipt.payment}` : "—" },
-          {
-            label: "Linked Invoice",
-            value: latestReceipt?.billing_invoice ? `#${latestReceipt.billing_invoice}` : "—",
-          },
+          { label: "Amount Received", value: accountingMoney(latestReceipt?.amount || 0), emphasize: true },
+          { label: "Receipt Type", value: latestReceipt?.receipt_type || "—" },
+          { label: "Source Ref", value: latestReceipt?.source_reference || latestReceipt?.direct_sale_no || "—" },
         ]}
         detailFields={[
           { label: "Document Status", value: latestReceipt?.status || "—" },
           { label: "Direct Sale", value: latestReceipt?.direct_sale_no || "—" },
-          { label: "Journal Entry", value: latestReceipt?.posted_journal_entry_no || "Pending" },
-          { label: "Remarks", value: latestReceipt?.notes || "—" },
+          { label: "Notes", value: latestReceipt?.notes || "—" },
         ]}
       />
     </PortalPage>

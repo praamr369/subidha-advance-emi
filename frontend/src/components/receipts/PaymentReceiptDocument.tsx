@@ -4,9 +4,11 @@ import type { ReactNode } from "react";
 
 import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFieldGrid,
   PrintFooter,
+  PrintKeyValueGrid,
+  PrintAmountSummary,
   PrintNote,
+  PrintSignatureBlock,
   PrintStatusBadge,
   type PrintField,
 } from "@/components/print/DocumentPrimitives";
@@ -31,7 +33,6 @@ type PaymentReceiptDocumentProps = {
 export default function PaymentReceiptDocument({
   audienceLabel,
   receiptReference,
-  paymentId,
   statusLabel,
   statusToneClassName,
   statusNote,
@@ -50,7 +51,6 @@ export default function PaymentReceiptDocument({
           subtitle={audienceLabel}
           metaRows={[
             { label: "Receipt Ref", value: receiptReference },
-            { label: "Payment ID", value: `#${paymentId}` },
             { label: "Status", value: statusLabel },
           ]}
         />
@@ -62,7 +62,7 @@ export default function PaymentReceiptDocument({
               toneClassName={statusToneClassName}
             />
             <span className="text-[11px] text-slate-600">
-              This receipt is generated from posted payment records.
+              Receipt generated from posted payment records. Keep for your records.
             </span>
           </div>
           <div className="text-right">
@@ -78,29 +78,27 @@ export default function PaymentReceiptDocument({
         {statusNote ? <div className="print-doc-section">{statusNote}</div> : null}
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintFieldGrid
-            title="Party Information"
-            fields={partyFields}
+          <PrintKeyValueGrid
+            title="Customer / Party"
+            rows={partyFields}
             columns="sm:grid-cols-2"
           />
-          <PrintFieldGrid
-            title="Reference Information"
-            fields={referenceFields}
+          <PrintKeyValueGrid
+            title="Payment Context"
+            rows={referenceFields}
             columns="sm:grid-cols-2"
           />
         </div>
 
-        <PrintFieldGrid
-          title="Payment Summary"
-          fields={summaryFields}
-          columns="md:grid-cols-2 xl:grid-cols-4"
+        <PrintAmountSummary title="Payment Summary" rows={summaryFields} />
+
+        <PrintKeyValueGrid
+          title="Transaction Details"
+          rows={detailFields}
+          columns="sm:grid-cols-2"
         />
 
-        <PrintFieldGrid
-          title="Transaction Details"
-          fields={detailFields}
-          columns="md:grid-cols-2 xl:grid-cols-3"
-        />
+        <PrintSignatureBlock />
 
         <PrintNote>{footerNote}</PrintNote>
 

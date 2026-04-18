@@ -293,7 +293,7 @@ export default function BillingDocumentDetailPage() {
           <BillingPrintDocument
             title={invoice.tax_mode === "GST" ? "GST Tax Invoice" : "Retail Invoice"}
             subtitle={`${invoice.billing_channel} document detail with source trace and linked documents.`}
-            reference={invoice.document_no || `Invoice ${invoice.id}`}
+            reference={invoice.document_no || invoice.source_reference || "Invoice"}
             meta={`Customer ${invoice.customer_name_snapshot || invoice.customer_name || "Walk-in"}`}
             statusLabel={invoice.status}
             statusToneClassName={
@@ -332,24 +332,20 @@ export default function BillingDocumentDetailPage() {
             summaryFields={[
               { label: "Sub Total", value: accountingMoney(invoice.subtotal) },
               { label: "Tax Total", value: accountingMoney(invoice.tax_total) },
-              { label: "Grand Total", value: accountingMoney(invoice.grand_total) },
+              { label: "Grand Total", value: accountingMoney(invoice.grand_total), emphasize: true },
               { label: "Received", value: accountingMoney(invoice.received_total) },
               { label: "Balance Due", value: accountingMoney(invoice.balance_total), emphasize: true },
             ]}
             detailFields={[
-              { label: "Document Type", value: invoice.document_type || "INVOICE" },
-              { label: "Finance Account", value: invoice.finance_account_name || "—" },
-              { label: "Journal Entry", value: invoice.posted_journal_entry_no || "Pending" },
               { label: "Document Status", value: invoice.status },
               { label: "Terms", value: invoice.terms || "—" },
-              { label: "Remarks", value: invoice.notes || "—" },
+              { label: "Notes", value: invoice.notes || "—" },
             ]}
-            lineItems={invoice.lines.slice(0, 12).map((line) => ({
+            lineItems={invoice.lines.map((line) => ({
               description: line.description,
               quantity: line.quantity,
               unitPrice: accountingMoney(line.unit_price),
               lineTotal: accountingMoney(line.line_total),
-              note: [line.product_code, line.inventory_item_sku].filter(Boolean).join(" • "),
             }))}
           />
         </>

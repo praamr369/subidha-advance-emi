@@ -112,7 +112,11 @@ export default function BillingCreditNotesPage() {
         title="Credit Note"
         subtitle="Printable credit-note preview for approved return and allowance adjustments."
         reference={latestPosted?.note_no || "No posted credit note"}
-        meta={latestPosted ? `Original invoice ${latestPosted.original_invoice_no || latestPosted.original_invoice}` : "Waiting for a posted credit note"}
+        meta={
+          latestPosted
+            ? `Original invoice ${latestPosted.original_invoice_no || "—"}`
+            : "Waiting for a posted credit note"
+        }
         statusLabel={latestPosted?.status}
         statusToneClassName={
           latestPosted?.status === "POSTED"
@@ -124,21 +128,14 @@ export default function BillingCreditNotesPage() {
         partyFields={[
           {
             label: "Adjusted Invoice",
-            value: latestPosted?.original_invoice_no || (latestPosted ? `#${latestPosted.original_invoice}` : "—"),
+            value: latestPosted?.original_invoice_no || "—",
             emphasize: true,
           },
           {
             label: "Stock Effect",
             value: latestPosted?.stock_effect ? "Yes" : "No",
           },
-          {
-            label: "Status",
-            value: latestPosted?.status || "—",
-          },
-          {
-            label: "Journal Entry",
-            value: latestPosted?.posted_journal_entry_no || "Pending",
-          },
+          { label: "Status", value: latestPosted?.status || "—" },
         ]}
         referenceFields={[
           { label: "Note Date", value: latestPosted?.note_date || "—" },
@@ -155,10 +152,9 @@ export default function BillingCreditNotesPage() {
         detailFields={[
           { label: "Reason", value: latestPosted?.reason || "—" },
           { label: "Original Invoice", value: latestPosted?.original_invoice_no || "—" },
-          { label: "Journal Entry", value: latestPosted?.posted_journal_entry_no || "Pending" },
           { label: "Document Status", value: latestPosted?.status || "—" },
         ]}
-        lineItems={(latestPosted?.lines || []).slice(0, 8).map((line) => ({
+        lineItems={(latestPosted?.lines || []).map((line) => ({
           description: line.description,
           quantity: line.quantity,
           unitPrice: accountingMoney(line.taxable_value),

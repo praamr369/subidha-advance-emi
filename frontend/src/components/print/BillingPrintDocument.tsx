@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 
 import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFieldGrid,
   PrintFooter,
+  PrintKeyValueGrid,
+  PrintAmountSummary,
   PrintNote,
   PrintStatusBadge,
   type PrintField,
@@ -128,30 +129,18 @@ export default function BillingPrintDocument({
         ) : null}
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintFieldGrid
-            title="Party Information"
-            fields={partyFields}
-            columns="sm:grid-cols-2"
-          />
-          <PrintFieldGrid
-            title="Reference Metadata"
-            fields={referenceFields}
-            columns="sm:grid-cols-2"
-          />
+          <PrintKeyValueGrid title="Bill To / Party" rows={partyFields} columns="sm:grid-cols-2" />
+          <PrintKeyValueGrid title="Document Metadata" rows={referenceFields} columns="sm:grid-cols-2" />
         </div>
 
-        <PrintFieldGrid
-          title="Amount Summary"
-          fields={summaryFields}
-          columns="md:grid-cols-2 xl:grid-cols-4"
-        />
+        <PrintAmountSummary title="Amount Summary" rows={summaryFields} />
 
         <LineItemsSection lineItems={lineItems} />
 
-        <PrintFieldGrid
-          title="Document Details"
-          fields={detailFields}
-          columns="md:grid-cols-2 xl:grid-cols-3"
+        <PrintKeyValueGrid
+          title="Notes / Terms"
+          rows={detailFields}
+          columns="sm:grid-cols-2"
         />
 
         <PrintNote>{footerNote}</PrintNote>

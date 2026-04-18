@@ -140,9 +140,20 @@ def build_branch_reporting_overview(*, branch_id: int | None = None, start_date=
     if branch_id:
         stock_locations = stock_locations.filter(branch_id=branch_id)
 
+    reversed_payment_queryset = payment_queryset.filter(
+        allocation_metadata__reversal__is_reversed=True
+    )
+    active_payment_queryset = payment_queryset.exclude(
+        allocation_metadata__reversal__is_reversed=True
+    )
+
     cash_total = payment_queryset.filter(method="CASH").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     upi_total = payment_queryset.filter(method="UPI").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     bank_total = payment_queryset.filter(Q(method="BANK") | Q(method="CARD")).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    cash_net_total = active_payment_queryset.filter(method="CASH").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    upi_net_total = active_payment_queryset.filter(method="UPI").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    bank_net_total = active_payment_queryset.filter(Q(method="BANK") | Q(method="CARD")).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
     stock_balance = stock_queryset.aggregate(
         qty_in=Sum("quantity_in"),
@@ -184,9 +195,16 @@ def build_branch_reporting_overview(*, branch_id: int | None = None, start_date=
         "collections": {
             "count": payment_queryset.count(),
             "gross_amount": f"{_money(payment_queryset.aggregate(total=Sum('amount'))['total']):.2f}",
+            "active_count": active_payment_queryset.count(),
+            "reversed_count": reversed_payment_queryset.count(),
+            "reversed_amount": f"{_money(reversed_payment_queryset.aggregate(total=Sum('amount'))['total']):.2f}",
+            "net_amount": f"{_money(active_payment_queryset.aggregate(total=Sum('amount'))['total']):.2f}",
             "cash_total": f"{_money(cash_total):.2f}",
             "bank_total": f"{_money(bank_total):.2f}",
             "upi_total": f"{_money(upi_total):.2f}",
+            "cash_net_total": f"{_money(cash_net_total):.2f}",
+            "bank_net_total": f"{_money(bank_net_total):.2f}",
+            "upi_net_total": f"{_money(upi_net_total):.2f}",
         },
         "direct_sales": {
             "count": direct_sale_queryset.count(),

@@ -333,17 +333,9 @@ export default function PartnerPaymentDetailPage() {
               ]}
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
-                { label: "Product Code", value: payment.product_code || "—" },
-                {
-                  label: "Subscription Status",
-                  value: payment.subscription_status || "—",
-                },
-                {
-                  label: "Plan Type",
-                  value: payment.subscription_plan_type || "—",
-                },
+                { label: "Plan Type", value: payment.subscription_plan_type || "—" },
+                { label: "Subscription", value: subscriptionLabel },
                 { label: "EMI Context", value: emiContext },
-                { label: "EMI Status", value: payment.emi_status || "—" },
                 { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
                 {
                   label: "EMI Amount",
@@ -359,10 +351,6 @@ export default function PartnerPaymentDetailPage() {
                     typeof payment.lucky_number === "number"
                       ? `#${payment.lucky_number}`
                       : "—",
-                },
-                {
-                  label: "Verified By",
-                  value: payment.verified_by_username || "—",
                 },
                 { label: "Reference Number", value: payment.reference_no || "—" },
               ]}

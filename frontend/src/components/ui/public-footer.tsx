@@ -6,9 +6,11 @@ import { ROUTES } from "@/lib/routes";
 
 const footerLinks = [
   { href: ROUTES.public.products, label: "Products" },
+  { href: ROUTES.public.luckyPlan, label: "Lucky Plan" },
   { href: ROUTES.public.apply, label: "Apply" },
   { href: ROUTES.public.winnerHistory, label: "Winner History" },
   { href: ROUTES.public.contact, label: "Contact" },
+  { href: ROUTES.public.blog, label: "Blog" },
   { href: ROUTES.public.login, label: "Login" },
   { href: ROUTES.public.register, label: "Register" },
 ];

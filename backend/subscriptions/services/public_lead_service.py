@@ -82,6 +82,7 @@ def create_public_lead(
     *,
     name: str,
     phone: str,
+    email: str = "",
     city: str = "",
     interested_product: str = "",
     preferred_emi_amount=None,
@@ -91,6 +92,7 @@ def create_public_lead(
     lead = PublicLead.objects.create(
         name=(name or "").strip(),
         phone=(phone or "").strip(),
+        email=(email or "").strip(),
         city=(city or "").strip(),
         product=product,
         interested_product=_resolve_interested_product(product, interested_product),

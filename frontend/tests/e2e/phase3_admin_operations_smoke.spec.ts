@@ -9,18 +9,20 @@ test("phase-3 admin operations hubs load with visible navigation actions", async
   await expect(
     page.getByRole("heading", { name: "Inventory Operations" })
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Items" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Ledger" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Adjustments" })).toBeVisible();
+  const inventoryActions = page.locator(".portal-page-actions");
+  await expect(inventoryActions.getByRole("link", { name: "Items" })).toBeVisible();
+  await expect(inventoryActions.getByRole("link", { name: "Ledger" })).toBeVisible();
+  await expect(inventoryActions.getByRole("link", { name: "Adjustments" })).toBeVisible();
 
   await page.goto("/admin/billing");
   await expect(
     page.getByRole("heading", { name: "Billing Operations" })
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Invoices" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Credit Notes" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Debit Notes" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Receipts" })).toBeVisible();
+  const billingActions = page.locator(".portal-page-actions");
+  await expect(billingActions.getByRole("link", { name: "Invoices" })).toBeVisible();
+  await expect(billingActions.getByRole("link", { name: "Credit Notes" })).toBeVisible();
+  await expect(billingActions.getByRole("link", { name: "Debit Notes" })).toBeVisible();
+  await expect(billingActions.getByRole("link", { name: "Receipts" })).toBeVisible();
 
   await page.goto("/admin/reminders");
   await expect(page.getByRole("heading", { name: "Reminder Queue" })).toBeVisible();

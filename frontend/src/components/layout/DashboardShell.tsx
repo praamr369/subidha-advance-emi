@@ -73,6 +73,7 @@ type ShellNavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
 };
 
 type ShellNavGroup = {
@@ -204,11 +205,17 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
       title: group.title,
       icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
       items: group.items
-        .filter((item) => typeof item.href === "string" && item.href.trim().length > 0)
+        .filter(
+          (item) =>
+            !item.hidden &&
+            typeof item.href === "string" &&
+            item.href.trim().length > 0
+        )
         .map((item) => ({
           label: item.label,
           href: item.href,
           icon: ICON_MAP[item.icon],
+          disabled: Boolean(item.disabled),
         })),
     }))
     .filter((group) => group.items.length > 0);
@@ -394,6 +401,9 @@ function UserDropdown({
 function Sidebar({
   role,
   pathname,
+  displayName,
+  onLogout,
+  isLoggingOut,
   collapsed,
   onToggleCollapse,
   mobileOpen,
@@ -401,6 +411,9 @@ function Sidebar({
 }: {
   role: NavigationRole;
   pathname: string;
+  displayName: string;
+  onLogout: () => void;
+  isLoggingOut: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen?: boolean;
@@ -419,6 +432,7 @@ function Sidebar({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     () => readExpandedGroups()
   );
+  const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
   const [navQuery, setNavQuery] = useState("");
   const normalizedNavQuery = navQuery.trim().toLowerCase();
   const visibleGroups = useMemo(() => {
@@ -449,8 +463,7 @@ function Sidebar({
   const toggleGroup = useCallback(
     (title: string, defaultOpen: boolean) => {
       if (collapsed && !isMobile) {
-        onToggleCollapse();
-        setExpandedGroups((current) => ({ ...current, [title]: true }));
+        setFlyoutGroup((current) => (current === title ? null : title));
         return;
       }
       setExpandedGroups((current) => ({
@@ -458,7 +471,7 @@ function Sidebar({
         [title]: !(current[title] ?? defaultOpen),
       }));
     },
-    [collapsed, isMobile, onToggleCollapse]
+    [collapsed, isMobile]
   );
 
   const sidebarClasses = cn(
@@ -478,41 +491,49 @@ function Sidebar({
         />
       ) : null}
 
-      <aside className={sidebarClasses}>
-        <div className="flex h-[4.75rem] items-center gap-3 border-b border-[var(--sidebar-rail-border)] px-4">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
-            SC
-          </div>
-
-          {!collapsed ? (
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                {brandConfig.companyName}
-              </div>
-              <div className="truncate text-base font-semibold tracking-tight text-white">
-                {brandConfig.platformName}
-              </div>
+      <aside className={sidebarClasses} onMouseLeave={() => setFlyoutGroup(null)}>
+        <div className="sticky top-0 z-10 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
+          <div className="flex h-[4.75rem] items-center gap-3 px-4">
+            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
+              SF
             </div>
-          ) : null}
 
-          {!isMobile ? (
-            <button
-              onClick={onToggleCollapse}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
-              aria-label="Close sidebar"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+            {!collapsed ? (
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                  {brandConfig.companyName}
+                </div>
+                <div className="truncate text-base font-semibold tracking-tight text-white">
+                  {brandConfig.platformName}
+                </div>
+              </div>
+            ) : (
+              <span className="sr-only">{brandConfig.platformName}</span>
+            )}
+
+            {!isMobile ? (
+              <button
+                onClick={() => {
+                  setFlyoutGroup(null);
+                  onToggleCollapse();
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
+                aria-label="Close sidebar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {!collapsed ? (
@@ -575,9 +596,32 @@ function Sidebar({
               const groupActive = group.items.some((item) => item.href === activeHref);
               const defaultOpen = role === "ADMIN" ? index === 0 : true;
               const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
+              const flyoutOpen = collapsed && flyoutGroup === group.title;
 
               return (
-                <section key={group.title} className="space-y-1">
+                <section
+                  key={group.title}
+                  className="relative space-y-1"
+                  onMouseEnter={() => {
+                    if (!collapsed) return;
+                    setFlyoutGroup(group.title);
+                  }}
+                  onFocus={() => {
+                    if (!collapsed) return;
+                    setFlyoutGroup(group.title);
+                  }}
+                  onBlur={(event) => {
+                    if (!collapsed) return;
+                    const nextTarget = event.relatedTarget as Node | null;
+                    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+                    setFlyoutGroup(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setFlyoutGroup(null);
+                    }
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.title, defaultOpen)}
@@ -588,49 +632,161 @@ function Sidebar({
                         ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
                         : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
                     )}
-                    aria-expanded={groupOpen}
+                    aria-expanded={collapsed ? flyoutOpen : groupOpen}
+                    aria-haspopup={collapsed ? "menu" : undefined}
                     title={collapsed ? group.title : undefined}
                   >
-                    <GroupIcon className={cn("h-4 w-4 shrink-0", groupActive ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white")} />
+                    <GroupIcon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        groupActive
+                          ? "text-[var(--sidebar-primary)]"
+                          : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+                      )}
+                    />
                     {!collapsed ? (
                       <>
                         <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.01em]">
                           {group.title}
                         </span>
-                        <span className="rounded-full border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sidebar-item-muted)]">
-                          {group.items.length}
-                        </span>
-                        {groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {groupOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                       </>
-                    ) : null}
+                    ) : (
+                      <span className="sr-only">{group.title}</span>
+                    )}
                   </button>
+
+                  {collapsed && flyoutOpen ? (
+                    <div
+                      role="menu"
+                      aria-label={`${group.title} navigation`}
+                      className="absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
+                    >
+                      <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                          {group.title}
+                        </div>
+                        <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">
+                          Select a module
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {group.items.map((item) => {
+                          const active = item.href === activeHref;
+                          const Icon = item.icon;
+                          const classes = cn(
+                            "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
+                            item.disabled
+                              ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
+                              : active
+                              ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                              : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                          );
+
+                          if (item.disabled) {
+                            return (
+                              <div
+                                key={`${group.title}:${item.href}:${item.label}`}
+                                className={classes}
+                                aria-disabled="true"
+                                title="Not available yet"
+                              >
+                                <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+                                <span className="min-w-0 truncate text-[13px] font-medium">
+                                  {item.label}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <Link
+                              key={`${group.title}:${item.href}:${item.label}`}
+                              href={item.href}
+                              onClick={isMobile ? onClose : undefined}
+                              className={classes}
+                              role="menuitem"
+                            >
+                              <Icon
+                                className={cn(
+                                  "h-4 w-4 shrink-0",
+                                  active
+                                    ? "text-[var(--sidebar-primary)]"
+                                    : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+                                )}
+                              />
+                              <span className="min-w-0 truncate text-[13px] font-medium">
+                                {item.label}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {groupOpen ? (
                     <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/80 pl-3">
                       {group.items.map((item) => {
                         const active = item.href === activeHref;
                         const Icon = item.icon;
+                        const rowBase = cn(
+                          "group relative flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
+                          collapsed ? "justify-center" : "",
+                          active
+                            ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                            : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                        );
 
                         return (
-                          <Link
-                            key={`${group.title}:${item.href}:${item.label}`}
-                            href={item.href}
-                            onClick={isMobile ? onClose : undefined}
-                            className={cn(
-                              "group flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
-                              active
-                                ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                                : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                            )}
-                          >
-                            <Icon
+                          item.disabled ? (
+                            <div
+                              key={`${group.title}:${item.href}:${item.label}`}
                               className={cn(
-                                "h-4 w-4 shrink-0",
-                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+                                rowBase,
+                                "cursor-not-allowed opacity-70"
                               )}
-                            />
-                            <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                          </Link>
+                              aria-disabled="true"
+                              title="Not available yet"
+                            >
+                              <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+                              {!collapsed ? (
+                                <span className="min-w-0 truncate text-[13px] font-medium">
+                                  {item.label}
+                                </span>
+                              ) : (
+                                <span className="sr-only">{item.label}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <Link
+                              key={`${group.title}:${item.href}:${item.label}`}
+                              href={item.href}
+                              onClick={isMobile ? onClose : undefined}
+                              className={rowBase}
+                              title={collapsed ? item.label : undefined}
+                            >
+                              <Icon
+                                className={cn(
+                                  "h-4 w-4 shrink-0",
+                                  active
+                                    ? "text-[var(--sidebar-primary)]"
+                                    : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+                                )}
+                              />
+                              {!collapsed ? (
+                                <span className="min-w-0 truncate text-[13px] font-medium">
+                                  {item.label}
+                                </span>
+                              ) : (
+                                <span className="sr-only">{item.label}</span>
+                              )}
+                            </Link>
+                          )
                         );
                       })}
                     </div>
@@ -641,24 +797,66 @@ function Sidebar({
           </div>
         </nav>
 
-        {!collapsed ? (
-          <div className="border-t border-[var(--sidebar-rail-border)] p-4">
-            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                Operational Mode
+        <div className="sticky bottom-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-3">
+          {!collapsed ? (
+            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-white">
+                    {displayName}
+                  </div>
+                  <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                    {formatRoleLabel(role)}
+                  </div>
+                </div>
+                <Link
+                  href={getSettingsHref(role)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                  title="Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
               </div>
-              <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">
-                Live enterprise workspace. Finance, stock, billing, and service flows remain source-linked and auditable.
-              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link
+                  href={getProfileHref(role)}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                >
+                  Profile
+                </Link>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={isLoggingOut}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoggingOut ? "Logging out..." : "Logout"}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="border-t border-[var(--sidebar-rail-border)] p-4 text-center">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-              Live
-            </span>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href={getSettingsHref(role)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
+              <button
+                type="button"
+                onClick={onLogout}
+                disabled={isLoggingOut}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                title="Logout"
+                aria-label="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
     </>
   );
@@ -755,6 +953,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             <Sidebar
               role={role}
               pathname={pathname}
+              displayName={displayName}
+              onLogout={logout}
+              isLoggingOut={isLoggingOut}
               collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebarCollapse}
             />
@@ -764,6 +965,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             <Sidebar
               role={role}
               pathname={pathname}
+              displayName={displayName}
+              onLogout={logout}
+              isLoggingOut={isLoggingOut}
               collapsed={false}
               onToggleCollapse={toggleSidebarCollapse}
               mobileOpen={mobileOpen}

@@ -272,6 +272,7 @@ def sync_party_for_lead(lead: PublicLead, *, party: PartyMaster | None = None, p
         source_pk=lead.id,
         display_name=lead.name,
         phone=lead.phone,
+        email=getattr(lead, "email", ""),
         city=lead.city,
         is_active=lead.status != "CLOSED",
         source_reference=f"LEAD-{lead.id}",

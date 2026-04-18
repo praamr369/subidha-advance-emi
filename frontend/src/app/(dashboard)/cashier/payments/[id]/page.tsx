@@ -273,12 +273,8 @@ export default function CashierPaymentReceiptPage() {
               ]}
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
-                {
-                  label: "Subscription Status",
-                  value: payment.subscription_status || "—",
-                },
+                { label: "Subscription", value: subscriptionLabel },
                 { label: "EMI Context", value: emiContext },
-                { label: "EMI Status", value: payment.emi_status || "—" },
                 { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
                 { label: "EMI Amount", value: money(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },

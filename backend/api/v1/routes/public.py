@@ -14,11 +14,33 @@ from subscriptions.services.winner_state_service import winner_history_q
 class PublicLeadSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     phone = serializers.RegexField(regex=r"^\d{10}$")
+    email = serializers.EmailField(required=False, allow_blank=True)
     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     product_id = serializers.IntegerField(required=False, allow_null=True)
     interested_product = serializers.CharField(max_length=255, required=False, allow_blank=True)
     preferred_emi_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+def _mask_public_name(raw):
+    """
+    Reduce exposure of customer identity in public winner pages.
+    Keeps a recognizable display label without publishing full names.
+    """
+    if not raw:
+        return None
+
+    normalized = " ".join(part for part in str(raw).strip().split(" ") if part)
+    if not normalized:
+        return None
+
+    parts = normalized.split(" ")
+    if len(parts) == 1:
+        return parts[0]
+
+    first = parts[0]
+    last_initial = parts[-1][:1].upper()
+    return f"{first} {last_initial}."
 
 
 def _serialize_public_winner(draw: LuckyDraw):
@@ -37,7 +59,7 @@ def _serialize_public_winner(draw: LuckyDraw):
     if subscription:
         customer = getattr(subscription, "customer", None)
         product = getattr(subscription, "product", None)
-        customer_name = getattr(customer, "name", None)
+        customer_name = _mask_public_name(getattr(customer, "name", None))
         product_name = getattr(product, "name", None)
 
     lucky_number = getattr(draw.winner_lucky_id, "lucky_number", None)
@@ -55,8 +77,10 @@ def _serialize_public_winner(draw: LuckyDraw):
         "customer_name": customer_name,
         "product_name": product_name,
         "committed_hash": draw.committed_hash,
-        "waived_emi_count": draw.waived_emi_count,
-        "waived_amount": str(draw.waived_amount),
+        "waived_emi_count": draw.waived_emi_count or 0,
+        "waived_amount": (
+            str(draw.waived_amount) if draw.waived_amount is not None else None
+        ),
     }
 
 
@@ -131,6 +155,7 @@ class PublicLeadView(APIView):
                 "data": {
                     "name": lead.name,
                     "phone": lead.phone,
+                    "email": lead.email,
                     "city": lead.city,
                     "product_id": lead.product_id,
                     "interested_product": lead.interested_product,
@@ -205,12 +230,20 @@ class PublicWinnerHistoryView(APIView):
         )
 
 
+class PublicWinnersView(PublicWinnerHistoryView):
+    """
+    Alias route for clients that expect `/public/winners/`.
+    Uses the same safe serialization as `/public/winner-history/`.
+    """
+
+
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
     path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),
+    path("winners/", PublicWinnersView.as_view(), name="public-winners"),
     path("winner-history/", PublicWinnerHistoryView.as_view(), name="public-winner-history"),
     path("health/", PublicLivenessView.as_view(), name="public-health"),
     path("readiness/", PublicReadinessView.as_view(), name="public-readiness"),

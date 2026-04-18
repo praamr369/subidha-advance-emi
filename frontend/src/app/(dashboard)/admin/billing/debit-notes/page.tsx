@@ -112,7 +112,11 @@ export default function BillingDebitNotesPage() {
         title="Debit Note"
         subtitle="Printable debit-note preview for controlled upward invoice adjustments."
         reference={latestPosted?.note_no || "No posted debit note"}
-        meta={latestPosted ? `Original invoice ${latestPosted.original_invoice_no || latestPosted.original_invoice}` : "Waiting for a posted debit note"}
+        meta={
+          latestPosted
+            ? `Original invoice ${latestPosted.original_invoice_no || "—"}`
+            : "Waiting for a posted debit note"
+        }
         statusLabel={latestPosted?.status}
         statusToneClassName={
           latestPosted?.status === "POSTED"
@@ -124,21 +128,14 @@ export default function BillingDebitNotesPage() {
         partyFields={[
           {
             label: "Adjusted Invoice",
-            value: latestPosted?.original_invoice_no || (latestPosted ? `#${latestPosted.original_invoice}` : "—"),
+            value: latestPosted?.original_invoice_no || "—",
             emphasize: true,
           },
           {
             label: "Stock Effect",
             value: latestPosted?.stock_effect ? "Yes" : "No",
           },
-          {
-            label: "Status",
-            value: latestPosted?.status || "—",
-          },
-          {
-            label: "Journal Entry",
-            value: latestPosted?.posted_journal_entry_no || "Pending",
-          },
+          { label: "Status", value: latestPosted?.status || "—" },
         ]}
         referenceFields={[
           { label: "Note Date", value: latestPosted?.note_date || "—" },
@@ -155,10 +152,9 @@ export default function BillingDebitNotesPage() {
         detailFields={[
           { label: "Reason", value: latestPosted?.reason || "—" },
           { label: "Original Invoice", value: latestPosted?.original_invoice_no || "—" },
-          { label: "Journal Entry", value: latestPosted?.posted_journal_entry_no || "Pending" },
           { label: "Document Status", value: latestPosted?.status || "—" },
         ]}
-        lineItems={(latestPosted?.lines || []).slice(0, 8).map((line) => ({
+        lineItems={(latestPosted?.lines || []).map((line) => ({
           description: line.description,
           quantity: line.quantity,
           unitPrice: accountingMoney(line.taxable_value),

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -10,6 +10,8 @@ import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { getAdminDashboard, type AdminDashboardResponse } from "@/services/admin";
+import { getBranchReportingOverview, type BranchReportingOverview } from "@/services/branch-control";
 import type { AdminCommissionSummaryResponse } from "@/types/commission";
 
 type PayoutBatchRow = {
@@ -48,6 +50,17 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Failed to load finance dashboard.";
+}
+
+function toIsoDate(value: Date): string {
+  const yyyy = value.getFullYear();
+  const mm = String(value.getMonth() + 1).padStart(2, "0");
+  const dd = String(value.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function monthStartIso(value: Date): string {
+  return toIsoDate(new Date(value.getFullYear(), value.getMonth(), 1));
 }
 
 function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
@@ -173,11 +186,13 @@ function FinanceLaneCard({
 export default function AdminFinancePage() {
   const [summary, setSummary] = useState<AdminCommissionSummaryResponse | null>(null);
   const [batches, setBatches] = useState<PayoutBatchRow[]>([]);
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboardResponse | null>(null);
+  const [monthOverview, setMonthOverview] = useState<BranchReportingOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") {
       setLoading(true);
     } else {
@@ -185,21 +200,32 @@ export default function AdminFinancePage() {
     }
 
     try {
-      const [summaryPayload, batchesPayload] = await Promise.all([
-        apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
-        apiFetch<unknown>("/admin/commission-payout-batches/list/"),
-      ]);
+      const now = new Date();
+      const [summaryPayload, batchesPayload, dashboardPayload, monthOverviewPayload] =
+        await Promise.all([
+          apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
+          apiFetch<unknown>("/admin/commission-payout-batches/list/"),
+          getAdminDashboard(),
+          getBranchReportingOverview({
+            start_date: monthStartIso(now),
+            end_date: toIsoDate(now),
+          }),
+        ]);
 
       setSummary(summaryPayload);
       setBatches(
         toArray<Record<string, unknown>>(batchesPayload).map(normalizePayoutBatch)
       );
+      setAdminDashboard(dashboardPayload);
+      setMonthOverview(monthOverviewPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
       if (mode === "initial") {
         setSummary(null);
         setBatches([]);
+        setAdminDashboard(null);
+        setMonthOverview(null);
       }
     } finally {
       if (mode === "initial") {
@@ -208,11 +234,11 @@ export default function AdminFinancePage() {
         setRefreshing(false);
       }
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadPage("initial");
-  }, []);
+  }, [loadPage]);
 
   const draftBatchCount = useMemo(
     () => batches.filter((row) => row.status.toUpperCase() === "DRAFT").length,
@@ -230,11 +256,29 @@ export default function AdminFinancePage() {
   );
 
   const recentBatches = useMemo(() => batches.slice(0, 5), [batches]);
+  const monthCash =
+    Number(
+      monthOverview?.collections.cash_net_total ?? monthOverview?.collections.cash_total ?? 0
+    ) || 0;
+  const monthBank =
+    Number(
+      monthOverview?.collections.bank_net_total ?? monthOverview?.collections.bank_total ?? 0
+    ) || 0;
+  const monthUpi =
+    Number(
+      monthOverview?.collections.upi_net_total ?? monthOverview?.collections.upi_total ?? 0
+    ) || 0;
+  const monthNet = Number(monthOverview?.collections.net_amount ?? monthOverview?.collections.gross_amount ?? 0) || 0;
+  const todayNet = Number(adminDashboard?.collections?.today_net_amount ?? adminDashboard?.financial?.today_collection ?? 0) || 0;
+  const outstandingReceivables = Number(adminDashboard?.summary?.outstanding_amount ?? adminDashboard?.financial?.total_outstanding ?? 0) || 0;
+  const overdueAmount = Number(adminDashboard?.summary?.overdue_amount ?? 0) || 0;
+  const waivedAmount = Number(adminDashboard?.summary?.total_waived_amount ?? 0) || 0;
+  const reconciliationFlags = Number(adminDashboard?.reconciliation?.flagged_count ?? 0) || 0;
 
   return (
     <PortalPage
       title="Finance Control Center"
-      subtitle="Monitor commission exposure, settled payout preparation, and payout batch lifecycle from one finance workspace."
+      subtitle="Finance snapshot for collections, receivables, reconciliation, commissions, and payout operations. Only real ledger-backed numbers are shown."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Partner Finance", href: ROUTES.admin.financeCommissions },
@@ -301,6 +345,57 @@ export default function AdminFinancePage() {
 
         {!loading && !error ? (
           <>
+            <section className="grid gap-4 xl:grid-cols-4">
+              <FinanceLaneCard
+                eyebrow="Collections"
+                title="Today collections (net)"
+                description="Net collections for today from canonical admin dashboard (reversals excluded when available)."
+                value={money(todayNet)}
+                secondaryValue="Use Payments/Collections for row-level posting."
+                primaryHref={ROUTES.admin.payments}
+                primaryLabel="Open payments"
+                secondaryHref={ROUTES.admin.collections}
+                secondaryLabel="Open collections"
+                tone="success"
+              />
+              <FinanceLaneCard
+                eyebrow="Collections"
+                title="Month-to-date (net)"
+                description="Branch-control reporting totals for the current month window."
+                value={money(monthNet)}
+                secondaryValue={`${money(monthCash)} cash · ${money(monthBank)} bank · ${money(monthUpi)} UPI`}
+                primaryHref={ROUTES.admin.branchReporting}
+                primaryLabel="Open branch reporting"
+                secondaryHref={ROUTES.admin.payments}
+                secondaryLabel="Payment log"
+                tone="default"
+              />
+              <FinanceLaneCard
+                eyebrow="Receivables"
+                title="Outstanding receivables"
+                description="Remaining canonical outstanding amount across active subscriptions."
+                value={money(outstandingReceivables)}
+                secondaryValue={`${money(overdueAmount)} overdue · ${money(waivedAmount)} waived`}
+                primaryHref={ROUTES.admin.subscriptions}
+                primaryLabel="Open subscriptions"
+                secondaryHref={ROUTES.admin.emis}
+                secondaryLabel="EMI register"
+                tone={overdueAmount > 0 ? "warning" : "default"}
+              />
+              <FinanceLaneCard
+                eyebrow="Governance"
+                title="Reconciliation flags"
+                description="Flagged mismatches should be handled via controlled reconciliation workflows."
+                value={String(reconciliationFlags)}
+                secondaryValue="Avoid manual edits; keep audit trails intact."
+                primaryHref={buildAdminReconciliationRoute({ flagged: true })}
+                primaryLabel="Open flagged queue"
+                secondaryHref={buildAdminReconciliationRoute()}
+                secondaryLabel="Reconciliation"
+                tone={reconciliationFlags > 0 ? "warning" : "success"}
+              />
+            </section>
+
             <section className="grid gap-4 xl:grid-cols-4">
               <FinanceLaneCard
                 eyebrow="Commissions"

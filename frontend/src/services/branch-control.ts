@@ -75,9 +75,16 @@ export type BranchReportingOverview = {
   collections: {
     count: number;
     gross_amount: string;
+    active_count?: number;
+    reversed_count?: number;
+    reversed_amount?: string;
+    net_amount?: string;
     cash_total: string;
     bank_total: string;
     upi_total: string;
+    cash_net_total?: string;
+    bank_net_total?: string;
+    upi_net_total?: string;
   };
   direct_sales: {
     count: number;

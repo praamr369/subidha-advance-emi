@@ -449,6 +449,7 @@ class Product(TimeStampedModel):
 class PublicLead(TimeStampedModel):
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=10, db_index=True)
+    email = models.EmailField(blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
     product = models.ForeignKey(
         Product,

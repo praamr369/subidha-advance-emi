@@ -292,10 +292,6 @@ export default function BillingContractsPage() {
                         highlightedProfile.product_code ||
                         "—",
                     },
-                    {
-                      label: "Subscription",
-                      value: `#${highlightedProfile.subscription}`,
-                    },
                   ]}
                   contractFields={[
                     {

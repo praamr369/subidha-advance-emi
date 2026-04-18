@@ -38,6 +38,7 @@ export type PublicWinnerHistoryResponse = {
 export type PublicLeadPayload = {
   name: string;
   phone: string;
+  email?: string;
   city?: string;
   product_id?: number;
   interested_product?: string;
@@ -166,6 +167,19 @@ export async function getPublicWinnerHistory(
     `/public/winner-history/?${params.toString()}`,
     { cache: "no-store" },
     "Unable to load winner history right now."
+  );
+}
+
+export async function getPublicWinners(
+  limit = 12
+): Promise<PublicWinnerHistoryResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+
+  return fetchPublic<PublicWinnerHistoryResponse>(
+    `/public/winners/?${params.toString()}`,
+    { cache: "no-store" },
+    "Unable to load winners right now."
   );
 }
 

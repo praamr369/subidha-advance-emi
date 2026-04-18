@@ -266,13 +266,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
   );
 }
 
-function FieldShell({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function FieldShell({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-2 text-sm">
       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -437,3 +431,4 @@ function ProductCard({ product }: { product: PublicProduct }) {
     </Link>
   );
 }
+

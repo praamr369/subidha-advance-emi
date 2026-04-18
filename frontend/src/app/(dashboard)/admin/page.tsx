@@ -130,6 +130,47 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function formatLocalDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resolveWindowDateRange(
+  preset: DashboardWindowPreset,
+  customStartDate: string,
+  customEndDate: string
+): { start: string | undefined; end: string | undefined; label: string } {
+  const today = new Date();
+  const todayLabel = formatLocalDate(today);
+
+  if (preset === "CUSTOM") {
+    return {
+      start: customStartDate || undefined,
+      end: customEndDate || undefined,
+      label:
+        customStartDate && customEndDate
+          ? `${customStartDate} → ${customEndDate}`
+          : "Custom range",
+    };
+  }
+
+  if (preset === "THIS_MONTH") {
+    const start = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    return { start, end: todayLabel, label: `This month (${start} → ${todayLabel})` };
+  }
+
+  if (preset === "LAST_30_DAYS") {
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 29);
+    const start = formatLocalDate(startDate);
+    return { start, end: todayLabel, label: `Last 30 days (${start} → ${todayLabel})` };
+  }
+
+  return { start: undefined, end: undefined, label: "All time" };
+}
+
 function toNumber(value?: string | number | null): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -433,10 +474,16 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [windowPreset, setWindowPreset] =
-    useState<DashboardWindowPreset>("DEFAULT");
+    useState<DashboardWindowPreset>("THIS_MONTH");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState("");
+  const [todayBranchOverview, setTodayBranchOverview] =
+    useState<BranchReportingOverview | null>(null);
+  const branchWindow = useMemo(
+    () => resolveWindowDateRange(windowPreset, startDate, endDate),
+    [endDate, startDate, windowPreset]
+  );
   const dashboardQuery = useMemo(
     () =>
       windowPreset === "CUSTOM"
@@ -451,11 +498,19 @@ export default function AdminDashboardPage() {
   const branchReportingQuery = useMemo(
     () => ({
       branch_id: selectedBranchId || undefined,
-      start_date: startDate || undefined,
-      end_date: endDate || undefined,
+      start_date: branchWindow.start,
+      end_date: branchWindow.end,
     }),
-    [endDate, selectedBranchId, startDate]
+    [branchWindow.end, branchWindow.start, selectedBranchId]
   );
+  const todayBranchReportingQuery = useMemo(() => {
+    const today = formatLocalDate(new Date());
+    return {
+      branch_id: selectedBranchId || undefined,
+      start_date: today,
+      end_date: today,
+    };
+  }, [selectedBranchId]);
   const branchScopedQuery = useMemo(
     () => ({
       branch: selectedBranchId || undefined,
@@ -482,6 +537,7 @@ export default function AdminDashboardPage() {
         leadQueuePayload,
         requestQueuePayload,
         branchOverviewPayload,
+        todayBranchOverviewPayload,
         stockSummaryPayload,
         purchaseDraftPayload,
         purchaseApprovedPayload,
@@ -501,13 +557,14 @@ export default function AdminDashboardPage() {
         listDashboardWinners({ ...dashboardQuery, limit: 4 }),
         getAdminDeliverySummary(),
         listAdminSupportRequests({ status: "SUBMITTED" }),
-        listAdminLeads({ status: "NEW" }),
+        listAdminLeads({}),
         listSubscriptionRequests("admin", {
           status: "SUBMITTED",
           page: 1,
           pageSize: 1,
         }),
         getBranchReportingOverview(branchReportingQuery),
+        getBranchReportingOverview(todayBranchReportingQuery),
         getStockSummary({ branch: selectedBranchId || undefined }),
         listPurchaseBills({
           ...branchScopedQuery,
@@ -565,6 +622,7 @@ export default function AdminDashboardPage() {
       setLeadQueue(leadQueuePayload);
       setRequestQueue(requestQueuePayload);
       setBranchOverview(branchOverviewPayload);
+      setTodayBranchOverview(todayBranchOverviewPayload);
       setBranchBreakdowns(branchMetricPayloads);
       setStockSummary(stockSummaryPayload);
       setPurchaseDrafts(purchaseDraftPayload);
@@ -586,6 +644,7 @@ export default function AdminDashboardPage() {
         setLeadQueue(null);
         setRequestQueue(null);
         setBranchOverview(null);
+        setTodayBranchOverview(null);
         setBranchBreakdowns([]);
         setStockSummary(null);
         setPurchaseDrafts(null);
@@ -601,7 +660,13 @@ export default function AdminDashboardPage() {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }, [branchReportingQuery, branchScopedQuery, dashboardQuery, selectedBranchId]);
+  }, [
+    branchReportingQuery,
+    branchScopedQuery,
+    dashboardQuery,
+    selectedBranchId,
+    todayBranchReportingQuery,
+  ]);
 
   useEffect(() => {
     void loadDashboard("initial");
@@ -647,7 +712,11 @@ export default function AdminDashboardPage() {
       deliverySummary.in_transit
     : 0;
   const supportActionCount = supportQueue?.count ?? 0;
-  const onboardingActionCount = (requestQueue?.count ?? 0) + (leadQueue?.count ?? 0);
+  const leadActionCount =
+    (leadQueue?.summary.new ?? 0) +
+    (leadQueue?.summary.in_progress ?? 0) +
+    (leadQueue?.summary.contacted ?? 0);
+  const onboardingActionCount = (requestQueue?.count ?? 0) + leadActionCount;
   const selectedBranch = selectedBranchId
     ? branchOverview?.branches.find(
         (branch) => String(branch.id) === selectedBranchId
@@ -656,9 +725,33 @@ export default function AdminDashboardPage() {
   const selectedBranchLabel = selectedBranch
     ? `${selectedBranch.code} · ${selectedBranch.name}`
     : "All branches";
-  const cashTotal = toNumber(branchOverview?.collections.cash_total);
-  const bankTotal = toNumber(branchOverview?.collections.bank_total);
-  const upiTotal = toNumber(branchOverview?.collections.upi_total);
+  const cashTotal = toNumber(
+    branchOverview?.collections.cash_net_total ?? branchOverview?.collections.cash_total
+  );
+  const bankTotal = toNumber(
+    branchOverview?.collections.bank_net_total ?? branchOverview?.collections.bank_total
+  );
+  const upiTotal = toNumber(
+    branchOverview?.collections.upi_net_total ?? branchOverview?.collections.upi_total
+  );
+  const todayCashTotal = toNumber(
+    todayBranchOverview?.collections.cash_net_total ??
+      todayBranchOverview?.collections.cash_total
+  );
+  const todayBankTotal = toNumber(
+    todayBranchOverview?.collections.bank_net_total ??
+      todayBranchOverview?.collections.bank_total
+  );
+  const todayUpiTotal = toNumber(
+    todayBranchOverview?.collections.upi_net_total ??
+      todayBranchOverview?.collections.upi_total
+  );
+  const todayNetCollections =
+    todayBranchOverview?.collections.net_amount ??
+    legacy?.collections?.today_net_amount ??
+    "0.00";
+  const windowNetCollections =
+    branchOverview?.collections.net_amount ?? branchOverview?.collections.gross_amount;
   const stockRows = stockSummary?.results ?? [];
   const lowStockRows = stockRows.filter((row) => row.is_below_reorder);
   const rawMaterialLowRows = lowStockRows.filter(
@@ -686,17 +779,22 @@ export default function AdminDashboardPage() {
     branchOverview?.subscriptions.active_contracts ??
     summary?.active_subscriptions ??
     0;
+  const portfolioMix = legacy?.portfolio_mix ?? null;
+  const portfolioTotal = Math.max(
+    (portfolioMix?.emi ?? 0) + (portfolioMix?.rent ?? 0) + (portfolioMix?.lease ?? 0),
+    1
+  );
+  const leadPipeline = legacy?.crm?.lead_pipeline ?? leadQueue?.summary ?? null;
+  const leadPipelineCounts = {
+    new: Number(leadPipeline?.new ?? 0),
+    in_progress: Number(leadPipeline?.in_progress ?? 0),
+    contacted: Number(leadPipeline?.contacted ?? 0),
+    converted: Number(leadPipeline?.converted ?? 0),
+    closed: Number(leadPipeline?.closed ?? 0),
+  };
+  const recentLeads = leadQueue?.results ?? [];
   const overdueEmiCount =
     branchOverview?.subscriptions.overdue_emi_count ?? summary?.overdue_emis ?? 0;
-  const subscriptionPostureTotal = Math.max(activeContracts + overdueEmiCount, 1);
-  const nextDrawBatch = legacy?.batches.next_draw_batch ?? null;
-  const batchTotalSlots = Number(nextDrawBatch?.total_slots ?? 0);
-  const batchAvailableSlots = Number(nextDrawBatch?.available_slots ?? 0);
-  const batchFilledSlots =
-    batchTotalSlots > 0
-      ? Math.max(0, batchTotalSlots - batchAvailableSlots)
-      : Number(nextDrawBatch?.subscription_count ?? 0);
-  const batchFillTotal = Math.max(batchTotalSlots, batchFilledSlots, 1);
   const collectionTrendRows = Array.from(
     paymentRows
       .slice()
@@ -712,26 +810,33 @@ export default function AdminDashboardPage() {
     1
   );
   const branchCollectionMax = Math.max(
-    ...branchBreakdowns.map((item) => toNumber(item.collections.gross_amount)),
+    ...branchBreakdowns.map((item) =>
+      toNumber(item.collections.net_amount ?? item.collections.gross_amount)
+    ),
     1
   );
 
   return (
     <PortalPage
-      title="Admin Dashboard"
-      subtitle="Enterprise operations cockpit for collections, billing, inventory, delivery, service, accounting, workforce, and branch governance."
+      title="Business Control Center"
+      subtitle="Executive operating console for finance, collections, CRM, subscriptions (EMI / RENT / LEASE), direct sales, inventory, branches, staff, and governance."
       helperNote="All sections below use live module data only. No operational KPI here is synthetic or detached from source modules."
       helperTone="info"
       breadcrumbs={[{ label: "Admin" }]}
       actions={[
         {
           href: ROUTES.admin.paymentsCreate,
-          label: "Collect EMI",
+          label: "Collect Payment",
           variant: "primary",
         },
         {
-          href: overdueFollowUpHref,
-          label: "Overdue EMI Queue",
+          href: ROUTES.admin.finance,
+          label: "Finance",
+          variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.crm,
+          label: "CRM",
           variant: "secondary",
         },
         {
@@ -739,35 +844,32 @@ export default function AdminDashboardPage() {
           label: "Reconciliation Flags",
           variant: "secondary",
         },
-        {
-          href: ROUTES.admin.subscriptionsCreate,
-          label: "Create Subscription",
-          variant: "ghost",
-        },
       ]}
       stats={
         legacy && summary
           ? [
               {
-                label: "Customers",
-                value: String(legacy.subscription_kpis?.total_customers ?? 0),
-              },
-              {
-                label: "Active Contracts",
-                value: String(summary.active_subscriptions ?? 0),
-              },
-              {
-                label: "Collected Today",
-                value: money(legacy.collections?.today_net_amount),
+                label: "Today collections",
+                value: money(todayNetCollections),
                 tone: "success",
               },
               {
-                label: "Flagged Reconciliation",
-                value: String(reconciliationSurface?.flagged_count ?? 0),
+                label: "Window collections",
+                value: money(windowNetCollections),
+                tone: "info",
+              },
+              {
+                label: "Outstanding receivables",
+                value: money(summary.outstanding_amount),
+                tone: (toNumber(summary.outstanding_amount) ?? 0) > 0 ? "warning" : "success",
+              },
+              {
+                label: "Overdue amount",
+                value: money(summary.overdue_amount),
                 tone:
-                  (reconciliationSurface?.flagged_count ?? 0) > 0
+                  (toNumber(summary.overdue_amount) ?? 0) > 0
                     ? "warning"
-                    : "info",
+                    : "success",
               },
             ]
           : []
@@ -839,17 +941,17 @@ export default function AdminDashboardPage() {
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DashboardKpiCard
-                label="Collections (Selected Scope)"
-                value={money(branchOverview?.collections.gross_amount)}
-                detail={`${branchOverview?.collections.count ?? 0} payment rows · ${selectedBranchLabel}`}
+                label="Collections (Window scope)"
+                value={money(windowNetCollections)}
+                detail={`${branchOverview?.collections.active_count ?? branchOverview?.collections.count ?? 0} active · ${branchOverview?.collections.reversed_count ?? 0} reversed · ${branchWindow.label} · ${selectedBranchLabel}`}
                 href={ROUTES.admin.branchReporting}
                 tone="success"
                 icon={<Banknote className="h-5 w-5 text-emerald-700" />}
               />
               <DashboardKpiCard
-                label="Active Lucky Plan Contracts"
+                label="Active contracts"
                 value={String(activeContracts)}
-                detail={`${overdueEmiCount} overdue EMI rows in the same branch posture`}
+                detail={`Portfolio includes EMI / RENT / LEASE. ${overdueEmiCount} overdue EMI rows in the same branch posture.`}
                 href={ROUTES.admin.subscriptions}
                 tone={overdueEmiCount > 0 ? "warning" : "info"}
                 icon={<Users className="h-5 w-5 text-sky-700" />}
@@ -863,7 +965,7 @@ export default function AdminDashboardPage() {
                 icon={<Siren className="h-5 w-5 text-amber-700" />}
               />
               <DashboardKpiCard
-                label="Stock Alert Queue"
+                label="Stock alert queue"
                 value={String(lowStockRows.length)}
                 detail={`${rawMaterialLowRows.length} raw-material alert(s) from real inventory summary`}
                 href={ROUTES.admin.inventoryStockOnHand}
@@ -924,7 +1026,7 @@ export default function AdminDashboardPage() {
                   />
                   <AttentionRow
                     title="Lead and onboarding follow-up"
-                    detail={`${requestQueue?.count ?? 0} subscription request(s) and ${leadQueue?.count ?? 0} lead(s) need conversion or closure.`}
+                    detail={`${requestQueue?.count ?? 0} subscription request(s) and ${leadActionCount} open lead(s) need conversion or closure.`}
                     value={String(onboardingActionCount)}
                     href={onboardingRequestsHref}
                     tone={onboardingActionCount > 0 ? "warning" : "success"}
@@ -941,16 +1043,36 @@ export default function AdminDashboardPage() {
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Payment mode split
+                      Payment mode split (window net)
                     </div>
                     <div className="mt-2 text-2xl font-semibold text-slate-950">
                       {money(cashTotal + bankTotal + upiTotal)}
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
-                      Cash, bank/card, and UPI totals for the selected branch/date scope.
+                      Net totals for the active window scope (reversed rows excluded when available).
                     </p>
+                    {branchOverview?.collections.reversed_amount ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Reversed amount in window: {money(branchOverview.collections.reversed_amount)} ({branchOverview.collections.reversed_count ?? 0} row(s)).
+                      </p>
+                    ) : null}
                     <div className="mt-5">
                       <PaymentModeSplit cash={cashTotal} bank={bankTotal} upi={upiTotal} />
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Today (net)
+                      </div>
+                      <div className="mt-2 text-xl font-semibold text-slate-950">
+                        {money(todayCashTotal + todayBankTotal + todayUpiTotal)}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Snapshot for {formatLocalDate(new Date())} in the same branch scope.
+                      </p>
+                      <div className="mt-4">
+                        <PaymentModeSplit cash={todayCashTotal} bank={todayBankTotal} upi={todayUpiTotal} />
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -975,9 +1097,15 @@ export default function AdminDashboardPage() {
                                 ? `${branchPayload.branch.code} · ${branchPayload.branch.name}`
                                 : "All branches"
                             }
-                            value={toNumber(branchPayload.collections.gross_amount)}
+                            value={toNumber(
+                              branchPayload.collections.net_amount ??
+                                branchPayload.collections.gross_amount
+                            )}
                             total={branchCollectionMax}
-                            meta={money(branchPayload.collections.gross_amount)}
+                            meta={money(
+                              branchPayload.collections.net_amount ??
+                                branchPayload.collections.gross_amount
+                            )}
                             tone="success"
                           />
                         ))}
@@ -995,37 +1123,53 @@ export default function AdminDashboardPage() {
 
             <div className="grid gap-4 xl:grid-cols-3">
               <CockpitPanel
-                title="Lucky Plan posture"
-                description="Active contracts, overdue pressure, and next batch readiness stay separate from billing/accounting truth."
-                actionHref={ROUTES.admin.batches}
-                actionLabel="Open batches"
+                title="Portfolio mix"
+                description="Business mix across EMI / RENT / LEASE subscriptions plus direct sales signals. Zero counts are shown honestly when a channel has no data yet."
+                actionHref={ROUTES.admin.subscriptions}
+                actionLabel="Open subscriptions"
               >
                 <div className="space-y-5">
                   <HorizontalBar
-                    label="Active contracts"
-                    value={activeContracts}
-                    total={subscriptionPostureTotal}
-                    meta={`${activeContracts} active`}
+                    label="EMI subscriptions"
+                    value={portfolioMix?.emi ?? 0}
+                    total={portfolioTotal}
+                    meta={`${portfolioMix?.emi ?? 0} total`}
                     tone="info"
                   />
                   <HorizontalBar
-                    label="Overdue EMI pressure"
-                    value={overdueEmiCount}
-                    total={subscriptionPostureTotal}
-                    meta={`${overdueEmiCount} overdue`}
-                    tone={overdueEmiCount > 0 ? "warning" : "success"}
+                    label="RENT subscriptions"
+                    value={portfolioMix?.rent ?? 0}
+                    total={portfolioTotal}
+                    meta={`${portfolioMix?.rent ?? 0} total`}
+                    tone="default"
                   />
                   <HorizontalBar
-                    label={nextDrawBatch?.batch_code ?? "Next draw batch"}
-                    value={batchFilledSlots}
-                    total={batchFillTotal}
-                    meta={
-                      batchTotalSlots > 0
-                        ? `${batchFilledSlots}/${batchTotalSlots} filled`
-                        : `${batchFilledSlots} subscriptions`
-                    }
+                    label="LEASE subscriptions"
+                    value={portfolioMix?.lease ?? 0}
+                    total={portfolioTotal}
+                    meta={`${portfolioMix?.lease ?? 0} total`}
                     tone="success"
                   />
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Direct sales (window)
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-slate-950">
+                      {String(branchOverview?.direct_sales.count ?? 0)}
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Gross value {money(branchOverview?.direct_sales.gross_total)} · Delivery and invoicing tracked in Billing/Delivery modules.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <ActionButton href={ROUTES.admin.billingDirectSales} variant="secondary" className="h-9 px-3 text-xs">
+                        Direct sales
+                      </ActionButton>
+                      <ActionButton href={ROUTES.admin.deliveries} variant="secondary" className="h-9 px-3 text-xs">
+                        Deliveries
+                      </ActionButton>
+                    </div>
+                  </div>
                 </div>
               </CockpitPanel>
 
@@ -1210,6 +1354,123 @@ export default function AdminDashboardPage() {
               </CockpitPanel>
             </div>
 
+            <CockpitPanel
+              title="CRM & lead pipeline"
+              description="Pipeline posture is shown from the real lead register. Follow-ups and conversions should be executed in the Leads/CRM modules to keep audit trails intact."
+              actionHref={ROUTES.admin.crm}
+              actionLabel="Open CRM"
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Pipeline snapshot
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-950">
+                    {String(leadActionCount)}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Open leads (New + In Progress + Contacted) needing follow-up in the queue.
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-5">
+                    {[
+                      ["New", leadPipelineCounts.new, buildAdminLeadsRoute({ status: "NEW" })],
+                      [
+                        "In Progress",
+                        leadPipelineCounts.in_progress,
+                        buildAdminLeadsRoute({ status: "IN_PROGRESS" }),
+                      ],
+                      [
+                        "Contacted",
+                        leadPipelineCounts.contacted,
+                        buildAdminLeadsRoute({ status: "CONTACTED" }),
+                      ],
+                      [
+                        "Converted",
+                        leadPipelineCounts.converted,
+                        buildAdminLeadsRoute({ status: "CONVERTED" }),
+                      ],
+                      ["Closed", leadPipelineCounts.closed, buildAdminLeadsRoute({ status: "CLOSED" })],
+                    ].map(([label, value, href]) => (
+                      <Link
+                        key={String(label)}
+                        href={String(href)}
+                        className="rounded-2xl border border-white/75 bg-white/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
+                      >
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          {label as ReactNode}
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-foreground">
+                          {String(value)}
+                        </div>
+                        <div className="mt-1 text-[11px] font-medium text-slate-500">
+                          Open list
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton href={ROUTES.admin.crmLeads} variant="secondary" className="h-9 px-3 text-xs">
+                      Lead register
+                    </ActionButton>
+                    <ActionButton href={newLeadQueueHref} variant="secondary" className="h-9 px-3 text-xs">
+                      New leads
+                    </ActionButton>
+                    <ActionButton href={ROUTES.admin.crmParties} variant="secondary" className="h-9 px-3 text-xs">
+                      Party directory
+                    </ActionButton>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Latest leads
+                      </div>
+                      <div className="mt-1 text-sm text-slate-600">
+                        Recent inquiries requiring assignment, follow-up, or conversion.
+                      </div>
+                    </div>
+                    <ActionButton href={ROUTES.admin.leads} variant="outline" className="h-9 px-3 text-xs">
+                      Open triage
+                    </ActionButton>
+                  </div>
+
+                  {recentLeads.length === 0 ? (
+                    <EmptyState
+                      title="No leads in queue"
+                      description="Public leads and admin-created leads will appear here once recorded."
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {recentLeads.slice(0, 6).map((lead) => (
+                        <Link
+                          key={lead.id}
+                          href={`${ROUTES.admin.leads}/${lead.id}`}
+                          className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-foreground">
+                              {lead.name || "Unnamed lead"}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {lead.phone || "No phone"} · {lead.city || "No city"}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {lead.product_name || lead.interested_product || "General inquiry"} · {lead.status}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-xs text-muted-foreground">
+                            {formatDateTime(lead.created_at)}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CockpitPanel>
+
             <WorkspaceSection
               title="Daily action buckets"
               description="Each bucket opens the existing canonical operational workspace with live filters applied, so admin can move directly from summary posture into the real queue."
@@ -1282,7 +1543,7 @@ export default function AdminDashboardPage() {
                 eyebrow="Sales & Onboarding"
                 title="Onboarding handoff"
                 value={String(onboardingActionCount)}
-                detail={`${requestQueue?.count ?? 0} submitted subscription request(s) and ${leadQueue?.count ?? 0} new lead(s) still need operator handoff into real customer or contract records.`}
+                detail={`${requestQueue?.count ?? 0} submitted subscription request(s) and ${leadActionCount} open lead(s) still need operator handoff into real customer or contract records.`}
                 primaryHref={onboardingRequestsHref}
                 primaryLabel="Open request queue"
                 secondaryHref={newLeadQueueHref}

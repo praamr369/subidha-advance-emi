@@ -414,6 +414,19 @@ button {
     print-color-adjust: exact;
   }
 
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .dashboard-shell-chrome,
   .receipt-print-hide,
   .receipt-print-page .portal-page-breadcrumbs,
@@ -469,6 +482,16 @@ button {
   .receipt-document .print-doc-section {
     break-inside: avoid-page;
     page-break-inside: avoid;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
   }
 
   .receipt-document table th {

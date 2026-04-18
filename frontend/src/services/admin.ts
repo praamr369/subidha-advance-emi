@@ -51,6 +51,21 @@ export type AdminDashboardResponse = {
     completed: number;
     won: number;
   };
+  portfolio_mix?: {
+    emi: number;
+    rent: number;
+    lease: number;
+  };
+  crm?: {
+    lead_pipeline: {
+      new: number;
+      in_progress: number;
+      contacted: number;
+      converted: number;
+      closed: number;
+    };
+    open_leads: number;
+  };
   batches: {
     total_batches: number;
     total_draws: number;
@@ -128,6 +143,15 @@ type AdminDashboardPayload = {
     active?: number;
     completed?: number;
     won?: number;
+  };
+  portfolio_mix?: {
+    emi?: number;
+    rent?: number;
+    lease?: number;
+  };
+  crm?: {
+    lead_pipeline?: Record<string, unknown>;
+    open_leads?: number;
   };
   batches?: {
     total_batches?: number;
@@ -393,6 +417,25 @@ export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
       completed: toNumber(dashboard.subscriptions?.completed),
       won: toNumber(dashboard.subscriptions?.won),
     },
+    portfolio_mix: dashboard.portfolio_mix
+      ? {
+          emi: toNumber(dashboard.portfolio_mix.emi),
+          rent: toNumber(dashboard.portfolio_mix.rent),
+          lease: toNumber(dashboard.portfolio_mix.lease),
+        }
+      : undefined,
+    crm: dashboard.crm
+      ? {
+          lead_pipeline: {
+            new: toNumber(dashboard.crm.lead_pipeline?.new),
+            in_progress: toNumber(dashboard.crm.lead_pipeline?.in_progress),
+            contacted: toNumber(dashboard.crm.lead_pipeline?.contacted),
+            converted: toNumber(dashboard.crm.lead_pipeline?.converted),
+            closed: toNumber(dashboard.crm.lead_pipeline?.closed),
+          },
+          open_leads: toNumber(dashboard.crm.open_leads),
+        }
+      : undefined,
     batches: {
       total_batches: toNumber(dashboard.batches?.total_batches),
       total_draws: toNumber(dashboard.batches?.total_draws),

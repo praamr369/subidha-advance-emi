@@ -8,6 +8,29 @@ export type PrintField = {
   emphasize?: boolean;
 };
 
+function isEmptyToken(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "number") return !Number.isFinite(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return true;
+    return trimmed === "—" || trimmed === "-" || trimmed.toLowerCase() === "n/a";
+  }
+  return false;
+}
+
+function isEmptyFieldValue(value: ReactNode): boolean {
+  if (isEmptyToken(value)) return true;
+
+  // If a field value is an array, treat it as empty only when all entries are empty.
+  if (Array.isArray(value)) {
+    if (value.length === 0) return true;
+    return value.every((item) => isEmptyFieldValue(item as ReactNode));
+  }
+
+  return false;
+}
+
 export function PrintFieldCard({
   label,
   value,
@@ -17,7 +40,7 @@ export function PrintFieldCard({
   return (
     <div
       className={cn(
-        "print-doc-card rounded-xl border border-slate-300 px-3.5 py-2.5",
+        "print-doc-card rounded-lg border border-slate-300 px-3.5 py-2.5",
         className
       )}
     >
@@ -49,7 +72,8 @@ export function PrintFieldGrid({
   columns = "md:grid-cols-2 xl:grid-cols-4",
   className,
 }: PrintFieldGridProps) {
-  if (fields.length === 0) return null;
+  const visibleFields = fields.filter((field) => !isEmptyFieldValue(field.value));
+  if (visibleFields.length === 0) return null;
 
   return (
     <section className={cn("print-doc-section space-y-2.5", className)}>
@@ -57,9 +81,94 @@ export function PrintFieldGrid({
         {title}
       </h3>
       <div className={cn("grid gap-2.5", columns)}>
-        {fields.map((field, index) => (
+        {visibleFields.map((field, index) => (
           <PrintFieldCard key={`${field.label}-${index}`} {...field} />
         ))}
+      </div>
+    </section>
+  );
+}
+
+export function PrintKeyValueGrid({
+  title,
+  rows,
+  columns = "sm:grid-cols-2",
+  className,
+}: {
+  title: string;
+  rows: PrintField[];
+  columns?: string;
+  className?: string;
+}) {
+  const visibleRows = rows.filter((row) => !isEmptyFieldValue(row.value));
+  if (visibleRows.length === 0) return null;
+
+  return (
+    <section className={cn("print-doc-section space-y-2.5", className)}>
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+        {title}
+      </h3>
+      <div className={cn("grid gap-2.5", columns)}>
+        {visibleRows.map((row, index) => (
+          <div
+            key={`${row.label}-${index}`}
+            className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5"
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              {row.label}
+            </div>
+            <div
+              className={cn(
+                "mt-1 text-[13px] leading-5 text-slate-900",
+                row.emphasize ? "print-doc-amount font-semibold" : "font-medium"
+              )}
+            >
+              {row.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function PrintAmountSummary({
+  title = "Summary",
+  rows,
+  className,
+}: {
+  title?: string;
+  rows: PrintField[];
+  className?: string;
+}) {
+  const visibleRows = rows.filter((row) => !isEmptyFieldValue(row.value));
+  if (visibleRows.length === 0) return null;
+
+  return (
+    <section className={cn("print-doc-section", className)}>
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+        {title}
+      </h3>
+      <div className="mt-2 overflow-hidden rounded-lg border border-slate-300 bg-white">
+        <table className="w-full border-collapse text-[12px] leading-5">
+          <tbody>
+            {visibleRows.map((row, index) => (
+              <tr key={`${row.label}-${index}`} className="border-t border-slate-200 first:border-t-0">
+                <td className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  {row.label}
+                </td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right text-slate-900",
+                    row.emphasize ? "print-doc-amount font-semibold" : "font-medium"
+                  )}
+                >
+                  {row.value}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );
@@ -126,6 +235,37 @@ export function PrintFooter({
     >
       <span>{leftText}</span>
       <span>{rightText}</span>
+    </div>
+  );
+}
+
+export function PrintSignatureBlock({
+  leftLabel = "Customer signature",
+  rightLabel = "Authorized signatory",
+  className,
+}: {
+  leftLabel?: string;
+  rightLabel?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("print-doc-section grid gap-4 sm:grid-cols-2", className)}>
+      <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+          {leftLabel}
+        </div>
+        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-slate-600">
+          Signature
+        </div>
+      </div>
+      <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+          {rightLabel}
+        </div>
+        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-slate-600">
+          Stamp / Signature
+        </div>
+      </div>
     </div>
   );
 }

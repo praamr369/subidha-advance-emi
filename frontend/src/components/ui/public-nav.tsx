@@ -19,6 +19,7 @@ const links = [
   { href: ROUTES.public.winnerHistory, label: "Winner History" },
   { href: ROUTES.public.about, label: "About" },
   { href: ROUTES.public.contact, label: "Contact" },
+  { href: ROUTES.public.blog, label: "Blog" },
 ];
 
 const actions = [

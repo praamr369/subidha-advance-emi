@@ -37,6 +37,7 @@ export default function ApplyPageClient() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [interestedProduct, setInterestedProduct] = useState(initialInterestedProduct);
   const [preferredEmiAmount, setPreferredEmiAmount] = useState("");
@@ -62,6 +63,7 @@ export default function ApplyPageClient() {
       const response = await submitPublicLead({
         name: name.trim(),
         phone: phone.trim(),
+        email: email.trim() || undefined,
         city: city.trim(),
         ...(typeof parsedProductId === "number" ? { product_id: parsedProductId } : {}),
         interested_product: interestedProduct.trim(),
@@ -79,6 +81,7 @@ export default function ApplyPageClient() {
       );
       setName("");
       setPhone("");
+      setEmail("");
       setCity("");
       setInterestedProduct(initialInterestedProduct);
       setPreferredEmiAmount("");
@@ -175,6 +178,18 @@ export default function ApplyPageClient() {
               value={city}
               onChange={(event) => setCity(event.target.value)}
               placeholder="Where should the branch contact you?"
+              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-foreground">Email (optional)</span>
+            <input
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="If you prefer email follow-up"
               className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>

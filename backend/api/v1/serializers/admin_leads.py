@@ -63,6 +63,7 @@ class AdminLeadListSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "phone",
+            "email",
             "city",
             "product_id",
             "product_name",

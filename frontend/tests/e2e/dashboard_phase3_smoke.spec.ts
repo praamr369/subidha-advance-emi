@@ -21,21 +21,25 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await page.goto("/admin");
     const sidebar = page.getByRole("complementary");
     await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
-    await expect(page.getByText("Control Center", { exact: true })).toBeVisible();
-    await expect(page.getByText("Sales & Onboarding", { exact: true })).toBeVisible();
-    await expect(page.getByText("Collections & EMI", { exact: true })).toBeVisible();
-    await expect(page.getByText("Fulfillment", { exact: true })).toBeVisible();
-    await expect(page.getByText("Catalog & Inventory", { exact: true })).toBeVisible();
-    await expect(page.getByText("Partner Finance", { exact: true })).toBeVisible();
-    await expect(page.getByText("Billing & Accounting", { exact: true })).toBeVisible();
-    await expect(page.getByText("Governance", { exact: true })).toBeVisible();
+    // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
+    await expect(sidebar.getByText("Lucky Plan Operations", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("CRM & Parties", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Direct Sales & Billing", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Inventory & Procurement", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Manufacturing", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Service Desk", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Accounting & Finance", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Payroll & Workforce", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Branches & Counters", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Reports & Governance", { exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Collect EMI" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "New Contract" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "New Subscription" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Daily action buckets" })).toBeVisible();
-    await expect(page.getByText("Overdue EMI follow-up", { exact: true })).toBeVisible();
-    await expect(page.getByText("Flagged payment reconciliation", { exact: true })).toBeVisible();
-    await expect(page.getByText("Pending delivery actions", { exact: true })).toBeVisible();
-    await expect(page.getByText("Onboarding handoff", { exact: true })).toBeVisible();
+    // Bucket titles may appear both as headings and inside linked cards; assert the heading to avoid strict-mode collisions.
+    await expect(page.getByRole("heading", { name: "Overdue EMI follow-up" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Flagged payment reconciliation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pending delivery actions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Onboarding handoff" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export upcoming" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export overdue" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export CSV" }).first()).toBeVisible();

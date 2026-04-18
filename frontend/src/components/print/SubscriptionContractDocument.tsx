@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 
 import DocumentHeader from "@/components/print/DocumentHeader";
 import {
-  PrintFieldGrid,
   PrintFooter,
+  PrintKeyValueGrid,
+  PrintAmountSummary,
   PrintNote,
   PrintStatusBadge,
   type PrintField,
@@ -30,7 +31,6 @@ export type ContractField = PrintField;
 export default function SubscriptionContractDocument({
   audienceLabel,
   contractReference,
-  subscriptionId,
   statusLabel,
   statusToneClassName,
   customerFields,
@@ -50,7 +50,6 @@ export default function SubscriptionContractDocument({
           subtitle={audienceLabel}
           metaRows={[
             { label: "Contract Ref", value: contractReference },
-            { label: "Subscription", value: `#${subscriptionId}` },
             { label: "Status", value: statusLabel },
             ...(issuedOn ? [{ label: "Issued On", value: issuedOn }] : []),
           ]}
@@ -71,23 +70,11 @@ export default function SubscriptionContractDocument({
         {statusNote ? <div className="print-doc-section">{statusNote}</div> : null}
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <PrintFieldGrid
-            title="Customer Summary"
-            fields={customerFields}
-            columns="sm:grid-cols-2"
-          />
-          <PrintFieldGrid
-            title="Contract Context"
-            fields={contractFields}
-            columns="sm:grid-cols-2"
-          />
+          <PrintKeyValueGrid title="Customer Summary" rows={customerFields} columns="sm:grid-cols-2" />
+          <PrintKeyValueGrid title="Plan / Contract Context" rows={contractFields} columns="sm:grid-cols-2" />
         </div>
 
-        <PrintFieldGrid
-          title="Financial Summary"
-          fields={financialFields}
-          columns="md:grid-cols-2 xl:grid-cols-4"
-        />
+        <PrintAmountSummary title="Financial Summary" rows={financialFields} />
 
         {terms.length > 0 ? (
           <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 px-3.5 py-3 text-slate-700">

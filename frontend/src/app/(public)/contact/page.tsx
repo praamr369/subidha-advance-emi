@@ -1,82 +1,105 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import PortalPage from "@/components/ui/PortalPage";
+import CtaBanner from "@/components/public/CtaBanner";
+import PublicPageShell from "@/components/public/PublicPageShell";
+import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
+import ContactLeadForm from "./ContactLeadForm";
 
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Find the practical public contact routes for product enquiries, Lucky Plan applications, and customer login.",
+    "Contact Subidha Furniture, Asansol. Send an enquiry about products, batches, and Lucky Plan monthly plans.",
 };
 
 export default function ContactPage() {
+  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "";
+  const contactPhone = process.env.NEXT_PUBLIC_CONTACT_PHONE || "";
+  const contactAddress = process.env.NEXT_PUBLIC_CONTACT_ADDRESS || "";
+
   return (
-    <PortalPage
-      title="Contact & Branch Follow-up"
-      subtitle="Use the practical contact route that matches where you are in the Lucky Plan journey."
+    <PublicPageShell
+      title="Contact"
+      subtitle="Ask about products, active batches, and monthly plan comfort. The branch can guide you through enrollment after your enquiry."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Contact" },
       ]}
       actions={[
-        { href: ROUTES.public.apply, label: "Apply Now", variant: "primary" },
-        { href: ROUTES.public.products, label: "Browse Products", variant: "secondary" },
+        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
+        { label: "Products", href: ROUTES.public.products, variant: "secondary" },
       ]}
     >
-      <section className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Visit the branch</h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Subidha Furniture
-            <br />
-            Asansol, West Bengal
-          </p>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            For in-person product browsing, enrollment assistance, and Lucky Plan
-            clarification, visit the branch with your product preference and
-            phone number.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">New enquiries</h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            If you are exploring products or want EMI guidance, use the real
-            application form so the branch receives your contact and product
-            context.
-          </p>
-          <Link
-            href={ROUTES.public.apply}
-            className="mt-4 inline-flex h-10 items-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-          >
-            Open Apply Form
-          </Link>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Existing customers</h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Existing customers should use their account to check subscriptions,
-            payments, and support guidance instead of relying on a public
-            placeholder contact flow.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href={ROUTES.public.login}
-              className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Login
-            </Link>
-            <Link
-              href={ROUTES.public.register}
-              className="inline-flex h-10 items-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Register
-            </Link>
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="space-y-6">
+          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]">
+            <SectionHeader
+              eyebrow="Branch"
+              title="Visit Subidha Furniture"
+              description="Asansol, West Bengal"
+            />
+            {contactAddress ? (
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                {contactAddress}
+              </p>
+            ) : null}
+            <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
+              {contactPhone ? (
+                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                  Phone: {contactPhone}
+                </div>
+              ) : null}
+              {contactEmail ? (
+                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                  Email: {contactEmail}
+                </div>
+              ) : null}
+              {!contactPhone && !contactEmail ? (
+                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                  Contact details are provided by the branch during follow-up.
+                </div>
+              ) : null}
+            </div>
+            <p className="mt-5 text-sm leading-7 text-muted-foreground">
+              For in-person product browsing, enrollment assistance, and Lucky Plan clarification, visit the branch with your product preference and phone number.
+            </p>
           </div>
-        </div>
+
+          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]">
+            <SectionHeader
+              eyebrow="Existing customers"
+              title="Already enrolled?"
+              description="Use your account for subscriptions, payments, and support guidance."
+            />
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                href={ROUTES.public.login}
+                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                Login
+              </Link>
+              <Link
+                href={ROUTES.public.register}
+                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                Register
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <ContactLeadForm />
       </section>
-    </PortalPage>
+
+      <CtaBanner
+        title="Want to include a product in your enquiry?"
+        description="Browse the live catalogue first, then open Apply to carry the product context directly into the enquiry."
+        actions={[
+          { href: ROUTES.public.products, label: "Browse products", variant: "secondary" },
+          { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
+        ]}
+      />
+    </PublicPageShell>
   );
 }
