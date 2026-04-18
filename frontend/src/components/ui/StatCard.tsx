@@ -1,8 +1,9 @@
 // frontend/src/components/ui/StatCard.tsx
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
 
 type StatCardProps = {
   label: string;
@@ -52,6 +53,15 @@ const toneColors = {
   },
 };
 
+function safeMetric(value: string | number): string | number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return "—";
+  return trimmed;
+}
+
 export default function StatCard({
   label,
   value,
@@ -67,6 +77,12 @@ export default function StatCard({
   className,
 }: StatCardProps) {
   const toneStyle = toneColors[tone];
+  const normalizedValue = safeMetric(value);
+  const progressValue =
+    typeof progress === "number" && Number.isFinite(progress)
+      ? Math.max(0, Math.min(100, progress))
+      : undefined;
+
   const card = (
     <div
       className={cn(
@@ -77,19 +93,11 @@ export default function StatCard({
     >
       <div className={cn("absolute inset-x-5 top-0 h-px rounded-full", toneStyle.accent)} />
       <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-white/40 blur-2xl" />
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="enterprise-eyebrow">
-            {label}
-          </div>
-          <div className="enterprise-metric mt-3 text-foreground">
-            {value}
-          </div>
-          {subtext && (
-            <div className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
-              {subtext}
-            </div>
-          )}
+          <div className="enterprise-eyebrow">{label}</div>
+          <div className="enterprise-metric mt-3 text-foreground">{normalizedValue}</div>
+          {subtext ? <div className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">{subtext}</div> : null}
         </div>
         {icon ? (
           <div
@@ -122,21 +130,14 @@ export default function StatCard({
         </div>
       ) : null}
 
-      {progress !== undefined ? (
+      {progressValue !== undefined ? (
         <div className="mt-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">
-              {progressLabel || "Progress"}
-            </span>
-            <span className="font-medium text-foreground">
-              {Math.max(0, Math.min(100, progress))}%
-            </span>
+            <span className="text-muted-foreground">{progressLabel || "Progress"}</span>
+            <span className="font-medium text-foreground">{progressValue}%</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-300"
-              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-            />
+            <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${progressValue}%` }} />
           </div>
         </div>
       ) : null}

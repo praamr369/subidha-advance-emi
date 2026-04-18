@@ -18,6 +18,7 @@ type Counts = {
   financeAccountsActive: number;
   chartAccountsActive: number;
   accountingPeriods: number;
+  documentSequencesActive: number;
   products: number;
   batches: number;
 };
@@ -80,6 +81,7 @@ export default function BusinessSetupOverviewPage() {
     financeAccountsActive: 0,
     chartAccountsActive: 0,
     accountingPeriods: 0,
+    documentSequencesActive: 0,
     products: 0,
     batches: 0,
   });
@@ -100,6 +102,7 @@ export default function BusinessSetupOverviewPage() {
         financeAccountsActive: Number(readiness.counts?.finance_accounts_active || 0),
         chartAccountsActive: Number(readiness.counts?.chart_of_accounts_active || 0),
         accountingPeriods: Number(readiness.counts?.accounting_periods || 0),
+        documentSequencesActive: Number(readiness.counts?.document_sequences_active || 0),
         products: Number(readiness.counts?.products || 0),
         batches: Number(readiness.counts?.batches || 0),
       });
@@ -115,6 +118,14 @@ export default function BusinessSetupOverviewPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const requiredMissing =
+    checklist?.items.filter((item) => item.level === "required" && item.status !== "complete") ?? [];
+  const recommendedPending =
+    checklist?.items.filter((item) => item.level === "recommended" && item.status !== "complete") ?? [];
+
+  const requiredComplete = Number(checklist?.counts?.required_items_complete || 0);
+  const requiredTotal = Number(checklist?.counts?.required_items_total || 0);
 
   return (
     <div className="space-y-6">
@@ -132,6 +143,9 @@ export default function BusinessSetupOverviewPage() {
               <div className="mt-1 text-2xl font-semibold text-foreground">
                 {checklist.percent_complete}% complete
               </div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                Required setup: {requiredComplete}/{requiredTotal || 0} complete
+              </div>
             </div>
             <div
               className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${
@@ -143,6 +157,16 @@ export default function BusinessSetupOverviewPage() {
               {checklist.is_ready_for_go_live ? "Ready for go-live" : "Setup incomplete"}
             </div>
           </div>
+
+          {!checklist.is_ready_for_go_live ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="text-sm font-semibold text-amber-900">Not ready for live operations</div>
+              <p className="mt-1 text-sm text-amber-900">
+                Critical setup blockers still remain. Use the required setup links below before live collections, billing,
+                or new subscription intake.
+              </p>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -173,6 +197,64 @@ export default function BusinessSetupOverviewPage() {
           </Link>
         ))}
       </section>
+
+      {checklist ? (
+        <section className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="text-base font-semibold text-foreground">Required setup actions</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Complete these first before running live operational workflows.
+            </p>
+            <div className="mt-4 space-y-3">
+              {requiredMissing.length > 0 ? (
+                requiredMissing.map((item) => (
+                  <Link
+                    key={item.key}
+                    href={item.route || "/admin/settings/business-setup/checklist"}
+                    className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 transition hover:border-amber-300"
+                  >
+                    <div className="text-sm font-semibold text-amber-900">{item.label}</div>
+                    <div className="mt-1 text-sm text-amber-900">{item.detail}</div>
+                  </Link>
+                ))
+              ) : (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                  All required setup items are complete.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="text-base font-semibold text-foreground">Recommended setup actions</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              These are not hard blockers, but they reduce audit and daily operations risk.
+            </p>
+            <div className="mt-4 space-y-3">
+              {recommendedPending.map((item) => (
+                <Link
+                  key={item.key}
+                  href={item.route || "/admin/settings/business-setup/checklist"}
+                  className="block rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 transition hover:border-blue-300"
+                >
+                  <div className="text-sm font-semibold text-blue-900">{item.label}</div>
+                  <div className="mt-1 text-sm text-blue-900">{item.detail}</div>
+                </Link>
+              ))}
+              <Link
+                href="/admin/accounting/periods"
+                className="block rounded-xl border border-border bg-background px-3 py-3 transition hover:border-ring"
+              >
+                <div className="text-sm font-semibold text-foreground">Document number series</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Active series: {counts.documentSequencesActive}. Configure invoice and receipt sequence controls for live
+                  posting.
+                </div>
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

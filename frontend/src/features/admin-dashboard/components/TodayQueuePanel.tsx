@@ -7,6 +7,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import EmptyState from "@/components/feedback/EmptyState";
 import CollectPaymentDrawer from "@/features/collections/components/CollectPaymentDrawer";
 import { useTodayQueue } from "@/features/admin-dashboard/hooks/useTodayQueue";
+import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 
 export type CollectionQueueItem = {
   id?: number | string | null;
@@ -67,68 +68,58 @@ export default function TodayQueuePanel({
 
   return (
     <>
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          </div>
-          <div className="rounded-xl bg-muted p-2 text-foreground">
-            <CircleDollarSign className="h-5 w-5" />
-          </div>
-        </div>
+      <PageSection className="p-6">
+        <SectionHeader
+          title={title}
+          description={subtitle}
+          actions={
+            <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-2 text-foreground">
+              <CircleDollarSign className="h-5 w-5" />
+            </div>
+          }
+        />
 
         {isLoading && !items ? (
-          <div className="rounded-xl border border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground">
+          <div className="mt-4 rounded-xl border border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground">
             Loading today queue...
           </div>
         ) : isError && !items ? (
-          <ErrorState
-            title="Unable to load today queue"
-            description={error instanceof Error ? error.message : "Request failed."}
-          />
+          <div className="mt-4">
+            <ErrorState
+              title="Unable to load today queue"
+              description={error instanceof Error ? error.message : "Request failed."}
+            />
+          </div>
         ) : normalizedItems.length === 0 ? (
-          <EmptyState
-            title="No collection items"
-            description="No collection queue items are available right now."
-          />
+          <div className="mt-4">
+            <EmptyState
+              title="No collection items"
+              description="No collection queue items are available right now."
+            />
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="mt-4 space-y-3">
             {normalizedItems.map((item, index) => {
               const emiId = item.emi_id ?? item.id ?? null;
               const rowKey = buildQueueItemKey(item, index);
 
               return (
-                <div
+                <article
                   key={rowKey}
-                  className="flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 md:flex-row md:items-center md:justify-between"
+                  className="grid gap-4 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
                 >
                   <div className="min-w-0 space-y-1">
-                    <div className="text-sm font-semibold text-foreground">
-                      {item.customer_name || "Unknown customer"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      EMI #{emiId ?? "—"} · Subscription #{item.subscription_id ?? "—"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Batch {item.batch_code || "—"} · Lucky #{item.lucky_number ?? "—"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Phone: {item.customer_phone || "—"} · Due: {formatDate(item.due_date)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Status: {item.status || "—"}
-                    </div>
+                    <div className="text-sm font-semibold text-foreground">{item.customer_name || "Unknown customer"}</div>
+                    <div className="text-sm text-muted-foreground">EMI #{emiId ?? "—"} · Subscription #{item.subscription_id ?? "—"}</div>
+                    <div className="text-sm text-muted-foreground">Batch {item.batch_code || "—"} · Lucky #{item.lucky_number ?? "—"}</div>
+                    <div className="text-sm text-muted-foreground">Phone: {item.customer_phone || "—"} · Due: {formatDate(item.due_date)}</div>
+                    <div className="text-sm text-muted-foreground">Status: {item.status || "—"}</div>
                   </div>
 
                   <div className="flex items-center justify-between gap-4 md:min-w-[220px] md:justify-end">
                     <div className="text-right">
-                      <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Amount Due
-                      </div>
-                      <div className="text-base font-semibold text-foreground">
-                        ₹ {formatAmount(item.amount_due)}
-                      </div>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">Amount Due</div>
+                      <div className="text-base font-semibold text-foreground">₹ {formatAmount(item.amount_due)}</div>
                     </div>
 
                     <button
@@ -139,26 +130,19 @@ export default function TodayQueuePanel({
                       Collect
                     </button>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
-      </section>
+      </PageSection>
 
       <CollectPaymentDrawer
         open={Boolean(selectedItem)}
-        emiId={
-          selectedItem?.emi_id ??
-          (typeof selectedItem?.id === "number" ? selectedItem.id : null)
-        }
+        emiId={selectedItem?.emi_id ?? (typeof selectedItem?.id === "number" ? selectedItem.id : null)}
         suggestedAmount={selectedItem?.amount_due ?? null}
         customerName={selectedItem?.customer_name ?? undefined}
-        subscriptionLabel={
-          selectedItem?.subscription_id
-            ? `#${selectedItem.subscription_id}`
-            : undefined
-        }
+        subscriptionLabel={selectedItem?.subscription_id ? `#${selectedItem.subscription_id}` : undefined}
         onClose={() => setSelectedItem(null)}
         onCollected={() => setSelectedItem(null)}
       />

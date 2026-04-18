@@ -2,6 +2,7 @@
 
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
+import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 import { usePriorityAlerts } from "@/features/admin-dashboard/hooks/usePriorityAlerts";
 
 function severityClass(severity: string) {
@@ -21,12 +22,13 @@ export default function PriorityAlertsPanel() {
   const { data, isLoading, isError, error } = usePriorityAlerts();
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm">
-      <div className="border-b border-border px-6 py-4">
-        <h2 className="text-lg font-semibold text-foreground">Priority Alerts</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Operational and financial exceptions that need review.
-        </p>
+    <PageSection className="p-0">
+      <div className="px-6 py-4">
+        <SectionHeader
+          title="Priority Alerts"
+          description="Operational and financial exceptions that need review."
+          className="border-b-0 pb-0"
+        />
       </div>
 
       {isLoading ? (
@@ -56,7 +58,7 @@ export default function PriorityAlertsPanel() {
 
                 <span
                   className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${severityClass(
-                    alert.severity,
+                    alert.severity
                   )}`}
                 >
                   {alert.severity}
@@ -66,6 +68,6 @@ export default function PriorityAlertsPanel() {
           ))}
         </div>
       )}
-    </div>
+    </PageSection>
   );
 }

@@ -83,6 +83,15 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
 )
+from api.v1.views.admin_reports import (
+    AdminBatchPerformanceAggregateView,
+    AdminBatchPerformanceSummaryView,
+    AdminEmiAggregateView,
+    AdminEmiSummaryView,
+    AdminReconciliationAttentionAggregateView,
+    AdminRevenueAggregateView,
+    AdminRevenueSummaryView,
+)
 from api.v1.views.admin_support_requests import (
     AdminSupportRequestAssignView,
     AdminSupportRequestDetailView,
@@ -177,4 +186,11 @@ urlpatterns = [
     path("collection-requests/", AdminPartnerCollectionRequestListView.as_view()),
     path("collection-requests/<int:pk>/approve/", AdminPartnerCollectionRequestApproveView.as_view()),
     path("collection-requests/<int:pk>/reject/", AdminPartnerCollectionRequestRejectView.as_view()),
+    path("reports/revenue-aggregate/", AdminRevenueAggregateView.as_view()),
+    path("reports/revenue-summary/", AdminRevenueSummaryView.as_view()),
+    path("reports/emi-aggregate/", AdminEmiAggregateView.as_view()),
+    path("reports/emi-summary/", AdminEmiSummaryView.as_view()),
+    path("reports/batch-performance-aggregate/", AdminBatchPerformanceAggregateView.as_view()),
+    path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
+    path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
 ]

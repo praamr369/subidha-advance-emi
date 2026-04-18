@@ -184,7 +184,13 @@ textarea::placeholder {
 }
 
 a, button, input, select, textarea {
-  transition: all 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 button {
@@ -341,6 +347,25 @@ button {
   backdrop-filter: blur(8px);
 }
 
+.dashboard-app .portal-scroll-area {
+  scrollbar-gutter: stable;
+}
+
+.dashboard-app .route-content-fade {
+  animation: route-fade-in 0.2s ease-out;
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0.88;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .dashboard-app .portal-page > .portal-page-content {
   gap: 1.35rem;
 }
@@ -359,6 +384,30 @@ button {
 
 .dashboard-app table tbody td {
   vertical-align: top;
+}
+
+.dashboard-app .portal-page-content > * {
+  min-width: 0;
+}
+
+.dashboard-app .portal-page-content .overflow-x-auto {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--border) 88%, white 12%);
+  background: color-mix(in oklab, var(--surface-card-elevated) 92%, var(--surface-muted) 8%);
+}
+
+@media (max-width: 768px) {
+  .dashboard-app .enterprise-title {
+    font-size: clamp(1.35rem, 7vw, 1.8rem);
+  }
+
+  .dashboard-app .portal-page {
+    padding-inline: 0.25rem;
+  }
+
+  .dashboard-app table thead th {
+    white-space: nowrap;
+  }
 }
 
 .dashboard-app .enterprise-note {

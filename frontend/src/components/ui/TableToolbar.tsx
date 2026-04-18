@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { DataToolbar, PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 import { cn } from "@/lib/utils";
 
 type TableToolbarProps = {
@@ -22,25 +23,16 @@ export default function TableToolbar({
   footer,
 }: TableToolbarProps) {
   return (
-    <div
-      className={cn(
-        "surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm",
-        className
-      )}
-    >
+    <PageSection className={cn("p-5", className)}>
       {title || description || actions ? (
-        <div className="mb-4 flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            {title ? <h3 className="enterprise-section-title text-base">{title}</h3> : null}
-            {description ? (
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-            ) : null}
-          </div>
-          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-        </div>
+        <SectionHeader title={title || "Workspace"} description={description} actions={actions} />
       ) : null}
-      <div className="flex flex-col gap-4">{children}</div>
-      {footer ? <div className="mt-4 border-t border-border pt-4">{footer}</div> : null}
-    </div>
+      <div className={cn("flex flex-col gap-4", title || description || actions ? "mt-4" : "")}>{children}</div>
+      {footer ? (
+        <DataToolbar className="mt-4 border-t border-border pt-4 shadow-none">
+          <div className="w-full">{footer}</div>
+        </DataToolbar>
+      ) : null}
+    </PageSection>
   );
 }

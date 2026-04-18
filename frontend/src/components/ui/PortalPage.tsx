@@ -2,9 +2,9 @@
 "use client";
 
 import Link from "next/link";
-
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
+
 import { cn } from "@/lib/utils";
 
 type PortalAction = {
@@ -46,14 +46,14 @@ type PortalPageProps = {
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
   switch (variant) {
     case "primary":
-      return "border-primary/80 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]";
+      return "border-primary/80 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]";
     case "danger":
-      return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)] hover:-translate-y-0.5";
+      return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)]";
     case "ghost":
-      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]";
+      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]";
     case "secondary":
     default:
-      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
+      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
   }
 }
 
@@ -73,9 +73,7 @@ function getToneClassName(tone: PortalStat["tone"] | PortalStatusBadge["tone"] =
   }
 }
 
-function getToneIcon(
-  tone: PortalStat["tone"] | PortalStatusBadge["tone"] = "default"
-) {
+function getToneIcon(tone: PortalStat["tone"] | PortalStatusBadge["tone"] = "default") {
   switch (tone) {
     case "success":
       return CheckCircle2;
@@ -91,6 +89,14 @@ function getToneIcon(
   }
 }
 
+function normalizeStatValue(value: string | number): string | number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const trimmed = value.trim();
+  return trimmed || "—";
+}
+
 export default function PortalPage({
   title,
   subtitle,
@@ -104,13 +110,12 @@ export default function PortalPage({
   maxWidth = 1320,
   className,
 }: PortalPageProps) {
-  const resolvedMaxWidth =
-    typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
+  const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
 
   return (
     <main
       className={cn(
-        "portal-page mx-auto flex flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8",
+        "portal-page mx-auto flex flex-col gap-5 px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
         className
       )}
       style={{ maxWidth: resolvedMaxWidth }}
@@ -124,10 +129,7 @@ export default function PortalPage({
             const isLast = index === breadcrumbs.length - 1;
 
             return (
-              <div
-                key={`${crumb.label}-${index}`}
-                className="flex items-center gap-2"
-              >
+              <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
@@ -140,7 +142,7 @@ export default function PortalPage({
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1 text-xs",
                       isLast
-                        ? "border-primary/60 bg-primary text-primary-foreground shadow-[0_12px_28px_-20px_rgba(30,64,175,0.72)]"
+                        ? "border-primary/60 bg-primary text-primary-foreground"
                         : "border-border bg-[var(--surface-card-elevated)] font-medium text-foreground"
                     )}
                   >
@@ -148,27 +150,21 @@ export default function PortalPage({
                   </span>
                 )}
 
-                {!isLast ? (
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                ) : null}
+                {!isLast ? <ChevronRight className="h-4 w-4 text-slate-400" /> : null}
               </div>
             );
           })}
         </nav>
       ) : null}
 
-      <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_28px_70px_-48px_rgba(15,23,42,0.52)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.26),transparent_44%)]" />
+      <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[1.65rem] border border-border bg-card shadow-[0_24px_56px_-44px_rgba(15,23,42,0.52)]">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),transparent_44%)]" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
-        <div className="pointer-events-none absolute -right-12 top-0 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-[color-mix(in_oklab,var(--accent)_25%,transparent)] blur-3xl" />
-        <div className="relative flex flex-col gap-6 p-5 sm:p-6">
+        <div className="relative flex flex-col gap-5 p-4 sm:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="enterprise-title">
-                  {title}
-                </h1>
+                <h1 className="enterprise-title">{title}</h1>
 
                 {statusBadge ? (
                   <span
@@ -187,9 +183,7 @@ export default function PortalPage({
               </div>
 
               {subtitle ? (
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  {subtitle}
-                </p>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>
               ) : null}
 
               {helperNote ? (
@@ -231,11 +225,9 @@ export default function PortalPage({
               {stats.map((stat, index) => (
                 <div
                   key={`${stat.label}-${index}`}
-                  className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_45px_-36px_rgba(15,23,42,0.48)]"
+                  className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)]"
                 >
-                  <div className="enterprise-eyebrow">
-                    {stat.label}
-                  </div>
+                  <div className="enterprise-eyebrow">{stat.label}</div>
 
                   <div
                     className={cn(
@@ -243,15 +235,15 @@ export default function PortalPage({
                       stat.tone === "success"
                         ? "text-emerald-800"
                         : stat.tone === "warning"
-                        ? "text-amber-800"
-                        : stat.tone === "danger"
-                        ? "text-red-800"
-                        : stat.tone === "info"
-                        ? "text-sky-800"
-                        : "text-foreground"
+                          ? "text-amber-800"
+                          : stat.tone === "danger"
+                            ? "text-red-800"
+                            : stat.tone === "info"
+                              ? "text-sky-800"
+                              : "text-foreground"
                     )}
                   >
-                    {stat.value}
+                    {normalizeStatValue(stat.value)}
                   </div>
                 </div>
               ))}
@@ -260,7 +252,7 @@ export default function PortalPage({
         </div>
       </section>
 
-      <section className="portal-page-content grid gap-5">{children}</section>
+      <section className="portal-page-content grid gap-4 sm:gap-5">{children}</section>
     </main>
   );
 }

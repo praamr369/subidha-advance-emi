@@ -50,6 +50,10 @@ import {
   X,
 } from "lucide-react";
 
+import PortalHeader from "@/components/layout/PortalHeader";
+import PortalShell from "@/components/layout/PortalShell";
+import RoleSidebar from "@/components/layout/RoleSidebar";
+import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
@@ -205,12 +209,7 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
       title: group.title,
       icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
       items: group.items
-        .filter(
-          (item) =>
-            !item.hidden &&
-            typeof item.href === "string" &&
-            item.href.trim().length > 0
-        )
+        .filter((item) => !item.hidden && typeof item.href === "string" && item.href.trim().length > 0)
         .map((item) => ({
           label: item.label,
           href: item.href,
@@ -263,30 +262,12 @@ function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
   switch (role) {
     case "ADMIN":
       return [
-        {
-          label: "New Subscription",
-          href: ROUTES.admin.subscriptionsCreate,
-        },
-        {
-          label: "Collect EMI",
-          href: ROUTES.admin.paymentsCreate,
-        },
-        {
-          label: "Direct Sale",
-          href: ROUTES.admin.billingDirectSales,
-        },
-        {
-          label: "Purchase Bill",
-          href: ROUTES.admin.accountingPurchaseBills,
-        },
-        {
-          label: "Stock Adjust",
-          href: ROUTES.admin.inventoryAdjustments,
-        },
-        {
-          label: "Branch Report",
-          href: ROUTES.admin.branchReporting,
-        },
+        { label: "New Subscription", href: ROUTES.admin.subscriptionsCreate },
+        { label: "Collect EMI", href: ROUTES.admin.paymentsCreate },
+        { label: "Direct Sale", href: ROUTES.admin.billingDirectSales },
+        { label: "Purchase Bill", href: ROUTES.admin.accountingPurchaseBills },
+        { label: "Stock Adjust", href: ROUTES.admin.inventoryAdjustments },
+        { label: "Branch Report", href: ROUTES.admin.branchReporting },
       ];
     default:
       return [];
@@ -296,7 +277,7 @@ function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
 function getProfileHref(role: NavigationRole) {
   switch (role) {
     case "CUSTOMER":
-      return "/customer/profile";
+      return ROUTES.customer.profile;
     case "ADMIN":
       return ROUTES.admin.settings;
     default:
@@ -309,10 +290,18 @@ function getSettingsHref(role: NavigationRole) {
     case "ADMIN":
       return ROUTES.admin.settings;
     case "CUSTOMER":
-      return "/customer/profile";
+      return ROUTES.customer.profile;
     default:
       return getRoleBasePath(role);
   }
+}
+
+function RailTooltip({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 rounded-md border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block group-focus-within:block">
+      {label}
+    </span>
+  );
 }
 
 function UserDropdown({
@@ -344,6 +333,7 @@ function UserDropdown({
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-surface)] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] transition hover:border-[var(--surface-border-strong)] hover:bg-white"
       >
@@ -351,15 +341,13 @@ function UserDropdown({
           {displayName.charAt(0).toUpperCase()}
         </span>
         <span className="hidden min-w-0 text-left sm:block">
-          <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">
-            {displayName}
-          </span>
+          <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">{displayName}</span>
           <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
         </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </button>
 
-      {isOpen && (
+      {isOpen ? (
         <div className="absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl border border-[var(--surface-border-strong)] bg-white p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)] duration-100">
           <div className="border-b border-border px-3 py-2">
             <div className="text-sm font-semibold text-foreground">{displayName}</div>
@@ -382,6 +370,7 @@ function UserDropdown({
             Settings
           </Link>
           <button
+            type="button"
             onClick={() => {
               setIsOpen(false);
               onLogout();
@@ -393,12 +382,12 @@ function UserDropdown({
             {isLoggingOut ? "Logging out..." : "Logout"}
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function Sidebar({
+function SidebarContent({
   role,
   pathname,
   displayName,
@@ -406,7 +395,6 @@ function Sidebar({
   isLoggingOut,
   collapsed,
   onToggleCollapse,
-  mobileOpen,
   onClose,
 }: {
   role: NavigationRole;
@@ -416,7 +404,6 @@ function Sidebar({
   isLoggingOut: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  mobileOpen?: boolean;
   onClose?: () => void;
 }) {
   const isMobile = typeof onClose === "function";
@@ -429,12 +416,11 @@ function Sidebar({
     return matches[0]?.href ?? null;
   }, [navGroups, pathname]);
   const quickActions = useMemo(() => getRoleQuickActions(role), [role]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    () => readExpandedGroups()
-  );
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readExpandedGroups());
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
   const [navQuery, setNavQuery] = useState("");
   const normalizedNavQuery = navQuery.trim().toLowerCase();
+
   const visibleGroups = useMemo(() => {
     if (!normalizedNavQuery) return navGroups;
 
@@ -444,9 +430,7 @@ function Sidebar({
         if (groupMatch) return group;
         return {
           ...group,
-          items: group.items.filter((item) =>
-            item.label.toLowerCase().includes(normalizedNavQuery)
-          ),
+          items: group.items.filter((item) => item.label.toLowerCase().includes(normalizedNavQuery)),
         };
       })
       .filter((group) => group.items.length > 0);
@@ -474,368 +458,302 @@ function Sidebar({
     [collapsed, isMobile]
   );
 
-  const sidebarClasses = cn(
-    "dashboard-shell-chrome flex flex-col border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-all duration-300",
-    "bg-[linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
-    isMobile ? "fixed inset-y-0 left-0 z-50 md:hidden" : "h-screen",
-    isMobile ? (mobileOpen ? "translate-x-0" : "-translate-x-full") : collapsed ? "w-[5.8rem]" : "w-[19rem]"
-  );
-
   return (
-    <>
-      {isMobile && mobileOpen ? (
-        <div
-          className="dashboard-shell-chrome fixed inset-0 z-40 bg-slate-950/55 md:hidden"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      ) : null}
+    <div className="flex h-full flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
+      <div className="sticky top-0 z-20 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
+        <div className="flex h-[4.75rem] items-center gap-3 px-4">
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
+            SF
+          </div>
 
-      <aside className={sidebarClasses} onMouseLeave={() => setFlyoutGroup(null)}>
-        <div className="sticky top-0 z-10 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
-          <div className="flex h-[4.75rem] items-center gap-3 px-4">
-            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
-              SF
-            </div>
-
-            {!collapsed ? (
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                  {brandConfig.companyName}
-                </div>
-                <div className="truncate text-base font-semibold tracking-tight text-white">
-                  {brandConfig.platformName}
-                </div>
+          {!collapsed ? (
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                {brandConfig.companyName}
               </div>
-            ) : (
-              <span className="sr-only">{brandConfig.platformName}</span>
-            )}
+              <div className="truncate text-base font-semibold tracking-tight text-white">{brandConfig.platformName}</div>
+            </div>
+          ) : (
+            <span className="sr-only">{brandConfig.platformName}</span>
+          )}
 
-            {!isMobile ? (
-              <button
-                onClick={() => {
-                  setFlyoutGroup(null);
-                  onToggleCollapse();
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
-                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
-                aria-label="Close sidebar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+          {!isMobile ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFlyoutGroup(null);
+                onToggleCollapse();
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
+              aria-label="Close sidebar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!collapsed ? (
+        <div className="border-b border-[var(--sidebar-rail-border)] px-4 py-4">
+          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] p-3.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+              {getRoleWorkspaceLabel(role)}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">{getRoleWorkspaceDescription(role)}</p>
+          </div>
+
+          {quickActions.length > 0 ? (
+            <div className="mt-3.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Fast Actions</div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    onClick={isMobile ? onClose : undefined}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] px-2 text-center text-[11px] font-semibold text-[var(--sidebar-foreground)] transition hover:border-[var(--sidebar-item-active-border)] hover:bg-[var(--sidebar-item-hover)]"
+                  >
+                    {action.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-3.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Navigate</label>
+            <div className="relative mt-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
+              <input
+                type="search"
+                value={navQuery}
+                onChange={(event) => setNavQuery(event.target.value)}
+                placeholder="Filter modules"
+                className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-3 text-xs font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
+              />
+            </div>
           </div>
         </div>
+      ) : null}
 
-        {!collapsed ? (
-          <div className="border-b border-[var(--sidebar-rail-border)] px-4 py-4">
-            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] p-3.5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                {getRoleWorkspaceLabel(role)}
-              </div>
-              <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">
-                {getRoleWorkspaceDescription(role)}
-              </p>
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-2.5">
+          {visibleGroups.length === 0 && !collapsed ? (
+            <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
+              No navigation matches for &quot;{navQuery.trim()}&quot;.
             </div>
+          ) : null}
+          {visibleGroups.map((group, index) => {
+            const GroupIcon = group.icon;
+            const groupActive = group.items.some((item) => item.href === activeHref);
+            const defaultOpen = role === "ADMIN" ? index === 0 : true;
+            const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
+            const flyoutOpen = collapsed && flyoutGroup === group.title;
 
-            {quickActions.length > 0 ? (
-              <div className="mt-3.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                  Fast Actions
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {quickActions.map((action) => (
-                    <Link
-                      key={action.href}
-                      href={action.href}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] px-2 text-center text-[11px] font-semibold text-[var(--sidebar-foreground)] transition hover:border-[var(--sidebar-item-active-border)] hover:bg-[var(--sidebar-item-hover)]"
-                    >
-                      {action.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="mt-3.5">
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                Navigate
-              </label>
-              <div className="relative mt-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
-                <input
-                  type="search"
-                  value={navQuery}
-                  onChange={(event) => setNavQuery(event.target.value)}
-                  placeholder="Filter modules"
-                  className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-3 text-xs font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-2.5">
-            {visibleGroups.length === 0 && !collapsed ? (
-              <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
-                No navigation matches for &quot;{navQuery.trim()}&quot;.
-              </div>
-            ) : null}
-            {visibleGroups.map((group, index) => {
-              const GroupIcon = group.icon;
-              const groupActive = group.items.some((item) => item.href === activeHref);
-              const defaultOpen = role === "ADMIN" ? index === 0 : true;
-              const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
-              const flyoutOpen = collapsed && flyoutGroup === group.title;
-
-              return (
-                <section
-                  key={group.title}
-                  className="relative space-y-1"
-                  onMouseEnter={() => {
-                    if (!collapsed) return;
-                    setFlyoutGroup(group.title);
-                  }}
-                  onFocus={() => {
-                    if (!collapsed) return;
-                    setFlyoutGroup(group.title);
-                  }}
-                  onBlur={(event) => {
-                    if (!collapsed) return;
-                    const nextTarget = event.relatedTarget as Node | null;
-                    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+            return (
+              <section
+                key={group.title}
+                className="group relative space-y-1"
+                onMouseEnter={() => {
+                  if (!collapsed) return;
+                  setFlyoutGroup(group.title);
+                }}
+                onFocus={() => {
+                  if (!collapsed) return;
+                  setFlyoutGroup(group.title);
+                }}
+                onBlur={(event) => {
+                  if (!collapsed) return;
+                  const nextTarget = event.relatedTarget as Node | null;
+                  if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+                  setFlyoutGroup(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
                     setFlyoutGroup(null);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setFlyoutGroup(null);
-                    }
-                  }}
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.title, defaultOpen)}
+                  className={cn(
+                    "group/nav relative flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition",
+                    collapsed ? "justify-center" : "",
+                    groupActive
+                      ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                      : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                  )}
+                  aria-expanded={collapsed ? flyoutOpen : groupOpen}
+                  aria-haspopup={collapsed ? "menu" : undefined}
+                  title={collapsed ? group.title : undefined}
                 >
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.title, defaultOpen)}
+                  <GroupIcon
                     className={cn(
-                      "group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition",
-                      collapsed ? "justify-center" : "",
-                      groupActive
-                        ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                        : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                      "h-4 w-4 shrink-0",
+                      groupActive ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/nav:text-white"
                     )}
-                    aria-expanded={collapsed ? flyoutOpen : groupOpen}
-                    aria-haspopup={collapsed ? "menu" : undefined}
-                    title={collapsed ? group.title : undefined}
-                  >
-                    <GroupIcon
-                      className={cn(
-                        "h-4 w-4 shrink-0",
-                        groupActive
-                          ? "text-[var(--sidebar-primary)]"
-                          : "text-[var(--sidebar-item-muted)] group-hover:text-white"
-                      )}
-                    />
-                    {!collapsed ? (
-                      <>
-                        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.01em]">
-                          {group.title}
-                        </span>
-                        {groupOpen ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </>
-                    ) : (
+                  />
+                  {!collapsed ? (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.01em]">{group.title}</span>
+                      {groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </>
+                  ) : (
+                    <>
                       <span className="sr-only">{group.title}</span>
-                    )}
-                  </button>
+                      <RailTooltip label={group.title} />
+                    </>
+                  )}
+                </button>
 
-                  {collapsed && flyoutOpen ? (
-                    <div
-                      role="menu"
-                      aria-label={`${group.title} navigation`}
-                      className="absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
-                    >
-                      <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                          {group.title}
-                        </div>
-                        <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">
-                          Select a module
-                        </div>
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        {group.items.map((item) => {
-                          const active = item.href === activeHref;
-                          const Icon = item.icon;
-                          const classes = cn(
-                            "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
-                            item.disabled
-                              ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
-                              : active
-                              ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                              : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                          );
-
-                          if (item.disabled) {
-                            return (
-                              <div
-                                key={`${group.title}:${item.href}:${item.label}`}
-                                className={classes}
-                                aria-disabled="true"
-                                title="Not available yet"
-                              >
-                                <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                                <span className="min-w-0 truncate text-[13px] font-medium">
-                                  {item.label}
-                                </span>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <Link
-                              key={`${group.title}:${item.href}:${item.label}`}
-                              href={item.href}
-                              onClick={isMobile ? onClose : undefined}
-                              className={classes}
-                              role="menuitem"
-                            >
-                              <Icon
-                                className={cn(
-                                  "h-4 w-4 shrink-0",
-                                  active
-                                    ? "text-[var(--sidebar-primary)]"
-                                    : "text-[var(--sidebar-item-muted)] group-hover:text-white"
-                                )}
-                              />
-                              <span className="min-w-0 truncate text-[13px] font-medium">
-                                {item.label}
-                              </span>
-                            </Link>
-                          );
-                        })}
-                      </div>
+                {collapsed && flyoutOpen ? (
+                  <div
+                    role="menu"
+                    aria-label={`${group.title} navigation`}
+                    className="absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
+                  >
+                    <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">{group.title}</div>
+                      <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">Select a module</div>
                     </div>
-                  ) : null}
-
-                  {groupOpen ? (
-                    <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/80 pl-3">
+                    <div className="mt-2 space-y-1">
                       {group.items.map((item) => {
                         const active = item.href === activeHref;
                         const Icon = item.icon;
-                        const rowBase = cn(
-                          "group relative flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
-                          collapsed ? "justify-center" : "",
-                          active
-                            ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                            : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                        const classes = cn(
+                          "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
+                          item.disabled
+                            ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
+                            : active
+                              ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                              : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
                         );
 
-                        return (
-                          item.disabled ? (
-                            <div
-                              key={`${group.title}:${item.href}:${item.label}`}
-                              className={cn(
-                                rowBase,
-                                "cursor-not-allowed opacity-70"
-                              )}
-                              aria-disabled="true"
-                              title="Not available yet"
-                            >
+                        if (item.disabled) {
+                          return (
+                            <div key={`${group.title}:${item.href}:${item.label}`} className={classes} aria-disabled="true" title="Not available yet">
                               <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                              {!collapsed ? (
-                                <span className="min-w-0 truncate text-[13px] font-medium">
-                                  {item.label}
-                                </span>
-                              ) : (
-                                <span className="sr-only">{item.label}</span>
-                              )}
+                              <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
                             </div>
-                          ) : (
-                            <Link
-                              key={`${group.title}:${item.href}:${item.label}`}
-                              href={item.href}
-                              onClick={isMobile ? onClose : undefined}
-                              className={rowBase}
-                              title={collapsed ? item.label : undefined}
-                            >
-                              <Icon
-                                className={cn(
-                                  "h-4 w-4 shrink-0",
-                                  active
-                                    ? "text-[var(--sidebar-primary)]"
-                                    : "text-[var(--sidebar-item-muted)] group-hover:text-white"
-                                )}
-                              />
-                              {!collapsed ? (
-                                <span className="min-w-0 truncate text-[13px] font-medium">
-                                  {item.label}
-                                </span>
-                              ) : (
-                                <span className="sr-only">{item.label}</span>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={`${group.title}:${item.href}:${item.label}`}
+                            href={item.href}
+                            onClick={isMobile ? onClose : undefined}
+                            className={classes}
+                            role="menuitem"
+                          >
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
                               )}
-                            </Link>
-                          )
+                            />
+                            <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+                          </Link>
                         );
                       })}
                     </div>
-                  ) : null}
-                </section>
-              );
-            })}
-          </div>
-        </nav>
+                  </div>
+                ) : null}
 
-        <div className="sticky bottom-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-3">
-          {!collapsed ? (
-            <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-white">
-                    {displayName}
+                {groupOpen ? (
+                  <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/80 pl-3">
+                    {group.items.map((item) => {
+                      const active = item.href === activeHref;
+                      const Icon = item.icon;
+                      const rowBase = cn(
+                        "group/item relative flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
+                        active
+                          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+                          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                      );
+
+                      return item.disabled ? (
+                        <div key={`${group.title}:${item.href}:${item.label}`} className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
+                          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+                          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+                        </div>
+                      ) : (
+                        <Link
+                          key={`${group.title}:${item.href}:${item.label}`}
+                          href={item.href}
+                          onClick={isMobile ? onClose : undefined}
+                          className={rowBase}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <Icon
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
+                            )}
+                          />
+                          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
-                  <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                    {formatRoleLabel(role)}
-                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div className="sticky bottom-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-3">
+        {!collapsed ? (
+          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-white">{displayName}</div>
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                  {formatRoleLabel(role)}
                 </div>
-                <Link
-                  href={getSettingsHref(role)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
-                  title="Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Link>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Link
-                  href={getProfileHref(role)}
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
-                >
-                  Profile
-                </Link>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  disabled={isLoggingOut}
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isLoggingOut ? "Logging out..." : "Logout"}
-                </button>
-              </div>
+              <Link
+                href={getSettingsHref(role)}
+                onClick={isMobile ? onClose : undefined}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                title="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link
+                href={getProfileHref(role)}
+                onClick={isMobile ? onClose : undefined}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
+              >
+                Profile
+              </Link>
+              <button
+                type="button"
+                onClick={onLogout}
+                disabled={isLoggingOut}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div className="group relative">
               <Link
                 href={getSettingsHref(role)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
@@ -844,6 +762,9 @@ function Sidebar({
               >
                 <Settings className="h-4 w-4" />
               </Link>
+              <RailTooltip label="Settings" />
+            </div>
+            <div className="group relative">
               <button
                 type="button"
                 onClick={onLogout}
@@ -854,11 +775,12 @@ function Sidebar({
               >
                 <LogOut className="h-4 w-4" />
               </button>
+              <RailTooltip label="Logout" />
             </div>
-          )}
-        </div>
-      </aside>
-    </>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -878,7 +800,7 @@ function Topbar({
   isLoggingOut: boolean;
 }) {
   return (
-    <header className="dashboard-shell-chrome sticky top-0 z-30 border-b border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-surface)_92%,white_8%)] backdrop-blur-xl">
+    <PortalHeader>
       <div className="flex min-h-[4.4rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
@@ -896,14 +818,9 @@ function Topbar({
           </div>
         </div>
 
-        <UserDropdown
-          displayName={displayName}
-          role={role}
-          onLogout={onLogout}
-          isLoggingOut={isLoggingOut}
-        />
+        <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
       </div>
-    </header>
+    </PortalHeader>
   );
 }
 
@@ -911,9 +828,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
-    readBooleanSetting(SIDEBAR_COLLAPSED_KEY, false)
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readBooleanSetting(SIDEBAR_COLLAPSED_KEY, false));
   const [session, setSession] = useState(() => getStoredSession());
   const { logout, isLoggingOut } = useLogout();
 
@@ -947,35 +862,22 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   return (
     <DashboardShellContext.Provider value={true}>
-      <div className="dashboard-app text-foreground">
-        <div className="flex min-h-screen">
-          <div className="hidden md:block">
-            <Sidebar
-              role={role}
-              pathname={pathname}
-              displayName={displayName}
-              onLogout={logout}
-              isLoggingOut={isLoggingOut}
-              collapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebarCollapse}
-            />
-          </div>
-
-          {mobileOpen ? (
-            <Sidebar
-              role={role}
-              pathname={pathname}
-              displayName={displayName}
-              onLogout={logout}
-              isLoggingOut={isLoggingOut}
-              collapsed={false}
-              onToggleCollapse={toggleSidebarCollapse}
-              mobileOpen={mobileOpen}
-              onClose={() => setMobileOpen(false)}
-            />
-          ) : null}
-
-          <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative">
+        <PortalShell
+          sidebar={
+            <RoleSidebar collapsed={sidebarCollapsed}>
+              <SidebarContent
+                role={role}
+                pathname={pathname}
+                displayName={displayName}
+                onLogout={logout}
+                isLoggingOut={isLoggingOut}
+                collapsed={sidebarCollapsed}
+                onToggleCollapse={toggleSidebarCollapse}
+              />
+            </RoleSidebar>
+          }
+          header={
             <Topbar
               title={title}
               role={role}
@@ -984,14 +886,26 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               onLogout={logout}
               isLoggingOut={isLoggingOut}
             />
+          }
+        >
+          <>
+            <BusinessSetupWorkflowBanner role={role} pathname={pathname} />
+            {children}
+          </>
+        </PortalShell>
 
-            <main className="flex-1">
-              <div className="mx-auto w-full max-w-[1760px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-                {children}
-              </div>
-            </main>
-          </div>
-        </div>
+        <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
+          <SidebarContent
+            role={role}
+            pathname={pathname}
+            displayName={displayName}
+            onLogout={logout}
+            isLoggingOut={isLoggingOut}
+            collapsed={false}
+            onToggleCollapse={toggleSidebarCollapse}
+            onClose={() => setMobileOpen(false)}
+          />
+        </RoleSidebar>
       </div>
     </DashboardShellContext.Provider>
   );
