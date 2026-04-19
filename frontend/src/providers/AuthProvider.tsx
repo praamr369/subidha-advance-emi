@@ -60,9 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     syncSession();
 
     window.addEventListener("storage", syncSession);
+    window.addEventListener("subidha:session", syncSession);
     return () => {
       active = false;
       window.removeEventListener("storage", syncSession);
+      window.removeEventListener("subidha:session", syncSession);
     };
   }, []);
 

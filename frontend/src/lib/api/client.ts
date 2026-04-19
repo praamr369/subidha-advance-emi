@@ -6,6 +6,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@/lib/auth/tokens";
+import { getStoredSession } from "@/lib/auth/session";
 
 export class ApiError extends Error {
   status: number;
@@ -176,7 +177,8 @@ function shouldJsonEncodeBody(value: unknown): value is Record<string, unknown> 
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
+  const refreshToken =
+    getRefreshToken() ?? getStoredSession()?.refreshToken ?? null;
 
   if (!refreshToken) {
     clearTokens();
@@ -256,9 +258,10 @@ async function apiFetchInternal<T>(
   }
 
   const accessToken = token ?? getAccessToken();
+  const resolvedAccessToken = accessToken ?? getStoredSession()?.accessToken ?? null;
 
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
+  if (resolvedAccessToken) {
+    headers.Authorization = `Bearer ${resolvedAccessToken}`;
   }
 
   const response = await fetch(buildApiUrl(path), {

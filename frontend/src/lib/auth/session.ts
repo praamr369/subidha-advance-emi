@@ -15,6 +15,7 @@ export type StoredSession = {
 
 const AUTH_ROLE_COOKIE = "subidha_role";
 const AUTH_PRESENT_COOKIE = "subidha_auth";
+const SESSION_CHANGE_EVENT = "subidha:session";
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -45,6 +46,15 @@ function syncAuthCookies(session: StoredSession | null) {
 
   setCookie(AUTH_ROLE_COOKIE, (session.role || "").toUpperCase());
   setCookie(AUTH_PRESENT_COOKIE, "1");
+}
+
+function notifySessionChanged() {
+  if (!isBrowser()) return;
+  try {
+    window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+  } catch {
+    // ignore
+  }
 }
 
 function normalizeStoredSession(value: unknown): StoredSession | null {
@@ -102,6 +112,7 @@ export function setSession(session: StoredSession): void {
   setAccessToken(normalized.accessToken);
   setRefreshToken(normalized.refreshToken);
   syncAuthCookies(normalized);
+  notifySessionChanged();
 }
 
 export function storeSession(session: StoredSession): void {
@@ -114,6 +125,7 @@ export function clearSession(): void {
   window.localStorage.removeItem(SESSION_KEY);
   clearTokens();
   syncAuthCookies(null);
+  notifySessionChanged();
 }
 
 export function getAccessToken(): string | null {

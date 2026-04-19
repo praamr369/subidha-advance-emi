@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/lib/constants";
-import { clearSession } from "@/lib/auth/session";
+import { clearSession, getStoredSession } from "@/lib/auth/session";
 import {
   getAccessToken,
   getRefreshToken,
@@ -206,7 +206,8 @@ function looksLikeJsonString(value: string): boolean {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
+  const refreshToken =
+    getRefreshToken() ?? getStoredSession()?.refreshToken ?? null;
 
   if (!refreshToken) {
     clearSession();
@@ -284,7 +285,8 @@ async function apiFetchInternal<T>(
     requestBody = originalBody as BodyInit;
   }
 
-  const accessToken = token ?? getAccessToken();
+  const accessToken =
+    token ?? getAccessToken() ?? getStoredSession()?.accessToken ?? null;
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
