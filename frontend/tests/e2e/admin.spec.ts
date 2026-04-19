@@ -43,7 +43,7 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
 
   await page.goto("/admin");
   await expect(
-    page.getByRole("heading", { name: "Admin Dashboard" })
+    page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
   ).toBeVisible();
 
   await page.goto(
@@ -697,7 +697,7 @@ test("admin customer create success exposes OTP access handoff without echoing t
   );
   await expect(page.locator("#identifier")).toHaveValue("newcustomer620@example.com");
   await expect(page.locator("body")).toContainText(
-    "sent to the registered email address"
+    /OTP is delivered to the registered (account )?email/i
   );
 });
 

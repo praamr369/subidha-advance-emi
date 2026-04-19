@@ -28,6 +28,7 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
       "Consumes signals from every operational module but does not own customer, product, payment, or accounting truth.",
     routes: [
       { label: "Dashboard", href: ROUTES.admin.dashboard },
+      { label: "Operations", href: ROUTES.admin.operations },
       { label: "Analytics", href: ROUTES.admin.analytics },
       { label: "Branch Reporting", href: ROUTES.admin.branchReporting },
       { label: "Reports", href: ROUTES.admin.reports },

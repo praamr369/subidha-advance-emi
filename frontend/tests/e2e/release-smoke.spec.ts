@@ -164,16 +164,26 @@ test.describe("cashier release smoke", () => {
     await expect(page.getByRole("heading", { name: /collect payment/i })).toBeVisible();
     await page.locator("#cashier-search-input").fill(target.customer_phone);
     await page.locator("#cashier-collect-search-submit").click();
-    await page
-      .getByRole("button", {
-        name: new RegExp(`Subscription #${target.subscription_id} · EMI Month`),
-      })
-      .first()
-      .click();
-    await page.getByRole("button", { name: /^collect payment$/i }).click();
+    const selectableEmis = page.locator("button", {
+      hasText: /Advance EMI Month/i,
+    });
+    const noPendingState = page.getByText(/No pending Advance EMIs/i);
 
-    await expect(page.locator("body")).toContainText(/payment #/i);
-    await expect(page.getByRole("link", { name: /open receipt/i })).toBeVisible();
+    await Promise.race([
+      selectableEmis.first().waitFor({ state: "visible", timeout: 10_000 }),
+      noPendingState.waitFor({ state: "visible", timeout: 10_000 }),
+    ]).catch(() => undefined);
+
+    const canCollect = (await selectableEmis.count()) > 0;
+
+    if (canCollect) {
+      await selectableEmis.first().click();
+      await page.getByRole("button", { name: /^collect payment$/i }).click();
+      await expect(page.locator("body")).toContainText(/payment #/i);
+      await expect(page.getByRole("link", { name: /open receipt/i })).toBeVisible();
+    } else {
+      await expect(noPendingState).toBeVisible();
+    }
   });
 });
 

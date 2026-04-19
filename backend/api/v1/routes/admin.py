@@ -91,6 +91,7 @@ from api.v1.views.admin_contracts import (
     AdminRentContractCreateView,
 )
 from api.v1.views.admin_reports import (
+    AdminAnalyticsSummaryView,
     AdminBatchPerformanceAggregateView,
     AdminBatchPerformanceSummaryView,
     AdminEmiAggregateView,
@@ -208,4 +209,5 @@ urlpatterns = [
     path("reports/batch-performance-aggregate/", AdminBatchPerformanceAggregateView.as_view()),
     path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
     path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
+    path("reports/analytics-summary/", AdminAnalyticsSummaryView.as_view()),
 ]

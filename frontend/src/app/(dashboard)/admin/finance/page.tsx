@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -10,8 +11,20 @@ import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
-import { getAdminDashboard, type AdminDashboardResponse } from "@/services/admin";
-import { getBranchReportingOverview, type BranchReportingOverview } from "@/services/branch-control";
+import {
+  listChartOfAccounts,
+  listFinanceAccounts,
+  listPurchaseBills,
+  type AccountingPaginatedResponse,
+  type AccountingPurchaseBill,
+  type ChartOfAccount,
+  type FinanceAccount,
+} from "@/services/accounting";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import {
+  getAdminAnalyticsSummary,
+  type AdminAnalyticsSummaryResponse,
+} from "@/services/reports";
 import type { AdminCommissionSummaryResponse } from "@/types/commission";
 
 type PayoutBatchRow = {
@@ -52,17 +65,6 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load finance dashboard.";
 }
 
-function toIsoDate(value: Date): string {
-  const yyyy = value.getFullYear();
-  const mm = String(value.getMonth() + 1).padStart(2, "0");
-  const dd = String(value.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function monthStartIso(value: Date): string {
-  return toIsoDate(new Date(value.getFullYear(), value.getMonth(), 1));
-}
-
 function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
   return {
     id: toNumber(row.id),
@@ -77,13 +79,9 @@ function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
         row.payout_total
     ),
     commission_count: toNumber(
-      row.commission_count ??
-        row.item_count ??
-        row.total_items ??
-        row.row_count
+      row.commission_count ?? row.item_count ?? row.total_items ?? row.row_count
     ),
-    created_at:
-      typeof row.created_at === "string" ? row.created_at : undefined,
+    created_at: typeof row.created_at === "string" ? row.created_at : undefined,
     finalized_at:
       typeof row.finalized_at === "string" || row.finalized_at === null
         ? (row.finalized_at as string | null)
@@ -93,6 +91,31 @@ function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
         ? (row.cancelled_at as string | null)
         : undefined,
   };
+}
+
+function MiniBar({
+  label,
+  value,
+  total,
+  amount,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  amount: string;
+}) {
+  const width = total <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((value / total) * 100)));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="font-semibold text-foreground">{label}</span>
+        <span className="text-muted-foreground">{amount}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-sky-600 transition-all" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
 }
 
 function SectionCard({
@@ -149,17 +172,13 @@ function FinanceLaneCard({
 
   return (
     <section className={`rounded-2xl border p-5 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-        {eyebrow}
-      </div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">{eyebrow}</div>
       <h2 className="mt-2 text-lg font-semibold text-slate-900">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-slate-700">{description}</p>
 
       <div className="mt-4 space-y-1">
         <div className="text-2xl font-semibold text-slate-900">{value}</div>
-        {secondaryValue ? (
-          <div className="text-sm text-slate-600">{secondaryValue}</div>
-        ) : null}
+        {secondaryValue ? <div className="text-sm text-slate-600">{secondaryValue}</div> : null}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
@@ -186,55 +205,97 @@ function FinanceLaneCard({
 export default function AdminFinancePage() {
   const [summary, setSummary] = useState<AdminCommissionSummaryResponse | null>(null);
   const [batches, setBatches] = useState<PayoutBatchRow[]>([]);
-  const [adminDashboard, setAdminDashboard] = useState<AdminDashboardResponse | null>(null);
-  const [monthOverview, setMonthOverview] = useState<BranchReportingOverview | null>(null);
+  const [analytics, setAnalytics] = useState<AdminAnalyticsSummaryResponse | null>(null);
+  const [chartAccounts, setChartAccounts] =
+    useState<AccountingPaginatedResponse<ChartOfAccount> | null>(null);
+  const [financeAccounts, setFinanceAccounts] =
+    useState<AccountingPaginatedResponse<FinanceAccount> | null>(null);
+  const [draftPurchaseBills, setDraftPurchaseBills] =
+    useState<AccountingPaginatedResponse<AccountingPurchaseBill> | null>(null);
+  const [approvedPurchaseBills, setApprovedPurchaseBills] =
+    useState<AccountingPaginatedResponse<AccountingPurchaseBill> | null>(null);
+
+  const [windowPreset, setWindowPreset] =
+    useState<DashboardWindowPreset>("THIS_MONTH");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+  const analyticsQuery = useMemo(
+    () =>
+      windowPreset === "CUSTOM"
+        ? {
+            window: windowPreset,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+          }
+        : {
+            window: windowPreset,
+          },
+    [endDate, startDate, windowPreset]
+  );
 
-    try {
-      const now = new Date();
-      const [summaryPayload, batchesPayload, dashboardPayload, monthOverviewPayload] =
-        await Promise.all([
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      try {
+        const [
+          summaryPayload,
+          batchesPayload,
+          analyticsPayload,
+          chartPayload,
+          financeAccountPayload,
+          draftPurchasePayload,
+          approvedPurchasePayload,
+        ] = await Promise.all([
           apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
           apiFetch<unknown>("/admin/commission-payout-batches/list/"),
-          getAdminDashboard(),
-          getBranchReportingOverview({
-            start_date: monthStartIso(now),
-            end_date: toIsoDate(now),
-          }),
+          getAdminAnalyticsSummary(analyticsQuery),
+          listChartOfAccounts(),
+          listFinanceAccounts(),
+          listPurchaseBills({ status: "DRAFT", page_size: 1 }),
+          listPurchaseBills({ status: "APPROVED", page_size: 1 }),
         ]);
 
-      setSummary(summaryPayload);
-      setBatches(
-        toArray<Record<string, unknown>>(batchesPayload).map(normalizePayoutBatch)
-      );
-      setAdminDashboard(dashboardPayload);
-      setMonthOverview(monthOverviewPayload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setSummary(null);
-        setBatches([]);
-        setAdminDashboard(null);
-        setMonthOverview(null);
+        setSummary(summaryPayload);
+        setBatches(
+          toArray<Record<string, unknown>>(batchesPayload).map(normalizePayoutBatch)
+        );
+        setAnalytics(analyticsPayload);
+        setChartAccounts(chartPayload);
+        setFinanceAccounts(financeAccountPayload);
+        setDraftPurchaseBills(draftPurchasePayload);
+        setApprovedPurchaseBills(approvedPurchasePayload);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        if (mode === "initial") {
+          setSummary(null);
+          setBatches([]);
+          setAnalytics(null);
+          setChartAccounts(null);
+          setFinanceAccounts(null);
+          setDraftPurchaseBills(null);
+          setApprovedPurchaseBills(null);
+        }
+      } finally {
+        if (mode === "initial") {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
-    } finally {
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setRefreshing(false);
-      }
-    }
-  }, []);
+    },
+    [analyticsQuery]
+  );
 
   useEffect(() => {
     void loadPage("initial");
@@ -256,29 +317,39 @@ export default function AdminFinancePage() {
   );
 
   const recentBatches = useMemo(() => batches.slice(0, 5), [batches]);
-  const monthCash =
-    Number(
-      monthOverview?.collections.cash_net_total ?? monthOverview?.collections.cash_total ?? 0
-    ) || 0;
-  const monthBank =
-    Number(
-      monthOverview?.collections.bank_net_total ?? monthOverview?.collections.bank_total ?? 0
-    ) || 0;
-  const monthUpi =
-    Number(
-      monthOverview?.collections.upi_net_total ?? monthOverview?.collections.upi_total ?? 0
-    ) || 0;
-  const monthNet = Number(monthOverview?.collections.net_amount ?? monthOverview?.collections.gross_amount ?? 0) || 0;
-  const todayNet = Number(adminDashboard?.collections?.today_net_amount ?? adminDashboard?.financial?.today_collection ?? 0) || 0;
-  const outstandingReceivables = Number(adminDashboard?.summary?.outstanding_amount ?? adminDashboard?.financial?.total_outstanding ?? 0) || 0;
-  const overdueAmount = Number(adminDashboard?.summary?.overdue_amount ?? 0) || 0;
-  const waivedAmount = Number(adminDashboard?.summary?.total_waived_amount ?? 0) || 0;
-  const reconciliationFlags = Number(adminDashboard?.reconciliation?.flagged_count ?? 0) || 0;
+
+  const methodRows = analytics?.payment_method_mix.rows ?? [];
+  const cashNet = toNumber(methodRows.find((row) => row.method === "CASH")?.net_amount);
+  const bankNet = toNumber(methodRows.find((row) => row.method === "BANK")?.net_amount);
+  const upiNet = toNumber(methodRows.find((row) => row.method === "UPI")?.net_amount);
+  const windowNet = toNumber(analytics?.overview.window_net_collections);
+
+  const outstandingReceivables = toNumber(analytics?.overview.outstanding_amount);
+  const overdueAmount = toNumber(analytics?.overview.overdue_emi_amount);
+  const reconciliationFlags = toNumber(analytics?.overview.reconciliation_flagged_count);
+  const purchaseQueueCount =
+    (draftPurchaseBills?.count ?? 0) + (approvedPurchaseBills?.count ?? 0);
+  const chartAccountCount = chartAccounts?.count ?? 0;
+  const financeAccountCount = financeAccounts?.count ?? 0;
+
+  const directSalesGross = toNumber(analytics?.direct_sales_posture.summary.gross_total);
+  const directSalesCount = analytics?.direct_sales_posture.summary.count ?? 0;
+  const directSalesTrend = analytics?.direct_sales_posture.trend ?? [];
+  const directSalesTrendMax = directSalesTrend.reduce(
+    (max, row) => Math.max(max, toNumber(row.gross_total)),
+    0
+  );
+
+  const receivableAging = analytics?.receivables_pressure.aging ?? [];
+  const receivableAgingMax = receivableAging.reduce(
+    (max, row) => Math.max(max, toNumber(row.amount)),
+    0
+  );
 
   return (
     <PortalPage
       title="Finance Control Center"
-      subtitle="Finance snapshot for collections, receivables, reconciliation, commissions, and payout operations. Only real ledger-backed numbers are shown."
+      subtitle="Workflow hub for accounts, books, procurement, direct sales, reconciliation exceptions, commissions, and payout controls."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Partner Finance", href: ROUTES.admin.financeCommissions },
@@ -298,22 +369,31 @@ export default function AdminFinancePage() {
       ]}
       stats={[
         {
-          label: "Pending Commission",
-          value: money(summary?.summary?.pending_commission),
-          tone: "warning",
-        },
-        {
-          label: "Settled Commission",
-          value: money(summary?.summary?.settled_commission),
+          label: "Window Collections",
+          value: money(analytics?.overview.window_net_collections),
           tone: "success",
         },
         {
-          label: "Unsettled Rows",
-          value: String(summary?.summary?.pending_count ?? 0),
+          label: "Outstanding",
+          value: money(analytics?.overview.outstanding_amount),
+          tone: "warning",
+        },
+        {
+          label: "Reconciliation Flags",
+          value: String(analytics?.overview.reconciliation_flagged_count ?? 0),
+          tone:
+            (analytics?.overview.reconciliation_flagged_count ?? 0) > 0
+              ? "warning"
+              : undefined,
         },
         {
           label: "Payout Batches",
           value: String(batches.length),
+        },
+        {
+          label: "Purchase Bills",
+          value: String(purchaseQueueCount),
+          tone: purchaseQueueCount > 0 ? "warning" : "success",
         },
       ]}
       statusBadge={{
@@ -333,6 +413,18 @@ export default function AdminFinancePage() {
           </button>
         </section>
 
+        <DashboardTimeWindowSelector
+          value={windowPreset}
+          startDate={startDate}
+          endDate={endDate}
+          loading={refreshing || loading}
+          title="Finance window"
+          description="Window drives backend finance analytics slices for reporting and control routing while transactional posting semantics remain unchanged."
+          onWindowChange={setWindowPreset}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+        />
+
         {loading ? <LoadingBlock label="Loading finance control center..." /> : null}
 
         {!loading && error ? (
@@ -348,147 +440,289 @@ export default function AdminFinancePage() {
             <section className="grid gap-4 xl:grid-cols-4">
               <FinanceLaneCard
                 eyebrow="Collections"
-                title="Today collections (net)"
-                description="Net collections for today from canonical admin dashboard (reversals excluded when available)."
-                value={money(todayNet)}
-                secondaryValue="Use Payments/Collections for row-level posting."
+                title="Window collections (net)"
+                description="Windowed net collections from backend analytics summary with reversal-aware treatment."
+                value={money(windowNet)}
+                secondaryValue={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
                 primaryHref={ROUTES.admin.payments}
                 primaryLabel="Open payments"
                 secondaryHref={ROUTES.admin.collections}
                 secondaryLabel="Open collections"
                 tone="success"
               />
-              <FinanceLaneCard
-                eyebrow="Collections"
-                title="Month-to-date (net)"
-                description="Branch-control reporting totals for the current month window."
-                value={money(monthNet)}
-                secondaryValue={`${money(monthCash)} cash · ${money(monthBank)} bank · ${money(monthUpi)} UPI`}
-                primaryHref={ROUTES.admin.branchReporting}
-                primaryLabel="Open branch reporting"
-                secondaryHref={ROUTES.admin.payments}
-                secondaryLabel="Payment log"
-                tone="default"
-              />
+
               <FinanceLaneCard
                 eyebrow="Receivables"
                 title="Outstanding receivables"
-                description="Remaining canonical outstanding amount across active subscriptions."
+                description="Canonical outstanding amount across active contracts with overdue signal retained."
                 value={money(outstandingReceivables)}
-                secondaryValue={`${money(overdueAmount)} overdue · ${money(waivedAmount)} waived`}
+                secondaryValue={`${money(overdueAmount)} overdue`}
                 primaryHref={ROUTES.admin.subscriptions}
                 primaryLabel="Open subscriptions"
-                secondaryHref={ROUTES.admin.emis}
-                secondaryLabel="EMI register"
+                secondaryHref={ROUTES.admin.emisOverdue}
+                secondaryLabel="Overdue queue"
                 tone={overdueAmount > 0 ? "warning" : "default"}
               />
+
               <FinanceLaneCard
-                eyebrow="Governance"
-                title="Reconciliation flags"
-                description="Flagged mismatches should be handled via controlled reconciliation workflows."
+                eyebrow="Reconciliation"
+                title="Exception queue"
+                description="Reconciliation flags route into controlled exception workflows with audit-safe handling."
                 value={String(reconciliationFlags)}
-                secondaryValue="Avoid manual edits; keep audit trails intact."
+                secondaryValue="Do not mutate payment history directly."
                 primaryHref={buildAdminReconciliationRoute({ flagged: true })}
                 primaryLabel="Open flagged queue"
                 secondaryHref={buildAdminReconciliationRoute()}
                 secondaryLabel="Reconciliation"
                 tone={reconciliationFlags > 0 ? "warning" : "success"}
               />
+
+              <FinanceLaneCard
+                eyebrow="Direct sales"
+                title="Retail billing linkage"
+                description="Direct-sale trend remains separate from EMI contracts and is linked through billing/accounting routes."
+                value={money(directSalesGross)}
+                secondaryValue={`${directSalesCount} direct-sale documents in selected window`}
+                primaryHref={ROUTES.admin.billingDirectSales}
+                primaryLabel="Open direct sales"
+                secondaryHref={ROUTES.admin.billingRegister}
+                secondaryLabel="Billing register"
+                tone="default"
+              />
+            </section>
+
+            <section className="grid gap-4 xl:grid-cols-4">
+              <FinanceLaneCard
+                eyebrow="Masters"
+                title="Chart of accounts"
+                description="Ledger account master used by books, journals, and operational bridge posting."
+                value={`${chartAccountCount} chart accounts`}
+                secondaryValue="Accounting-side master"
+                primaryHref={ROUTES.admin.accountingChartOfAccounts}
+                primaryLabel="Open chart of accounts"
+                secondaryHref={ROUTES.admin.settingsBusinessSetupChartAccounts}
+                secondaryLabel="Business setup chart"
+                tone={chartAccountCount > 0 ? "success" : "warning"}
+              />
+
+              <FinanceLaneCard
+                eyebrow="Masters"
+                title="Finance accounts"
+                description="Operational cash/bank/UPI accounts for collections, bills, payout, and book routing."
+                value={`${financeAccountCount} finance accounts`}
+                secondaryValue="Branch-scoped where configured"
+                primaryHref={ROUTES.admin.settingsBusinessSetupFinanceAccounts}
+                primaryLabel="Open finance accounts"
+                secondaryHref={ROUTES.admin.accountingBooks}
+                secondaryLabel="Open books"
+                tone={financeAccountCount > 0 ? "success" : "warning"}
+              />
+
+              <FinanceLaneCard
+                eyebrow="Books"
+                title="Cash, bank, and UPI books"
+                description="Route into book registers for account-facing review without altering payment truth."
+                value={money(windowNet)}
+                secondaryValue={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
+                primaryHref={ROUTES.admin.accountingBooksCash}
+                primaryLabel="Cash book"
+                secondaryHref={ROUTES.admin.accountingBooksBank}
+                secondaryLabel="Bank book"
+                tone="default"
+              />
+
+              <FinanceLaneCard
+                eyebrow="Procurement"
+                title="Purchase bill obligations"
+                description="Draft and approved purchase bills waiting controlled posting or settlement follow-through."
+                value={`${purchaseQueueCount} active bills`}
+                secondaryValue={`${draftPurchaseBills?.count ?? 0} draft · ${approvedPurchaseBills?.count ?? 0} approved`}
+                primaryHref={ROUTES.admin.accountingPurchaseBills}
+                primaryLabel="Open purchase bills"
+                secondaryHref={ROUTES.admin.accountingVendors}
+                secondaryLabel="Vendor register"
+                tone={purchaseQueueCount > 0 ? "warning" : "success"}
+              />
             </section>
 
             <section className="grid gap-4 xl:grid-cols-4">
               <FinanceLaneCard
                 eyebrow="Commissions"
-                title="Commission Register"
-                description="Review total commission exposure, unsettled rows, and finance status."
+                title="Commission register"
+                description="Review total partner commission exposure and unsettled register rows."
                 value={money(summary?.summary?.total_commission)}
-                secondaryValue={`${String(
-                  summary?.summary?.pending_count ?? 0
-                )} unsettled · ${String(summary?.summary?.settled_count ?? 0)} settled`}
-                primaryHref="/admin/finance/commissions"
-                primaryLabel="Open Commissions"
-                secondaryHref="/admin/partners"
-                secondaryLabel="Partner Directory"
+                secondaryValue={`${String(summary?.summary?.pending_count ?? 0)} unsettled · ${String(summary?.summary?.settled_count ?? 0)} settled`}
+                primaryHref={ROUTES.admin.financeCommissions}
+                primaryLabel="Open commissions"
+                secondaryHref={ROUTES.admin.partners}
+                secondaryLabel="Partner directory"
                 tone="warning"
               />
 
               <FinanceLaneCard
                 eyebrow="Settlement"
-                title="Payout Queue"
-                description="Prepare eligible commission rows for payout batches. Pending rows settle on batch finalize, while legacy settled rows remain batchable."
+                title="Payout queue"
+                description="Prepare eligible commission rows for payout batch packaging and review."
                 value={money(summary?.summary?.pending_commission)}
-                secondaryValue={`${String(
-                  Number(summary?.summary?.pending_count ?? 0) +
-                    Number(summary?.summary?.settled_count ?? 0)
-                )} eligible rows across pending and legacy settled states`}
-                primaryHref="/admin/finance/commissions/settled"
-                primaryLabel="Open Payout Queue"
-                secondaryHref="/admin/finance/commissions"
-                secondaryLabel="Back to Register"
+                secondaryValue={`${String(Number(summary?.summary?.pending_count ?? 0) + Number(summary?.summary?.settled_count ?? 0))} payout-eligible rows`}
+                primaryHref={ROUTES.admin.financeSettledCommissions}
+                primaryLabel="Open payout queue"
+                secondaryHref={ROUTES.admin.financeCommissions}
+                secondaryLabel="Back to register"
                 tone="success"
               />
 
               <FinanceLaneCard
                 eyebrow="Payouts"
-                title="Payout Batches"
-                description="Review draft, finalized, and cancelled payout batches."
+                title="Payout batches"
+                description="Draft, finalized, and cancelled batch visibility for settlement discipline."
                 value={String(batches.length)}
                 secondaryValue={`${draftBatchCount} draft · ${finalizedBatchCount} finalized · ${cancelledBatchCount} cancelled`}
-                primaryHref="/admin/finance/payout-batches"
-                primaryLabel="Open Payout Batches"
+                primaryHref={ROUTES.admin.financePayoutBatches}
+                primaryLabel="Open payout batches"
                 tone="default"
               />
 
               <FinanceLaneCard
                 eyebrow="Risk"
-                title="Reversed Commission Value"
-                description="Track reversed commission impact separately from settled and pending values."
+                title="Reversed commission value"
+                description="Track reversed commission impact separately from pending and settled amounts."
                 value={money(summary?.summary?.reversed_commission)}
                 secondaryValue={`${String(summary?.summary?.reversed_count ?? 0)} reversed rows`}
-                primaryHref="/admin/finance/commissions"
-                primaryLabel="Review Commission Risk"
+                primaryHref={ROUTES.admin.financeCommissions}
+                primaryLabel="Review commission risk"
                 secondaryHref={buildAdminReconciliationRoute({ view: "payments" })}
-                secondaryLabel="Payment Reconciliation"
-                tone={
-                  Number(summary?.summary?.reversed_commission ?? 0) > 0 ? "danger" : "default"
-                }
+                secondaryLabel="Payment reconciliation"
+                tone={Number(summary?.summary?.reversed_commission ?? 0) > 0 ? "danger" : "default"}
               />
             </section>
 
-            <SectionCard
-              title="Finance workflow note"
-              description="Use the commission register for row-level review, the payout queue for batch preparation, reconciliation for mismatch cleanup, and payout batches for controlled finalize/cancel lifecycle."
-            >
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/admin/finance/commissions"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Commission Register
-                </Link>
+            <section className="grid gap-4 xl:grid-cols-3">
+              <SectionCard
+                title="Receivables aging"
+                description="Backend-prepared aging buckets for pending and overdue receivables pressure."
+              >
+                {receivableAging.length === 0 ? (
+                  <EmptyState
+                    title="No aging buckets"
+                    description="No pending receivable rows are currently visible."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {receivableAging.map((row) => (
+                      <MiniBar
+                        key={row.bucket}
+                        label={row.label}
+                        value={toNumber(row.amount)}
+                        total={Math.max(receivableAgingMax, 1)}
+                        amount={`${money(row.amount)} · ${row.count}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
 
-                <Link
-                  href="/admin/finance/commissions/settled"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Payout Queue
-                </Link>
+              <SectionCard
+                title="Direct-sales trend"
+                description="Windowed direct-sale gross values from billing-backed source records."
+              >
+                {directSalesTrend.length === 0 ? (
+                  <EmptyState
+                    title="No direct-sale trend rows"
+                    description="No non-cancelled direct-sale rows are visible in this window."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {directSalesTrend.slice(-6).map((row) => (
+                      <MiniBar
+                        key={`${row.date || "na"}-${row.count}`}
+                        label={row.date || "Unknown date"}
+                        value={toNumber(row.gross_total)}
+                        total={Math.max(directSalesTrendMax, 1)}
+                        amount={`${money(row.gross_total)} · ${row.count}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
 
-                <Link
-                  href="/admin/finance/reconciliation"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Commission Reconciliation
-                </Link>
+              <SectionCard
+                title="Finance workflow launchpad"
+                description="Every action below routes to an existing operational finance module; no placeholder buttons."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={ROUTES.admin.accountingChartOfAccounts}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Chart of Accounts
+                  </Link>
 
-                <Link
-                  href="/admin/finance/payout-batches"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Payout Batches
-                </Link>
-              </div>
-            </SectionCard>
+                  <Link
+                    href={ROUTES.admin.settingsBusinessSetupFinanceAccounts}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Finance Accounts
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.accountingBooksCash}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Cash Book
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.accountingBooksBank}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Bank Book
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.accountingBooksUpi}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    UPI Book
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.accountingPurchaseBills}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Purchase Bills
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.billingDirectSales}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Direct Sales
+                  </Link>
+
+                  <Link
+                    href={buildAdminReconciliationRoute({ flagged: true })}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Reconciliation Flags
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.financeCommissions}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Commission Register
+                  </Link>
+
+                  <Link
+                    href={ROUTES.admin.financePayoutBatches}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Payout Batches
+                  </Link>
+                </div>
+              </SectionCard>
+            </section>
 
             <SectionCard
               title="Recent payout batches"
@@ -508,15 +742,13 @@ export default function AdminFinancePage() {
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
-                          <div className="font-medium text-foreground">
-                            Batch #{row.id}
-                          </div>
+                          <div className="font-medium text-foreground">Batch #{row.id}</div>
                           <div className="mt-1 text-sm text-slate-600">
                             {row.status} · {row.commission_count} commission rows
                           </div>
                           <div className="mt-1 text-xs text-slate-600">
-                            Created {formatDateTime(row.created_at)} · Finalized{" "}
-                            {formatDateTime(row.finalized_at)} · Cancelled{" "}
+                            Created {formatDateTime(row.created_at)} · Finalized {" "}
+                            {formatDateTime(row.finalized_at)} · Cancelled {" "}
                             {formatDateTime(row.cancelled_at)}
                           </div>
                         </div>
@@ -526,9 +758,7 @@ export default function AdminFinancePage() {
                             <div className="text-sm font-semibold text-foreground">
                               {money(row.total_amount)}
                             </div>
-                            <div className="text-xs text-slate-600">
-                              Batch total
-                            </div>
+                            <div className="text-xs text-slate-600">Batch total</div>
                           </div>
 
                           <Link

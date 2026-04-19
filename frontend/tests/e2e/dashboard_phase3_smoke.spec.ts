@@ -20,7 +20,9 @@ test.describe("admin dashboard phase-3 smoke", () => {
   test("admin dashboard shows canonical sidebar groups and action workspace buckets", async ({ page }) => {
     await page.goto("/admin");
     const sidebar = page.getByRole("complementary");
-    await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
+    ).toBeVisible();
     // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
     await expect(sidebar.getByText("Executive Overview", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("CRM & Leads", { exact: true })).toBeVisible();
@@ -34,14 +36,10 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(
       sidebar.getByRole("link", { name: "Analytics", exact: true })
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Daily action buckets" })).toBeVisible();
-    // Bucket titles may appear both as headings and inside linked cards; assert the heading to avoid strict-mode collisions.
-    await expect(page.getByRole("heading", { name: "Overdue EMI follow-up" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Flagged payment reconciliation" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Pending delivery actions" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Onboarding handoff" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export upcoming" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export overdue" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export CSV" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Urgent Attention" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Launch Points" })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Overdue Advance EMI follow-up");
+    await expect(page.locator("body")).toContainText("Finance Control");
+    await expect(page.locator("body")).toContainText("Reports Center");
   });
 });

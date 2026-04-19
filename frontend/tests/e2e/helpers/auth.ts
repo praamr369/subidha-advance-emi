@@ -3,9 +3,9 @@ import { expect, type Page } from "@playwright/test";
 import { FRONTEND_BASE_URL, type RoleCredentials } from "./smoke-data";
 
 export async function expectLoginScreen(page: Page): Promise<void> {
-  await expect(
-    page.getByRole("heading", { name: /sign in to your account/i })
-  ).toBeVisible();
+  await expect(page.locator("#username")).toBeVisible();
+  await expect(page.locator("#password")).toBeVisible();
+  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 }
 
 export async function loginWithCredentials(
@@ -59,7 +59,7 @@ export async function bootstrapRoleSession(
 
 export async function logoutFromApp(page: Page): Promise<void> {
   await page.goto("/logout");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
   await expectLoginScreen(page);
 }
 

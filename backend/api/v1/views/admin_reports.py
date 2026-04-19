@@ -8,6 +8,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
+from api.v1.serializers.dashboard_surfaces import DashboardWindowQuerySerializer
+from subscriptions.services.admin_reporting_analytics_service import (
+    build_admin_reporting_analytics_summary,
+)
+from subscriptions.services.dashboard_canonical_financial_summary_service import (
+    resolve_dashboard_window,
+)
 from subscriptions.models import (
     Batch,
     Commission,
@@ -232,3 +239,19 @@ class AdminEmiSummaryView(APIView):
 
 class AdminBatchPerformanceSummaryView(AdminBatchPerformanceAggregateView):
     """Alias endpoint with the Phase-7B response contract."""
+
+
+class AdminAnalyticsSummaryView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        serializer = DashboardWindowQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        window_params = resolve_dashboard_window(**serializer.validated_data)
+
+        return Response(
+            build_admin_reporting_analytics_summary(
+                actor_user=request.user,
+                window_params=window_params,
+            )
+        )

@@ -75,6 +75,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "dashboard",
         },
         {
+          label: "Operations Workspace",
+          href: ROUTES.admin.operations,
+          icon: "operations",
+        },
+        {
           label: "Branch Dashboard",
           href: ROUTES.admin.branchReporting,
           icon: "analytics",

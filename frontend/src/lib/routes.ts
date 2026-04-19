@@ -21,6 +21,7 @@ export const ROUTES = {
     dashboard: "/admin",
 
     analytics: "/admin/analytics",
+    operations: "/admin/operations",
     auditLogs: "/admin/audit-logs",
 
     collections: "/admin/collections",

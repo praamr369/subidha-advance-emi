@@ -168,3 +168,14 @@ class AdminDashboardApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["subscriptions"]["won"], 1)
+
+    def test_admin_dashboard_requires_admin_role(self):
+        customer_user = create_customer_user(
+            username="dashboard_non_admin",
+            phone="7304000099",
+        )
+        self.client.force_authenticate(user=customer_user)
+
+        response = self.client.get("/api/v1/admin/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

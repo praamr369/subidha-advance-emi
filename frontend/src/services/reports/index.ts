@@ -1,4 +1,5 @@
 import { request } from "@/services/api";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 import type { EmiRecord } from "@/services/emis";
 import type { PaymentRegisterRow } from "@/services/payments";
 import { getAdminPaymentRegister } from "@/services/payments";
@@ -137,6 +138,16 @@ function toResultsArray<T>(
   if (Array.isArray(payload)) return payload;
   if (payload && Array.isArray(payload.results)) return payload.results;
   return [];
+}
+
+function buildQuery(params: Record<string, string | number | undefined | null>): string {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `?${query}` : "";
 }
 
 function byMethodTotals(rows: PaymentRegisterRow[]) {
@@ -368,4 +379,171 @@ export async function getReconciliationSnapshot() {
       note: "Reconciliation snapshot is sourced from the admin subscription reconciliation-attention endpoint.",
     } as ReportAccuracy,
   };
+}
+
+export type AdminAnalyticsSummaryQuery = {
+  window?: DashboardWindowPreset;
+  as_of?: string;
+  start_date?: string;
+  end_date?: string;
+};
+
+export type AdminAnalyticsSummaryResponse = {
+  generated_at: string;
+  filters: {
+    window: DashboardWindowPreset | "DEFAULT";
+    as_of?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+  };
+  summary: Record<string, unknown>;
+  overview: {
+    window_net_collections: string;
+    window_active_collection_count: number;
+    window_reversed_amount: string;
+    outstanding_amount: string;
+    overdue_emi_count: number;
+    overdue_emi_amount: string;
+    reconciliation_flagged_count: number;
+    delivery_action_count: number;
+    direct_sales_window_count: number;
+    direct_sales_window_gross_total: string;
+    pending_commission_amount: string;
+    pending_commission_count: number;
+  };
+  collections_trend: {
+    summary: {
+      count: number;
+      active_count: number;
+      reversed_count: number;
+      gross_amount: string;
+      reversed_amount: string;
+      net_amount: string;
+    };
+    points: Array<{
+      date: string | null;
+      count: number;
+      active_count: number;
+      reversed_count: number;
+      gross_amount: string;
+      reversed_amount: string;
+      net_amount: string;
+    }>;
+  };
+  payment_method_mix: {
+    rows: Array<{
+      method: string;
+      count: number;
+      active_count: number;
+      reversed_count: number;
+      gross_amount: string;
+      reversed_amount: string;
+      net_amount: string;
+    }>;
+    summary: {
+      total_net_amount: string;
+    };
+  };
+  receivables_pressure: {
+    reference_date: string;
+    pending_count: number;
+    pending_amount: string;
+    overdue_count: number;
+    overdue_amount: string;
+    aging: Array<{
+      bucket: string;
+      label: string;
+      count: number;
+      amount: string;
+    }>;
+  };
+  subscription_mix: {
+    plan_type: Array<{ plan_type: string; count: number }>;
+    status: Array<{ status: string; count: number }>;
+    batch_mix: Array<{
+      batch_id: number | null;
+      batch_code: string;
+      subscription_count: number;
+      active_subscription_count: number;
+      monthly_booked_value: string;
+    }>;
+    new_subscriptions_trend: Array<{
+      date: string | null;
+      count: number;
+      monthly_booked_value: string;
+    }>;
+  };
+  reconciliation_posture: {
+    checked_count: number;
+    flagged_count: number;
+    flagged_ratio: number;
+    note?: string;
+    results: Array<{
+      subscription_id: number;
+      subscription_number: string;
+      customer_name?: string;
+      total_amount: string;
+      paid_amount: string;
+      waived_amount: string;
+      pending_outstanding: string;
+      computed_outstanding: string;
+      delta: string;
+    }>;
+  };
+  delivery_posture: {
+    supported: boolean;
+    summary: Record<string, unknown>;
+  };
+  direct_sales_posture: {
+    supported: boolean;
+    summary: {
+      count: number;
+      gross_total: string;
+    };
+    trend: Array<{
+      date: string | null;
+      count: number;
+      gross_total: string;
+    }>;
+  };
+  finance_posture: {
+    supported: boolean;
+    chart_of_accounts_count: number;
+    finance_accounts_count: number;
+    purchase_obligations: {
+      draft_count: number;
+      draft_total: string;
+      approved_count: number;
+      approved_total: string;
+      posted_count: number;
+      posted_total: string;
+    };
+    commission_summary: {
+      total_count: number;
+      total_commission: string;
+      pending_count: number;
+      pending_amount: string;
+      settled_count: number;
+      settled_amount: string;
+      reversed_count: number;
+      reversed_amount: string;
+    };
+    payout_batches: {
+      total_count: number;
+      draft_count: number;
+      draft_total: string;
+      finalized_count: number;
+      finalized_total: string;
+      cancelled_count: number;
+      cancelled_total: string;
+    };
+  };
+};
+
+export async function getAdminAnalyticsSummary(
+  params: AdminAnalyticsSummaryQuery = {}
+): Promise<AdminAnalyticsSummaryResponse> {
+  return request<AdminAnalyticsSummaryResponse>(
+    `/admin/reports/analytics-summary/${buildQuery(params)}`
+  );
 }

@@ -8,10 +8,10 @@ test.describe("admin dashboard smoke", () => {
   test("admin dashboard renders canonical finance panels", async ({ page }) => {
     await page.goto("/admin");
     await expect(
-      page.getByRole("heading", { name: "Admin Dashboard" })
+      page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
     ).toBeVisible();
-    await expect(page.locator("body")).toContainText("Due collection queue");
-    await expect(page.locator("body")).toContainText("Reconciliation attention");
+    await expect(page.locator("body")).toContainText("Settlement Posture");
+    await expect(page.locator("body")).toContainText("Launch Points");
   });
 });
 
