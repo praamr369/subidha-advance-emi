@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import PublicPageShell from "@/components/public/PublicPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import { ROUTES } from "@/lib/routes";
 import { submitPublicLead } from "@/services/public";
@@ -101,24 +101,21 @@ export default function ApplyPageClient() {
     Boolean(selectedProductId) || Boolean(selectedProductName) || Boolean(selectedProductCode);
 
   return (
-    <PortalPage
-      title="Apply for the Lucky Plan"
-      subtitle="Submit your enquiry with product context, preferred EMI comfort, and contact details so the branch can follow up with the right plan guidance."
+    <PublicPageShell
+      title="Apply / Enquire"
+      subtitle="Share your product preference, preferred monthly comfort, and contact details so the branch can guide you on Lucky Plan Advance EMI (and any rent/lease availability)."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Apply" },
       ]}
       actions={[
-        { href: ROUTES.public.products, label: "Browse Products", variant: "secondary" },
-        { href: ROUTES.public.login, label: "Login", variant: "ghost" },
+        { label: "Browse Products", href: ROUTES.public.products, variant: "secondary" },
+        { label: "Contact", href: ROUTES.public.contact, variant: "secondary" },
       ]}
-      statusBadge={{ label: "Public Enquiry Flow", tone: "info" }}
-      helperNote="Submit with correct phone and product preference so branch follow-up can map directly to inventory and subscription workflow."
-      helperTone="info"
     >
       {hasProductContext ? (
-        <section className="surface-panel-elevated rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+        <section className="public-card p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Selected Product Context
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -144,7 +141,7 @@ export default function ApplyPageClient() {
         </section>
       ) : null}
 
-      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="public-surface p-6">
         <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-medium text-foreground">Name</span>
@@ -154,7 +151,7 @@ export default function ApplyPageClient() {
               onChange={(event) => setName(event.target.value)}
               placeholder="Enter your full name"
               required
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -167,7 +164,7 @@ export default function ApplyPageClient() {
               placeholder="10-digit phone number"
               required
               pattern="[0-9]{10}"
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -178,7 +175,7 @@ export default function ApplyPageClient() {
               value={city}
               onChange={(event) => setCity(event.target.value)}
               placeholder="Where should the branch contact you?"
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -190,7 +187,7 @@ export default function ApplyPageClient() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="If you prefer email follow-up"
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -201,7 +198,7 @@ export default function ApplyPageClient() {
               value={interestedProduct}
               onChange={(event) => setInterestedProduct(event.target.value)}
               placeholder="Product name, code, or preferred category"
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -214,7 +211,7 @@ export default function ApplyPageClient() {
               value={preferredEmiAmount}
               onChange={(event) => setPreferredEmiAmount(event.target.value)}
               placeholder="Optional monthly comfort range"
-              className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
@@ -228,16 +225,17 @@ export default function ApplyPageClient() {
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Tell us what you want to buy, your preferred branch follow-up time, or any product questions."
-              className="rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+              className="rounded-xl border border-border bg-white/80 px-4 py-3 text-sm outline-none transition focus:border-ring"
             />
           </label>
 
           <div className="lg:col-span-2 flex flex-wrap gap-3">
             <ActionButton
               type="submit"
-              variant="primary"
+              variant="secondary"
               loading={loading}
               size="lg"
+              className="border-slate-950/10 bg-slate-950 text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.82)] hover:bg-slate-900 hover:border-slate-950/10"
             >
               {loading ? "Submitting..." : "Submit Application"}
             </ActionButton>
@@ -264,6 +262,6 @@ export default function ApplyPageClient() {
           </div>
         ) : null}
       </section>
-    </PortalPage>
+    </PublicPageShell>
   );
 }

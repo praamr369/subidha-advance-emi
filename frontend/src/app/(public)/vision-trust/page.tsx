@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import PortalPage from "@/components/ui/PortalPage";
+import PublicPageShell from "@/components/public/PublicPageShell";
+import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = {
@@ -11,27 +12,49 @@ export const metadata: Metadata = {
 
 export default function VisionTrustPage() {
   return (
-    <PortalPage
+    <PublicPageShell
       title="Vision & Trust"
-      subtitle="The public site should help customers verify the business and move into a real next step without marketing-only dead ends."
+      subtitle="Trust comes from live product visibility, real enquiry capture, and winner publication sourced from revealed draw records."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Vision & Trust" },
       ]}
       actions={[
-        { href: ROUTES.public.winners, label: "View Winners", variant: "secondary" },
-        { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
+        { label: "View winners", href: ROUTES.public.winners, variant: "secondary" },
+        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <p className="text-sm leading-7 text-muted-foreground">
-          Trust on the public site comes from live product visibility, real
-          application capture, and winner publication sourced from revealed draw
-          records. The platform keeps payment history, draw execution, and
-          customer role access separate so public trust signals do not depend on
-          decorative placeholder content.
-        </p>
+      <section className="public-surface p-6">
+        <SectionHeader
+          eyebrow="Principles"
+          title="Built for real operations"
+          description="SUBIDHA CORE is a real money-handling system. The public experience focuses on clarity, transparency, and safe next steps."
+        />
+        <div className="mt-6 grid gap-3 lg:grid-cols-3">
+          {[
+            {
+              title: "No fake marketing signals",
+              description:
+                "Public pages show real catalogue, real stats (when available), and honest empty states when data is missing.",
+            },
+            {
+              title: "Transparency without leaking private data",
+              description:
+                "Winner visibility is sourced from revealed draw records with privacy-safe display labels, not internal ledgers.",
+            },
+            {
+              title: "Conversion paths that map to workflows",
+              description:
+                "Apply/Enquire captures product context so branch follow-up can map directly to onboarding and subscription workflows.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="public-card p-5">
+              <div className="text-base font-semibold text-foreground">{item.title}</div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.description}</p>
+            </div>
+          ))}
+        </div>
       </section>
-    </PortalPage>
+    </PublicPageShell>
   );
 }

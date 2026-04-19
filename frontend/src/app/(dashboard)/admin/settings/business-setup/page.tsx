@@ -9,9 +9,11 @@ import {
   getSetupChecklist,
   type SetupChecklist,
 } from "@/services/business-setup";
+import { getAdminPublicBusinessProfile } from "@/services/public-site";
 
 type Counts = {
   businessProfileConfigured: boolean;
+  publicSiteConfigured: boolean;
   branchesActive: number;
   branchesPrimaryConfigured: boolean;
   cashCountersActive: number;
@@ -33,6 +35,12 @@ const cards = [
     description: "Legal identity, contact data, address, and invoice defaults.",
     href: "/admin/settings/business-setup/profile",
     countKey: "businessProfileConfigured" as const,
+  },
+  {
+    title: "Public Site",
+    description: "Public-facing contact, social links, hero text, and logo.",
+    href: "/admin/settings/business-setup/public-site",
+    countKey: "publicSiteConfigured" as const,
   },
   {
     title: "Branches",
@@ -75,6 +83,7 @@ const cards = [
 export default function BusinessSetupOverviewPage() {
   const [counts, setCounts] = useState<Counts>({
     businessProfileConfigured: false,
+    publicSiteConfigured: false,
     branchesActive: 0,
     branchesPrimaryConfigured: false,
     cashCountersActive: 0,
@@ -92,10 +101,14 @@ export default function BusinessSetupOverviewPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const readiness = await getSetupChecklist();
+      const [readiness, publicProfile] = await Promise.all([
+        getSetupChecklist(),
+        getAdminPublicBusinessProfile().catch(() => null),
+      ]);
 
       setCounts({
         businessProfileConfigured: Boolean(readiness.counts?.business_profile_configured),
+        publicSiteConfigured: Boolean(publicProfile),
         branchesActive: Number(readiness.counts?.branches_active || 0),
         branchesPrimaryConfigured: Boolean(readiness.counts?.branches_primary_configured),
         cashCountersActive: Number(readiness.counts?.cash_counters_active || 0),
@@ -187,8 +200,8 @@ export default function BusinessSetupOverviewPage() {
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {loading
                 ? "…"
-                : card.countKey === "businessProfileConfigured"
-                  ? counts.businessProfileConfigured
+                : card.countKey === "businessProfileConfigured" || card.countKey === "publicSiteConfigured"
+                  ? counts[card.countKey]
                     ? "Configured"
                     : "Missing"
                   : counts[card.countKey]}

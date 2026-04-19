@@ -184,7 +184,17 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "subscriptions",
         },
         {
-          label: "EMI Register",
+          label: "Rent Contracts",
+          href: `${ROUTES.admin.subscriptions}?plan_type=RENT`,
+          icon: "subscriptions",
+        },
+        {
+          label: "Lease Contracts",
+          href: `${ROUTES.admin.subscriptions}?plan_type=LEASE`,
+          icon: "subscriptions",
+        },
+        {
+          label: "Advance EMI Register",
           href: ROUTES.admin.emis,
           icon: "emis",
         },
@@ -266,7 +276,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "reconciliation",
         },
         {
-          label: "Overdue EMI",
+          label: "Overdue Advance EMIs",
           href: ROUTES.admin.emisOverdue,
           icon: "emis",
         },
@@ -623,7 +633,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Search EMI",
+      title: "Search Advance EMI",
       icon: "cashCounter",
       items: [
         {

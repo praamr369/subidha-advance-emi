@@ -142,9 +142,18 @@ export default function BillingDirectSalesPage() {
   });
   const leadId = parsePositiveInteger(searchParams.get("lead"));
   const focusedSaleId = parsePositiveInteger(searchParams.get("focus_sale"));
+  const deliveryRequiredFilter = (searchParams.get("delivery_required") || "").trim().toLowerCase();
+  const statusFilter = (searchParams.get("status") || "").trim().toUpperCase();
 
   async function loadPage() {
     try {
+      const directSaleQuery: Record<string, string> = {};
+      if (deliveryRequiredFilter === "true" || deliveryRequiredFilter === "false") {
+        directSaleQuery.delivery_required = deliveryRequiredFilter;
+      }
+      if (statusFilter) {
+        directSaleQuery.status = statusFilter;
+      }
       const [
         directSalesPayload,
         customerPayload,
@@ -154,7 +163,7 @@ export default function BillingDirectSalesPage() {
         branchPayload,
         counterPayload,
       ] = await Promise.all([
-        listDirectSales(),
+        listDirectSales(directSaleQuery),
         listCustomers(),
         listProducts(),
         listInventoryItems(),
@@ -182,7 +191,7 @@ export default function BillingDirectSalesPage() {
 
   useEffect(() => {
     void loadPage();
-  }, []);
+  }, [deliveryRequiredFilter, statusFilter]);
 
   useEffect(() => {
     const prefillCustomerId = parsePositiveInteger(searchParams.get("customer"));

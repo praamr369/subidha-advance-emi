@@ -1,6 +1,9 @@
 from rest_framework import serializers
 
-from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
+from subscriptions.models import DeliveryStatus, PlanType, Subscription, SubscriptionDelivery
+from subscriptions.services.delivery_service import (
+    build_subscription_delivery_summary,
+)
 
 
 class _BaseSubscriptionDeliveryReadSerializer(serializers.ModelSerializer):
@@ -199,3 +202,65 @@ class AdminSubscriptionDeliveryReasonSerializer(serializers.Serializer):
 
 class AdminSubscriptionDeliveryNotesSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminDeliverySourceSubscriptionSerializer(serializers.ModelSerializer):
+    subscription_number = serializers.SerializerMethodField()
+    customer_id = serializers.IntegerField(source="customer.id", read_only=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    customer_phone = serializers.CharField(source="customer.phone", read_only=True)
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_code = serializers.CharField(source="product.product_code", read_only=True)
+    batch_id = serializers.IntegerField(source="batch.id", read_only=True)
+    batch_code = serializers.CharField(source="batch.batch_code", read_only=True)
+    lucky_id = serializers.IntegerField(source="lucky_id.id", read_only=True)
+    lucky_number = serializers.IntegerField(source="lucky_id.lucky_number", read_only=True)
+    delivery_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Subscription
+        fields = (
+            "id",
+            "subscription_number",
+            "plan_type",
+            "contract_reference",
+            "fulfillment_status",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "product_id",
+            "product_name",
+            "product_code",
+            "batch_id",
+            "batch_code",
+            "lucky_id",
+            "lucky_number",
+            "delivery_summary",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_subscription_number(self, obj):
+        return f"SUB-{obj.pk}" if obj.pk else None
+
+    def get_delivery_summary(self, obj):
+        return build_subscription_delivery_summary(obj)
+
+
+class AdminDeliverySourceSubscriptionPrefillSerializer(serializers.Serializer):
+    source = AdminDeliverySourceSubscriptionSerializer()
+    defaults = serializers.DictField(child=serializers.CharField(allow_blank=True), required=True)
+
+    def validate_defaults(self, value: dict) -> dict:
+        return dict(value or {})
+
+
+class AdminDeliverySourceSubscriptionsQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    plan_type = serializers.ChoiceField(
+        required=False,
+        allow_null=True,
+        choices=list(PlanType.values),
+    )
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=50)

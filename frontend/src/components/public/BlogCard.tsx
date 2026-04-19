@@ -26,12 +26,12 @@ export default function BlogCard({
     <Link
       href={`/blog/${post.slug}`}
       className={cn(
-        "group relative overflow-hidden rounded-[1.9rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.62)] transition hover:-translate-y-1 hover:shadow-[0_34px_92px_-62px_rgba(15,23,42,0.62)]",
+        "public-card group relative overflow-hidden p-6 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.62)] transition hover:-translate-y-1 hover:shadow-[0_34px_92px_-62px_rgba(15,23,42,0.62)]",
         className
       )}
     >
       <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-slate-200/90 to-transparent" />
-      <div className="pointer-events-none absolute -right-12 top-10 h-28 w-28 rounded-full bg-sky-200/25 blur-3xl transition group-hover:opacity-80" />
+      <div className="pointer-events-none absolute -right-12 top-10 h-28 w-28 rounded-full bg-slate-200/35 blur-3xl transition group-hover:opacity-80" />
       <div className="pointer-events-none absolute -left-10 bottom-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl transition group-hover:opacity-80" />
 
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -56,4 +56,3 @@ export default function BlogCard({
     </Link>
   );
 }
-

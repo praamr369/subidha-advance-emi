@@ -36,8 +36,8 @@ export default function DashboardKpiRow() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-      <StatCard label="Pending EMIs" value={data?.pendingEmisCount ?? 0} />
-      <StatCard label="Overdue EMIs" value={data?.overdueEmisCount ?? 0} tone={(data?.overdueEmisCount ?? 0) > 0 ? "warning" : "default"} />
+      <StatCard label="Pending Advance EMIs" value={data?.pendingEmisCount ?? 0} />
+      <StatCard label="Overdue Advance EMIs" value={data?.overdueEmisCount ?? 0} tone={(data?.overdueEmisCount ?? 0) > 0 ? "warning" : "default"} />
       <StatCard label="Today Collection" value={formatCurrency(data?.todayCollectionAmount ?? 0)} tone="success" />
       <StatCard label="Active Subscriptions" value={data?.activeSubscriptionsCount ?? 0} />
       <StatCard label="Total Subscriptions" value={data?.totalSubscriptionsCount ?? 0} />

@@ -29,7 +29,7 @@ export default function AuthBrand({
         <div
           className={cn(
             "relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5",
-            dark && "border-white/20 bg-white/10"
+            dark && "border-white/25 bg-white shadow-[0_12px_26px_-22px_rgba(0,0,0,0.55)]"
           )}
         >
           <Image

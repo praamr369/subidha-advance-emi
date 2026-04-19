@@ -128,7 +128,7 @@ export default function LoginPage() {
     <AuthLayoutShell
       formTitle="Welcome back"
       formSubtitle="Sign in to access the Subidha Furniture operations workspace."
-      panelTitle="Run daily Lucky Plan EMI operations with confidence"
+      panelTitle="Run daily Lucky Plan Advance EMI operations with confidence"
       panelDescription="Sign in with your authorized account to access role-safe collections, CRM, and customer operations."
     >
       <form onSubmit={handleSubmit} className="space-y-5">

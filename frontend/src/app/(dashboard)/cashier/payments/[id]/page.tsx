@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ActionStrip, DetailMetaGrid, DetailSection, StatusChip } from "@/components/detail";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import PortalPage from "@/components/ui/PortalPage";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getCashierPaymentDetail,
   type CashierTransaction,
 } from "@/services/cashier";
 
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  const parsed = Number(value);
+  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -37,33 +40,6 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Failed to load cashier payment receipt.";
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-  className = "",
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={[
-        "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm",
-        className,
-      ].join(" ")}
-    >
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 export default function CashierPaymentReceiptPage() {
@@ -131,7 +107,7 @@ export default function CashierPaymentReceiptPage() {
       : "—";
   const emiContext = payment?.emi
     ? `#${payment.emi}${typeof payment.emi_month_no === "number" ? ` · Month ${payment.emi_month_no}` : ""}`
-    : "Not linked to a single EMI row";
+    : "Not linked to a single advance EMI row";
 
   function handlePrint() {
     window.print();
@@ -247,13 +223,13 @@ export default function CashierPaymentReceiptPage() {
                 { label: "Customer", value: payment.customer_name || "—", emphasize: true },
                 { label: "Phone", value: payment.customer_phone || "—" },
                 { label: "Subscription", value: subscriptionLabel, emphasize: true },
-                { label: "Plan Type", value: payment.subscription_plan_type || "—" },
+                { label: "Plan Type", value: formatPlanTypeLabel(payment.subscription_plan_type) },
               ]}
               referenceFields={[
                 { label: "Receipt Ref", value: receiptReference, emphasize: true },
                 { label: "Payment Date", value: formatDate(payment.payment_date) },
                 { label: "Method", value: payment.method || "—" },
-                { label: "EMI Context", value: emiContext },
+                { label: "Advance EMI Context", value: emiContext },
               ]}
               summaryFields={[
                 {
@@ -274,9 +250,9 @@ export default function CashierPaymentReceiptPage() {
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
                 { label: "Subscription", value: subscriptionLabel },
-                { label: "EMI Context", value: emiContext },
-                { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
-                { label: "EMI Amount", value: money(payment.emi_amount) },
+                { label: "Advance EMI Context", value: emiContext },
+                { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
+                { label: "Advance EMI Amount", value: money(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
                   label: "Lucky Number",
@@ -290,12 +266,42 @@ export default function CashierPaymentReceiptPage() {
               footerNote="Use browser print to keep a paper counter copy or save this receipt as PDF. This view is sourced from the cashier-scoped payment record."
             />
 
-            <SectionCard
+            <DetailSection
+              className="receipt-print-hide"
+              title="Collection snapshot"
+              description="Operational summary for this cashier-visible collection record."
+            >
+              <DetailMetaGrid
+                items={[
+                  { label: "Receipt Reference", value: receiptReference },
+                  {
+                    label: "Collection Status",
+                    value: (
+                      <StatusChip
+                        label={statusLabel}
+                        tone={statusLabel === "REVERSED" ? "danger" : "success"}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Recorded At",
+                    value: formatDateTime(payment.created_at || payment.payment_date),
+                  },
+                  { label: "Operator", value: payment.collected_by_username || "—" },
+                  { label: "Customer", value: payment.customer_name || "—" },
+                  { label: "Subscription", value: subscriptionLabel },
+                  { label: "Method", value: payment.method || "—" },
+                  { label: "Amount", value: money(payment.amount), tone: "success" },
+                ]}
+              />
+            </DetailSection>
+
+            <DetailSection
               className="receipt-print-hide"
               title="Next step"
               description="Use the next action that matches the customer conversation at the counter."
             >
-              <div className="flex flex-wrap gap-2">
+              <ActionStrip>
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -324,8 +330,8 @@ export default function CashierPaymentReceiptPage() {
                 >
                   Return to Dashboard
                 </Link>
-              </div>
-            </SectionCard>
+              </ActionStrip>
+            </DetailSection>
           </>
         ) : null}
       </div>

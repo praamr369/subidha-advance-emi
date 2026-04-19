@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from api.v1.serializers.public import PublicProductSerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
+from api.v1.views.public_site import PublicBusinessProfileView
 from subscriptions.models import Batch, LuckyDraw, Product, Subscription
 from subscriptions.services.public_lead_service import create_public_lead
 from subscriptions.services.winner_state_service import winner_history_q
@@ -239,6 +240,7 @@ class PublicWinnersView(PublicWinnerHistoryView):
 
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
+    path("business-profile/", PublicBusinessProfileView.as_view(), name="public-business-profile"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
     path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),

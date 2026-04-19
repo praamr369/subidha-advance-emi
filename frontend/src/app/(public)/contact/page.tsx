@@ -4,6 +4,7 @@ import Link from "next/link";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { ROUTES } from "@/lib/routes";
 import ContactLeadForm from "./ContactLeadForm";
 
@@ -13,10 +14,13 @@ export const metadata: Metadata = {
     "Contact Subidha Furniture, Asansol. Send an enquiry about products, batches, and Lucky Plan monthly plans.",
 };
 
-export default function ContactPage() {
-  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "";
-  const contactPhone = process.env.NEXT_PUBLIC_CONTACT_PHONE || "";
-  const contactAddress = process.env.NEXT_PUBLIC_CONTACT_ADDRESS || "";
+export default async function ContactPage() {
+  const profile = await getResolvedPublicBusinessProfile();
+  const contactEmail = (profile.support_email || "").trim();
+  const contactPhone = (profile.support_phone || "").trim();
+  const contactAddress = (profile.address_text || "").trim();
+  const businessHours = (profile.business_hours || "").trim();
+  const mapUrl = (profile.map_url || "").trim();
 
   return (
     <PublicPageShell
@@ -55,12 +59,35 @@ export default function ContactPage() {
                   Email: {contactEmail}
                 </div>
               ) : null}
+              {businessHours ? (
+                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                  Hours: {businessHours}
+                </div>
+              ) : null}
+              {mapUrl ? (
+                <Link
+                  href={mapUrl}
+                  className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 transition hover:bg-white"
+                >
+                  Open map
+                </Link>
+              ) : null}
               {!contactPhone && !contactEmail ? (
                 <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
                   Contact details are provided by the branch during follow-up.
                 </div>
               ) : null}
             </div>
+            {profile.resolved_whatsapp_link ? (
+              <div className="mt-4">
+                <Link
+                  href={profile.resolved_whatsapp_link}
+                  className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5"
+                >
+                  WhatsApp the branch
+                </Link>
+              </div>
+            ) : null}
             <p className="mt-5 text-sm leading-7 text-muted-foreground">
               For in-person product browsing, enrollment assistance, and Lucky Plan clarification, visit the branch with your product preference and phone number.
             </p>

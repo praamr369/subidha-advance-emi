@@ -4,18 +4,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DetailSection, MoneySummary, StatusChip } from "@/components/detail";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   listCustomerPayments,
   type CustomerPayment,
 } from "@/services/customer";
 
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  const parsed = Number(value);
+  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -58,12 +61,8 @@ function paymentStatus(payment: CustomerPayment): "RECORDED" | "REVERSED" {
   return payment.is_reversed ? "REVERSED" : "RECORDED";
 }
 
-function statusBadgeClass(status: "RECORDED" | "REVERSED"): string {
-  if (status === "REVERSED") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+function statusBadgeTone(status: "RECORDED" | "REVERSED"): "success" | "danger" {
+  return status === "REVERSED" ? "danger" : "success";
 }
 
 export default function CustomerPaymentsPage() {
@@ -162,7 +161,7 @@ export default function CustomerPaymentsPage() {
               {row.subscription_number || `SUB-${row.subscription}`}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {row.product_name || row.subscription_plan_type || "Lucky Plan"}
+              {row.product_name || formatPlanTypeLabel(row.subscription_plan_type) || "Lucky Plan"}
             </div>
           </div>
         ),
@@ -202,23 +201,15 @@ export default function CustomerPaymentsPage() {
         align: "right" as const,
         render: (row: CustomerPayment) => money(row.amount),
       },
-      {
-        key: "status",
-        title: "Status",
-        render: (row: CustomerPayment) => {
-          const status = paymentStatus(row);
-          return (
-            <span
-              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusBadgeClass(
-                status
-              )}`}
-            >
-              {status}
-            </span>
-          );
+        {
+          key: "status",
+          title: "Status",
+          render: (row: CustomerPayment) => {
+            const status = paymentStatus(row);
+            return <StatusChip label={status} tone={statusBadgeTone(status)} />;
+          },
         },
-      },
-    ],
+      ],
     []
   );
 
@@ -278,7 +269,10 @@ export default function CustomerPaymentsPage() {
       statusBadge={{ label: "Customer Payment Truth", tone: "info" }}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <DetailSection
+          title="Filter payments"
+          description="Narrow customer-visible payment history by subscription or collection method."
+        >
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="flex-1">
               <label
@@ -352,7 +346,7 @@ export default function CustomerPaymentsPage() {
               {methodFilter ? ` method ${methodFilter}` : ""}
             </div>
           ) : null}
-        </section>
+        </DetailSection>
 
         {loading ? <LoadingBlock label="Loading payment history..." /> : null}
 
@@ -377,14 +371,31 @@ export default function CustomerPaymentsPage() {
 
         {!loading && !error && rows.length > 0 ? (
           <>
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <DetailSection
+              title="Settlement summary"
+              description="Customer-safe summary of payment records in the current result set."
+            >
+              <MoneySummary
+                items={[
+                  { label: "Total paid amount", value: money(totalPaidAmount), tone: "success" },
+                  { label: "Payment records", value: count },
+                  { label: "Linked subscriptions", value: uniqueSubscriptionCount },
+                  {
+                    label: "Reversed records",
+                    value: reversedCount,
+                    tone: reversedCount > 0 ? "warning" : "default",
+                  },
+                ]}
+              />
+            </DetailSection>
+
+            <DetailSection
+              title="Payment history"
+              description="This page shows only your recorded payments. Use View Receipt for transaction proof."
+            >
               <div className="mb-4">
-                <h2 className="text-base font-semibold text-foreground">
-                  Payment history
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This page shows only your recorded payments. Use View Receipt
-                  for transaction proof.
+                <p className="text-sm text-muted-foreground">
+                  Rows are customer-safe and exclude internal finance-only fields.
                 </p>
               </div>
 
@@ -401,7 +412,7 @@ export default function CustomerPaymentsPage() {
                   </Link>
                 )}
               />
-            </section>
+            </DetailSection>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
               Payment rows on this page come directly from the customer payments

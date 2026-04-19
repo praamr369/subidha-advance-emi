@@ -42,7 +42,7 @@ export default function PublicProductMedia({
     >
       <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
       <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-200/30 blur-3xl" />
-      <div className="pointer-events-none absolute -right-12 top-2 h-24 w-24 rounded-full bg-sky-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute -right-12 top-2 h-24 w-24 rounded-full bg-slate-200/40 blur-3xl" />
 
       {shouldRenderImage ? (
         <Image

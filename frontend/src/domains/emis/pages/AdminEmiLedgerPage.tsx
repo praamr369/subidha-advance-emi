@@ -33,7 +33,7 @@ export default function AdminEmiLedgerPage() {
       .catch((err: unknown) => {
         if (cancelled) return;
         setRows([]);
-        setError(err instanceof Error ? err.message : "Failed to load EMI ledger");
+        setError(err instanceof Error ? err.message : "Failed to load advance EMI ledger");
         setLoadedKey(requestKey);
       });
 
@@ -45,7 +45,7 @@ export default function AdminEmiLedgerPage() {
   const loading = loadedKey !== requestKey;
 
   return (
-    <PortalPage title="EMI Ledger" subtitle="Operational due/paid/waived view for quick collection and reconciliation actions.">
+    <PortalPage title="Advance EMI Ledger" subtitle="Operational due/paid/waived view for quick collection and reconciliation actions.">
       <section style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">All status</option>
@@ -82,9 +82,9 @@ export default function AdminEmiLedgerPage() {
         rows={rows}
         loading={loading}
         error={error}
-        emptyText="No EMI records found for this filter."
+        emptyText="No advance EMI records found for this filter."
         columns={[
-          { key: "month_no", title: "EMI #" },
+          { key: "month_no", title: "Advance EMI #" },
           { key: "subscription", title: "Subscription" },
           { key: "due_date", title: "Due Date" },
           { key: "amount", title: "Amount", align: "right", render: (row) => money(row.amount) },

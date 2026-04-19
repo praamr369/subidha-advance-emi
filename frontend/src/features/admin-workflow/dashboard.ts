@@ -129,7 +129,7 @@ export async function fetchAdminWorkflow(): Promise<AdminWorkflowViewModel> {
       helpText: "Live contracts under admin control.",
     },
     {
-      label: "Overdue EMI",
+      label: "Overdue Advance EMI",
       value: String(overdueCount),
       tone: asNumber(overdueCount) > 0 ? "warning" : "success",
       helpText: "Accounts requiring collections follow-up.",
@@ -169,7 +169,7 @@ export async function fetchAdminWorkflow(): Promise<AdminWorkflowViewModel> {
         primaryMetric: asMoney(
           payload.financial?.today_collection ?? collectionsThisMonth
         ),
-        supportingMetric: `${payload.emi?.pending ?? 0} pending EMI`,
+        supportingMetric: `${payload.emi?.pending ?? 0} pending Advance EMI`,
       };
     }
 

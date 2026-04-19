@@ -1,4 +1,4 @@
-import { authFetch } from "@/services/api-client";
+import { apiFetch } from "@/lib/api";
 
 export type DashboardSummary = {
   pendingEmisCount: number;
@@ -74,11 +74,11 @@ function toNumber(value: unknown): number {
 }
 
 async function getSubscriptionKpis(): Promise<SubscriptionKpisResponse> {
-  return authFetch<SubscriptionKpisResponse>("/admin/subscriptions/kpis/");
+  return apiFetch<SubscriptionKpisResponse>("/admin/subscriptions/kpis/");
 }
 
 async function getReconciliationAttention(): Promise<ReconciliationAttentionItem[]> {
-  const payload = await authFetch<
+  const payload = await apiFetch<
     ReconciliationAttentionItem[] | { results?: ReconciliationAttentionItem[] }
   >("/admin/subscriptions/reconciliation-attention/");
 
@@ -88,7 +88,7 @@ async function getReconciliationAttention(): Promise<ReconciliationAttentionItem
 }
 
 async function getCommissionSummary(): Promise<CommissionSummaryResponse> {
-  return authFetch<CommissionSummaryResponse>("/admin/commissions/summary/");
+  return apiFetch<CommissionSummaryResponse>("/admin/commissions/summary/");
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -137,8 +137,8 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
   if (overdueEmis > 0) {
     alerts.push({
       id: "overdue-emis",
-      title: "Overdue EMI follow-up required",
-      description: `${overdueEmis} EMI records are overdue and need collection action.`,
+      title: "Overdue Advance EMI follow-up required",
+      description: `${overdueEmis} advance EMI records are overdue and need collection action.`,
       severity: overdueEmis >= 25 ? "CRITICAL" : overdueEmis >= 10 ? "HIGH" : "MEDIUM",
     });
   }

@@ -7,7 +7,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from services.subscriptions.create_subscription import create_subscription
-from subscriptions.models import Batch, Customer, Emi, Product, Subscription
+from subscriptions.models import Batch, Customer, Emi, Product, Subscription, SubscriptionDocument
 
 
 class PermissionTests(TestCase):
@@ -436,3 +436,177 @@ class Phase7BContractTests(TestCase):
         draw_timeline = self.client.get(f"/api/v1/admin/lucky-draws/{draw_id}/timeline/")
         self.assertEqual(draw_timeline.status_code, 200)
         self.assertIn("results", draw_timeline.data)
+
+
+class RentLeaseContractWorkflowTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+
+        self.admin = User.objects.create_user(
+            username="admin_rent_lease",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800020000",
+        )
+        self.client.force_authenticate(self.admin)
+
+        self.customer_user = User.objects.create_user(
+            username="cust_rent_lease",
+            password="pass1234",
+            role="CUSTOMER",
+            phone="9800020001",
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Rent Lease Customer",
+            phone="9800020001",
+        )
+
+        self.product_rent = Product.objects.create(
+            product_code="RENT-001",
+            name="Rent Chair",
+            base_price=Decimal("1000.00"),
+            is_rent_enabled=True,
+        )
+        self.product_lease = Product.objects.create(
+            product_code="LEASE-001",
+            name="Lease Sofa",
+            base_price=Decimal("1200.00"),
+            is_lease_enabled=True,
+        )
+
+    def test_rent_contract_create_generates_pdf_and_no_emi_schedule(self):
+        response = self.client.post(
+            "/api/v1/admin/contracts/rent/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_rent.id,
+                "tenure_months": 10,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "20.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["plan_type"], "RENT")
+        self.assertIsNotNone(response.data.get("rent_profile"))
+
+        subscription_id = response.data["id"]
+        subscription = Subscription.objects.get(pk=subscription_id)
+        self.assertEqual(subscription.plan_type, "RENT")
+        self.assertEqual(subscription.emis.count(), 0)
+
+        pdf_docs = SubscriptionDocument.objects.filter(
+            subscription=subscription, document_type="RENT_CONTRACT_PDF"
+        )
+        self.assertEqual(pdf_docs.count(), 1)
+
+    def test_lease_contract_create_generates_pdf_and_no_emi_schedule(self):
+        response = self.client.post(
+            "/api/v1/admin/contracts/lease/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_lease.id,
+                "tenure_months": 12,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "25.00",
+                "ownership_transfer_allowed": True,
+                "buyout_amount": "200.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["plan_type"], "LEASE")
+        self.assertIsNotNone(response.data.get("lease_profile"))
+
+        subscription_id = response.data["id"]
+        subscription = Subscription.objects.get(pk=subscription_id)
+        self.assertEqual(subscription.plan_type, "LEASE")
+        self.assertEqual(subscription.emis.count(), 0)
+
+        pdf_docs = SubscriptionDocument.objects.filter(
+            subscription=subscription, document_type="LEASE_CONTRACT_PDF"
+        )
+        self.assertEqual(pdf_docs.count(), 1)
+
+    def test_deposit_percent_validation_rejects_outside_range(self):
+        response = self.client.post(
+            "/api/v1/admin/contracts/rent/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_rent.id,
+                "tenure_months": 10,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "10.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+        response_high = self.client.post(
+            "/api/v1/admin/contracts/rent/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_rent.id,
+                "tenure_months": 10,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "31.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response_high.status_code, 400)
+
+    def test_contract_document_upload(self):
+        rent = self.client.post(
+            "/api/v1/admin/contracts/rent/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_rent.id,
+                "tenure_months": 6,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "20.00",
+            },
+            format="json",
+        )
+        self.assertEqual(rent.status_code, 201)
+        subscription_id = rent.data["id"]
+
+        upload_file = SimpleUploadedFile(
+            "kyc-id.txt", b"kyc", content_type="text/plain"
+        )
+        upload_response = self.client.post(
+            f"/api/v1/admin/subscriptions/{subscription_id}/documents/",
+            {"document_type": "CUSTOMER_KYC_ID", "file": upload_file},
+            format="multipart",
+        )
+        self.assertEqual(upload_response.status_code, 201)
+        self.assertEqual(upload_response.data["document_type"], "CUSTOMER_KYC_ID")
+
+    def test_return_assessment_updates_refund_amount(self):
+        rent = self.client.post(
+            "/api/v1/admin/contracts/rent/",
+            {
+                "customer": self.customer.id,
+                "product": self.product_rent.id,
+                "tenure_months": 6,
+                "start_date": "2026-01-01",
+                "security_deposit_percent": "20.00",
+            },
+            format="json",
+        )
+        self.assertEqual(rent.status_code, 201)
+        subscription_id = rent.data["id"]
+
+        assessment = self.client.post(
+            f"/api/v1/admin/subscriptions/{subscription_id}/return-assessment/",
+            {
+                "return_condition_status": "DAMAGED",
+                "deduction_amount": "50.00",
+                "notes": "Minor scratches",
+            },
+            format="json",
+        )
+        self.assertEqual(assessment.status_code, 200)
+        self.assertIn("rent_profile", assessment.data)
+        self.assertEqual(assessment.data["rent_profile"]["return_condition_status"], "DAMAGED")

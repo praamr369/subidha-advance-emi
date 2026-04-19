@@ -128,6 +128,73 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         return self.trade_name or self.legal_name
 
 
+class PublicBusinessProfile(BusinessSetupTimeStampedModel):
+    """
+    Public-facing business identity and contact settings.
+
+    Intentionally separated from BusinessProfile so public pages never need to
+    depend on internal-only fields (GSTIN, PAN, document prefixes, etc).
+    """
+
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    tagline = models.CharField(max_length=255, blank=True, default="")
+    hero_title = models.CharField(max_length=255, blank=True, default="")
+    hero_subtitle = models.TextField(blank=True, default="")
+
+    support_phone = models.CharField(max_length=20, blank=True, default="")
+    support_email = models.EmailField(blank=True, default="")
+
+    whatsapp_phone = models.CharField(max_length=20, blank=True, default="")
+    whatsapp_link = models.URLField(blank=True, default="")
+
+    facebook_url = models.URLField(blank=True, default="")
+    instagram_url = models.URLField(blank=True, default="")
+    youtube_url = models.URLField(blank=True, default="")
+
+    address_text = models.TextField(blank=True, default="")
+    map_url = models.URLField(blank=True, default="")
+    business_hours = models.TextField(blank=True, default="")
+
+    public_logo_url = models.URLField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "public_business_profiles"
+        ordering = ["-created_at", "-id"]
+
+    def clean(self):
+        errors = {}
+
+        if self.is_active and PublicBusinessProfile.objects.filter(is_active=True).exclude(pk=self.pk).exists():
+            errors["is_active"] = "Only one active public business profile is allowed."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.display_name = (self.display_name or "").strip()
+        self.tagline = (self.tagline or "").strip()
+        self.hero_title = (self.hero_title or "").strip()
+        self.hero_subtitle = (self.hero_subtitle or "").strip()
+        self.support_phone = (self.support_phone or "").strip()
+        self.support_email = (self.support_email or "").strip()
+        self.whatsapp_phone = (self.whatsapp_phone or "").strip()
+        self.whatsapp_link = (self.whatsapp_link or "").strip()
+        self.facebook_url = (self.facebook_url or "").strip()
+        self.instagram_url = (self.instagram_url or "").strip()
+        self.youtube_url = (self.youtube_url or "").strip()
+        self.address_text = (self.address_text or "").strip()
+        self.map_url = (self.map_url or "").strip()
+        self.business_hours = (self.business_hours or "").strip()
+        self.public_logo_url = (self.public_logo_url or "").strip()
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.display_name or "Public Business Profile"
+
+
 class Branch(BusinessSetupTimeStampedModel):
     code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)

@@ -550,7 +550,7 @@ export default function CashierCollectPage() {
                       <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[260px]">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                            EMI Amount
+                            Advance EMI Amount
                           </div>
                           <div className="mt-1 text-sm font-semibold text-foreground">
                             {money(result.amount)}
@@ -650,7 +650,7 @@ export default function CashierCollectPage() {
             >
               {pendingEmis.length === 0 ? (
                 <EmptyState
-                  title="No pending EMIs"
+                  title="No pending Advance EMIs"
                   description="No collectible EMI rows were returned for this customer."
                 />
               ) : (
@@ -673,7 +673,7 @@ export default function CashierCollectPage() {
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-1">
                             <div className="text-sm font-semibold text-foreground">
-                              Subscription #{emi.subscription} · EMI Month {emi.month_no}
+                              Subscription #{emi.subscription} · Advance EMI Month {emi.month_no}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-2">
                               <StatusBadge
@@ -698,7 +698,7 @@ export default function CashierCollectPage() {
                           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                                EMI Amount
+                                Advance EMI Amount
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
                                 {money(emi.amount)}
@@ -805,7 +805,7 @@ export default function CashierCollectPage() {
                       </div>
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                          EMI Month
+                          Advance EMI Month
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
                           {selectedEmi.month_no}

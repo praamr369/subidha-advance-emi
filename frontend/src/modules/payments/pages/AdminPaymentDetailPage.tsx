@@ -15,6 +15,7 @@ import {
 } from "@/services/payments";
 import { normalizeApiError } from "@/services/api/errors";
 import { useReversePayment } from "@/modules/payments/hooks/useReversePayment";
+import { ADVANCE_EMI_LABEL } from "@/lib/plan-labels";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -90,7 +91,7 @@ export default function AdminPaymentDetailPage() {
   }, [loadPayment]);
 
   const resolvedPlanType = useMemo(() => {
-    return "EMI";
+    return ADVANCE_EMI_LABEL;
   }, []);
 
   const reversed = useMemo(() => {
@@ -182,10 +183,10 @@ export default function AdminPaymentDetailPage() {
                 <b>Subscription:</b> {payment.subscription}
               </p>
               <p>
-                <b>EMI ID:</b> {payment.emi ?? "-"}
+                <b>Advance EMI ID:</b> {payment.emi ?? "-"}
               </p>
               <p>
-                <b>EMI Month:</b> {payment.emi_month_no ?? "-"}
+                <b>Advance EMI Month:</b> {payment.emi_month_no ?? "-"}
               </p>
               <p>
                 <b>Customer:</b> {payment.customer_name || "-"}

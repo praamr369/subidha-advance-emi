@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/lib/constants";
-import { clearSession } from "@/lib/auth/session";
+import { clearSession, getStoredSession } from "@/lib/auth/session";
 import {
   getAccessToken,
   getRefreshToken,
@@ -32,7 +32,7 @@ function resolveFilename(
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
+  const refreshToken = getRefreshToken() ?? getStoredSession()?.refreshToken ?? null;
   if (!refreshToken) {
     clearSession();
     return null;

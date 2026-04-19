@@ -13,6 +13,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getPartnerPaymentDetail,
   type PartnerPayment,
@@ -117,7 +118,7 @@ export default function PartnerPaymentDetailPage() {
   const emiContext =
     payment?.emi_id || payment?.emi
       ? `#${payment.emi_id ?? payment.emi}${typeof payment?.emi_month_no === "number" ? ` · Month ${payment.emi_month_no}` : ""}`
-      : "Not linked to a single EMI row";
+      : "Not linked to a single advance EMI row";
 
   const paymentReference = useMemo(() => {
     if (!payment) return "—";
@@ -238,7 +239,7 @@ export default function PartnerPaymentDetailPage() {
               }
             />
             <DetailItem
-              label="EMI Status"
+              label="Advance EMI Status"
               value={
                 payment?.emi_status ? <StatusBadge status={payment.emi_status} /> : "—"
               }
@@ -313,7 +314,7 @@ export default function PartnerPaymentDetailPage() {
                 { label: "Receipt Ref", value: paymentReference, emphasize: true },
                 { label: "Payment Date", value: formatDate(payment.payment_date) },
                 { label: "Method", value: payment.method || "—" },
-                { label: "EMI Context", value: emiContext },
+                { label: "Advance EMI Context", value: emiContext },
               ]}
               summaryFields={[
                 {
@@ -333,12 +334,12 @@ export default function PartnerPaymentDetailPage() {
               ]}
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
-                { label: "Plan Type", value: payment.subscription_plan_type || "—" },
+                { label: "Plan Type", value: formatPlanTypeLabel(payment.subscription_plan_type) },
                 { label: "Subscription", value: subscriptionLabel },
-                { label: "EMI Context", value: emiContext },
-                { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
+                { label: "Advance EMI Context", value: emiContext },
+                { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
                 {
-                  label: "EMI Amount",
+                  label: "Advance EMI Amount",
                   value:
                     payment.emi_amount === null || payment.emi_amount === undefined
                       ? "—"
@@ -402,7 +403,7 @@ export default function PartnerPaymentDetailPage() {
                     )
                   }
                 />
-                <DetailItem label="Plan Type" value={payment.subscription_plan_type || "—"} />
+                <DetailItem label="Plan Type" value={formatPlanTypeLabel(payment.subscription_plan_type)} />
                 <DetailItem label="Product" value={payment.product_name || "—"} />
                 <DetailItem label="Product Code" value={payment.product_code || "—"} />
                 <DetailItem
@@ -423,8 +424,8 @@ export default function PartnerPaymentDetailPage() {
 
             <WorkspaceSection
               className="receipt-print-hide"
-              title="EMI context"
-              description="Installment-level linkage shown only when this payment is tied to a specific EMI row."
+              title="Advance EMI context"
+              description="Installment-level linkage shown only when this payment is tied to a specific advance EMI row."
               footer={
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                   This detail view stays inside partner scope. Commission settlement, reversals, and broader reconciliation remain in admin-only workflows.
@@ -432,10 +433,10 @@ export default function PartnerPaymentDetailPage() {
               }
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem label="EMI" value={emiContext} />
+                <DetailItem label="Advance EMI" value={emiContext} />
                 <DetailItem label="Due Date" value={formatDate(payment.emi_due_date ?? null)} />
                 <DetailItem
-                  label="EMI Amount"
+                  label="Advance EMI Amount"
                   value={
                     payment.emi_amount === null || payment.emi_amount === undefined
                       ? "—"
@@ -443,7 +444,7 @@ export default function PartnerPaymentDetailPage() {
                   }
                 />
                 <DetailItem
-                  label="EMI Status"
+                  label="Advance EMI Status"
                   value={
                     payment.emi_status ? <StatusBadge status={payment.emi_status} /> : "—"
                   }

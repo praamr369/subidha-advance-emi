@@ -17,9 +17,13 @@ from subscriptions.models import (
     Batch,
     Commission,
     CommissionStatus,
+    ContractRefundStatus,
+    ContractReturnConditionStatus,
     Customer,
+    DocumentVerificationStatus,
     Emi,
     EmiStatus,
+    LeaseSubscriptionProfile,
     LuckyDraw,
     LuckyId,
     LuckyIdStatus,
@@ -31,7 +35,10 @@ from subscriptions.models import (
     ProductCategoryMaster,
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
+    RentSubscriptionProfile,
     Subscription,
+    SubscriptionDocument,
+    SubscriptionDocumentType,
     SubscriptionStatus,
     KycStatus,
 )
@@ -1632,6 +1639,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
+    rent_profile = serializers.SerializerMethodField()
+    lease_profile = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
     financial_summary = serializers.SerializerMethodField()
     reconciliation_flags = serializers.SerializerMethodField()
     winner_status = serializers.SerializerMethodField()
@@ -1642,6 +1652,9 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
 
     class Meta(SubscriptionAdminSerializer.Meta):
         fields = SubscriptionAdminSerializer.Meta.fields + (
+            "rent_profile",
+            "lease_profile",
+            "documents",
             "winner_status",
             "winner_summary",
             "financial_summary",
@@ -1704,6 +1717,80 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "batch": snapshot["batch"],
             "partner": snapshot["partner"],
         }
+
+    def get_rent_profile(self, obj):
+        profile = getattr(obj, "rent_profile", None)
+        if not profile:
+            return None
+
+        return {
+            "security_deposit_percent": str(profile.security_deposit_percent),
+            "security_deposit_amount": str(profile.security_deposit_amount),
+            "refundable_security_deposit": str(profile.refundable_security_deposit),
+            "return_condition_status": profile.return_condition_status,
+            "deduction_amount": str(profile.deduction_amount),
+            "refund_amount": str(profile.refund_amount),
+            "refund_status": profile.refund_status,
+            "return_inspection_notes": profile.return_inspection_notes,
+            "handover_notes": profile.handover_notes,
+            "contract_terms_snapshot": profile.contract_terms_snapshot,
+            "created_at": profile.created_at,
+            "updated_at": profile.updated_at,
+        }
+
+    def get_lease_profile(self, obj):
+        profile = getattr(obj, "lease_profile", None)
+        if not profile:
+            return None
+
+        return {
+            "security_deposit_percent": str(profile.security_deposit_percent),
+            "security_deposit_amount": str(profile.security_deposit_amount),
+            "refundable_security_deposit": str(profile.refundable_security_deposit),
+            "buyout_amount": str(profile.buyout_amount) if profile.buyout_amount is not None else None,
+            "ownership_transfer_allowed": bool(profile.ownership_transfer_allowed),
+            "return_condition_status": profile.return_condition_status,
+            "deduction_amount": str(profile.deduction_amount),
+            "refund_amount": str(profile.refund_amount),
+            "refund_status": profile.refund_status,
+            "return_inspection_notes": profile.return_inspection_notes,
+            "handover_notes": profile.handover_notes,
+            "contract_terms_snapshot": profile.contract_terms_snapshot,
+            "created_at": profile.created_at,
+            "updated_at": profile.updated_at,
+        }
+
+    def get_documents(self, obj):
+        request = self.context.get("request")
+        queryset = getattr(obj, "documents", None)
+        if queryset is None:
+            docs = (
+                SubscriptionDocument.objects.filter(subscription=obj)
+                .select_related("uploaded_by")
+                .order_by("-created_at", "-id")
+            )
+        else:
+            docs = list(queryset.all().select_related("uploaded_by").order_by("-created_at", "-id"))
+
+        def file_url(doc: SubscriptionDocument) -> str | None:
+            try:
+                return serialize_media_url(request, doc.file)
+            except Exception:
+                return None
+
+        return [
+            {
+                "id": doc.id,
+                "document_type": doc.document_type,
+                "verification_status": doc.verification_status,
+                "notes": doc.notes,
+                "file_url": file_url(doc),
+                "uploaded_by_username": getattr(getattr(doc, "uploaded_by", None), "username", None),
+                "created_at": doc.created_at,
+                "updated_at": doc.updated_at,
+            }
+            for doc in docs
+        ]
 
     def get_reconciliation_flags(self, obj):
         snapshot = self._snapshot(obj)

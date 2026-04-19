@@ -92,18 +92,18 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
   },
   {
     key: "collections-emi",
-    title: "Collections & EMI",
+    title: "Collections & Advance EMI",
     href: ROUTES.admin.collections,
     description:
-      "Collections, payment review, EMI follow-up, reminders, and reconciliation attention.",
+      "Collections, payment review, advance EMI follow-up, reminders, and reconciliation attention.",
     operationalFocus:
-      "Run daily collection operations while preserving the existing EMI and payment source of truth.",
+      "Run daily collection operations while preserving the existing advance EMI and payment source of truth.",
     masterDataDirection:
-      "Depends on subscription, EMI, payment, and reconciliation data; never recalculates or replaces their semantics.",
+      "Depends on subscription, advance EMI, payment, and reconciliation data; never recalculates or replaces their semantics.",
     routes: [
       { label: "Collections", href: ROUTES.admin.collections },
       { label: "Payments", href: ROUTES.admin.payments },
-      { label: "EMI Register", href: ROUTES.admin.emis },
+      { label: "Advance EMI Register", href: ROUTES.admin.emis },
       { label: "Reconciliation", href: ROUTES.admin.reconciliation },
     ],
   },

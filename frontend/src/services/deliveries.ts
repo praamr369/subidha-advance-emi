@@ -77,6 +77,43 @@ export type DeliveryListResponse = {
   results: DeliveryRecord[];
 };
 
+export type SubscriptionPlanType = "EMI" | "RENT" | "LEASE";
+
+export type DeliverySourceSubscription = {
+  id: number;
+  subscription_number?: string | null;
+  plan_type: SubscriptionPlanType;
+  contract_reference?: string | null;
+  fulfillment_status?: string | null;
+  customer_id?: number | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  product_code?: string | null;
+  batch_id?: number | null;
+  batch_code?: string | null;
+  lucky_id?: number | null;
+  lucky_number?: number | null;
+  delivery_summary?: (DeliveryRecord & { delivery_status?: DeliveryStatus; history_count?: number }) | null;
+  created_at?: string | null;
+};
+
+export type DeliverySourceSubscriptionsResponse = {
+  count: number;
+  results: DeliverySourceSubscription[];
+};
+
+export type DeliverySourceSubscriptionPrefill = {
+  source: DeliverySourceSubscription;
+  defaults: {
+    receiver_name?: string;
+    receiver_phone?: string;
+    delivery_address_snapshot?: string;
+    notes?: string;
+  };
+};
+
 export type AdminDeliveryQuery = {
   q?: string;
   status?: DeliveryStatus | "";
@@ -206,6 +243,68 @@ export function normalizeDeliveryListResponse(payload: unknown): DeliveryListRes
   };
 }
 
+function normalizePlanType(value: unknown): SubscriptionPlanType {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  if (normalized === "EMI" || normalized === "RENT" || normalized === "LEASE") return normalized;
+  return "EMI";
+}
+
+export function normalizeDeliverySourceSubscription(payload: unknown): DeliverySourceSubscription {
+  const row = (payload ?? {}) as Record<string, unknown>;
+  const deliverySummaryRaw = row.delivery_summary ?? null;
+  const deliverySummary =
+    deliverySummaryRaw && typeof deliverySummaryRaw === "object"
+      ? ({
+          ...normalizeDeliveryRecord(deliverySummaryRaw),
+          delivery_status: normalizeStatus((deliverySummaryRaw as Record<string, unknown>).delivery_status),
+          history_count: toNumber((deliverySummaryRaw as Record<string, unknown>).history_count, 0) || undefined,
+        } as DeliverySourceSubscription["delivery_summary"])
+      : null;
+
+  return {
+    id: toNumber(row.id),
+    subscription_number: toStringOrNull(row.subscription_number),
+    plan_type: normalizePlanType(row.plan_type),
+    contract_reference: toStringOrNull(row.contract_reference),
+    fulfillment_status: toStringOrNull(row.fulfillment_status),
+    customer_id: toNullableNumber(row.customer_id),
+    customer_name: toStringOrNull(row.customer_name),
+    customer_phone: toStringOrNull(row.customer_phone),
+    product_id: toNullableNumber(row.product_id),
+    product_name: toStringOrNull(row.product_name),
+    product_code: toStringOrNull(row.product_code),
+    batch_id: toNullableNumber(row.batch_id),
+    batch_code: toStringOrNull(row.batch_code),
+    lucky_id: toNullableNumber(row.lucky_id),
+    lucky_number: toNullableNumber(row.lucky_number),
+    delivery_summary: deliverySummary,
+    created_at: toStringOrNull(row.created_at),
+  };
+}
+
+export function normalizeDeliverySourceSubscriptionsResponse(payload: unknown): DeliverySourceSubscriptionsResponse {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results) ? root.results : [];
+  return {
+    count: toNumber(root.count, 0),
+    results: results.map(normalizeDeliverySourceSubscription),
+  };
+}
+
+export function normalizeDeliverySourceSubscriptionPrefill(payload: unknown): DeliverySourceSubscriptionPrefill {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const defaults = (root.defaults ?? {}) as Record<string, unknown>;
+  return {
+    source: normalizeDeliverySourceSubscription(root.source),
+    defaults: {
+      receiver_name: toStringOrNull(defaults.receiver_name) ?? "",
+      receiver_phone: toStringOrNull(defaults.receiver_phone) ?? "",
+      delivery_address_snapshot: toStringOrNull(defaults.delivery_address_snapshot) ?? "",
+      notes: toStringOrNull(defaults.notes) ?? "",
+    },
+  };
+}
+
 function buildQuery(params: AdminDeliveryQuery = {}): string {
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q);
@@ -251,6 +350,29 @@ export async function createAdminDelivery(payload: {
     body: JSON.stringify(payload),
   });
   return normalizeDeliveryRecord(response);
+}
+
+export async function listAdminDeliverySourceSubscriptions(params: {
+  q?: string;
+  plan_type?: SubscriptionPlanType;
+  limit?: number;
+}): Promise<DeliverySourceSubscriptionsResponse> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.plan_type) search.set("plan_type", params.plan_type);
+  if (typeof params.limit === "number") search.set("limit", String(params.limit));
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(`/admin/deliveries/sources/subscriptions/${query ? `?${query}` : ""}`);
+  return normalizeDeliverySourceSubscriptionsResponse(payload);
+}
+
+export async function getAdminDeliverySourceSubscriptionPrefill(
+  subscriptionId: number | string
+): Promise<DeliverySourceSubscriptionPrefill> {
+  const payload = await apiFetch<unknown>(
+    `/admin/deliveries/sources/subscriptions/${subscriptionId}/prefill/`
+  );
+  return normalizeDeliverySourceSubscriptionPrefill(payload);
 }
 
 export async function updateAdminDelivery(

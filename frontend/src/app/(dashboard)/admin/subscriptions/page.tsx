@@ -822,6 +822,19 @@ export default function AdminSubscriptionsPage() {
                               >
                                 Payments Register
                               </Link>
+
+                              <Link
+                                href={`/admin/deliveries?subscription=${row.id}&portfolio=${
+                                  String(row.plan_type || "").toUpperCase() === "RENT"
+                                    ? "RENT"
+                                    : String(row.plan_type || "").toUpperCase() === "LEASE"
+                                      ? "LEASE"
+                                      : "ADVANCE_EMI"
+                                }`}
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                              >
+                                Create Delivery
+                              </Link>
                             </div>
                           </td>
                         </tr>

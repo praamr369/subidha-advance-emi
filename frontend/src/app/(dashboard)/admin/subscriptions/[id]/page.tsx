@@ -23,6 +23,7 @@ import {
   DetailMetricTile,
 } from "@/domains/subscriptions/detail/surfaces";
 import { apiFetch, toArray } from "@/lib/api";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -125,6 +126,37 @@ type EmiRow = {
   warnings: string[];
 };
 
+type ContractDocument = {
+  id: number;
+  document_type: string;
+  verification_status: string;
+  notes: string;
+  file_url: string | null;
+  uploaded_by_username: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type RentProfile = {
+  security_deposit_percent: string;
+  security_deposit_amount: string;
+  refundable_security_deposit: string;
+  return_condition_status: string;
+  deduction_amount: string;
+  refund_amount: string;
+  refund_status: string;
+  return_inspection_notes: string;
+  handover_notes: string;
+  contract_terms_snapshot: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type LeaseProfile = RentProfile & {
+  buyout_amount: string | null;
+  ownership_transfer_allowed: boolean;
+};
+
 type SubscriptionDetailRecord = {
   id: number;
   customer_id: number | null;
@@ -163,6 +195,9 @@ type SubscriptionDetailRecord = {
   delivery_summary: DeliveryRecord | null;
   deliveries: DeliveryRecord[];
   emis: EmiRow[];
+  rent_profile: RentProfile | null;
+  lease_profile: LeaseProfile | null;
+  documents: ContractDocument[];
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -416,6 +451,52 @@ function normalizeEmiRow(raw: Record<string, unknown>): EmiRow {
   };
 }
 
+function normalizeContractDocument(raw: Record<string, unknown>): ContractDocument {
+  return {
+    id: toNumber(raw.id),
+    document_type: toStringValue(raw.document_type).trim() || "DOCUMENT",
+    verification_status: toStringValue(raw.verification_status).trim() || "PENDING",
+    notes: toStringValue(raw.notes).trim(),
+    file_url: toNullableString(raw.file_url),
+    uploaded_by_username: toNullableString(raw.uploaded_by_username),
+    created_at: toNullableString(raw.created_at),
+    updated_at: toNullableString(raw.updated_at),
+  };
+}
+
+function normalizeRentProfile(raw: unknown): RentProfile | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  return {
+    security_deposit_percent: String(value.security_deposit_percent ?? "0.00"),
+    security_deposit_amount: String(value.security_deposit_amount ?? "0.00"),
+    refundable_security_deposit: String(value.refundable_security_deposit ?? "0.00"),
+    return_condition_status: toStringValue(value.return_condition_status).trim() || "NOT_ASSESSED",
+    deduction_amount: String(value.deduction_amount ?? "0.00"),
+    refund_amount: String(value.refund_amount ?? "0.00"),
+    refund_status: toStringValue(value.refund_status).trim() || "PENDING",
+    return_inspection_notes: toStringValue(value.return_inspection_notes),
+    handover_notes: toStringValue(value.handover_notes),
+    contract_terms_snapshot: toStringValue(value.contract_terms_snapshot),
+    created_at: toNullableString(value.created_at),
+    updated_at: toNullableString(value.updated_at),
+  };
+}
+
+function normalizeLeaseProfile(raw: unknown): LeaseProfile | null {
+  const base = normalizeRentProfile(raw);
+  if (!base) return null;
+  const value = raw as Record<string, unknown>;
+  return {
+    ...base,
+    buyout_amount:
+      value.buyout_amount === null || value.buyout_amount === undefined
+        ? null
+        : String(value.buyout_amount),
+    ownership_transfer_allowed: toBoolean(value.ownership_transfer_allowed),
+  };
+}
+
 function normalizeAuditEvent(raw: Record<string, unknown>): AuditEvent {
   return {
     id: toNumber(raw.id),
@@ -488,6 +569,9 @@ function normalizeSubscriptionDetail(
       normalizeDeliveryRecord
     ),
     emis: toArray<Record<string, unknown>>(raw.emis).map(normalizeEmiRow),
+    rent_profile: normalizeRentProfile(raw.rent_profile),
+    lease_profile: normalizeLeaseProfile(raw.lease_profile),
+    documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
   };
 }
 
@@ -640,6 +724,28 @@ export default function AdminSubscriptionDetailPage() {
   const financeWarnings = reconciliationFlags?.warnings ?? [];
   const showReconciliationWarning =
     financeWarnings.length > 0 || !reconciliationFlags?.is_financially_consistent;
+  const isEmiSubscription = subscription?.plan_type === "EMI";
+  const contractProfile = useMemo(() => {
+    if (!subscription) return null;
+    if (subscription.plan_type === "RENT") return subscription.rent_profile;
+    if (subscription.plan_type === "LEASE") return subscription.lease_profile;
+    return null;
+  }, [subscription]);
+  const contractDocuments = useMemo(
+    () => subscription?.documents ?? [],
+    [subscription?.documents]
+  );
+  const contractPdfDocument = useMemo(() => {
+    if (!subscription) return null;
+    const targetType =
+      subscription.plan_type === "RENT"
+        ? "RENT_CONTRACT_PDF"
+        : subscription.plan_type === "LEASE"
+          ? "LEASE_CONTRACT_PDF"
+          : null;
+    if (!targetType) return null;
+    return contractDocuments.find((doc) => doc.document_type === targetType) ?? null;
+  }, [contractDocuments, subscription]);
 
   return (
     <PortalPage
@@ -677,7 +783,13 @@ export default function AdminSubscriptionDetailPage() {
                 variant: "secondary" as const,
               },
               {
-                href: `/admin/deliveries?subscription=${subscription.id}`,
+                href: `/admin/deliveries?subscription=${subscription.id}&portfolio=${
+                  String(subscription.plan_type || "").toUpperCase() === "RENT"
+                    ? "RENT"
+                    : String(subscription.plan_type || "").toUpperCase() === "LEASE"
+                      ? "LEASE"
+                      : "ADVANCE_EMI"
+                }`,
                 label: "Delivery Workspace",
                 variant: "secondary" as const,
               },
@@ -733,7 +845,7 @@ export default function AdminSubscriptionDetailPage() {
           tone: detailSemantics.hasWinnerHistory ? "success" : undefined,
         },
         {
-          label: "Waived EMI",
+          label: "Waived Advance EMI",
           value: String(detailSemantics.waivedEmiCount),
           tone: detailSemantics.hasWaiver ? "success" : undefined,
         },
@@ -906,7 +1018,7 @@ export default function AdminSubscriptionDetailPage() {
                     meta={
                       <>
                         <DetailMetricTile
-                          label="Waived EMI Rows"
+                          label="Waived Advance EMI Rows"
                           value={String(detailSemantics.waivedEmiCount)}
                           tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
                         />
@@ -967,86 +1079,229 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Phone" value={subscription.customer_phone} />
                   <DetailValue label="Product" value={subscription.product_name} />
                   <DetailValue label="Product Code" value={subscription.product_code} />
-                  <DetailValue label="Plan Type" value={subscription.plan_type} />
+                  <DetailValue label="Plan Type" value={formatPlanTypeLabel(subscription.plan_type)} />
                   <DetailValue label="Tenure" value={`${subscription.tenure_months} months`} />
-                  <DetailValue label="Batch" value={subscription.batch_code || "—"} />
+                  <DetailValue
+                    label="Batch"
+                    value={isEmiSubscription ? subscription.batch_code || "—" : "Not applicable"}
+                  />
                   <DetailValue
                     label="Batch Status"
                     value={
-                      subscription.batch_status ? (
+                      isEmiSubscription && subscription.batch_status ? (
                         <StatusBadge status={subscription.batch_status} />
                       ) : (
-                        "—"
+                        isEmiSubscription
+                          ? "—"
+                          : "Not applicable"
                       )
                     }
                   />
                   <DetailValue
                     label="Lucky ID"
-                    value={subscription.lucky_id != null ? `#${subscription.lucky_id}` : "—"}
+                    value={
+                      isEmiSubscription
+                        ? subscription.lucky_id != null
+                          ? `#${subscription.lucky_id}`
+                          : "—"
+                        : "Not applicable"
+                    }
                   />
                   <DetailValue
                     label="Lucky Number"
-                    value={formatLuckyNumberLabel(subscription.lucky_number)}
+                    value={isEmiSubscription ? formatLuckyNumberLabel(subscription.lucky_number) : "Not applicable"}
                   />
-                  <DetailValue label="Partner" value={subscription.partner_name || "—"} />
-                  <DetailValue label="Partner Phone" value={subscription.partner_phone || "—"} />
+                  <DetailValue label="Partner" value={isEmiSubscription ? subscription.partner_name || "—" : "Not applicable"} />
+                  <DetailValue label="Partner Phone" value={isEmiSubscription ? subscription.partner_phone || "—" : "Not applicable"} />
                   <DetailValue label="Start Date" value={formatDate(subscription.start_date)} />
                   <DetailValue label="Created At" value={formatDateTime(subscription.created_at)} />
                 </div>
               </SectionCard>
 
-              <SectionCard
-                title="Winner / lucky context"
-                description="Winning draw linkage and waived EMI posture."
-                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailValue
-                    label="Winner Status"
-                    value={<StatusBadge status={winnerStatus === "WON" ? "WON" : "NOT_WON"} label={winnerStatus === "WON" ? "Won" : "Not won"} />}
-                  />
-                  <DetailValue
-                    label="Winner Month"
-                    value={
-                      winnerSummary?.winner_month != null
-                        ? `Month ${winnerSummary.winner_month}`
-                        : subscription.winner_month != null
-                        ? `Month ${subscription.winner_month}`
-                        : "—"
-                    }
-                  />
-                  <DetailValue
-                    label="Lucky Number"
-                    value={formatLuckyNumberLabel(
-                      winnerSummary?.lucky_number ?? subscription.lucky_number
-                    )}
-                  />
-                  <DetailValue
-                    label="Draw Reference"
-                    value={
-                      winnerSummary?.draw_id != null
-                        ? `Draw #${winnerSummary.draw_id} · Month ${winnerSummary.draw_month ?? "—"}`
-                        : "—"
-                    }
-                  />
-                  <DetailValue
-                    label="Draw Revealed"
-                    value={formatDateTime(winnerSummary?.draw_revealed_at)}
-                  />
-                  <DetailValue
-                    label="Waiver Scope"
-                    value={winnerSummary?.waiver_scope || "—"}
-                  />
-                  <DetailValue
-                    label="Waived EMI Count"
-                    value={String(winnerSummary?.waived_emi_count ?? financialSummary.emi_count_waived)}
-                  />
-                  <DetailValue
-                    label="Waived Amount"
-                    value={money(winnerSummary?.waived_amount ?? financialSummary.waived_amount)}
-                  />
-                </div>
-              </SectionCard>
+              {isEmiSubscription ? (
+                <SectionCard
+                  title="Winner / lucky context"
+                  description="Winning draw linkage and waived EMI posture."
+                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DetailValue
+                      label="Winner Status"
+                      value={<StatusBadge status={winnerStatus === "WON" ? "WON" : "NOT_WON"} label={winnerStatus === "WON" ? "Won" : "Not won"} />}
+                    />
+                    <DetailValue
+                      label="Winner Month"
+                      value={
+                        winnerSummary?.winner_month != null
+                          ? `Month ${winnerSummary.winner_month}`
+                          : subscription.winner_month != null
+                          ? `Month ${subscription.winner_month}`
+                          : "—"
+                      }
+                    />
+                    <DetailValue
+                      label="Lucky Number"
+                      value={formatLuckyNumberLabel(
+                        winnerSummary?.lucky_number ?? subscription.lucky_number
+                      )}
+                    />
+                    <DetailValue
+                      label="Draw Reference"
+                      value={
+                        winnerSummary?.draw_id != null
+                          ? `Draw #${winnerSummary.draw_id} · Month ${winnerSummary.draw_month ?? "—"}`
+                          : "—"
+                      }
+                    />
+                    <DetailValue
+                      label="Draw Revealed"
+                      value={formatDateTime(winnerSummary?.draw_revealed_at)}
+                    />
+                    <DetailValue
+                      label="Waiver Scope"
+                      value={winnerSummary?.waiver_scope || "—"}
+                    />
+                    <DetailValue
+                      label="Waived Advance EMI Count"
+                      value={String(winnerSummary?.waived_emi_count ?? financialSummary.emi_count_waived)}
+                    />
+                    <DetailValue
+                      label="Waived Amount"
+                      value={money(winnerSummary?.waived_amount ?? financialSummary.waived_amount)}
+                    />
+                  </div>
+                </SectionCard>
+              ) : (
+                <SectionCard
+                  title="Rent/Lease profile"
+                  description="Security deposit posture, return assessment status, and contract documents."
+                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                >
+                  {contractProfile ? (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <DetailValue
+                          label="Security Deposit (%)"
+                          value={`${contractProfile.security_deposit_percent}%`}
+                        />
+                        <DetailValue
+                          label="Security Deposit (amount)"
+                          value={money(contractProfile.security_deposit_amount)}
+                        />
+                        <DetailValue
+                          label="Refundable Deposit"
+                          value={money(contractProfile.refundable_security_deposit)}
+                        />
+                        <DetailValue
+                          label="Return Condition"
+                          value={<StatusBadge status={contractProfile.return_condition_status} />}
+                        />
+                        <DetailValue
+                          label="Deduction Amount"
+                          value={money(contractProfile.deduction_amount)}
+                        />
+                        <DetailValue
+                          label="Refund Amount"
+                          value={money(contractProfile.refund_amount)}
+                        />
+                        <DetailValue
+                          label="Refund Status"
+                          value={<StatusBadge status={contractProfile.refund_status} />}
+                        />
+                        {subscription.plan_type === "LEASE" ? (
+                          <>
+                            <DetailValue
+                              label="Buyout Amount"
+                              value={
+                                subscription.lease_profile?.buyout_amount
+                                  ? money(subscription.lease_profile.buyout_amount)
+                                  : "—"
+                              }
+                            />
+                            <DetailValue
+                              label="Ownership Transfer"
+                              value={
+                                subscription.lease_profile?.ownership_transfer_allowed
+                                  ? "Allowed"
+                                  : "Not allowed"
+                              }
+                            />
+                          </>
+                        ) : null}
+                      </div>
+
+                      {contractPdfDocument?.file_url ? (
+                        <div className="mt-5 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            Generated contract PDF
+                          </div>
+                          <a
+                            href={contractPdfDocument.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex text-sm font-semibold text-sky-700 hover:underline"
+                          >
+                            Open {subscription.plan_type} Contract PDF
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="mt-5 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                          No contract PDF document is attached yet.
+                        </div>
+                      )}
+
+                      <div className="mt-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Documents
+                        </div>
+                        {contractDocuments.length > 0 ? (
+                          <div className="mt-3 grid gap-2">
+                            {contractDocuments.slice(0, 10).map((doc) => (
+                              <div
+                                key={doc.id}
+                                className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="text-sm font-medium text-foreground">
+                                    {doc.document_type}
+                                  </div>
+                                  <StatusBadge status={doc.verification_status} size="sm" />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Uploaded {formatDateTime(doc.created_at)} · {doc.uploaded_by_username || "—"}
+                                </div>
+                                {doc.file_url ? (
+                                  <a
+                                    href={doc.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-sm font-medium text-sky-700 hover:underline"
+                                  >
+                                    Open file
+                                  </a>
+                                ) : null}
+                              </div>
+                            ))}
+                            {contractDocuments.length > 10 ? (
+                              <div className="text-xs text-muted-foreground">
+                                Showing 10 of {contractDocuments.length} documents.
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                            No documents uploaded yet. Upload KYC ID and signature from the create flow or via subscription documents endpoint.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                      No rent/lease profile is attached to this subscription.
+                    </div>
+                  )}
+                </SectionCard>
+              )}
             </section>
 
             <SectionCard
@@ -1085,7 +1340,13 @@ export default function AdminSubscriptionDetailPage() {
                       Open Delivery Detail
                     </Link>
                     <Link
-                      href={`/admin/deliveries?subscription=${subscription.id}`}
+                      href={`/admin/deliveries?subscription=${subscription.id}&portfolio=${
+                        String(subscription.plan_type || "").toUpperCase() === "RENT"
+                          ? "RENT"
+                          : String(subscription.plan_type || "").toUpperCase() === "LEASE"
+                            ? "LEASE"
+                            : "ADVANCE_EMI"
+                      }`}
                       className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                     >
                       Open Delivery Workspace
@@ -1151,7 +1412,7 @@ export default function AdminSubscriptionDetailPage() {
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue label="Total Contract Value" value={money(financialSummary.total_amount)} />
-                <DetailValue label="EMI Schedule Total" value={money(financialSummary.total_emi_amount)} />
+                <DetailValue label="Advance EMI Schedule Total" value={money(financialSummary.total_emi_amount)} />
                 <DetailValue label="Paid Amount" value={money(financialSummary.paid_amount)} />
                 <DetailValue label="Reversed Amount" value={money(financialSummary.reversed_amount)} />
                 <DetailValue label="Waived Amount" value={money(financialSummary.waived_amount)} />
@@ -1210,14 +1471,15 @@ export default function AdminSubscriptionDetailPage() {
               )}
             </SectionCard>
 
-            <SectionCard
-              title="EMI schedule"
-              description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
-              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
-            >
+            {isEmiSubscription ? (
+              <SectionCard
+                title="Advance EMI schedule"
+                description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
+                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+              >
               {emis.length === 0 ? (
                 <EmptyState
-                  title="No EMI schedule found"
+                  title="No Advance EMI schedule found"
                   description="This subscription does not currently expose EMI rows."
                 />
               ) : (
@@ -1304,52 +1566,55 @@ export default function AdminSubscriptionDetailPage() {
                   </table>
                 </div>
               )}
-            </SectionCard>
+              </SectionCard>
+            ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
-                title="Waived EMI rows"
-                description="Future waived rows should be visible distinctly and never rewrite already paid installments."
-                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
-              >
-                {waivedEmis.length === 0 ? (
-                  <EmptyState
-                    title="No waived EMI rows"
-                    description="No waived EMI rows are currently visible for this subscription."
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {waivedEmis.map((emi) => (
-                      <div
-                        key={emi.id}
-                        className="rounded-xl border border-blue-200 bg-blue-50 p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-medium text-blue-900">
-                              Month {emi.month_no}
-                            </div>
-                            <div className="mt-1 text-xs text-blue-800">
-                              Due {formatDate(emi.due_date)}
-                            </div>
-                            <div className="mt-1 text-xs text-blue-800">
-                              Waiver ledger: {money(emi.waiver_ledger_amount)}
-                            </div>
-                          </div>
-                          <div className="text-right text-sm font-semibold text-blue-900">
-                            <div>{money(emi.amount)}</div>
-                            {emi.warnings.length > 0 ? (
-                              <div className="mt-1 text-xs font-normal text-blue-800">
-                                {emi.warnings.join(" ")}
+              {isEmiSubscription ? (
+                <SectionCard
+                  title="Waived Advance EMI rows"
+                  description="Future waived rows should be visible distinctly and never rewrite already paid installments."
+                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                >
+                  {waivedEmis.length === 0 ? (
+                    <EmptyState
+                      title="No waived EMI rows"
+                      description="No waived EMI rows are currently visible for this subscription."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {waivedEmis.map((emi) => (
+                        <div
+                          key={emi.id}
+                          className="rounded-xl border border-blue-200 bg-blue-50 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-medium text-blue-900">
+                                Month {emi.month_no}
                               </div>
-                            ) : null}
+                              <div className="mt-1 text-xs text-blue-800">
+                                Due {formatDate(emi.due_date)}
+                              </div>
+                              <div className="mt-1 text-xs text-blue-800">
+                                Waiver ledger: {money(emi.waiver_ledger_amount)}
+                              </div>
+                            </div>
+                            <div className="text-right text-sm font-semibold text-blue-900">
+                              <div>{money(emi.amount)}</div>
+                              {emi.warnings.length > 0 ? (
+                                <div className="mt-1 text-xs font-normal text-blue-800">
+                                  {emi.warnings.join(" ")}
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+              ) : null}
 
               <SectionCard
                 title="Recent payments"
@@ -1376,7 +1641,7 @@ export default function AdminSubscriptionDetailPage() {
                             <div className="mt-1 text-xs text-muted-foreground">
                               {payment.method} · {formatDate(payment.payment_date)}
                               {payment.emi_month_no != null
-                                ? ` · EMI Month ${payment.emi_month_no}`
+                                ? ` · Advance EMI Month ${payment.emi_month_no}`
                                 : ""}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">

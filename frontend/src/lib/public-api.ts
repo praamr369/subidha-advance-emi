@@ -4,14 +4,15 @@ export {
   getPublicWinnerHistory,
   getPublicWinners,
   getPublicProductDetail,
+  getPublicBusinessProfile,
   listPublicProducts,
   submitPublicLead,
   type PublicLatestWinnerResponse,
   type PublicLeadPayload,
   type PublicLeadResponse,
   type PublicProduct,
+  type PublicBusinessProfile,
   type PublicStats,
   type PublicWinner,
   type PublicWinnerHistoryResponse,
 } from "@/services/public";
-

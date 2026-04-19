@@ -1,4 +1,4 @@
-import { authFetch } from "@/services/api-client";
+import { apiFetch } from "@/lib/api";
 
 export type CollectionQueueItem = {
   id: number;
@@ -27,13 +27,13 @@ export type RecentCollectionItem = {
 };
 
 export async function getDueTodayCollections(): Promise<CollectionQueueItem[]> {
-  return authFetch("/admin/collections/due-today");
+  return apiFetch("/admin/collections/due-today");
 }
 
 export async function getOverdueCollections(): Promise<CollectionQueueItem[]> {
-  return authFetch("/admin/collections/overdue");
+  return apiFetch("/admin/collections/overdue");
 }
 
 export async function getRecentCollections(): Promise<RecentCollectionItem[]> {
-  return authFetch("/admin/collections/recent");
+  return apiFetch("/admin/collections/recent");
 }

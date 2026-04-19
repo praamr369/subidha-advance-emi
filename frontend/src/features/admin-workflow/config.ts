@@ -19,7 +19,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
   {
     id: "catalog-control",
     title: "Product catalog",
-    description: "Price governance, EMI-ready catalog control, and import validation for retail inventory.",
+    description: "Price governance, advance EMI-ready catalog control, and import validation for retail inventory.",
     href: "/admin/products",
     owner: "Catalog team",
     health: "healthy",
@@ -47,7 +47,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
   {
     id: "collections",
     title: "Collections desk",
-    description: "EMI collection tracking, payment verification, and receipt-linked payment monitoring.",
+    description: "Advance EMI collection tracking, payment verification, and receipt-linked payment monitoring.",
     href: "/admin/payments",
     owner: "Collections team",
     health: "attention",
@@ -75,7 +75,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
   {
     id: "reconciliation",
     title: "Subscription reconciliation",
-    description: "Exception handling for subscription, EMI, and payment integrity before closeout.",
+    description: "Exception handling for subscription, advance EMI, and payment integrity before closeout.",
     href: buildAdminReconciliationRoute(),
     owner: "Finance control",
     health: "critical",
@@ -95,7 +95,7 @@ export const defaultWorkflowTasks: WorkflowTask[] = [
   {
     id: "review-overdue",
     title: "Review overdue subscriptions",
-    description: "Prioritize collections on accounts with pending EMI pressure.",
+    description: "Prioritize collections on accounts with pending advance EMI pressure.",
     href: "/admin/emis/overdue",
     tone: "warning",
   },

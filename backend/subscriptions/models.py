@@ -6,6 +6,7 @@ from xml.parsers.expat import errors
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils.text import slugify
@@ -50,6 +51,17 @@ def product_image_upload_to(instance, filename: str) -> str:
     )
     token = uuid4().hex[:10]
     return f"products/{identity}/{identity}-{token}{extension}"
+
+def subscription_document_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".bin"
+
+    subscription_id = getattr(instance, "subscription_id", None)
+    doc_type = (getattr(instance, "document_type", "") or "DOC").strip().lower()
+    token = uuid4().hex[:12]
+    identity = f"sub-{subscription_id}" if subscription_id else "subscription"
+    return f"subscriptions/{identity}/{doc_type}-{token}{extension}"
 
 
 # =====================================================
@@ -167,6 +179,32 @@ class CommissionStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     SETTLED = "SETTLED", "Settled"
     REVERSED = "REVERSED", "Reversed"
+
+class ContractReturnConditionStatus(models.TextChoices):
+    NOT_ASSESSED = "NOT_ASSESSED", "Not Assessed"
+    GOOD = "GOOD", "Good"
+    FAIR = "FAIR", "Fair"
+    DAMAGED = "DAMAGED", "Damaged"
+
+
+class ContractRefundStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    PARTIAL = "PARTIAL", "Partial"
+    REFUNDED = "REFUNDED", "Refunded"
+    WITHHELD = "WITHHELD", "Withheld"
+
+
+class SubscriptionDocumentType(models.TextChoices):
+    CUSTOMER_KYC_ID = "CUSTOMER_KYC_ID", "Customer KYC ID"
+    CUSTOMER_SIGNATURE = "CUSTOMER_SIGNATURE", "Customer Signature"
+    RENT_CONTRACT_PDF = "RENT_CONTRACT_PDF", "Rent Contract PDF"
+    LEASE_CONTRACT_PDF = "LEASE_CONTRACT_PDF", "Lease Contract PDF"
+
+
+class DocumentVerificationStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    VERIFIED = "VERIFIED", "Verified"
+    REJECTED = "REJECTED", "Rejected"
 
 
 
@@ -1236,6 +1274,276 @@ class Subscription(TimeStampedModel):
 
 
 # =====================================================
+# CONTRACTS (RENT / LEASE)
+# =====================================================
+
+class RentSubscriptionProfile(TimeStampedModel):
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="rent_profile",
+    )
+    security_deposit_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        validators=[
+            MinValueValidator(Decimal("20.00")),
+            MaxValueValidator(Decimal("30.00")),
+        ],
+    )
+    security_deposit_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    refundable_security_deposit = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    return_condition_status = models.CharField(
+        max_length=30,
+        choices=ContractReturnConditionStatus.choices,
+        default=ContractReturnConditionStatus.NOT_ASSESSED,
+        db_index=True,
+    )
+    deduction_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    refund_status = models.CharField(
+        max_length=20,
+        choices=ContractRefundStatus.choices,
+        default=ContractRefundStatus.PENDING,
+        db_index=True,
+    )
+    return_inspection_notes = models.TextField(blank=True, default="")
+    handover_notes = models.TextField(blank=True, default="")
+    contract_terms_snapshot = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "rent_subscription_profiles"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["refund_status"]),
+            models.Index(fields=["return_condition_status"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(security_deposit_percent__gte=Decimal("20.00"))
+                & Q(security_deposit_percent__lte=Decimal("30.00")),
+                name="chk_rent_security_deposit_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=Q(security_deposit_amount__gte=MONEY_ZERO),
+                name="chk_rent_security_deposit_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(deduction_amount__gte=MONEY_ZERO),
+                name="chk_rent_deduction_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(refund_amount__gte=MONEY_ZERO),
+                name="chk_rent_refund_amount_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if self.subscription_id and self.subscription.plan_type != PlanType.RENT:
+            errors["subscription"] = "Rent profile can only be attached to RENT subscriptions."
+
+        if self.security_deposit_percent is None:
+            errors["security_deposit_percent"] = "Security deposit percent is required."
+        else:
+            if (
+                self.security_deposit_percent < Decimal("20.00")
+                or self.security_deposit_percent > Decimal("30.00")
+            ):
+                errors["security_deposit_percent"] = "Security deposit percent must be between 20 and 30."
+
+        if self.deduction_amount is not None and self.deduction_amount < MONEY_ZERO:
+            errors["deduction_amount"] = "Deduction amount cannot be negative."
+
+        if self.refund_amount is not None and self.refund_amount < MONEY_ZERO:
+            errors["refund_amount"] = "Refund amount cannot be negative."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.return_inspection_notes = (self.return_inspection_notes or "").strip()
+        self.handover_notes = (self.handover_notes or "").strip()
+        self.contract_terms_snapshot = (self.contract_terms_snapshot or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"RentProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+class LeaseSubscriptionProfile(TimeStampedModel):
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="lease_profile",
+    )
+    security_deposit_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        validators=[
+            MinValueValidator(Decimal("20.00")),
+            MaxValueValidator(Decimal("30.00")),
+        ],
+    )
+    security_deposit_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    refundable_security_deposit = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    buyout_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    ownership_transfer_allowed = models.BooleanField(default=False)
+    return_condition_status = models.CharField(
+        max_length=30,
+        choices=ContractReturnConditionStatus.choices,
+        default=ContractReturnConditionStatus.NOT_ASSESSED,
+        db_index=True,
+    )
+    deduction_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO
+    )
+    refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    refund_status = models.CharField(
+        max_length=20,
+        choices=ContractRefundStatus.choices,
+        default=ContractRefundStatus.PENDING,
+        db_index=True,
+    )
+    return_inspection_notes = models.TextField(blank=True, default="")
+    handover_notes = models.TextField(blank=True, default="")
+    contract_terms_snapshot = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "lease_subscription_profiles"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["refund_status"]),
+            models.Index(fields=["return_condition_status"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(security_deposit_percent__gte=Decimal("20.00"))
+                & Q(security_deposit_percent__lte=Decimal("30.00")),
+                name="chk_lease_security_deposit_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=Q(security_deposit_amount__gte=MONEY_ZERO),
+                name="chk_lease_security_deposit_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(deduction_amount__gte=MONEY_ZERO),
+                name="chk_lease_deduction_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(refund_amount__gte=MONEY_ZERO),
+                name="chk_lease_refund_amount_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+
+        if self.subscription_id and self.subscription.plan_type != PlanType.LEASE:
+            errors["subscription"] = "Lease profile can only be attached to LEASE subscriptions."
+
+        if self.security_deposit_percent is None:
+            errors["security_deposit_percent"] = "Security deposit percent is required."
+        else:
+            if (
+                self.security_deposit_percent < Decimal("20.00")
+                or self.security_deposit_percent > Decimal("30.00")
+            ):
+                errors["security_deposit_percent"] = "Security deposit percent must be between 20 and 30."
+
+        if self.buyout_amount is not None and self.buyout_amount < MONEY_ZERO:
+            errors["buyout_amount"] = "Buyout amount cannot be negative."
+
+        if self.deduction_amount is not None and self.deduction_amount < MONEY_ZERO:
+            errors["deduction_amount"] = "Deduction amount cannot be negative."
+
+        if self.refund_amount is not None and self.refund_amount < MONEY_ZERO:
+            errors["refund_amount"] = "Refund amount cannot be negative."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.return_inspection_notes = (self.return_inspection_notes or "").strip()
+        self.handover_notes = (self.handover_notes or "").strip()
+        self.contract_terms_snapshot = (self.contract_terms_snapshot or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"LeaseProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+class SubscriptionDocument(TimeStampedModel):
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    document_type = models.CharField(
+        max_length=40,
+        choices=SubscriptionDocumentType.choices,
+        db_index=True,
+    )
+    file = models.FileField(upload_to=subscription_document_upload_to)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="uploaded_subscription_documents",
+    )
+    verification_status = models.CharField(
+        max_length=20,
+        choices=DocumentVerificationStatus.choices,
+        default=DocumentVerificationStatus.PENDING,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "subscription_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "document_type"]),
+            models.Index(fields=["verification_status", "created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.subscription_id:
+            errors["subscription"] = "Subscription is required."
+        if not self.document_type:
+            errors["document_type"] = "Document type is required."
+        if not self.file:
+            errors["file"] = "File is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.document_type} for SUB-{self.subscription_id}"
+
+# =====================================================
 # DELIVERY
 # =====================================================
 
@@ -2097,6 +2405,7 @@ class AuditLog(models.Model):
     class ActionType(models.TextChoices):
         USER_CREATED = "USER_CREATED", "User Created"   
         USER_UPDATED = "USER_UPDATED", "User Updated"
+        PUBLIC_SITE_UPDATED = "PUBLIC_SITE_UPDATED", "Public Site Updated"
         USER_ACTIVATED = "USER_ACTIVATED", "User Activated"
         USER_DEACTIVATED = "USER_DEACTIVATED", "User Deactivated"
         USER_PASSWORD_RESET = "USER_PASSWORD_RESET", "User Password Reset"

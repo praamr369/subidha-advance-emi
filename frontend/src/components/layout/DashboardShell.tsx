@@ -263,7 +263,7 @@ function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
     case "ADMIN":
       return [
         { label: "New Subscription", href: ROUTES.admin.subscriptionsCreate },
-        { label: "Collect EMI", href: ROUTES.admin.paymentsCreate },
+        { label: "Collect Advance EMI", href: ROUTES.admin.paymentsCreate },
         { label: "Direct Sale", href: ROUTES.admin.billingDirectSales },
         { label: "Purchase Bill", href: ROUTES.admin.accountingPurchaseBills },
         { label: "Stock Adjust", href: ROUTES.admin.inventoryAdjustments },

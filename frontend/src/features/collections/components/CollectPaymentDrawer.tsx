@@ -126,7 +126,7 @@ function CollectPaymentDrawerContent({
     e.preventDefault();
 
     if (!emiId) {
-      setLocalError("EMI reference is missing.");
+      setLocalError("Advance EMI reference is missing.");
       return;
     }
 
@@ -188,7 +188,7 @@ function CollectPaymentDrawerContent({
     <DrawerShell
       open={Boolean(emiId)}
       title="Collect Payment"
-      description="Record a payment against the selected EMI with explicit financial controls."
+      description="Record a payment against the selected advance EMI with explicit financial controls."
       onClose={onClose}
     >
       <div className="space-y-6">
@@ -196,7 +196,7 @@ function CollectPaymentDrawerContent({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  EMI ID
+                  Advance EMI ID
                 </div>
                 <div className="mt-1 text-sm text-foreground">
                   {emiId ? `#${emiId}` : "—"}

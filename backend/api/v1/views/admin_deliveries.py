@@ -6,6 +6,8 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.delivery import (
+    AdminDeliverySourceSubscriptionsQuerySerializer,
+    AdminDeliverySourceSubscriptionSerializer,
     AdminSubscriptionDeliveryCreateSerializer,
     AdminSubscriptionDeliveryMarkDeliveredSerializer,
     AdminSubscriptionDeliveryReadSerializer,
@@ -13,7 +15,8 @@ from api.v1.serializers.delivery import (
     AdminSubscriptionDeliveryTransitionSerializer,
     AdminSubscriptionDeliveryUpdateSerializer,
 )
-from subscriptions.models import DeliveryStatus
+from subscriptions.models import DeliveryStatus, Subscription
+from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     cancel_subscription_delivery,
@@ -137,6 +140,90 @@ class AdminDeliveryListCreateView(APIView):
         return Response(
             AdminSubscriptionDeliveryReadSerializer(delivery).data,
             status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminDeliverySourceSubscriptionsView(APIView):
+    """
+    Source-driven delivery creation helper.
+
+    Provides a searchable list of subscriptions and their current delivery summary so the
+    admin UI can create deliveries without manual/raw subscription id entry.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        query_serializer = AdminDeliverySourceSubscriptionsQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+
+        q = (query_serializer.validated_data.get("q") or "").strip()
+        plan_type = query_serializer.validated_data.get("plan_type")
+        limit = query_serializer.validated_data.get("limit") or 20
+
+        queryset = Subscription.objects.select_related(
+            "customer",
+            "product",
+            "batch",
+            "lucky_id",
+        ).prefetch_related(get_subscription_delivery_prefetch()).order_by("-created_at", "-id")
+
+        if plan_type:
+            queryset = queryset.filter(plan_type=plan_type)
+
+        if q:
+            filters = (
+                Q(customer__name__icontains=q)
+                | Q(customer__phone__icontains=q)
+                | Q(product__name__icontains=q)
+                | Q(product__product_code__icontains=q)
+                | Q(contract_reference__icontains=q)
+                | Q(batch__batch_code__icontains=q)
+            )
+            if q.isdigit():
+                filters = filters | Q(id=int(q)) | Q(lucky_id__lucky_number=int(q))
+            queryset = queryset.filter(filters)
+
+        serializer = AdminDeliverySourceSubscriptionSerializer(queryset[:limit], many=True)
+        return Response(
+            {
+                "count": queryset.count(),
+                "results": serializer.data,
+            }
+        )
+
+
+class AdminDeliverySourceSubscriptionPrefillView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, subscription_id: int):
+        subscription = get_object_or_404(
+            Subscription.objects.select_related(
+                "customer",
+                "product",
+                "batch",
+                "lucky_id",
+            ).prefetch_related(get_subscription_delivery_prefetch()),
+            pk=subscription_id,
+        )
+
+        customer = subscription.customer
+        address_parts = [
+            (getattr(customer, "address", "") or "").strip(),
+            (getattr(customer, "city", "") or "").strip(),
+        ]
+        address_snapshot = ", ".join([part for part in address_parts if part])
+
+        return Response(
+            {
+                "source": AdminDeliverySourceSubscriptionSerializer(subscription).data,
+                "defaults": {
+                    "receiver_name": (getattr(customer, "name", "") or "").strip(),
+                    "receiver_phone": (getattr(customer, "phone", "") or "").strip(),
+                    "delivery_address_snapshot": address_snapshot,
+                    "notes": "",
+                },
+            }
         )
 
 

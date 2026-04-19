@@ -59,7 +59,7 @@ function buildQueueItemKey(item: CollectionQueueItem, index: number): string {
 export default function TodayQueuePanel({
   items,
   title = "Today Queue",
-  subtitle = "EMIs available for collection workflow.",
+  subtitle = "Advance EMIs available for collection workflow.",
 }: TodayQueuePanelProps) {
   const [selectedItem, setSelectedItem] = useState<CollectionQueueItem | null>(null);
   const { data, isLoading, isError, error } = useTodayQueue();
@@ -110,7 +110,7 @@ export default function TodayQueuePanel({
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="text-sm font-semibold text-foreground">{item.customer_name || "Unknown customer"}</div>
-                    <div className="text-sm text-muted-foreground">EMI #{emiId ?? "—"} · Subscription #{item.subscription_id ?? "—"}</div>
+                    <div className="text-sm text-muted-foreground">Advance EMI #{emiId ?? "—"} · Subscription #{item.subscription_id ?? "—"}</div>
                     <div className="text-sm text-muted-foreground">Batch {item.batch_code || "—"} · Lucky #{item.lucky_number ?? "—"}</div>
                     <div className="text-sm text-muted-foreground">Phone: {item.customer_phone || "—"} · Due: {formatDate(item.due_date)}</div>
                     <div className="text-sm text-muted-foreground">Status: {item.status || "—"}</div>

@@ -16,7 +16,7 @@ type AuthLayoutShellProps = {
 
 const DEFAULT_PANEL_TITLE = "Subidha Furniture secure operations access";
 const DEFAULT_PANEL_DESCRIPTION =
-  "Sign in to run daily Lucky Plan EMI operations through one controlled workspace.";
+  "Sign in to run daily Lucky Plan Advance EMI operations through one controlled workspace.";
 
 const PANEL_POINTS = [
   {
@@ -45,12 +45,12 @@ export default function AuthLayoutShell({
   return (
     <section
       className={cn(
-        "w-full overflow-hidden rounded-[28px] border border-slate-300 bg-white shadow-[0_26px_60px_-42px_rgba(15,23,42,0.36)]",
+        "public-surface w-full overflow-hidden",
         "grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
         className
       )}
     >
-      <aside className="hidden border-r border-slate-200 bg-slate-900/95 lg:block">
+      <aside className="hidden border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(148,163,184,0.12),transparent_42%),linear-gradient(160deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] lg:block">
         <div className="flex h-full flex-col justify-between p-8 xl:p-10">
           <div>
             <AuthBrand tone="dark" />
@@ -78,11 +78,12 @@ export default function AuthLayoutShell({
 
       <div className="flex min-h-full items-center">
         <div className="mx-auto w-full max-w-xl px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-          {compactMobileBrand ? (
-            <AuthBrand compact className="mb-5 lg:hidden" />
-          ) : null}
+          <AuthBrand
+            compact={compactMobileBrand}
+            className="mb-5"
+          />
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <div className="public-card p-5 sm:p-7">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.9rem]">
               {formTitle}
             </h1>

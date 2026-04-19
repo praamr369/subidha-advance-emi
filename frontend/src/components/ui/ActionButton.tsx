@@ -34,7 +34,7 @@ type ActionButtonProps = Omit<
 function getVariantClassName(variant: ActionButtonVariant) {
   switch (variant) {
     case "primary":
-      return "border-primary/90 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.66)] hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] hover:border-primary";
+      return "border-primary/90 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(15,23,42,0.62)] hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] hover:border-primary";
     case "destructive":
       return "border-red-700/80 bg-red-700 text-white shadow-[0_18px_34px_-24px_rgba(127,29,29,0.76)] hover:bg-red-800";
     case "outline":

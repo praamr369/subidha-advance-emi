@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import ShareActions from "@/components/communications/ShareActions";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
@@ -290,6 +291,14 @@ export default function BillingDocumentDetailPage() {
             title="Document Print / PDF"
             description="Print this billing document preview for handover or archive-safe PDF filing."
           />
+          <div className="mb-6">
+            <ShareActions
+              title="Billing Document"
+              message={`Billing document: ${invoice.document_no || invoice.source_reference || `#${invoice.id}`}\nTotal: ${accountingMoney(invoice.grand_total)}\n(Requires login to view)`}
+              whatsappPhone={invoice.customer_phone_snapshot || null}
+              label="Share"
+            />
+          </div>
 
           <BillingPrintDocument
             title={invoice.tax_mode === "GST" ? "GST Tax Invoice" : "Retail Invoice"}

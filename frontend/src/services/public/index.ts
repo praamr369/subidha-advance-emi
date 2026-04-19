@@ -64,6 +64,29 @@ export type PublicProduct = {
   description?: string | null;
 };
 
+export type PublicBusinessProfile = {
+  display_name?: string;
+  tagline?: string;
+  hero_title?: string;
+  hero_subtitle?: string;
+  support_phone?: string;
+  support_email?: string;
+  whatsapp_phone?: string;
+  whatsapp_link?: string;
+  facebook_url?: string;
+  instagram_url?: string;
+  youtube_url?: string;
+  address_text?: string;
+  map_url?: string;
+  business_hours?: string;
+  public_logo_url?: string;
+  updated_at?: string;
+};
+
+type PublicBusinessProfileResponse = {
+  profile: PublicBusinessProfile | null;
+};
+
 type PublicProductsResponse = {
   count?: number;
   results?: PublicProduct[];
@@ -237,4 +260,14 @@ export async function submitPublicLead(
     },
     "Unable to submit your enquiry right now."
   );
+}
+
+export async function getPublicBusinessProfile(): Promise<PublicBusinessProfile | null> {
+  const payload = await fetchPublic<PublicBusinessProfileResponse>(
+    "/public/business-profile/",
+    { cache: "no-store" },
+    "Unable to load public business profile right now."
+  );
+
+  return payload.profile ?? null;
 }

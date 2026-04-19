@@ -10,6 +10,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 
@@ -68,6 +69,9 @@ type CreatedSubscriptionResponse = {
   total_amount?: string;
   monthly_amount?: string;
   status?: string;
+  rent_profile?: Record<string, unknown> | null;
+  lease_profile?: Record<string, unknown> | null;
+  documents?: Array<Record<string, unknown>>;
 };
 
 const LUCKY_PREVIEW_LIMIT = 12;
@@ -357,6 +361,17 @@ export default function SubscriptionCreatePage() {
   const [luckyId, setLuckyId] = useState<LuckyIdOption | null>(null);
   const [partner, setPartner] = useState<PartnerOption | null>(null);
 
+  const [securityDepositPercent, setSecurityDepositPercent] = useState("20");
+  const [leaseBuyoutAmount, setLeaseBuyoutAmount] = useState("");
+  const [ownershipTransferAllowed, setOwnershipTransferAllowed] = useState(false);
+  const [handoverNotes, setHandoverNotes] = useState("");
+  const [contractTermsSnapshot, setContractTermsSnapshot] = useState("");
+
+  const [kycFiles, setKycFiles] = useState<File[]>([]);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [docUploadBusy, setDocUploadBusy] = useState(false);
+  const [docUploadError, setDocUploadError] = useState<string | null>(null);
+
   const [customerQuery, setCustomerQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [batchQuery, setBatchQuery] = useState("");
@@ -441,6 +456,8 @@ export default function SubscriptionCreatePage() {
   }, [leadContext?.lead, success]);
 
   const isEmiPlan = planType === "EMI";
+  const isRentPlan = planType === "RENT";
+  const isLeasePlan = planType === "LEASE";
 
   const tenureMonths = useMemo(() => {
     if (isEmiPlan) {
@@ -455,6 +472,17 @@ export default function SubscriptionCreatePage() {
     if (!tenureMonths || tenureMonths <= 0) return "0.00";
     return (totalAmount / tenureMonths).toFixed(2);
   }, [totalAmount, tenureMonths]);
+
+  const depositPercentNumber = useMemo(() => {
+    const parsed = Number(securityDepositPercent);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, [securityDepositPercent]);
+
+  const securityDepositAmount = useMemo(() => {
+    const percent = depositPercentNumber;
+    if (!percent || percent <= 0) return "0.00";
+    return (totalAmount * percent / 100).toFixed(2);
+  }, [depositPercentNumber, totalAmount]);
 
   const productModes = useMemo(() => enabledPlanModes(product), [product]);
   const luckyPreviewLabel = useMemo(() => {
@@ -486,8 +514,23 @@ export default function SubscriptionCreatePage() {
     if (!customer || !product || !startDate) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
     if (isEmiPlan && !batch) return false;
+    if (!isEmiPlan) {
+      if (depositPercentNumber < 20 || depositPercentNumber > 30) return false;
+      if (isRentPlan && !product.is_rent_enabled) return false;
+      if (isLeasePlan && !product.is_lease_enabled) return false;
+    }
     return true;
-  }, [customer, product, startDate, tenureMonths, isEmiPlan, batch]);
+  }, [
+    customer,
+    product,
+    startDate,
+    tenureMonths,
+    isEmiPlan,
+    batch,
+    depositPercentNumber,
+    isRentPlan,
+    isLeasePlan,
+  ]);
 
   function nextLuckyRequestToken(): number {
     luckyRequestSequence.current += 1;
@@ -521,9 +564,14 @@ export default function SubscriptionCreatePage() {
       const payload = await apiFetch<unknown>(
         `/admin/products/search/?q=${encodeURIComponent(productQuery.trim())}`
       );
-      setProductResults(
-        toArray<Record<string, unknown>>(payload).map(normalizeProduct)
-      );
+      const normalized = toArray<Record<string, unknown>>(payload).map(normalizeProduct);
+      const filtered = normalized.filter((item) => {
+        if (isEmiPlan) return Boolean(item.is_emi_enabled);
+        if (isRentPlan) return Boolean(item.is_rent_enabled);
+        if (isLeasePlan) return Boolean(item.is_lease_enabled);
+        return true;
+      });
+      setProductResults(filtered);
     } catch (err) {
       setError(toErrorMessage(err));
       setProductResults([]);
@@ -964,6 +1012,7 @@ export default function SubscriptionCreatePage() {
   async function handleSubmit() {
     setError(null);
     setSuccess(null);
+    setDocUploadError(null);
 
     if (!customer) {
       setError("Customer is required.");
@@ -990,34 +1039,70 @@ export default function SubscriptionCreatePage() {
       return;
     }
 
+    if (!isEmiPlan && (depositPercentNumber < 20 || depositPercentNumber > 30)) {
+      setError("Security deposit percent must be between 20 and 30.");
+      return;
+    }
+
     setSubmitting(true);
-    setGlobalLoadingLabel("Creating subscription and applying contract rules...");
+    setGlobalLoadingLabel(
+      isEmiPlan
+        ? "Creating subscription and applying contract rules..."
+        : `Creating ${planType} contract and generating contract PDF...`
+    );
 
     try {
-      const body: Record<string, unknown> = {
-        customer: customer.id,
-        product: product.id,
-        partner: partner?.id ?? null,
-        plan_type: planType,
-        tenure_months: tenureMonths,
-        start_date: startDate,
-      };
+      let created: CreatedSubscriptionResponse;
 
       if (isEmiPlan) {
-        body.batch = batch?.id ?? null;
-        body.lucky_id = luckyId?.id ?? null;
-      } else {
-        body.batch = null;
-        body.lucky_id = null;
-      }
+        const body: Record<string, unknown> = {
+          customer: customer.id,
+          product: product.id,
+          partner: partner?.id ?? null,
+          plan_type: planType,
+          tenure_months: tenureMonths,
+          start_date: startDate,
+          batch: batch?.id ?? null,
+          lucky_id: luckyId?.id ?? null,
+        };
 
-      const created = await apiFetch<CreatedSubscriptionResponse>(
-        "/admin/subscriptions/",
-        {
+        created = await apiFetch<CreatedSubscriptionResponse>("/admin/subscriptions/", {
           method: "POST",
           body: JSON.stringify(body),
-        }
-      );
+        });
+      } else if (isRentPlan) {
+        const body: Record<string, unknown> = {
+          customer: customer.id,
+          product: product.id,
+          tenure_months: tenureMonths,
+          start_date: startDate,
+          security_deposit_percent: depositPercentNumber,
+          handover_notes: handoverNotes || "",
+          contract_terms_snapshot: contractTermsSnapshot || "",
+        };
+
+        created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/rent/", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      } else {
+        const body: Record<string, unknown> = {
+          customer: customer.id,
+          product: product.id,
+          tenure_months: tenureMonths,
+          start_date: startDate,
+          security_deposit_percent: depositPercentNumber,
+          buyout_amount: leaseBuyoutAmount.trim() ? leaseBuyoutAmount.trim() : null,
+          ownership_transfer_allowed: ownershipTransferAllowed,
+          handover_notes: handoverNotes || "",
+          contract_terms_snapshot: contractTermsSnapshot || "",
+        };
+
+        created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/lease/", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      }
 
       setSuccess(created);
     } catch (err) {
@@ -1025,6 +1110,55 @@ export default function SubscriptionCreatePage() {
     } finally {
       setSubmitting(false);
       setGlobalLoadingLabel(null);
+    }
+  }
+
+  async function uploadDocument(subscriptionId: number, documentType: string, file: File, notes?: string) {
+    const form = new FormData();
+    form.append("document_type", documentType);
+    form.append("file", file);
+    if (notes) form.append("notes", notes);
+
+    return apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/documents/`, {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  async function refreshSuccess(subscriptionId: number) {
+    const refreshed = await apiFetch<CreatedSubscriptionResponse>(`/admin/subscriptions/${subscriptionId}/`, {
+      cache: "no-store",
+    });
+    setSuccess(refreshed);
+  }
+
+  async function handleUploadSelectedDocuments() {
+    if (!success?.id) return;
+    setDocUploadError(null);
+
+    if (kycFiles.length === 0) {
+      setDocUploadError("Select at least one KYC document file.");
+      return;
+    }
+
+    if (!signatureFile) {
+      setDocUploadError("Select a customer signature file.");
+      return;
+    }
+
+    setDocUploadBusy(true);
+    try {
+      for (const file of kycFiles) {
+        await uploadDocument(success.id, "CUSTOMER_KYC_ID", file, "Customer KYC ID");
+      }
+      await uploadDocument(success.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
+      await refreshSuccess(success.id);
+      setKycFiles([]);
+      setSignatureFile(null);
+    } catch (err) {
+      setDocUploadError(toErrorMessage(err));
+    } finally {
+      setDocUploadBusy(false);
     }
   }
 
@@ -1054,7 +1188,7 @@ export default function SubscriptionCreatePage() {
       stats={[
         {
           label: "Plan Type",
-          value: planType,
+          value: formatPlanTypeLabel(planType),
         },
         {
           label: "Tenure",
@@ -1066,7 +1200,7 @@ export default function SubscriptionCreatePage() {
           tone: "success",
         },
         {
-          label: "Default EMI",
+          label: isEmiPlan ? "Default Advance EMI" : "Recurring Amount (monthly)",
           value: money(monthlyAmount),
         },
       ]}
@@ -1078,11 +1212,11 @@ export default function SubscriptionCreatePage() {
       <div className="space-y-6">
         <SectionCard
           title="Creation rules"
-          description="Product base price is treated as total contract price. Default EMI is total contract price divided by tenure months."
+          description="Product base price is treated as total contract price. Default Advance EMI is total contract price divided by tenure months."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DetailValue label="Contract Value Source" value="Product base price" />
-            <DetailValue label="Default EMI Formula" value="base price / tenure months" />
+            <DetailValue label="Default Advance EMI Formula" value="base price / tenure months" />
             <DetailValue
               label="EMI Plan Rule"
               value="Batch required, Lucky ID optional"
@@ -1204,53 +1338,55 @@ export default function SubscriptionCreatePage() {
               placeholder="Search product by name or code"
             />
 
-            <SearchPanel<PartnerOption>
-              title="Partner (optional)"
-              description="Attach a partner to the contract when applicable. Press Enter to search."
-              query={partnerQuery}
-              setQuery={setPartnerQuery}
-              onSearch={runPartnerSearch}
-              loading={partnerLoading}
-              selected={partner}
-              onClear={() => {
-                setPartner(null);
-                setPartnerResults([]);
-              }}
-              results={partnerResults}
-              renderSelected={(item) => (
-                <div>
-                  <div className="font-medium text-foreground">
-                    {item.username || `Partner #${item.id}`}
+            {isEmiPlan ? (
+              <SearchPanel<PartnerOption>
+                title="Partner (optional)"
+                description="Attach a partner to the contract when applicable. Press Enter to search."
+                query={partnerQuery}
+                setQuery={setPartnerQuery}
+                onSearch={runPartnerSearch}
+                loading={partnerLoading}
+                selected={partner}
+                onClear={() => {
+                  setPartner(null);
+                  setPartnerResults([]);
+                }}
+                results={partnerResults}
+                renderSelected={(item) => (
+                  <div>
+                    <div className="font-medium text-foreground">
+                      {item.username || `Partner #${item.id}`}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.phone || "No phone"}
+                    </div>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {item.phone || "No phone"}
+                )}
+                renderOption={(item) => (
+                  <div>
+                    <div className="font-medium text-foreground">
+                      {item.username || `Partner #${item.id}`}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.phone || "No phone"}
+                    </div>
                   </div>
-                </div>
-              )}
-              renderOption={(item) => (
-                <div>
-                  <div className="font-medium text-foreground">
-                    {item.username || `Partner #${item.id}`}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {item.phone || "No phone"}
-                  </div>
-                </div>
-              )}
-              onSelect={(item) => {
-                setPartner(item);
-                setPartnerResults([]);
-                setError(null);
-                setSuccess(null);
-              }}
-              placeholder="Search partner by username or phone"
-            />
+                )}
+                onSelect={(item) => {
+                  setPartner(item);
+                  setPartnerResults([]);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                placeholder="Search partner by username or phone"
+              />
+            ) : null}
 
             <div className="rounded-xl border border-border bg-background p-4">
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-foreground">Plan Type</h3>
                 <p className="text-xs text-muted-foreground">
-                  EMI requires batch linkage. Rent and lease use manual tenure.
+                  Advance EMI requires batch linkage. Rent and lease use manual tenure.
                 </p>
               </div>
 
@@ -1263,6 +1399,7 @@ export default function SubscriptionCreatePage() {
                     setPlanType(nextPlanType);
                     setBatch(null);
                     setLuckyId(null);
+                    setPartner(null);
                     setBatchResults([]);
                     setLuckyResults([]);
                     setLuckyQuery("");
@@ -1272,7 +1409,7 @@ export default function SubscriptionCreatePage() {
                   }}
                   className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                 >
-                  <option value="EMI">EMI</option>
+                  <option value="EMI">Advance EMI</option>
                   <option value="RENT">RENT</option>
                   <option value="LEASE">LEASE</option>
                 </select>
@@ -1446,11 +1583,140 @@ export default function SubscriptionCreatePage() {
                 </div>
               </>
             ) : (
-              <div className="lg:col-span-2">
-                <EmptyState
-                  title="Batch and Lucky ID not required"
-                  description="Rent and lease plans are created without batch or Lucky ID allocation."
-                />
+              <div className="lg:col-span-2 space-y-4">
+                <div className="rounded-xl border border-border bg-background p-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Security deposit (required)
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Deposit must be between 20% and 30% of contract value. Refund is processed after return-condition assessment.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Deposit percent
+                      </label>
+                      <input
+                        type="number"
+                        min="20"
+                        max="30"
+                        step="0.5"
+                        value={securityDepositPercent}
+                        onChange={(event) => {
+                          setSecurityDepositPercent(event.target.value);
+                          setError(null);
+                          setSuccess(null);
+                        }}
+                        className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                      />
+                      <p className="mt-2 text-xs text-muted-foreground">Allowed range: 20 to 30</p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Deposit amount
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-foreground">
+                        {money(securityDepositAmount)}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Computed from contract value {money(totalAmount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isLeasePlan ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Buyout amount (optional)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={leaseBuyoutAmount}
+                          onChange={(event) => {
+                            setLeaseBuyoutAmount(event.target.value);
+                            setError(null);
+                            setSuccess(null);
+                          }}
+                          className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                        />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Leave blank if buyout is not applicable.
+                        </p>
+                      </div>
+
+                      <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3">
+                        <input
+                          id="ownership-transfer"
+                          type="checkbox"
+                          checked={ownershipTransferAllowed}
+                          onChange={(event) => {
+                            setOwnershipTransferAllowed(event.target.checked);
+                            setError(null);
+                            setSuccess(null);
+                          }}
+                          className="mt-1 h-4 w-4 rounded border border-border"
+                        />
+                        <label htmlFor="ownership-transfer" className="text-sm">
+                          <div className="font-medium text-foreground">
+                            Ownership transfer allowed
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Enable only if the lease contract allows transfer after fulfillment.
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground">Handover notes (optional)</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Stored on the contract profile for operational handover history.
+                      </p>
+                    </div>
+                    <textarea
+                      value={handoverNotes}
+                      onChange={(event) => {
+                        setHandoverNotes(event.target.value);
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                      rows={4}
+                      className="mt-4 w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+                      placeholder="Optional notes for condition, delivery, or handover checklist..."
+                    />
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground">Contract terms snapshot (optional)</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to use the default system terms snapshot. Stored immutably for audit.
+                      </p>
+                    </div>
+                    <textarea
+                      value={contractTermsSnapshot}
+                      onChange={(event) => {
+                        setContractTermsSnapshot(event.target.value);
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                      rows={4}
+                      className="mt-4 w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
+                      placeholder="Optional custom terms snapshot for lawyer review..."
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1543,7 +1809,7 @@ export default function SubscriptionCreatePage() {
             />
             <DetailValue
               label="Partner"
-              value={partner?.username || "—"}
+              value={isEmiPlan ? (partner?.username || "—") : "Not applicable"}
             />
             <DetailValue
               label="Tenure"
@@ -1554,9 +1820,15 @@ export default function SubscriptionCreatePage() {
               value={money(totalAmount)}
             />
             <DetailValue
-              label="Default EMI"
+              label={isEmiPlan ? "Default Advance EMI" : "Recurring Amount (monthly)"}
               value={money(monthlyAmount)}
             />
+            {!isEmiPlan ? (
+              <DetailValue
+                label="Security Deposit"
+                value={`${depositPercentNumber.toFixed(2)}% · ${money(securityDepositAmount)}`}
+              />
+            ) : null}
           </div>
         </SectionCard>
 
@@ -1604,7 +1876,7 @@ export default function SubscriptionCreatePage() {
 
         {error ? (
           <ErrorState
-            title="Unable to create subscription"
+            title={isEmiPlan ? "Unable to create subscription" : "Unable to create contract"}
             description={error}
             onRetry={canSubmit ? handleSubmit : undefined}
           />
@@ -1612,25 +1884,148 @@ export default function SubscriptionCreatePage() {
 
         {success ? (
           <SectionCard
-            title="Subscription created"
-            description="The contract was created successfully and is ready for downstream workflows."
+            title={isEmiPlan ? "Subscription created" : "Contract created"}
+            description={
+              isEmiPlan
+                ? "The contract was created successfully and is ready for downstream workflows."
+                : "Contract created successfully. Upload KYC/signature and open the generated contract PDF from the documents list."
+            }
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DetailValue label="Subscription ID" value={`#${success.id}`} />
-              <DetailValue label="Plan Type" value={success.plan_type || planType} />
+              <DetailValue label="Plan Type" value={formatPlanTypeLabel(success.plan_type || planType)} />
               <DetailValue label="Status" value={success.status || "ACTIVE"} />
               <DetailValue
-                label="Monthly EMI"
+                label={isEmiPlan ? "Monthly Advance EMI" : "Recurring Amount (monthly)"}
                 value={money(success.monthly_amount || monthlyAmount)}
               />
             </div>
+
+            {!isEmiPlan ? (
+              <div className="mt-5 rounded-xl border border-border bg-background p-4">
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm font-semibold text-foreground">KYC and signature uploads</div>
+                  <div className="text-xs text-muted-foreground">
+                    Upload at least one customer KYC document and the customer signature for this contract.
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(event) => {
+                        const files = Array.from(event.target.files ?? []);
+                        setKycFiles(files);
+                        setDocUploadError(null);
+                      }}
+                      className="mt-2 block w-full text-sm"
+                    />
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Customer signature file</label>
+                    <input
+                      type="file"
+                      onChange={(event) => {
+                        const file = (event.target.files ?? [])[0] ?? null;
+                        setSignatureFile(file);
+                        setDocUploadError(null);
+                      }}
+                      className="mt-2 block w-full text-sm"
+                    />
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {signatureFile ? signatureFile.name : "No file selected"}
+                    </div>
+                  </div>
+                </div>
+
+                {docUploadError ? (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    {docUploadError}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleUploadSelectedDocuments();
+                    }}
+                    disabled={docUploadBusy}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {docUploadBusy ? "Uploading..." : "Upload Documents"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void refreshSuccess(success.id);
+                    }}
+                    disabled={docUploadBusy}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Refresh Contract Detail
+                  </button>
+                </div>
+
+                {Array.isArray(success.documents) && success.documents.length > 0 ? (
+                  <div className="mt-4 grid gap-2">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Attached documents
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {success.documents.slice(0, 8).map((doc) => {
+                        const id = Number((doc as Record<string, unknown>).id ?? 0);
+                        const type = String((doc as Record<string, unknown>).document_type ?? "");
+                        const url = (doc as Record<string, unknown>).file_url;
+                        const href = typeof url === "string" ? url : null;
+                        return (
+                          <div
+                            key={`${type}-${id}`}
+                            className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3"
+                          >
+                            <div className="text-sm font-medium text-foreground">{type || "Document"}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {href ? "Ready" : "No file URL"}
+                            </div>
+                            {href ? (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 inline-flex text-sm font-medium text-sky-700 hover:underline"
+                              >
+                                Open file
+                              </a>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Full document list is available in the subscription detail page.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    No documents attached yet.
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 href={`/admin/subscriptions/${success.id}`}
                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
               >
-                Open Subscription
+                Open Detail
               </Link>
 
               <Link
@@ -1673,7 +2068,13 @@ export default function SubscriptionCreatePage() {
               disabled={!canSubmit || submitting}
               className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Creating Subscription..." : "Create Subscription"}
+              {submitting
+                ? isEmiPlan
+                  ? "Creating Subscription..."
+                  : "Creating Contract..."
+                : isEmiPlan
+                  ? "Create Subscription"
+                  : "Create Contract"}
             </button>
 
             <button

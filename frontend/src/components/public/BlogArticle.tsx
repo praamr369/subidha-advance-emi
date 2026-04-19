@@ -56,9 +56,9 @@ export default function BlogArticle({
               return (
                 <div
                   key={`${block.type}-${index}`}
-                  className="rounded-[1.8rem] border border-sky-200/80 bg-sky-50/80 px-5 py-4 text-sm leading-6 text-sky-900 shadow-[0_18px_46px_-38px_rgba(30,64,175,0.35)]"
+                  className="rounded-[1.8rem] border border-amber-200/70 bg-amber-50/70 px-5 py-4 text-sm leading-6 text-slate-900 shadow-[0_18px_46px_-38px_rgba(15,23,42,0.28)]"
                 >
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
                     {block.title}
                   </div>
                   <p className="mt-2">{block.text}</p>
@@ -80,4 +80,3 @@ export default function BlogArticle({
     </article>
   );
 }
-

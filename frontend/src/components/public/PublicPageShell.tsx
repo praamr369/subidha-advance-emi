@@ -51,7 +51,7 @@ export default function PublicPageShell({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-[0_12px_28px_-20px_rgba(30,64,175,0.72)]">
+                  <span className="inline-flex items-center rounded-full border border-slate-950/10 bg-slate-950 px-3 py-1 text-xs font-semibold text-white shadow-[0_12px_28px_-20px_rgba(15,23,42,0.72)]">
                     {crumb.label}
                   </span>
                 )}
@@ -62,9 +62,9 @@ export default function PublicPageShell({
         </nav>
       ) : null}
 
-      <header className="relative overflow-hidden rounded-[2.25rem] border border-white/75 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.16),transparent_28%),radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-7 shadow-[0_32px_90px_-56px_rgba(15,23,42,0.68)] sm:p-10">
+      <header className="public-hero p-7 sm:p-10">
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-slate-200/90 to-transparent" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-slate-200/40 blur-3xl" />
         <div className="pointer-events-none absolute left-0 top-24 h-40 w-40 rounded-full bg-amber-200/25 blur-3xl" />
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -104,4 +104,3 @@ export default function PublicPageShell({
     </main>
   );
 }
-

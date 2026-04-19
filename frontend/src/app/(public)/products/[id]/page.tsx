@@ -99,7 +99,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         Back to catalogue
       </Link>
 
-      <section className="relative overflow-hidden rounded-[2.5rem] border border-white/75 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.16),transparent_24%),linear-gradient(145deg,rgba(255,255,255,0.99),rgba(248,250,252,0.94))] p-6 shadow-[0_34px_90px_-58px_rgba(15,23,42,0.78)] sm:p-8 lg:p-10">
+      <section className="relative overflow-hidden rounded-[2.5rem] border border-white/75 bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.16),transparent_26%),linear-gradient(145deg,rgba(255,255,255,0.99),rgba(250,250,249,0.94))] p-6 shadow-[0_34px_90px_-58px_rgba(15,23,42,0.78)] sm:p-8 lg:p-10">
         <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="space-y-4">
@@ -165,4 +165,3 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     </PublicPageShell>
   );
 }
-

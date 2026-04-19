@@ -3,6 +3,7 @@ import Link from "next/link";
 const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
+  { href: "/admin/settings/business-setup/public-site", label: "Public Site" },
   { href: "/admin/settings/business-setup/branches", label: "Branches" },
   { href: "/admin/settings/business-setup/finance-accounts", label: "Accounting Setup" },
   { href: "/admin/settings/business-setup/cash-desks", label: "Counters" },

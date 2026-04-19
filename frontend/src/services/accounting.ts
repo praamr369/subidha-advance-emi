@@ -1,6 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth/tokens";
-import { API_BASE_URL } from "@/lib/constants";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 export type AccountingPaginatedResponse<T> = {
   count: number;
@@ -1421,25 +1420,10 @@ export function getItrExportPack(id: number) {
 }
 
 export async function downloadItrExportPack(id: number): Promise<void> {
-  const token = getAccessToken();
-  const response = await fetch(`${API_BASE_URL}/accounting/exports/itr-pack/${id}/download/`, {
-    method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to download ITR export pack.");
-  }
-
-  const blob = await response.blob();
-  const objectUrl = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = `itr-pack-${id}.zip`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.URL.revokeObjectURL(objectUrl);
+  return downloadAuthenticatedFile(
+    `/accounting/exports/itr-pack/${id}/download/`,
+    `itr-pack-${id}.zip`
+  );
 }
 
 export function runAccountingBridge(payload: {

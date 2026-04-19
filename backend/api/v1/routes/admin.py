@@ -24,6 +24,8 @@ from api.v1.views.admin_deliveries import (
     AdminDeliveryMarkFailedView,
     AdminDeliveryMarkReturnedView,
     AdminDeliveryRequestReturnView,
+    AdminDeliverySourceSubscriptionPrefillView,
+    AdminDeliverySourceSubscriptionsView,
     AdminDeliverySummaryView,
     AdminDeliveryTransitionView,
 )
@@ -69,6 +71,7 @@ from api.v1.views.admin_resources import (
     PaymentAdminViewSet,
     ProductAdminViewSet,
 )
+from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
 from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
     PaymentReconciliationDetailView,
@@ -82,6 +85,10 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestApproveView,
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
+)
+from api.v1.views.admin_contracts import (
+    AdminLeaseContractCreateView,
+    AdminRentContractCreateView,
 )
 from api.v1.views.admin_reports import (
     AdminBatchPerformanceAggregateView,
@@ -121,13 +128,21 @@ router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="a
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("contracts/rent/", AdminRentContractCreateView.as_view()),
+    path("contracts/lease/", AdminLeaseContractCreateView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),
+    path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("business-setup/reset/", BusinessSetupResetExecuteView.as_view()),
     path("dashboard/", AdminDashboardView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
+    path("deliveries/sources/subscriptions/", AdminDeliverySourceSubscriptionsView.as_view()),
+    path(
+        "deliveries/sources/subscriptions/<int:subscription_id>/prefill/",
+        AdminDeliverySourceSubscriptionPrefillView.as_view(),
+    ),
     path("deliveries/<int:pk>/", AdminDeliveryDetailView.as_view()),
     path("deliveries/<int:pk>/transition/", AdminDeliveryTransitionView.as_view()),
     path("deliveries/<int:pk>/mark-delivered/", AdminDeliveryMarkDeliveredView.as_view()),

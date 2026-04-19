@@ -15,11 +15,15 @@ import {
 import { ROUTES } from "@/lib/routes";
 import {
   createAdminDelivery,
+  getAdminDeliverySourceSubscriptionPrefill,
   listAdminDeliveries,
+  listAdminDeliverySourceSubscriptions,
   type DeliveryBucket,
   type DeliveryListResponse,
   type DeliveryRecord,
   type DeliveryStatus,
+  type DeliverySourceSubscription,
+  type SubscriptionPlanType,
 } from "@/services/deliveries";
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -94,6 +98,7 @@ export default function AdminDeliveriesPage() {
   const initialBucket = (searchParams.get("bucket") || "").trim().toUpperCase() as DeliveryBucket;
   const initialCustomer = (searchParams.get("customer") || "").trim();
   const initialSubscription = (searchParams.get("subscription") || "").trim();
+  const initialPortfolio = (searchParams.get("portfolio") || "").trim().toUpperCase();
   const initialBatch = (searchParams.get("batch") || "").trim();
   const initialDateFrom = (searchParams.get("date_from") || "").trim();
   const initialDateTo = (searchParams.get("date_to") || "").trim();
@@ -128,6 +133,13 @@ export default function AdminDeliveriesPage() {
   const [dateToInput, setDateToInput] = useState(initialDateTo);
 
   const [createSubscriptionId, setCreateSubscriptionId] = useState(initialSubscription);
+  const [createPortfolio, setCreatePortfolio] = useState<
+    "ADVANCE_EMI" | "RENT" | "LEASE" | "DIRECT_SALE"
+  >(
+    initialPortfolio === "RENT" || initialPortfolio === "LEASE" || initialPortfolio === "DIRECT_SALE"
+      ? (initialPortfolio as "RENT" | "LEASE" | "DIRECT_SALE")
+      : "ADVANCE_EMI"
+  );
   const [createStatus, setCreateStatus] = useState<"PENDING" | "SCHEDULED">("PENDING");
   const [createScheduledDate, setCreateScheduledDate] = useState("");
   const [createReceiverName, setCreateReceiverName] = useState("");
@@ -135,6 +147,12 @@ export default function AdminDeliveriesPage() {
   const [createAddress, setCreateAddress] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [sourceResults, setSourceResults] = useState<DeliverySourceSubscription[]>([]);
+  const [selectedSource, setSelectedSource] = useState<DeliverySourceSubscription | null>(null);
+  const [sourcePrefillLoading, setSourcePrefillLoading] = useState(false);
 
   useEffect(() => {
     setQInput(initialQ);
@@ -146,6 +164,11 @@ export default function AdminDeliveriesPage() {
     setDateFromInput(initialDateFrom);
     setDateToInput(initialDateTo);
     setCreateSubscriptionId(initialSubscription);
+    setCreatePortfolio(
+      initialPortfolio === "RENT" || initialPortfolio === "LEASE" || initialPortfolio === "DIRECT_SALE"
+        ? (initialPortfolio as "RENT" | "LEASE" | "DIRECT_SALE")
+        : "ADVANCE_EMI"
+    );
   }, [
     initialBatch,
     initialBucket,
@@ -155,7 +178,76 @@ export default function AdminDeliveriesPage() {
     initialQ,
     initialStatus,
     initialSubscription,
+    initialPortfolio,
   ]);
+
+  function portfolioToPlanType(
+    portfolio: "ADVANCE_EMI" | "RENT" | "LEASE" | "DIRECT_SALE"
+  ): SubscriptionPlanType | null {
+    if (portfolio === "DIRECT_SALE") return null;
+    if (portfolio === "ADVANCE_EMI") return "EMI";
+    return portfolio;
+  }
+
+  const createPlanType = portfolioToPlanType(createPortfolio);
+
+  const activeSelectedDelivery = selectedSource?.delivery_summary?.is_active_delivery
+    ? selectedSource.delivery_summary
+    : null;
+
+  async function runSourceSearch(input: string) {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      setSourceResults([]);
+      setSourceError(null);
+      return;
+    }
+
+    try {
+      setSourceLoading(true);
+      setSourceError(null);
+      const payload = await listAdminDeliverySourceSubscriptions({
+        q: trimmed,
+        plan_type: createPlanType || undefined,
+        limit: 20,
+      });
+      setSourceResults(payload.results);
+    } catch (err) {
+      setSourceResults([]);
+      setSourceError(toErrorMessage(err, "Unable to search subscriptions for delivery creation."));
+    } finally {
+      setSourceLoading(false);
+    }
+  }
+
+  async function prefillFromSubscriptionId(subscriptionId: number | string) {
+    const raw = String(subscriptionId).trim();
+    if (!raw) return;
+
+    try {
+      setSourcePrefillLoading(true);
+      setSourceError(null);
+      const payload = await getAdminDeliverySourceSubscriptionPrefill(raw);
+      setSelectedSource(payload.source);
+      setCreateSubscriptionId(String(payload.source.id));
+      setCreateReceiverName(payload.defaults.receiver_name || "");
+      setCreateReceiverPhone(payload.defaults.receiver_phone || "");
+      setCreateAddress(payload.defaults.delivery_address_snapshot || "");
+      setCreateNotes(payload.defaults.notes || "");
+    } catch (err) {
+      setSelectedSource(null);
+      setSourceError(toErrorMessage(err, "Unable to load subscription delivery prefill."));
+    } finally {
+      setSourcePrefillLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!initialSubscription.trim()) return;
+    if (createPortfolio === "DIRECT_SALE") return;
+    void prefillFromSubscriptionId(initialSubscription.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSubscription, createPortfolio]);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -234,8 +326,18 @@ export default function AdminDeliveriesPage() {
 
   async function handleCreateDelivery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (createPortfolio === "DIRECT_SALE") {
+      setError("Direct sales must be fulfilled through the Direct Sales delivery workflow (not subscription deliveries).");
+      return;
+    }
     if (!createSubscriptionId.trim()) {
       setError("Subscription id is required to create a delivery.");
+      return;
+    }
+    if (activeSelectedDelivery) {
+      setError(
+        `An active delivery already exists for this subscription (${activeSelectedDelivery.delivery_reference}). Complete or cancel the active delivery before creating a new one.`
+      );
       return;
     }
 
@@ -417,60 +519,267 @@ export default function AdminDeliveriesPage() {
           title="Create Delivery"
           description="Open a delivery record for a subscription. Status starts in PENDING or SCHEDULED only, and active delivery paths stay one-at-a-time."
         >
-          <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleCreateDelivery}>
-            <input
-              value={createSubscriptionId}
-              onChange={(event) => setCreateSubscriptionId(event.target.value)}
-              placeholder="Subscription ID"
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-            <select
-              value={createStatus}
-              onChange={(event) => setCreateStatus(event.target.value as "PENDING" | "SCHEDULED")}
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            >
-              <option value="PENDING">Pending</option>
-              <option value="SCHEDULED">Scheduled</option>
-            </select>
-            <input
-              type="date"
-              value={createScheduledDate}
-              onChange={(event) => setCreateScheduledDate(event.target.value)}
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-            <input
-              value={createReceiverName}
-              onChange={(event) => setCreateReceiverName(event.target.value)}
-              placeholder="Receiver name"
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-            <input
-              value={createReceiverPhone}
-              onChange={(event) => setCreateReceiverPhone(event.target.value)}
-              placeholder="Receiver phone"
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-            <textarea
-              value={createAddress}
-              onChange={(event) => setCreateAddress(event.target.value)}
-              placeholder="Delivery address snapshot"
-              className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm lg:col-span-2"
-            />
-            <textarea
-              value={createNotes}
-              onChange={(event) => setCreateNotes(event.target.value)}
-              placeholder="Operational notes"
-              className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm lg:col-span-2"
-            />
-            <div className="lg:col-span-2">
-              <button
-                type="submit"
-                disabled={creating}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {creating ? "Creating..." : "Create Delivery"}
-              </button>
+          <form className="grid gap-4" onSubmit={handleCreateDelivery}>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Portfolio
+                </span>
+                <select
+                  value={createPortfolio}
+                  onChange={(event) => {
+                    const next = event.target.value as typeof createPortfolio;
+                    setCreatePortfolio(next);
+                    setSelectedSource(null);
+                    setSourceResults([]);
+                    setSourceQuery("");
+                    setSourceError(null);
+                    setCreateSubscriptionId("");
+                    setCreateReceiverName("");
+                    setCreateReceiverPhone("");
+                    setCreateAddress("");
+                    setCreateNotes("");
+                  }}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="ADVANCE_EMI">Advance EMI</option>
+                  <option value="RENT">Rent</option>
+                  <option value="LEASE">Lease</option>
+                  <option value="DIRECT_SALE">Direct Sale</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Start status
+                </span>
+                <select
+                  value={createStatus}
+                  onChange={(event) => setCreateStatus(event.target.value as "PENDING" | "SCHEDULED")}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  disabled={createPortfolio === "DIRECT_SALE"}
+                >
+                  <option value="PENDING">Pending</option>
+                  <option value="SCHEDULED">Scheduled</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Scheduled date
+                </span>
+                <input
+                  type="date"
+                  value={createScheduledDate}
+                  onChange={(event) => setCreateScheduledDate(event.target.value)}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  disabled={createPortfolio === "DIRECT_SALE" || createStatus !== "SCHEDULED"}
+                />
+              </label>
             </div>
+
+            {createPortfolio === "DIRECT_SALE" ? (
+              <div className="rounded-2xl border border-border bg-[var(--surface-muted)] p-4 text-sm text-muted-foreground">
+                Direct Sale deliveries are tracked through the Direct Sales register (delivery gate + delivered marker).
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`${ROUTES.admin.billingDirectSales}?delivery_required=true`}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted"
+                  >
+                    Open Direct Sales (delivery required)
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.billingDirectSales}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted"
+                  >
+                    Open Direct Sales register
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-foreground">Select subscription source</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Search by subscription id, customer phone/name, product, batch, or contract reference. Selecting a
+                    subscription autofills receiver and address snapshots.
+                  </p>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <input
+                      value={sourceQuery}
+                      onChange={(event) => setSourceQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void runSourceSearch(sourceQuery);
+                        }
+                      }}
+                      placeholder="Search subscriptions for delivery"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void runSourceSearch(sourceQuery)}
+                      disabled={sourceLoading}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {sourceLoading ? "Searching..." : "Search"}
+                    </button>
+                  </div>
+
+                  {sourceError ? (
+                    <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {sourceError}
+                    </div>
+                  ) : null}
+
+                  {sourceResults.length > 0 ? (
+                    <div className="mt-4 space-y-2">
+                      {sourceResults.map((item) => {
+                        const summary = item.delivery_summary;
+                        const hasActive = Boolean(summary?.is_active_delivery);
+                        return (
+                          <button
+                            type="button"
+                            key={item.id}
+                            onClick={() => void prefillFromSubscriptionId(item.id)}
+                            className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-foreground">
+                                  {item.subscription_number || `SUB-${item.id}`}
+                                  <span className="ml-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                    {item.plan_type === "EMI" ? "Advance EMI" : item.plan_type}
+                                  </span>
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {item.customer_name || "Customer"} · {item.customer_phone || "—"}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {item.product_name || "Product"} {item.batch_code ? `· ${item.batch_code}` : ""}
+                                  {typeof item.lucky_number === "number" ? ` · Lucky ${String(item.lucky_number).padStart(2, "0")}` : ""}
+                                </div>
+                              </div>
+                              <div className="text-right text-xs text-muted-foreground">
+                                <div>Fulfillment {item.fulfillment_status || "PENDING"}</div>
+                                {summary ? (
+                                  <div className={hasActive ? "text-amber-700" : ""}>
+                                    Delivery {summary.status} · {summary.delivery_reference}
+                                  </div>
+                                ) : (
+                                  <div>No delivery yet</div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                      Search results show up here.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-foreground">Source preview & autofill</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Review the source and adjust receiver/address fields before creating the delivery record.
+                  </p>
+
+                  {sourcePrefillLoading ? (
+                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                      Loading subscription prefill…
+                    </div>
+                  ) : selectedSource ? (
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-border bg-[var(--surface-muted)] p-4">
+                        <div className="text-sm font-semibold text-foreground">
+                          {selectedSource.subscription_number || `SUB-${selectedSource.id}`}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {selectedSource.plan_type === "EMI" ? "Advance EMI" : selectedSource.plan_type}
+                          {selectedSource.contract_reference ? ` · Contract ${selectedSource.contract_reference}` : ""}
+                        </div>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {selectedSource.customer_name || "Customer"} · {selectedSource.customer_phone || "—"}
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {selectedSource.product_name || "Product"} {selectedSource.product_code ? `(${selectedSource.product_code})` : ""}
+                        </div>
+                        {activeSelectedDelivery ? (
+                          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                            Active delivery exists: {activeSelectedDelivery.delivery_reference} ({activeSelectedDelivery.status}).{" "}
+                            <Link
+                              href={`/admin/deliveries/${activeSelectedDelivery.id}`}
+                              className="font-semibold underline underline-offset-4"
+                            >
+                              Open delivery
+                            </Link>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          value={createReceiverName}
+                          onChange={(event) => setCreateReceiverName(event.target.value)}
+                          placeholder="Receiver name"
+                          className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={createReceiverPhone}
+                          onChange={(event) => setCreateReceiverPhone(event.target.value)}
+                          placeholder="Receiver phone"
+                          className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <textarea
+                        value={createAddress}
+                        onChange={(event) => setCreateAddress(event.target.value)}
+                        placeholder="Delivery address snapshot"
+                        className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <textarea
+                        value={createNotes}
+                        onChange={(event) => setCreateNotes(event.target.value)}
+                        placeholder="Operational notes"
+                        className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          disabled={creating || Boolean(activeSelectedDelivery)}
+                          className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {creating ? "Creating..." : "Create delivery"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSource(null);
+                            setCreateSubscriptionId("");
+                          }}
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                        >
+                          Clear selection
+                        </button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Creating a delivery does not post payments or change EMI financial history. It only opens the controlled fulfillment workflow.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                      Select a subscription from the search results to see a preview and autofill defaults.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </form>
         </SectionCard>
 

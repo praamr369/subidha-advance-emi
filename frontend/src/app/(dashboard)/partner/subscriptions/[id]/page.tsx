@@ -19,6 +19,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   buildSubscriptionDetailSemantics,
   formatLuckyNumberLabel,
@@ -352,7 +353,7 @@ export default function PartnerSubscriptionDetailPage() {
           ? subscription.subscription_number || `Subscription #${subscription.id}`
           : "Partner Subscription Detail"
       }
-      subtitle="Partner-scoped subscription detail with contract, due-position, and EMI schedule visibility only."
+      subtitle="Partner-scoped subscription detail with contract, due-position, and advance EMI schedule visibility only."
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscriptions", href: backHref },
@@ -478,7 +479,7 @@ export default function PartnerSubscriptionDetailPage() {
                     size="md"
                   />
                   <div className="text-xs text-muted-foreground">
-                    {detailSemantics.waivedEmiCount} waived EMI rows ·{" "}
+                    {detailSemantics.waivedEmiCount} waived Advance EMI rows ·{" "}
                     {money(detailSemantics.waivedAmount)}
                   </div>
                 </div>
@@ -500,7 +501,7 @@ export default function PartnerSubscriptionDetailPage() {
                     />
                   </div>
                 ) : (
-                  "No next due EMI"
+                  "No next due Advance EMI"
                 )
               }
             />
@@ -528,7 +529,7 @@ export default function PartnerSubscriptionDetailPage() {
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
-                label="EMI Total"
+                label="Advance EMI Total"
                 value={money(summary.emi_total)}
                 subtext={`${subscription.emi_count ?? emiRows.length} scheduled rows`}
                 icon={<CreditCard className="h-4 w-4" />}
@@ -536,14 +537,14 @@ export default function PartnerSubscriptionDetailPage() {
               <StatCard
                 label="Collected"
                 value={money(summary.paid_amount)}
-                subtext={`${subscription.paid_emi_count ?? 0} paid EMIs`}
+                subtext={`${subscription.paid_emi_count ?? 0} paid Advance EMIs`}
                 tone="success"
                 icon={<ShieldCheck className="h-4 w-4" />}
               />
               <StatCard
                 label="Waived"
                 value={money(summary.waived_amount)}
-                subtext={`${subscription.waived_emi_count ?? 0} waived EMIs`}
+                subtext={`${subscription.waived_emi_count ?? 0} waived Advance EMIs`}
                 tone={summary.waived_amount > 0 ? "info" : "default"}
                 icon={<Trophy className="h-4 w-4" />}
               />
@@ -623,7 +624,7 @@ export default function PartnerSubscriptionDetailPage() {
                   value={
                     <div>
                       <div className="font-medium text-foreground">
-                        {subscription.plan_type || "Lucky EMI"}
+                        {formatPlanTypeLabel(subscription.plan_type)}
                       </div>
                       <div className="text-muted-foreground">
                         {subscription.tenure_months
@@ -640,7 +641,7 @@ export default function PartnerSubscriptionDetailPage() {
                   tone="success"
                 />
                 <DetailItem
-                  label="Monthly EMI"
+                  label="Monthly Advance EMI"
                   value={money(subscription.monthly_amount)}
                   tone="success"
                 />
@@ -686,7 +687,7 @@ export default function PartnerSubscriptionDetailPage() {
                   tone={nextDueOverdue ? "danger" : "default"}
                 />
                 <DetailItem
-                  label="Pending EMI Rows"
+                  label="Pending Advance EMI Rows"
                   value={String(pendingEmiCount)}
                   tone={pendingEmiCount > 0 ? "warning" : "success"}
                 />
@@ -699,7 +700,7 @@ export default function PartnerSubscriptionDetailPage() {
             </WorkspaceSection>
 
             <WorkspaceSection
-              title="EMI schedule"
+              title="Advance EMI schedule"
               description="Installment rows visible to this partner subscription scope."
               footer={
                 <p className="text-sm text-muted-foreground">
@@ -709,8 +710,8 @@ export default function PartnerSubscriptionDetailPage() {
             >
               {emiRows.length === 0 ? (
                 <EmptyState
-                  title="No EMI schedule"
-                  description="No EMI rows are available for this subscription yet."
+                  title="No Advance EMI schedule"
+                  description="No advance EMI rows are available for this subscription yet."
                 />
               ) : (
                 <DataTable<EmiRow> rows={emiRows} columns={emiColumns} />

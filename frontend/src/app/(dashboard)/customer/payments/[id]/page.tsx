@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ActionStrip, DetailMetaGrid, DetailSection, StatusChip } from "@/components/detail";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import PortalPage from "@/components/ui/PortalPage";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getCustomerPaymentDetail,
   type CustomerPayment,
 } from "@/services/customer";
 
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  const parsed = Number(value);
+  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -48,33 +51,6 @@ function toErrorMessage(error: unknown): string {
   }
 
   return "Failed to load customer payment receipt.";
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-  className = "",
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={[
-        "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm",
-        className,
-      ].join(" ")}
-    >
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 export default function CustomerPaymentReceiptPage() {
@@ -141,7 +117,7 @@ export default function CustomerPaymentReceiptPage() {
       : "—";
   const emiContext = payment?.emi_id
     ? `#${payment.emi_id} · Month ${payment.emi_month_no ?? "—"}`
-    : "Not linked to a single EMI row";
+    : "Not linked to a single advance EMI row";
   const supportHref = payment
     ? `/customer/support?payment=${payment.id}&subscription=${
         payment.subscription_id ?? payment.subscription
@@ -272,7 +248,7 @@ export default function CustomerPaymentReceiptPage() {
                 { label: "Receipt Ref", value: receiptReference, emphasize: true },
                 { label: "Payment Date", value: formatDate(payment.payment_date) },
                 { label: "Method", value: payment.method || "—" },
-                { label: "EMI Context", value: emiContext },
+                { label: "Advance EMI Context", value: emiContext },
               ]}
               summaryFields={[
                 {
@@ -292,11 +268,11 @@ export default function CustomerPaymentReceiptPage() {
               ]}
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
-                { label: "Plan Type", value: payment.subscription_plan_type || "—" },
+                { label: "Plan Type", value: formatPlanTypeLabel(payment.subscription_plan_type) },
                 { label: "Subscription", value: subscriptionLabel },
-                { label: "EMI Context", value: emiContext },
-                { label: "EMI Due Date", value: formatDate(payment.emi_due_date) },
-                { label: "EMI Amount", value: money(payment.emi_amount) },
+                { label: "Advance EMI Context", value: emiContext },
+                { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
+                { label: "Advance EMI Amount", value: money(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
                   label: "Lucky Number",
@@ -310,12 +286,53 @@ export default function CustomerPaymentReceiptPage() {
               footerNote="Use browser print to keep a paper copy or save this receipt as PDF. This view is sourced from your customer-scoped payment record only."
             />
 
-            <SectionCard
+            <DetailSection
+              className="receipt-print-hide"
+              title="Payment snapshot"
+              description="Customer-safe payment context from the same recorded receipt."
+            >
+              <DetailMetaGrid
+                items={[
+                  { label: "Receipt Reference", value: receiptReference },
+                  {
+                    label: "Payment Status",
+                    value: (
+                      <StatusChip
+                        label={statusLabel}
+                        tone={payment.is_reversed ? "danger" : "success"}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Recorded At",
+                    value: formatDateTime(payment.created_at || payment.payment_date),
+                  },
+                  { label: "Collected By", value: payment.collected_by_username || "—" },
+                  { label: "Subscription", value: subscriptionLabel },
+                  { label: "Advance EMI Context", value: emiContext },
+                  {
+                    label: "Advance EMI Amount",
+                    value: money(payment.emi_amount),
+                    tone: "success",
+                  },
+                  {
+                    label: "Batch / Lucky",
+                    value: `${payment.batch_code || "—"} / ${
+                      typeof payment.lucky_number === "number"
+                        ? `#${payment.lucky_number}`
+                        : "—"
+                    }`,
+                  },
+                ]}
+              />
+            </DetailSection>
+
+            <DetailSection
               className="receipt-print-hide"
               title="Next step"
               description="Use the next route that matches what you need to check."
             >
-              <div className="flex flex-wrap gap-2">
+              <ActionStrip>
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -346,8 +363,8 @@ export default function CustomerPaymentReceiptPage() {
                 >
                   Report an Issue
                 </Link>
-              </div>
-            </SectionCard>
+              </ActionStrip>
+            </DetailSection>
           </>
         ) : null}
       </div>

@@ -10,6 +10,8 @@ import {
   type FormEvent,
 } from "react";
 
+import ShareActions from "@/components/communications/ShareActions";
+import { ActionStrip, DetailSection } from "@/components/detail";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -108,7 +110,8 @@ type ReversePaymentResponse = {
 };
 
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  const parsed = Number(value);
+  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -566,6 +569,15 @@ export default function AdminPaymentDetailRoutePage() {
             >
               Print / Save PDF
             </button>
+
+            {resolvedPayment ? (
+              <ShareActions
+                title="EMI Collection Receipt"
+                message={`Receipt Ref: ${receiptReference}\nAmount: ${money(resolvedPayment.amount)}`}
+                whatsappPhone={resolvedPayment.customer_phone || null}
+                label="Share"
+              />
+            ) : null}
           </div>
         </section>
 
@@ -769,7 +781,7 @@ export default function AdminPaymentDetailRoutePage() {
                     }
                   />
                   <DetailValue
-                    label="EMI Month"
+                    label="Advance EMI Month"
                     value={
                       resolvedPayment.emi_month_no !== null &&
                       resolvedPayment.emi_month_no !== undefined
@@ -1021,12 +1033,12 @@ export default function AdminPaymentDetailRoutePage() {
               )}
             </SectionCard>
 
-            <SectionCard
+            <DetailSection
               className="receipt-print-hide"
               title="Next Step"
               description="Use the route that matches the finance review or proof workflow."
             >
-              <div className="flex flex-wrap gap-2">
+              <ActionStrip>
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -1050,8 +1062,8 @@ export default function AdminPaymentDetailRoutePage() {
                     Open Subscription
                   </Link>
                 ) : null}
-              </div>
-            </SectionCard>
+              </ActionStrip>
+            </DetailSection>
           </>
         ) : null}
       </div>

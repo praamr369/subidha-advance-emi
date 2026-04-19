@@ -15,6 +15,7 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   listPartnerSubscriptionsRegister,
   type PartnerSubscriptionRegisterResponse,
@@ -197,7 +198,7 @@ export default function PartnerSubscriptionsPage() {
               {row.subscription_number || `SUB-${row.id}`}
             </div>
             <div className="text-xs text-muted-foreground">
-              Lucky #{row.lucky_number ?? "—"} · {row.plan_type || "Lucky EMI"}
+              Lucky #{row.lucky_number ?? "—"} · {formatPlanTypeLabel(row.plan_type)}
             </div>
           </div>
         ),

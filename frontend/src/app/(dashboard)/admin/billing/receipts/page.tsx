@@ -84,6 +84,14 @@ export default function BillingReceiptsPage() {
   ];
 
   const latestReceipt = rows[0];
+  const receiptShare = latestReceipt
+    ? {
+        title: "Receipt",
+        message: `Receipt: ${latestReceipt.receipt_no || `#${latestReceipt.id}`}\nAmount: ${accountingMoney(latestReceipt.amount)}\n(Requires login to view)`,
+        whatsappPhone: latestReceipt.customer_phone_snapshot || null,
+        label: "Share",
+      }
+    : undefined;
 
   return (
     <PortalPage
@@ -115,6 +123,7 @@ export default function BillingReceiptsPage() {
         className="mb-4"
         title="Receipt Print / PDF"
         description="Print this posted receipt preview for customer handover or save it as PDF for records."
+        share={receiptShare}
       />
 
       <BillingPrintDocument

@@ -46,6 +46,10 @@ from api.v1.serializers.admin_resources import (
     SubscriptionAdminDetailSerializer,
 )
 from api.v1.serializers.inventory import InventoryItemSerializer
+from api.v1.serializers.contracts import (
+    ContractReturnAssessmentSerializer,
+    SubscriptionDocumentUploadSerializer,
+)
 
 from api.v1.views import customer
 from products.services.catalog_master_service import (
@@ -73,6 +77,7 @@ from subscriptions.models import (
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
     Subscription,
+    SubscriptionDocument,
     SubscriptionStatus,
     KycStatus,
     BatchStatus,
@@ -86,7 +91,7 @@ from subscriptions.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )
-from subscriptions.services.audit_service import log_customer_kyc_decision
+from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
@@ -2138,8 +2143,16 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             "batch",
             "lucky_id",
             "partner",
+            "rent_profile",
+            "lease_profile",
         )
-        .prefetch_related("emis", "emis__payments", "payments", get_subscription_delivery_prefetch())
+        .prefetch_related(
+            "emis",
+            "emis__payments",
+            "payments",
+            "documents",
+            get_subscription_delivery_prefetch(),
+        )
         .all()
         .order_by("-created_at", "-id")
     )
@@ -2454,3 +2467,105 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
                 "results": _serialize_audit_queryset(items),
             }
         )
+
+    @action(detail=True, methods=["get", "post"], url_path="documents", parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def documents(self, request, pk=None):
+        subscription = self.get_object()
+
+        def _file_url(file_field):
+            if not file_field:
+                return None
+            try:
+                url = file_field.url
+            except Exception:
+                return None
+            return request.build_absolute_uri(url)
+
+        if request.method == "GET":
+            docs = (
+                SubscriptionDocument.objects.filter(subscription=subscription)
+                .select_related("uploaded_by")
+                .order_by("-created_at", "-id")
+            )
+            return Response(
+                {
+                    "count": docs.count(),
+                    "results": [
+                        {
+                            "id": doc.id,
+                            "document_type": doc.document_type,
+                            "verification_status": doc.verification_status,
+                            "notes": doc.notes,
+                            "file_url": _file_url(doc.file),
+                            "uploaded_by_username": getattr(getattr(doc, "uploaded_by", None), "username", None),
+                            "created_at": doc.created_at,
+                            "updated_at": doc.updated_at,
+                        }
+                        for doc in docs
+                    ],
+                }
+            )
+
+        serializer = SubscriptionDocumentUploadSerializer(
+            data=request.data,
+            context={"subscription": subscription},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        doc = SubscriptionDocument.objects.create(
+            subscription=subscription,
+            document_type=serializer.validated_data["document_type"],
+            file=serializer.validated_data["file"],
+            notes=(serializer.validated_data.get("notes") or ""),
+            verification_status=serializer.validated_data.get("verification_status"),
+            uploaded_by=request.user,
+        )
+
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=doc,
+            performed_by=request.user,
+            metadata={
+                "event": "CONTRACT_DOCUMENT_UPLOADED",
+                "subscription_id": subscription.id,
+                "plan_type": subscription.plan_type,
+                "document_type": doc.document_type,
+            },
+        )
+
+        return Response(
+            {
+                "id": doc.id,
+                "document_type": doc.document_type,
+                "verification_status": doc.verification_status,
+                "notes": doc.notes,
+                "file_url": _file_url(doc.file),
+                "uploaded_by_username": request.user.username,
+                "created_at": doc.created_at,
+                "updated_at": doc.updated_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="return-assessment")
+    def return_assessment(self, request, pk=None):
+        subscription = self.get_object()
+        serializer = ContractReturnAssessmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        from subscriptions.services.rent_lease_contract_service import assess_return_and_calculate_refund
+
+        result = assess_return_and_calculate_refund(
+            subscription=subscription,
+            return_condition_status=serializer.validated_data["return_condition_status"],
+            deduction_amount=serializer.validated_data["deduction_amount"],
+            notes=(serializer.validated_data.get("notes") or ""),
+            performed_by=request.user,
+        )
+
+        refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
+        payload = SubscriptionAdminDetailSerializer(
+            refreshed, context={"request": request}
+        ).data
+        payload["return_assessment"] = result
+        return Response(payload)

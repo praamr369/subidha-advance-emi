@@ -408,7 +408,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                   <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                     <div className="font-medium">SUB-{row.subscription}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      EMI Month {row.month_no}
+                      Advance EMI Month {row.month_no}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       Batch {row.batch_code || "—"}
@@ -700,7 +700,7 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
                   )}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  EMI Month {row.month_no} · Due {formatDate(row.due_date)} ·{" "}
+                  Advance EMI Month {row.month_no} · Due {formatDate(row.due_date)} ·{" "}
                   {daysOverdue} days overdue
                 </div>
                 <div className="text-xs text-muted-foreground">

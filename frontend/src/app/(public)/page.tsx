@@ -5,12 +5,15 @@ import BrandLockup from "@/components/public/BrandLockup";
 import BlogCard from "@/components/public/BlogCard";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
+import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
 import SectionHeader from "@/components/public/SectionHeader";
 import TrustStrip from "@/components/public/TrustStrip";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
+import { brandConfig } from "@/config/brand";
 import { getAllBlogPosts } from "@/lib/blog-data";
 import { formatCurrency } from "@/lib/format";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
+import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = {
@@ -35,6 +38,7 @@ function buildApplyHref(product: {
 
 export default async function PublicHome() {
   const blogPosts = getAllBlogPosts().slice(0, 3);
+  const profile = await getResolvedPublicBusinessProfile();
 
   const [statsResult, latestWinnerResult, productsResult] = await Promise.allSettled([
     getPublicStats(),
@@ -50,21 +54,23 @@ export default async function PublicHome() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <section className="relative overflow-hidden rounded-[2.25rem] border border-white/75 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.18),transparent_28%),radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-8 shadow-[0_32px_90px_-52px_rgba(15,23,42,0.68)] sm:p-10">
+      <section className="public-hero p-8 sm:p-10">
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-slate-200/40 blur-3xl" />
         <div className="pointer-events-none absolute left-0 top-24 h-40 w-40 rounded-full bg-amber-200/25 blur-3xl" />
         <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
           <div>
-            <BrandLockup subtitle="Asansol, West Bengal · Lucky Plan EMI" />
+            <BrandLockup
+              logoSrc={profile.resolved_logo_src}
+              companyName={profile.resolved_display_name}
+              subtitle={`${profile.resolved_tagline} · ${brandConfig.publicBranchLocation}`}
+            />
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.4rem]">
-              Bring Home Furniture with a Smarter Monthly Plan
+              {(profile.hero_title || "").trim() || "Bring Home Furniture with a Smarter Monthly Plan"}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-              Subidha Furniture helps families access furniture through a structured
-              monthly plan and a transparent Lucky Plan system: join a batch, receive
-              a Lucky ID, pay EMI month by month, and see published winners with a
-              future EMI waiver benefit.
+              {(profile.hero_subtitle || "").trim() ||
+                "Subidha Furniture helps families access furniture through a structured monthly plan and a transparent Lucky Plan system: join a batch, receive a Lucky ID, pay Advance EMI month by month, and see published winners with a future Advance EMI waiver benefit."}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
@@ -73,6 +79,14 @@ export default async function PublicHome() {
               >
                 View Products
               </Link>
+              {profile.resolved_whatsapp_link ? (
+                <Link
+                  href={profile.resolved_whatsapp_link}
+                  className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  WhatsApp
+                </Link>
+              ) : null}
               <Link
                 href={ROUTES.public.luckyPlan}
                 className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
@@ -88,24 +102,24 @@ export default async function PublicHome() {
             </div>
           </div>
 
-          <div className="rounded-[1.9rem] border border-white/75 bg-white/72 p-6 shadow-[0_26px_60px_-44px_rgba(15,23,42,0.64)] backdrop-blur">
+          <div className="public-card p-6 shadow-[0_26px_60px_-44px_rgba(15,23,42,0.64)]">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Quick overview
             </div>
             <div className="mt-4 grid gap-3">
-              <div className="rounded-[1.4rem] border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+              <div className="public-card-sm p-4">
                 <div className="font-medium text-foreground">Typical cycle</div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   15-month structured plan with clear monthly EMI tracking.
                 </p>
               </div>
-              <div className="rounded-[1.4rem] border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+              <div className="public-card-sm p-4">
                 <div className="font-medium text-foreground">Lucky IDs</div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   00–99 per batch, assigned based on availability.
                 </p>
               </div>
-              <div className="rounded-[1.4rem] border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+              <div className="public-card-sm p-4">
                 <div className="font-medium text-foreground">Winner benefit</div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Waiver of remaining future EMI only (no refund of past EMI).
@@ -118,7 +132,9 @@ export default async function PublicHome() {
 
       <TrustStrip />
 
-      <section className="grid gap-6 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <PlanCategoryShowcase />
+
+      <section className="public-surface grid gap-6 p-6">
         <SectionHeader
           eyebrow="Lucky Plan, explained"
           title="What is Lucky Plan?"
@@ -171,7 +187,7 @@ export default async function PublicHome() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <section className="public-surface space-y-4 p-6">
         <SectionHeader
           eyebrow="Live public stats"
           title="Live public business signals"
@@ -187,7 +203,7 @@ export default async function PublicHome() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-[1.8rem] border border-white/75 bg-white/80 p-5 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.6)]"
+                className="public-card p-5 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.6)]"
               >
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {item.label}
@@ -199,7 +215,7 @@ export default async function PublicHome() {
             ))}
           </div>
         ) : (
-          <div className="rounded-[1.6rem] border border-white/75 bg-white/80 px-5 py-4 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+          <div className="public-card-sm px-5 py-4 text-sm text-muted-foreground">
             Live public stats are currently unavailable.
           </div>
         )}
@@ -214,7 +230,7 @@ export default async function PublicHome() {
         <WinnerSpotlight winner={latestWinner} />
       </section>
 
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <section className="public-surface space-y-4 p-6">
         <SectionHeader
           eyebrow="Live catalogue"
           title="Featured products"
@@ -237,7 +253,7 @@ export default async function PublicHome() {
         </SectionHeader>
 
         {products.length === 0 ? (
-          <div className="rounded-[1.6rem] border border-white/75 bg-white/80 px-5 py-4 text-sm leading-6 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+          <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">
             No products are currently published in the public catalogue. You can still contact the branch to ask about available batches and product options.
           </div>
         ) : (
@@ -245,7 +261,7 @@ export default async function PublicHome() {
             {products.map((product) => (
               <div
                 key={product.id}
-                className="group rounded-[2rem] border border-white/75 bg-white/82 p-5 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]"
+                className="public-card group p-5 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]"
               >
                 <Link href={`${ROUTES.public.products}/${product.id}`}>
                   <PublicProductMedia
@@ -292,7 +308,7 @@ export default async function PublicHome() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <section className="public-surface space-y-4 p-6">
         <SectionHeader
           eyebrow="Learn"
           title="Blog"

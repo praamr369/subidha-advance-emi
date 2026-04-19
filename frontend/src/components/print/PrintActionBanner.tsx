@@ -6,6 +6,7 @@ type PrintActionBannerProps = {
   title?: string;
   description?: string;
   buttonLabel?: string;
+  share?: Parameters<typeof PrintActions>[0]["share"];
   className?: string;
 };
 
@@ -13,6 +14,7 @@ export default function PrintActionBanner({
   title = "Print-ready copy",
   description = "Use browser print to save a clean paper copy or PDF without dashboard chrome.",
   buttonLabel = "Print / Save PDF",
+  share,
   className,
 }: PrintActionBannerProps) {
   return (
@@ -20,6 +22,7 @@ export default function PrintActionBanner({
       title={title}
       description={description}
       buttonLabel={buttonLabel}
+      share={share}
       className={className}
     />
   );

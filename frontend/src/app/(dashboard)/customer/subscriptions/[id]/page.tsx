@@ -20,6 +20,7 @@ import {
   DetailMetricTile,
   DetailSectionShell,
 } from "@/domains/subscriptions/detail/surfaces";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
 
 import {
   getCustomerSubscription,
@@ -289,14 +290,14 @@ export default function CustomerSubscriptionDetailPage() {
 
   const paymentProgressLabel =
     emiRows.length > 0
-      ? `${paidEmiCount} of ${emiRows.length} EMI rows paid`
-      : "No EMI schedule";
+      ? `${paidEmiCount} of ${emiRows.length} Advance EMI rows paid`
+      : "No Advance EMI schedule";
 
   const columns = useMemo(
     () => [
       {
         key: "month_no",
-        title: "EMI Month",
+        title: "Advance EMI Month",
         render: (row: EmiRow) => `Month ${row.month_no}`,
       },
       {
@@ -342,7 +343,7 @@ export default function CustomerSubscriptionDetailPage() {
   return (
     <PortalPage
       title="Subscription Details"
-      subtitle="Track contract lifecycle, winner benefit history, waiver impact, and EMI settlement from your live subscription record."
+      subtitle="Track contract lifecycle, winner benefit history, waiver impact, and advance EMI settlement from your live subscription record."
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Subscriptions", href: "/customer/subscriptions" },
@@ -375,7 +376,7 @@ export default function CustomerSubscriptionDetailPage() {
           type="button"
           onClick={() => void loadPage("refresh")}
           disabled={refreshing}
-          className="inline-flex items-center rounded-xl border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-[0_16px_36px_-24px_rgba(15,23,42,0.35)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
@@ -400,7 +401,7 @@ export default function CustomerSubscriptionDetailPage() {
 
       {!loading && !error && subscription ? (
         <div className="space-y-6">
-          <section className="rounded-[30px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_30px_120px_-48px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+          <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
             <div className="mb-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                 Subscription clarity
@@ -432,8 +433,8 @@ export default function CustomerSubscriptionDetailPage() {
                       value={paymentProgressLabel}
                       hint={
                         pendingEmiCount > 0
-                          ? `${pendingEmiCount} EMI rows still need settlement.`
-                          : "No pending EMI rows remain."
+                          ? `${pendingEmiCount} Advance EMI rows still need settlement.`
+                          : "No pending Advance EMI rows remain."
                       }
                     />
                     <DetailMetricTile
@@ -505,7 +506,7 @@ export default function CustomerSubscriptionDetailPage() {
                 meta={
                   <>
                     <DetailMetricTile
-                      label="Waived EMI rows"
+                      label="Waived Advance EMI rows"
                       value={String(detailSemantics.waivedEmiCount)}
                       tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
                     />
@@ -517,7 +518,7 @@ export default function CustomerSubscriptionDetailPage() {
                     <DetailMetricTile
                       label="Waiver scope"
                       value={detailSemantics.waiverScope || "—"}
-                      hint="Winner benefits apply only to future EMI rows."
+                      hint="Winner benefits apply only to future Advance EMI rows."
                     />
                   </>
                 }
@@ -526,21 +527,21 @@ export default function CustomerSubscriptionDetailPage() {
           </section>
 
           {detailSemantics.hasWinnerHistory ? (
-            <div className="rounded-[24px] border border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.96),rgba(224,242,254,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(2,132,199,0.28)]">
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
                 Winner history stays separate from contract status
               </p>
               <p className="mt-2 text-sm leading-6 text-sky-950">
-                A winner subscription may appear as <span className="font-semibold">WON</span> while it still has remaining EMI exposure, and later as <span className="font-semibold">COMPLETED</span> once every EMI row is paid or waived. The winner record stays visible in both cases.
+                A winner subscription may appear as <span className="font-semibold">WON</span> while it still has remaining Advance EMI exposure, and later as <span className="font-semibold">COMPLETED</span> once every Advance EMI row is paid or waived. The winner record stays visible in both cases.
               </p>
             </div>
           ) : pendingEmiCount > 0 ? (
-            <div className="rounded-[24px] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.96),rgba(254,243,199,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(217,119,6,0.28)]">
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
                 Settlement note
               </p>
               <p className="mt-2 text-sm leading-6 text-amber-950">
-                Pending EMI rows remain outstanding until a payment is recorded or a waiver is applied in the backend.
+                Pending Advance EMI rows remain outstanding until a payment is recorded or a waiver is applied in the backend.
               </p>
             </div>
           ) : null}
@@ -565,7 +566,7 @@ export default function CustomerSubscriptionDetailPage() {
                 <DetailMetricTile
                   label="Product"
                   value={text(subscription.product_name)}
-                  hint={text(subscription.plan_type)}
+                  hint={formatPlanTypeLabel(subscription.plan_type)}
                 />
                 <DetailMetricTile
                   label="Batch"
@@ -590,11 +591,11 @@ export default function CustomerSubscriptionDetailPage() {
 
             <DetailSectionShell
               title="Financial position"
-              description="Current contract-level financial posture from EMI rows and the canonical backend summary."
+              description="Current contract-level financial posture from advance EMI rows and the canonical backend summary."
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <DetailMetricTile
-                  label="EMI total"
+                  label="Advance EMI total"
                   value={money(financialSummary.emi_total)}
                 />
                 <DetailMetricTile
@@ -613,11 +614,11 @@ export default function CustomerSubscriptionDetailPage() {
                   tone={detailSemantics.isSettled ? "success" : "warning"}
                 />
                 <DetailMetricTile
-                  label="Paid EMI rows"
+                  label="Paid Advance EMI rows"
                   value={paidEmiCount}
                 />
                 <DetailMetricTile
-                  label="Pending EMI rows"
+                  label="Pending Advance EMI rows"
                   value={pendingEmiCount}
                   tone={pendingEmiCount > 0 ? "warning" : "success"}
                 />
@@ -678,7 +679,7 @@ export default function CustomerSubscriptionDetailPage() {
 
                 {Array.isArray(subscription.deliveries) &&
                 subscription.deliveries.length > 0 ? (
-                  <div className="mt-6 overflow-x-auto rounded-[22px] border border-slate-200/80 bg-white/70 p-2">
+                  <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-background p-2">
                     <table className="min-w-full border-separate border-spacing-0">
                       <thead>
                         <tr className="text-left">
@@ -715,23 +716,23 @@ export default function CustomerSubscriptionDetailPage() {
                 ) : null}
               </>
             ) : (
-              <div className="rounded-[22px] border border-slate-200/80 bg-white/75 px-4 py-4 text-sm leading-6 text-slate-600 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.3)]">
+              <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
                 Delivery tracking will appear here once the shop creates a delivery record for this subscription.
               </div>
             )}
           </DetailSectionShell>
 
           <DetailSectionShell
-            title="EMI schedule"
-            description="Customer-visible EMI rows with paid, waived, and outstanding amounts shown separately."
+            title="Advance EMI schedule"
+            description="Customer-visible advance EMI rows with paid, waived, and outstanding amounts shown separately."
           >
             {emiRows.length === 0 ? (
               <EmptyState
-                title="No EMI schedule found"
-                description="No EMI rows were returned for this subscription."
+                title="No Advance EMI schedule found"
+                description="No advance EMI rows were returned for this subscription."
               />
             ) : (
-              <div className="rounded-[22px] border border-slate-200/80 bg-white/80 p-2 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.26)]">
+              <div className="rounded-2xl border border-border bg-background p-2">
                 <DataTable<EmiRow> rows={emiRows} columns={columns} />
               </div>
             )}

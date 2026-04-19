@@ -44,7 +44,7 @@ function formatDate(value?: string | null): string {
 export default function CollectionsWorkspace({
   items = [],
   title = "Collections Workspace",
-  subtitle = "Review due EMIs and record collections through the hardened payment workflow.",
+  subtitle = "Review due advance EMIs and record collections through the hardened payment workflow.",
 }: CollectionsWorkspaceProps) {
   const [selectedItem, setSelectedItem] = useState<CollectionQueueItem | null>(null);
 
@@ -82,7 +82,7 @@ export default function CollectionsWorkspace({
                       {item.customer_name || "Unknown customer"}
                     </div>
                     <div className="text-sm text-slate-500">
-                      EMI #{emiId} · Subscription #{item.subscription_id ?? "—"}
+                      Advance EMI #{emiId} · Subscription #{item.subscription_id ?? "—"}
                     </div>
                     <div className="text-sm text-slate-500">
                       Batch {item.batch_code || "—"} · Lucky #{item.lucky_number ?? "—"}

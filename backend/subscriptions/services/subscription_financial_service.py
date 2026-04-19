@@ -15,6 +15,7 @@ from subscriptions.models import (
     Payment,
     Subscription,
     SubscriptionStatus,
+    SubscriptionDocument,
     q2,
 )
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
@@ -55,6 +56,8 @@ def get_subscription_detail_queryset():
         "batch",
         "partner",
         "lucky_id",
+        "rent_profile",
+        "lease_profile",
     ).prefetch_related(
         Prefetch(
             "emis",
@@ -72,6 +75,12 @@ def get_subscription_detail_queryset():
         Prefetch(
             "winning_draws",
             queryset=LuckyDraw.objects.order_by("-draw_month", "-id"),
+        ),
+        Prefetch(
+            "documents",
+            queryset=SubscriptionDocument.objects.select_related("uploaded_by").order_by(
+                "-created_at", "-id"
+            ),
         ),
         get_subscription_delivery_prefetch(),
     )
