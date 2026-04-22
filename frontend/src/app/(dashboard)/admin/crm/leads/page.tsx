@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ClipboardList, FolderKanban, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -150,43 +152,72 @@ export default function AdminCrmLeadRegisterPage() {
       ) : null}
 
       {!loading && !error ? (
-        <WorkspaceSection
-          title="Lead Register"
-          description="This register mirrors the live admin lead workflow but adds party and follow-up continuity so staff can move between CRM and operational conversion screens safely."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as AdminLeadStatus | "")}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-              >
-                <option value="">All statuses</option>
-                <option value="NEW">New</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="CONTACTED">Contacted</option>
-                <option value="CONVERTED">Converted</option>
-                <option value="CLOSED">Closed</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void loadPage(status)}
-                className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Apply
-              </button>
-            </div>
-          }
-        >
-          <EnterpriseDataTable
-            data={rows}
-            columns={columns}
-            onRowClick={(row) => {
-              window.location.href = `${ROUTES.admin.leads}/${row.id}`;
-            }}
-            emptyTitle="No CRM leads found"
-            emptyDescription="No lead rows match the current CRM register filter."
+        <>
+          <ControlLaneGrid
+            title="Lead continuity lanes"
+            description="CRM lead review stays separate from lead inbox triage and party-directory governance."
+            lanes={[
+              {
+                title: "Lead inbox",
+                description: "Operational queue for assignment, contact, and conversion handoff.",
+                href: ROUTES.admin.leads,
+                icon: <ClipboardList className="h-4 w-4" />,
+                badge: "Queue",
+              },
+              {
+                title: "CRM overview",
+                description: "Cross-party CRM posture and recent interaction visibility.",
+                href: ROUTES.admin.crm,
+                icon: <FolderKanban className="h-4 w-4" />,
+                badge: "CRM",
+              },
+              {
+                title: "Party directory",
+                description: "Shared additive identity layer for leads, customers, partners, vendors, and staff.",
+                href: ROUTES.admin.crmParties,
+                icon: <Users className="h-4 w-4" />,
+                badge: "Directory",
+              },
+            ]}
           />
-        </WorkspaceSection>
+          <WorkspaceSection
+            title="Lead Register"
+            description="This register mirrors the live admin lead workflow but adds party and follow-up continuity so staff can move between CRM and operational conversion screens safely."
+            action={
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as AdminLeadStatus | "")}
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                >
+                  <option value="">All statuses</option>
+                  <option value="NEW">New</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="CONTACTED">Contacted</option>
+                  <option value="CONVERTED">Converted</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void loadPage(status)}
+                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Apply
+                </button>
+              </div>
+            }
+          >
+            <EnterpriseDataTable
+              data={rows}
+              columns={columns}
+              onRowClick={(row) => {
+                window.location.href = `${ROUTES.admin.leads}/${row.id}`;
+              }}
+              emptyTitle="No CRM leads found"
+              emptyDescription="No lead rows match the current CRM register filter."
+            />
+          </WorkspaceSection>
+        </>
       ) : null}
     </PortalPage>
   );

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -291,6 +292,36 @@ export default function AdminLeadsPage() {
       statusBadge={{ label: "Public Lead Operations", tone: "info" }}
     >
       <div className="space-y-6">
+        <ControlLaneGrid
+          title="Lead operation lanes"
+          description="Public lead intake, CRM continuity, customer creation, and billing conversion remain separate route-safe workflows."
+          lanes={[
+            {
+              title: "CRM overview",
+              description: "Cross-party CRM posture and follow-up visibility.",
+              href: ROUTES.admin.crm,
+              badge: "CRM",
+            },
+            {
+              title: "CRM lead register",
+              description: "Party-linked lead register for continuity review.",
+              href: ROUTES.admin.crmLeads,
+              badge: "Register",
+            },
+            {
+              title: "Customer register",
+              description: "Create or review customer records after controlled conversion.",
+              href: ROUTES.admin.customers,
+              badge: "Customer",
+            },
+            {
+              title: "Direct sales lane",
+              description: "Retail conversion and billing stay outside the lead inbox itself.",
+              href: ROUTES.admin.billingDirectSales,
+              badge: "Billing",
+            },
+          ]}
+        />
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <SummaryCard label="Total" value={summaryValue(summary, "total")} hint="Current filtered queue" />
           <SummaryCard label="New" value={summaryValue(summary, "new")} hint="Unworked submissions" />

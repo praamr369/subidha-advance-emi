@@ -14,6 +14,10 @@ const smokeMetaPath =
   path.resolve(__dirname, "../backend/playwright-smoke-meta.json");
 const smokeDbPath =
   process.env.PLAYWRIGHT_DB_PATH || "/tmp/subidha-playwright-smoke.sqlite3";
+const smokeManifestPath = path.resolve(
+  __dirname,
+  "tests/e2e/.generated/smoke-manifest.json"
+);
 const resolvePythonExecutable = () => {
   const envConfigured =
     process.env.PLAYWRIGHT_PYTHON || process.env.PYTHON_BIN || "";
@@ -69,6 +73,14 @@ export default defineConfig({
       },
     },
     {
+      name: "chromium-release-smoke",
+      dependencies: ["setup"],
+      testMatch: /.*release-smoke\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
       name: "chromium-auth-smoke",
       testMatch: /.*real-login-smoke\.spec\.ts/,
       use: {
@@ -78,7 +90,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `bash -lc "rm -f '${smokeDbPath}' '${smokeMetaPath}' && ${pythonExecutable} ../backend/manage.py migrate --noinput --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py seed_playwright_smoke --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py runserver 127.0.0.1:8100 --settings core.settings.playwright --noreload"`,
+      command: `bash -lc "rm -f '${smokeDbPath}' '${smokeMetaPath}' '${smokeManifestPath}' && ${pythonExecutable} ../backend/manage.py migrate --noinput --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py seed_playwright_smoke --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py runserver 127.0.0.1:8100 --settings core.settings.playwright --noreload"`,
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: false,
       timeout: 120_000,

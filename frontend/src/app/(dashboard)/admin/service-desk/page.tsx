@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { MessageSquareWarning, RotateCcw, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -87,6 +89,33 @@ export default function AdminServiceDeskOverviewPage() {
 
         {!loading && !error && payload ? (
           <>
+            <ControlLaneGrid
+              title="Service control lanes"
+              description="Complaint intake, return handling, and service execution stay as explicit case lanes linked back to support, billing, and delivery records."
+              lanes={[
+                {
+                  title: "Complaint lane",
+                  description: "Handle complaint-linked cases and intake review.",
+                  href: ROUTES.admin.serviceDeskComplaints,
+                  icon: <MessageSquareWarning className="h-4 w-4" />,
+                  badge: "Complaint",
+                },
+                {
+                  title: "Return lane",
+                  description: "Run returns and exchange posture through explicit case tracking.",
+                  href: ROUTES.admin.serviceDeskReturns,
+                  icon: <RotateCcw className="h-4 w-4" />,
+                  badge: "Returns",
+                },
+                {
+                  title: "Service ticket lane",
+                  description: "After-sales service tickets and work execution remain route-safe and auditable.",
+                  href: ROUTES.admin.serviceDeskTickets,
+                  icon: <Wrench className="h-4 w-4" />,
+                  badge: "Service",
+                },
+              ]}
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Finance Pending"

@@ -13,6 +13,7 @@ import {
 } from "react";
 import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -34,6 +35,7 @@ import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDelivery
 import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+import { ROUTES } from "@/lib/routes";
 
 type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
 type KycStatus =
@@ -529,6 +531,40 @@ export default function AdminCustomersPage() {
       statusBadge={{ label: "Customer Operations", tone: "info" }}
     >
       <div className="space-y-6">
+        <ControlLaneGrid
+          title="Customer control lanes"
+          description="Customer onboarding, CRM continuity, collection operations, and support handling stay linked but operationally separate."
+          lanes={[
+            {
+              title: "Create customer",
+              description: "Start a new customer record in the canonical admin register.",
+              href: `${ROUTES.admin.customers}/create`,
+              icon: <UserPlus className="h-4 w-4" />,
+              badge: "Setup",
+            },
+            {
+              title: "CRM directory",
+              description: "Review party continuity and follow-up posture before conversion or escalation.",
+              href: ROUTES.admin.crmParties,
+              icon: <Users className="h-4 w-4" />,
+              badge: "CRM",
+            },
+            {
+              title: "Collections workspace",
+              description: "Move into payment and EMI operations without blending profile editing with collection actions.",
+              href: ROUTES.admin.collections,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Ops",
+            },
+            {
+              title: "Support queue",
+              description: "Customer disputes and service issues remain in their own route-safe queue.",
+              href: ROUTES.admin.supportRequests,
+              icon: <ShieldCheck className="h-4 w-4" />,
+              badge: "Support",
+            },
+          ]}
+        />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Visible Customers"

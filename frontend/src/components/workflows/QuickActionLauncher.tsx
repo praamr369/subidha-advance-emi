@@ -180,35 +180,32 @@ export default function QuickActionLauncher({
                 {favoriteItems.map((item) => {
                   const href = item.kind === "workflow" ? item.canonicalHref : item.href;
                   return (
-                    <Link
-                      key={`fav-${href}`}
-                      href={href}
-                      onClick={onClose}
-                      className="group flex items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                    >
-                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-700" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-foreground">{item.label}</span>
-                        <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
-                          {item.kind === "workflow" ? item.description : item.description}
+                    <div key={`fav-${href}`} className="group flex items-start gap-2">
+                      <Link
+                        href={href}
+                        onClick={onClose}
+                        className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                      >
+                        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+                          <Star className="h-4 w-4 fill-amber-400 text-amber-700" />
                         </span>
-                      </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-foreground">{item.label}</span>
+                          <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
+                            {item.description}
+                          </span>
+                        </span>
+                      </Link>
                       <button
                         type="button"
-                        className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border bg-transparent text-muted-foreground opacity-0 transition hover:bg-white group-hover:opacity-100"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleToggleFavorite(href);
-                        }}
+                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground opacity-100 transition hover:border-[var(--surface-border-strong)] hover:bg-white md:opacity-0 md:group-hover:opacity-100"
+                        onClick={() => handleToggleFavorite(href)}
                         aria-label="Remove from favorites"
                         title="Remove from favorites"
                       >
                         <X className="h-4 w-4" />
                       </button>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

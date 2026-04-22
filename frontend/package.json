@@ -13,6 +13,7 @@
     "typecheck": "node scripts/run-typecheck.mjs",
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run build",
     "test:e2e:smoke": "npm run build:smoke && playwright test --project=chromium-smoke",
+    "test:e2e:release-smoke": "npm run build:smoke && playwright test --project=chromium-release-smoke",
     "test:e2e:smoke:headed": "npm run build:smoke && playwright test --project=chromium-smoke --headed",
     "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
     "test:e2e:auth-smoke:headed": "playwright test --project=chromium-auth-smoke --headed",

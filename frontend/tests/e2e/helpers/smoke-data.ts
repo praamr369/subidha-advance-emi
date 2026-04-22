@@ -67,6 +67,8 @@ export const AUTH_DIR = path.join(E2E_ROOT, ".auth");
 export const GENERATED_DIR = path.join(E2E_ROOT, ".generated");
 export const MANIFEST_PATH = path.join(GENERATED_DIR, "smoke-manifest.json");
 
+let cachedManifest: SmokeManifest | null = null;
+
 export function ensureSmokeDirectories(): void {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   fs.mkdirSync(GENERATED_DIR, { recursive: true });
@@ -78,18 +80,26 @@ export function authStatePath(role: RoleKey): string {
 }
 
 export function readSmokeManifest(): SmokeManifest {
+  if (cachedManifest) {
+    return cachedManifest;
+  }
+
   if (!fs.existsSync(MANIFEST_PATH)) {
     throw new Error(
       `Missing Playwright smoke manifest at ${MANIFEST_PATH}. Run the setup project first.`
     );
   }
 
-  return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SmokeManifest;
+  cachedManifest = JSON.parse(
+    fs.readFileSync(MANIFEST_PATH, "utf8")
+  ) as SmokeManifest;
+  return cachedManifest;
 }
 
 export function writeSmokeManifest(manifest: SmokeManifest): void {
   ensureSmokeDirectories();
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+  cachedManifest = manifest;
 }
 
 export function escapeRegex(value: string): string {

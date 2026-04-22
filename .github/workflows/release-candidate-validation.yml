@@ -90,7 +90,7 @@ jobs:
         working-directory: frontend
         env:
           PLAYWRIGHT_PYTHON: python
-        run: npm run test:e2e:smoke
+        run: npm run test:e2e:release-smoke
 
       - name: Upload Playwright smoke artifacts
         if: failure()

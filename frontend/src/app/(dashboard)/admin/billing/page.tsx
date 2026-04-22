@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FileBadge2, FileText, Receipt, RotateCcw } from "lucide-react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
@@ -109,6 +110,40 @@ export default function BillingOverviewPage() {
 
       {!loading && !error ? (
         <>
+          <ControlLaneGrid
+            title="Billing lanes"
+            description="Billing documents, direct sales, receipts, and accounting mirrors stay explicit so retail execution does not blur with EMI collection or ledger posting."
+            lanes={[
+              {
+                title: "Document register",
+                description: "Open the canonical billing register for invoice, receipt, and note workflows.",
+                href: ROUTES.admin.billingRegister,
+                icon: <FileText className="h-4 w-4" />,
+                badge: "Register",
+              },
+              {
+                title: "Direct sales",
+                description: "Retail order and recovery workflows remain separate from subscription EMI collections.",
+                href: ROUTES.admin.billingDirectSales,
+                icon: <RotateCcw className="h-4 w-4" />,
+                badge: "Retail",
+              },
+              {
+                title: "Receipts",
+                description: "Receipt documents remain distinct from payment posting and accounting books.",
+                href: ROUTES.admin.billingReceipts,
+                icon: <Receipt className="h-4 w-4" />,
+                badge: "Receipt",
+              },
+              {
+                title: "Accounting mirrors",
+                description: "Open accounting control lanes when billing needs controlled posting or compliance follow-up.",
+                href: ROUTES.admin.accounting,
+                icon: <FileBadge2 className="h-4 w-4" />,
+                badge: "Control",
+              },
+            ]}
+          />
           <div className="receipt-print-hide grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Draft Invoices"

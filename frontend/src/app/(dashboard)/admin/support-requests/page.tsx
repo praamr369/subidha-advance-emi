@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -257,6 +258,30 @@ export default function AdminSupportRequestsPage() {
       statusBadge={{ label: "Customer Support Intake", tone: "info" }}
     >
       <div className="space-y-6">
+        <ControlLaneGrid
+          title="Support lanes"
+          description="Customer support intake, service handling, payments, and customer master data stay cross-linked but operationally separate."
+          lanes={[
+            {
+              title: "Service desk",
+              description: "Escalate complaints, returns, and service tickets into explicit after-sales cases.",
+              href: ROUTES.admin.serviceDesk,
+              badge: "Escalate",
+            },
+            {
+              title: "Customer register",
+              description: "Open the canonical customer module for profile and KYC context.",
+              href: ROUTES.admin.customers,
+              badge: "Customer",
+            },
+            {
+              title: "Payments register",
+              description: "Review linked payment rows without folding support into finance execution.",
+              href: ROUTES.admin.payments,
+              badge: "Payment",
+            },
+          ]}
+        />
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
             <div>

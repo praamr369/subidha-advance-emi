@@ -4,8 +4,14 @@ import { readSmokeManifest } from "./helpers/smoke-data";
 import { readSmokeMeta, roleStorageStatePath } from "./helpers/smoke-meta";
 
 const backendRoot = process.env.PLAYWRIGHT_BACKEND_ROOT || "http://127.0.0.1:8100";
-const meta = readSmokeMeta();
-const manifest = readSmokeManifest();
+
+function getMeta() {
+  return readSmokeMeta();
+}
+
+function getManifest() {
+  return readSmokeManifest();
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -59,6 +65,7 @@ test("admin login entry page is available", async ({ page, browser }) => {
 
 test.describe("public release smoke", () => {
   test("public product catalogue and detail load", async ({ page }) => {
+    const manifest = getManifest();
     await page.goto("/products");
     await expect(
       page.getByRole("heading", { name: "Products" })
@@ -77,6 +84,7 @@ test.describe("admin release smoke", () => {
   test.use({ storageState: roleStorageStatePath("admin") });
 
   test("admin batch lifecycle entry flow works", async ({ page }) => {
+    const meta = getMeta();
     const batchCode = `SMOKEE2E${Date.now().toString().slice(-6)}`;
 
     await page.goto("/admin/batches/create");
@@ -96,6 +104,7 @@ test.describe("admin release smoke", () => {
   });
 
   test("admin payment collection and reversal work", async ({ page }) => {
+    const meta = getMeta();
     const target = meta.entities.admin_collection;
     const referenceNo = `SMOKE-ADMIN-${Date.now()}`;
 
@@ -149,6 +158,7 @@ test.describe("admin release smoke", () => {
   });
 
   test("admin subscription detail renders lifecycle surfaces", async ({ page }) => {
+    const meta = getMeta();
     await page.goto(`/admin/subscriptions/${meta.entities.admin_collection.subscription_id}`);
     await expect(page.getByRole("heading", { name: /subscription #/i })).toBeVisible();
     await expect(page.locator("body")).toContainText(/contract, winner, and waiver posture/i);
@@ -160,6 +170,7 @@ test.describe("admin release smoke", () => {
   test("admin payment reconciliation compatibility route redirects to canonical workspace", async ({
     page,
   }) => {
+    const meta = getMeta();
     await page.goto(
       `/admin/payments/reconciliation?subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}`
     );
@@ -178,6 +189,7 @@ test.describe("cashier release smoke", () => {
   test.use({ storageState: roleStorageStatePath("cashier") });
 
   test("cashier collection flow works", async ({ page }) => {
+    const meta = getMeta();
     const target = meta.entities.cashier_collection;
 
     await page.goto("/cashier/collect");
@@ -212,6 +224,7 @@ test.describe("partner release smoke", () => {
   test.use({ storageState: roleStorageStatePath("partner") });
 
   test("partner payments list loads", async ({ page }) => {
+    const meta = getMeta();
     await page.goto("/partner/payments");
     await expect(page.getByRole("heading", { name: /partner payments/i })).toBeVisible();
     await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.reference_no);
@@ -222,6 +235,7 @@ test.describe("customer release smoke", () => {
   test.use({ storageState: roleStorageStatePath("customer") });
 
   test("customer dashboard and payments history load", async ({ page }) => {
+    const meta = getMeta();
     await page.goto("/customer");
     await expect(page.locator("body")).toContainText(/customer workspace/i);
     await expect(page.locator("body")).toContainText(/next payment due/i);
@@ -232,6 +246,7 @@ test.describe("customer release smoke", () => {
   });
 
   test("customer subscription detail renders lifecycle surfaces", async ({ page }) => {
+    const meta = getMeta();
     await page.goto(`/customer/subscriptions/${meta.entities.preseed_payment.subscription_id}`);
     await expect(
       page.getByRole("heading", { name: "Subscription Details" })
