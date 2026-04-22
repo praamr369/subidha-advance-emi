@@ -55,6 +55,27 @@ class DirectSaleDeliveredSerializer(serializers.Serializer):
     delivery_reference = serializers.CharField(required=False, allow_blank=True)
 
 
+class DirectSaleCollectionSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    receipt_date = serializers.DateField(required=False)
+    finance_account_id = serializers.IntegerField(required=False, min_value=1)
+    branch_id = serializers.IntegerField(required=False, min_value=1)
+    cash_counter_id = serializers.IntegerField(required=False, min_value=1)
+    reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_amount(self, value):
+        if _money(value) <= Decimal("0.00"):
+            raise serializers.ValidationError("Collection amount must be greater than zero.")
+        return _money(value)
+
+    def validate_reference_no(self, value):
+        return (value or "").strip()
+
+    def validate_notes(self, value):
+        return (value or "").strip()
+
+
 class DirectSaleLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)

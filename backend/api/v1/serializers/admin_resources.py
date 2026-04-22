@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.models import User, UserRole
+from accounting.models import FinanceAccount
 from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
 from crm.services.party_service import sync_party_for_customer
@@ -697,6 +698,8 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
     cash_counter_id = serializers.IntegerField(source="cash_counter.id", read_only=True)
     cash_counter_code = serializers.CharField(source="cash_counter.code", read_only=True)
     cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True)
+    finance_account_id = serializers.IntegerField(source="finance_account.id", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
 
     subscription_id = serializers.IntegerField(source="subscription.id", read_only=True)
     subscription_number = serializers.SerializerMethodField()
@@ -752,6 +755,8 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
             "cash_counter_id",
             "cash_counter_code",
             "cash_counter_name",
+            "finance_account_id",
+            "finance_account_name",
             "subscription",
             "subscription_id",
             "subscription_number",
@@ -892,6 +897,10 @@ class AdminPaymentCollectSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
     payment_date = serializers.DateField()
+    finance_account_id = serializers.PrimaryKeyRelatedField(
+        source="finance_account",
+        queryset=FinanceAccount.objects.select_related("chart_account").all()
+    )
     branch_id = serializers.IntegerField(required=False, min_value=1)
     cash_counter_id = serializers.IntegerField(required=False, min_value=1)
     reference_no = serializers.CharField(

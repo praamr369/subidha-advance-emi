@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
+import { useState } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
+import ModalShell from "@/components/ui/ModalShell";
 
 type ConfirmActionButtonProps = {
   label: string;
@@ -29,17 +30,6 @@ export default function ConfirmActionButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !loading) {
-        setOpen(false);
-      }
-    }
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [loading, open]);
-
   async function handleConfirm() {
     setLoading(true);
     try {
@@ -61,21 +51,46 @@ export default function ConfirmActionButton({
         {label}
       </ActionButton>
 
-      {open ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="surface-panel-elevated w-full max-w-md rounded-[1.75rem] border border-border bg-card p-6 shadow-[0_32px_90px_-42px_rgba(15,23,42,0.8)]">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-amber-800">
-                <AlertTriangle className="h-4 w-4" />
+      <ModalShell
+        open={open}
+        onClose={() => {
+          if (loading) return;
+          setOpen(false);
+        }}
+        title={title}
+        closeOnEscape={!loading}
+        closeOnOverlayClick={!loading}
+        panelClassName="max-w-lg"
+      >
+        <div className="flex flex-col">
+          <div className="workflow-panel-header px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={loading}
+                className="popup-control inline-flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Close confirmation dialog"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
+          </div>
+
+          <div className="workflow-panel-footer px-5 py-4 sm:px-6">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <ActionButton
-                variant="ghost"
+                variant="outline"
                 disabled={loading}
                 onClick={() => setOpen(false)}
               >
@@ -91,7 +106,7 @@ export default function ConfirmActionButton({
             </div>
           </div>
         </div>
-      ) : null}
+      </ModalShell>
     </>
   );
 }

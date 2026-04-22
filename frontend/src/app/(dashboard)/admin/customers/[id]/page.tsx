@@ -96,6 +96,83 @@ type PaymentPreviewRow = {
   is_reversed: boolean;
 };
 
+type DirectSaleOperationalRow = {
+  id: number;
+  sale_no?: string | null;
+  sale_date?: string | null;
+  status?: string;
+  branch_name?: string | null;
+  billing_invoice_no?: string | null;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+};
+
+type ReceiptOperationalRow = {
+  id: number;
+  receipt_no?: string | null;
+  receipt_type?: string | null;
+  receipt_date?: string | null;
+  amount: string;
+  finance_account_name?: string | null;
+};
+
+type DocumentOperationalRow = {
+  id: number;
+  subscription_number?: string;
+  document_type?: string | null;
+  verification_status?: string | null;
+  created_at?: string | null;
+};
+
+type PartnerLinkageRow = {
+  partner_id?: number | null;
+  partner_name?: string | null;
+  subscription_count: number;
+};
+
+type CustomerOperationalProfile = {
+  overview: {
+    subscription_count: number;
+    active_subscriptions: number;
+    direct_sale_count: number;
+    direct_sale_outstanding_count: number;
+    direct_sale_outstanding_total: string;
+    receipt_count: number;
+    receipt_total: string;
+  };
+  direct_sales: {
+    summary: {
+      total_count: number;
+      outstanding_count: number;
+      gross_total: string;
+      received_total: string;
+      outstanding_total: string;
+    };
+    rows: DirectSaleOperationalRow[];
+  };
+  ledger_summary: {
+    entry_count: number;
+    total_credits: string;
+    total_debits: string;
+    net_subscription_collections: string;
+    direct_sale_receivable_total: string;
+  };
+  receipts_documents: {
+    summary: {
+      receipt_count: number;
+      receipt_total: string;
+      document_count: number;
+    };
+    receipts: ReceiptOperationalRow[];
+    documents: DocumentOperationalRow[];
+  };
+  partner_linkages: {
+    count: number;
+    rows: PartnerLinkageRow[];
+  };
+};
+
 type KycDecisionResponse = {
   id: number;
   kyc_status: KycStatus | "APPROVED";
@@ -284,6 +361,96 @@ function normalizePaymentPreview(
       toStringValue(raw.subscription_number) ||
       (subscriptionId ? `SUB-${subscriptionId}` : undefined),
     is_reversed: isReversed,
+  };
+}
+
+function normalizeCustomerOperationalProfile(
+  raw: Record<string, unknown>
+): CustomerOperationalProfile {
+  const overview = toObject(raw.overview) ?? {};
+  const directSales = toObject(raw.direct_sales) ?? {};
+  const directSaleSummary = toObject(directSales.summary) ?? {};
+  const ledgerSummary = toObject(raw.ledger_summary) ?? {};
+  const receiptsDocuments = toObject(raw.receipts_documents) ?? {};
+  const receiptsSummary = toObject(receiptsDocuments.summary) ?? {};
+  const partnerLinkages = toObject(raw.partner_linkages) ?? {};
+
+  return {
+    overview: {
+      subscription_count: toNumber(overview.subscription_count),
+      active_subscriptions: toNumber(overview.active_subscriptions),
+      direct_sale_count: toNumber(overview.direct_sale_count),
+      direct_sale_outstanding_count: toNumber(
+        overview.direct_sale_outstanding_count
+      ),
+      direct_sale_outstanding_total: toMoneyString(
+        overview.direct_sale_outstanding_total
+      ),
+      receipt_count: toNumber(overview.receipt_count),
+      receipt_total: toMoneyString(overview.receipt_total),
+    },
+    direct_sales: {
+      summary: {
+        total_count: toNumber(directSaleSummary.total_count),
+        outstanding_count: toNumber(directSaleSummary.outstanding_count),
+        gross_total: toMoneyString(directSaleSummary.gross_total),
+        received_total: toMoneyString(directSaleSummary.received_total),
+        outstanding_total: toMoneyString(directSaleSummary.outstanding_total),
+      },
+      rows: extractNestedArray(directSales, ["rows"]).map((row) => ({
+        id: toNumber(row.id),
+        sale_no: toNullableString(row.sale_no),
+        sale_date: toNullableString(row.sale_date),
+        status: toStringValue(row.status) || "UNKNOWN",
+        branch_name:
+          toNullableString(row.branch_name) ?? toNullableString(row.branch_code),
+        billing_invoice_no: toNullableString(row.billing_invoice_no),
+        grand_total: toMoneyString(row.grand_total),
+        received_total: toMoneyString(row.received_total),
+        balance_total: toMoneyString(row.balance_total),
+      })),
+    },
+    ledger_summary: {
+      entry_count: toNumber(ledgerSummary.entry_count),
+      total_credits: toMoneyString(ledgerSummary.total_credits),
+      total_debits: toMoneyString(ledgerSummary.total_debits),
+      net_subscription_collections: toMoneyString(
+        ledgerSummary.net_subscription_collections
+      ),
+      direct_sale_receivable_total: toMoneyString(
+        ledgerSummary.direct_sale_receivable_total
+      ),
+    },
+    receipts_documents: {
+      summary: {
+        receipt_count: toNumber(receiptsSummary.receipt_count),
+        receipt_total: toMoneyString(receiptsSummary.receipt_total),
+        document_count: toNumber(receiptsSummary.document_count),
+      },
+      receipts: extractNestedArray(receiptsDocuments, ["receipts"]).map((row) => ({
+        id: toNumber(row.id),
+        receipt_no: toNullableString(row.receipt_no),
+        receipt_type: toNullableString(row.receipt_type),
+        receipt_date: toNullableString(row.receipt_date),
+        amount: toMoneyString(row.amount),
+        finance_account_name: toNullableString(row.finance_account_name),
+      })),
+      documents: extractNestedArray(receiptsDocuments, ["documents"]).map((row) => ({
+        id: toNumber(row.id),
+        subscription_number: toStringValue(row.subscription_number) || undefined,
+        document_type: toNullableString(row.document_type),
+        verification_status: toNullableString(row.verification_status),
+        created_at: toNullableString(row.created_at),
+      })),
+    },
+    partner_linkages: {
+      count: toNumber(partnerLinkages.count),
+      rows: extractNestedArray(partnerLinkages, ["rows"]).map((row) => ({
+        partner_id: toNullableNumber(row.partner_id),
+        partner_name: toNullableString(row.partner_name),
+        subscription_count: toNumber(row.subscription_count),
+      })),
+    },
   };
 }
 
@@ -779,6 +946,8 @@ export default function AdminCustomerDetailPage() {
   const [customer, setCustomer] = useState<CustomerDetailRecord | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionPreviewRow[]>([]);
   const [payments, setPayments] = useState<PaymentPreviewRow[]>([]);
+  const [operationalProfile, setOperationalProfile] =
+    useState<CustomerOperationalProfile | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -796,11 +965,14 @@ export default function AdminCustomerDetailPage() {
       else setRefreshing(true);
 
       try {
-        const [customerResult, subscriptionResult, paymentResult] =
+        const [customerResult, subscriptionResult, paymentResult, operationalResult] =
           await Promise.allSettled([
             apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
             apiFetch<unknown>(`/admin/subscriptions/?customer=${customerId}`),
             apiFetch<unknown>(`/admin/payments/?customer=${customerId}`),
+            apiFetch<Record<string, unknown>>(
+              `/admin/customers/${customerId}/operational-profile/`
+            ),
           ]);
 
         if (customerResult.status !== "fulfilled") {
@@ -814,6 +986,7 @@ export default function AdminCustomerDetailPage() {
 
         let nextSubscriptions: SubscriptionPreviewRow[] = [];
         let nextPayments: PaymentPreviewRow[] = [];
+        let nextOperationalProfile: CustomerOperationalProfile | null = null;
 
         if (subscriptionResult.status === "fulfilled") {
           nextSubscriptions = toArray<Record<string, unknown>>(subscriptionResult.value)
@@ -867,9 +1040,20 @@ export default function AdminCustomerDetailPage() {
           );
         }
 
+        if (operationalResult.status === "fulfilled") {
+          nextOperationalProfile = normalizeCustomerOperationalProfile(
+            operationalResult.value
+          );
+        } else {
+          nextWarnings.push(
+            "Operational profile sections could not be loaded from the dedicated customer operations endpoint."
+          );
+        }
+
         setCustomer(normalizedCustomer);
         setSubscriptions(nextSubscriptions);
         setPayments(nextPayments);
+        setOperationalProfile(nextOperationalProfile);
         setWarnings(nextWarnings);
         setError(null);
       } catch (err) {
@@ -878,6 +1062,7 @@ export default function AdminCustomerDetailPage() {
           setCustomer(null);
           setSubscriptions([]);
           setPayments([]);
+          setOperationalProfile(null);
           setWarnings([]);
         }
       } finally {
@@ -916,6 +1101,21 @@ export default function AdminCustomerDetailPage() {
     [subscriptions]
   );
 
+  const outstandingDirectSales = useMemo(
+    () =>
+      operationalProfile?.direct_sales.rows.filter(
+        (row) => Number(row.balance_total || 0) > 0
+      ) ?? [],
+    [operationalProfile]
+  );
+
+  const firstOutstandingDirectSale = useMemo(
+    () => outstandingDirectSales[0] ?? null,
+    [outstandingDirectSales]
+  );
+
+  const latestPayment = useMemo(() => payments[0] ?? null, [payments]);
+
   const passwordResetIdentifier = useMemo(
     () =>
       resolvePasswordResetEmail({
@@ -953,10 +1153,36 @@ export default function AdminCustomerDetailPage() {
         label: "Create Subscription",
         variant: "secondary",
       });
+      nextActions.push({
+        href: `/admin/billing/direct-sales?customer=${customer.id}`,
+        label: "Direct Sale Desk",
+        variant: "secondary",
+      });
+      nextActions.push({
+        href: `/admin/collections?customer=${customer.id}`,
+        label: "Collections",
+        variant: "secondary",
+      });
+    }
+
+    if (firstOutstandingDirectSale) {
+      nextActions.push({
+        href: `/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`,
+        label: "Collect Direct Sale",
+        variant: "primary",
+      });
+    }
+
+    if (latestSubscription) {
+      nextActions.push({
+        href: `/admin/payments/create?subscription=${latestSubscription.id}`,
+        label: "Collect Subscription",
+        variant: "secondary",
+      });
     }
 
     return nextActions;
-  }, [customer]);
+  }, [customer, firstOutstandingDirectSale, latestSubscription]);
 
   async function handleKycDecision(status: "VERIFIED" | "REJECTED") {
     if (!customerId) return;
@@ -1029,7 +1255,7 @@ export default function AdminCustomerDetailPage() {
   return (
     <PortalPage
       title={customer?.name || `Customer #${customerId ?? "—"}`}
-      subtitle="Inspect customer profile, KYC state, linked contracts, and recent payment activity from one operational page."
+      subtitle="Inspect KYC state, direct-sale exposure, subscription contracts, collections, receipts, and partner linkage from one operational customer workspace."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Customers", href: "/admin/customers" },
@@ -1118,7 +1344,7 @@ export default function AdminCustomerDetailPage() {
             )}
 
             {/* Advanced Stats Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
               <StatCard
                 title="Active Subscriptions"
                 value={String(activeSubscriptionCount)}
@@ -1153,6 +1379,24 @@ export default function AdminCustomerDetailPage() {
                   )
                 }
                 tone={kycTone}
+              />
+              <StatCard
+                title="Direct-Sale Outstanding"
+                value={money(
+                  operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
+                )}
+                icon={<Wallet className="h-4 w-4" />}
+                tone={
+                  operationalProfile?.direct_sales.summary.outstanding_count
+                    ? "warning"
+                    : "default"
+                }
+              />
+              <StatCard
+                title="Receipts / Docs"
+                value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.document_count ?? 0}`}
+                icon={<CreditCard className="h-4 w-4" />}
+                tone="default"
               />
             </div>
 
@@ -1361,6 +1605,163 @@ export default function AdminCustomerDetailPage() {
               </SectionCard>
             </div>
 
+            {operationalProfile ? (
+              <div className="grid gap-6 xl:grid-cols-2">
+                <SectionCard
+                  title="Customer Workflow Rails"
+                  description="Keep retail direct-sale operations and subscription-sale operations visible together while preserving separate posting, collection, and reconciliation paths."
+                >
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                        Direct Sale
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-amber-950">
+                        {operationalProfile.direct_sales.summary.total_count} bill(s)
+                      </div>
+                      <div className="mt-2 space-y-1 text-sm text-amber-900">
+                        <div>
+                          Outstanding {money(operationalProfile.direct_sales.summary.outstanding_total)}
+                        </div>
+                        <div>
+                          Collected {money(operationalProfile.direct_sales.summary.received_total)}
+                        </div>
+                        <div>
+                          Open receivables {operationalProfile.direct_sales.summary.outstanding_count}
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={`/admin/billing/direct-sales?customer=${customer.id}`}
+                          className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-950 shadow-sm transition hover:bg-amber-100/60"
+                        >
+                          Open Direct Sales
+                        </Link>
+                        {firstOutstandingDirectSale ? (
+                          <Link
+                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`}
+                            className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                          >
+                            Collect Balance
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Subscription Sale
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-emerald-950">
+                        {operationalProfile.overview.subscription_count} contract(s)
+                      </div>
+                      <div className="mt-2 space-y-1 text-sm text-emerald-900">
+                        <div>
+                          Active contracts {operationalProfile.overview.active_subscriptions}
+                        </div>
+                        <div>
+                          Net collections {money(operationalProfile.ledger_summary.net_subscription_collections)}
+                        </div>
+                        <div>
+                          Latest payment {latestPayment ? money(latestPayment.amount) : "—"}
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={`/admin/subscriptions?customer=${customer.id}`}
+                          className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
+                        >
+                          Open Subscriptions
+                        </Link>
+                        <Link
+                          href={`/admin/subscriptions/create?customer=${customer.id}`}
+                          className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
+                        >
+                          Create Subscription
+                        </Link>
+                        {latestSubscription ? (
+                          <Link
+                            href={`/admin/payments/create?subscription=${latestSubscription.id}`}
+                            className="inline-flex items-center rounded-md border border-emerald-900 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
+                          >
+                            Collect EMI
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  title="Operational Finance Summary"
+                  description="Unified customer view across subscription contracts, direct-sale receivables, receipts, and ledger-backed collections."
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DetailValue
+                      label="Subscription contracts"
+                      value={String(operationalProfile.overview.subscription_count)}
+                    />
+                    <DetailValue
+                      label="Direct sales"
+                      value={String(operationalProfile.overview.direct_sale_count)}
+                    />
+                    <DetailValue
+                      label="Direct-sale outstanding"
+                      value={money(
+                        operationalProfile.overview.direct_sale_outstanding_total
+                      )}
+                    />
+                    <DetailValue
+                      label="Retail receipts"
+                      value={`${operationalProfile.receipts_documents.summary.receipt_count} receipt(s)`}
+                    />
+                    <DetailValue
+                      label="Ledger credits"
+                      value={money(operationalProfile.ledger_summary.total_credits)}
+                    />
+                    <DetailValue
+                      label="Net subscription collections"
+                      value={money(
+                        operationalProfile.ledger_summary.net_subscription_collections
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                    Direct-sale receivables remain operationally separate from subscription EMI ledger entries. The unified customer profile keeps both visible without mixing their posting rules.
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  title="Partner Linkage"
+                  description="Partner or referral linkage visible from subscription-side activity."
+                >
+                  {operationalProfile.partner_linkages.rows.length === 0 ? (
+                    <EmptyState
+                      title="No partner linkage"
+                      description="No partner-linked subscriptions were returned for this customer."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {operationalProfile.partner_linkages.rows.map((row) => (
+                        <div
+                          key={`${row.partner_id ?? "unknown"}-${row.partner_name ?? "partner"}`}
+                          className="rounded-xl border border-border bg-background px-4 py-3"
+                        >
+                          <div className="text-sm font-semibold text-foreground">
+                            {row.partner_name || `Partner ${row.partner_id ?? "—"}`}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {row.subscription_count} linked subscription(s)
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+              </div>
+            ) : null}
+
             <SectionCard
               title="Linked Subscriptions"
               description="Contract history and current subscription context for this customer."
@@ -1378,6 +1779,136 @@ export default function AdminCustomerDetailPage() {
             >
               <PaymentsTable rows={payments} />
             </SectionCard>
+
+            {operationalProfile ? (
+              <>
+                <SectionCard
+                  title="Direct Sale History"
+                  description="Retail direct-sale bills linked to this customer, including current outstanding balances for later collection."
+                  actionHref={`/admin/billing/direct-sales?customer=${customer.id}`}
+                  actionLabel="Open Direct Sales"
+                >
+                  {operationalProfile.direct_sales.rows.length === 0 ? (
+                    <EmptyState
+                      title="No direct-sale history"
+                      description="No direct-sale records were returned for this customer."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {operationalProfile.direct_sales.rows.map((row) => (
+                        <div
+                          key={row.id}
+                          className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">
+                                {row.sale_no || `SALE-${row.id}`} · {row.billing_invoice_no || "No invoice no."}
+                              </div>
+                              <div className="mt-1 text-sm text-muted-foreground">
+                                {row.branch_name || "Primary branch"} · {formatDate(row.sale_date)}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Status {row.status || "UNKNOWN"}
+                              </div>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grand Total</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{money(row.grand_total)}</div>
+                              </div>
+                              <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{money(row.received_total)}</div>
+                              </div>
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
+                                <div className="mt-1 text-sm font-semibold text-amber-900">{money(row.balance_total)}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                              href={`/admin/billing/direct-sales?focus_sale=${row.id}`}
+                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                            >
+                              Open Direct Sale
+                            </Link>
+                            <Link
+                              href={`/admin/billing/receipts?direct_sale=${row.id}`}
+                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                            >
+                              Receipts
+                            </Link>
+                            {Number(row.balance_total || 0) > 0 ? (
+                              <Link
+                                href={`/admin/payments/create?workflow=direct-sale&direct_sale=${row.id}`}
+                                className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                              >
+                                Collect Balance
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Receipts & Documents"
+                  description="Retail receipts and subscription documents visible from the unified customer operations surface."
+                >
+                  <div className="grid gap-6 xl:grid-cols-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Receipts</h3>
+                      <div className="mt-3 space-y-3">
+                        {operationalProfile.receipts_documents.receipts.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No billing receipts were returned for this customer.</p>
+                        ) : (
+                          operationalProfile.receipts_documents.receipts.map((receipt) => (
+                            <div key={receipt.id} className="rounded-xl border border-border bg-background px-4 py-3">
+                              <div className="text-sm font-semibold text-foreground">
+                                {receipt.receipt_no || `Receipt #${receipt.id}`}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {receipt.receipt_type || "Receipt"} · {formatDate(receipt.receipt_date)}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {receipt.finance_account_name || "Finance account not labeled"} · {money(receipt.amount)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Documents</h3>
+                      <div className="mt-3 space-y-3">
+                        {operationalProfile.receipts_documents.documents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No subscription documents were returned for this customer.</p>
+                        ) : (
+                          operationalProfile.receipts_documents.documents.map((document) => (
+                            <div key={document.id} className="rounded-xl border border-border bg-background px-4 py-3">
+                              <div className="text-sm font-semibold text-foreground">
+                                {document.document_type || "Document"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {document.subscription_number || "Subscription"} · {document.verification_status || "PENDING"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Uploaded {formatDateTime(document.created_at)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </SectionCard>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

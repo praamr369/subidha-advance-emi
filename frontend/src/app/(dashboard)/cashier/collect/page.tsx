@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -10,6 +11,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
 import {
   collectPayment,
   getPendingEmisByPhone,
@@ -64,6 +66,7 @@ function overdueLabel(emi: PendingEmiRecord | null | undefined): string {
 
 type PaymentMethod = "CASH" | "UPI" | "BANK";
 type CashierSearchMode = "phone" | "subscription" | "lucky" | "emi";
+type CollectionWorkflow = "subscription" | "direct-sale";
 
 const SEARCH_MODE_CONFIG: Record<
   CashierSearchMode,
@@ -110,6 +113,10 @@ const SECONDARY_BUTTON_CLASS_NAME =
   "inline-flex h-11 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function CashierCollectPage() {
+  const searchParams = useSearchParams();
+  const workflowQueryParam = searchParams.get("workflow");
+  const [collectionWorkflow, setCollectionWorkflow] =
+    useState<CollectionWorkflow>("subscription");
   const [searchMode, setSearchMode] = useState<CashierSearchMode>("phone");
   const [searchInput, setSearchInput] = useState("");
   const [submittedPhone, setSubmittedPhone] = useState("");
@@ -146,6 +153,14 @@ export default function CashierCollectPage() {
   const pendingEmis = lookup?.emis ?? [];
   const hasLookupResult = Boolean(lookup);
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
+  const directSaleHref = "/cashier/collect?workflow=direct-sale";
+  const subscriptionHref = "/cashier/collect";
+
+  useEffect(() => {
+    setCollectionWorkflow(
+      workflowQueryParam === "direct-sale" ? "direct-sale" : "subscription"
+    );
+  }, [workflowQueryParam]);
 
   function clearSelectionForNewLookup() {
     setSelectedEmiId(null);
@@ -348,18 +363,46 @@ export default function CashierCollectPage() {
 
   return (
     <PortalPage
-      title="Collect Payment"
-      subtitle="Search collectible EMI rows, select the exact installment, and post a cashier collection with immediate proof visibility."
-      helperNote="Search first, verify the exact EMI row, then post once. This counter flow stays aligned with existing payment audit and reconciliation rules."
+      title={
+        collectionWorkflow === "direct-sale"
+          ? "Collect Direct-Sale Balance"
+          : "Collect Payment"
+      }
+      subtitle={
+        collectionWorkflow === "direct-sale"
+          ? "Collect against outstanding direct-sale bills without entering the EMI allocation path."
+          : "Search collectible EMI rows, select the exact installment, and post a cashier collection with immediate proof visibility."
+      }
+      helperNote={
+        collectionWorkflow === "direct-sale"
+          ? "Use direct-sale collection only for invoiced retail bills with outstanding balance. EMI, rent, and lease collections stay in the subscription workflow."
+          : "Search first, verify the exact EMI row, then post once. This counter flow stays aligned with existing payment audit and reconciliation rules."
+      }
       helperTone="info"
       breadcrumbs={[
         { label: "Cashier", href: "/cashier" },
-        { label: "Collect Payment" },
+        {
+          label:
+            collectionWorkflow === "direct-sale"
+              ? "Collect Direct-Sale Balance"
+              : "Collect Payment",
+        },
       ]}
       actions={[
         {
           href: "/cashier/payments",
           label: "Payment History",
+          variant: "secondary",
+        },
+        {
+          href:
+            collectionWorkflow === "direct-sale"
+              ? subscriptionHref
+              : directSaleHref,
+          label:
+            collectionWorkflow === "direct-sale"
+              ? "Open EMI Collection"
+              : "Open Direct Sale",
           variant: "secondary",
         },
         {
@@ -375,34 +418,115 @@ export default function CashierCollectPage() {
       ]}
       stats={[
         {
-          label: "Search Mode",
-          value: activeSearchConfig.label,
+          label: "Workflow",
+          value:
+            collectionWorkflow === "direct-sale"
+              ? "Direct Sale"
+              : "Subscription EMI",
         },
         {
-          label: "Pending EMI Count",
-          value: String(lookup?.total_pending_emis ?? 0),
+          label:
+            collectionWorkflow === "direct-sale"
+              ? "Search Mode"
+              : "Pending EMI Count",
+          value:
+            collectionWorkflow === "direct-sale"
+              ? "Phone / Sale / Customer"
+              : String(lookup?.total_pending_emis ?? 0),
           tone: "warning",
         },
         {
-          label: "Overdue EMI",
-          value: String(lookup?.overdue_emi_count ?? 0),
+          label:
+            collectionWorkflow === "direct-sale"
+              ? "Current Queue"
+              : "Overdue EMI",
+          value:
+            collectionWorkflow === "direct-sale"
+              ? lookup?.customer_name || "Direct-sale receivables"
+              : String(lookup?.overdue_emi_count ?? 0),
           tone: "warning",
         },
         {
-          label: "Next Due",
-          value: lookup?.next_due_date ? formatDate(lookup.next_due_date) : "—",
+          label:
+            collectionWorkflow === "direct-sale"
+              ? "Reference"
+              : "Next Due",
+          value:
+            collectionWorkflow === "direct-sale"
+              ? "Receipt-safe retail collection"
+              : lookup?.next_due_date
+                ? formatDate(lookup.next_due_date)
+                : "—",
           tone:
+            collectionWorkflow === "subscription" &&
             (lookup?.overdue_emi_count ?? 0) > 0
               ? "warning"
               : undefined,
         },
       ]}
       statusBadge={{
-        label: "Cashier Collection",
+        label:
+          collectionWorkflow === "direct-sale"
+            ? "Cashier Direct Sale"
+            : "Cashier Collection",
         tone: "info",
       }}
     >
       <div className="space-y-6">
+        <SectionCard
+          title="Workflow selection"
+          description="Keep retail direct-sale collections separate from subscription EMI collections so each path stays operationally clear and financially safe."
+        >
+          <div className="flex flex-wrap gap-3">
+            {(
+              [
+                {
+                  id: "subscription" as const,
+                  label: "Subscription EMI",
+                  description:
+                    "Collect against exact EMI rows using the existing subscription payment workflow.",
+                },
+                {
+                  id: "direct-sale" as const,
+                  label: "Direct Sale",
+                  description:
+                    "Collect against outstanding invoiced retail bills using retail receipts.",
+                },
+              ] satisfies Array<{
+                id: CollectionWorkflow;
+                label: string;
+                description: string;
+              }>
+            ).map((workflow) => {
+              const active = collectionWorkflow === workflow.id;
+              return (
+                <button
+                  key={workflow.id}
+                  type="button"
+                  onClick={() => setCollectionWorkflow(workflow.id)}
+                  className={[
+                    "min-w-[220px] rounded-2xl border px-4 py-3 text-left transition",
+                    active
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border bg-background hover:bg-muted",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-semibold text-foreground">
+                    {workflow.label}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {workflow.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        {collectionWorkflow === "direct-sale" ? (
+          <CashierDirectSaleCollectPanel />
+        ) : (
+          <>
         <SectionCard
           title="Step 1 · Search collectible EMI rows"
           description="Phone loads the full customer queue directly. Subscription, lucky, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
@@ -963,6 +1087,8 @@ export default function CashierCollectPage() {
             </SectionCard>
           </>
         ) : null}
+          </>
+        )}
       </div>
     </PortalPage>
   );

@@ -124,6 +124,25 @@ export type DirectSalePayload = {
   lines: DirectSaleLine[];
 };
 
+export type DirectSaleCollectionPayload = {
+  amount: string;
+  receipt_date?: string;
+  finance_account_id?: number;
+  branch_id?: number;
+  cash_counter_id?: number;
+  reference_no?: string;
+  notes?: string;
+};
+
+export type DirectSaleCollectionResponse = {
+  created: boolean;
+  direct_sale: DirectSale;
+  invoice: BillingInvoice;
+  receipt: ReceiptDocument;
+  outstanding_before: string;
+  outstanding_after: string;
+};
+
 export type BillingInvoice = {
   id: number;
   document_no?: string | null;
@@ -341,6 +360,10 @@ export function listDirectSales(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<DirectSale>>(`/billing/direct-sales/${buildQuery(params)}`);
 }
 
+export function getDirectSale(id: number | string) {
+  return apiFetch<DirectSale>(`/billing/direct-sales/${id}/`);
+}
+
 export function createDirectSale(payload: DirectSalePayload) {
   return apiFetch<DirectSale>("/billing/direct-sales/", {
     method: "POST",
@@ -373,6 +396,16 @@ export function markDirectSaleDelivered(id: number, delivery_reference = "") {
       body: JSON.stringify({ delivery_reference }),
     }
   );
+}
+
+export function collectDirectSalePayment(
+  id: number,
+  payload: DirectSaleCollectionPayload
+) {
+  return apiFetch<DirectSaleCollectionResponse>(`/billing/direct-sales/${id}/collect/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function approveBillingInvoice(id: number) {

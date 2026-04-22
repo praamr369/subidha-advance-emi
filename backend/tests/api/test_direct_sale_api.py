@@ -104,3 +104,82 @@ class DirectSaleApiTests(APITestCase):
         self.assertEqual(invoice_list.data["count"], 1)
         self.assertEqual(invoice_list.data["results"][0]["source_type"], "DIRECT_SALE")
         self.assertEqual(invoice_list.data["results"][0]["direct_sale"], direct_sale_id)
+
+    def test_admin_can_collect_outstanding_direct_sale_balance(self):
+        create_response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 17),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "delivery_required": False,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "subtotal": "9500.00",
+                "discount_total": "0.00",
+                "taxable_total": "9500.00",
+                "tax_total": "0.00",
+                "grand_total": "9500.00",
+                "received_total": "5000.00",
+                "balance_total": "4500.00",
+                "notes": "Outstanding direct-sale collection test",
+                "lines": [
+                    {
+                        "product": self.product.id,
+                        "inventory_item": self.inventory_item.id,
+                        "description": "Outstanding direct-sale line",
+                        "quantity": "1.000",
+                        "unit_price": "9500.00",
+                        "discount_amount": "0.00",
+                        "taxable_value": "9500.00",
+                        "gst_rate": None,
+                        "cgst_amount": "0.00",
+                        "sgst_amount": "0.00",
+                        "igst_amount": "0.00",
+                        "line_total": "9500.00",
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+
+        direct_sale_id = create_response.data["id"]
+        invoice_id = create_response.data["billing_invoice_id"]
+        self.assertTrue(invoice_id)
+
+        approve_response = self.client.post(
+            f"/api/v1/billing/invoices/{invoice_id}/approve/",
+            {},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK, approve_response.data)
+
+        post_response = self.client.post(
+            f"/api/v1/billing/invoices/{invoice_id}/post/",
+            {},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, status.HTTP_200_OK, post_response.data)
+
+        collect_response = self.client.post(
+            f"/api/v1/billing/direct-sales/{direct_sale_id}/collect/",
+            {
+                "amount": "4500.00",
+                "finance_account_id": self.cash_account.id,
+                "reference_no": "DIRSALE-API-COLLECT-001",
+                "notes": "Collected later from admin",
+            },
+            format="json",
+        )
+        self.assertEqual(collect_response.status_code, status.HTTP_201_CREATED, collect_response.data)
+        self.assertTrue(collect_response.data["created"])
+        self.assertEqual(collect_response.data["direct_sale"]["balance_total"], "0.00")
+        self.assertEqual(collect_response.data["invoice"]["balance_total"], "0.00")
+        self.assertEqual(collect_response.data["receipt"]["amount"], "4500.00")
+
+        outstanding_list = self.client.get("/api/v1/billing/direct-sales/?outstanding_only=true")
+        self.assertEqual(outstanding_list.status_code, status.HTTP_200_OK, outstanding_list.data)
+        self.assertEqual(outstanding_list.data["count"], 0)

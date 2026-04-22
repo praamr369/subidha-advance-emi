@@ -29,11 +29,58 @@ export function accountingDate(value?: string | null): string {
   });
 }
 
+function collectErrorMessages(
+  value: unknown,
+  prefix?: string,
+): string[] {
+  if (typeof value === "string") {
+    const cleaned = value.trim();
+    if (!cleaned) return [];
+    return [prefix ? `${prefix}: ${cleaned}` : cleaned];
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value.flatMap((item) => collectErrorMessages(item));
+    if (!parts.length) return [];
+    return [prefix ? `${prefix}: ${parts.join(", ")}` : parts.join(", ")];
+  }
+
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const prioritizedKeys = ["detail", "message", "error", "non_field_errors"];
+
+  for (const key of prioritizedKeys) {
+    if (!(key in record)) continue;
+    const messages = collectErrorMessages(record[key]);
+    if (messages.length) return messages;
+  }
+
+  return Object.entries(record)
+    .filter(([key]) => !["status", "success", "data"].includes(key))
+    .flatMap(([key, entry]) => collectErrorMessages(entry, key));
+}
+
 export function accountingErrorMessage(
   error: unknown,
   fallback: string
 ): string {
+  if (error && typeof error === "object") {
+    const errorRecord = error as Record<string, unknown>;
+    for (const key of ["body", "details"]) {
+      if (!(key in errorRecord)) continue;
+      const messages = collectErrorMessages(errorRecord[key]);
+      if (messages.length) return messages.join("; ");
+    }
+  }
+
   if (error instanceof Error && error.message.trim()) return error.message;
+
+  const messages = collectErrorMessages(error);
+  if (messages.length) return messages.join("; ");
+
   return fallback;
 }
 

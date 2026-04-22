@@ -4,6 +4,7 @@ from datetime import date
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -53,6 +54,16 @@ class AdminPaymentApiTests(APITestCase):
             amount=Decimal("1000.00"),
             due_date=date(2026, 4, 7),
         )
+        self.cash_finance = FinanceAccount.objects.create(
+            name="Admin Cash Counter",
+            kind=FinanceAccountKind.CASH,
+            chart_account=ChartOfAccount.objects.create(
+                code="ADM-PAY-CASH-001",
+                name="Admin Payment Cash",
+                account_type=ChartOfAccountType.ASSET,
+            ),
+            opening_balance=Decimal("0.00"),
+        )
 
     def test_admin_payment_collect_success(self):
         response = self.client.post(
@@ -61,6 +72,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-001",
                 "notes": "admin collect test",
@@ -85,6 +97,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-002",
             },
@@ -96,6 +109,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-002",
             },
@@ -121,6 +135,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-003",
             },
@@ -153,6 +168,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-004",
             },
@@ -181,6 +197,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-005",
             },
@@ -223,6 +240,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-006",
             },
@@ -260,6 +278,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-007",
             },
@@ -286,6 +305,7 @@ class AdminPaymentApiTests(APITestCase):
                 "emi": self.emi.id,
                 "amount": "1000.00",
                 "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "payment_date": "2026-03-17",
                 "reference_no": "ADM-API-008",
             },

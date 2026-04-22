@@ -198,6 +198,11 @@ class OperationalAccountingBridgePostingTests(TestCase):
         self.assertEqual(bridge.source_type, "WINNER_WAIVER")
 
     def test_commission_settlement_bridge_posts_once_per_settled_commission(self):
+        cash_account = self._create_finance_account(
+            code="OPB-COM-CASH-001",
+            name="Operational Commission Cash",
+            kind=FinanceAccountKind.CASH,
+        )
         partner = create_partner_user(
             username="opb_partner_settle",
             phone="9367000002",
@@ -215,6 +220,7 @@ class OperationalAccountingBridgePostingTests(TestCase):
             amount=Decimal("800.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=cash_account.id,
             reference_no="OPB-COMMISSION-001",
             payment_date=self.today,
         )["payment"]

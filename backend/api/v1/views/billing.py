@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -27,6 +29,7 @@ from billing.services.billing_service import (
     post_billing_invoice,
     void_receipt_document,
 )
+from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from billing.services.billing_sync_service import (
     sync_payment_into_billing,
     sync_subscription_billing_profile,
@@ -41,6 +44,7 @@ from api.v1.serializers.billing import (
     BillingProfileSerializer,
     BillingProfileSyncSerializer,
     BillingSyncEventSerializer,
+    DirectSaleCollectionSerializer,
     DirectSaleConfirmSerializer,
     DirectSaleDeliveredSerializer,
     DirectSaleSerializer,
@@ -89,6 +93,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             queryset = queryset.filter(status=status_value)
         if delivery_required in {"true", "false"}:
             queryset = queryset.filter(delivery_required=delivery_required == "true")
+        if self.request.query_params.get("outstanding_only") in {"1", "true", "TRUE", "yes", "YES"}:
+            queryset = queryset.filter(status="INVOICED", balance_total__gt=Decimal("0.00"))
         return queryset
 
     def get_serializer_class(self):
@@ -96,6 +102,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             return DirectSaleConfirmSerializer
         if self.action == "mark_delivered":
             return DirectSaleDeliveredSerializer
+        if self.action == "collect_payment":
+            return DirectSaleCollectionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="confirm")
@@ -126,6 +134,46 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = DirectSaleSerializer(sale, context=self.get_serializer_context())
         return Response({"updated": updated, "direct_sale": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="collect")
+    def collect_payment(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = collect_direct_sale_payment(
+                direct_sale_id=int(pk),
+                amount=serializer.validated_data["amount"],
+                collected_by=request.user,
+                receipt_date=serializer.validated_data.get("receipt_date"),
+                finance_account_id=serializer.validated_data.get("finance_account_id"),
+                branch_id=serializer.validated_data.get("branch_id"),
+                cash_counter_id=serializer.validated_data.get("cash_counter_id"),
+                reference_no=serializer.validated_data.get("reference_no"),
+                notes=serializer.validated_data.get("notes"),
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            {
+                "created": result["created"],
+                "direct_sale": DirectSaleSerializer(
+                    result["direct_sale"],
+                    context=self.get_serializer_context(),
+                ).data,
+                "invoice": BillingInvoiceSerializer(
+                    result["invoice"],
+                    context=self.get_serializer_context(),
+                ).data,
+                "receipt": ReceiptDocumentSerializer(
+                    result["receipt"],
+                    context=self.get_serializer_context(),
+                ).data,
+                "outstanding_before": str(result["outstanding_before"]),
+                "outstanding_after": str(result["outstanding_after"]),
+            },
+            status=status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK,
+        )
 
 
 class BillingInvoiceViewSet(AdminBillingModelViewSet):

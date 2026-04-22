@@ -1,9 +1,11 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from accounting.models import (
     ChartOfAccount,
+    ChartOfAccountType,
     CompensationComponentType,
     EmployeeAttendance,
     EmployeeCompensationComponent,
@@ -34,6 +36,11 @@ from accounting.models import (
 from accounting.services.journal_posting_service import (
     create_journal_entry,
     update_draft_journal_entry,
+)
+from accounting.services.master_edit_service import (
+    AccountingMasterUpdateService,
+    get_chart_account_editability,
+    get_finance_account_editability,
 )
 from accounting.services.salary_posting_service import post_salary_payment
 from accounting.services.workforce_service import (
@@ -69,6 +76,7 @@ class JournalEntryVoidSerializer(serializers.Serializer):
 
 class ChartOfAccountSerializer(serializers.ModelSerializer):
     parent_code = serializers.CharField(source="parent.code", read_only=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = ChartOfAccount
@@ -82,10 +90,97 @@ class ChartOfAccountSerializer(serializers.ModelSerializer):
             "is_active",
             "allow_manual_posting",
             "system_code",
+            "notes",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ChartOfAccountDetailSerializer(ChartOfAccountSerializer):
+    parent_name = serializers.CharField(source="parent.name", read_only=True)
+    child_count = serializers.SerializerMethodField()
+    finance_account_count = serializers.SerializerMethodField()
+    editability = serializers.SerializerMethodField()
+
+    class Meta(ChartOfAccountSerializer.Meta):
+        fields = ChartOfAccountSerializer.Meta.fields + [
+            "parent_name",
+            "child_count",
+            "finance_account_count",
+            "editability",
+        ]
+
+    def get_child_count(self, obj):
+        return obj.children.count()
+
+    def get_finance_account_count(self, obj):
+        return obj.finance_accounts.count()
+
+    def get_editability(self, obj):
+        return get_chart_account_editability(obj)
+
+
+class ChartOfAccountUpdateSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(required=False, allow_blank=True)
+    name = serializers.CharField(required=False, allow_blank=True)
+    account_type = serializers.ChoiceField(
+        choices=ChartOfAccountType.choices,
+        required=False,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+    system_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = ChartOfAccount
+        fields = [
+            "code",
+            "name",
+            "account_type",
+            "parent",
+            "is_active",
+            "allow_manual_posting",
+            "system_code",
+            "notes",
+        ]
+
+    def validate_code(self, value):
+        return (value or "").strip().upper()
+
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        return cleaned
+
+    def validate_system_code(self, value):
+        return (value or "").strip().upper() or None
+
+    def validate_notes(self, value):
+        return (value or "").strip()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        if instance is None:
+            return attrs
+        try:
+            AccountingMasterUpdateService.validate_chart_account_update(
+                account=instance,
+                payload=attrs,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs
+
+    def update(self, instance, validated_data):
+        updated = AccountingMasterUpdateService.update_chart_account(
+            account=instance,
+            payload=validated_data,
+            actor=getattr(self.context.get("request"), "user", None),
+        )
+        updated.refresh_from_db()
+        return updated
 
 
 class FinanceAccountSerializer(serializers.ModelSerializer):
@@ -93,6 +188,7 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
     chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = FinanceAccount
@@ -110,10 +206,79 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
             "is_active",
             "bank_last4",
             "upi_handle",
+            "notes",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class FinanceAccountDetailSerializer(FinanceAccountSerializer):
+    editability = serializers.SerializerMethodField()
+
+    class Meta(FinanceAccountSerializer.Meta):
+        fields = FinanceAccountSerializer.Meta.fields + [
+            "editability",
+        ]
+
+    def get_editability(self, obj):
+        return get_finance_account_editability(obj)
+
+
+class FinanceAccountUpdateSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = FinanceAccount
+        fields = [
+            "name",
+            "kind",
+            "chart_account",
+            "opening_balance",
+            "is_active",
+            "bank_last4",
+            "upi_handle",
+            "notes",
+        ]
+
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        return cleaned
+
+    def validate_bank_last4(self, value):
+        return (value or "").strip()
+
+    def validate_upi_handle(self, value):
+        return (value or "").strip()
+
+    def validate_notes(self, value):
+        return (value or "").strip()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        if instance is None:
+            return attrs
+        try:
+            AccountingMasterUpdateService.validate_finance_account_update(
+                account=instance,
+                payload=attrs,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs
+
+    def update(self, instance, validated_data):
+        updated = AccountingMasterUpdateService.update_finance_account(
+            account=instance,
+            payload=validated_data,
+            actor=getattr(self.context.get("request"), "user", None),
+        )
+        updated.refresh_from_db()
+        return updated
 
 
 class JournalEntryLineSerializer(serializers.ModelSerializer):

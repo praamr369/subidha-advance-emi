@@ -11,6 +11,7 @@ from billing.services.billing_service import (
     mark_direct_sale_delivered,
     post_billing_invoice,
 )
+from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from inventory.models import InventoryItem, StockLedger, StockMovementType
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
@@ -142,3 +143,68 @@ class DirectSaleWorkflowTests(TestCase):
             ).exists()
         )
         self.assertTrue(ReceiptDocument.objects.filter(billing_invoice=invoice).exists())
+
+    def test_collect_direct_sale_payment_updates_receivable_and_receipt_history(self):
+        payload = self._direct_sale_payload(delivery_required=False)
+        payload["received_total"] = Decimal("5000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = BillingInvoice.objects.get(direct_sale=sale)
+
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        result = collect_direct_sale_payment(
+            direct_sale_id=sale.id,
+            amount=Decimal("4000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.cash_account.id,
+            reference_no="DIRSALE-COLLECT-001",
+            notes="Second collection pass",
+        )
+
+        self.assertTrue(result["created"])
+        sale.refresh_from_db()
+        invoice.refresh_from_db()
+
+        self.assertEqual(sale.received_total, Decimal("9000.00"))
+        self.assertEqual(sale.balance_total, Decimal("9000.00"))
+        self.assertEqual(invoice.received_total, Decimal("9000.00"))
+        self.assertEqual(invoice.balance_total, Decimal("9000.00"))
+
+        self.assertEqual(
+            ReceiptDocument.objects.filter(
+                direct_sale=sale,
+                receipt_type="RETAIL_RECEIPT",
+                status=BillingDocumentStatus.POSTED,
+            ).count(),
+            2,
+        )
+        self.assertIn("[collection-ref:DIRSALE-COLLECT-001]", result["receipt"].notes)
+
+    def test_collect_direct_sale_payment_is_duplicate_safe_with_reference(self):
+        payload = self._direct_sale_payload(delivery_required=False)
+        payload["received_total"] = Decimal("8000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = BillingInvoice.objects.get(direct_sale=sale)
+
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        first = collect_direct_sale_payment(
+            direct_sale_id=sale.id,
+            amount=Decimal("3000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.cash_account.id,
+            reference_no="DIRSALE-DUP-001",
+        )
+        second = collect_direct_sale_payment(
+            direct_sale_id=sale.id,
+            amount=Decimal("3000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.cash_account.id,
+            reference_no="DIRSALE-DUP-001",
+        )
+
+        self.assertTrue(first["created"])
+        self.assertFalse(second["created"])
+        self.assertEqual(first["receipt"].id, second["receipt"].id)

@@ -30,6 +30,7 @@ from accounting.services.journal_posting_service import (
     void_journal_entry,
 )
 from accounting.services.money_movement_service import post_money_movement
+from accounting.services.vendor_operational_service import build_vendor_operational_summary
 from accounting.services.salary_posting_service import (
     approve_salary_sheet,
     post_salary_sheet,
@@ -48,6 +49,8 @@ from accounting.services.workforce_service import (
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
     ChartOfAccountSerializer,
+    ChartOfAccountDetailSerializer,
+    ChartOfAccountUpdateSerializer,
     EmployeeExpenseClaimActionSerializer,
     EmployeeExpenseClaimPaymentSerializer,
     EmployeeExpenseClaimSerializer,
@@ -56,6 +59,8 @@ from api.v1.serializers.accounting import (
     EmployeeProfileSerializer,
     ExpenseVoucherSerializer,
     FinanceAccountSerializer,
+    FinanceAccountDetailSerializer,
+    FinanceAccountUpdateSerializer,
     JournalEntryPostSerializer,
     JournalEntrySerializer,
     JournalEntryVoidSerializer,
@@ -83,9 +88,51 @@ class ChartOfAccountViewSet(AdminAccountingModelViewSet):
     ordering_fields = ["code", "name", "created_at"]
     ordering = ["code", "id"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        account_type = (self.request.query_params.get("account_type") or "").strip().upper()
+        is_active = self.request.query_params.get("is_active")
+        if account_type:
+            queryset = queryset.filter(account_type=account_type)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ChartOfAccountDetailSerializer
+        if self.action == "partial_update":
+            return ChartOfAccountUpdateSerializer
+        return super().get_serializer_class()
+
+    @action(detail=True, methods=["get"], url_path="editability")
+    def editability(self, request, pk=None):
+        account = self.get_object()
+        payload = ChartOfAccountDetailSerializer(
+            account,
+            context=self.get_serializer_context(),
+        ).data
+        return Response(
+            {
+                "success": True,
+                "data": payload,
+                "editability": payload["editability"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+        detail = ChartOfAccountDetailSerializer(
+            self.get_object(),
+            context=self.get_serializer_context(),
+        )
+        response.data = detail.data
+        return response
+
 
 class FinanceAccountViewSet(AdminAccountingModelViewSet):
-    queryset = FinanceAccount.objects.select_related("chart_account").all()
+    queryset = FinanceAccount.objects.select_related("chart_account", "branch").all()
     serializer_class = FinanceAccountSerializer
     search_fields = ["name", "upi_handle", "bank_last4", "chart_account__code"]
     ordering_fields = ["name", "kind", "created_at"]
@@ -103,6 +150,38 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
         return queryset
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return FinanceAccountDetailSerializer
+        if self.action == "partial_update":
+            return FinanceAccountUpdateSerializer
+        return super().get_serializer_class()
+
+    @action(detail=True, methods=["get"], url_path="editability")
+    def editability(self, request, pk=None):
+        account = self.get_object()
+        payload = FinanceAccountDetailSerializer(
+            account,
+            context=self.get_serializer_context(),
+        ).data
+        return Response(
+            {
+                "success": True,
+                "data": payload,
+                "editability": payload["editability"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+        detail = FinanceAccountDetailSerializer(
+            self.get_object(),
+            context=self.get_serializer_context(),
+        )
+        response.data = detail.data
+        return response
 
 
 class JournalEntryViewSet(AdminAccountingModelViewSet):
@@ -189,6 +268,13 @@ class VendorViewSet(AdminAccountingModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
         return queryset
+
+    @action(detail=True, methods=["get"], url_path="operational-summary")
+    def operational_summary(self, request, pk=None):
+        return Response(
+            build_vendor_operational_summary(self.get_object()),
+            status=status.HTTP_200_OK,
+        )
 
 
 class ExpenseVoucherViewSet(AdminAccountingModelViewSet):

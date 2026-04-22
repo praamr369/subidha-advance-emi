@@ -41,6 +41,7 @@ type PortalPageProps = {
   children?: ReactNode;
   maxWidth?: number | string;
   className?: string;
+  presentation?: "page" | "popup";
 };
 
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
@@ -109,18 +110,22 @@ export default function PortalPage({
   children,
   maxWidth = 1320,
   className,
+  presentation = "page",
 }: PortalPageProps) {
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
+  const isPopup = presentation === "popup";
+  const showPopupMeta = isPopup && Boolean(subtitle || helperNote || statusBadge || actions.length > 0);
 
   return (
     <main
       className={cn(
-        "portal-page mx-auto flex flex-col gap-5 px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
+        "portal-page mx-auto flex flex-col gap-5",
+        isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
         className
       )}
       style={{ maxWidth: resolvedMaxWidth }}
     >
-      {breadcrumbs.length > 0 ? (
+      {!isPopup && breadcrumbs.length > 0 ? (
         <nav
           aria-label="Breadcrumb"
           className="portal-page-breadcrumbs flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
@@ -157,100 +162,166 @@ export default function PortalPage({
         </nav>
       ) : null}
 
-      <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[1.65rem] border border-border bg-card shadow-[0_24px_56px_-44px_rgba(15,23,42,0.52)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),transparent_44%)]" />
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
-        <div className="relative flex flex-col gap-5 p-4 sm:p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="enterprise-title">{title}</h1>
+      {isPopup ? (
+        <>
+          <h1 className="sr-only">{title}</h1>
+          {showPopupMeta ? (
+            <section className="popup-workflow-toolbar rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[0_18px_48px_-40px_rgba(15,23,42,0.48)] sm:px-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1">
+                  {statusBadge ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+                        getToneClassName(statusBadge.tone)
+                      )}
+                    >
+                      {(() => {
+                        const Icon = getToneIcon(statusBadge.tone);
+                        return <Icon className="h-3.5 w-3.5" />;
+                      })()}
+                      {statusBadge.label}
+                    </span>
+                  ) : null}
 
-                {statusBadge ? (
-                  <span
+                  {subtitle ? (
+                    <p className={cn("max-w-4xl text-sm leading-6 text-muted-foreground", statusBadge ? "mt-3" : "")}>
+                      {subtitle}
+                    </p>
+                  ) : null}
+
+                  {helperNote ? (
+                    <div
+                      className={cn(
+                        "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
+                        helperTone === "warning"
+                          ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                          : helperTone === "info"
+                            ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
+                            : "border-border bg-[var(--surface-muted)] text-foreground"
+                      )}
+                    >
+                      {helperNote}
+                    </div>
+                  ) : null}
+                </div>
+
+                {actions.length > 0 ? (
+                  <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
+                    {actions.map((action) => (
+                      <Link
+                        key={`${action.href}-${action.label}`}
+                        href={action.href}
+                        className={cn(
+                          "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                          getActionClassName(action.variant)
+                        )}
+                      >
+                        {action.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[1.65rem] border border-border bg-card shadow-[0_24px_56px_-44px_rgba(15,23,42,0.52)]">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),transparent_44%)]" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
+          <div className="relative flex flex-col gap-5 p-4 sm:p-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="enterprise-title">{title}</h1>
+
+                  {statusBadge ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+                        getToneClassName(statusBadge.tone)
+                      )}
+                    >
+                      {(() => {
+                        const Icon = getToneIcon(statusBadge.tone);
+                        return <Icon className="h-3.5 w-3.5" />;
+                      })()}
+                      {statusBadge.label}
+                    </span>
+                  ) : null}
+                </div>
+
+                {subtitle ? (
+                  <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>
+                ) : null}
+
+                {helperNote ? (
+                  <div
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
-                      getToneClassName(statusBadge.tone)
+                      "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
+                      helperTone === "warning"
+                        ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                        : helperTone === "info"
+                          ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
+                          : "border-border bg-[var(--surface-muted)] text-foreground"
                     )}
                   >
-                    {(() => {
-                      const Icon = getToneIcon(statusBadge.tone);
-                      return <Icon className="h-3.5 w-3.5" />;
-                    })()}
-                    {statusBadge.label}
-                  </span>
+                    {helperNote}
+                  </div>
                 ) : null}
               </div>
 
-              {subtitle ? (
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>
-              ) : null}
-
-              {helperNote ? (
-                <div
-                  className={cn(
-                    "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
-                    helperTone === "warning"
-                      ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
-                      : helperTone === "info"
-                        ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-                        : "border-border bg-[var(--surface-muted)] text-foreground"
-                  )}
-                >
-                  {helperNote}
+              {actions.length > 0 ? (
+                <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
+                  {actions.map((action) => (
+                    <Link
+                      key={`${action.href}-${action.label}`}
+                      href={action.href}
+                      className={cn(
+                        "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                        getActionClassName(action.variant)
+                      )}
+                    >
+                      {action.label}
+                    </Link>
+                  ))}
                 </div>
               ) : null}
             </div>
 
-            {actions.length > 0 ? (
-              <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
-                {actions.map((action) => (
-                  <Link
-                    key={`${action.href}-${action.label}`}
-                    href={action.href}
-                    className={cn(
-                      "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
-                      getActionClassName(action.variant)
-                    )}
+            {stats.length > 0 ? (
+              <div className="portal-page-stats grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {stats.map((stat, index) => (
+                  <div
+                    key={`${stat.label}-${index}`}
+                    className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)]"
                   >
-                    {action.label}
-                  </Link>
+                    <div className="enterprise-eyebrow">{stat.label}</div>
+
+                    <div
+                      className={cn(
+                        "enterprise-metric mt-2",
+                        stat.tone === "success"
+                          ? "text-emerald-800"
+                          : stat.tone === "warning"
+                            ? "text-amber-800"
+                            : stat.tone === "danger"
+                              ? "text-red-800"
+                              : stat.tone === "info"
+                                ? "text-sky-800"
+                                : "text-foreground"
+                      )}
+                    >
+                      {normalizeStatValue(stat.value)}
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : null}
           </div>
-
-          {stats.length > 0 ? (
-            <div className="portal-page-stats grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat, index) => (
-                <div
-                  key={`${stat.label}-${index}`}
-                  className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)]"
-                >
-                  <div className="enterprise-eyebrow">{stat.label}</div>
-
-                  <div
-                    className={cn(
-                      "enterprise-metric mt-2",
-                      stat.tone === "success"
-                        ? "text-emerald-800"
-                        : stat.tone === "warning"
-                          ? "text-amber-800"
-                          : stat.tone === "danger"
-                            ? "text-red-800"
-                            : stat.tone === "info"
-                              ? "text-sky-800"
-                              : "text-foreground"
-                    )}
-                  >
-                    {normalizeStatValue(stat.value)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="portal-page-content grid gap-4 sm:gap-5">{children}</section>
     </main>

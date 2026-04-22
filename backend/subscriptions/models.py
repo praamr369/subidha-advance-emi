@@ -1837,6 +1837,13 @@ class Payment(TimeStampedModel):
         blank=True,
         related_name="payments",
     )
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="subscription_payments",
+    )
     method = models.CharField(max_length=10, choices=PaymentMethod.choices, db_index=True)
     reference_no = models.CharField(
         max_length=100,
@@ -1880,6 +1887,7 @@ class Payment(TimeStampedModel):
             models.Index(fields=["emi"]),
             models.Index(fields=["branch", "payment_date"]),
             models.Index(fields=["cash_counter", "payment_date"]),
+            models.Index(fields=["finance_account", "payment_date"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -1915,6 +1923,12 @@ class Payment(TimeStampedModel):
             counter_branch_id = getattr(self.cash_counter, "branch_id", None)
             if self.branch_id and counter_branch_id and self.branch_id != counter_branch_id:
                 errors["cash_counter"] = "Selected counter must belong to the payment branch."
+        if self.finance_account_id:
+            if not self.finance_account.is_active:
+                errors["finance_account"] = "Selected finance account must be active."
+            finance_branch_id = getattr(self.finance_account, "branch_id", None)
+            if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
+                errors["finance_account"] = "Selected finance account must belong to the payment branch."
 
         if self.reference_no is not None:
             self.reference_no = self.reference_no.strip() or None
@@ -1937,6 +1951,209 @@ class Payment(TimeStampedModel):
 
     def __str__(self):
         return f"Payment #{self.pk} - {self.amount}"
+
+
+class CustomerAdvanceStatus(models.TextChoices):
+    UNAPPLIED = "UNAPPLIED", "Unapplied"
+    PARTIALLY_APPLIED = "PARTIALLY_APPLIED", "Partially Applied"
+    FULLY_APPLIED = "FULLY_APPLIED", "Fully Applied"
+
+
+class CustomerAdvance(TimeStampedModel):
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="customer_advances",
+    )
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        related_name="customer_advances",
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="customer_advances",
+    )
+    cash_counter = models.ForeignKey(
+        "branch_control.CashCounter",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="customer_advances",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    unapplied_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    method = models.CharField(max_length=10, choices=PaymentMethod.choices, db_index=True)
+    reference_no = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    payment_date = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=CustomerAdvanceStatus.choices,
+        default=CustomerAdvanceStatus.UNAPPLIED,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    allocation_metadata = models.JSONField(default=dict, blank=True)
+    collected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="customer_advances_collected",
+    )
+
+    class Meta:
+        db_table = "customer_advances"
+        ordering = ["-payment_date", "-id"]
+        indexes = [
+            models.Index(fields=["customer", "payment_date"]),
+            models.Index(fields=["finance_account", "payment_date"]),
+            models.Index(fields=["status", "payment_date"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reference_no"],
+                condition=Q(reference_no__isnull=False),
+                name="uq_customer_advance_reference_no",
+            ),
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="chk_customer_advance_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(unapplied_amount__gte=0),
+                name="chk_customer_advance_unapplied_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.amount is None or self.amount <= MONEY_ZERO:
+            errors["amount"] = "Advance amount must be greater than zero."
+        if self.unapplied_amount is None or self.unapplied_amount < MONEY_ZERO:
+            errors["unapplied_amount"] = "Unapplied amount cannot be negative."
+        if (
+            self.amount is not None
+            and self.unapplied_amount is not None
+            and self.unapplied_amount > self.amount
+        ):
+            errors["unapplied_amount"] = "Unapplied amount cannot exceed advance amount."
+        if not self.payment_date:
+            errors["payment_date"] = "Payment date is required."
+        if self.cash_counter_id:
+            counter_branch_id = getattr(self.cash_counter, "branch_id", None)
+            if self.branch_id and counter_branch_id and self.branch_id != counter_branch_id:
+                errors["cash_counter"] = "Selected counter must belong to the advance branch."
+        if self.finance_account_id:
+            if not self.finance_account.is_active:
+                errors["finance_account"] = "Selected finance account must be active."
+            finance_branch_id = getattr(self.finance_account, "branch_id", None)
+            if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
+                errors["finance_account"] = "Selected finance account must belong to the advance branch."
+        if self.reference_no is not None:
+            self.reference_no = self.reference_no.strip() or None
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip() or None
+        self.notes = (self.notes or "").strip()
+        if self.pk is None and self.unapplied_amount is None:
+            self.unapplied_amount = self.amount
+        if self.branch_id is None:
+            self.branch = (
+                getattr(self.cash_counter, "branch", None)
+                or getattr(self.finance_account, "branch", None)
+                or _default_branch()
+            )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Advance #{self.pk} - {self.amount}"
+
+
+class CustomerAdvanceAllocation(TimeStampedModel):
+    advance = models.ForeignKey(
+        CustomerAdvance,
+        on_delete=models.PROTECT,
+        related_name="allocations",
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="advance_allocations",
+    )
+    emi = models.ForeignKey(
+        Emi,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="advance_allocations",
+    )
+    payment = models.OneToOneField(
+        Payment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="customer_advance_allocation",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    allocated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="customer_advance_allocations",
+    )
+    allocation_date = models.DateField(db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "customer_advance_allocations"
+        ordering = ["-allocation_date", "-id"]
+        indexes = [
+            models.Index(fields=["advance", "allocation_date"]),
+            models.Index(fields=["subscription", "allocation_date"]),
+            models.Index(fields=["emi", "allocation_date"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="chk_customer_advance_allocation_amount_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.amount is None or self.amount <= MONEY_ZERO:
+            errors["amount"] = "Allocation amount must be greater than zero."
+        if not self.allocation_date:
+            errors["allocation_date"] = "Allocation date is required."
+        if self.emi_id and self.subscription_id and self.emi.subscription_id != self.subscription_id:
+            errors["emi"] = "Selected EMI must belong to the selected subscription."
+        if self.subscription_id and self.advance_id:
+            if self.subscription.customer_id != self.advance.customer_id:
+                errors["subscription"] = "Advance can be allocated only within the same customer."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Advance Allocation #{self.pk} - {self.amount}"
 # =====================================================
 # PAYMENT RECONCILIATION
 # =====================================================

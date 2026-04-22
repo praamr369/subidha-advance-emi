@@ -183,6 +183,11 @@ export default function CashierDashboardPage() {
           variant: "primary",
         },
         {
+          href: "/cashier/collect?workflow=direct-sale",
+          label: "Collect Direct Sale",
+          variant: "secondary",
+        },
+        {
           href: "/cashier/payments",
           label: "Payment History",
           variant: "secondary",

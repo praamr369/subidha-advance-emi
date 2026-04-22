@@ -12,15 +12,23 @@ import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
+  getVendorOperationalSummary,
   listChartOfAccounts,
   listFinanceAccounts,
   listPurchaseBills,
+  listVendors,
   type AccountingPaginatedResponse,
   type AccountingPurchaseBill,
   type ChartOfAccount,
   type FinanceAccount,
+  type VendorOperationalSummary,
 } from "@/services/accounting";
+import { listDirectSales, type DirectSale } from "@/services/billing";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import {
+  getAdminPaymentRegister,
+  type PaymentRegisterRow,
+} from "@/services/payments";
 import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
@@ -34,7 +42,6 @@ type PayoutBatchRow = {
   commission_count: number;
   created_at?: string;
   finalized_at?: string | null;
-  cancelled_at?: string | null;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -58,11 +65,18 @@ function formatDateTime(value: string | null | undefined): string {
   return new Date(parsed).toLocaleString();
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleDateString();
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
-  return "Failed to load finance dashboard.";
+  return "Failed to load finance control center.";
 }
 
 function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
@@ -85,10 +99,6 @@ function normalizePayoutBatch(row: Record<string, unknown>): PayoutBatchRow {
     finalized_at:
       typeof row.finalized_at === "string" || row.finalized_at === null
         ? (row.finalized_at as string | null)
-        : undefined,
-    cancelled_at:
-      typeof row.cancelled_at === "string" || row.cancelled_at === null
-        ? (row.cancelled_at as string | null)
         : undefined,
   };
 }
@@ -118,6 +128,45 @@ function MiniBar({
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  note,
+  href,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  note: string;
+  href?: string;
+  tone?: "default" | "warning" | "success" | "danger";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-200 bg-red-50"
+      : tone === "warning"
+        ? "border-amber-200 bg-amber-50"
+        : tone === "success"
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-slate-200 bg-white";
+
+  const content = (
+    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
+      <div className="mt-1 text-sm text-slate-600">{note}</div>
+    </div>
+  );
+
+  if (!href) return content;
+
+  return (
+    <Link href={href} className="block transition hover:-translate-y-0.5">
+      {content}
+    </Link>
+  );
+}
+
 function SectionCard({
   title,
   description,
@@ -138,70 +187,6 @@ function SectionCard({
   );
 }
 
-function FinanceLaneCard({
-  eyebrow,
-  title,
-  description,
-  value,
-  secondaryValue,
-  primaryHref,
-  primaryLabel,
-  secondaryHref,
-  secondaryLabel,
-  tone = "default",
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  value: string;
-  secondaryValue?: string;
-  primaryHref: string;
-  primaryLabel: string;
-  secondaryHref?: string;
-  secondaryLabel?: string;
-  tone?: "default" | "warning" | "success" | "danger";
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "border-red-200 bg-red-50"
-      : tone === "warning"
-      ? "border-amber-200 bg-amber-50"
-      : tone === "success"
-      ? "border-emerald-200 bg-emerald-50"
-      : "border-slate-200 bg-white";
-
-  return (
-    <section className={`rounded-2xl border p-5 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">{eyebrow}</div>
-      <h2 className="mt-2 text-lg font-semibold text-slate-900">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{description}</p>
-
-      <div className="mt-4 space-y-1">
-        <div className="text-2xl font-semibold text-slate-900">{value}</div>
-        {secondaryValue ? <div className="text-sm text-slate-600">{secondaryValue}</div> : null}
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Link
-          href={primaryHref}
-          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-        >
-          {primaryLabel}
-        </Link>
-
-        {secondaryHref && secondaryLabel ? (
-          <Link
-            href={secondaryHref}
-            className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-          >
-            {secondaryLabel}
-          </Link>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 export default function AdminFinancePage() {
   const [summary, setSummary] = useState<AdminCommissionSummaryResponse | null>(null);
   const [batches, setBatches] = useState<PayoutBatchRow[]>([]);
@@ -214,6 +199,9 @@ export default function AdminFinancePage() {
     useState<AccountingPaginatedResponse<AccountingPurchaseBill> | null>(null);
   const [approvedPurchaseBills, setApprovedPurchaseBills] =
     useState<AccountingPaginatedResponse<AccountingPurchaseBill> | null>(null);
+  const [directSales, setDirectSales] = useState<DirectSale[]>([]);
+  const [recentCollections, setRecentCollections] = useState<PaymentRegisterRow[]>([]);
+  const [vendorSummaries, setVendorSummaries] = useState<VendorOperationalSummary[]>([]);
 
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("THIS_MONTH");
@@ -255,6 +243,9 @@ export default function AdminFinancePage() {
           financeAccountPayload,
           draftPurchasePayload,
           approvedPurchasePayload,
+          directSalesPayload,
+          paymentRegisterPayload,
+          vendorsPayload,
         ] = await Promise.all([
           apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
           apiFetch<unknown>("/admin/commission-payout-batches/list/"),
@@ -263,7 +254,14 @@ export default function AdminFinancePage() {
           listFinanceAccounts(),
           listPurchaseBills({ status: "DRAFT", page_size: 1 }),
           listPurchaseBills({ status: "APPROVED", page_size: 1 }),
+          listDirectSales({ outstanding_only: "true", page_size: 6 }),
+          getAdminPaymentRegister(),
+          listVendors({ page_size: 6 }),
         ]);
+
+        const vendorDetails = await Promise.all(
+          vendorsPayload.results.map((vendor) => getVendorOperationalSummary(vendor.id))
+        );
 
         setSummary(summaryPayload);
         setBatches(
@@ -274,6 +272,15 @@ export default function AdminFinancePage() {
         setFinanceAccounts(financeAccountPayload);
         setDraftPurchaseBills(draftPurchasePayload);
         setApprovedPurchaseBills(approvedPurchasePayload);
+        setDirectSales(directSalesPayload.results);
+        setRecentCollections(paymentRegisterPayload.results.slice(0, 8));
+        setVendorSummaries(
+          vendorDetails.sort(
+            (left, right) =>
+              toNumber(right.summary.outstanding_payable_total) -
+              toNumber(left.summary.outstanding_payable_total)
+          )
+        );
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -285,6 +292,9 @@ export default function AdminFinancePage() {
           setFinanceAccounts(null);
           setDraftPurchaseBills(null);
           setApprovedPurchaseBills(null);
+          setDirectSales([]);
+          setRecentCollections([]);
+          setVendorSummaries([]);
         }
       } finally {
         if (mode === "initial") {
@@ -301,44 +311,18 @@ export default function AdminFinancePage() {
     void loadPage("initial");
   }, [loadPage]);
 
-  const draftBatchCount = useMemo(
-    () => batches.filter((row) => row.status.toUpperCase() === "DRAFT").length,
-    [batches]
-  );
-
-  const finalizedBatchCount = useMemo(
-    () => batches.filter((row) => row.status.toUpperCase() === "FINALIZED").length,
-    [batches]
-  );
-
-  const cancelledBatchCount = useMemo(
-    () => batches.filter((row) => row.status.toUpperCase() === "CANCELLED").length,
-    [batches]
-  );
-
-  const recentBatches = useMemo(() => batches.slice(0, 5), [batches]);
-
   const methodRows = analytics?.payment_method_mix.rows ?? [];
   const cashNet = toNumber(methodRows.find((row) => row.method === "CASH")?.net_amount);
   const bankNet = toNumber(methodRows.find((row) => row.method === "BANK")?.net_amount);
   const upiNet = toNumber(methodRows.find((row) => row.method === "UPI")?.net_amount);
   const windowNet = toNumber(analytics?.overview.window_net_collections);
-
   const outstandingReceivables = toNumber(analytics?.overview.outstanding_amount);
   const overdueAmount = toNumber(analytics?.overview.overdue_emi_amount);
   const reconciliationFlags = toNumber(analytics?.overview.reconciliation_flagged_count);
-  const purchaseQueueCount =
-    (draftPurchaseBills?.count ?? 0) + (approvedPurchaseBills?.count ?? 0);
   const chartAccountCount = chartAccounts?.count ?? 0;
   const financeAccountCount = financeAccounts?.count ?? 0;
-
-  const directSalesGross = toNumber(analytics?.direct_sales_posture.summary.gross_total);
-  const directSalesCount = analytics?.direct_sales_posture.summary.count ?? 0;
-  const directSalesTrend = analytics?.direct_sales_posture.trend ?? [];
-  const directSalesTrendMax = directSalesTrend.reduce(
-    (max, row) => Math.max(max, toNumber(row.gross_total)),
-    0
-  );
+  const purchaseQueueCount =
+    (draftPurchaseBills?.count ?? 0) + (approvedPurchaseBills?.count ?? 0);
 
   const receivableAging = analytics?.receivables_pressure.aging ?? [];
   const receivableAgingMax = receivableAging.reduce(
@@ -346,60 +330,66 @@ export default function AdminFinancePage() {
     0
   );
 
+  const directSalesGross = toNumber(analytics?.direct_sales_posture.summary.gross_total);
+  const directSalesCount = analytics?.direct_sales_posture.summary.count ?? 0;
+  const directSalesOutstandingTotal = useMemo(
+    () => directSales.reduce((sum, row) => sum + toNumber(row.balance_total), 0),
+    [directSales]
+  );
+  const supplierPayableTotal = useMemo(
+    () =>
+      vendorSummaries.reduce(
+        (sum, row) => sum + toNumber(row.summary.outstanding_payable_total),
+        0
+      ),
+    [vendorSummaries]
+  );
+  const draftBatchCount = useMemo(
+    () => batches.filter((row) => row.status.toUpperCase() === "DRAFT").length,
+    [batches]
+  );
+  const recentBatches = useMemo(() => batches.slice(0, 4), [batches]);
+
   return (
     <PortalPage
       title="Finance Control Center"
-      subtitle="Workflow hub for accounts, books, procurement, direct sales, reconciliation exceptions, commissions, and payout controls."
+      subtitle="Admin finance operations view for customer receivables, supplier payables, direct-sale recovery, subscription collections, account mix, and reconciliation-sensitive review."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Partner Finance", href: ROUTES.admin.financeCommissions },
         { label: "Finance" },
-      ]}
-      actions={[
-        {
-          href: ROUTES.admin.financeCommissions,
-          label: "Open Commissions",
-          variant: "primary",
-        },
-        {
-          href: ROUTES.admin.financePayoutBatches,
-          label: "Open Payout Batches",
-          variant: "secondary",
-        },
       ]}
       stats={[
         {
-          label: "Window Collections",
-          value: money(analytics?.overview.window_net_collections),
+          label: "Window Net",
+          value: money(windowNet),
           tone: "success",
         },
         {
-          label: "Outstanding",
-          value: money(analytics?.overview.outstanding_amount),
-          tone: "warning",
+          label: "Customer Receivables",
+          value: money(outstandingReceivables),
+          tone: outstandingReceivables > 0 ? "warning" : "success",
+        },
+        {
+          label: "Direct-Sale Unpaid",
+          value: money(directSalesOutstandingTotal),
+          tone: directSalesOutstandingTotal > 0 ? "warning" : "success",
+        },
+        {
+          label: "Supplier Payables",
+          value: money(supplierPayableTotal),
+          tone: supplierPayableTotal > 0 ? "warning" : "success",
         },
         {
           label: "Reconciliation Flags",
-          value: String(analytics?.overview.reconciliation_flagged_count ?? 0),
-          tone:
-            (analytics?.overview.reconciliation_flagged_count ?? 0) > 0
-              ? "warning"
-              : undefined,
-        },
-        {
-          label: "Payout Batches",
-          value: String(batches.length),
-        },
-        {
-          label: "Purchase Bills",
-          value: String(purchaseQueueCount),
-          tone: purchaseQueueCount > 0 ? "warning" : "success",
+          value: String(reconciliationFlags),
+          tone: reconciliationFlags > 0 ? "warning" : "info",
         },
       ]}
       statusBadge={{
         label: "Finance Operations",
         tone: "info",
       }}
+      maxWidth={1440}
     >
       <div className="space-y-6">
         <section className="flex justify-end">
@@ -419,7 +409,7 @@ export default function AdminFinancePage() {
           endDate={endDate}
           loading={refreshing || loading}
           title="Finance window"
-          description="Window drives backend finance analytics slices for reporting and control routing while transactional posting semantics remain unchanged."
+          description="Window changes analytics slices only. Transaction posting, receipts, and ledgers continue to use the existing controlled services."
           onWindowChange={setWindowPreset}
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
@@ -437,170 +427,250 @@ export default function AdminFinancePage() {
 
         {!loading && !error ? (
           <>
-            <section className="grid gap-4 xl:grid-cols-4">
-              <FinanceLaneCard
-                eyebrow="Collections"
-                title="Window collections (net)"
-                description="Windowed net collections from backend analytics summary with reversal-aware treatment."
-                value={money(windowNet)}
-                secondaryValue={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
-                primaryHref={ROUTES.admin.payments}
-                primaryLabel="Open payments"
-                secondaryHref={ROUTES.admin.collections}
-                secondaryLabel="Open collections"
-                tone="success"
-              />
-
-              <FinanceLaneCard
-                eyebrow="Receivables"
-                title="Outstanding receivables"
-                description="Canonical outstanding amount across active contracts with overdue signal retained."
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <MetricCard
+                label="Customer Receivables"
                 value={money(outstandingReceivables)}
-                secondaryValue={`${money(overdueAmount)} overdue`}
-                primaryHref={ROUTES.admin.subscriptions}
-                primaryLabel="Open subscriptions"
-                secondaryHref={ROUTES.admin.emisOverdue}
-                secondaryLabel="Overdue queue"
+                note={`${money(overdueAmount)} overdue EMI`}
+                href={ROUTES.admin.collections}
                 tone={overdueAmount > 0 ? "warning" : "default"}
               />
-
-              <FinanceLaneCard
-                eyebrow="Reconciliation"
-                title="Exception queue"
-                description="Reconciliation flags route into controlled exception workflows with audit-safe handling."
-                value={String(reconciliationFlags)}
-                secondaryValue="Do not mutate payment history directly."
-                primaryHref={buildAdminReconciliationRoute({ flagged: true })}
-                primaryLabel="Open flagged queue"
-                secondaryHref={buildAdminReconciliationRoute()}
-                secondaryLabel="Reconciliation"
-                tone={reconciliationFlags > 0 ? "warning" : "success"}
+              <MetricCard
+                label="Direct Sale Unpaid"
+                value={money(directSalesOutstandingTotal)}
+                note={`${directSales.length} receivable bills`}
+                href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale`}
+                tone={directSalesOutstandingTotal > 0 ? "warning" : "default"}
               />
-
-              <FinanceLaneCard
-                eyebrow="Direct sales"
-                title="Retail billing linkage"
-                description="Direct-sale trend remains separate from EMI contracts and is linked through billing/accounting routes."
-                value={money(directSalesGross)}
-                secondaryValue={`${directSalesCount} direct-sale documents in selected window`}
-                primaryHref={ROUTES.admin.billingDirectSales}
-                primaryLabel="Open direct sales"
-                secondaryHref={ROUTES.admin.billingRegister}
-                secondaryLabel="Billing register"
-                tone="default"
+              <MetricCard
+                label="Supplier Payables"
+                value={money(supplierPayableTotal)}
+                note={`${vendorSummaries.length} supplier summaries`}
+                href={ROUTES.admin.accountingVendors}
+                tone={supplierPayableTotal > 0 ? "warning" : "default"}
               />
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-4">
-              <FinanceLaneCard
-                eyebrow="Masters"
-                title="Chart of accounts"
-                description="Ledger account master used by books, journals, and operational bridge posting."
-                value={`${chartAccountCount} chart accounts`}
-                secondaryValue="Accounting-side master"
-                primaryHref={ROUTES.admin.accountingChartOfAccounts}
-                primaryLabel="Open chart of accounts"
-                secondaryHref={ROUTES.admin.settingsBusinessSetupChartAccounts}
-                secondaryLabel="Business setup chart"
-                tone={chartAccountCount > 0 ? "success" : "warning"}
-              />
-
-              <FinanceLaneCard
-                eyebrow="Masters"
-                title="Finance accounts"
-                description="Operational cash/bank/UPI accounts for collections, bills, payout, and book routing."
-                value={`${financeAccountCount} finance accounts`}
-                secondaryValue="Branch-scoped where configured"
-                primaryHref={ROUTES.admin.settingsBusinessSetupFinanceAccounts}
-                primaryLabel="Open finance accounts"
-                secondaryHref={ROUTES.admin.accountingBooks}
-                secondaryLabel="Open books"
-                tone={financeAccountCount > 0 ? "success" : "warning"}
-              />
-
-              <FinanceLaneCard
-                eyebrow="Books"
-                title="Cash, bank, and UPI books"
-                description="Route into book registers for account-facing review without altering payment truth."
+              <MetricCard
+                label="Payment Account Mix"
                 value={money(windowNet)}
-                secondaryValue={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
-                primaryHref={ROUTES.admin.accountingBooksCash}
-                primaryLabel="Cash book"
-                secondaryHref={ROUTES.admin.accountingBooksBank}
-                secondaryLabel="Bank book"
-                tone="default"
-              />
-
-              <FinanceLaneCard
-                eyebrow="Procurement"
-                title="Purchase bill obligations"
-                description="Draft and approved purchase bills waiting controlled posting or settlement follow-through."
-                value={`${purchaseQueueCount} active bills`}
-                secondaryValue={`${draftPurchaseBills?.count ?? 0} draft · ${approvedPurchaseBills?.count ?? 0} approved`}
-                primaryHref={ROUTES.admin.accountingPurchaseBills}
-                primaryLabel="Open purchase bills"
-                secondaryHref={ROUTES.admin.accountingVendors}
-                secondaryLabel="Vendor register"
-                tone={purchaseQueueCount > 0 ? "warning" : "success"}
-              />
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-4">
-              <FinanceLaneCard
-                eyebrow="Commissions"
-                title="Commission register"
-                description="Review total partner commission exposure and unsettled register rows."
-                value={money(summary?.summary?.total_commission)}
-                secondaryValue={`${String(summary?.summary?.pending_count ?? 0)} unsettled · ${String(summary?.summary?.settled_count ?? 0)} settled`}
-                primaryHref={ROUTES.admin.financeCommissions}
-                primaryLabel="Open commissions"
-                secondaryHref={ROUTES.admin.partners}
-                secondaryLabel="Partner directory"
-                tone="warning"
-              />
-
-              <FinanceLaneCard
-                eyebrow="Settlement"
-                title="Payout queue"
-                description="Prepare eligible commission rows for payout batch packaging and review."
-                value={money(summary?.summary?.pending_commission)}
-                secondaryValue={`${String(Number(summary?.summary?.pending_count ?? 0) + Number(summary?.summary?.settled_count ?? 0))} payout-eligible rows`}
-                primaryHref={ROUTES.admin.financeSettledCommissions}
-                primaryLabel="Open payout queue"
-                secondaryHref={ROUTES.admin.financeCommissions}
-                secondaryLabel="Back to register"
+                note={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
+                href={ROUTES.admin.payments}
                 tone="success"
               />
-
-              <FinanceLaneCard
-                eyebrow="Payouts"
-                title="Payout batches"
-                description="Draft, finalized, and cancelled batch visibility for settlement discipline."
-                value={String(batches.length)}
-                secondaryValue={`${draftBatchCount} draft · ${finalizedBatchCount} finalized · ${cancelledBatchCount} cancelled`}
-                primaryHref={ROUTES.admin.financePayoutBatches}
-                primaryLabel="Open payout batches"
-                tone="default"
-              />
-
-              <FinanceLaneCard
-                eyebrow="Risk"
-                title="Reversed commission value"
-                description="Track reversed commission impact separately from pending and settled amounts."
-                value={money(summary?.summary?.reversed_commission)}
-                secondaryValue={`${String(summary?.summary?.reversed_count ?? 0)} reversed rows`}
-                primaryHref={ROUTES.admin.financeCommissions}
-                primaryLabel="Review commission risk"
-                secondaryHref={buildAdminReconciliationRoute({ view: "payments" })}
-                secondaryLabel="Payment reconciliation"
-                tone={Number(summary?.summary?.reversed_commission ?? 0) > 0 ? "danger" : "default"}
+              <MetricCard
+                label="Reconciliation Queue"
+                value={String(reconciliationFlags)}
+                note={`${draftBatchCount} draft payout batches`}
+                href={buildAdminReconciliationRoute({ flagged: true })}
+                tone={reconciliationFlags > 0 ? "danger" : "success"}
               />
             </section>
 
             <section className="grid gap-4 xl:grid-cols-3">
               <SectionCard
+                title="Receivables and posting control"
+                description="Customer dues stay split by rail, but the posting surface remains controlled through existing collection, receipt, and finance-account workflows."
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Subscription overdue</span>
+                    <span className="font-semibold text-slate-900">{money(overdueAmount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Direct-sale unpaid</span>
+                    <span className="font-semibold text-slate-900">{money(directSalesOutstandingTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Recent net collection</span>
+                    <span className="font-semibold text-emerald-700">{money(windowNet)}</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Link
+                      href={ROUTES.admin.collections}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Collections Workspace
+                    </Link>
+                    <Link
+                      href={ROUTES.admin.payments}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Payment Register
+                    </Link>
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Supplier payable and books"
+                description="Vendor settlements, purchase bills, and finance accounts remain aligned through the current accounting posting paths."
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Purchase bill queue</span>
+                    <span className="font-semibold text-slate-900">{purchaseQueueCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Chart of accounts</span>
+                    <span className="font-semibold text-slate-900">{chartAccountCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <span className="font-medium text-slate-700">Finance accounts</span>
+                    <span className="font-semibold text-slate-900">{financeAccountCount}</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Link
+                      href={ROUTES.admin.accountingPurchaseBills}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Purchase Bills
+                    </Link>
+                    <Link
+                      href={ROUTES.admin.accountingVendors}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Vendor Ledger View
+                    </Link>
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Payment method mix"
+                description="Collections remain traceable by operational finance account without changing the underlying payment truth."
+              >
+                <div className="space-y-3">
+                  <MiniBar
+                    label="Cash"
+                    value={cashNet}
+                    total={Math.max(windowNet, 1)}
+                    amount={money(cashNet)}
+                  />
+                  <MiniBar
+                    label="Bank"
+                    value={bankNet}
+                    total={Math.max(windowNet, 1)}
+                    amount={money(bankNet)}
+                  />
+                  <MiniBar
+                    label="UPI"
+                    value={upiNet}
+                    total={Math.max(windowNet, 1)}
+                    amount={money(upiNet)}
+                  />
+                </div>
+              </SectionCard>
+            </section>
+
+            <section className="grid gap-4 xl:grid-cols-2">
+              <SectionCard
+                title="Direct-sale unpaid recovery"
+                description="These bills already use the controlled direct-sale collection path. Admin can collect from the finance rail and cashier can continue counter recovery through the cashier flow."
+              >
+                {directSales.length === 0 ? (
+                  <EmptyState
+                    title="No direct-sale receivables"
+                    description="No outstanding invoiced direct-sale bills are waiting for recovery."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {directSales.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">
+                              {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              Invoice {sale.billing_invoice_no || "—"} · {formatDate(sale.sale_date)} · Collected {money(sale.received_total)}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-600">
+                              Finance account {sale.finance_account_name || "Not tagged"} · Branch {sale.branch_name || sale.branch_code || "Primary branch"}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                              Outstanding {money(sale.balance_total)}
+                            </div>
+                            <Link
+                              href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale&direct_sale=${sale.id}`}
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                            >
+                              Collect
+                            </Link>
+                            <Link
+                              href={`${ROUTES.admin.billingDirectSales}?focus_sale=${sale.id}`}
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                            >
+                              Open Sale
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+
+              <SectionCard
+                title="Recent collections"
+                description="Recent payment register rows give finance visibility into posting method, customer, subscription linkage, and reversal-safe review."
+              >
+                {recentCollections.length === 0 ? (
+                  <EmptyState
+                    title="No recent collections"
+                    description="No payment register rows are visible right now."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {recentCollections.map((row) => (
+                      <div
+                        key={row.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">
+                              {row.customer_name || "Unassigned customer"} · {money(row.amount)}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              {row.method || "Unknown method"} · {formatDate(row.payment_date)} · Collected by {row.collected_by_username || "System"}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-600">
+                              Subscription {row.subscription_number || row.subscription || "—"} · Branch {row.branch_name || row.branch_code || "—"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {row.is_reversed ? (
+                              <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800">
+                                Reversed
+                              </span>
+                            ) : (
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                                Active
+                              </span>
+                            )}
+                            <Link
+                              href={ROUTES.admin.payments}
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                            >
+                              Register
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            </section>
+
+            <section className="grid gap-4 xl:grid-cols-3">
+              <SectionCard
                 title="Receivables aging"
-                description="Backend-prepared aging buckets for pending and overdue receivables pressure."
+                description="Backend-prepared aging buckets keep overdue subscription exposure visible without changing the underlying EMI ledger rules."
               >
                 {receivableAging.length === 0 ? (
                   <EmptyState
@@ -623,157 +693,170 @@ export default function AdminFinancePage() {
               </SectionCard>
 
               <SectionCard
-                title="Direct-sales trend"
-                description="Windowed direct-sale gross values from billing-backed source records."
+                title="Supplier payable visibility"
+                description="Vendor operational summaries stay separate from customer ledgers while remaining visible from the same finance control surface."
               >
-                {directSalesTrend.length === 0 ? (
+                {vendorSummaries.length === 0 ? (
                   <EmptyState
-                    title="No direct-sale trend rows"
-                    description="No non-cancelled direct-sale rows are visible in this window."
+                    title="No supplier summaries"
+                    description="No vendor summaries are available yet."
                   />
                 ) : (
                   <div className="space-y-3">
-                    {directSalesTrend.slice(-6).map((row) => (
-                      <MiniBar
-                        key={`${row.date || "na"}-${row.count}`}
-                        label={row.date || "Unknown date"}
-                        value={toNumber(row.gross_total)}
-                        total={Math.max(directSalesTrendMax, 1)}
-                        amount={`${money(row.gross_total)} · ${row.count}`}
-                      />
+                    {vendorSummaries.map((vendor) => (
+                      <div
+                        key={vendor.vendor.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{vendor.vendor.name}</div>
+                            <div className="mt-1 text-xs text-slate-600">
+                              {vendor.summary.posted_purchase_bill_count} posted purchase bills · {vendor.summary.posted_settlement_count} posted settlements
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-amber-900">
+                              {money(vendor.summary.outstanding_payable_total)}
+                            </div>
+                            <Link
+                              href={`${ROUTES.admin.accountingVendors}?vendor=${vendor.vendor.id}`}
+                              className="mt-1 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                            >
+                              Open Vendor
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </SectionCard>
 
               <SectionCard
-                title="Finance workflow launchpad"
-                description="Every action below routes to an existing operational finance module; no placeholder buttons."
+                title="Reconciliation and payout discipline"
+                description="Finance exceptions, commission exposure, and payout batches stay visible without bypassing the current audit-safe workflows."
               >
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={ROUTES.admin.accountingChartOfAccounts}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Chart of Accounts
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.settingsBusinessSetupFinanceAccounts}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Finance Accounts
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.accountingBooksCash}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Cash Book
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.accountingBooksBank}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Bank Book
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.accountingBooksUpi}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    UPI Book
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.accountingPurchaseBills}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Purchase Bills
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.billingDirectSales}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Direct Sales
-                  </Link>
-
-                  <Link
-                    href={buildAdminReconciliationRoute({ flagged: true })}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Reconciliation Flags
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.financeCommissions}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Commission Register
-                  </Link>
-
-                  <Link
-                    href={ROUTES.admin.financePayoutBatches}
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    Payout Batches
-                  </Link>
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Reconciliation flags</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">{reconciliationFlags}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Pending commission exposure</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {money(summary?.summary?.pending_commission)}
+                    </div>
+                  </div>
+                  {recentBatches.length === 0 ? (
+                    <EmptyState
+                      title="No payout batches"
+                      description="No payout batches are currently available."
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {recentBatches.map((row) => (
+                        <div
+                          key={row.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">Batch #{row.id}</div>
+                              <div className="mt-1 text-xs text-slate-600">
+                                {row.status} · {row.commission_count} commission rows
+                              </div>
+                            </div>
+                            <div className="text-right text-xs text-slate-600">
+                              <div className="font-semibold text-slate-900">{money(row.total_amount)}</div>
+                              <div>{formatDateTime(row.created_at)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Link
+                      href={buildAdminReconciliationRoute({ flagged: true })}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Flagged Queue
+                    </Link>
+                    <Link
+                      href={ROUTES.admin.financePayoutBatches}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Payout Batches
+                    </Link>
+                  </div>
                 </div>
               </SectionCard>
             </section>
 
-            <SectionCard
-              title="Recent payout batches"
-              description="Recent payout batch records for finance visibility and downstream detail review."
-            >
-              {recentBatches.length === 0 ? (
-                <EmptyState
-                  title="No payout batches"
-                  description="No payout batches are currently available."
-                />
-              ) : (
-                <div className="space-y-3">
-                  {recentBatches.map((row) => (
-                    <div
-                      key={row.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+            <section className="grid gap-4 xl:grid-cols-2">
+              <SectionCard
+                title="Direct-sale rail and subscription rail"
+                description="Finance review keeps both sales rails visible without collapsing them into a single posting model."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Direct Sale</div>
+                    <div className="mt-2 text-xl font-semibold text-slate-900">{money(directSalesGross)}</div>
+                    <div className="mt-1 text-sm text-slate-600">{directSalesCount} direct-sale documents in selected window</div>
+                    <Link
+                      href={ROUTES.admin.billingDirectSales}
+                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                     >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                          <div className="font-medium text-foreground">Batch #{row.id}</div>
-                          <div className="mt-1 text-sm text-slate-600">
-                            {row.status} · {row.commission_count} commission rows
-                          </div>
-                          <div className="mt-1 text-xs text-slate-600">
-                            Created {formatDateTime(row.created_at)} · Finalized {" "}
-                            {formatDateTime(row.finalized_at)} · Cancelled {" "}
-                            {formatDateTime(row.cancelled_at)}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-foreground">
-                              {money(row.total_amount)}
-                            </div>
-                            <div className="text-xs text-slate-600">Batch total</div>
-                          </div>
-
-                          <Link
-                            href={`/admin/finance/payout-batches/${row.id}`}
-                            className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                          >
-                            Open Batch
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      Open Direct Sale
+                    </Link>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Subscription Sale</div>
+                    <div className="mt-2 text-xl font-semibold text-slate-900">{money(outstandingReceivables)}</div>
+                    <div className="mt-1 text-sm text-slate-600">{money(overdueAmount)} overdue from EMI side</div>
+                    <Link
+                      href={ROUTES.admin.subscriptions}
+                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Open Subscriptions
+                    </Link>
+                  </div>
                 </div>
-              )}
-            </SectionCard>
+              </SectionCard>
+
+              <SectionCard
+                title="Ledger review routes"
+                description="Use the existing route-specific ledgers and books for detailed review. This page only unifies visibility and routing across the real posting surfaces."
+              >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Link
+                    href={ROUTES.admin.accountingBooksCash}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Cash Book
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.accountingBooksBank}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Bank Book
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.accountingBooksUpi}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    UPI Book
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.accountingChartOfAccounts}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    Chart of Accounts
+                  </Link>
+                </div>
+              </SectionCard>
+            </section>
           </>
         ) : null}
       </div>

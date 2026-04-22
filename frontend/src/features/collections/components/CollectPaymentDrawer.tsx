@@ -27,6 +27,9 @@ const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = [
   "CARD",
 ];
 
+const FIELD_CLASS_NAME =
+  "h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60";
+
 function normalizeAmount(value: string | number | null | undefined): string {
   const parsed = Number(value ?? 0);
   if (!Number.isFinite(parsed) || parsed <= 0) return "";
@@ -190,9 +193,10 @@ function CollectPaymentDrawerContent({
       title="Collect Payment"
       description="Record a payment against the selected advance EMI with explicit financial controls."
       onClose={onClose}
+      size="default"
     >
       <div className="space-y-6">
-          <section className="rounded-2xl border border-border bg-card p-4">
+          <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -245,7 +249,7 @@ function CollectPaymentDrawerContent({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={submitting}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                className={FIELD_CLASS_NAME}
               />
             </div>
 
@@ -259,7 +263,7 @@ function CollectPaymentDrawerContent({
                   setPaymentMethod(e.target.value as PaymentMethod)
                 }
                 disabled={submitting}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                className={FIELD_CLASS_NAME}
               >
                 {PAYMENT_METHOD_OPTIONS.map((method) => (
                   <option key={method} value={method}>
@@ -284,7 +288,7 @@ function CollectPaymentDrawerContent({
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
                 disabled={submitting}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                className={FIELD_CLASS_NAME}
               />
             </div>
 
@@ -298,8 +302,11 @@ function CollectPaymentDrawerContent({
                 onChange={(e) => setReferenceNo(e.target.value)}
                 disabled={submitting}
                 placeholder="Optional transaction reference"
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                className={FIELD_CLASS_NAME}
               />
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Required for UPI, bank, and card collections. Cash can remain blank if no receipt reference exists.
+              </p>
             </div>
 
             <div>
@@ -312,7 +319,7 @@ function CollectPaymentDrawerContent({
                 disabled={submitting}
                 rows={4}
                 placeholder="Optional collection note"
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -322,7 +329,7 @@ function CollectPaymentDrawerContent({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="popup-action-bar items-center">
               <button
                 type="submit"
                 disabled={!canSubmit || submitting}

@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import UserRole
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -66,6 +67,16 @@ class CashierApiTests(APITestCase):
             month_no=2,
             amount=Decimal("190.00"),
             due_date=today + timedelta(days=1),
+        )
+        self.cash_finance = FinanceAccount.objects.create(
+            name="Cashier Counter Finance",
+            kind=FinanceAccountKind.CASH,
+            chart_account=ChartOfAccount.objects.create(
+                code="CASHIER-CASH-001",
+                name="Cashier Cash",
+                account_type=ChartOfAccountType.ASSET,
+            ),
+            opening_balance=Decimal("0.00"),
         )
 
     def test_cashier_dashboard_allowed_for_admin(self):
@@ -140,6 +151,7 @@ class CashierApiTests(APITestCase):
                 "emi_id": self.emi.id,
                 "amount": "190.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-001",
                 "note": "cashier test payment",
             },
@@ -167,6 +179,7 @@ class CashierApiTests(APITestCase):
                 "emi_id": self.emi.id,
                 "amount": "190.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-002",
                 "note": "cashier duplicate test",
             },
@@ -178,6 +191,7 @@ class CashierApiTests(APITestCase):
                 "emi_id": self.emi.id,
                 "amount": "190.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-002",
                 "note": "cashier duplicate test",
             },
@@ -204,13 +218,14 @@ class CashierApiTests(APITestCase):
             {
                 "amount": "190.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-003",
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "emi_id is required.")
+        self.assertIn("emi_id", response.data)
 
     def test_cashier_collect_requires_amount(self):
         self.client.force_authenticate(user=self.admin)
@@ -220,13 +235,14 @@ class CashierApiTests(APITestCase):
             {
                 "emi_id": self.emi.id,
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-004",
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "amount is required.")
+        self.assertIn("amount", response.data)
 
     def test_cashier_collect_invalid_amount_fails(self):
         self.client.force_authenticate(user=self.admin)
@@ -237,16 +253,14 @@ class CashierApiTests(APITestCase):
                 "emi_id": self.emi.id,
                 "amount": "-10",
                 "method": "CASH",
+                "finance_account_id": self.cash_finance.id,
                 "reference_no": "CASH-API-005",
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"],
-            "Payment amount must be greater than zero.",
-        )
+        self.assertIn("amount", response.data)
 
     def test_cashier_dashboard_denied_to_customer(self):
         customer_user = create_user(

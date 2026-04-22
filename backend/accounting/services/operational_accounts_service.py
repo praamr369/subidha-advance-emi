@@ -48,6 +48,12 @@ def ensure_phase3_system_accounts():
             name="EMI Collection Clearing",
             account_type=ChartOfAccountType.LIABILITY,
         ),
+        "CUSTOMER_ADVANCES": _ensure_system_account(
+            system_code="CUSTOMER_ADVANCES",
+            code="ADV-2200",
+            name="Customer Advances and Unapplied Receipts",
+            account_type=ChartOfAccountType.LIABILITY,
+        ),
         "EMI_WAIVER_EXPENSE": _ensure_system_account(
             system_code="EMI_WAIVER_EXPENSE",
             code="EMI-5200",

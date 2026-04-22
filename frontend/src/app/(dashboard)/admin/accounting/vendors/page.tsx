@@ -10,14 +10,17 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
+import EmptyState from "@/components/feedback/EmptyState";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   createVendor,
+  getVendorOperationalSummary,
   listVendors,
   updateVendor,
   type Vendor,
+  type VendorOperationalSummary,
 } from "@/services/accounting";
 
 type VendorFormState = {
@@ -59,6 +62,8 @@ export default function AccountingVendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [form, setForm] = useState<VendorFormState>(EMPTY_FORM);
+  const [summary, setSummary] = useState<VendorOperationalSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,6 +77,11 @@ export default function AccountingVendorsPage() {
     try {
       const payload = await listVendors();
       setVendors(payload.results);
+      setSelectedVendorId((current) =>
+        current && payload.results.some((vendor) => vendor.id === current)
+          ? current
+          : payload.results[0]?.id ?? null
+      );
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to load vendors."));
@@ -90,6 +100,37 @@ export default function AccountingVendorsPage() {
     () => vendors.find((vendor) => vendor.id === selectedVendorId) ?? null,
     [selectedVendorId, vendors]
   );
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSummary() {
+      if (!selectedVendorId) {
+        setSummary(null);
+        return;
+      }
+      setSummaryLoading(true);
+      try {
+        const payload = await getVendorOperationalSummary(selectedVendorId);
+        if (!active) return;
+        setSummary(payload);
+      } catch (err) {
+        if (!active) return;
+        setSummary(null);
+        setError(accountingErrorMessage(err, "Failed to load vendor payable summary."));
+      } finally {
+        if (active) {
+          setSummaryLoading(false);
+        }
+      }
+    }
+
+    void loadSummary();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedVendorId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -174,6 +215,124 @@ export default function AccountingVendorsPage() {
 
         {notice ? <AccountingNotice message={notice} /> : null}
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
+
+        <WorkspaceSection
+          title="Supplier payable view"
+          description="Select a vendor from the register below to review purchase-bill exposure, settlement history, and the current payable position."
+        >
+          {!selectedVendor ? (
+            <EmptyState
+              title="No vendor selected"
+              description="Create or select a vendor to inspect purchase and payable activity."
+            />
+          ) : summaryLoading ? (
+            <div className="rounded-xl border border-border bg-background px-4 py-8 text-sm text-muted-foreground">
+              Loading payable summary for {selectedVendor.name}...
+            </div>
+          ) : !summary ? (
+            <EmptyState
+              title="No payable summary available"
+              description="The vendor summary could not be loaded yet."
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-xl border border-border bg-background px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vendor</div>
+                  <div className="mt-1 text-base font-semibold text-foreground">{summary.vendor.name}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-background px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posted purchase bills</div>
+                  <div className="mt-1 text-base font-semibold text-foreground">{summary.summary.posted_purchase_bill_count}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-background px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posted settlements</div>
+                  <div className="mt-1 text-base font-semibold text-foreground">{summary.summary.posted_settlement_count}</div>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Outstanding payable</div>
+                  <div className="mt-1 text-base font-semibold text-amber-900">₹{summary.summary.outstanding_payable_total}</div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-foreground">Recent purchase bills</h3>
+                  <div className="mt-3 space-y-3">
+                    {summary.purchase_bills.rows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No purchase bills posted for this vendor yet.</p>
+                    ) : (
+                      summary.purchase_bills.rows.slice(0, 4).map((bill) => (
+                        <div key={bill.id} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">{bill.bill_no}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{bill.branch_name || bill.branch_code || "Primary branch"} · {bill.status}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-foreground">₹{bill.grand_total}</div>
+                              <div className="mt-1 text-xs text-amber-700">Outstanding ₹{bill.outstanding_amount}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-foreground">Recent settlements</h3>
+                  <div className="mt-3 space-y-3">
+                    {summary.settlements.rows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No settlement history recorded for this vendor yet.</p>
+                    ) : (
+                      summary.settlements.rows.slice(0, 4).map((settlement) => (
+                        <div key={settlement.id} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">{settlement.settlement_no}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{settlement.reference_no || "No reference"} · {settlement.status}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-foreground">₹{settlement.amount}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{settlement.purchase_bill_no || "Vendor-level settlement"}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+                <h3 className="text-sm font-semibold text-foreground">Timeline</h3>
+                <div className="mt-3 space-y-3">
+                  {summary.timeline.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No purchase or settlement timeline entries available yet.</p>
+                  ) : (
+                    summary.timeline.slice(0, 6).map((entry) => (
+                      <div key={`${entry.kind}-${entry.reference_no}-${entry.date}`} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">{entry.reference_no}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">{entry.kind.replace("_", " ")} · {entry.status} · {entry.date}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-foreground">₹{entry.amount}</div>
+                            {entry.outstanding_amount ? (
+                              <div className="mt-1 text-xs text-amber-700">Open ₹{entry.outstanding_amount}</div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </WorkspaceSection>
 
         <WorkspaceSection
           title={selectedVendor ? "Edit Vendor" : "Create Vendor"}

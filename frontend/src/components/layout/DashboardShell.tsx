@@ -40,6 +40,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingCart,
+  Star,
   Ticket,
   Trophy,
   Truck,
@@ -54,6 +55,9 @@ import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import RoleSidebar from "@/components/layout/RoleSidebar";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
+import WorkflowProvider from "@/components/workflows/WorkflowProvider";
+import CommandPalette from "@/components/workflows/CommandPalette";
+import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
@@ -65,6 +69,7 @@ import {
   type NavIconKey,
   type NavigationRole,
 } from "@/config/navigation";
+import { pushRecent, readFavorites, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
 
 const DashboardShellContext = createContext(false);
@@ -84,11 +89,6 @@ type ShellNavGroup = {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   items: ShellNavItem[];
-};
-
-type ShellQuickAction = {
-  label: string;
-  href: string;
 };
 
 const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> = {
@@ -133,8 +133,13 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
   collectPayment: CircleDollarSign,
 };
 
-const SIDEBAR_COLLAPSED_KEY = "subidha:dashboard-sidebar-collapsed:v1";
+const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
+
+function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
+  if (!sessionId) return SIDEBAR_COLLAPSED_LEGACY_KEY;
+  return `subidha:dashboard-sidebar-collapsed:v2:${sessionId}:${role}`;
+}
 
 function readBooleanSetting(key: string, fallback: boolean) {
   if (typeof window === "undefined") return fallback;
@@ -220,58 +225,12 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
     .filter((group) => group.items.length > 0);
 }
 
-function getRoleWorkspaceLabel(role: NavigationRole) {
-  switch (role) {
-    case "ADMIN":
-      return "Admin Control Center";
-    case "PARTNER":
-      return "Partner Operations";
-    case "CUSTOMER":
-      return "Customer Workspace";
-    case "CASHIER":
-      return "Cashier Counter";
-    default:
-      return "Workspace";
-  }
-}
-
-function getRoleWorkspaceDescription(role: NavigationRole) {
-  switch (role) {
-    case "ADMIN":
-      return "Collections, billing, inventory, accounting, workforce, and branch governance in one controlled rail.";
-    case "PARTNER":
-      return "Track assigned customers, subscriptions, collections, and commission posture.";
-    case "CUSTOMER":
-      return "Monitor your subscriptions, payment history, delivery, and support records.";
-    case "CASHIER":
-      return "Run counter collections with branch-safe posting and receipt flow.";
-    default:
-      return "Role-based workspace.";
-  }
-}
-
 function formatRoleLabel(role: NavigationRole) {
   if (role === "ADMIN") return "Admin";
   if (role === "PARTNER") return "Partner";
   if (role === "CUSTOMER") return "Customer";
   if (role === "CASHIER") return "Cashier";
   return "Workspace";
-}
-
-function getRoleQuickActions(role: NavigationRole): ShellQuickAction[] {
-  switch (role) {
-    case "ADMIN":
-      return [
-        { label: "New Subscription", href: ROUTES.admin.subscriptionsCreate },
-        { label: "Collect Advance EMI", href: ROUTES.admin.paymentsCreate },
-        { label: "Direct Sale", href: ROUTES.admin.billingDirectSales },
-        { label: "Purchase Bill", href: ROUTES.admin.accountingPurchaseBills },
-        { label: "Stock Adjust", href: ROUTES.admin.inventoryAdjustments },
-        { label: "Branch Report", href: ROUTES.admin.branchReporting },
-      ];
-    default:
-      return [];
-  }
 }
 
 function getProfileHref(role: NavigationRole) {
@@ -391,6 +350,7 @@ function SidebarContent({
   role,
   pathname,
   displayName,
+  sessionId,
   onLogout,
   isLoggingOut,
   collapsed,
@@ -400,6 +360,7 @@ function SidebarContent({
   role: NavigationRole;
   pathname: string;
   displayName: string;
+  sessionId: number | null;
   onLogout: () => void;
   isLoggingOut: boolean;
   collapsed: boolean;
@@ -415,11 +376,20 @@ function SidebarContent({
       .sort((left, right) => right.href.length - left.href.length);
     return matches[0]?.href ?? null;
   }, [navGroups, pathname]);
-  const quickActions = useMemo(() => getRoleQuickActions(role), [role]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readExpandedGroups());
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
   const [navQuery, setNavQuery] = useState("");
   const normalizedNavQuery = navQuery.trim().toLowerCase();
+  const [favorites, setFavorites] = useState<string[]>(() => (sessionId ? readFavorites(sessionId, role) : []));
+
+  const favoriteLinks = useMemo(() => {
+    if (favorites.length === 0) return [];
+    const allItems = navGroups.flatMap((group) => group.items);
+    return favorites
+      .map((href) => allItems.find((item) => item.href === href))
+      .filter((item): item is ShellNavItem => Boolean(item))
+      .slice(0, 6);
+  }, [favorites, navGroups]);
 
   const visibleGroups = useMemo(() => {
     if (!normalizedNavQuery) return navGroups;
@@ -461,8 +431,8 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
       <div className="sticky top-0 z-20 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
-        <div className="flex h-[4.75rem] items-center gap-3 px-4">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_10px_22px_-16px_rgba(15,23,42,0.9)]">
+        <div className="flex h-[5rem] items-center gap-3 px-5">
+          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.9)]">
             SF
           </div>
 
@@ -471,7 +441,7 @@ function SidebarContent({
               <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
                 {brandConfig.companyName}
               </div>
-              <div className="truncate text-base font-semibold tracking-tight text-white">{brandConfig.platformName}</div>
+              <div className="truncate text-lg font-semibold tracking-tight text-white">{brandConfig.platformName}</div>
             </div>
           ) : (
             <span className="sr-only">{brandConfig.platformName}</span>
@@ -504,27 +474,53 @@ function SidebarContent({
       </div>
 
       {!collapsed ? (
-        <div className="border-b border-[var(--sidebar-rail-border)] px-4 py-4">
-          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] p-3.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-              {getRoleWorkspaceLabel(role)}
+        <div className="border-b border-[var(--sidebar-rail-border)] px-5 py-4">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_74%,transparent)] px-3.5 py-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+                {formatRoleLabel(role)} Navigation
+              </div>
+              <div className="mt-1 text-sm font-semibold text-white">All operational modules are grouped here.</div>
             </div>
-            <p className="mt-1 text-xs leading-5 text-[var(--sidebar-item-muted)]">{getRoleWorkspaceDescription(role)}</p>
+            <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_74%,transparent)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+              Live
+            </div>
           </div>
 
-          {quickActions.length > 0 ? (
+          {favoriteLinks.length > 0 ? (
             <div className="mt-3.5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Fast Actions</div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {quickActions.map((action) => (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    onClick={isMobile ? onClose : undefined}
-                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_75%,transparent)] px-2 text-center text-[11px] font-semibold text-[var(--sidebar-foreground)] transition hover:border-[var(--sidebar-item-active-border)] hover:bg-[var(--sidebar-item-hover)]"
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Favorites</div>
+              <div className="mt-2 space-y-1">
+                {favoriteLinks.map((item) => (
+                  <div
+                    key={`fav-${item.href}`}
+                    className="group/fav flex items-center justify-between gap-2 rounded-xl border border-transparent px-2.5 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] transition hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
                   >
-                    {action.label}
-                  </Link>
+                    <Link
+                      href={item.href}
+                      onClick={isMobile ? onClose : undefined}
+                      className="min-w-0 flex-1 truncate"
+                      aria-label={item.label}
+                    >
+                      {item.label}
+                    </Link>
+                    {sessionId ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/fav:opacity-100"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const next = toggleFavorite(sessionId, role, item.href);
+                          setFavorites(next);
+                        }}
+                        aria-label="Remove favorite"
+                        title="Remove favorite"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </div>
@@ -539,24 +535,24 @@ function SidebarContent({
                 value={navQuery}
                 onChange={(event) => setNavQuery(event.target.value)}
                 placeholder="Filter modules"
-                className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-3 text-xs font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
+                className="h-11 w-full rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-10 pr-3 text-sm font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
               />
             </div>
           </div>
         </div>
       ) : null}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <div className="space-y-2.5">
+      <nav className="flex-1 overflow-y-auto px-4 py-5">
+        <div className="space-y-3">
           {visibleGroups.length === 0 && !collapsed ? (
             <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
               No navigation matches for &quot;{navQuery.trim()}&quot;.
             </div>
           ) : null}
-          {visibleGroups.map((group, index) => {
+          {visibleGroups.map((group) => {
             const GroupIcon = group.icon;
             const groupActive = group.items.some((item) => item.href === activeHref);
-            const defaultOpen = role === "ADMIN" ? index === 0 : true;
+            const defaultOpen = true;
             const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
             const flyoutOpen = collapsed && flyoutGroup === group.title;
 
@@ -588,7 +584,7 @@ function SidebarContent({
                   type="button"
                   onClick={() => toggleGroup(group.title, defaultOpen)}
                   className={cn(
-                    "group/nav relative flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition",
+                    "group/nav relative flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition",
                     collapsed ? "justify-center" : "",
                     groupActive
                       ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
@@ -606,7 +602,7 @@ function SidebarContent({
                   />
                   {!collapsed ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.01em]">{group.title}</span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[0.01em]">{group.title}</span>
                       {groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </>
                   ) : (
@@ -672,12 +668,12 @@ function SidebarContent({
                 ) : null}
 
                 {groupOpen ? (
-                  <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/80 pl-3">
+                  <div className="space-y-1.5 border-l border-[var(--sidebar-rail-border)]/80 pl-4">
                     {group.items.map((item) => {
                       const active = item.href === activeHref;
                       const Icon = item.icon;
                       const rowBase = cn(
-                        "group/item relative flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm transition",
+                        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
                         active
                           ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
                           : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
@@ -689,21 +685,45 @@ function SidebarContent({
                           <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
                         </div>
                       ) : (
-                        <Link
+                        <div
                           key={`${group.title}:${item.href}:${item.label}`}
-                          href={item.href}
-                          onClick={isMobile ? onClose : undefined}
                           className={rowBase}
                           title={collapsed ? item.label : undefined}
                         >
-                          <Icon
-                            className={cn(
-                              "h-4 w-4 shrink-0",
-                              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
-                            )}
-                          />
-                          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                        </Link>
+                          <Link
+                            href={item.href}
+                            onClick={isMobile ? onClose : undefined}
+                            className="flex min-w-0 flex-1 items-center gap-2.5"
+                            aria-label={item.label}
+                          >
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
+                              )}
+                            />
+                            <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
+                          </Link>
+                          {sessionId && !collapsed ? (
+                            <button
+                              type="button"
+                              className={cn(
+                                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
+                                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
+                              )}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const next = toggleFavorite(sessionId, role, item.href);
+                                setFavorites(next);
+                              }}
+                              aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
+                              title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
+                            >
+                              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
+                            </button>
+                          ) : null}
+                        </div>
                       );
                     })}
                   </div>
@@ -716,7 +736,7 @@ function SidebarContent({
 
       <div className="sticky bottom-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-3">
         {!collapsed ? (
-          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3">
+          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{displayName}</div>
@@ -789,6 +809,8 @@ function Topbar({
   role,
   displayName,
   onOpenSidebar,
+  onOpenCommandPalette,
+  onOpenQuickActions,
   onLogout,
   isLoggingOut,
 }: {
@@ -796,6 +818,8 @@ function Topbar({
   role: NavigationRole;
   displayName: string;
   onOpenSidebar: () => void;
+  onOpenCommandPalette: () => void;
+  onOpenQuickActions: () => void;
   onLogout: () => void;
   isLoggingOut: boolean;
 }) {
@@ -818,7 +842,41 @@ function Topbar({
           </div>
         </div>
 
-        <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white sm:hidden"
+            aria-label="Open command palette"
+            title="Command palette"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white sm:inline-flex"
+            aria-label="Open command palette (Ctrl+K)"
+            title="Command palette (Ctrl+K)"
+          >
+            <Search className="h-4 w-4" />
+            Command
+            <span className="ml-1 rounded-lg border border-border bg-white px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+              Ctrl K
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenQuickActions}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+            aria-label="Open quick actions"
+            title="Quick actions"
+          >
+            <ReceiptText className="h-4 w-4" />
+            New
+          </button>
+          <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
+        </div>
       </div>
     </PortalHeader>
   );
@@ -828,85 +886,153 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readBooleanSetting(SIDEBAR_COLLAPSED_KEY, false));
   const [session, setSession] = useState(() => getStoredSession());
   const { logout, isLoggingOut } = useLogout();
+  const role = normalizeRole(session?.role);
+  const sessionId = session?.id ?? null;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readBooleanSetting(sidebarCollapsedKey(sessionId, role), false)
+  );
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandEpoch, setCommandEpoch] = useState(0);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  const openCommandPalette = useCallback(() => {
+    setCommandEpoch((prev) => prev + 1);
+    setCommandOpen(true);
+  }, []);
 
   const toggleSidebarCollapse = useCallback(() => {
     setSidebarCollapsed((prev) => !prev);
   }, []);
 
+  const collapsedStorageKey = sidebarCollapsedKey(sessionId, role);
+
   useEffect(() => {
     try {
-      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+      window.localStorage.setItem(collapsedStorageKey, String(sidebarCollapsed));
     } catch {
       // Non-critical preference persistence.
     }
-  }, [sidebarCollapsed]);
+  }, [collapsedStorageKey, sidebarCollapsed]);
 
   useEffect(() => {
     function handleStorage() {
-      setSession(getStoredSession());
+      const nextSession = getStoredSession();
+      setSession(nextSession);
+      const nextRole = normalizeRole(nextSession?.role);
+      const nextSessionId = nextSession?.id ?? null;
+      setSidebarCollapsed(readBooleanSetting(sidebarCollapsedKey(nextSessionId, nextRole), false));
     }
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  const displayName = session?.name || "User";
+  const title = pathname === getRoleBasePath(role) ? "Dashboard" : buildPageTitle(pathname);
+
+  useEffect(() => {
+    if (nested) return;
+    if (!sessionId) return;
+    pushRecent(sessionId, role, pathname);
+  }, [nested, pathname, role, sessionId]);
+
+  useEffect(() => {
+    if (nested) return;
+    function shouldIgnore(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target) return false;
+      const tag = target.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (shouldIgnore(event)) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openCommandPalette();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [nested, openCommandPalette]);
+
   if (nested) {
     return <>{children}</>;
   }
 
-  const role = normalizeRole(session?.role);
-  const displayName = session?.name || "User";
-  const title = pathname === getRoleBasePath(role) ? "Dashboard" : buildPageTitle(pathname);
-
   return (
     <DashboardShellContext.Provider value={true}>
-      <div className="relative">
-        <PortalShell
-          sidebar={
-            <RoleSidebar collapsed={sidebarCollapsed}>
-              <SidebarContent
+      <WorkflowProvider role={role}>
+        <div className="relative">
+          <PortalShell
+            sidebar={
+              <RoleSidebar collapsed={sidebarCollapsed}>
+                <SidebarContent
+                  key={`sidebar:${role}:${sessionId ?? "anon"}`}
+                  role={role}
+                  pathname={pathname}
+                  displayName={displayName}
+                  sessionId={sessionId}
+                  onLogout={logout}
+                  isLoggingOut={isLoggingOut}
+                  collapsed={sidebarCollapsed}
+                  onToggleCollapse={toggleSidebarCollapse}
+                />
+              </RoleSidebar>
+            }
+            header={
+              <Topbar
+                title={title}
                 role={role}
-                pathname={pathname}
                 displayName={displayName}
+                onOpenSidebar={() => setMobileOpen(true)}
+                onOpenCommandPalette={openCommandPalette}
+                onOpenQuickActions={() => setQuickActionsOpen(true)}
                 onLogout={logout}
                 isLoggingOut={isLoggingOut}
-                collapsed={sidebarCollapsed}
-                onToggleCollapse={toggleSidebarCollapse}
               />
-            </RoleSidebar>
-          }
-          header={
-            <Topbar
-              title={title}
+            }
+          >
+            <>
+              <BusinessSetupWorkflowBanner role={role} pathname={pathname} />
+              {children}
+            </>
+          </PortalShell>
+
+          <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
+            <SidebarContent
+              key={`sidebar-mobile:${role}:${sessionId ?? "anon"}`}
               role={role}
+              pathname={pathname}
               displayName={displayName}
-              onOpenSidebar={() => setMobileOpen(true)}
+              sessionId={sessionId}
               onLogout={logout}
               isLoggingOut={isLoggingOut}
+              collapsed={false}
+              onToggleCollapse={toggleSidebarCollapse}
+              onClose={() => setMobileOpen(false)}
             />
-          }
-        >
-          <>
-            <BusinessSetupWorkflowBanner role={role} pathname={pathname} />
-            {children}
-          </>
-        </PortalShell>
+          </RoleSidebar>
 
-        <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
-          <SidebarContent
+          <QuickActionLauncher
+            open={quickActionsOpen}
+            onClose={() => setQuickActionsOpen(false)}
             role={role}
-            pathname={pathname}
-            displayName={displayName}
-            onLogout={logout}
-            isLoggingOut={isLoggingOut}
-            collapsed={false}
-            onToggleCollapse={toggleSidebarCollapse}
-            onClose={() => setMobileOpen(false)}
+            sessionId={sessionId}
+            currentPathname={pathname}
           />
-        </RoleSidebar>
-      </div>
+          <CommandPalette
+            key={`command:${role}:${sessionId ?? "anon"}:${commandEpoch}`}
+            open={commandOpen}
+            onClose={() => setCommandOpen(false)}
+            role={role}
+            sessionId={sessionId}
+            currentPathname={pathname}
+          />
+        </div>
+      </WorkflowProvider>
     </DashboardShellContext.Provider>
   );
 }

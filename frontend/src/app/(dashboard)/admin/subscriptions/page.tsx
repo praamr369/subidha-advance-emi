@@ -9,6 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -240,6 +241,7 @@ function statusBadgeClass(status: SubscriptionStatus): string {
 }
 
 export default function AdminSubscriptionsPage() {
+  const { openWorkflow } = useWorkflowLauncher();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -806,6 +808,18 @@ export default function AdminSubscriptionsPage() {
                               >
                                 Open Subscription
                               </Link>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openWorkflow("admin.collectPayment", {
+                                    query: { subscription: row.id },
+                                  })
+                                }
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                              >
+                                Quick Collect
+                              </button>
 
                               {typeof row.customer_id === "number" ? (
                                 <Link

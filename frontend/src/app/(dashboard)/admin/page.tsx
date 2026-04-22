@@ -23,6 +23,8 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import ActionButton from "@/components/ui/ActionButton";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
   buildReconciliationPosture,
   buildSettlementPosture,
@@ -92,6 +94,7 @@ function LaunchCard({
 }
 
 export default function AdminDashboardPage() {
+  const { openWorkflow } = useWorkflowLauncher();
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
   const [legacy, setLegacy] = useState<AdminDashboardResponse | null>(null);
   const [deliverySummary, setDeliverySummary] = useState<DeliverySummaryPayload | null>(null);
@@ -236,6 +239,36 @@ export default function AdminDashboardPage() {
       }}
     >
       <div className="space-y-6">
+        <WorkspaceSection
+          title="Quick actions"
+          description="Drawer-first launch for high-frequency workflows. Canonical pages remain the source of truth for deep audit and long forms."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="primary" onClick={() => openWorkflow("admin.createSubscription")}>
+                New Subscription
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => openWorkflow("admin.collectPayment")}>
+                Collect Payment
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createCustomer")}>
+                New Customer
+              </ActionButton>
+            </div>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+              Financial posting stays server-validated; the drawer never bypasses service-layer allocation rules.
+            </div>
+            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+              Use the sidebar Favorites + command palette (Ctrl+K) to reduce navigation cost under daily ops.
+            </div>
+            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+              Deep link pages remain canonical for reconciliation, receipts, reversals, and audit review.
+            </div>
+          </div>
+        </WorkspaceSection>
+
         <div className="flex justify-end">
           <button
             type="button"

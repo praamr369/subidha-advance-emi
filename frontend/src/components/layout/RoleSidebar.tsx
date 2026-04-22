@@ -32,7 +32,7 @@ export default function RoleSidebar({
         ) : null}
         <aside
           className={cn(
-            "dashboard-shell-chrome fixed inset-y-0 left-0 z-50 w-[18.75rem] border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-transform duration-200 md:hidden",
+            "dashboard-shell-chrome fixed inset-y-0 left-0 z-50 w-[22rem] border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-transform duration-200 md:hidden",
             "bg-[linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
             mobileOpen ? "translate-x-0" : "-translate-x-full",
             className
@@ -49,7 +49,7 @@ export default function RoleSidebar({
       className={cn(
         "dashboard-shell-chrome h-screen border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-[width] duration-200",
         "bg-[linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
-        collapsed ? "w-[5.8rem]" : "w-[19rem]",
+        collapsed ? "w-[6rem]" : "w-[23rem]",
         className
       )}
     >

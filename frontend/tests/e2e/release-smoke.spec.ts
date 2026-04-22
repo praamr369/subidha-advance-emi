@@ -92,13 +92,18 @@ test.describe("admin release smoke", () => {
     await page.locator("#payment_method").selectOption("UPI");
     await page.locator("#reference_no").fill(referenceNo);
 
+    await page.getByRole("button", { name: /record payment/i }).click();
+    await expect(
+      page.getByRole("heading", { name: /confirm payment posting/i })
+    ).toBeVisible();
+
     const [collectResponse] = await Promise.all([
       page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
           response.url().includes("/admin/payments/collect/")
       ),
-      page.getByRole("button", { name: /record payment/i }).click(),
+      page.getByRole("button", { name: /confirm posting/i }).click(),
     ]);
 
     expect(collectResponse.ok()).toBeTruthy();

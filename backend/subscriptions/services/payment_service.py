@@ -5,6 +5,8 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from accounting.models import FinanceAccount, FinanceAccountKind
+from accounting.services.finance_posting_service import FinancePostingService
 from branch_control.models import Branch
 from branch_control.services.branch_service import (
     assigned_counter_for_user,
@@ -21,6 +23,10 @@ from subscriptions.models import (
     LuckyIdStatus,
     MONEY_ZERO,
     Payment,
+    PaymentReconciliation,
+    PaymentReconciliationEvent,
+    ReconciliationEventType,
+    ReconciliationStatus,
     Subscription,
     SubscriptionStatus,
 )
@@ -233,6 +239,99 @@ def _reconcile_after_payment(subscription: Subscription, emi: Emi):
     _refresh_subscription_status(subscription)
 
 
+def _fallback_finance_account_for_method(method: str):
+    normalized = (method or "CASH").strip().upper()
+    kind = FinanceAccountKind.CASH
+    if normalized == "BANK":
+        kind = FinanceAccountKind.BANK
+    elif normalized == "UPI":
+        kind = FinanceAccountKind.UPI
+    candidates = list(
+        FinanceAccount.objects.select_related("chart_account")
+        .filter(kind=kind, is_active=True)
+        .order_by("id")[:2]
+    )
+    if candidates:
+        return candidates[0]
+    return None
+
+
+def _emi_outstanding_amount(emi: Emi) -> Decimal:
+    net_paid = _get_emi_net_paid(emi)
+    outstanding = Decimal(str(emi.amount)) - Decimal(str(net_paid))
+    if outstanding < MONEY_ZERO:
+        return MONEY_ZERO
+    return outstanding
+
+
+def _upsert_payment_reconciliation(
+    *,
+    payment: Payment,
+    expected_amount: Decimal,
+    actor,
+    note: Optional[str] = None,
+):
+    expected_amount = Decimal(str(expected_amount or MONEY_ZERO))
+    paid_amount = Decimal(str(payment.amount or MONEY_ZERO))
+    variance = paid_amount - expected_amount
+
+    if payment.emi_id is None:
+        status_value = ReconciliationStatus.UNLINKED
+    elif paid_amount == expected_amount:
+        status_value = ReconciliationStatus.MATCHED
+    elif paid_amount < expected_amount:
+        status_value = ReconciliationStatus.PARTIAL
+    else:
+        status_value = ReconciliationStatus.OVERPAID
+
+    reconciliation, created = PaymentReconciliation.objects.get_or_create(
+        payment=payment,
+        defaults={
+            "matched_emi": payment.emi,
+            "status": status_value,
+            "expected_amount": expected_amount,
+            "paid_amount": paid_amount,
+            "variance_amount": variance,
+            "notes": note or "",
+        },
+    )
+    if not created:
+        reconciliation.matched_emi = payment.emi
+        reconciliation.status = status_value
+        reconciliation.expected_amount = expected_amount
+        reconciliation.paid_amount = paid_amount
+        reconciliation.variance_amount = variance
+        if note:
+            reconciliation.notes = "\n".join(
+                part for part in [reconciliation.notes.strip(), note] if part
+            ).strip()
+        reconciliation.reconciled_by = actor
+        reconciliation.reconciled_at = timezone.now()
+        reconciliation.save(
+            update_fields=[
+                "matched_emi",
+                "status",
+                "expected_amount",
+                "paid_amount",
+                "variance_amount",
+                "notes",
+                "reconciled_by",
+                "reconciled_at",
+                "updated_at",
+            ]
+        )
+
+    PaymentReconciliationEvent.objects.create(
+        reconciliation=reconciliation,
+        event_type=ReconciliationEventType.CREATED if created else ReconciliationEventType.STATUS_CHANGED,
+        old_status="",
+        new_status=reconciliation.status,
+        message=note or f"Expected {expected_amount:.2f}, paid {paid_amount:.2f}",
+        actor=actor,
+    )
+    return reconciliation
+
+
 def _sync_billing_best_effort(
     *,
     subscription: Subscription,
@@ -307,6 +406,7 @@ def record_emi_payment(
     payment_date=None,
     branch_id: int | None = None,
     cash_counter_id: int | None = None,
+    finance_account_id: int | None = None,
 ):
     """
     Canonical payment collection entrypoint.
@@ -334,6 +434,8 @@ def record_emi_payment(
             "payment": existing,
             "emi": existing.emi,
             "subscription": existing.subscription,
+            "finance_account": getattr(existing, "finance_account", None),
+            "reconciliation": getattr(existing, "reconciliation", None),
             "created": False,
         }
 
@@ -345,12 +447,28 @@ def record_emi_payment(
     subscription = emi.subscription
 
     _assert_payment_write_allowed(subscription, emi)
+    outstanding_before = _emi_outstanding_amount(emi)
+    if amount > outstanding_before:
+        raise ValueError("Payment amount cannot exceed the EMI outstanding balance. Collect extra money as customer advance instead.")
     branch, cash_counter = _resolve_branch_and_counter(
         actor=collected_by,
         subscription=subscription,
         branch_id=branch_id,
         cash_counter_id=cash_counter_id,
     )
+    resolved_finance_account_id = finance_account_id or getattr(cash_counter, "finance_account_id", None)
+    if resolved_finance_account_id is None:
+        fallback_finance_account = _fallback_finance_account_for_method(method)
+        if fallback_finance_account is None:
+            raise ValueError("Finance account selection is required for payment collection.")
+        finance_account = fallback_finance_account
+    else:
+        finance_account = FinancePostingService.resolve_operational_finance_account(
+            finance_account_id=resolved_finance_account_id,
+        )
+    finance_branch_id = getattr(finance_account, "branch_id", None)
+    if branch and finance_branch_id and branch.id != finance_branch_id:
+        raise ValueError("Selected finance account does not belong to the payment branch.")
 
     payment = Payment.objects.create(
         customer=subscription.customer,
@@ -359,10 +477,20 @@ def record_emi_payment(
         amount=amount,
         branch=branch,
         cash_counter=cash_counter,
+        finance_account=finance_account,
         method=method,
         reference_no=reference_no,
         collected_by=collected_by,
         payment_date=payment_date,
+        allocation_metadata={
+            "collection_mode": "DIRECT",
+            "finance_account_id": finance_account.id,
+            "finance_chart_account_id": finance_account.chart_account_id,
+            "posting_side": {
+                "debit": finance_account.chart_account.code,
+                "credit": "ACCOUNTS_RECEIVABLE",
+            },
+        },
     )
 
     allocated_amount = allocate_payment(payment)
@@ -390,6 +518,7 @@ def record_emi_payment(
             "emi_id": emi.id,
             "branch_id": payment.branch_id,
             "cash_counter_id": payment.cash_counter_id,
+            "finance_account_id": payment.finance_account_id,
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
@@ -402,6 +531,17 @@ def record_emi_payment(
     )
 
     _reconcile_after_payment(subscription, emi)
+    FinancePostingService.post_subscription_collection(
+        payment=payment,
+        finance_account=finance_account,
+        performed_by=collected_by,
+    )
+    reconciliation = _upsert_payment_reconciliation(
+        payment=payment,
+        expected_amount=outstanding_before,
+        actor=collected_by,
+        note=f"Collected through finance account {finance_account.name}.",
+    )
     _sync_billing_best_effort(
         subscription=subscription,
         actor=collected_by,
@@ -415,6 +555,8 @@ def record_emi_payment(
         "emi": emi,
         "subscription": subscription,
         "allocated_amount": allocated_amount,
+        "finance_account": finance_account,
+        "reconciliation": reconciliation,
         "created": True,
     }
 
@@ -435,6 +577,7 @@ def collect_payment_for_admin(
     note: Optional[str] = None,
     branch_id: Optional[int] = None,
     cash_counter_id: Optional[int] = None,
+    finance_account_id: Optional[int] = None,
 ):
     """
     Backward-compatible admin wrapper.
@@ -471,6 +614,7 @@ def collect_payment_for_admin(
         payment_date=payment_date,
         branch_id=branch_id,
         cash_counter_id=cash_counter_id,
+        finance_account_id=finance_account_id,
     )
 
 

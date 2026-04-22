@@ -25,16 +25,17 @@ test.describe("admin dashboard phase-3 smoke", () => {
     ).toBeVisible();
     // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
     await expect(sidebar.getByText("Executive Overview", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("CRM & Leads", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Sales & Orders", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Subscriptions", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Finance & Accounts", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Customer & CRM", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Direct Sale Workflow", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Subscription Sale Workflow", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Collections & Cash Desk", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Finance & Ledger Control", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Reports & Analytics", { exact: true })).toBeVisible();
     await expect(
       sidebar.getByRole("link", { name: "Business Control Center", exact: true })
     ).toBeVisible();
     await expect(
-      sidebar.getByRole("link", { name: "Analytics", exact: true })
+      sidebar.getByRole("link", { name: "Analytics", exact: true }).first()
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Urgent Attention" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Launch Points" })).toBeVisible();

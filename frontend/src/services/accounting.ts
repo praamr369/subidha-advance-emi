@@ -18,6 +18,7 @@ export type ChartOfAccount = {
   is_active: boolean;
   allow_manual_posting: boolean;
   system_code?: string | null;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -36,8 +37,39 @@ export type FinanceAccount = {
   is_active: boolean;
   bank_last4?: string;
   upi_handle?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type AccountingMasterEditability = {
+  can_edit: boolean;
+  editable_fields: string[];
+  locked_fields: Record<string, string>;
+  can_deactivate: boolean;
+  deactivate_reason?: string | null;
+  can_change_parent?: boolean | null;
+  parent_change_reason?: string | null;
+  can_change_chart_account?: boolean | null;
+  chart_account_change_reason?: string | null;
+  usage_summary?: Record<string, boolean | string | number | null>;
+};
+
+export type ChartOfAccountDetail = ChartOfAccount & {
+  parent_name?: string | null;
+  child_count?: number;
+  finance_account_count?: number;
+  editability: AccountingMasterEditability;
+};
+
+export type FinanceAccountDetail = FinanceAccount & {
+  editability: AccountingMasterEditability;
+};
+
+export type AccountingEditabilityEnvelope<T> = {
+  success: boolean;
+  data: T;
+  editability: AccountingMasterEditability;
 };
 
 export type JournalEntryLine = {
@@ -86,6 +118,91 @@ export type Vendor = {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type VendorOperationalPurchaseBill = {
+  id: number;
+  bill_no: string;
+  bill_date: string;
+  status: string;
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  finance_account_id?: number | null;
+  finance_account_name?: string | null;
+  grand_total: string;
+  settled_amount: string;
+  outstanding_amount: string;
+};
+
+export type VendorOperationalSettlement = {
+  id: number;
+  settlement_no: string;
+  settlement_date: string;
+  status: string;
+  amount: string;
+  reference_no?: string | null;
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  finance_account_id?: number | null;
+  finance_account_name?: string | null;
+  purchase_bill_id?: number | null;
+  purchase_bill_no?: string | null;
+};
+
+export type VendorOperationalTimelineRow = {
+  kind: "PURCHASE_BILL" | "SETTLEMENT";
+  date: string;
+  reference_no: string;
+  status: string;
+  amount: string;
+  outstanding_amount?: string | null;
+  linked_purchase_bill_id?: number | null;
+};
+
+export type VendorOperationalSummary = {
+  vendor: {
+    id: number;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    is_active: boolean;
+    gstin?: string | null;
+  };
+  summary: {
+    purchase_bill_count: number;
+    posted_purchase_bill_count: number;
+    settlement_count: number;
+    posted_settlement_count: number;
+    posted_purchase_total: string;
+    posted_settlement_total: string;
+    outstanding_payable_total: string;
+  };
+  purchase_bills: {
+    summary: {
+      total_count: number;
+      draft_count: number;
+      approved_count: number;
+      posted_count: number;
+      cancelled_count: number;
+      gross_total: string;
+      posted_total: string;
+    };
+    rows: VendorOperationalPurchaseBill[];
+  };
+  settlements: {
+    summary: {
+      total_count: number;
+      draft_count: number;
+      posted_count: number;
+      cancelled_count: number;
+      gross_total: string;
+      posted_total: string;
+    };
+    rows: VendorOperationalSettlement[];
+  };
+  timeline: VendorOperationalTimelineRow[];
 };
 
 export type ExpenseVoucher = {
@@ -867,6 +984,23 @@ export function createChartOfAccount(payload: Partial<ChartOfAccount>) {
   });
 }
 
+export function getChartOfAccount(id: number) {
+  return apiFetch<ChartOfAccountDetail>(`/accounting/chart-of-accounts/${id}/`);
+}
+
+export function updateChartOfAccount(id: number, payload: Partial<ChartOfAccount>) {
+  return apiFetch<ChartOfAccountDetail>(`/accounting/chart-of-accounts/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getChartOfAccountEditability(id: number) {
+  return apiFetch<AccountingEditabilityEnvelope<ChartOfAccountDetail>>(
+    `/accounting/chart-of-accounts/${id}/editability/`
+  );
+}
+
 export function listFinanceAccounts(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<FinanceAccount>>(
     `/accounting/finance-accounts/${buildQuery(params)}`
@@ -878,6 +1012,23 @@ export function createFinanceAccount(payload: Partial<FinanceAccount>) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getFinanceAccount(id: number) {
+  return apiFetch<FinanceAccountDetail>(`/accounting/finance-accounts/${id}/`);
+}
+
+export function updateFinanceAccount(id: number, payload: Partial<FinanceAccount>) {
+  return apiFetch<FinanceAccountDetail>(`/accounting/finance-accounts/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getFinanceAccountEditability(id: number) {
+  return apiFetch<AccountingEditabilityEnvelope<FinanceAccountDetail>>(
+    `/accounting/finance-accounts/${id}/editability/`
+  );
 }
 
 export function listJournalEntries(params: Record<string, string | number | undefined | null> = {}) {
@@ -936,6 +1087,12 @@ export function updateVendor(id: number, payload: Partial<Vendor>) {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+export function getVendorOperationalSummary(id: number) {
+  return apiFetch<VendorOperationalSummary>(
+    `/accounting/vendors/${id}/operational-summary/`
+  );
 }
 
 export function listExpenses(params: Record<string, string | number | undefined | null> = {}) {

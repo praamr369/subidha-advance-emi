@@ -33,6 +33,7 @@ import {
   type PaymentRegisterRow,
   type PaymentRegisterSummary,
 } from "@/services/payments";
+import { listDirectSales, type DirectSale } from "@/services/billing";
 
 // =====================================================
 // TYPES
@@ -742,6 +743,7 @@ export default function AdminCollectionsPage() {
   const [dueTodayRows, setDueTodayRows] = useState<EmiRow[]>([]);
   const [overdueRows, setOverdueRows] = useState<EmiRow[]>([]);
   const [recentPayments, setRecentPayments] = useState<PaymentRegisterRow[]>([]);
+  const [directSaleRows, setDirectSaleRows] = useState<DirectSale[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -753,7 +755,12 @@ export default function AdminCollectionsPage() {
     else setRefreshing(true);
 
     try {
-      const [dueTodayPayload, overduePayload, recentPaymentsPayload] =
+      const [
+        dueTodayPayload,
+        overduePayload,
+        recentPaymentsPayload,
+        directSalesPayload,
+      ] =
         await Promise.all([
           apiFetch<unknown>(
             `/admin/emis/?status=PENDING&date_from=${today}&date_to=${today}`
@@ -762,6 +769,9 @@ export default function AdminCollectionsPage() {
           getAdminPaymentRegister({
             dateFrom: today,
             dateTo: today,
+          }),
+          listDirectSales({
+            outstanding_only: "true",
           }),
         ]);
 
@@ -772,6 +782,7 @@ export default function AdminCollectionsPage() {
         toArray<Record<string, unknown>>(overduePayload).map(normalizeEmi)
       );
       setRecentPayments(recentPaymentsPayload.results);
+      setDirectSaleRows(directSalesPayload.results);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -779,6 +790,7 @@ export default function AdminCollectionsPage() {
         setDueTodayRows([]);
         setOverdueRows([]);
         setRecentPayments([]);
+        setDirectSaleRows([]);
       }
     } finally {
       if (mode === "initial") setLoading(false);
@@ -837,6 +849,15 @@ export default function AdminCollectionsPage() {
   );
 
   const overduePreview = useMemo(() => visibleOverdueRows.slice(0, 6), [visibleOverdueRows]);
+  const directSalePreview = useMemo(() => directSaleRows.slice(0, 6), [directSaleRows]);
+  const directSaleOutstandingTotal = useMemo(
+    () =>
+      directSaleRows.reduce(
+        (sum, row) => sum + Number(row.balance_total || 0),
+        0
+      ),
+    [directSaleRows]
+  );
 
   const exportRows = useMemo(
     () =>
@@ -862,7 +883,7 @@ export default function AdminCollectionsPage() {
   return (
     <PortalPage
       title="Collections Workspace"
-      subtitle="Daily collections control center for due-today follow-up, posted payment verification, and overdue preview."
+      subtitle="Operational collections control center for subscription EMI follow-up, direct-sale receivables, and posted payment verification."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Collections & EMI", href: ROUTES.admin.collections },
@@ -875,6 +896,11 @@ export default function AdminCollectionsPage() {
             : ROUTES.admin.payments,
           label: "Open Payments",
           variant: "primary",
+        },
+        {
+          href: `${ROUTES.admin.paymentsCreate}?workflow=direct-sale`,
+          label: "Direct-Sale Collect",
+          variant: "secondary",
         },
         {
           href: ROUTES.admin.emisOverdue,
@@ -969,7 +995,7 @@ export default function AdminCollectionsPage() {
         {!loading && !error && (
           <>
             {/* Advanced KPI Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <KpiCard
                 title="Due Today"
                 value={String(visibleDueTodayRows.length)}
@@ -999,6 +1025,13 @@ export default function AdminCollectionsPage() {
                 icon={<AlertCircle className="h-4 w-4" />}
                 tone={visibleOverdueRows.length > 0 ? "danger" : "warning"}
                 href="/admin/emis/overdue"
+              />
+              <KpiCard
+                title="Direct-Sale Outstanding"
+                value={money(directSaleOutstandingTotal)}
+                icon={<Wallet className="h-4 w-4" />}
+                tone={directSaleRows.length > 0 ? "warning" : "default"}
+                href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale`}
               />
             </div>
 
@@ -1044,7 +1077,69 @@ export default function AdminCollectionsPage() {
                 >
                   Open Admin Collection
                 </Link>
+
+                <Link
+                  href="/admin/payments/create?workflow=direct-sale"
+                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                >
+                  Open Direct-Sale Collection
+                </Link>
               </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Direct-sale receivables"
+              description="Outstanding invoiced direct sales stay separate from the EMI queue but remain collectible from the same operational control layer."
+              actionHref="/admin/payments/create?workflow=direct-sale"
+              actionLabel="Collect Direct Sale"
+            >
+              {directSalePreview.length === 0 ? (
+                <EmptyState
+                  title="No outstanding direct sales"
+                  description="No invoiced direct-sale receivables are currently awaiting collection."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {directSalePreview.map((sale) => (
+                    <div
+                      key={sale.id}
+                      className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                          </div>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            Invoice {sale.billing_invoice_no || "—"} · {sale.branch_name || sale.branch_code || "Primary branch"}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Sale date {formatDate(sale.sale_date)} · Collected {money(sale.received_total)}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                            Outstanding {money(sale.balance_total)}
+                          </div>
+                          <Link
+                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${sale.id}`}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Collect
+                          </Link>
+                          <Link
+                            href={`/admin/billing/direct-sales?focus_sale=${sale.id}`}
+                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                          >
+                            Open Sale
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </SectionCard>
 
             <SectionCard

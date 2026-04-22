@@ -86,6 +86,12 @@ from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
 )
+from api.v1.views.finance_operations import (
+    AdminAdvanceAllocationView,
+    AdminFinanceAccountOperationalSummaryView,
+    AdminFinanceTransferView,
+    AdminReconciliationOverviewView,
+)
 from api.v1.views.admin_contracts import (
     AdminLeaseContractCreateView,
     AdminRentContractCreateView,
@@ -128,7 +134,6 @@ router.register(r"products", ProductAdminViewSet, basename="admin-products")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 
 urlpatterns = [
-    path("", include(router.urls)),
     path("contracts/rent/", AdminRentContractCreateView.as_view()),
     path("contracts/lease/", AdminLeaseContractCreateView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),
@@ -182,6 +187,10 @@ urlpatterns = [
     path("commissions/reconciliation/", AdminCommissionReconciliationView.as_view()),
     path("commissions/statements/export/", AdminCommissionStatementExportView.as_view()),
     path("commissions/bulk-settle/", AdminCommissionBulkSettleView.as_view()),
+    path("payments/allocate-advance/", AdminAdvanceAllocationView.as_view()),
+    path("finance-transfers/", AdminFinanceTransferView.as_view()),
+    path("reconciliation/overview/", AdminReconciliationOverviewView.as_view()),
+    path("finance-accounts/operational-summary/", AdminFinanceAccountOperationalSummaryView.as_view()),
     path("commission-payout-batches/", AdminPayoutBatchCreateView.as_view()),
     path("commission-payout-batches/list/", AdminPayoutBatchListView.as_view()),
     path("commission-payout-batches/preview/", AdminPayoutBatchPreviewView.as_view()),
@@ -210,4 +219,5 @@ urlpatterns = [
     path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
     path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
     path("reports/analytics-summary/", AdminAnalyticsSummaryView.as_view()),
+    path("", include(router.urls)),
 ]

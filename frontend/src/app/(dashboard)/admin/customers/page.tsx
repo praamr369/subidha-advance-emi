@@ -23,6 +23,7 @@ import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import ActionButton from "@/components/ui/ActionButton";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
   importCustomers,
   previewCustomerImport,
@@ -175,6 +176,7 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
 }
 
 export default function AdminCustomersPage() {
+  const { openWorkflow } = useWorkflowLauncher();
   const customerImportFileRef = useRef<HTMLInputElement | null>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -565,6 +567,13 @@ export default function AdminCustomersPage() {
                 leftIcon={<RefreshCw className="h-4 w-4" />}
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                onClick={() => openWorkflow("admin.createCustomer")}
+                leftIcon={<UserPlus className="h-4 w-4" />}
+              >
+                Quick Create Customer
               </ActionButton>
               <ActionButton
                 variant="primary"

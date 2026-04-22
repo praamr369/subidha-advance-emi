@@ -394,6 +394,7 @@ class ChartOfAccount(AccountingTimeStampedModel):
         blank=True,
         db_index=True,
     )
+    notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "accounting_chart_of_accounts"
@@ -416,6 +417,7 @@ class ChartOfAccount(AccountingTimeStampedModel):
         self.system_code = (
             (self.system_code or "").strip().upper() or None
         )
+        self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -451,6 +453,7 @@ class FinanceAccount(AccountingTimeStampedModel):
     is_active = models.BooleanField(default=True, db_index=True)
     bank_last4 = models.CharField(max_length=4, blank=True, default="")
     upi_handle = models.CharField(max_length=255, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "accounting_finance_accounts"
@@ -473,6 +476,7 @@ class FinanceAccount(AccountingTimeStampedModel):
         self.name = (self.name or "").strip()
         self.bank_last4 = (self.bank_last4 or "").strip()
         self.upi_handle = (self.upi_handle or "").strip()
+        self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = _default_branch()
         self.full_clean()

@@ -19,7 +19,7 @@ test("admin split surfaces load with expected role-safe posture", async ({ page 
 
   await page.goto("/admin/finance");
   await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("Workflow hub for accounts");
+  await expect(page.locator("body")).toContainText("Admin finance operations view");
 });
 
 test("reports and finance launch cards point to real routes", async ({ page }) => {
@@ -35,7 +35,7 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
   ];
 
   for (const link of reportLinks) {
-    const launch = page.getByRole("link", { name: link.label });
+    const launch = page.getByRole("link", { name: link.label }).first();
     await expect(launch).toBeVisible();
     await expect(launch).toHaveAttribute("href", new RegExp(`^${link.hrefPrefix}`));
   }
@@ -43,16 +43,18 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
   await page.goto("/admin/finance");
   await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
   const financeLaunchpadLinks: Array<{ label: string; hrefPrefix: string }> = [
-    { label: "Chart of Accounts", hrefPrefix: "/admin/accounting/chart-of-accounts" },
-    { label: "Finance Accounts", hrefPrefix: "/admin/settings/business-setup/finance-accounts" },
+    { label: "Collections Workspace", hrefPrefix: "/admin/collections" },
+    { label: "Payment Register", hrefPrefix: "/admin/payments" },
+    { label: "Purchase Bills", hrefPrefix: "/admin/accounting/purchase-bills" },
+    { label: "Vendor Ledger View", hrefPrefix: "/admin/accounting/vendors" },
+    { label: "Flagged Queue", hrefPrefix: "/admin/reconciliation" },
+    { label: "Payout Batches", hrefPrefix: "/admin/finance/payout-batches" },
+    { label: "Open Direct Sale", hrefPrefix: "/admin/billing/direct-sales" },
+    { label: "Open Subscriptions", hrefPrefix: "/admin/subscriptions" },
     { label: "Cash Book", hrefPrefix: "/admin/accounting/books/cash" },
     { label: "Bank Book", hrefPrefix: "/admin/accounting/books/bank" },
     { label: "UPI Book", hrefPrefix: "/admin/accounting/books/upi" },
-    { label: "Purchase Bills", hrefPrefix: "/admin/accounting/purchase-bills" },
-    { label: "Direct Sales", hrefPrefix: "/admin/billing/direct-sales" },
-    { label: "Reconciliation Flags", hrefPrefix: "/admin/reconciliation" },
-    { label: "Commission Register", hrefPrefix: "/admin/finance/commissions" },
-    { label: "Payout Batches", hrefPrefix: "/admin/finance/payout-batches" },
+    { label: "Chart of Accounts", hrefPrefix: "/admin/accounting/chart-of-accounts" },
   ];
 
   for (const link of financeLaunchpadLinks) {

@@ -97,9 +97,14 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "CRM & Leads",
+      title: "Customer & CRM",
       icon: "crm",
       items: [
+        {
+          label: "Customers",
+          href: ROUTES.admin.customers,
+          icon: "customers",
+        },
         {
           label: "CRM Overview",
           href: ROUTES.admin.crm,
@@ -120,17 +125,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.admin.crmParties,
           icon: "customers",
         },
-      ],
-    },
-    {
-      title: "Customers",
-      icon: "customers",
-      items: [
-        {
-          label: "Customers",
-          href: ROUTES.admin.customers,
-          icon: "customers",
-        },
         {
           label: "Support Requests",
           href: ROUTES.admin.supportRequests,
@@ -144,31 +138,31 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Sales & Orders",
+      title: "Direct Sale Workflow",
       icon: "billing",
       items: [
         {
-          label: "Billing Cockpit",
+          label: "Direct Sale Desk",
           href: ROUTES.admin.billing,
           icon: "billing",
         },
         {
-          label: "Direct Sales",
+          label: "Direct Sale Register",
           href: ROUTES.admin.billingDirectSales,
           icon: "billing",
         },
         {
-          label: "Billing Register",
-          href: ROUTES.admin.billingRegister,
-          icon: "billing",
+          label: "Collect Direct-Sale Balance",
+          href: `${ROUTES.admin.paymentsCreate}?workflow=direct-sale`,
+          icon: "collections",
         },
         {
-          label: "Invoices",
+          label: "Retail Invoices",
           href: ROUTES.admin.billingInvoices,
           icon: "billing",
         },
         {
-          label: "Receipts",
+          label: "Retail Receipts",
           href: ROUTES.admin.billingReceipts,
           icon: "billing",
         },
@@ -180,12 +174,17 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Subscriptions",
+      title: "Subscription Sale Workflow",
       icon: "subscriptions",
       items: [
         {
-          label: "Subscriptions",
+          label: "Subscription Register",
           href: ROUTES.admin.subscriptions,
+          icon: "subscriptions",
+        },
+        {
+          label: "Create Subscription Sale",
+          href: ROUTES.admin.subscriptionsCreate,
           icon: "subscriptions",
         },
         {
@@ -199,9 +198,19 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "subscriptions",
         },
         {
-          label: "Advance EMI Register",
+          label: "EMI Register",
           href: ROUTES.admin.emis,
           icon: "emis",
+        },
+        {
+          label: "Subscription Collections",
+          href: ROUTES.admin.collections,
+          icon: "collections",
+        },
+        {
+          label: "Collect Subscription Payment",
+          href: ROUTES.admin.paymentsCreate,
+          icon: "payments",
         },
         {
           label: "Subscription Requests",
@@ -221,7 +230,79 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Finance & Accounts",
+      title: "Collections & Cash Desk",
+      icon: "collections",
+      items: [
+        {
+          label: "Collections Workspace",
+          href: ROUTES.admin.collections,
+          icon: "collections",
+        },
+        {
+          label: "Payment Register",
+          href: ROUTES.admin.payments,
+          icon: "payments",
+        },
+        {
+          label: "Overdue Advance EMIs",
+          href: ROUTES.admin.emisOverdue,
+          icon: "emis",
+        },
+        {
+          label: "Payment Reminders",
+          href: ROUTES.admin.remindersPaymentReminders,
+          icon: "reminders",
+        },
+        {
+          label: "Cash Counters",
+          href: ROUTES.admin.counters,
+          icon: "cashCounter",
+        },
+      ],
+    },
+    {
+      title: "Inventory & Supplier Purchases",
+      icon: "inventory",
+      items: [
+        {
+          label: "Inventory Overview",
+          href: ROUTES.admin.inventory,
+          icon: "inventory",
+        },
+        {
+          label: "Inventory Items",
+          href: ROUTES.admin.inventoryItems,
+          icon: "inventory",
+        },
+        {
+          label: "Stock On Hand",
+          href: ROUTES.admin.inventoryStockOnHand,
+          icon: "inventory",
+        },
+        {
+          label: "Stock Ledger",
+          href: ROUTES.admin.inventoryLedger,
+          icon: "reports",
+        },
+        {
+          label: "Purchase Bills",
+          href: ROUTES.admin.accountingPurchaseBills,
+          icon: "procurement",
+        },
+        {
+          label: "Suppliers",
+          href: ROUTES.admin.accountingVendors,
+          icon: "partners",
+        },
+        {
+          label: "Supplier Settlements",
+          href: ROUTES.admin.accountingVendorSettlements,
+          icon: "finance",
+        },
+      ],
+    },
+    {
+      title: "Finance & Ledger Control",
       icon: "finance",
       items: [
         {
@@ -250,6 +331,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           icon: "payments",
         },
         {
+          label: "Reconciliation",
+          href: buildAdminReconciliationRoute(),
+          icon: "reconciliation",
+        },
+        {
           label: "Commissions",
           href: ROUTES.admin.financeCommissions,
           icon: "commissions",
@@ -258,37 +344,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           label: "Payout Batches",
           href: ROUTES.admin.financePayoutBatches,
           icon: "payoutBatches",
-        },
-      ],
-    },
-    {
-      title: "Collections & Receivables",
-      icon: "collections",
-      items: [
-        {
-          label: "Collections",
-          href: ROUTES.admin.collections,
-          icon: "collections",
-        },
-        {
-          label: "Payments",
-          href: ROUTES.admin.payments,
-          icon: "payments",
-        },
-        {
-          label: "Reconciliation",
-          href: buildAdminReconciliationRoute(),
-          icon: "reconciliation",
-        },
-        {
-          label: "Overdue Advance EMIs",
-          href: ROUTES.admin.emisOverdue,
-          icon: "emis",
-        },
-        {
-          label: "Payment Reminders",
-          href: ROUTES.admin.remindersPaymentReminders,
-          icon: "reminders",
         },
       ],
     },
@@ -309,80 +364,13 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Inventory",
-      icon: "inventory",
-      items: [
-        {
-          label: "Inventory Overview",
-          href: ROUTES.admin.inventory,
-          icon: "inventory",
-        },
-        {
-          label: "Inventory Items",
-          href: ROUTES.admin.inventoryItems,
-          icon: "inventory",
-        },
-        {
-          label: "Stock On Hand",
-          href: ROUTES.admin.inventoryStockOnHand,
-          icon: "inventory",
-        },
-        {
-          label: "Stock Ledger",
-          href: ROUTES.admin.inventoryLedger,
-          icon: "reports",
-        },
-        {
-          label: "Stock Movements",
-          href: ROUTES.admin.inventoryMovements,
-          icon: "reports",
-        },
-        {
-          label: "Stock Adjustments",
-          href: ROUTES.admin.inventoryAdjustments,
-          icon: "reconciliation",
-        },
-        {
-          label: "Opening Stock Import",
-          href: ROUTES.admin.inventoryOpeningStock,
-          icon: "products",
-        },
-      ],
-    },
-    {
-      title: "Vendors & Procurement",
-      icon: "procurement",
-      items: [
-        {
-          label: "Purchase Register",
-          href: ROUTES.admin.accountingPurchaseBills,
-          icon: "procurement",
-        },
-        {
-          label: "Vendors",
-          href: ROUTES.admin.accountingVendors,
-          icon: "partners",
-        },
-        {
-          label: "Vendor Settlements",
-          href: ROUTES.admin.accountingVendorSettlements,
-          icon: "finance",
-        },
-      ],
-    },
-    {
-      title: "Branches",
+      title: "Operational Governance",
       icon: "branches",
       items: [
         {
           label: "Branches",
           href: ROUTES.admin.branches,
           icon: "branches",
-        },
-        {
-          label: "Cash Counters",
-          href: ROUTES.admin.counters,
-          icon: "cashCounter",
         },
         {
           label: "Branch Reporting",
@@ -414,6 +402,21 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           label: "Payroll Register",
           href: ROUTES.admin.accountingSalary,
           icon: "payroll",
+        },
+        {
+          label: "Inventory Movements",
+          href: ROUTES.admin.inventoryMovements,
+          icon: "reports",
+        },
+        {
+          label: "Stock Adjustments",
+          href: ROUTES.admin.inventoryAdjustments,
+          icon: "reconciliation",
+        },
+        {
+          label: "Opening Stock Import",
+          href: ROUTES.admin.inventoryOpeningStock,
+          icon: "products",
         },
       ],
     },
@@ -638,11 +641,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Search Advance EMI",
+      title: "Collection Workflows",
       icon: "cashCounter",
       items: [
         {
-          label: "Collect Payment",
+          label: "Collect Subscription / Direct Sale",
           href: ROUTES.cashier.collect,
           icon: "collectPayment",
         },

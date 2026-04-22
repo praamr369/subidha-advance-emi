@@ -81,9 +81,7 @@ export default function FormActions({
     <div
       className={cn(
         "mt-6",
-      sticky &&
-          "sticky bottom-0 z-10 rounded-xl border border-border bg-[color-mix(in_oklab,var(--surface-card-elevated)_95%,transparent)] px-4 pb-3 shadow-[0_-16px_28px_-20px_rgba(15,23,42,0.28)] backdrop-blur",
-        sticky && "pt-4"
+        sticky && "popup-action-bar mt-6"
       )}
     >
       <div className={cn("flex flex-wrap items-center gap-3", justifyContent)}>

@@ -92,6 +92,7 @@ from subscriptions.services.payment_service import (
     reverse_payment_for_admin,
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
+from subscriptions.services.customer_account_service import build_customer_operational_profile
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
@@ -581,6 +582,14 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["get"], url_path="operational-profile")
+    def operational_profile(self, request, pk=None):
+        customer = self.get_object()
+        return Response(
+            build_customer_operational_profile(customer),
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["post"], url_path="import-preview")
     def import_preview(self, request):
         uploaded = request.FILES.get("file")
@@ -1016,6 +1025,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
             "customer",
             "branch",
             "cash_counter",
+            "finance_account",
             "subscription",
             "subscription__product",
             "subscription__batch",
@@ -1232,6 +1242,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         payment_method = validated["payment_method"]
         branch_id = validated.get("branch_id")
         cash_counter_id = validated.get("cash_counter_id")
+        finance_account = validated["finance_account"]
         reference_no = validated.get("reference_no")
         notes = validated.get("notes")
 
@@ -1245,6 +1256,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
                 note=notes or None,
                 branch_id=branch_id,
                 cash_counter_id=cash_counter_id,
+                finance_account_id=finance_account.id,
             )
         except ValidationError as exc:
             message = (
@@ -1270,6 +1282,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         payment_obj = result["payment"]
         emi_obj = result["emi"]
         subscription_obj = result["subscription"]
+        finance_account = result.get("finance_account")
+        reconciliation = result.get("reconciliation")
 
         payment_data = self.get_serializer(payment_obj).data
 
@@ -1318,6 +1332,18 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
                     "subscription_number": f"SUB-{subscription_obj.id}",
                     "status": subscription_obj.status,
                 },
+                "finance_account": (
+                    {
+                        "id": finance_account.id,
+                        "name": finance_account.name,
+                        "kind": finance_account.kind,
+                        "chart_account_id": finance_account.chart_account_id,
+                        "chart_account_code": finance_account.chart_account.code,
+                    }
+                    if finance_account is not None
+                    else None
+                ),
+                "reconciliation_status": getattr(reconciliation, "status", None),
             },
             status=(
                 status.HTTP_201_CREATED

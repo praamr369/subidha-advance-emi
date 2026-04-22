@@ -42,6 +42,7 @@ import WidgetShell from "@/components/admin/dashboard/WidgetShell";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
   buildReconciliationPosture,
   buildSettlementPosture,
@@ -233,6 +234,7 @@ function attentionFromCount(params: {
 }
 
 export default function AdminOperationsDashboard() {
+  const { openWorkflow } = useWorkflowLauncher();
   const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
   const [deliverySummary, setDeliverySummary] =
@@ -1273,31 +1275,54 @@ export default function AdminOperationsDashboard() {
                         {dueRows.length > 0 ? (
                           <div className="grid gap-2">
                             {dueRows.map((row) => (
-                              <Link
+                              <div
                                 key={String(row.id)}
-                                href={
-                                  row.subscription_id
-                                    ? buildAdminCollectionsRoute({
-                                        subscription: String(row.subscription_id),
-                                      })
-                                    : dueCollectionWorkspaceHref
-                                }
-                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
                               >
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="font-semibold text-slate-950">
-                                    {row.subscription_number ?? row.subscription_id ?? "Subscription"}
+                                <Link
+                                  href={
+                                    row.subscription_id
+                                      ? buildAdminCollectionsRoute({
+                                          subscription: String(row.subscription_id),
+                                        })
+                                      : dueCollectionWorkspaceHref
+                                  }
+                                  className="min-w-0 flex-1"
+                                >
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="font-semibold text-slate-950">
+                                      {row.subscription_number ?? row.subscription_id ?? "Subscription"}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      {row.due_date ? formatDate(row.due_date) : "—"}
+                                    </span>
                                   </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {row.due_date ? formatDate(row.due_date) : "—"}
-                                  </span>
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  {row.customer_name ?? "Unknown customer"}
-                                  {row.pending_amount ? ` • Due ${money(row.pending_amount)}` : ""}
-                                  {row.is_overdue ? ` • ${row.overdue_days ?? 0}d overdue` : ""}
-                                </div>
-                              </Link>
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    {row.customer_name ?? "Unknown customer"}
+                                    {row.pending_amount ? ` • Due ${money(row.pending_amount)}` : ""}
+                                    {row.is_overdue ? ` • ${row.overdue_days ?? 0}d overdue` : ""}
+                                  </div>
+                                </Link>
+
+                                {row.subscription_id && typeof row.emi_id === "number" && row.emi_id > 0 ? (
+                                  <ActionButton
+                                    size="sm"
+                                    variant="secondary"
+                                    leftIcon={<CircleDollarSign className="h-4 w-4" />}
+                                    ariaLabel="Collect payment"
+                                    onClick={() =>
+                                      openWorkflow("admin.collectPayment", {
+                                        query: {
+                                          subscription: row.subscription_id,
+                                          emi: row.emi_id,
+                                        },
+                                      })
+                                    }
+                                  >
+                                    Collect
+                                  </ActionButton>
+                                ) : null}
+                              </div>
                             ))}
                           </div>
                         ) : (

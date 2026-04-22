@@ -13,6 +13,7 @@ import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
+type SubscriptionCreateVariant = "page" | "drawer";
 
 type CustomerOption = {
   id: number;
@@ -349,9 +350,21 @@ function SearchPanel<T>({
   );
 }
 
-export default function SubscriptionCreatePage() {
-  const searchParams = useSearchParams();
-  const searchParamKey = searchParams.toString();
+export default function SubscriptionCreatePage({
+  variant = "page",
+  queryString,
+  onCreated,
+}: {
+  variant?: SubscriptionCreateVariant;
+  queryString?: string;
+  onCreated?: (subscriptionId: number) => void;
+} = {}) {
+  const runtimeSearchParams = useSearchParams();
+  const searchParamKey = useMemo(() => {
+    const raw = (queryString ?? "").trim();
+    if (raw) return raw.replace(/^\?/, "");
+    return runtimeSearchParams.toString();
+  }, [queryString, runtimeSearchParams]);
   const luckyRequestSequence = useRef(0);
   const [planType, setPlanType] = useState<PlanType>("EMI");
 
@@ -446,6 +459,10 @@ export default function SubscriptionCreatePage() {
     return `/admin/customers/create?${params.toString()}`;
   }, [leadContext, product?.id, product?.name, product?.product_code]);
 
+  const canonicalSelfHref = useMemo(() => {
+    return searchParamKey ? `/admin/subscriptions/create?${searchParamKey}` : "/admin/subscriptions/create";
+  }, [searchParamKey]);
+
   const returnToLeadHref = useMemo(() => {
     if (!success || !leadContext?.lead) return null;
 
@@ -458,6 +475,7 @@ export default function SubscriptionCreatePage() {
   const isEmiPlan = planType === "EMI";
   const isRentPlan = planType === "RENT";
   const isLeasePlan = planType === "LEASE";
+  const isDrawer = variant === "drawer";
 
   const tenureMonths = useMemo(() => {
     if (isEmiPlan) {
@@ -1105,6 +1123,7 @@ export default function SubscriptionCreatePage() {
       }
 
       setSuccess(created);
+      onCreated?.(created.id);
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -1164,75 +1183,94 @@ export default function SubscriptionCreatePage() {
 
   return (
     <PortalPage
-      title="Create Subscription"
+      title={variant === "drawer" ? "Create subscription" : "Create Subscription"}
       subtitle="Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
       helperNote="This flow preserves existing EMI, payment, waiver, draw, and audit semantics while adding safe contract onboarding controls."
       helperTone="info"
-      breadcrumbs={[
-        { label: "Admin", href: "/admin" },
-        { label: "Subscriptions", href: "/admin/subscriptions" },
-        { label: "Create" },
-      ]}
-      actions={[
-        {
-          href: "/admin/subscriptions",
-          label: "Back to Register",
-          variant: "secondary",
-        },
-        {
-          href: customerCreateHref,
-          label: "Create Customer",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        {
-          label: "Plan Type",
-          value: formatPlanTypeLabel(planType),
-        },
-        {
-          label: "Tenure",
-          value: tenureMonths > 0 ? `${tenureMonths} months` : "—",
-        },
-        {
-          label: "Contract Value",
-          value: money(totalAmount),
-          tone: "success",
-        },
-        {
-          label: isEmiPlan ? "Default Advance EMI" : "Recurring Amount (monthly)",
-          value: money(monthlyAmount),
-        },
-      ]}
+      breadcrumbs={
+        variant === "drawer"
+          ? []
+          : [
+              { label: "Admin", href: "/admin" },
+              { label: "Subscriptions", href: "/admin/subscriptions" },
+              { label: "Create" },
+            ]
+      }
+      actions={
+        variant === "drawer"
+          ? [
+              { href: canonicalSelfHref, label: "Open full page", variant: "secondary" },
+              { href: customerCreateHref, label: "Create Customer", variant: "ghost" },
+            ]
+          : [
+              {
+                href: "/admin/subscriptions",
+                label: "Back to Register",
+                variant: "secondary",
+              },
+              {
+                href: customerCreateHref,
+                label: "Create Customer",
+                variant: "secondary",
+              },
+            ]
+      }
+      stats={
+        variant === "drawer"
+          ? []
+          : [
+              {
+                label: "Plan Type",
+                value: formatPlanTypeLabel(planType),
+              },
+              {
+                label: "Tenure",
+                value: tenureMonths > 0 ? `${tenureMonths} months` : "—",
+              },
+              {
+                label: "Contract Value",
+                value: money(totalAmount),
+                tone: "success",
+              },
+              {
+                label: isEmiPlan ? "Default Advance EMI" : "Recurring Amount (monthly)",
+                value: money(monthlyAmount),
+              },
+            ]
+      }
       statusBadge={{
         label: "Contract Creation",
         tone: "info",
       }}
+      presentation={variant === "drawer" ? "popup" : "page"}
+      maxWidth={variant === "drawer" ? "100%" : undefined}
     >
       <div className="space-y-6">
-        <SectionCard
-          title="Creation rules"
-          description="Product base price is treated as total contract price. Default Advance EMI is total contract price divided by tenure months."
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailValue label="Contract Value Source" value="Product base price" />
-            <DetailValue label="Default Advance EMI Formula" value="base price / tenure months" />
-            <DetailValue
-              label="EMI Plan Rule"
-              value="Batch required, Lucky ID optional"
-            />
-            <DetailValue
-              label="Lucky ID Behavior"
-              value={
-                isEmiPlan
-                  ? luckyId
-                    ? `Manual Lucky ${formatLuckyNumber(luckyId)}`
-                    : "Auto-assign first available if left empty"
-                  : "Not used for rent/lease"
-              }
-            />
-          </div>
-        </SectionCard>
+        {!isDrawer ? (
+          <SectionCard
+            title="Creation rules"
+            description="Product base price is treated as total contract price. Default Advance EMI is total contract price divided by tenure months."
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <DetailValue label="Contract Value Source" value="Product base price" />
+              <DetailValue label="Default Advance EMI Formula" value="base price / tenure months" />
+              <DetailValue
+                label="EMI Plan Rule"
+                value="Batch required, Lucky ID optional"
+              />
+              <DetailValue
+                label="Lucky ID Behavior"
+                value={
+                  isEmiPlan
+                    ? luckyId
+                      ? `Manual Lucky ${formatLuckyNumber(luckyId)}`
+                      : "Auto-assign first available if left empty"
+                    : "Not used for rent/lease"
+                }
+              />
+            </div>
+          </SectionCard>
+        ) : null}
 
         <SectionCard
           title="Step 1 · Contract parties"
@@ -2061,7 +2099,7 @@ export default function SubscriptionCreatePage() {
           title="Create contract"
           description="Submit only after verifying customer, product, plan structure, and financial preview."
         >
-          <div className="flex flex-wrap gap-3">
+          <div className={variant === "drawer" ? "popup-action-bar items-center" : "flex flex-wrap gap-3"}>
             <button
               type="button"
               onClick={handleSubmit}

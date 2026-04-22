@@ -10,7 +10,14 @@ from accounting.models import (
     FinanceAccount,
     FinanceAccountKind,
 )
+from billing.models import BillingInvoice
+from billing.services.billing_service import (
+    approve_billing_invoice,
+    create_direct_sale,
+    post_billing_invoice,
+)
 from branch_control.models import Branch, CashCounter
+from inventory.models import InventoryItem
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
@@ -131,6 +138,21 @@ class CashierBranchScopeTests(APITestCase):
             cash_counter_id=self.counter_two.id,
         )
 
+        self.branch_one_direct_sale = self._create_branch_direct_sale(
+            branch=self.branch_one,
+            counter=self.counter_one,
+            finance_account=self.cash_account_one,
+            customer_phone="73992010001",
+            suffix=1,
+        )
+        self.branch_two_direct_sale = self._create_branch_direct_sale(
+            branch=self.branch_two,
+            counter=self.counter_two,
+            finance_account=self.cash_account_two,
+            customer_phone="73992010002",
+            suffix=2,
+        )
+
     def _create_branch_subscription(
         self,
         *,
@@ -184,6 +206,73 @@ class CashierBranchScopeTests(APITestCase):
         )
         return subscription, paid_emi, pending_emi
 
+    def _create_branch_direct_sale(
+        self,
+        *,
+        branch: Branch,
+        counter: CashCounter,
+        finance_account: FinanceAccount,
+        customer_phone: str,
+        suffix: int,
+    ):
+        customer = create_customer_profile(
+            user=create_customer_user(
+                username=f"{branch.code.lower()}_retail_{suffix}",
+                phone=customer_phone,
+            ),
+            name=f"{branch.code} Retail Customer {suffix}",
+            phone=customer_phone,
+        )
+        product = create_product(
+            name=f"{branch.code} Direct Product {suffix}",
+            product_code=f"{branch.code}-DIR-{suffix:03d}",
+            base_price=Decimal("700.00"),
+        )
+        inventory_item = InventoryItem.objects.create(
+            product=product,
+            sku=f"{branch.code}-DIRSKU-{suffix:03d}",
+            opening_stock_qty=Decimal("5.000"),
+            reorder_level_qty=Decimal("1.000"),
+            standard_unit_cost=Decimal("450.00"),
+        )
+        sale = create_direct_sale(
+            payload={
+                "sale_date": date(2026, 4, 18),
+                "customer": customer,
+                "branch": branch,
+                "cash_counter": counter,
+                "tax_mode": "NON_GST",
+                "finance_account": finance_account,
+                "delivery_required": False,
+                "received_total": Decimal("200.00"),
+                "customer_name_snapshot": customer.name,
+                "customer_phone_snapshot": customer.phone,
+                "notes": f"{branch.code} retail receivable",
+                "lines": [
+                    {
+                        "product": product,
+                        "inventory_item": inventory_item,
+                        "description": "Retail branch direct-sale line",
+                        "quantity": Decimal("1.000"),
+                        "unit_price": Decimal("700.00"),
+                        "discount_amount": Decimal("0.00"),
+                        "taxable_value": Decimal("700.00"),
+                        "gst_rate": None,
+                        "cgst_amount": Decimal("0.00"),
+                        "sgst_amount": Decimal("0.00"),
+                        "igst_amount": Decimal("0.00"),
+                        "line_total": Decimal("700.00"),
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            created_by=self.admin,
+        )
+        invoice = BillingInvoice.objects.get(direct_sale=sale)
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        return sale
+
     def test_cashier_payment_history_only_returns_assigned_branch_rows(self):
         self.client.force_authenticate(user=self.cashier)
 
@@ -206,6 +295,7 @@ class CashierBranchScopeTests(APITestCase):
                 "emi_id": self.branch_one_pending_emi.id,
                 "amount": "100.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_account_one.id,
                 "reference_no": "BR1-CASHIER-002",
             },
             format="json",
@@ -216,6 +306,42 @@ class CashierBranchScopeTests(APITestCase):
         self.assertEqual(
             response.data["payment"]["cash_counter_id"],
             self.counter_one.id,
+        )
+
+    def test_cashier_pending_direct_sales_only_returns_assigned_branch_rows(self):
+        self.client.force_authenticate(user=self.cashier)
+
+        allowed = self.client.get(
+            f"/api/v1/cashier/pending-direct-sales/?phone={self.branch_one_direct_sale.customer_phone_snapshot}"
+        )
+        denied = self.client.get(
+            f"/api/v1/cashier/pending-direct-sales/?phone={self.branch_two_direct_sale.customer_phone_snapshot}"
+        )
+
+        self.assertEqual(allowed.status_code, status.HTTP_200_OK, allowed.data)
+        self.assertEqual(allowed.data["total_outstanding_sales"], 1)
+        self.assertEqual(allowed.data["direct_sales"][0]["branch_id"], self.branch_one.id)
+        self.assertEqual(denied.status_code, status.HTTP_404_NOT_FOUND, denied.data)
+
+    def test_cashier_direct_sale_collection_defaults_to_assigned_branch_and_counter(self):
+        self.client.force_authenticate(user=self.cashier)
+
+        response = self.client.post(
+            "/api/v1/cashier/collect-direct-sale/",
+            {
+                "direct_sale_id": self.branch_one_direct_sale.id,
+                "amount": "500.00",
+                "reference_no": "BR1-DIR-COLL-001",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["receipt"]["branch_id"], self.branch_one.id)
+        self.assertEqual(response.data["receipt"]["cash_counter_id"], self.counter_one.id)
+        self.assertEqual(
+            response.data["receipt"]["finance_account_id"],
+            self.cash_account_one.id,
         )
 
     def test_unassigned_cashier_is_blocked_from_multi_branch_collection(self):
@@ -235,6 +361,7 @@ class CashierBranchScopeTests(APITestCase):
                 "emi_id": self.branch_one_pending_emi.id,
                 "amount": "100.00",
                 "method": "CASH",
+                "finance_account_id": self.cash_account_one.id,
                 "reference_no": "UNASSIGNED-CASHIER-001",
             },
             format="json",

@@ -93,6 +93,12 @@ export type CashierCollectibleSearchMode =
   | "emi"
   | "any";
 
+export type CashierDirectSaleSearchMode =
+  | "phone"
+  | "sale"
+  | "customer"
+  | "any";
+
 export type CashierCollectibleSearchResult = {
   emi_id: number;
   customer_id?: number | null;
@@ -166,6 +172,91 @@ export type CashierCollectPaymentResponse = {
     batch_id?: number | null;
     lucky_id?: number | null;
   };
+};
+
+export type CashierCollectibleDirectSale = {
+  direct_sale_id: number;
+  sale_no?: string | null;
+  sale_date?: string | null;
+  status?: string | null;
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_phone?: string;
+  branch_id?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter_id?: number | null;
+  cash_counter_code?: string | null;
+  cash_counter_name?: string | null;
+  finance_account_id?: number | null;
+  finance_account_name?: string | null;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+  billing_invoice_id?: number | null;
+  billing_invoice_no?: string | null;
+  billing_invoice_status?: string | null;
+};
+
+export type CashierPendingDirectSalesResponse = {
+  customer_id?: number | null;
+  customer_name?: string;
+  phone?: string;
+  total_outstanding_sales: number;
+  total_outstanding_amount: string;
+  direct_sales: CashierCollectibleDirectSale[];
+};
+
+export type CashierDirectSaleSearchResponse = {
+  count: number;
+  results: CashierCollectibleDirectSale[];
+};
+
+export type CashierCollectDirectSalePayload = {
+  direct_sale_id: number;
+  amount: number;
+  branch_id?: number;
+  cash_counter_id?: number;
+  finance_account_id?: number;
+  reference_no?: string;
+  note?: string;
+};
+
+export type CashierCollectDirectSaleResponse = {
+  message: string;
+  created: boolean;
+  receipt: {
+    id: number;
+    receipt_no?: string | null;
+    receipt_type?: string | null;
+    status?: string | null;
+    receipt_date?: string | null;
+    amount: string;
+    finance_account_id?: number | null;
+    branch_id?: number | null;
+    cash_counter_id?: number | null;
+    source_reference?: string | null;
+  };
+  direct_sale: {
+    id: number;
+    sale_no?: string | null;
+    status?: string | null;
+    grand_total: string;
+    received_total: string;
+    balance_total: string;
+    branch_id?: number | null;
+    cash_counter_id?: number | null;
+    finance_account_id?: number | null;
+  };
+  invoice: {
+    id: number;
+    document_no?: string | null;
+    status?: string | null;
+    received_total: string;
+    balance_total: string;
+  };
+  outstanding_before: string;
+  outstanding_after: string;
 };
 
 export type CashierPaymentHistoryResponse = {
@@ -483,6 +574,40 @@ function normalizeCollectibleSearchResult(
   };
 }
 
+function normalizeCashierDirectSale(
+  row: Record<string, unknown>
+): CashierCollectibleDirectSale {
+  return {
+    direct_sale_id: toNumber(row.direct_sale_id ?? row.id),
+    sale_no: asNullableString(row.sale_no),
+    sale_date: asNullableString(row.sale_date),
+    status: asNullableString(row.status),
+    customer_id:
+      typeof row.customer_id === "number" ? row.customer_id : null,
+    customer_name:
+      typeof row.customer_name === "string" ? row.customer_name : undefined,
+    customer_phone:
+      typeof row.customer_phone === "string" ? row.customer_phone : undefined,
+    branch_id: typeof row.branch_id === "number" ? row.branch_id : null,
+    branch_code: asNullableString(row.branch_code),
+    branch_name: asNullableString(row.branch_name),
+    cash_counter_id:
+      typeof row.cash_counter_id === "number" ? row.cash_counter_id : null,
+    cash_counter_code: asNullableString(row.cash_counter_code),
+    cash_counter_name: asNullableString(row.cash_counter_name),
+    finance_account_id:
+      typeof row.finance_account_id === "number" ? row.finance_account_id : null,
+    finance_account_name: asNullableString(row.finance_account_name),
+    grand_total: toMoneyString(row.grand_total),
+    received_total: toMoneyString(row.received_total),
+    balance_total: toMoneyString(row.balance_total),
+    billing_invoice_id:
+      typeof row.billing_invoice_id === "number" ? row.billing_invoice_id : null,
+    billing_invoice_no: asNullableString(row.billing_invoice_no),
+    billing_invoice_status: asNullableString(row.billing_invoice_status),
+  };
+}
+
 export async function getCashierDashboard(): Promise<CashierDashboardResponse> {
   const payload = await apiFetch<Record<string, unknown>>("/cashier/dashboard/");
   const rawSummary =
@@ -561,10 +686,60 @@ export async function searchCashierCollectibleEmis(
   };
 }
 
+export async function getPendingDirectSalesByPhone(
+  phone: string
+): Promise<CashierPendingDirectSalesResponse> {
+  const payload = await apiFetch<Record<string, unknown>>(
+    `/cashier/pending-direct-sales/?phone=${encodeURIComponent(phone)}`
+  );
+
+  const rawRows = Array.isArray(payload.direct_sales) ? payload.direct_sales : [];
+
+  return {
+    customer_id:
+      typeof payload.customer_id === "number" ? payload.customer_id : null,
+    customer_name:
+      typeof payload.customer_name === "string" ? payload.customer_name : undefined,
+    phone: typeof payload.phone === "string" ? payload.phone : undefined,
+    total_outstanding_sales: toNumber(payload.total_outstanding_sales ?? rawRows.length),
+    total_outstanding_amount: toMoneyString(payload.total_outstanding_amount),
+    direct_sales: rawRows.map((item) =>
+      normalizeCashierDirectSale(item as Record<string, unknown>)
+    ),
+  };
+}
+
+export async function searchCashierCollectibleDirectSales(
+  query: string,
+  mode: CashierDirectSaleSearchMode
+): Promise<CashierDirectSaleSearchResponse> {
+  const payload = await apiFetch<Record<string, unknown>>(
+    `/cashier/search-direct-sales/?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(mode)}`
+  );
+
+  const rawRows = Array.isArray(payload.results) ? payload.results : [];
+
+  return {
+    count: toNumber(payload.count ?? rawRows.length),
+    results: rawRows.map((item) =>
+      normalizeCashierDirectSale(item as Record<string, unknown>)
+    ),
+  };
+}
+
 export async function collectPayment(
   payload: CashierCollectPaymentPayload
 ): Promise<CashierCollectPaymentResponse> {
   return apiFetch<CashierCollectPaymentResponse>("/cashier/collect-payment/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function collectDirectSalePayment(
+  payload: CashierCollectDirectSalePayload
+): Promise<CashierCollectDirectSaleResponse> {
+  return apiFetch<CashierCollectDirectSaleResponse>("/cashier/collect-direct-sale/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
