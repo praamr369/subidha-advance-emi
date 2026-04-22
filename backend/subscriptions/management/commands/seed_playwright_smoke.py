@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import UserRole
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import (
     Batch,
@@ -52,7 +53,13 @@ class Command(BaseCommand):
         emit_json = bool(options.get("emit_json"))
         User = get_user_model()
         today = timezone.localdate()
-        meta_path = Path(settings.BASE_DIR) / SMOKE_META_FILENAME
+        meta_path = Path(
+            getattr(
+                settings,
+                "PLAYWRIGHT_SMOKE_META_PATH",
+                Path(settings.BASE_DIR) / SMOKE_META_FILENAME,
+            )
+        )
 
         admin = self._upsert_user(
             User,
@@ -112,6 +119,7 @@ class Command(BaseCommand):
             city="Dhaka",
             address="Winner Smoke Address",
         )
+        smoke_finance_account = self._ensure_smoke_finance_account()
 
         product = Product.objects.update_or_create(
             product_code="SMOKE-EMI-001",
@@ -212,6 +220,7 @@ class Command(BaseCommand):
             emi=paid_emi,
             amount=paid_emi.amount,
             collected_by=admin,
+            finance_account=smoke_finance_account,
             method="UPI",
             reference_no="SMOKE-PAID-001",
             note="Seeded payment for partner and customer smoke views.",
@@ -222,6 +231,7 @@ class Command(BaseCommand):
             emi=cashier_history_emi,
             amount=cashier_history_emi.amount,
             collected_by=cashier,
+            finance_account=smoke_finance_account,
             method="CASH",
             reference_no="SMOKE-CASH-001",
             note="Seeded cashier history payment so Month 2 remains collectible.",
@@ -468,6 +478,7 @@ class Command(BaseCommand):
         emi,
         amount,
         collected_by,
+        finance_account,
         method,
         reference_no,
         note,
@@ -480,6 +491,7 @@ class Command(BaseCommand):
                 emi_id=emi.id,
                 amount=amount,
                 collected_by=collected_by,
+                finance_account_id=finance_account.id,
                 method=method,
                 reference_no=reference_no,
                 note=note,
@@ -491,6 +503,29 @@ class Command(BaseCommand):
             payment.refresh_from_db()
 
         return payment
+
+    def _ensure_smoke_finance_account(self):
+        chart_account, _ = ChartOfAccount.objects.update_or_create(
+            system_code="PLAYWRIGHT_SMOKE_CASH",
+            defaults={
+                "code": "PLAYWRIGHT-SMOKE-CASH",
+                "name": "Playwright Smoke Cash",
+                "account_type": ChartOfAccountType.ASSET,
+                "is_active": True,
+                "allow_manual_posting": True,
+            },
+        )
+        finance_account, _ = FinanceAccount.objects.update_or_create(
+            name="Playwright Smoke Cash",
+            defaults={
+                "kind": FinanceAccountKind.CASH,
+                "chart_account": chart_account,
+                "opening_balance": Decimal("0.00"),
+                "is_active": True,
+                "notes": "Seeded operational finance account for Playwright smoke payments.",
+            },
+        )
+        return finance_account
 
     def _upsert_collection_request(
         self,

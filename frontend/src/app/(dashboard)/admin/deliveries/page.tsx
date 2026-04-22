@@ -220,7 +220,7 @@ export default function AdminDeliveriesPage() {
     }
   }
 
-  async function prefillFromSubscriptionId(subscriptionId: number | string) {
+  const prefillFromSubscriptionId = useCallback(async (subscriptionId: number | string) => {
     const raw = String(subscriptionId).trim();
     if (!raw) return;
 
@@ -240,14 +240,13 @@ export default function AdminDeliveriesPage() {
     } finally {
       setSourcePrefillLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!initialSubscription.trim()) return;
     if (createPortfolio === "DIRECT_SALE") return;
     void prefillFromSubscriptionId(initialSubscription.trim());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSubscription, createPortfolio]);
+  }, [createPortfolio, initialSubscription, prefillFromSubscriptionId]);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {

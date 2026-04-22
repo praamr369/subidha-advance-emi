@@ -7,6 +7,7 @@ export type PaymentCollectionPayload = {
   amount: string;
   payment_method: PaymentMethod;
   payment_date: string;
+  finance_account_id: number;
   branch_id?: number;
   cash_counter_id?: number;
   reference_no?: string;
@@ -49,6 +50,14 @@ export type PaymentCollectionResult = {
     subscription_number?: string;
     status?: string;
   };
+  finance_account?: {
+    id: number;
+    name: string;
+    kind: "CASH" | "BANK" | "UPI";
+    chart_account_id?: number | null;
+    chart_account_code?: string | null;
+  } | null;
+  reconciliation_status?: string | null;
   detail?: string;
 };
 

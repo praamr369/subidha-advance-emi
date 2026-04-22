@@ -8,6 +8,19 @@ async function openQuickActions(page: Page) {
   await expect(page.locator(".workflow-modal-panel")).toBeVisible();
 }
 
+async function openWorkflowFromQuickActions(page: Page, label: string) {
+  const quickActions = page.getByRole("dialog", { name: "Quick actions" });
+  const workflowCard = quickActions
+    .locator("section")
+    .filter({ hasText: "Workflows" })
+    .locator("div.rounded-\\[1\\.35rem\\]")
+    .filter({ hasText: label })
+    .first();
+
+  await expect(workflowCard).toBeVisible();
+  await workflowCard.getByRole("button", { name: "Open" }).click();
+}
+
 async function expectContainedWithin(container: Locator, target: Locator) {
   const [containerBox, targetBox] = await Promise.all([container.boundingBox(), target.boundingBox()]);
 
@@ -57,9 +70,9 @@ test.describe("admin popup workflow chrome", () => {
     await expect(commandPalette).not.toBeVisible();
 
     await openQuickActions(page);
-    await page.getByRole("dialog", { name: "Quick actions" }).getByRole("button", { name: "Open" }).nth(2).click();
+    await openWorkflowFromQuickActions(page, "Collect subscription payment");
 
-    const paymentDrawer = page.getByRole("dialog", { name: "Collect payment" });
+    const paymentDrawer = page.getByRole("dialog", { name: "Collect subscription payment" });
     await expect(paymentDrawer).toBeVisible();
     await expect(paymentDrawer.locator(".popup-workflow-toolbar")).toBeVisible();
     await expect(paymentDrawer.locator(".portal-page-header")).toHaveCount(0);
@@ -89,7 +102,7 @@ test.describe("admin popup workflow chrome", () => {
     await page.goto("/admin");
 
     await openQuickActions(page);
-    await page.getByRole("dialog", { name: "Quick actions" }).getByRole("button", { name: "Open" }).nth(0).click();
+    await openWorkflowFromQuickActions(page, "Create customer");
 
     const customerDrawer = page.getByRole("dialog", { name: "Create customer" });
     await expect(customerDrawer).toBeVisible();
@@ -100,7 +113,7 @@ test.describe("admin popup workflow chrome", () => {
     await expect(customerDrawer).not.toBeVisible();
 
     await openQuickActions(page);
-    await page.getByRole("dialog", { name: "Quick actions" }).getByRole("button", { name: "Open" }).nth(1).click();
+    await openWorkflowFromQuickActions(page, "Create subscription sale");
 
     const subscriptionDrawer = page.getByRole("dialog", { name: "Create subscription" });
     await expect(subscriptionDrawer).toBeVisible();
@@ -118,7 +131,7 @@ test.describe("partner popup workflow chrome", () => {
     await page.goto("/partner");
 
     await openQuickActions(page);
-    await page.getByRole("dialog", { name: "Quick actions" }).getByRole("button", { name: "Open" }).first().click();
+    await openWorkflowFromQuickActions(page, "Submit collection");
 
     const partnerDrawer = page.getByRole("dialog", { name: "Submit collection" });
     await expect(partnerDrawer).toBeVisible();
@@ -135,7 +148,7 @@ test.describe("customer popup workflow chrome", () => {
     await page.goto("/customer");
 
     await openQuickActions(page);
-    await page.getByRole("dialog", { name: "Quick actions" }).getByRole("button", { name: "Open" }).first().click();
+    await openWorkflowFromQuickActions(page, "Request subscription");
 
     const customerDrawer = page.getByRole("dialog", { name: "Request subscription" });
     await expect(customerDrawer).toBeVisible();

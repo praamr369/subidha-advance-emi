@@ -14,6 +14,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -73,6 +74,10 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             due_date=date(2026, 5, 7),
         )
+        self.finance_account = create_finance_account(
+            code="TEST-RECON-001",
+            name="Reconciliation Cash",
+        )
 
     def _sum_ledger_amount(self, *, emi, entry_type):
         return (
@@ -101,6 +106,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-001",
         )
 
@@ -129,6 +135,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-002",
         )
         payment = result["payment"]
@@ -164,6 +171,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-003",
         )
         payment = result["payment"]
@@ -186,6 +194,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-004",
         )
 
@@ -199,6 +208,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-005",
         )
         record_emi_payment(
@@ -206,6 +216,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-006",
         )
         record_emi_payment(
@@ -213,6 +224,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-007",
         )
 
@@ -226,6 +238,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-008",
         )
         record_emi_payment(
@@ -233,6 +246,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-009",
         )
         record_emi_payment(
@@ -240,6 +254,7 @@ class ReconciliationTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-010",
         )
 

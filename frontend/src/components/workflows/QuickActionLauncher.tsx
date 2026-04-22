@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Bookmark, History, Plus, Star, X } from "lucide-react";
 
 import { workflowsForRole } from "@/config/workflows";
@@ -9,7 +9,12 @@ import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ModalShell from "@/components/ui/ModalShell";
 import { cn } from "@/lib/utils";
-import { readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
+import {
+  readFavoritesSnapshot,
+  readRecentsSnapshot,
+  subscribeWorkspacePrefs,
+  toggleFavorite,
+} from "@/lib/workspace-prefs";
 
 type LaunchItem =
   | {
@@ -62,15 +67,15 @@ export default function QuickActionLauncher({
 }) {
   const { openWorkflow } = useWorkflowLauncher();
   const workflows = useMemo(() => workflowsForRole(role), [role]);
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      setFavorites([]);
-      return;
-    }
-    setFavorites(readFavorites(sessionId, role));
-  }, [role, sessionId]);
+  const favoritesSnapshot = useSyncExternalStore(
+    subscribeWorkspacePrefs,
+    () => (sessionId ? readFavoritesSnapshot(sessionId, role) : "[]"),
+    () => "[]"
+  );
+  const favorites = useMemo(() => {
+    if (!sessionId) return [];
+    return JSON.parse(favoritesSnapshot) as string[];
+  }, [favoritesSnapshot, sessionId]);
 
   const navGroups = useMemo(() => getNavigationGroupsForRole(role), [role]);
   const navItems = useMemo(() => flattenNav(navGroups), [navGroups]);
@@ -91,15 +96,15 @@ export default function QuickActionLauncher({
   const allItems = useMemo(() => [...workflowItems, ...navItems], [navItems, workflowItems]);
   const indexByHref = useMemo(() => new Map(allItems.map((item) => [item.kind === "workflow" ? item.canonicalHref : item.href, item])), [allItems]);
 
-  const [recents, setRecents] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      setRecents([]);
-      return;
-    }
-    setRecents(readRecents(sessionId, role));
-  }, [role, sessionId]);
+  const recentsSnapshot = useSyncExternalStore(
+    subscribeWorkspacePrefs,
+    () => (sessionId ? readRecentsSnapshot(sessionId, role) : "[]"),
+    () => "[]"
+  );
+  const recents = useMemo(() => {
+    if (!sessionId) return [];
+    return JSON.parse(recentsSnapshot) as string[];
+  }, [recentsSnapshot, sessionId]);
 
   const favoriteItems = useMemo(() => {
     if (!sessionId) return [];
@@ -120,8 +125,7 @@ export default function QuickActionLauncher({
 
   function handleToggleFavorite(href: string) {
     if (!sessionId) return;
-    const next = toggleFavorite(sessionId, role, href);
-    setFavorites(next);
+    toggleFavorite(sessionId, role, href);
   }
 
   if (!open) return null;

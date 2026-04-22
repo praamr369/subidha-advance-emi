@@ -52,10 +52,9 @@ export type SmokeMeta = {
   };
 };
 
-const SMOKE_META_PATH = path.resolve(
-  process.cwd(),
-  "../backend/playwright-smoke-meta.json"
-);
+const SMOKE_META_PATH = process.env.PLAYWRIGHT_SMOKE_META_PATH
+  ? path.resolve(process.cwd(), process.env.PLAYWRIGHT_SMOKE_META_PATH)
+  : path.resolve(process.cwd(), "../backend/playwright-smoke-meta.json");
 
 export const AUTH_STATE_DIR = path.resolve(process.cwd(), "tests/e2e/.auth");
 

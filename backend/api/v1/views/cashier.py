@@ -6,7 +6,9 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounting.models import FinanceAccount
 from api.v1.permissions import IsCashierOrAdmin
+from api.v1.serializers.accounting import FinanceAccountSerializer
 from api.v1.serializers.finance_operations import (
     CashierAdvanceCollectionSerializer,
     CashierPaymentCollectionSerializer,
@@ -83,6 +85,50 @@ def _serialize_cashier_direct_sale_result(sale: DirectSale):
         "billing_invoice_no": getattr(latest_invoice, "document_no", None),
         "billing_invoice_status": getattr(latest_invoice, "status", None),
     }
+
+
+class CashierFinanceAccountListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
+
+    def get(self, request, *args, **kwargs):
+        queryset = FinanceAccount.objects.select_related("chart_account", "branch")
+        queryset = scope_queryset_to_user_branches(
+            queryset,
+            user=request.user,
+            field_name="branch_id",
+        )
+
+        is_active = request.query_params.get("is_active")
+        if is_active is not None:
+            queryset = queryset.filter(
+                is_active=is_active in {"1", "true", "TRUE", "yes", "YES"}
+            )
+
+        kind = (request.query_params.get("kind") or "").strip().upper()
+        if kind:
+            queryset = queryset.filter(kind=kind)
+
+        try:
+            page_size = int(request.query_params.get("page_size") or 100)
+        except (TypeError, ValueError):
+            page_size = 100
+        page_size = max(1, min(page_size, 200))
+
+        rows = list(queryset.order_by("name", "id")[:page_size])
+        payload = FinanceAccountSerializer(
+            rows,
+            many=True,
+            context={"request": request},
+        ).data
+        return Response(
+            {
+                "count": len(payload),
+                "next": None,
+                "previous": None,
+                "results": payload,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class CashierCollectPayment(APIView):

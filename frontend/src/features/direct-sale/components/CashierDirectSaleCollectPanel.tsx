@@ -99,7 +99,10 @@ export default function CashierDirectSaleCollectPanel() {
   const [success, setSuccess] = useState<CashierCollectDirectSaleResponse | null>(null);
 
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
-  const directSales = lookup?.direct_sales ?? [];
+  const directSales = useMemo(
+    () => lookup?.direct_sales ?? [],
+    [lookup?.direct_sales]
+  );
 
   const selectedDirectSale = useMemo<CashierCollectibleDirectSale | null>(() => {
     if (!selectedDirectSaleId) return null;

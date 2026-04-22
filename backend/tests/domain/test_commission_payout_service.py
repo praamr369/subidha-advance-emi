@@ -25,6 +25,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -67,6 +68,10 @@ class CommissionPayoutBatchDomainTests(TestCase):
             draw_day=5,
             start_date=date(2026, 3, 1),
         )
+        self.finance_account = create_finance_account(
+            code="TEST-PAYOUT-001",
+            name="Payout Batch Cash",
+        )
 
     def _create_commission(
         self,
@@ -97,6 +102,7 @@ class CommissionPayoutBatchDomainTests(TestCase):
             amount=Decimal("100.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no=reference_no,
         )["payment"]
         return payment.commission

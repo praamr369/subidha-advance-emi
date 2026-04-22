@@ -13,11 +13,15 @@ import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
 import {
+  collectAdvance,
   collectPayment,
   getPendingEmisByPhone,
+  listCashierFinanceAccounts,
   searchCashierCollectibleEmis,
+  type CashierCollectAdvanceResponse,
   type CashierCollectPaymentResponse,
   type CashierCollectibleSearchResult,
+  type FinanceAccount,
   type PendingEmiLookupResponse,
   type PendingEmiRecord,
 } from "@/services/cashier";
@@ -137,6 +141,8 @@ export default function CashierCollectPage() {
   const [selectedEmiId, setSelectedEmiId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [selectedFinanceAccountId, setSelectedFinanceAccountId] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [note, setNote] = useState("");
   const [collecting, setCollecting] = useState(false);
@@ -144,6 +150,14 @@ export default function CashierCollectPage() {
   const [success, setSuccess] = useState<CashierCollectPaymentResponse | null>(
     null
   );
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [advanceFinanceAccountId, setAdvanceFinanceAccountId] = useState("");
+  const [advanceReferenceNo, setAdvanceReferenceNo] = useState("");
+  const [advanceNote, setAdvanceNote] = useState("");
+  const [advanceSubmitting, setAdvanceSubmitting] = useState(false);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+  const [advanceSuccess, setAdvanceSuccess] =
+    useState<CashierCollectAdvanceResponse | null>(null);
 
   const selectedEmi = useMemo<PendingEmiRecord | null>(() => {
     if (!lookup || !selectedEmiId) return null;
@@ -155,6 +169,10 @@ export default function CashierCollectPage() {
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
   const directSaleHref = "/cashier/collect?workflow=direct-sale";
   const subscriptionHref = "/cashier/collect";
+  const availableFinanceAccounts = useMemo(
+    () => financeAccounts.filter((account) => account.kind === method),
+    [financeAccounts, method]
+  );
 
   useEffect(() => {
     setCollectionWorkflow(
@@ -162,9 +180,56 @@ export default function CashierCollectPage() {
     );
   }, [workflowQueryParam]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadFinanceAccountOptions() {
+      try {
+        const payload = await listCashierFinanceAccounts({
+          is_active: 1,
+          page_size: 100,
+        });
+        if (!active) return;
+        setFinanceAccounts(payload.results.filter((account) => account.is_active));
+      } catch {
+        if (!active) return;
+        setFinanceAccounts([]);
+      }
+    }
+
+    void loadFinanceAccountOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedFinanceAccountId((current) => {
+      if (
+        current &&
+        availableFinanceAccounts.some((account) => String(account.id) === current)
+      ) {
+        return current;
+      }
+      return availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "";
+    });
+
+    setAdvanceFinanceAccountId((current) => {
+      if (
+        current &&
+        availableFinanceAccounts.some((account) => String(account.id) === current)
+      ) {
+        return current;
+      }
+      return availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "";
+    });
+  }, [availableFinanceAccounts]);
+
   function clearSelectionForNewLookup() {
     setSelectedEmiId(null);
     setAmount("");
+    setSelectedFinanceAccountId("");
     setReferenceNo("");
     setNote("");
   }
@@ -181,12 +246,23 @@ export default function CashierCollectPage() {
     clearSelectionForNewLookup();
     setCollectError(null);
     setSuccess(null);
+    setAdvanceAmount("");
+    setAdvanceFinanceAccountId("");
+    setAdvanceReferenceNo("");
+    setAdvanceNote("");
+    setAdvanceError(null);
+    setAdvanceSuccess(null);
   }
 
   function resetCurrentCustomerSelection() {
     clearSelectionForNewLookup();
     setCollectError(null);
     setSuccess(null);
+    setAdvanceAmount("");
+    setAdvanceReferenceNo("");
+    setAdvanceNote("");
+    setAdvanceError(null);
+    setAdvanceSuccess(null);
   }
 
   function applyLookupPayload(
@@ -209,6 +285,9 @@ export default function CashierCollectPage() {
       setAmount(preferredEmi.balance_amount || preferredEmi.amount || "0.00");
       setReferenceNo("");
       setNote("");
+      setAdvanceAmount("");
+      setAdvanceReferenceNo("");
+      setAdvanceNote("");
       return true;
     }
 
@@ -334,6 +413,11 @@ export default function CashierCollectPage() {
       return;
     }
 
+    if (!selectedFinanceAccountId) {
+      setCollectError("Select a finance account before collecting payment.");
+      return;
+    }
+
     if ((method === "UPI" || method === "BANK") && !referenceNo.trim()) {
       setCollectError("Reference number is required for UPI or bank collection.");
       return;
@@ -348,6 +432,7 @@ export default function CashierCollectPage() {
         emi_id: selectedEmi.id,
         amount: parsedAmount,
         method,
+        finance_account_id: Number(selectedFinanceAccountId),
         reference_no: referenceNo.trim() || undefined,
         note: note.trim() || undefined,
       });
@@ -358,6 +443,54 @@ export default function CashierCollectPage() {
       setCollectError(toErrorMessage(error));
     } finally {
       setCollecting(false);
+    }
+  }
+
+  async function handleCollectAdvance(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!lookup?.customer_id) {
+      setAdvanceError("Load a customer queue before collecting customer advance.");
+      return;
+    }
+
+    const parsedAmount = Number(advanceAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setAdvanceError("Enter a valid advance amount.");
+      return;
+    }
+
+    if (!advanceFinanceAccountId) {
+      setAdvanceError("Select a finance account before collecting advance.");
+      return;
+    }
+
+    if ((method === "UPI" || method === "BANK") && !advanceReferenceNo.trim()) {
+      setAdvanceError("Reference number is required for UPI or bank advance collection.");
+      return;
+    }
+
+    setAdvanceSubmitting(true);
+    setAdvanceError(null);
+    setAdvanceSuccess(null);
+
+    try {
+      const response = await collectAdvance({
+        customer_id: lookup.customer_id,
+        amount: parsedAmount,
+        method,
+        finance_account_id: Number(advanceFinanceAccountId),
+        reference_no: advanceReferenceNo.trim() || undefined,
+        note: advanceNote.trim() || undefined,
+      });
+      setAdvanceSuccess(response);
+      setAdvanceAmount("");
+      setAdvanceReferenceNo("");
+      setAdvanceNote("");
+    } catch (error) {
+      setAdvanceError(toErrorMessage(error));
+    } finally {
+      setAdvanceSubmitting(false);
     }
   }
 
@@ -877,6 +1010,11 @@ export default function CashierCollectPage() {
                     EMI #{success.emi.id} · Posted{" "}
                     {formatDateTime(success.payment.created_at || success.payment.payment_date)}
                   </div>
+                  {success.finance_account ? (
+                    <div className="mt-1">
+                      Finance account {success.finance_account.name} · {success.finance_account.kind} · Reconciliation {success.reconciliation_status || "PENDING"}
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Link
                       href={`/cashier/payments/${success.payment.id}`}
@@ -1003,6 +1141,32 @@ export default function CashierCollectPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label
+                      htmlFor="collect-finance-account"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Finance account
+                    </label>
+                    <select
+                      id="collect-finance-account"
+                      value={selectedFinanceAccountId}
+                      onChange={(event) => setSelectedFinanceAccountId(event.target.value)}
+                      className={FIELD_CLASS_NAME}
+                      disabled={collecting}
+                    >
+                      <option value="">Select finance account</option>
+                      {availableFinanceAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs text-slate-600">
+                      This selection controls the finance route used for ledger posting and reconciliation visibility.
+                    </p>
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label
@@ -1081,6 +1245,131 @@ export default function CashierCollectPage() {
                     >
                       Back to Dashboard
                     </Link>
+                  </div>
+                </form>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Step 4 · Collect unapplied customer advance"
+              description="Use this when the customer is paying now but the amount should remain unapplied until a later EMI or receivable allocation."
+            >
+              {advanceSuccess ? (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  <div className="font-semibold">
+                    {advanceSuccess.message || "Customer advance collected successfully."}
+                  </div>
+                  <div className="mt-1">
+                    Advance #{advanceSuccess.data.customer_advance_id} · Unapplied balance {money(advanceSuccess.data.unapplied_amount)}.
+                  </div>
+                </div>
+              ) : null}
+
+              {advanceError ? (
+                <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {advanceError}
+                </div>
+              ) : null}
+
+              {!lookup?.customer_id ? (
+                <EmptyState
+                  title="Customer context required"
+                  description="Load a customer queue first so the advance can be attached to the correct customer safely."
+                />
+              ) : (
+                <form onSubmit={handleCollectAdvance} className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="collect-advance-amount"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Advance amount
+                    </label>
+                    <input
+                      id="collect-advance-amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={advanceAmount}
+                      onChange={(event) => setAdvanceAmount(event.target.value)}
+                      className={FIELD_CLASS_NAME}
+                      disabled={advanceSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="collect-advance-finance-account"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Finance account
+                    </label>
+                    <select
+                      id="collect-advance-finance-account"
+                      value={advanceFinanceAccountId}
+                      onChange={(event) => setAdvanceFinanceAccountId(event.target.value)}
+                      className={FIELD_CLASS_NAME}
+                      disabled={advanceSubmitting}
+                    >
+                      <option value="">Select finance account</option>
+                      {availableFinanceAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="collect-advance-reference"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Reference number
+                    </label>
+                    <input
+                      id="collect-advance-reference"
+                      type="text"
+                      value={advanceReferenceNo}
+                      onChange={(event) => setAdvanceReferenceNo(event.target.value)}
+                      placeholder={
+                        method === "CASH"
+                          ? "Optional for cash"
+                          : "Required for UPI / bank"
+                      }
+                      className={FIELD_CLASS_NAME}
+                      disabled={advanceSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="collect-advance-note"
+                      className="mb-2 block text-sm font-medium text-foreground"
+                    >
+                      Note
+                    </label>
+                    <input
+                      id="collect-advance-note"
+                      type="text"
+                      value={advanceNote}
+                      onChange={(event) => setAdvanceNote(event.target.value)}
+                      placeholder="Reason for holding as unapplied"
+                      className={FIELD_CLASS_NAME}
+                      disabled={advanceSubmitting}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <ActionButton
+                      type="submit"
+                      variant="secondary"
+                      size="lg"
+                      loading={advanceSubmitting}
+                      disabled={advanceSubmitting}
+                    >
+                      {advanceSubmitting ? "Collecting advance..." : "Collect Advance"}
+                    </ActionButton>
                   </div>
                 </form>
               )}

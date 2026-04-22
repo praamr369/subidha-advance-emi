@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
@@ -25,6 +25,14 @@ import {
 } from "@/services/accounting";
 import { listDirectSales, type DirectSale } from "@/services/billing";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import {
+  createFinanceTransfer,
+  getFinanceOperationalSummary,
+  getReconciliationOverview,
+  listFinanceTransfers,
+  type FinanceOperationalSummaryResponse,
+  type FinanceTransferListResponse,
+} from "@/services/finance-operations";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -202,6 +210,23 @@ export default function AdminFinancePage() {
   const [directSales, setDirectSales] = useState<DirectSale[]>([]);
   const [recentCollections, setRecentCollections] = useState<PaymentRegisterRow[]>([]);
   const [vendorSummaries, setVendorSummaries] = useState<VendorOperationalSummary[]>([]);
+  const [financeOperationalSummary, setFinanceOperationalSummary] =
+    useState<FinanceOperationalSummaryResponse | null>(null);
+  const [reconciliationOverview, setReconciliationOverview] = useState<Awaited<
+    ReturnType<typeof getReconciliationOverview>
+  > | null>(null);
+  const [financeTransfers, setFinanceTransfers] =
+    useState<FinanceTransferListResponse | null>(null);
+  const [transferForm, setTransferForm] = useState({
+    movement_date: new Date().toISOString().slice(0, 10),
+    from_finance_account_id: "",
+    to_finance_account_id: "",
+    amount: "",
+    reference_no: "",
+    notes: "",
+  });
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
 
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("THIS_MONTH");
@@ -246,6 +271,9 @@ export default function AdminFinancePage() {
           directSalesPayload,
           paymentRegisterPayload,
           vendorsPayload,
+          financeOperationalPayload,
+          reconciliationPayload,
+          financeTransferPayload,
         ] = await Promise.all([
           apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
           apiFetch<unknown>("/admin/commission-payout-batches/list/"),
@@ -257,6 +285,9 @@ export default function AdminFinancePage() {
           listDirectSales({ outstanding_only: "true", page_size: 6 }),
           getAdminPaymentRegister(),
           listVendors({ page_size: 6 }),
+          getFinanceOperationalSummary(),
+          getReconciliationOverview(),
+          listFinanceTransfers(),
         ]);
 
         const vendorDetails = await Promise.all(
@@ -274,6 +305,9 @@ export default function AdminFinancePage() {
         setApprovedPurchaseBills(approvedPurchasePayload);
         setDirectSales(directSalesPayload.results);
         setRecentCollections(paymentRegisterPayload.results.slice(0, 8));
+        setFinanceOperationalSummary(financeOperationalPayload);
+        setReconciliationOverview(reconciliationPayload);
+        setFinanceTransfers(financeTransferPayload);
         setVendorSummaries(
           vendorDetails.sort(
             (left, right) =>
@@ -294,6 +328,9 @@ export default function AdminFinancePage() {
           setApprovedPurchaseBills(null);
           setDirectSales([]);
           setRecentCollections([]);
+          setFinanceOperationalSummary(null);
+          setReconciliationOverview(null);
+          setFinanceTransfers(null);
           setVendorSummaries([]);
         }
       } finally {
@@ -321,6 +358,7 @@ export default function AdminFinancePage() {
   const reconciliationFlags = toNumber(analytics?.overview.reconciliation_flagged_count);
   const chartAccountCount = chartAccounts?.count ?? 0;
   const financeAccountCount = financeAccounts?.count ?? 0;
+  const transferAccountOptions = financeAccounts?.results ?? [];
   const purchaseQueueCount =
     (draftPurchaseBills?.count ?? 0) + (approvedPurchaseBills?.count ?? 0);
 
@@ -349,6 +387,65 @@ export default function AdminFinancePage() {
     [batches]
   );
   const recentBatches = useMemo(() => batches.slice(0, 4), [batches]);
+  const pendingSettlementAmount = toNumber(
+    reconciliationOverview?.pending_settlement_amount
+  );
+  const unappliedAdvanceTotal = toNumber(
+    reconciliationOverview?.unapplied_advance_total
+  );
+  const pendingSettlementAccounts =
+    reconciliationOverview?.pending_finance_accounts ?? 0;
+  const flaggedOperationalReconciliations =
+    reconciliationOverview?.flagged_reconciliation_count ?? reconciliationFlags;
+  const operationalRows = financeOperationalSummary?.results ?? [];
+
+  async function handleCreateTransfer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTransferNotice(null);
+    setError(null);
+
+    if (!transferForm.from_finance_account_id || !transferForm.to_finance_account_id) {
+      setError("Select both source and destination finance accounts.");
+      return;
+    }
+
+    if (transferForm.from_finance_account_id === transferForm.to_finance_account_id) {
+      setError("Source and destination finance accounts must be different.");
+      return;
+    }
+
+    if (!transferForm.amount.trim() || Number(transferForm.amount) <= 0) {
+      setError("Transfer amount must be greater than zero.");
+      return;
+    }
+
+    setTransferSubmitting(true);
+
+    try {
+      const created = await createFinanceTransfer({
+        movement_date: transferForm.movement_date,
+        from_finance_account_id: Number(transferForm.from_finance_account_id),
+        to_finance_account_id: Number(transferForm.to_finance_account_id),
+        amount: transferForm.amount,
+        reference_no: transferForm.reference_no.trim() || undefined,
+        notes: transferForm.notes.trim() || undefined,
+      });
+      setTransferNotice(`Transfer ${created.movement_no} posted successfully.`);
+      setTransferForm({
+        movement_date: new Date().toISOString().slice(0, 10),
+        from_finance_account_id: "",
+        to_finance_account_id: "",
+        amount: "",
+        reference_no: "",
+        notes: "",
+      });
+      await loadPage("refresh");
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
 
   return (
     <PortalPage
@@ -463,6 +560,246 @@ export default function AdminFinancePage() {
                 href={buildAdminReconciliationRoute({ flagged: true })}
                 tone={reconciliationFlags > 0 ? "danger" : "success"}
               />
+            </section>
+
+            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)]">
+              <SectionCard
+                title="Operational settlement posture"
+                description="These cards use the new backend reconciliation overview and finance-account operational summary so pending clearing, unapplied customer money, and settlement-sensitive accounts stay visible without changing the underlying payment truth."
+              >
+                <div className="grid gap-4 md:grid-cols-3">
+                  <MetricCard
+                    label="Pending Settlement"
+                    value={money(pendingSettlementAmount)}
+                    note={`${pendingSettlementAccounts} finance accounts still carrying unsettled value`}
+                    href={buildAdminReconciliationRoute({ flagged: true })}
+                    tone={pendingSettlementAmount > 0 ? "warning" : "success"}
+                  />
+                  <MetricCard
+                    label="Unapplied Advances"
+                    value={money(unappliedAdvanceTotal)}
+                    note="Customer money collected but not yet allocated to a receivable rail"
+                    tone={unappliedAdvanceTotal > 0 ? "warning" : "success"}
+                  />
+                  <MetricCard
+                    label="Flagged Finance Items"
+                    value={String(flaggedOperationalReconciliations)}
+                    note="Reconciliation items needing finance review or exception follow-up"
+                    href={buildAdminReconciliationRoute({ view: "payments", flagged: true })}
+                    tone={flaggedOperationalReconciliations > 0 ? "danger" : "success"}
+                  />
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {operationalRows.length === 0 ? (
+                    <EmptyState
+                      title="No operational finance summary"
+                      description="No finance accounts are available for settlement posture review."
+                    />
+                  ) : (
+                    operationalRows.slice(0, 6).map((row) => (
+                      <div
+                        key={row.finance_account_id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">
+                              {row.finance_account_name} · {row.kind}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-600">
+                              Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · Payments {money(row.payment_total)} · Advances {money(row.advance_total)}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={[
+                                "rounded-full px-3 py-1 text-xs font-semibold",
+                                row.reconciliation_status === "PENDING"
+                                  ? "border border-amber-200 bg-amber-50 text-amber-900"
+                                  : "border border-emerald-200 bg-emerald-50 text-emerald-800",
+                              ].join(" ")}
+                            >
+                              {row.reconciliation_status}
+                            </span>
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                              Pending {money(row.pending_settlement_amount)}
+                            </span>
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                              Unapplied {money(row.unapplied_advance_total)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                title="Admin finance transfer"
+                description="Create a first-class transfer between finance accounts. This uses the new backend finance transfer endpoint and keeps source/destination validation, posting, and auditability on the server."
+              >
+                {transferNotice ? (
+                  <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    {transferNotice}
+                  </div>
+                ) : null}
+
+                <form className="grid gap-3" onSubmit={handleCreateTransfer}>
+                  <label className="text-sm text-muted-foreground">
+                    Movement date
+                    <input
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      type="date"
+                      value={transferForm.movement_date}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          movement_date: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </label>
+
+                  <label className="text-sm text-muted-foreground">
+                    From finance account
+                    <select
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      value={transferForm.from_finance_account_id}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          from_finance_account_id: event.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Select source</option>
+                      {transferAccountOptions
+                        .filter((account) => account.is_active)
+                        .map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} · {account.kind}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm text-muted-foreground">
+                    To finance account
+                    <select
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      value={transferForm.to_finance_account_id}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          to_finance_account_id: event.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Select destination</option>
+                      {transferAccountOptions
+                        .filter((account) => account.is_active)
+                        .map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} · {account.kind}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm text-muted-foreground">
+                    Amount
+                    <input
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={transferForm.amount}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          amount: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </label>
+
+                  <label className="text-sm text-muted-foreground">
+                    Reference no
+                    <input
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      value={transferForm.reference_no}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          reference_no: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-muted-foreground">
+                    Notes
+                    <textarea
+                      className="mt-1 min-h-[96px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      value={transferForm.notes}
+                      onChange={(event) =>
+                        setTransferForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      disabled={transferSubmitting}
+                      className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {transferSubmitting ? "Posting transfer..." : "Post Transfer"}
+                    </button>
+                    <Link
+                      href={ROUTES.admin.accountingBooks}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      Open Books
+                    </Link>
+                  </div>
+                </form>
+
+                <div className="mt-5 space-y-3">
+                  {(financeTransfers?.results ?? []).slice(0, 5).map((transfer) => (
+                    <div
+                      key={transfer.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {transfer.movement_no}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-600">
+                            {transfer.from_finance_account_name} → {transfer.to_finance_account_name} · {formatDate(transfer.movement_date)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-slate-900">
+                            {money(transfer.amount)}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-600">{transfer.status}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
             </section>
 
             <section className="grid gap-4 xl:grid-cols-3">

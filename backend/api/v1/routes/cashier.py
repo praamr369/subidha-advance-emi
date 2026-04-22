@@ -4,6 +4,7 @@ from api.v1.views.cashier import (
     CashierCollectAdvance,
     CashierCollectDirectSalePayment,
     CashierCollectPayment,
+    CashierFinanceAccountListView,
     CashierPendingDirectSales,
     CashierSearchDirectSaleView,
 )
@@ -19,6 +20,7 @@ urlpatterns = [
     path("dashboard/", CashierDashboardView.as_view(), name="cashier-dashboard"),
     path("pending-emis/", CashierPendingEmis.as_view(), name="cashier-pending-emis"),
     path("pending-direct-sales/", CashierPendingDirectSales.as_view(), name="cashier-pending-direct-sales"),
+    path("finance-accounts/", CashierFinanceAccountListView.as_view(), name="cashier-finance-accounts"),
     path("search-emis/", CashierSearchEmiView.as_view(), name="cashier-search-emis"),
     path("search-direct-sales/", CashierSearchDirectSaleView.as_view(), name="cashier-search-direct-sales"),
     path("payments/", CashierPaymentHistoryView.as_view(), name="cashier-payment-history"),

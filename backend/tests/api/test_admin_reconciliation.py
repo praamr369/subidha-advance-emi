@@ -18,6 +18,7 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_emi,
+    create_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -94,12 +95,17 @@ class AdminReconciliationApiTests(APITestCase):
             amount=Decimal("900.00"),
             due_date=date(2026, 3, 9),
         )
+        self.finance_account = create_finance_account(
+            code="TEST-ADMIN-RECON-001",
+            name="Admin Reconciliation Cash",
+        )
 
         self.payment_primary = record_emi_payment(
             emi_id=self.emi_primary.id,
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-001",
         )["payment"]
         self.payment_secondary = record_emi_payment(
@@ -107,18 +113,23 @@ class AdminReconciliationApiTests(APITestCase):
             amount=Decimal("900.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="RECON-PAY-002",
         )["payment"]
 
-        self.reconciliation_primary = PaymentReconciliation.objects.create(
-            payment=self.payment_primary,
-            matched_emi=self.emi_primary,
-            status=ReconciliationStatus.PENDING,
-            expected_amount=Decimal("1000.00"),
-            paid_amount=Decimal("1000.00"),
-            variance_amount=Decimal("0.00"),
-            notes="Seeded pending review",
-        )
+        self.reconciliation_primary = self.payment_primary.reconciliation
+        self.reconciliation_primary.matched_emi = self.emi_primary
+        self.reconciliation_primary.status = ReconciliationStatus.PENDING
+        self.reconciliation_primary.expected_amount = Decimal("1000.00")
+        self.reconciliation_primary.paid_amount = Decimal("1000.00")
+        self.reconciliation_primary.variance_amount = Decimal("0.00")
+        self.reconciliation_primary.notes = "Seeded pending review"
+        self.reconciliation_primary.is_flagged = False
+        self.reconciliation_primary.is_locked = False
+        self.reconciliation_primary.reconciled_by = None
+        self.reconciliation_primary.reconciled_at = None
+        self.reconciliation_primary.save()
+        self.reconciliation_primary.events.all().delete()
         PaymentReconciliationEvent.objects.create(
             reconciliation=self.reconciliation_primary,
             event_type=ReconciliationEventType.CREATED,
@@ -128,19 +139,19 @@ class AdminReconciliationApiTests(APITestCase):
             actor=self.admin,
         )
 
-        self.reconciliation_secondary = PaymentReconciliation.objects.create(
-            payment=self.payment_secondary,
-            matched_emi=self.emi_secondary,
-            status=ReconciliationStatus.MISMATCH,
-            expected_amount=Decimal("850.00"),
-            paid_amount=Decimal("900.00"),
-            variance_amount=Decimal("50.00"),
-            is_flagged=True,
-            is_locked=True,
-            notes="Seeded mismatch review",
-            reconciled_by=self.admin,
-            reconciled_at=timezone.now(),
-        )
+        self.reconciliation_secondary = self.payment_secondary.reconciliation
+        self.reconciliation_secondary.matched_emi = self.emi_secondary
+        self.reconciliation_secondary.status = ReconciliationStatus.MISMATCH
+        self.reconciliation_secondary.expected_amount = Decimal("850.00")
+        self.reconciliation_secondary.paid_amount = Decimal("900.00")
+        self.reconciliation_secondary.variance_amount = Decimal("50.00")
+        self.reconciliation_secondary.is_flagged = True
+        self.reconciliation_secondary.is_locked = True
+        self.reconciliation_secondary.notes = "Seeded mismatch review"
+        self.reconciliation_secondary.reconciled_by = self.admin
+        self.reconciliation_secondary.reconciled_at = timezone.now()
+        self.reconciliation_secondary.save()
+        self.reconciliation_secondary.events.all().delete()
         PaymentReconciliationEvent.objects.create(
             reconciliation=self.reconciliation_secondary,
             event_type=ReconciliationEventType.LOCKED,

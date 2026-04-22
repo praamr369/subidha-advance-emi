@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -22,6 +27,23 @@ const POPUP_ROOT_ID = "subidha-popup-root";
 let popupLockCount = 0;
 let previousBodyOverflow = "";
 let previousHtmlOverflow = "";
+const popupRootListeners = new Set<() => void>();
+
+function emitPopupRootChange() {
+  popupRootListeners.forEach((listener) => listener());
+}
+
+function subscribePopupRoot(listener: () => void) {
+  popupRootListeners.add(listener);
+  return () => popupRootListeners.delete(listener);
+}
+
+function getPopupRootSnapshot() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  return document.getElementById(POPUP_ROOT_ID) as HTMLElement | null;
+}
 
 function ensurePopupRoot() {
   const existing = document.getElementById(POPUP_ROOT_ID);
@@ -31,6 +53,7 @@ function ensurePopupRoot() {
   root.id = POPUP_ROOT_ID;
   root.className = "subidha-popup-root";
   document.body.appendChild(root);
+  emitPopupRootChange();
   return root;
 }
 
@@ -79,10 +102,14 @@ function trapFocusWithin(container: HTMLElement, event: KeyboardEvent) {
 }
 
 export function usePopupPortalRoot() {
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const portalRoot = useSyncExternalStore(
+    subscribePopupRoot,
+    getPopupRootSnapshot,
+    () => null
+  );
 
   useEffect(() => {
-    setPortalRoot(ensurePopupRoot());
+    ensurePopupRoot();
   }, []);
 
   return portalRoot;

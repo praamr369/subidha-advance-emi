@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Bookmark, Command as CommandIcon, CornerDownLeft, History, Search, Star, X } from "lucide-react";
 
 import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "@/config/navigation";
@@ -9,7 +9,12 @@ import { workflowsForRole, type WorkflowDefinition, type WorkflowId } from "@/co
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ModalShell from "@/components/ui/ModalShell";
 import { cn } from "@/lib/utils";
-import { readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
+import {
+  readFavoritesSnapshot,
+  readRecentsSnapshot,
+  subscribeWorkspacePrefs,
+  toggleFavorite,
+} from "@/lib/workspace-prefs";
 
 type CommandPaletteProps = {
   open: boolean;
@@ -69,18 +74,25 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   const { openWorkflow } = useWorkflowLauncher();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [recents, setRecents] = useState<string[]>([]);
+  const favoritesSnapshot = useSyncExternalStore(
+    subscribeWorkspacePrefs,
+    () => (sessionId ? readFavoritesSnapshot(sessionId, role) : "[]"),
+    () => "[]"
+  );
+  const favorites = useMemo(() => {
+    if (!sessionId) return [];
+    return JSON.parse(favoritesSnapshot) as string[];
+  }, [favoritesSnapshot, sessionId]);
 
-  useEffect(() => {
-    if (!sessionId) {
-      setFavorites([]);
-      setRecents([]);
-      return;
-    }
-    setFavorites(readFavorites(sessionId, role));
-    setRecents(readRecents(sessionId, role));
-  }, [role, sessionId]);
+  const recentsSnapshot = useSyncExternalStore(
+    subscribeWorkspacePrefs,
+    () => (sessionId ? readRecentsSnapshot(sessionId, role) : "[]"),
+    () => "[]"
+  );
+  const recents = useMemo(() => {
+    if (!sessionId) return [];
+    return JSON.parse(recentsSnapshot) as string[];
+  }, [recentsSnapshot, sessionId]);
 
   const navGroups = useMemo(() => getNavigationGroupsForRole(role), [role]);
   const navItems = useMemo(() => flattenNav(navGroups), [navGroups]);
@@ -149,8 +161,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
 
   function handleToggleFavorite(href: string) {
     if (!sessionId) return;
-    const next = toggleFavorite(sessionId, role, href);
-    setFavorites(next);
+    toggleFavorite(sessionId, role, href);
   }
 
   function renderRow(item: PaletteItem) {

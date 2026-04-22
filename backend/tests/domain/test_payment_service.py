@@ -13,6 +13,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -42,6 +43,10 @@ class PaymentServiceTests(TestCase):
             month_no=1,
             amount=Decimal("1000.00"),
         )
+        self.finance_account = create_finance_account(
+            code="TEST-PAY-SVC-001",
+            name="Payment Service Cash",
+        )
 
     def test_record_emi_payment_success(self):
         result = record_emi_payment(
@@ -49,6 +54,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-001",
         )
 
@@ -77,6 +83,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-002",
         )
         second = record_emi_payment(
@@ -84,6 +91,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-002",
         )
 
@@ -98,6 +106,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-003",
         )
 
@@ -110,6 +119,7 @@ class PaymentServiceTests(TestCase):
                 amount=Decimal("900.00"),
                 collected_by=self.admin,
                 method="CASH",
+                finance_account_id=self.finance_account.id,
                 reference_no="TEST-REF-003",
             )
 
@@ -119,6 +129,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-004",
         )
 
@@ -128,6 +139,7 @@ class PaymentServiceTests(TestCase):
                 amount=Decimal("1000.00"),
                 collected_by=self.admin,
                 method="CASH",
+                finance_account_id=self.finance_account.id,
                 reference_no="TEST-REF-005",
             )
 
@@ -145,6 +157,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-006",
         )
         payment = result["payment"]
@@ -177,6 +190,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-007",
         )
         payment = result["payment"]
@@ -203,6 +217,7 @@ class PaymentServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="TEST-REF-008",
         )
         payment = result["payment"]
