@@ -65,6 +65,21 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
     String(manifest.entities.admin.subscription_id)
   );
   await expect(page.locator("#emi_id")).not.toHaveValue("");
+  await expect(page.locator("#finance_account_id")).not.toHaveValue("");
+});
+
+test("admin finance control center renders operational settlement and transfer surfaces", async ({
+  page,
+}) => {
+  await page.goto("/admin/finance");
+
+  await expect(
+    page.getByRole("heading", { name: "Finance Control Center" })
+  ).toBeVisible();
+  await expect(page.getByText("Operational settlement posture")).toBeVisible();
+  await expect(page.getByText("Admin finance transfer")).toBeVisible();
+  await expect(page.getByText("Pending Settlement")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Post Transfer" })).toBeVisible();
 });
 
 test("admin can review and approve a subscription request from the admin queue detail page", async ({

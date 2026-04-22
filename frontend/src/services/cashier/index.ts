@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api";
 import type {
+  AccountingPaginatedResponse,
+  FinanceAccount,
+} from "@/services/accounting";
+import type {
   CanonicalDashboardSummary,
   DashboardDueSubscription,
   DashboardReconciliationSurface,
@@ -127,6 +131,7 @@ export type CashierCollectPaymentPayload = {
   emi_id: number;
   amount: number;
   method: "CASH" | "UPI" | "BANK";
+  finance_account_id: number;
   branch_id?: number;
   cash_counter_id?: number;
   reference_no?: string;
@@ -171,6 +176,40 @@ export type CashierCollectPaymentResponse = {
     product_id?: number | null;
     batch_id?: number | null;
     lucky_id?: number | null;
+  };
+  finance_account?: {
+    id: number;
+    name: string;
+    kind: "CASH" | "BANK" | "UPI";
+    chart_account_id?: number | null;
+    chart_account_code?: string | null;
+  } | null;
+  reconciliation_status?: string | null;
+};
+
+export type CashierCollectAdvancePayload = {
+  customer_id: number;
+  amount: number;
+  method: "CASH" | "UPI" | "BANK";
+  finance_account_id: number;
+  branch_id?: number;
+  cash_counter_id?: number;
+  reference_no?: string;
+  note?: string;
+  payment_date?: string;
+};
+
+export type CashierCollectAdvanceResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    customer_advance_id: number;
+    customer_id: number;
+    finance_account_id: number;
+    amount: string;
+    unapplied_amount: string;
+    status: string;
+    reference_no?: string | null;
   };
 };
 
@@ -268,6 +307,20 @@ export type CashierPaymentDetailResponse = {
   payment: CashierTransaction;
   status_label: string;
 };
+
+export type { FinanceAccount };
+
+function buildQuery(
+  params: Record<string, string | number | undefined | null> = {}
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -668,6 +721,14 @@ export async function getPendingEmisByPhone(
   };
 }
 
+export async function listCashierFinanceAccounts(
+  params: Record<string, string | number | undefined | null> = {}
+): Promise<AccountingPaginatedResponse<FinanceAccount>> {
+  return apiFetch<AccountingPaginatedResponse<FinanceAccount>>(
+    `/cashier/finance-accounts/${buildQuery(params)}`
+  );
+}
+
 export async function searchCashierCollectibleEmis(
   query: string,
   mode: CashierCollectibleSearchMode
@@ -731,6 +792,15 @@ export async function collectPayment(
   payload: CashierCollectPaymentPayload
 ): Promise<CashierCollectPaymentResponse> {
   return apiFetch<CashierCollectPaymentResponse>("/cashier/collect-payment/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function collectAdvance(
+  payload: CashierCollectAdvancePayload
+): Promise<CashierCollectAdvanceResponse> {
+  return apiFetch<CashierCollectAdvanceResponse>("/cashier/collect-advance/", {
     method: "POST",
     body: JSON.stringify(payload),
   });

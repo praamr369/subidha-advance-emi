@@ -11,6 +11,20 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+async function selectFirstRealOption(page: import("@playwright/test").Page, selector: string) {
+  const field = page.locator(selector);
+  await expect(field).toBeVisible();
+  const options = await field.locator("option").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      value: (node as HTMLOptionElement).value,
+      disabled: (node as HTMLOptionElement).disabled,
+    }))
+  );
+  const firstRealOption = options.find((option) => option.value && !option.disabled);
+  expect(firstRealOption?.value).toBeTruthy();
+  await field.selectOption(firstRealOption!.value);
+}
+
 test("ops health endpoints are green", async ({ request }) => {
   const endpoints = [
     { path: "/healthz/", expected: "ok" },
@@ -89,7 +103,8 @@ test.describe("admin release smoke", () => {
     await expect(page.getByRole("heading", { name: /admin collection entry/i })).toBeVisible();
     await expect(page.locator("#subscription_id")).toHaveValue(String(target.subscription_id));
     await expect(page.locator("#emi_id")).toHaveValue(String(target.emi_id));
-    await page.locator("#payment_method").selectOption("UPI");
+    await page.locator("#payment_method").selectOption("CASH");
+    await selectFirstRealOption(page, "#finance_account_id");
     await page.locator("#reference_no").fill(referenceNo);
 
     await page.getByRole("button", { name: /record payment/i }).click();
@@ -183,6 +198,7 @@ test.describe("cashier release smoke", () => {
 
     if (canCollect) {
       await selectableEmis.first().click();
+      await selectFirstRealOption(page, "#collect-finance-account");
       await page.getByRole("button", { name: /^collect payment$/i }).click();
       await expect(page.locator("body")).toContainText(/payment #/i);
       await expect(page.getByRole("link", { name: /open receipt/i })).toBeVisible();

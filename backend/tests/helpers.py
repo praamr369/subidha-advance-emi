@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date
 
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
 from accounts.models import User, UserRole
 from subscriptions.models import (
     Batch,
@@ -252,3 +253,22 @@ def create_delivery(
         payload["returned_at"] = timezone.now()
 
     return SubscriptionDelivery.objects.create(**payload)
+
+
+def create_finance_account(
+    *,
+    code="TEST-FIN-001",
+    name="Test Finance Account",
+    kind="CASH",
+    opening_balance=Decimal("0.00"),
+):
+    return FinanceAccount.objects.create(
+        name=name,
+        kind=kind,
+        chart_account=ChartOfAccount.objects.create(
+            code=code,
+            name=f"{name} Ledger",
+            account_type=ChartOfAccountType.ASSET,
+        ),
+        opening_balance=opening_balance,
+    )

@@ -1,9 +1,10 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import DrawerShell from "@/components/ui/DrawerShell";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   collectPayment,
   type PaymentCollectionResult,
@@ -69,10 +70,52 @@ function CollectPaymentDrawerContent({
   const [amount, setAmount] = useState(() => normalizeAmount(suggestedAmount));
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [paymentDate, setPaymentDate] = useState(() => todayDateInputValue());
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [financeAccountId, setFinanceAccountId] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [notes, setNotes] = useState("");
   const [localError, setLocalError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const availableFinanceAccounts = useMemo(
+    () =>
+      financeAccounts.filter((account) =>
+        paymentMethod === "CARD"
+          ? account.kind === "BANK"
+          : account.kind === paymentMethod
+      ),
+    [financeAccounts, paymentMethod]
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadFinanceAccountOptions() {
+      try {
+        const payload = await listFinanceAccounts({ is_active: 1, page_size: 100 });
+        if (!active) return;
+        setFinanceAccounts(payload.results.filter((account) => account.is_active));
+      } catch {
+        if (!active) return;
+        setFinanceAccounts([]);
+      }
+    }
+
+    void loadFinanceAccountOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      financeAccountId &&
+      availableFinanceAccounts.some((account) => String(account.id) === financeAccountId)
+    ) {
+      return;
+    }
+    setFinanceAccountId(availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "");
+  }, [availableFinanceAccounts, financeAccountId]);
 
   async function invalidatePaymentQueries(
     result: PaymentCollectionResult
@@ -144,6 +187,11 @@ function CollectPaymentDrawerContent({
       return;
     }
 
+    if (!financeAccountId) {
+      setLocalError("Select a finance account before collecting payment.");
+      return;
+    }
+
     if (
       (paymentMethod === "UPI" ||
         paymentMethod === "BANK" ||
@@ -165,6 +213,7 @@ function CollectPaymentDrawerContent({
         amount,
         payment_method: paymentMethod,
         payment_date: paymentDate,
+        finance_account_id: Number(financeAccountId),
         reference_no: referenceNo.trim() || undefined,
         notes: notes.trim() || undefined,
       });
@@ -251,6 +300,25 @@ function CollectPaymentDrawerContent({
                 disabled={submitting}
                 className={FIELD_CLASS_NAME}
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-foreground">
+                Finance Account
+              </label>
+              <select
+                value={financeAccountId}
+                onChange={(e) => setFinanceAccountId(e.target.value)}
+                disabled={submitting}
+                className={FIELD_CLASS_NAME}
+              >
+                <option value="">Select finance account</option>
+                {availableFinanceAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} · {account.kind}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

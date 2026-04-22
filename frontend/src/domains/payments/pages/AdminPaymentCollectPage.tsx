@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { normalizeApiError } from "@/services/api/errors";
 import AdminDirectSaleCollectForm from "@/features/direct-sale/components/AdminDirectSaleCollectForm";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   listBranches,
   listCashCounters,
@@ -33,6 +34,7 @@ type FormState = {
   subscription_id: string;
   emi_id: string;
   amount: string;
+  finance_account_id: string;
   branch_id: string;
   cash_counter_id: string;
   payment_method: PaymentMethod;
@@ -74,6 +76,7 @@ function buildDefaultForm(): FormState {
     subscription_id: "",
     emi_id: "",
     amount: "",
+    finance_account_id: "",
     branch_id: "",
     cash_counter_id: "",
     payment_method: "CASH",
@@ -209,6 +212,7 @@ export default function AdminPaymentCollectPage({
     useState<AdminSubscriptionCollectionCandidate | null>(null);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [counters, setCounters] = useState<CashCounterRecord[]>([]);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
 
   const [emiOptions, setEmiOptions] = useState<AdminEmiCollectionCandidate[]>(
     []
@@ -235,6 +239,15 @@ export default function AdminPaymentCollectPage({
   const availableCounters = form.branch_id
     ? counters.filter((counter) => String(counter.branch) === form.branch_id)
     : counters;
+  const availableFinanceAccounts = useMemo(
+    () =>
+      financeAccounts.filter((account) =>
+        form.payment_method === "CARD"
+          ? account.kind === "BANK"
+          : account.kind === form.payment_method
+      ),
+    [financeAccounts, form.payment_method]
+  );
 
   const updateField = useCallback(function updateField<K extends keyof FormState>(
     key: K,
@@ -258,6 +271,7 @@ export default function AdminPaymentCollectPage({
       subscription_id: "",
       emi_id: "",
       amount: "",
+      finance_account_id: "",
       branch_id: "",
       cash_counter_id: "",
       reference_no: "",
@@ -346,17 +360,20 @@ export default function AdminPaymentCollectPage({
 
     async function loadBranchMasters() {
       try {
-        const [branchPayload, counterPayload] = await Promise.all([
+        const [branchPayload, counterPayload, financeAccountPayload] = await Promise.all([
           listBranches({ status: "ACTIVE" }),
           listCashCounters({ is_active: "true" }),
+          listFinanceAccounts({ is_active: 1, page_size: 100 }),
         ]);
         if (!active) return;
         setBranches(branchPayload.results);
         setCounters(counterPayload.results);
+        setFinanceAccounts(financeAccountPayload.results.filter((account) => account.is_active));
       } catch {
         if (!active) return;
         setBranches([]);
         setCounters([]);
+        setFinanceAccounts([]);
       }
     }
 
@@ -366,6 +383,22 @@ export default function AdminPaymentCollectPage({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      form.finance_account_id &&
+      availableFinanceAccounts.some(
+        (account) => String(account.id) === form.finance_account_id
+      )
+    ) {
+      return;
+    }
+
+    updateField(
+      "finance_account_id",
+      availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : ""
+    );
+  }, [availableFinanceAccounts, form.finance_account_id, updateField]);
 
   useEffect(() => {
     const trimmed = subscriptionSearch.trim();
@@ -534,6 +567,10 @@ export default function AdminPaymentCollectPage({
       return "Payment date is required.";
     }
 
+    if (!form.finance_account_id.trim()) {
+      return "Finance account is required.";
+    }
+
     if (form.payment_method !== "CASH" && !form.reference_no.trim()) {
       return "Reference number is required for non-cash collections.";
     }
@@ -572,6 +609,7 @@ export default function AdminPaymentCollectPage({
         amount: form.amount,
         payment_method: form.payment_method,
         payment_date: form.payment_date,
+        finance_account_id: Number(form.finance_account_id),
         branch_id: form.branch_id ? Number(form.branch_id) : undefined,
         cash_counter_id: form.cash_counter_id
           ? Number(form.cash_counter_id)
@@ -863,6 +901,33 @@ export default function AdminPaymentCollectPage({
 
               <div>
                 <label
+                  htmlFor="finance_account_id"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  Finance account <span className="text-red-600">*</span>
+                </label>
+                <select
+                  id="finance_account_id"
+                  name="finance_account_id"
+                  value={form.finance_account_id}
+                  onChange={onInputChange}
+                  className={FIELD_CLASS_NAME}
+                  required
+                >
+                  <option value="">Select finance account</option>
+                  {availableFinanceAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This route controls the operational finance posting used by the backend collection service.
+                </p>
+              </div>
+
+              <div>
+                <label
                   htmlFor="branch_id"
                   className="mb-2 block text-sm font-semibold text-foreground"
                 >
@@ -977,6 +1042,11 @@ export default function AdminPaymentCollectPage({
             {successMessage ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 {successMessage}
+                {submitResult?.finance_account ? (
+                  <div className="mt-1">
+                    Finance account {submitResult.finance_account.name} · {submitResult.finance_account.kind} · Reconciliation {submitResult.reconciliation_status || "PENDING"}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

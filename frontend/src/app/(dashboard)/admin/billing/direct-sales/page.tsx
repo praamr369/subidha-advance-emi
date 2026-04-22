@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -145,7 +145,7 @@ export default function BillingDirectSalesPage() {
   const deliveryRequiredFilter = (searchParams.get("delivery_required") || "").trim().toLowerCase();
   const statusFilter = (searchParams.get("status") || "").trim().toUpperCase();
 
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
     try {
       const directSaleQuery: Record<string, string> = {};
       if (deliveryRequiredFilter === "true" || deliveryRequiredFilter === "false") {
@@ -187,11 +187,11 @@ export default function BillingDirectSalesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [deliveryRequiredFilter, statusFilter]);
 
   useEffect(() => {
     void loadPage();
-  }, [deliveryRequiredFilter, statusFilter]);
+  }, [loadPage]);
 
   useEffect(() => {
     const prefillCustomerId = parsePositiveInteger(searchParams.get("customer"));
