@@ -1,7 +1,12 @@
 from decimal import Decimal
 from datetime import date
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
+from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
+    FinanceAccount,
+    FinanceAccountKind,
+)
 from accounts.models import User, UserRole
 from subscriptions.models import (
     Batch,
@@ -30,6 +35,7 @@ def create_user(
     is_staff: bool = False,
     is_superuser: bool = False,
 ):
+    ensure_default_payment_collection_accounts()
     return User.objects.create_user(
         username=username,
         password=password,
@@ -265,10 +271,93 @@ def create_finance_account(
     return FinanceAccount.objects.create(
         name=name,
         kind=kind,
+        is_active=True,
         chart_account=ChartOfAccount.objects.create(
             code=code,
             name=f"{name} Ledger",
             account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
         ),
         opening_balance=opening_balance,
     )
+
+
+def create_payment_collection_finance_account(
+    *,
+    code="TEST-COLLECT-FIN-001",
+    name="Test Collection Finance Account",
+    kind="CASH",
+    opening_balance=Decimal("0.00"),
+):
+    """
+    Shared test helper for a normal operational collection account.
+
+    Keeps finance hardening expectations explicit by always creating an active
+    finance account backed by an active posting-capable chart account.
+    """
+    return create_finance_account(
+        code=code,
+        name=name,
+        kind=kind,
+        opening_balance=opening_balance,
+    )
+
+
+def ensure_default_payment_collection_accounts():
+    """
+    Provide stable operational fallback accounts for legacy test fixtures.
+
+    Production logic still enforces finance-account selection whenever no
+    operational account can be resolved. These defaults only keep old test
+    setups aligned with the hardened collection path.
+    """
+    defaults = (
+        ("TEST-DEFAULT-CASH", "Default Test Cash Account", FinanceAccountKind.CASH),
+        ("TEST-DEFAULT-BANK", "Default Test Bank Account", FinanceAccountKind.BANK),
+        ("TEST-DEFAULT-UPI", "Default Test UPI Account", FinanceAccountKind.UPI),
+    )
+    accounts = {}
+    for code, name, kind in defaults:
+        chart_account, _ = ChartOfAccount.objects.get_or_create(
+            code=code,
+            defaults={
+                "name": f"{name} Ledger",
+                "account_type": ChartOfAccountType.ASSET,
+                "is_active": True,
+                "allow_manual_posting": True,
+            },
+        )
+        updates = []
+        if not chart_account.is_active:
+            chart_account.is_active = True
+            updates.append("is_active")
+        if not chart_account.allow_manual_posting:
+            chart_account.allow_manual_posting = True
+            updates.append("allow_manual_posting")
+        if updates:
+            chart_account.save(update_fields=updates)
+
+        finance_account, _ = FinanceAccount.objects.get_or_create(
+            name=name,
+            defaults={
+                "kind": kind,
+                "chart_account": chart_account,
+                "opening_balance": Decimal("0.00"),
+                "is_active": True,
+            },
+        )
+        finance_updates = []
+        if finance_account.kind != kind:
+            finance_account.kind = kind
+            finance_updates.append("kind")
+        if finance_account.chart_account_id != chart_account.id:
+            finance_account.chart_account = chart_account
+            finance_updates.append("chart_account")
+        if not finance_account.is_active:
+            finance_account.is_active = True
+            finance_updates.append("is_active")
+        if finance_updates:
+            finance_account.save(update_fields=finance_updates)
+        accounts[kind] = finance_account
+    return accounts

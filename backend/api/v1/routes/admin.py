@@ -69,9 +69,13 @@ from api.v1.views.admin_resources import (
     LuckyIdAdminViewSet,
     PartnerAdminListViewSet,
     PaymentAdminViewSet,
+    ProductCategoryMasterViewSet,
     ProductAdminViewSet,
+    ProductSubcategoryMasterViewSet,
+    ProductUnitOfMeasureMasterViewSet,
 )
 from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
+from api.v1.views.admin_otp_delivery import AdminOtpDeliveryReadinessView
 from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
     PaymentReconciliationDetailView,
@@ -131,6 +135,9 @@ router.register(r"lucky-ids", LuckyIdAdminViewSet, basename="admin-lucky-ids")
 router.register(r"partners", PartnerAdminListViewSet, basename="admin-partners")
 router.register(r"payments", PaymentAdminViewSet, basename="admin-payments")
 router.register(r"products", ProductAdminViewSet, basename="admin-products")
+router.register(r"product-categories", ProductCategoryMasterViewSet, basename="admin-product-categories")
+router.register(r"product-subcategories", ProductSubcategoryMasterViewSet, basename="admin-product-subcategories")
+router.register(r"product-units", ProductUnitOfMeasureMasterViewSet, basename="admin-product-units")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 
 urlpatterns = [
@@ -141,6 +148,7 @@ urlpatterns = [
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("business-setup/reset/", BusinessSetupResetExecuteView.as_view()),
+    path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
     path("dashboard/", AdminDashboardView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),

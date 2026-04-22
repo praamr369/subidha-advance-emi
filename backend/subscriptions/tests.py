@@ -15,10 +15,12 @@ from services.reconciliation.check_subscription_integrity import check_subscript
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import Batch, BatchStatus, Customer, EmiStatus, FinancialLedger, Payment, PlanType, Product
 from subscriptions.services.lucky_draw_service import create_lucky_draw_commit
+from tests.helpers import ensure_default_payment_collection_accounts
 
 
 class FinancialFlowTests(TestCase):
     def setUp(self):
+        ensure_default_payment_collection_accounts()
         User = get_user_model()
         self.customer_user = User.objects.create_user(
             username="cust_fin", password="pass1234", role="CUSTOMER", phone="9800000011"

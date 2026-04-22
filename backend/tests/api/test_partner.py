@@ -19,6 +19,7 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -80,6 +81,10 @@ class PartnerApiTests(APITestCase):
         self.lucky_id_1 = create_lucky_id(batch=self.batch, lucky_number=14)
         self.lucky_id_2 = create_lucky_id(batch=self.batch, lucky_number=15)
         self.lucky_id_3 = create_lucky_id(batch=self.batch, lucky_number=16)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-PARTNER-COLLECT-001",
+            name="Partner Test Collection Cash",
+        )
 
         self.subscription_primary_1 = create_subscription(
             customer=self.customer_a,
@@ -145,6 +150,7 @@ class PartnerApiTests(APITestCase):
             amount=Decimal("190.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="PARTNER-TEST-PAY-001",
         )["payment"]
         self.other_partner_payment = record_emi_payment(
@@ -152,6 +158,7 @@ class PartnerApiTests(APITestCase):
             amount=Decimal("300.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="PARTNER-TEST-PAY-002",
         )["payment"]
 
@@ -471,6 +478,10 @@ class PartnerCommissionApiTests(TestCase):
         )
 
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=1)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-PARTNER-COM-001",
+            name="Partner Commission Collection Cash",
+        )
 
         self.subscription = create_subscription(
             customer=self.customer,
@@ -500,6 +511,7 @@ class PartnerCommissionApiTests(TestCase):
             emi_id=self.emi.id,
             amount=Decimal("1000.00"),
             collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
             reference_no="API-COM-001",
         )
 
@@ -519,6 +531,7 @@ class PartnerCommissionApiTests(TestCase):
             emi_id=self.emi.id,
             amount=Decimal("1000.00"),
             collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
             reference_no="API-COM-002",
         )
 
@@ -536,6 +549,7 @@ class PartnerCommissionApiTests(TestCase):
             emi_id=self.emi.id,
             amount=Decimal("1000.00"),
             collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
             reference_no="API-COM-003",
         )
 
@@ -554,6 +568,7 @@ class PartnerCommissionApiTests(TestCase):
             emi_id=self.emi.id,
             amount=Decimal("1000.00"),
             collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
             reference_no="API-COM-004",
         )
 

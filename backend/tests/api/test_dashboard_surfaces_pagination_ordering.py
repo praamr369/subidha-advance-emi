@@ -13,6 +13,7 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_product,
     create_subscription,
@@ -33,6 +34,15 @@ class DashboardSurfacePaginationOrderingApiTests(APITestCase):
             user=self.customer_user,
             name="Dash Paging Customer",
             phone="7363100001",
+        )
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-DASH-PAGING-001",
+            name="Dashboard Paging Collection Cash",
+        )
+        self.bank_finance_account = create_payment_collection_finance_account(
+            code="TEST-DASH-PAGING-002",
+            name="Dashboard Paging Collection Bank",
+            kind="BANK",
         )
         product = create_product(
             name="Dash Paging Product",
@@ -69,6 +79,7 @@ class DashboardSurfacePaginationOrderingApiTests(APITestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="DP-PAY-001",
             payment_date=self.today - timedelta(days=8),
         )["payment"]
@@ -95,6 +106,7 @@ class DashboardSurfacePaginationOrderingApiTests(APITestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="BANK",
+            finance_account_id=self.bank_finance_account.id,
             reference_no="DP-PAY-002",
             payment_date=self.today - timedelta(days=2),
         )["payment"]

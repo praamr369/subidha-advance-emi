@@ -15,6 +15,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -53,6 +54,10 @@ class CommissionServiceTests(TestCase):
         )
 
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=11)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-COMMISSION-COLLECT-001",
+            name="Commission Collection Cash",
+        )
 
         self.subscription = create_subscription(
             customer=self.customer,
@@ -78,6 +83,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-001",
         )
 
@@ -118,6 +124,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-002",
         )
 
@@ -137,6 +144,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-003",
         )
 
@@ -153,6 +161,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-004",
         )
 
@@ -161,6 +170,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-004",
         )
 
@@ -182,6 +192,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-005",
         )
 
@@ -209,6 +220,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-006",
         )
 
@@ -239,6 +251,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-007",
         )
 
@@ -275,6 +288,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-008",
         )
 
@@ -292,6 +306,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-009",
         )
 
@@ -318,6 +333,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-010",
         )
 
@@ -343,6 +359,7 @@ class CommissionServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="COM-PAY-011",
         )
 
