@@ -32,6 +32,7 @@ import {
 } from "react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -1891,56 +1892,41 @@ export default function AdminOperationsDashboard() {
 
                   case "module-directory": {
                     return (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Link
-                          href={ROUTES.admin.collections}
-                          className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                        >
-                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                            <CircleDollarSign className="h-4 w-4" />
-                            Collections & Advance EMI
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Collections, payments, due lanes, and reconciliation workspaces.
-                          </div>
-                        </Link>
-                        <Link
-                          href={ROUTES.admin.inventory}
-                          className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                        >
-                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                            <PackageSearch className="h-4 w-4" />
-                            Inventory & Manufacturing
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Stock control, locations, and manufacturing operations.
-                          </div>
-                        </Link>
-                        <Link
-                          href={ROUTES.admin.billing}
-                          className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                        >
-                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                            <ShoppingCart className="h-4 w-4" />
-                            Billing & Direct Sales
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Direct sales register and billing documents.
-                          </div>
-                        </Link>
-                        <Link
-                          href={ROUTES.admin.accounting}
-                          className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                        >
-                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                            <Banknote className="h-4 w-4" />
-                            Accounting & Books
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Books, bridges, vendors, payroll, and procurement controls.
-                          </div>
-                        </Link>
-                      </div>
+                      <ControlLaneGrid
+                        title="Module lanes"
+                        description="Canonical admin workspaces stay route-safe. Collections, accounting, billing, inventory, and service remain explicit lanes instead of being merged into a single popup workflow."
+                        className="border-0 bg-transparent p-0 shadow-none"
+                        lanes={[
+                          {
+                            title: "Collections & Advance EMI",
+                            description: "Collections, payments, due lanes, and reconciliation workspaces.",
+                            href: ROUTES.admin.collections,
+                            icon: <CircleDollarSign className="h-4 w-4" />,
+                            badge: "Ops",
+                          },
+                          {
+                            title: "Inventory & Manufacturing",
+                            description: "Stock control, locations, and manufacturing operations.",
+                            href: ROUTES.admin.inventory,
+                            icon: <PackageSearch className="h-4 w-4" />,
+                            badge: "Stock",
+                          },
+                          {
+                            title: "Billing & Direct Sales",
+                            description: "Direct sales register, billing documents, and retail recovery surfaces.",
+                            href: ROUTES.admin.billing,
+                            icon: <ShoppingCart className="h-4 w-4" />,
+                            badge: "Billing",
+                          },
+                          {
+                            title: "Accounting & Books",
+                            description: "Books, bridges, vendors, payroll, and procurement controls.",
+                            href: ROUTES.admin.accounting,
+                            icon: <Banknote className="h-4 w-4" />,
+                            badge: "Control",
+                          },
+                        ]}
+                      />
                     );
                   }
 

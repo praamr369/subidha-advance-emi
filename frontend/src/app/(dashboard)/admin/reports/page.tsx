@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, RefreshCw, TrendingUp } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -369,6 +370,38 @@ export default function AdminReportsPage() {
 
         {!loading && !error ? (
           <>
+            <ControlLaneGrid
+              title="Report lanes"
+              description="Move from aggregate analytics into explicit operational workspaces. Reporting remains separate from finance posting, collections, and reconciliation execution."
+              lanes={[
+                {
+                  title: "Analytics overview",
+                  description: "Live dashboard-backed aggregate posture for admin leadership review.",
+                  href: ROUTES.admin.analytics,
+                  icon: <TrendingUp className="h-4 w-4" />,
+                  badge: "View",
+                },
+                {
+                  title: "Reconciliation workspace",
+                  description: "Investigate flagged subscriptions and finance deltas before period close.",
+                  href: buildAdminReconciliationRoute({ flagged: true }),
+                  icon: <AlertTriangle className="h-4 w-4" />,
+                  badge: "Risk",
+                },
+                {
+                  title: "Branch reporting",
+                  description: "Open branch-aware collections, sales, and people-cost reporting.",
+                  href: ROUTES.admin.branchReporting,
+                  badge: "Branch",
+                },
+                {
+                  title: "Finance control",
+                  description: "Receivables, payables, and account posture stay in a separate finance lane.",
+                  href: ROUTES.admin.finance,
+                  badge: "Finance",
+                },
+              ]}
+            />
             <WorkspaceSection
               title="Report shortcuts"
               description="Launch live reporting and action surfaces without dead-end placeholders."

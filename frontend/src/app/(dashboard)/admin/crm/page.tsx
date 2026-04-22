@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ClipboardList, FolderKanban, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -89,6 +91,33 @@ export default function AdminCrmOverviewPage() {
 
         {!loading && !error && payload ? (
           <>
+            <ControlLaneGrid
+              title="CRM lanes"
+              description="CRM keeps lead continuity, party identity, and follow-up posture explicit. Conversion into customers, subscriptions, and billing still happens in those dedicated modules."
+              lanes={[
+                {
+                  title: "Lead triage",
+                  description: "Operational inbox for public apply submissions and assignment.",
+                  href: ROUTES.admin.leads,
+                  icon: <ClipboardList className="h-4 w-4" />,
+                  badge: "Queue",
+                },
+                {
+                  title: "CRM lead register",
+                  description: "Party-linked lead register for lifecycle and follow-up review.",
+                  href: ROUTES.admin.crmLeads,
+                  icon: <FolderKanban className="h-4 w-4" />,
+                  badge: "CRM",
+                },
+                {
+                  title: "Party directory",
+                  description: "Shared additive identity layer across customer, partner, vendor, and staff records.",
+                  href: ROUTES.admin.crmParties,
+                  icon: <Users className="h-4 w-4" />,
+                  badge: "Directory",
+                },
+              ]}
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Customers"

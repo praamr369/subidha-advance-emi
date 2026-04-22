@@ -167,13 +167,8 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   function renderRow(item: PaletteItem) {
     const isFavorite = favorites.includes(item.href);
     const RowIcon = item.kind === "workflow" ? CommandIcon : Search;
-
-    const row = (
-      <div
-        className={cn(
-          "group flex items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-        )}
-      >
+    const rowContent = (
+      <>
         <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
           <RowIcon className="h-4 w-4" />
         </span>
@@ -188,16 +183,55 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
           <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.description}</span>
           <span className="mt-2 block truncate text-[11px] font-medium text-muted-foreground">{item.href}</span>
         </span>
+      </>
+    );
+
+    const rowActionClassName = cn(
+      "group flex min-w-0 flex-1 items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+    );
+
+    if (item.kind === "workflow") {
+      return (
+        <div key={`${item.kind}:${item.id}`} className="flex items-start gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openWorkflow(item.id, { query: undefined });
+            }}
+            className={cn(rowActionClassName, "text-left")}
+          >
+            {rowContent}
+          </button>
+          {sessionId ? (
+            <button
+              type="button"
+              onClick={() => handleToggleFavorite(item.href)}
+              className={cn(
+                "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-white",
+                isFavorite ? "text-amber-700" : ""
+              )}
+              aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+              title={isFavorite ? "Favorited" : "Favorite"}
+            >
+              <Star className={cn("h-4 w-4", isFavorite ? "fill-amber-400 text-amber-700" : "")} />
+            </button>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <div key={`${item.kind}:${item.href}`} className="flex items-start gap-2">
+        <Link href={item.href} onClick={onClose} className={rowActionClassName}>
+          {rowContent}
+        </Link>
         {sessionId ? (
           <button
             type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              handleToggleFavorite(item.href);
-            }}
+            onClick={() => handleToggleFavorite(item.href)}
             className={cn(
-              "mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border bg-transparent text-muted-foreground transition hover:bg-white",
+              "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-white",
               isFavorite ? "text-amber-700" : ""
             )}
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
@@ -207,33 +241,6 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
           </button>
         ) : null}
       </div>
-    );
-
-    if (item.kind === "workflow") {
-      return (
-        <button
-          type="button"
-          key={`${item.kind}:${item.id}`}
-          onClick={() => {
-            onClose();
-            openWorkflow(item.id, { query: undefined });
-          }}
-          className="w-full text-left"
-        >
-          {row}
-        </button>
-      );
-    }
-
-    return (
-      <Link
-        key={`${item.kind}:${item.href}`}
-        href={item.href}
-        onClick={onClose}
-        className="block"
-      >
-        {row}
-      </Link>
     );
   }
 

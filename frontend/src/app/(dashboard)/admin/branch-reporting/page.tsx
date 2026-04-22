@@ -1,7 +1,9 @@
 "use client";
 
+import { BarChart3, Building2, CircleDollarSign, PackageSearch, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
@@ -167,6 +169,47 @@ export default function AdminBranchReportingPage() {
 
         {!loading && !error && payload ? (
           <>
+            <ControlLaneGrid
+              title="Branch control lanes"
+              description="Branch reporting aggregates real branch-scoped truth. Open the dedicated registers to act on collections, counters, stock, and people-cost drivers."
+              lanes={[
+                {
+                  title: "Branch governance",
+                  description: "Manage branch identity and operational scope.",
+                  href: ROUTES.admin.branches,
+                  icon: <Building2 className="h-4 w-4" />,
+                  badge: "Setup",
+                },
+                {
+                  title: "Counter control",
+                  description: "Review counter mapping and front-desk collection control points.",
+                  href: ROUTES.admin.counters,
+                  icon: <CircleDollarSign className="h-4 w-4" />,
+                  badge: "Counter",
+                },
+                {
+                  title: "Operations cockpit",
+                  description: "Monitor daily work queues and branch-linked attention surfaces.",
+                  href: ROUTES.admin.operations,
+                  icon: <BarChart3 className="h-4 w-4" />,
+                  badge: "Ops",
+                },
+                {
+                  title: "Inventory visibility",
+                  description: "Open branch-relevant stock and movement registers.",
+                  href: ROUTES.admin.inventoryStockOnHand,
+                  icon: <PackageSearch className="h-4 w-4" />,
+                  badge: "Stock",
+                },
+                {
+                  title: "People-cost controls",
+                  description: "Keep staff and salary workflows explicit instead of hiding them inside branch totals.",
+                  href: ROUTES.admin.accountingStaff,
+                  icon: <Users className="h-4 w-4" />,
+                  badge: "Workforce",
+                },
+              ]}
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Collection Count"

@@ -4,13 +4,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   BookOpenText,
+  BriefcaseBusiness,
+  Building2,
   Landmark,
+  Receipt,
   ReceiptText,
   RefreshCw,
   ScrollText,
+  ShieldCheck,
   WalletCards,
 } from "lucide-react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -187,6 +192,61 @@ export default function AdminAccountingPage() {
 
         {!loading && !error ? (
           <>
+            <ControlLaneGrid
+              title="Accounting control lanes"
+              description="Accounting remains operationally separate from EMI collection. Each lane opens the dedicated admin register for controlled setup, posting, reconciliation, payroll, or compliance work."
+              lanes={[
+                {
+                  title: "Account structure",
+                  description: "Chart of accounts, books, and posting periods for additive ledger governance.",
+                  href: ROUTES.admin.accountingChartOfAccounts,
+                  icon: <BookOpenText className="h-4 w-4" />,
+                  badge: "Setup",
+                },
+                {
+                  title: "Cash / Bank / UPI control",
+                  description: "Finance-account and book review stays separate from cashier collection execution.",
+                  href: ROUTES.admin.accountingBooks,
+                  icon: <Landmark className="h-4 w-4" />,
+                  badge: "Books",
+                },
+                {
+                  title: "Posting & journals",
+                  description: "Manual journals and controlled accounting entries for finance admins.",
+                  href: ROUTES.admin.accountingJournals,
+                  icon: <ScrollText className="h-4 w-4" />,
+                  badge: "Posting",
+                },
+                {
+                  title: "Receivables / payables",
+                  description: "Vendor and procurement registers for payable visibility without merging into collections.",
+                  href: ROUTES.admin.accountingPurchaseBills,
+                  icon: <Receipt className="h-4 w-4" />,
+                  badge: "Ledger",
+                },
+                {
+                  title: "Payroll & staff",
+                  description: "Staff, salary, and expense-claim control lanes remain explicit and auditable.",
+                  href: ROUTES.admin.accountingStaff,
+                  icon: <BriefcaseBusiness className="h-4 w-4" />,
+                  badge: "Workforce",
+                },
+                {
+                  title: "Period / tax / controls",
+                  description: "Periods, GST, exports, and close controls for finance governance.",
+                  href: ROUTES.admin.accountingPeriods,
+                  icon: <ShieldCheck className="h-4 w-4" />,
+                  badge: "Close",
+                },
+                {
+                  title: "Branch-aware setup",
+                  description: "Finance books and branches stay aligned through explicit governance surfaces.",
+                  href: ROUTES.admin.branchReporting,
+                  icon: <Building2 className="h-4 w-4" />,
+                  badge: "Branch",
+                },
+              ]}
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Expense Approvals"

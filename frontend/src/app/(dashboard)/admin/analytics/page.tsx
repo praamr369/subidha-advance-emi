@@ -1,11 +1,14 @@
 "use client";
 
+import { Activity, BarChart3, Building2, FileSearch, ShieldCheck, Wallet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 type AdminAnalyticsSnapshot = {
@@ -112,6 +115,54 @@ export default function AnalyticsPage() {
 
         {!loading && !error && snapshot ? (
           <>
+            <ControlLaneGrid
+              title="Analysis lanes"
+              description="Use route-safe analytics workspaces to move from aggregate posture into the operational modules that own the underlying records."
+              lanes={[
+                {
+                  title: "Operations cockpit",
+                  description: "Daily queues, overdue posture, and cross-module workload signals.",
+                  href: ROUTES.admin.operations,
+                  icon: <Activity className="h-4 w-4" />,
+                  badge: "Ops",
+                },
+                {
+                  title: "Branch reporting",
+                  description: "Branch-wise collections, sales, people-cost, and stock posture from live registers.",
+                  href: ROUTES.admin.branchReporting,
+                  icon: <Building2 className="h-4 w-4" />,
+                  badge: "Branch",
+                },
+                {
+                  title: "Reports workspace",
+                  description: "Windowed trends, reconciliation pressure, and report drill-downs.",
+                  href: ROUTES.admin.reports,
+                  icon: <BarChart3 className="h-4 w-4" />,
+                  badge: "Reports",
+                },
+                {
+                  title: "Finance control",
+                  description: "Receivables, reconciliation, and cash or bank posture stay in a separate finance lane.",
+                  href: ROUTES.admin.finance,
+                  icon: <Wallet className="h-4 w-4" />,
+                  badge: "Finance",
+                },
+                {
+                  title: "Audit visibility",
+                  description: "Review admin actions and controls without fabricating synthetic metrics.",
+                  href: ROUTES.admin.auditLogs,
+                  icon: <ShieldCheck className="h-4 w-4" />,
+                  badge: "Audit",
+                },
+                {
+                  title: "Detailed reports",
+                  description: "Move from headline analytics into explicit report surfaces and exports.",
+                  href: ROUTES.admin.reports,
+                  icon: <FileSearch className="h-4 w-4" />,
+                  badge: "Detail",
+                },
+              ]}
+            />
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

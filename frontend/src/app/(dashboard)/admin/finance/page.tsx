@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -524,6 +525,61 @@ export default function AdminFinancePage() {
 
         {!loading && !error ? (
           <>
+            <ControlLaneGrid
+              title="Finance control lanes"
+              description="Accounting and finance remain distinct from EMI collection. These lanes route operators into the dedicated registers for account structure, account control, posting, reconciliation, payables or receivables, exports, and period governance."
+              lanes={[
+                {
+                  title: "Account structure",
+                  description: "Chart of accounts and finance-account setup for operational finance control.",
+                  href: ROUTES.admin.accountingChartOfAccounts,
+                  badge: "Setup",
+                },
+                {
+                  title: "Cash / Bank / UPI control",
+                  description: "Finance-account mix, transfers, and operational account posture without merging cashier collection screens.",
+                  href: ROUTES.admin.finance,
+                  badge: "Accounts",
+                  detail: "Use this lane for account mix and transfer visibility only.",
+                },
+                {
+                  title: "Posting & journals",
+                  description: "Manual journals and controlled posting stay in accounting, not inside the collection workflow.",
+                  href: ROUTES.admin.accountingJournals,
+                  badge: "Posting",
+                },
+                {
+                  title: "Reconciliation",
+                  description: "Investigate subscription and payment deltas before closing or settlement.",
+                  href: buildAdminReconciliationRoute({ flagged: true }),
+                  badge: "Risk",
+                },
+                {
+                  title: "Receivables / payables",
+                  description: "Customer receivables and vendor payables remain explicit and separately auditable.",
+                  href: ROUTES.admin.accountingVendors,
+                  badge: "Ledger",
+                },
+                {
+                  title: "Tax / billing / exports",
+                  description: "Open billing, GST, and export surfaces without collapsing them into finance review.",
+                  href: ROUTES.admin.billing,
+                  badge: "Compliance",
+                },
+                {
+                  title: "Period / controls",
+                  description: "Close governance, periods, and admin accounting controls.",
+                  href: ROUTES.admin.accountingPeriods,
+                  badge: "Close",
+                },
+                {
+                  title: "EMI collection lane",
+                  description: "Customer EMI and cashier collection remain a separate operational lane by design.",
+                  href: ROUTES.admin.collections,
+                  badge: "Separate",
+                },
+              ]}
+            />
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <MetricCard
                 label="Customer Receivables"
