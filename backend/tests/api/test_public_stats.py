@@ -15,6 +15,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_product,
     create_subscription,
@@ -27,6 +28,10 @@ class PublicStatsApiTests(APITestCase):
         self.admin = create_admin_user(
             username="public_stats_admin",
             phone="9317000001",
+        )
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-PUBLIC-STATS-001",
+            name="Public Stats Collection Cash",
         )
 
         customer = create_customer_profile(
@@ -80,6 +85,7 @@ class PublicStatsApiTests(APITestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="PUBLIC-STATS-PAY-001",
         )
         draw, secret_seed = create_lucky_draw_commit(batch=batch)

@@ -13,6 +13,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -42,6 +43,10 @@ class AuditLogTests(TestCase):
             start_date=date(2026, 3, 1),
         )
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=31)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-AUDIT-COLLECT-001",
+            name="Audit Collection Cash",
+        )
 
         self.subscription = create_subscription(
             customer=self.customer,
@@ -68,7 +73,10 @@ class AuditLogTests(TestCase):
         )
 
     def _audit_logs_for_object(self, object_id):
-        return AuditLog.objects.filter(object_id=object_id).order_by("created_at", "id")
+        return AuditLog.objects.filter(
+            model_name="payment",
+            object_id=object_id,
+        ).order_by("created_at", "id")
 
     def _audit_log_actions(self, object_id):
         return list(
@@ -81,6 +89,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-001",
         )
         payment = result["payment"]
@@ -113,6 +122,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-002",
         )
         payment = result["payment"]
@@ -155,6 +165,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-003",
         )
         payment = first["payment"]
@@ -164,6 +175,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-003",
         )
 
@@ -186,6 +198,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-004",
         )
         payment = result["payment"]
@@ -220,6 +233,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-005",
         )
         payment = result["payment"]
@@ -234,6 +248,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-006",
         )
         second = record_emi_payment(
@@ -241,6 +256,7 @@ class AuditLogTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="AUDIT-PAY-007",
         )
 

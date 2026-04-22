@@ -14,6 +14,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -55,6 +56,10 @@ class CommissionSettlementDomainTests(TestCase):
         )
 
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=21)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-COMMISSION-SETTLE-001",
+            name="Commission Settlement Collection Cash",
+        )
 
         self.subscription = create_subscription(
             customer=self.customer,
@@ -80,6 +85,7 @@ class CommissionSettlementDomainTests(TestCase):
             amount=Decimal("100.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="SET-DOM-001",
         )
         payment = payment_result["payment"]
@@ -107,6 +113,7 @@ class CommissionSettlementDomainTests(TestCase):
             amount=Decimal("100.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="SET-DOM-002",
         )
         commission = payment_result["payment"].commission
@@ -132,6 +139,7 @@ class CommissionSettlementDomainTests(TestCase):
             amount=Decimal("100.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="SET-DOM-003",
         )
         payment = payment_result["payment"]

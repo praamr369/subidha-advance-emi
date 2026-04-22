@@ -20,6 +20,7 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_emi,
+    create_payment_collection_finance_account,
     create_lucky_id,
     create_partner_user,
     create_product,
@@ -57,6 +58,10 @@ class SubscriptionFinancialServiceTests(TestCase):
             start_date=date(2026, 3, 1),
         )
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=31)
+        self.finance_account = create_payment_collection_finance_account(
+            code="TEST-SUB-FIN-001",
+            name="Subscription Financial Collection Cash",
+        )
         self.subscription = create_subscription(
             customer=self.customer,
             product=self.product,
@@ -96,6 +101,7 @@ class SubscriptionFinancialServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="SUB-FIN-PAY-001",
         )
 
@@ -120,6 +126,7 @@ class SubscriptionFinancialServiceTests(TestCase):
             amount=Decimal("1000.00"),
             collected_by=self.admin,
             method="CASH",
+            finance_account_id=self.finance_account.id,
             reference_no="SUB-FIN-PAY-002",
         )["payment"]
 

@@ -292,9 +292,12 @@ class CashierBranchScopeTests(APITestCase):
         response = self.client.get("/api/v1/cashier/finance-accounts/?is_active=1&page_size=100")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["results"][0]["id"], self.cash_account_one.id)
-        self.assertEqual(response.data["results"][0]["branch"], self.branch_one.id)
+        self.assertTrue(response.data["count"] >= 1)
+        result_ids = {row["id"] for row in response.data["results"]}
+        branch_ids = {row["branch"] for row in response.data["results"]}
+        self.assertIn(self.cash_account_one.id, result_ids)
+        self.assertNotIn(self.cash_account_two.id, result_ids)
+        self.assertEqual(branch_ids, {self.branch_one.id})
 
     def test_cashier_collection_defaults_to_assigned_branch_and_counter(self):
         self.client.force_authenticate(user=self.cashier)
