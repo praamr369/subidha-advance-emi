@@ -52,11 +52,17 @@ export type SmokeMeta = {
   };
 };
 
+const E2E_ROOT = path.resolve(__dirname, "..");
+const FRONTEND_ROOT = path.resolve(E2E_ROOT, "..", "..");
+const DEFAULT_SMOKE_META_PATH = path.resolve(
+  FRONTEND_ROOT,
+  "../backend/playwright-smoke-meta.json"
+);
 const SMOKE_META_PATH = process.env.PLAYWRIGHT_SMOKE_META_PATH
-  ? path.resolve(process.cwd(), process.env.PLAYWRIGHT_SMOKE_META_PATH)
-  : path.resolve(process.cwd(), "../backend/playwright-smoke-meta.json");
+  ? path.resolve(FRONTEND_ROOT, process.env.PLAYWRIGHT_SMOKE_META_PATH)
+  : DEFAULT_SMOKE_META_PATH;
 
-export const AUTH_STATE_DIR = path.resolve(process.cwd(), "tests/e2e/.auth");
+export const AUTH_STATE_DIR = path.join(E2E_ROOT, ".auth");
 
 let cachedMeta: SmokeMeta | null = null;
 
