@@ -82,6 +82,14 @@ class PublicLeadStatus(models.TextChoices):
     CLOSED = "CLOSED", "Closed"
 
 
+class PublicLeadIntent(models.TextChoices):
+    GENERAL = "GENERAL", "General"
+    QUOTATION = "QUOTATION", "Quotation"
+    ESTIMATE = "ESTIMATE", "Estimate"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+    SUBSCRIPTION = "SUBSCRIPTION", "Subscription"
+
+
 class SupportRequestStatus(models.TextChoices):
     SUBMITTED = "SUBMITTED", "Submitted"
     UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
@@ -511,7 +519,16 @@ class PublicLead(TimeStampedModel):
         default=PublicLeadStatus.NEW,
         db_index=True,
     )
+    intent = models.CharField(
+        max_length=20,
+        choices=PublicLeadIntent.choices,
+        default=PublicLeadIntent.GENERAL,
+        db_index=True,
+    )
     source = models.CharField(max_length=40, default="PUBLIC_SITE")
+    follow_up_required = models.BooleanField(default=False, db_index=True)
+    follow_up_on = models.DateField(null=True, blank=True, db_index=True)
+    follow_up_note = models.TextField(blank=True, default="")
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -574,6 +591,8 @@ class PublicLead(TimeStampedModel):
         normalized_phone = (self.phone or "").strip()
         if not normalized_phone:
             errors["phone"] = "Phone number is required."
+        if self.follow_up_required and self.follow_up_on is None:
+            errors["follow_up_on"] = "Follow-up date is required when follow-up is marked required."
 
         if errors:
             raise ValidationError(errors)
@@ -585,7 +604,9 @@ class PublicLead(TimeStampedModel):
         self.interested_product = (self.interested_product or "").strip()
         self.notes = (self.notes or "").strip()
         self.admin_notes = (self.admin_notes or "").strip()
+        self.intent = (self.intent or PublicLeadIntent.GENERAL).strip().upper()
         self.source = (self.source or "").strip() or "PUBLIC_SITE"
+        self.follow_up_note = (self.follow_up_note or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

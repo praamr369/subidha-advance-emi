@@ -13,6 +13,33 @@ test.describe("admin dashboard smoke", () => {
     await expect(page.locator("body")).toContainText("Settlement Posture");
     await expect(page.locator("body")).toContainText("Launch Points");
   });
+
+  test("admin widget board supports hide, pin, and reset controls", async ({
+    page,
+  }) => {
+    await page.goto("/admin");
+    await page.getByRole("button", { name: "Widget controls" }).click();
+
+    const quickActionsRow = page
+      .locator("div")
+      .filter({ hasText: "Quick actionsHigh-frequency workflow launchers with service-layer safeguards." })
+      .first();
+    await quickActionsRow.getByRole("button", { name: "Hide" }).click();
+    await expect(page.locator("body")).toContainText("1 widget is currently hidden.");
+
+    await quickActionsRow.getByRole("button", { name: "Pin" }).click();
+    await expect(page.locator("body")).toContainText("Pinned");
+
+    await page.getByRole("button", { name: "Reset layout" }).click();
+    await expect(page.locator("body")).toContainText("Quick actions");
+  });
+
+  test("admin dashboard supports preset mode switching", async ({ page }) => {
+    await page.goto("/admin");
+    await page.getByRole("button", { name: "Finance watch" }).click();
+    await expect(page.getByRole("button", { name: "Reset to preset" })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Settlement posture");
+  });
 });
 
 test.describe("partner dashboard smoke", () => {

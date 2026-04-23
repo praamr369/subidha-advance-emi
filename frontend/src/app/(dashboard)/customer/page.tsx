@@ -16,6 +16,7 @@ import {
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
+import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -257,6 +258,73 @@ export default function CustomerDashboardPage() {
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
       />
+
+      <WorkspaceSection
+        title="Workspace quick lanes"
+        description="Open common customer workflows quickly while keeping contract, payment, and support routes separate."
+      >
+        <DashboardWidgetBoard
+          storageKey="subidha:dashboard-widgets:customer:v1"
+          version={1}
+          title="Customer lane widgets"
+          description="Simple customer lane controls for subscription, payment, and support routes."
+          presets={[
+            {
+              id: "subscription-first",
+              label: "Subscription first",
+              description: "Prioritize subscription and payment visibility.",
+              order: ["subs", "payments", "support"],
+              pinned: ["subs", "payments"],
+            },
+            {
+              id: "support-first",
+              label: "Support first",
+              description: "Prioritize support escalation while preserving subscription context.",
+              order: ["support", "subs", "payments"],
+              pinned: ["support"],
+            },
+          ]}
+          widgets={[
+            {
+              id: "subs",
+              title: "My subscriptions",
+              subtitle: "Contract and winner posture overview.",
+              group: "core",
+              fixed: true,
+              content: (
+                <ActionButton href={ROUTES.customer.subscriptions} variant="outline" className="justify-between">
+                  Open subscriptions
+                  <ArrowRight className="h-4 w-4" />
+                </ActionButton>
+              ),
+            },
+            {
+              id: "payments",
+              title: "My payments",
+              subtitle: "Payment register and receipt lookup.",
+              group: "quick-actions",
+              content: (
+                <ActionButton href={ROUTES.customer.payments} variant="outline" className="justify-between">
+                  Open payments
+                  <ArrowRight className="h-4 w-4" />
+                </ActionButton>
+              ),
+            },
+            {
+              id: "support",
+              title: "Support requests",
+              subtitle: "Escalate customer-side issues safely.",
+              group: "operational",
+              content: (
+                <ActionButton href={ROUTES.customer.support} variant="outline" className="justify-between">
+                  Open support
+                  <ArrowRight className="h-4 w-4" />
+                </ActionButton>
+              ),
+            },
+          ]}
+        />
+      </WorkspaceSection>
 
       {loading ? <LoadingBlock label="Loading customer workspace..." /> : null}
 

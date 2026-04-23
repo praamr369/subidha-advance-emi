@@ -1,13 +1,14 @@
 from django.db.models import Count, Min, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import permissions, serializers
+from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.admin_leads import (
     AdminLeadAssignSerializer,
+    AdminLeadCreateSerializer,
     AdminLeadConversionCompleteSerializer,
     AdminLeadDetailSerializer,
     AdminLeadListSerializer,
@@ -16,9 +17,10 @@ from api.v1.serializers.admin_leads import (
 )
 from crm.models import PartyInteraction, PartyInteractionStatus, PartyLink, PartyLinkRole
 from crm.services.party_service import seed_missing_party_links
-from subscriptions.models import PublicLead, PublicLeadStatus
+from subscriptions.models import PublicLead, PublicLeadIntent, PublicLeadStatus
 from subscriptions.services.public_lead_service import (
     assign_public_lead,
+    create_admin_lead,
     complete_public_lead_conversion,
     update_public_lead_notes,
     update_public_lead_status,
@@ -41,6 +43,7 @@ def _lead_queryset():
 
 def _apply_filters(queryset, request):
     status_filter = (request.query_params.get("status") or "").strip().upper()
+    intent_filter = (request.query_params.get("intent") or "").strip().upper()
     assignee_filter = (request.query_params.get("assignee") or "").strip()
     q = (request.query_params.get("q") or "").strip()
     date_from = (request.query_params.get("date_from") or "").strip()
@@ -48,6 +51,8 @@ def _apply_filters(queryset, request):
 
     if status_filter and status_filter in PublicLeadStatus.values:
         queryset = queryset.filter(status=status_filter)
+    if intent_filter and intent_filter in PublicLeadIntent.values:
+        queryset = queryset.filter(intent=intent_filter)
 
     if assignee_filter:
         if assignee_filter == "unassigned":
@@ -174,6 +179,39 @@ class AdminLeadListView(APIView):
                 "results": serializer.data,
             }
         )
+
+    def post(self, request):
+        serializer = AdminLeadCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        try:
+            lead = create_admin_lead(
+                name=validated["name"],
+                phone=validated["phone"],
+                email=validated.get("email", ""),
+                city=validated.get("city", ""),
+                product=validated.get("product_id"),
+                interested_product=validated.get("interested_product", ""),
+                preferred_emi_amount=validated.get("preferred_emi_amount"),
+                notes=validated.get("notes", ""),
+                admin_notes=validated.get("admin_notes", ""),
+                source=validated.get("source", "OFFLINE_WALK_IN"),
+                intent=validated.get("intent"),
+                follow_up_required=validated.get("follow_up_required", False),
+                follow_up_on=validated.get("follow_up_on"),
+                follow_up_note=validated.get("follow_up_note", ""),
+                assigned_to=validated.get("assigned_to"),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        response_payload = AdminLeadDetailSerializer(
+            lead,
+            context=_crm_serializer_context(request, [lead]),
+        ).data
+        return Response(response_payload, status=status.HTTP_201_CREATED)
 
 
 class AdminLeadDetailView(APIView):

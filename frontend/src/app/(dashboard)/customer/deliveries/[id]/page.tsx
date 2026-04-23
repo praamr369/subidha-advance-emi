@@ -2,10 +2,12 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import {
@@ -185,9 +187,10 @@ export default function CustomerDeliveryDetailPage() {
 
   const [delivery, setDelivery] = useState<DeliveryRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async () => {
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (!deliveryId) {
       setError("Delivery id is missing.");
       setLoading(false);
@@ -195,7 +198,8 @@ export default function CustomerDeliveryDetailPage() {
     }
 
     try {
-      setLoading(true);
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
       const payload = await getCustomerDelivery(deliveryId);
       setDelivery(payload);
       setError(null);
@@ -203,12 +207,13 @@ export default function CustomerDeliveryDetailPage() {
       setError(toErrorMessage(err));
       setDelivery(null);
     } finally {
-      setLoading(false);
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
     }
   }, [deliveryId]);
 
   useEffect(() => {
-    void loadPage();
+    void loadPage("initial");
   }, [loadPage]);
 
   const timelineItems = useMemo(
@@ -300,6 +305,16 @@ export default function CustomerDeliveryDetailPage() {
             <WorkspaceSection
               title="Delivery posture"
               description="Current shipment state and the operational boundary for this delivery record."
+              action={
+                <ActionButton
+                  variant="outline"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={loading || refreshing}
+                  leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </ActionButton>
+              }
             >
               <WorkspaceNotice
                 tone={deliveryTone(delivery.status)}

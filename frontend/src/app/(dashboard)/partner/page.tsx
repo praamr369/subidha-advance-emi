@@ -15,6 +15,7 @@ import {
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
+import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -224,6 +225,80 @@ export default function PartnerDashboardPage() {
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
         />
+
+        <WorkspaceSection
+          title="Partner quick lanes"
+          description="Jump directly into collections, reports, and subscription intake without leaving partner scope boundaries."
+        >
+          <DashboardWidgetBoard
+            storageKey="subidha:dashboard-widgets:partner:v1"
+            version={1}
+            title="Partner lane widgets"
+            description="Role-safe partner shortcuts for collections, intake queue, and reports."
+            presets={[
+              {
+                id: "collections-first",
+                label: "Collections first",
+                description: "Keep partner collection submission and follow-up most prominent.",
+                order: ["collections", "requests", "reports"],
+                pinned: ["collections", "requests"],
+              },
+              {
+                id: "request-review",
+                label: "Request review",
+                description: "Prioritize intake request queue and review actions.",
+                order: ["requests", "collections", "reports"],
+                pinned: ["requests"],
+              },
+              {
+                id: "reports-focus",
+                label: "Reports focus",
+                description: "Bring reporting shortcut first for review and payout preparation windows.",
+                order: ["reports", "collections", "requests"],
+                pinned: ["reports"],
+              },
+            ]}
+            widgets={[
+              {
+                id: "collections",
+                title: "Submit collection",
+                subtitle: "Create controlled partner collection requests.",
+                group: "core",
+                fixed: true,
+                content: (
+                  <ActionButton href="/partner/collections/create" variant="outline" className="justify-between">
+                    Open collection form
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "requests",
+                title: "Request queue",
+                subtitle: "Partner subscription request review trail.",
+                group: "quick-actions",
+                content: (
+                  <ActionButton href="/partner/subscription-requests" variant="outline" className="justify-between">
+                    Open request queue
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "reports",
+                title: "Reports",
+                subtitle: "Partner-scoped collection/commission reporting.",
+                group: "operational",
+                content: (
+                  <ActionButton href="/partner/reports" variant="outline" className="justify-between">
+                    Open reports
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+            ]}
+          />
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
 

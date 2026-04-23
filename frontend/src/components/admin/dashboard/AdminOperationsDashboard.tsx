@@ -32,6 +32,7 @@ import {
 } from "react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
+import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
@@ -63,6 +64,7 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
+  ADMIN_DASHBOARD_WIDGET_PREFS_VERSION,
   readAdminDashboardWidgetPrefs,
   writeAdminDashboardWidgetPrefs,
   type AdminDashboardWidgetAttention,
@@ -144,7 +146,7 @@ const WIDGET_IDS = [
 type WidgetId = (typeof WIDGET_IDS)[number];
 
 const DEFAULT_WIDGET_PREFS: AdminDashboardWidgetPrefs = {
-  version: 1,
+  version: ADMIN_DASHBOARD_WIDGET_PREFS_VERSION,
   open: [
     "due-followup",
     "reconciliation-exceptions",
@@ -334,6 +336,7 @@ export default function AdminOperationsDashboard() {
 
   const [widgetPrefs, setWidgetPrefs] =
     useState<AdminDashboardWidgetPrefs>(DEFAULT_WIDGET_PREFS);
+  const operationsBoardStorageKey = "subidha:dashboard-widgets:admin-operations:v1";
   const prefsHydratedRef = useRef(false);
   const prevOpenRef = useRef<readonly string[]>([]);
 
@@ -1256,6 +1259,147 @@ export default function AdminOperationsDashboard() {
                   badge: "Finance",
                 },
               ],
+            },
+          ]}
+        />
+
+        <DashboardWidgetBoard
+          storageKey={operationsBoardStorageKey}
+          version={1}
+          title="Operations cockpit board"
+          description="Reorder route-safe operations clusters for daily focus while keeping core queues always visible."
+          presets={[
+            {
+              id: "collections-heavy",
+              label: "Collections heavy",
+              description: "Prioritize collections and finance follow-up clusters.",
+              order: [
+                "collections-followup",
+                "finance-visibility",
+                "customers-sales",
+                "crm-support",
+                "billing-queues",
+              ],
+              pinned: ["collections-followup", "finance-visibility"],
+            },
+            {
+              id: "support-heavy",
+              label: "Support heavy",
+              description: "Surface CRM/support and customer clusters for triage days.",
+              order: [
+                "crm-support",
+                "customers-sales",
+                "collections-followup",
+                "billing-queues",
+                "finance-visibility",
+              ],
+              pinned: ["crm-support", "customers-sales"],
+            },
+            {
+              id: "finance-watch",
+              label: "Finance watch",
+              description: "Keep finance and collections cross-links at top.",
+              order: [
+                "finance-visibility",
+                "collections-followup",
+                "billing-queues",
+                "crm-support",
+                "customers-sales",
+              ],
+              pinned: ["finance-visibility", "collections-followup"],
+            },
+            {
+              id: "sales-followup",
+              label: "Sales follow-up",
+              description: "Push customer/sales and billing queue routes first.",
+              order: [
+                "customers-sales",
+                "billing-queues",
+                "collections-followup",
+                "crm-support",
+                "finance-visibility",
+              ],
+              pinned: ["customers-sales", "billing-queues"],
+            },
+          ]}
+          widgets={[
+            {
+              id: "collections-followup",
+              title: "Collections follow-up",
+              subtitle: "Overdue and upcoming EMI queues with reconciliation cross-check links.",
+              group: "core",
+              fixed: true,
+              defaultPinned: true,
+              content: (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton href={buildAdminCollectionsRoute()} variant="outline" className="justify-between">
+                    Overdue collections
+                    <Siren className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton href={buildAdminCollectionsRoute()} variant="outline" className="justify-between">
+                    Upcoming dues
+                    <CalendarClock className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton href={buildAdminReconciliationRoute({ flagged: true })} variant="outline" className="justify-between">
+                    Reconciliation flags
+                    <ShieldAlert className="h-4 w-4" />
+                  </ActionButton>
+                </div>
+              ),
+            },
+            {
+              id: "customers-sales",
+              title: "Customers & sales",
+              subtitle: "Customer onboarding and subscription pipeline routes.",
+              group: "quick-actions",
+              defaultPinned: true,
+              content: (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton href={ROUTES.admin.customers} variant="outline">Customer register</ActionButton>
+                  <ActionButton href={ROUTES.admin.subscriptions} variant="outline">Subscription register</ActionButton>
+                  <ActionButton href={ROUTES.admin.leads} variant="outline">Lead inbox</ActionButton>
+                </div>
+              ),
+            },
+            {
+              id: "billing-queues",
+              title: "Billing queues",
+              subtitle: "Direct sales and billing operations routed separately from EMI collections.",
+              group: "operational",
+              content: (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton href={ROUTES.admin.billing} variant="outline">Billing workspace</ActionButton>
+                  <ActionButton href={ROUTES.admin.billingDirectSales} variant="outline">Direct sales</ActionButton>
+                  <ActionButton href={ROUTES.admin.payments} variant="outline">Payment register</ActionButton>
+                </div>
+              ),
+            },
+            {
+              id: "crm-support",
+              title: "CRM and support workload",
+              subtitle: "Service desk and support triage queues for operational follow-up.",
+              group: "attention",
+              fixed: true,
+              content: (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton href={ROUTES.admin.supportRequests} variant="outline">Support requests</ActionButton>
+                  <ActionButton href={ROUTES.admin.serviceDesk} variant="outline">Service desk</ActionButton>
+                  <ActionButton href={buildAdminLeadsRoute({ status: "OPEN" })} variant="outline">Open leads</ActionButton>
+                </div>
+              ),
+            },
+            {
+              id: "finance-visibility",
+              title: "Finance visibility cross-links",
+              subtitle: "Finance/accounting visibility links kept separate from collection posting.",
+              group: "operational",
+              content: (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <ActionButton href={ROUTES.admin.finance} variant="outline">Finance control</ActionButton>
+                  <ActionButton href={ROUTES.admin.accounting} variant="outline">Accounting lanes</ActionButton>
+                  <ActionButton href={ROUTES.admin.reports} variant="outline">Reports center</ActionButton>
+                </div>
+              ),
             },
           ]}
         />

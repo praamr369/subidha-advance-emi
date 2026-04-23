@@ -20,6 +20,9 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import DashboardWidgetBoard, {
+  type DashboardWidgetDefinition,
+} from "@/components/dashboard/DashboardWidgetBoard";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -146,6 +149,7 @@ export default function AdminDashboardPage() {
     ? deliverySummary.pending + deliverySummary.scheduled + deliverySummary.in_transit
     : 0;
   const nextDraw = legacy?.batches?.next_draw_batch;
+  const widgetStorageKey = "subidha:dashboard-widgets:admin:v1";
 
   const attentionItems = useMemo(
     () =>
@@ -240,132 +244,199 @@ export default function AdminDashboardPage() {
       }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
-          title="Quick actions"
-          description="Drawer-first launch for high-frequency workflows. Canonical pages remain the source of truth for deep audit and long forms."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <ActionButton variant="primary" onClick={() => openWorkflow("admin.createSubscription")}>
-                New Subscription
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => openWorkflow("admin.collectPayment")}>
-                Collect Payment
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createCustomer")}>
-                New Customer
-              </ActionButton>
-            </div>
-          }
-        >
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-              Financial posting stays server-validated; the drawer never bypasses service-layer allocation rules.
-            </div>
-            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-              Use the sidebar Favorites + command palette (Ctrl+K) to reduce navigation cost under daily ops.
-            </div>
-            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-              Deep link pages remain canonical for reconciliation, receipts, reversals, and audit review.
-            </div>
-          </div>
-        </WorkspaceSection>
-
         <div className="flex justify-end">
-          <button
+          <ActionButton
             type="button"
+            variant="outline"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
-            <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         </div>
 
-        <WorkspaceSection
-          title="Settlement Posture"
-          description="Read-only finance posture from canonical dashboard summaries. Posting, waiver, and reconciliation truth stays in backend service flows."
-          actionHref={ROUTES.admin.finance}
-          actionLabel="Open Finance Control"
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Posture"
-              value={settlementPosture?.badgeLabel ?? "Unavailable"}
-              subtext={settlementPosture?.description ?? "No canonical summary returned"}
-              tone={overdueCount > 0 || reconciliationFlags > 0 ? "warning" : "success"}
-              icon={<ShieldCheck className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Next Due"
-              value={summary?.next_due_amount ? money(summary.next_due_amount) : "—"}
-              subtext={
-                summary?.next_due_date
-                  ? `${summary.next_due_subscription_number ?? "Subscription"} · ${formatDate(summary.next_due_date)}`
-                  : "No next due row visible"
-              }
-              icon={<CalendarClock className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Delivery Actions"
-              value={String(deliveryActions)}
-              subtext={`${deliverySummary?.pending ?? 0} pending · ${deliverySummary?.in_transit ?? 0} in transit`}
-              tone={deliveryActions > 0 ? "warning" : "success"}
-              href={buildAdminDeliveriesRoute({ bucket: "PENDING" })}
-              icon={<Truck className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Lucky Draw"
-              value={nextDraw?.batch_code ?? "—"}
-              subtext={
-                nextDraw?.draw_date
-                  ? `${nextDraw.days_until_draw ?? 0} days to ${formatDate(nextDraw.draw_date)}`
-                  : "No draw scheduled"
-              }
-              href={ROUTES.admin.luckyDraws}
-              icon={<ClipboardCheck className="h-5 w-5" />}
-            />
-          </div>
-        </WorkspaceSection>
-
-        <WorkspaceSection
-          title="Urgent Attention"
-          description="Only decision-driving issues appear here. Use Operations Workspace for the full action queue."
-          actionHref={ROUTES.admin.operations}
-          actionLabel="Open Operations"
-        >
-          {attentionItems.length === 0 ? (
-            <EmptyState
-              title="No urgent launch issues"
-              description="Overdue EMI, reconciliation, and delivery action signals are currently quiet."
-            />
-          ) : (
-            <div className="grid gap-3 lg:grid-cols-3">
-              {attentionItems.map((item) => (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="rounded-[1.25rem] border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">{item.title}</div>
-                      <div className="mt-2 text-xs leading-5 text-muted-foreground">{item.detail}</div>
+        <DashboardWidgetBoard
+          storageKey={widgetStorageKey}
+          version={1}
+          title="Executive control center widgets"
+          description="Rearrange operational widgets, pin what matters most, hide optional cards, and reset to the default admin cockpit layout."
+          presets={[
+            {
+              id: "collections-heavy",
+              label: "Collections heavy",
+              description: "Prioritize due follow-up, quick actions, and launch access to collections.",
+              order: ["quick-actions", "urgent-attention", "settlement-posture", "launch-points"],
+              pinned: ["quick-actions", "urgent-attention"],
+            },
+            {
+              id: "support-heavy",
+              label: "Support heavy",
+              description: "Bring attention and launch surfaces up for support-response days.",
+              order: ["urgent-attention", "launch-points", "quick-actions", "settlement-posture"],
+              pinned: ["urgent-attention"],
+            },
+            {
+              id: "finance-watch",
+              label: "Finance watch",
+              description: "Keep settlement and attention widgets dominant for close/reconciliation windows.",
+              order: ["settlement-posture", "urgent-attention", "launch-points", "quick-actions"],
+              pinned: ["settlement-posture", "urgent-attention"],
+            },
+            {
+              id: "sales-followup",
+              label: "Sales follow-up",
+              description: "Emphasize quick actions and launch points for onboarding/sales throughput.",
+              order: ["quick-actions", "launch-points", "urgent-attention", "settlement-posture"],
+              pinned: ["quick-actions", "launch-points"],
+            },
+          ]}
+          widgets={[
+            {
+              id: "quick-actions",
+              title: "Quick actions",
+              subtitle: "High-frequency workflow launchers with service-layer safeguards.",
+              group: "quick-actions",
+              defaultPinned: true,
+              content: (
+                <WorkspaceSection
+                  title="Quick actions"
+                  description="Drawer-first launch for high-frequency workflows. Canonical pages remain the source of truth for deep audit and long forms."
+                  action={
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton variant="primary" onClick={() => openWorkflow("admin.createSubscription")}>
+                        New Subscription
+                      </ActionButton>
+                      <ActionButton variant="secondary" onClick={() => openWorkflow("admin.collectPayment")}>
+                        Collect Payment
+                      </ActionButton>
+                      <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createCustomer")}>
+                        New Customer
+                      </ActionButton>
                     </div>
-                    <AlertTriangle className={item.tone === "warning" ? "h-5 w-5 text-amber-700" : "h-5 w-5 text-slate-600"} />
+                  }
+                >
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+                      Financial posting stays server-validated; the drawer never bypasses service-layer allocation rules.
+                    </div>
+                    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+                      Use the sidebar Favorites + command palette (Ctrl+K) to reduce navigation cost under daily ops.
+                    </div>
+                    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+                      Deep link pages remain canonical for reconciliation, receipts, reversals, and audit review.
+                    </div>
                   </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </WorkspaceSection>
-
-        <WorkspaceSection
-          title="Launch Points"
-          description="Route-safe entry points for daily shop workflows, reports, and finance controls."
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LaunchCard
+                </WorkspaceSection>
+              ),
+            },
+            {
+              id: "settlement-posture",
+              title: "Settlement posture",
+              subtitle: "Core finance summary with next-due and delivery signal visibility.",
+              group: "core",
+              fixed: true,
+              defaultPinned: true,
+              content: (
+                <WorkspaceSection
+                  title="Settlement Posture"
+                  description="Read-only finance posture from canonical dashboard summaries. Posting, waiver, and reconciliation truth stays in backend service flows."
+                  actionHref={ROUTES.admin.finance}
+                  actionLabel="Open Finance Control"
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                      label="Posture"
+                      value={settlementPosture?.badgeLabel ?? "Unavailable"}
+                      subtext={settlementPosture?.description ?? "No canonical summary returned"}
+                      tone={overdueCount > 0 || reconciliationFlags > 0 ? "warning" : "success"}
+                      icon={<ShieldCheck className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Next Due"
+                      value={summary?.next_due_amount ? money(summary.next_due_amount) : "—"}
+                      subtext={
+                        summary?.next_due_date
+                          ? `${summary.next_due_subscription_number ?? "Subscription"} · ${formatDate(summary.next_due_date)}`
+                          : "No next due row visible"
+                      }
+                      icon={<CalendarClock className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Delivery Actions"
+                      value={String(deliveryActions)}
+                      subtext={`${deliverySummary?.pending ?? 0} pending · ${deliverySummary?.in_transit ?? 0} in transit`}
+                      tone={deliveryActions > 0 ? "warning" : "success"}
+                      href={buildAdminDeliveriesRoute({ bucket: "PENDING" })}
+                      icon={<Truck className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Lucky Draw"
+                      value={nextDraw?.batch_code ?? "—"}
+                      subtext={
+                        nextDraw?.draw_date
+                          ? `${nextDraw.days_until_draw ?? 0} days to ${formatDate(nextDraw.draw_date)}`
+                          : "No draw scheduled"
+                      }
+                      href={ROUTES.admin.luckyDraws}
+                      icon={<ClipboardCheck className="h-5 w-5" />}
+                    />
+                  </div>
+                </WorkspaceSection>
+              ),
+            },
+            {
+              id: "urgent-attention",
+              title: "Urgent attention",
+              subtitle: "Core watchlist for overdue, reconciliation, and delivery risk signals.",
+              group: "attention",
+              fixed: true,
+              content: (
+                <WorkspaceSection
+                  title="Urgent Attention"
+                  description="Only decision-driving issues appear here. Use Operations Workspace for the full action queue."
+                  actionHref={ROUTES.admin.operations}
+                  actionLabel="Open Operations"
+                >
+                  {attentionItems.length === 0 ? (
+                    <EmptyState
+                      title="No urgent launch issues"
+                      description="Overdue EMI, reconciliation, and delivery action signals are currently quiet."
+                    />
+                  ) : (
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      {attentionItems.map((item) => (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          className="rounded-[1.25rem] border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                              <div className="mt-2 text-xs leading-5 text-muted-foreground">{item.detail}</div>
+                            </div>
+                            <AlertTriangle className={item.tone === "warning" ? "h-5 w-5 text-amber-700" : "h-5 w-5 text-slate-600"} />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </WorkspaceSection>
+              ),
+            },
+            {
+              id: "launch-points",
+              title: "Launch points",
+              subtitle: "Route-safe entry points for finance, operations, CRM, and billing surfaces.",
+              group: "operational",
+              content: (
+                <WorkspaceSection
+                  title="Launch Points"
+                  description="Route-safe entry points for daily shop workflows, reports, and finance controls."
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <LaunchCard
               title="Operations Workspace"
               description="Overdue collections, deliveries, reminders, support, onboarding, inventory, and purchase queues."
               href={ROUTES.admin.operations}
@@ -417,8 +488,12 @@ export default function AdminDashboardPage() {
               href={ROUTES.admin.settingsBusinessSetup}
               icon={<ClipboardCheck className="h-5 w-5" />}
             />
-          </div>
-        </WorkspaceSection>
+                  </div>
+                </WorkspaceSection>
+              ),
+            },
+          ] satisfies DashboardWidgetDefinition[]}
+        />
       </div>
     </PortalPage>
   );

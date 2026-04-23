@@ -3,9 +3,10 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
+from django.utils import timezone
 
-from billing.models import DirectSale, ReceiptDocument
-from subscriptions.models import Customer
+from billing.models import BillingInvoice, DirectSale, ReceiptDocument
+from subscriptions.models import Customer, PublicLead, PublicLeadStatus
 from subscriptions.models import FinancialLedger, Payment, SubscriptionDocument
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
@@ -113,6 +114,63 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
     receipt_totals = receipt_qs.aggregate(
         total_count=Count("id"),
         total_amount=Sum("amount"),
+    )
+    invoice_qs = (
+        BillingInvoice.objects.select_related("branch", "direct_sale")
+        .filter(customer=customer)
+        .order_by("-invoice_date", "-id")
+    )
+    invoice_totals = invoice_qs.aggregate(
+        total_count=Count("id"),
+        posted_count=Count("id", filter=Q(status="POSTED")),
+        grand_total=Sum("grand_total"),
+        outstanding_total=Sum("balance_total"),
+    )
+
+    lead_filters = Q(converted_customer=customer)
+    if customer.phone:
+        lead_filters = lead_filters | Q(phone=customer.phone)
+    customer_email = (getattr(customer.user, "email", "") or "").strip()
+    if customer_email:
+        lead_filters = lead_filters | Q(email__iexact=customer_email)
+
+    lead_qs = (
+        PublicLead.objects.select_related(
+            "product",
+            "assigned_to",
+            "converted_subscription",
+            "converted_direct_sale",
+            "converted_by",
+        )
+        .filter(lead_filters)
+        .distinct()
+        .order_by("-created_at", "-id")
+    )
+    lead_totals = lead_qs.aggregate(
+        total_count=Count("id"),
+        open_count=Count(
+            "id",
+            filter=Q(
+                status__in=[
+                    PublicLeadStatus.NEW,
+                    PublicLeadStatus.IN_PROGRESS,
+                    PublicLeadStatus.CONTACTED,
+                ]
+            ),
+        ),
+        converted_count=Count("id", filter=Q(status=PublicLeadStatus.CONVERTED)),
+        quotation_count=Count("id", filter=Q(intent="QUOTATION")),
+        estimate_count=Count("id", filter=Q(intent="ESTIMATE")),
+        follow_up_required_count=Count("id", filter=Q(follow_up_required=True)),
+        follow_up_due_count=Count(
+            "id",
+            filter=Q(
+                follow_up_required=True,
+                follow_up_on__isnull=False,
+                follow_up_on__lte=timezone.localdate(),
+            )
+            & ~Q(status__in=[PublicLeadStatus.CONVERTED, PublicLeadStatus.CLOSED]),
+        ),
     )
 
     document_qs = (
@@ -229,6 +287,25 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         }
         for receipt in receipt_qs[:10]
     ]
+    recent_invoices = [
+        {
+            "id": invoice.id,
+            "document_no": invoice.document_no,
+            "invoice_date": invoice.invoice_date,
+            "status": invoice.status,
+            "billing_channel": invoice.billing_channel,
+            "branch_id": invoice.branch_id,
+            "branch_code": getattr(invoice.branch, "code", None),
+            "branch_name": getattr(invoice.branch, "name", None),
+            "direct_sale_id": invoice.direct_sale_id,
+            "direct_sale_no": getattr(invoice.direct_sale, "sale_no", None),
+            "subscription_id": invoice.subscription_id,
+            "grand_total": _money(invoice.grand_total),
+            "received_total": _money(invoice.received_total),
+            "balance_total": _money(invoice.balance_total),
+        }
+        for invoice in invoice_qs[:10]
+    ]
 
     recent_documents = [
         {
@@ -240,6 +317,41 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "created_at": document.created_at,
         }
         for document in document_qs[:10]
+    ]
+    recent_leads = [
+        {
+            "id": lead.id,
+            "name": lead.name,
+            "phone": lead.phone,
+            "email": lead.email,
+            "city": lead.city,
+            "status": lead.status,
+            "intent": lead.intent,
+            "source": lead.source,
+            "interested_product": lead.interested_product,
+            "preferred_emi_amount": (
+                _money(lead.preferred_emi_amount)
+                if lead.preferred_emi_amount is not None
+                else None
+            ),
+            "follow_up_required": lead.follow_up_required,
+            "follow_up_on": lead.follow_up_on,
+            "follow_up_note": lead.follow_up_note,
+            "notes": lead.notes,
+            "admin_notes": lead.admin_notes,
+            "assigned_to_id": lead.assigned_to_id,
+            "assigned_to_username": getattr(lead.assigned_to, "username", None),
+            "converted_customer_id": lead.converted_customer_id,
+            "converted_subscription_id": lead.converted_subscription_id,
+            "converted_direct_sale_id": lead.converted_direct_sale_id,
+            "converted_direct_sale_no": getattr(lead.converted_direct_sale, "sale_no", None),
+            "created_at": lead.created_at,
+            "converted_at": lead.converted_at,
+        }
+        for lead in lead_qs[:15]
+    ]
+    quotation_estimate_rows = [
+        row for row in recent_leads if row["intent"] in {"QUOTATION", "ESTIMATE"}
     ]
 
     return {
@@ -264,6 +376,12 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "direct_sale_outstanding_total": _money(direct_sales_totals["outstanding_total"]),
             "receipt_count": receipt_totals["total_count"] or 0,
             "receipt_total": _money(receipt_totals["total_amount"]),
+            "invoice_count": invoice_totals["total_count"] or 0,
+            "invoice_outstanding_total": _money(invoice_totals["outstanding_total"]),
+            "lead_count": lead_totals["total_count"] or 0,
+            "lead_open_count": lead_totals["open_count"] or 0,
+            "quotation_estimate_count": (lead_totals["quotation_count"] or 0)
+            + (lead_totals["estimate_count"] or 0),
         },
         "direct_sales": {
             "summary": {
@@ -304,9 +422,35 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
                 "receipt_count": receipt_totals["total_count"] or 0,
                 "receipt_total": _money(receipt_totals["total_amount"]),
                 "document_count": document_qs.count(),
+                "invoice_count": invoice_totals["total_count"] or 0,
+                "invoice_posted_count": invoice_totals["posted_count"] or 0,
+                "invoice_total": _money(invoice_totals["grand_total"]),
+                "invoice_outstanding_total": _money(invoice_totals["outstanding_total"]),
             },
             "receipts": recent_receipts,
+            "invoices": recent_invoices,
             "documents": recent_documents,
+        },
+        "leads": {
+            "summary": {
+                "total_count": lead_totals["total_count"] or 0,
+                "open_count": lead_totals["open_count"] or 0,
+                "converted_count": lead_totals["converted_count"] or 0,
+                "quotation_count": lead_totals["quotation_count"] or 0,
+                "estimate_count": lead_totals["estimate_count"] or 0,
+                "follow_up_required_count": lead_totals["follow_up_required_count"] or 0,
+                "follow_up_due_count": lead_totals["follow_up_due_count"] or 0,
+            },
+            "rows": recent_leads,
+        },
+        "quotation_estimates": {
+            "summary": {
+                "total_count": (lead_totals["quotation_count"] or 0)
+                + (lead_totals["estimate_count"] or 0),
+                "quotation_count": lead_totals["quotation_count"] or 0,
+                "estimate_count": lead_totals["estimate_count"] or 0,
+            },
+            "rows": quotation_estimate_rows,
         },
         "partner_linkages": {
             "count": len(partner_rows),

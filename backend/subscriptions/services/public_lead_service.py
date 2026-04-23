@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -12,6 +13,7 @@ from subscriptions.models import (
     Customer,
     Product,
     PublicLead,
+    PublicLeadIntent,
     PublicLeadStatus,
     Subscription,
 )
@@ -58,6 +60,17 @@ def _normalize_notes(value: str | None) -> str:
     return (value or "").strip()
 
 
+def _normalize_source(value: str | None, *, default: str) -> str:
+    return (value or "").strip().upper() or default
+
+
+def _normalize_intent(value: str | None) -> str:
+    candidate = (value or PublicLeadIntent.GENERAL).strip().upper()
+    if candidate not in PublicLeadIntent.values:
+        raise ValueError("Unsupported lead intent.")
+    return candidate
+
+
 def _normalize_decimal(value) -> Decimal | None:
     if value in (None, ""):
         return None
@@ -75,6 +88,14 @@ def _resolve_interested_product(product: Product | None, raw_value: str | None) 
     if product is None:
         return ""
     return f"{product.name} ({product.product_code})".strip()
+
+
+def _resolve_follow_up_datetime(follow_up_on):
+    if follow_up_on is None:
+        return None
+    naive = datetime.combine(follow_up_on, time(hour=11, minute=0))
+    current_timezone = timezone.get_current_timezone()
+    return timezone.make_aware(naive, current_timezone)
 
 
 @transaction.atomic
@@ -100,6 +121,10 @@ def create_public_lead(
         notes=_normalize_notes(notes),
         status=PublicLeadStatus.NEW,
         source="PUBLIC_SITE",
+        intent=PublicLeadIntent.GENERAL,
+        follow_up_required=False,
+        follow_up_on=None,
+        follow_up_note="",
     )
 
     log_audit(
@@ -113,6 +138,135 @@ def create_public_lead(
         },
     )
     sync_party_for_lead(lead)
+
+    return lead
+
+
+@transaction.atomic
+def create_admin_lead(
+    *,
+    name: str,
+    phone: str,
+    email: str = "",
+    city: str = "",
+    interested_product: str = "",
+    preferred_emi_amount=None,
+    notes: str = "",
+    admin_notes: str = "",
+    source: str = "OFFLINE_WALK_IN",
+    intent: str = PublicLeadIntent.GENERAL,
+    follow_up_required: bool = False,
+    follow_up_on=None,
+    follow_up_note: str = "",
+    product: Product | None = None,
+    assigned_to: User | None = None,
+    performed_by=None,
+):
+    validate_assignable_user(assigned_to)
+    resolved_intent = _normalize_intent(intent)
+    resolved_follow_up_required = bool(follow_up_required)
+    resolved_follow_up_on = follow_up_on
+    if resolved_follow_up_required and resolved_follow_up_on is None:
+        raise ValueError("Follow-up date is required when follow-up is marked required.")
+    if not resolved_follow_up_required:
+        resolved_follow_up_on = None
+
+    lead = PublicLead.objects.create(
+        name=(name or "").strip(),
+        phone=(phone or "").strip(),
+        email=(email or "").strip(),
+        city=(city or "").strip(),
+        product=product,
+        interested_product=_resolve_interested_product(product, interested_product),
+        preferred_emi_amount=_normalize_decimal(preferred_emi_amount),
+        notes=_normalize_notes(notes),
+        admin_notes=_normalize_notes(admin_notes),
+        status=PublicLeadStatus.NEW,
+        source=_normalize_source(source, default="OFFLINE_WALK_IN"),
+        intent=resolved_intent,
+        follow_up_required=resolved_follow_up_required,
+        follow_up_on=resolved_follow_up_on,
+        follow_up_note=_normalize_notes(follow_up_note),
+        assigned_to=assigned_to,
+        assigned_at=timezone.now() if assigned_to is not None else None,
+    )
+    lead_party = sync_party_for_lead(lead, performed_by=performed_by)
+
+    log_audit(
+        action_type=AuditLog.ActionType.LEAD_CREATED,
+        instance=lead,
+        performed_by=performed_by,
+        metadata={
+            "event": "ADMIN_LEAD_CREATED",
+            "source": lead.source,
+            "intent": lead.intent,
+            "product_id": lead.product_id,
+            "interested_product": lead.interested_product,
+            "follow_up_required": lead.follow_up_required,
+            "follow_up_on": lead.follow_up_on.isoformat() if lead.follow_up_on else None,
+        },
+    )
+
+    if assigned_to is not None:
+        log_audit(
+            action_type=AuditLog.ActionType.LEAD_ASSIGNED,
+            instance=lead,
+            performed_by=performed_by,
+            metadata={
+                "event": "LEAD_ASSIGNED",
+                "previous_assignee_id": None,
+                "previous_assignee_username": None,
+                "next_assignee_id": assigned_to.id,
+                "next_assignee_username": assigned_to.username,
+            },
+        )
+
+    if lead.admin_notes:
+        log_audit(
+            action_type=AuditLog.ActionType.LEAD_NOTE_UPDATED,
+            instance=lead,
+            performed_by=performed_by,
+            metadata={
+                "event": "LEAD_NOTE_UPDATED",
+                "mode": "replace",
+                "previous_length": 0,
+                "next_length": len(lead.admin_notes),
+                "note_excerpt": lead.admin_notes[:200],
+                "origin": "ADMIN_LEAD_CREATE",
+            },
+        )
+
+    if lead.follow_up_required and lead.follow_up_on is not None:
+        from crm.models import PartyInteractionType
+        from crm.services.interaction_service import create_party_interaction
+
+        follow_up_subject = "Lead follow-up"
+        if lead.intent == PublicLeadIntent.QUOTATION:
+            follow_up_subject = "Quotation follow-up"
+        elif lead.intent == PublicLeadIntent.ESTIMATE:
+            follow_up_subject = "Estimate follow-up"
+
+        follow_up_note_lines = [
+            line
+            for line in [
+                _normalize_notes(lead.follow_up_note),
+                _normalize_notes(lead.admin_notes),
+                _normalize_notes(lead.notes),
+            ]
+            if line
+        ]
+        follow_up_note_text = "\n\n".join(follow_up_note_lines).strip() or "Lead follow-up required."
+
+        create_party_interaction(
+            party=lead_party,
+            interaction_type=PartyInteractionType.FOLLOW_UP,
+            note=follow_up_note_text,
+            subject=f"{follow_up_subject} · Lead #{lead.id}",
+            next_follow_up_at=_resolve_follow_up_datetime(lead.follow_up_on),
+            related_source_model="PublicLead",
+            related_source_pk=lead.id,
+            performed_by=performed_by,
+        )
 
     return lead
 

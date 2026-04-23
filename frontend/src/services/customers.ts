@@ -5,7 +5,13 @@ export type CustomerRecord = {
   name: string;
   phone: string;
   kyc_status?: string;
+  status?: string;
   address?: string;
+  city?: string;
+  email?: string;
+  user_username?: string;
+  active_subscription_count?: number;
+  total_subscription_value?: string;
   created_at?: string;
   user?: number | null;
 };
@@ -33,7 +39,20 @@ function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
     phone: typeof row.phone === "string" ? row.phone : "",
     kyc_status:
       typeof row.kyc_status === "string" ? row.kyc_status : undefined,
+    status: typeof row.status === "string" ? row.status : undefined,
     address: typeof row.address === "string" ? row.address : undefined,
+    city: typeof row.city === "string" ? row.city : undefined,
+    email: typeof row.email === "string" ? row.email : undefined,
+    user_username:
+      typeof row.user_username === "string" ? row.user_username : undefined,
+    active_subscription_count:
+      typeof row.active_subscription_count === "number"
+        ? row.active_subscription_count
+        : undefined,
+    total_subscription_value:
+      typeof row.total_subscription_value === "string"
+        ? row.total_subscription_value
+        : undefined,
     created_at:
       typeof row.created_at === "string" ? row.created_at : undefined,
     user:

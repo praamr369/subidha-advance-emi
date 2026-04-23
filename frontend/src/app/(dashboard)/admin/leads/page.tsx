@@ -23,6 +23,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   listAdminLeads,
+  type AdminLeadIntent,
   type AdminLeadListQuery,
   type AdminLeadRow,
   type AdminLeadStatus,
@@ -36,6 +37,7 @@ import {
 type LeadFilters = {
   q: string;
   status: AdminLeadStatus | "";
+  intent: AdminLeadIntent | "";
   assignee: string;
   date_from: string;
   date_to: string;
@@ -44,6 +46,7 @@ type LeadFilters = {
 const DEFAULT_FILTERS: LeadFilters = {
   q: "",
   status: "",
+  intent: "",
   assignee: "",
   date_from: "",
   date_to: "",
@@ -88,10 +91,20 @@ function readFilters(searchParams: URLSearchParams): LeadFilters {
     status === "CLOSED"
       ? status
       : "";
+  const intent = (searchParams.get("intent") || "").trim().toUpperCase();
+  const normalizedIntent: LeadFilters["intent"] =
+    intent === "GENERAL" ||
+    intent === "QUOTATION" ||
+    intent === "ESTIMATE" ||
+    intent === "DIRECT_SALE" ||
+    intent === "SUBSCRIPTION"
+      ? intent
+      : "";
 
   return {
     q: (searchParams.get("q") || "").trim(),
     status: normalizedStatus,
+    intent: normalizedIntent,
     assignee: (searchParams.get("assignee") || "").trim(),
     date_from: (searchParams.get("date_from") || "").trim(),
     date_to: (searchParams.get("date_to") || "").trim(),
@@ -103,6 +116,7 @@ function buildQuery(filters: LeadFilters): string {
 
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.status) params.set("status", filters.status);
+  if (filters.intent) params.set("intent", filters.intent);
   if (filters.assignee.trim()) params.set("assignee", filters.assignee.trim());
   if (filters.date_from.trim()) params.set("date_from", filters.date_from.trim());
   if (filters.date_to.trim()) params.set("date_to", filters.date_to.trim());
@@ -164,6 +178,7 @@ export default function AdminLeadsPage() {
         const query: AdminLeadListQuery = {
           q: appliedFilters.q,
           status: appliedFilters.status,
+          intent: appliedFilters.intent,
           assignee: appliedFilters.assignee,
           date_from: appliedFilters.date_from,
           date_to: appliedFilters.date_to,
@@ -422,15 +437,15 @@ export default function AdminLeadsPage() {
             description="Use search, status, assignee, and created-date filters to reduce noise in the intake queue."
             footer={
               <div className="text-sm text-muted-foreground">
-                {appliedFilters.q || appliedFilters.status || appliedFilters.assignee
-                  ? `Active filters applied${appliedFilters.status ? ` · ${appliedFilters.status}` : ""}`
+                {appliedFilters.q || appliedFilters.status || appliedFilters.intent || appliedFilters.assignee
+                  ? `Active filters applied${appliedFilters.status ? ` · ${appliedFilters.status}` : ""}${appliedFilters.intent ? ` · ${appliedFilters.intent}` : ""}`
                   : "Search-first lead workflow for daily staff operations."}
               </div>
             }
           >
             <form
               onSubmit={handleApplyFilters}
-              className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_180px_220px_auto]"
+              className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_170px_170px_220px_auto]"
             >
               <label className="grid gap-2">
                 <span className="text-sm font-medium text-foreground">Search</span>
@@ -455,6 +470,22 @@ export default function AdminLeadsPage() {
                   <option value="CONTACTED">Contacted</option>
                   <option value="CONVERTED">Converted</option>
                   <option value="CLOSED">Closed</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-foreground">Intent</span>
+                <select
+                  value={draftFilters.intent}
+                  onChange={(event) => handleDraftChange("intent", event)}
+                  className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                >
+                  <option value="">All</option>
+                  <option value="GENERAL">General</option>
+                  <option value="QUOTATION">Quotation</option>
+                  <option value="ESTIMATE">Estimate</option>
+                  <option value="DIRECT_SALE">Direct Sale</option>
+                  <option value="SUBSCRIPTION">Subscription</option>
                 </select>
               </label>
 

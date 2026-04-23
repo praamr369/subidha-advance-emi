@@ -2,7 +2,27 @@ from rest_framework import serializers
 
 from billing.models import DirectSale
 from accounts.models import User, UserRole
-from subscriptions.models import Customer, PublicLead, Subscription
+from subscriptions.models import Customer, Product, PublicLead, PublicLeadIntent, Subscription
+
+
+def _validate_assignable_user(value):
+    if value is None:
+        return None
+
+    try:
+        user = User.objects.get(pk=value)
+    except User.DoesNotExist as exc:
+        raise serializers.ValidationError("Selected assignee does not exist.") from exc
+
+    if user.role not in {UserRole.ADMIN, UserRole.CASHIER, UserRole.PARTNER}:
+        raise serializers.ValidationError(
+            "Lead assignee must be an internal managed user."
+        )
+
+    if not user.is_active:
+        raise serializers.ValidationError("Lead assignee must be active.")
+
+    return user
 
 
 class AdminLeadListSerializer(serializers.ModelSerializer):
@@ -72,7 +92,11 @@ class AdminLeadListSerializer(serializers.ModelSerializer):
             "interested_product",
             "preferred_emi_amount",
             "status",
+            "intent",
             "source",
+            "follow_up_required",
+            "follow_up_on",
+            "follow_up_note",
             "assigned_to_id",
             "assigned_to_username",
             "assigned_to_role",
@@ -166,27 +190,60 @@ class AdminLeadStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=PublicLead._meta.get_field("status").choices)
 
 
+class AdminLeadCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)
+    phone = serializers.RegexField(regex=r"^\d{10}$")
+    email = serializers.EmailField(required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    product_id = serializers.IntegerField(required=False, allow_null=True)
+    interested_product = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    preferred_emi_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    admin_notes = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    intent = serializers.ChoiceField(
+        choices=PublicLeadIntent.choices,
+        required=False,
+        default=PublicLeadIntent.GENERAL,
+    )
+    follow_up_required = serializers.BooleanField(required=False, default=False)
+    follow_up_on = serializers.DateField(required=False, allow_null=True)
+    follow_up_note = serializers.CharField(required=False, allow_blank=True)
+    assigned_to = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_product_id(self, value):
+        if value is None:
+            return None
+        try:
+            return Product.objects.get(pk=value, is_active=True)
+        except Product.DoesNotExist as exc:
+            raise serializers.ValidationError("Selected product is not available.") from exc
+
+    def validate_assigned_to(self, value):
+        return _validate_assignable_user(value)
+
+    def validate(self, attrs):
+        follow_up_required = bool(attrs.get("follow_up_required"))
+        follow_up_on = attrs.get("follow_up_on")
+        if follow_up_required and follow_up_on is None:
+            raise serializers.ValidationError(
+                {"follow_up_on": "Follow-up date is required when follow-up is marked required."}
+            )
+        if not follow_up_required:
+            attrs["follow_up_on"] = None
+
+        attrs["source"] = (attrs.get("source") or "").strip().upper() or "OFFLINE_WALK_IN"
+        attrs["notes"] = (attrs.get("notes") or "").strip()
+        attrs["admin_notes"] = (attrs.get("admin_notes") or "").strip()
+        attrs["follow_up_note"] = (attrs.get("follow_up_note") or "").strip()
+        return attrs
+
+
 class AdminLeadAssignSerializer(serializers.Serializer):
     assigned_to = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_assigned_to(self, value):
-        if value is None:
-            return None
-
-        try:
-            user = User.objects.get(pk=value)
-        except User.DoesNotExist as exc:
-            raise serializers.ValidationError("Selected assignee does not exist.") from exc
-
-        if user.role not in {UserRole.ADMIN, UserRole.CASHIER, UserRole.PARTNER}:
-            raise serializers.ValidationError(
-                "Lead assignee must be an internal managed user."
-            )
-
-        if not user.is_active:
-            raise serializers.ValidationError("Lead assignee must be active.")
-
-        return user
+        return _validate_assignable_user(value)
 
 
 class AdminLeadNoteUpdateSerializer(serializers.Serializer):

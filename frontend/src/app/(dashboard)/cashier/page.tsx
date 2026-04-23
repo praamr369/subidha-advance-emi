@@ -14,6 +14,7 @@ import {
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
+import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -241,6 +242,77 @@ export default function CashierDashboardPage() {
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
         />
+
+        <WorkspaceSection
+          title="Counter quick lanes"
+          description="Fast route-safe launches for payment posting, direct-sale collection, and receipt lookup."
+        >
+          <DashboardWidgetBoard
+            storageKey="subidha:dashboard-widgets:cashier:v1"
+            version={1}
+            title="Cashier lane widgets"
+            description="Small, role-safe widget lane set for cashier workflows."
+            presets={[
+              {
+                id: "counter-collection",
+                label: "Counter collection",
+                description: "Keep collection and direct-sale actions at top.",
+                order: ["collect-emi", "collect-direct-sale", "history"],
+                pinned: ["collect-emi", "collect-direct-sale"],
+              },
+              {
+                id: "payment-history-focus",
+                label: "History focus",
+                description: "Prioritize payment-history lookup during audit/review windows.",
+                order: ["history", "collect-emi", "collect-direct-sale"],
+                pinned: ["history"],
+              },
+            ]}
+            widgets={[
+              {
+                id: "collect-emi",
+                title: "Collect EMI payment",
+                subtitle: "Open audited cashier collection flow.",
+                group: "core",
+                fixed: true,
+                content: (
+                  <ActionButton href="/cashier/collect" variant="outline" className="justify-between">
+                    Open collection workspace
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "collect-direct-sale",
+                title: "Collect direct sale",
+                subtitle: "Direct-sale posting without mixing EMI ledgers.",
+                group: "quick-actions",
+                content: (
+                  <ActionButton
+                    href="/cashier/collect?workflow=direct-sale"
+                    variant="outline"
+                    className="justify-between"
+                  >
+                    Open direct-sale flow
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "history",
+                title: "Payment history",
+                subtitle: "Lookup customer receipts and prior postings.",
+                group: "operational",
+                content: (
+                  <ActionButton href="/cashier/payments" variant="outline" className="justify-between">
+                    Open payment history
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+            ]}
+          />
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading cashier dashboard..." /> : null}
 

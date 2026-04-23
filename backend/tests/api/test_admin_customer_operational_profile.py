@@ -10,7 +10,9 @@ from billing.models import BillingInvoice
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from inventory.models import InventoryItem
+from subscriptions.models import PublicLeadIntent
 from subscriptions.models import SubscriptionDocument, SubscriptionDocumentType
+from subscriptions.services.public_lead_service import create_admin_lead
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
@@ -129,6 +131,20 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
             },
             created_by=self.admin,
         )
+        create_admin_lead(
+            name=self.customer.name,
+            phone=self.customer.phone,
+            city=self.customer.city or "",
+            product=self.product,
+            interested_product=self.product.name,
+            intent=PublicLeadIntent.QUOTATION,
+            source="OFFLINE_WALK_IN",
+            notes="Customer asked for quotation before direct-sale confirmation.",
+            follow_up_required=True,
+            follow_up_on=date(2026, 4, 18),
+            follow_up_note="Share final estimate and close sale.",
+            performed_by=self.admin,
+        )
         invoice = BillingInvoice.objects.get(direct_sale=self.direct_sale)
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
@@ -156,5 +172,8 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
         self.assertEqual(response.data["payments"]["summary"]["active_count"], 1)
         self.assertEqual(response.data["receipts_documents"]["summary"]["receipt_count"], 2)
         self.assertEqual(response.data["receipts_documents"]["summary"]["document_count"], 1)
+        self.assertEqual(response.data["receipts_documents"]["summary"]["invoice_count"], 1)
         self.assertEqual(len(response.data["direct_sales"]["rows"]), 1)
         self.assertEqual(len(response.data["subscriptions"]["rows"]), 1)
+        self.assertGreaterEqual(response.data["leads"]["summary"]["total_count"], 1)
+        self.assertEqual(response.data["quotation_estimates"]["summary"]["quotation_count"], 1)

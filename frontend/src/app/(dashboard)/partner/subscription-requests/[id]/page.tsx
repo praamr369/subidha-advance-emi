@@ -2,11 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
@@ -67,18 +69,20 @@ export default function PartnerSubscriptionRequestDetailPage() {
 
   const [request, setRequest] = useState<SubscriptionRequestRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async () => {
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (!requestId) {
       setError("Request id is missing.");
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
     try {
       const payload = await getSubscriptionRequest("partner", requestId);
       setRequest(payload);
@@ -87,12 +91,13 @@ export default function PartnerSubscriptionRequestDetailPage() {
       setError(toErrorMessage(err));
       setRequest(null);
     } finally {
-      setLoading(false);
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
     }
   }, [requestId]);
 
   useEffect(() => {
-    void loadPage();
+    void loadPage("initial");
   }, [loadPage]);
 
   const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
@@ -111,6 +116,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
               )}.`
             : "The partner request entered the intake queue.",
         timestamp: formatDateTime(request.created_at),
+        badge: <StatusBadge status="SUBMITTED" />,
       },
     ];
 
@@ -125,6 +131,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
             : "Review metadata was recorded for this request."
         ),
         timestamp: formatDateTime(request.reviewed_at),
+        badge: <StatusBadge status={request.status} />,
       });
     }
 
@@ -136,6 +143,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
           request.approved_subscription_number
         )} is now available in the partner subscription workspace.`,
         timestamp: formatDateTime(request.updated_at || request.reviewed_at),
+        badge: <StatusBadge status="APPROVED" label="Linked subscription" />,
       });
     } else if (request.status === "REJECTED") {
       items.push({
@@ -143,6 +151,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
         title: "Request rejected",
         description: text(request.review_note, "Review notes explain the rejection posture."),
         timestamp: formatDateTime(request.updated_at || request.reviewed_at),
+        badge: <StatusBadge status="REJECTED" />,
       });
     } else if (request.status === "CANCELLED") {
       items.push({
@@ -150,6 +159,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
         title: "Request cancelled",
         description: "The partner request remains part of the audit trail even after cancellation.",
         timestamp: formatDateTime(request.updated_at),
+        badge: <StatusBadge status="CANCELLED" />,
       });
     }
 
@@ -221,6 +231,16 @@ export default function PartnerSubscriptionRequestDetailPage() {
             <WorkspaceSection
               title="Request posture"
               description="Current intake and review state for this partner request."
+              action={
+                <ActionButton
+                  variant="outline"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={loading || refreshing}
+                  leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </ActionButton>
+              }
             >
               <div className="space-y-4">
                 <WorkspaceNotice

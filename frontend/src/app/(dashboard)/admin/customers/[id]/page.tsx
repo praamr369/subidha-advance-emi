@@ -35,6 +35,7 @@ import {
   resolvePasswordResetEmail,
 } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
+import { ROUTES } from "@/lib/routes";
 
 // =====================================================
 // TYPES
@@ -117,12 +118,47 @@ type ReceiptOperationalRow = {
   finance_account_name?: string | null;
 };
 
+type InvoiceOperationalRow = {
+  id: number;
+  document_no?: string | null;
+  invoice_date?: string | null;
+  status?: string | null;
+  billing_channel?: string | null;
+  direct_sale_id?: number | null;
+  direct_sale_no?: string | null;
+  subscription_id?: number | null;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+};
+
 type DocumentOperationalRow = {
   id: number;
   subscription_number?: string;
   document_type?: string | null;
   verification_status?: string | null;
   created_at?: string | null;
+};
+
+type LeadOperationalRow = {
+  id: number;
+  name: string;
+  phone: string;
+  status?: string | null;
+  intent?: string | null;
+  source?: string | null;
+  interested_product?: string | null;
+  follow_up_required: boolean;
+  follow_up_on?: string | null;
+  follow_up_note?: string | null;
+  converted_customer_id?: number | null;
+  converted_subscription_id?: number | null;
+  converted_direct_sale_id?: number | null;
+  converted_direct_sale_no?: string | null;
+  created_at?: string | null;
+  converted_at?: string | null;
+  admin_notes?: string | null;
+  notes?: string | null;
 };
 
 type PartnerLinkageRow = {
@@ -140,6 +176,11 @@ type CustomerOperationalProfile = {
     direct_sale_outstanding_total: string;
     receipt_count: number;
     receipt_total: string;
+    invoice_count: number;
+    invoice_outstanding_total: string;
+    lead_count: number;
+    lead_open_count: number;
+    quotation_estimate_count: number;
   };
   direct_sales: {
     summary: {
@@ -163,9 +204,34 @@ type CustomerOperationalProfile = {
       receipt_count: number;
       receipt_total: string;
       document_count: number;
+      invoice_count: number;
+      invoice_posted_count: number;
+      invoice_total: string;
+      invoice_outstanding_total: string;
     };
     receipts: ReceiptOperationalRow[];
+    invoices: InvoiceOperationalRow[];
     documents: DocumentOperationalRow[];
+  };
+  leads: {
+    summary: {
+      total_count: number;
+      open_count: number;
+      converted_count: number;
+      quotation_count: number;
+      estimate_count: number;
+      follow_up_required_count: number;
+      follow_up_due_count: number;
+    };
+    rows: LeadOperationalRow[];
+  };
+  quotation_estimates: {
+    summary: {
+      total_count: number;
+      quotation_count: number;
+      estimate_count: number;
+    };
+    rows: LeadOperationalRow[];
   };
   partner_linkages: {
     count: number;
@@ -373,6 +439,10 @@ function normalizeCustomerOperationalProfile(
   const ledgerSummary = toObject(raw.ledger_summary) ?? {};
   const receiptsDocuments = toObject(raw.receipts_documents) ?? {};
   const receiptsSummary = toObject(receiptsDocuments.summary) ?? {};
+  const leads = toObject(raw.leads) ?? {};
+  const leadsSummary = toObject(leads.summary) ?? {};
+  const quotationEstimates = toObject(raw.quotation_estimates) ?? {};
+  const quotationEstimateSummary = toObject(quotationEstimates.summary) ?? {};
   const partnerLinkages = toObject(raw.partner_linkages) ?? {};
 
   return {
@@ -388,6 +458,11 @@ function normalizeCustomerOperationalProfile(
       ),
       receipt_count: toNumber(overview.receipt_count),
       receipt_total: toMoneyString(overview.receipt_total),
+      invoice_count: toNumber(overview.invoice_count),
+      invoice_outstanding_total: toMoneyString(overview.invoice_outstanding_total),
+      lead_count: toNumber(overview.lead_count),
+      lead_open_count: toNumber(overview.lead_open_count),
+      quotation_estimate_count: toNumber(overview.quotation_estimate_count),
     },
     direct_sales: {
       summary: {
@@ -426,6 +501,10 @@ function normalizeCustomerOperationalProfile(
         receipt_count: toNumber(receiptsSummary.receipt_count),
         receipt_total: toMoneyString(receiptsSummary.receipt_total),
         document_count: toNumber(receiptsSummary.document_count),
+        invoice_count: toNumber(receiptsSummary.invoice_count),
+        invoice_posted_count: toNumber(receiptsSummary.invoice_posted_count),
+        invoice_total: toMoneyString(receiptsSummary.invoice_total),
+        invoice_outstanding_total: toMoneyString(receiptsSummary.invoice_outstanding_total),
       },
       receipts: extractNestedArray(receiptsDocuments, ["receipts"]).map((row) => ({
         id: toNumber(row.id),
@@ -435,12 +514,83 @@ function normalizeCustomerOperationalProfile(
         amount: toMoneyString(row.amount),
         finance_account_name: toNullableString(row.finance_account_name),
       })),
+      invoices: extractNestedArray(receiptsDocuments, ["invoices"]).map((row) => ({
+        id: toNumber(row.id),
+        document_no: toNullableString(row.document_no),
+        invoice_date: toNullableString(row.invoice_date),
+        status: toNullableString(row.status),
+        billing_channel: toNullableString(row.billing_channel),
+        direct_sale_id: toNullableNumber(row.direct_sale_id),
+        direct_sale_no: toNullableString(row.direct_sale_no),
+        subscription_id: toNullableNumber(row.subscription_id),
+        grand_total: toMoneyString(row.grand_total),
+        received_total: toMoneyString(row.received_total),
+        balance_total: toMoneyString(row.balance_total),
+      })),
       documents: extractNestedArray(receiptsDocuments, ["documents"]).map((row) => ({
         id: toNumber(row.id),
         subscription_number: toStringValue(row.subscription_number) || undefined,
         document_type: toNullableString(row.document_type),
         verification_status: toNullableString(row.verification_status),
         created_at: toNullableString(row.created_at),
+      })),
+    },
+    leads: {
+      summary: {
+        total_count: toNumber(leadsSummary.total_count),
+        open_count: toNumber(leadsSummary.open_count),
+        converted_count: toNumber(leadsSummary.converted_count),
+        quotation_count: toNumber(leadsSummary.quotation_count),
+        estimate_count: toNumber(leadsSummary.estimate_count),
+        follow_up_required_count: toNumber(leadsSummary.follow_up_required_count),
+        follow_up_due_count: toNumber(leadsSummary.follow_up_due_count),
+      },
+      rows: extractNestedArray(leads, ["rows"]).map((row) => ({
+        id: toNumber(row.id),
+        name: toStringValue(row.name) || `Lead #${toNumber(row.id)}`,
+        phone: toStringValue(row.phone),
+        status: toNullableString(row.status),
+        intent: toNullableString(row.intent),
+        source: toNullableString(row.source),
+        interested_product: toNullableString(row.interested_product),
+        follow_up_required: row.follow_up_required === true,
+        follow_up_on: toNullableString(row.follow_up_on),
+        follow_up_note: toNullableString(row.follow_up_note),
+        converted_customer_id: toNullableNumber(row.converted_customer_id),
+        converted_subscription_id: toNullableNumber(row.converted_subscription_id),
+        converted_direct_sale_id: toNullableNumber(row.converted_direct_sale_id),
+        converted_direct_sale_no: toNullableString(row.converted_direct_sale_no),
+        created_at: toNullableString(row.created_at),
+        converted_at: toNullableString(row.converted_at),
+        admin_notes: toNullableString(row.admin_notes),
+        notes: toNullableString(row.notes),
+      })),
+    },
+    quotation_estimates: {
+      summary: {
+        total_count: toNumber(quotationEstimateSummary.total_count),
+        quotation_count: toNumber(quotationEstimateSummary.quotation_count),
+        estimate_count: toNumber(quotationEstimateSummary.estimate_count),
+      },
+      rows: extractNestedArray(quotationEstimates, ["rows"]).map((row) => ({
+        id: toNumber(row.id),
+        name: toStringValue(row.name) || `Lead #${toNumber(row.id)}`,
+        phone: toStringValue(row.phone),
+        status: toNullableString(row.status),
+        intent: toNullableString(row.intent),
+        source: toNullableString(row.source),
+        interested_product: toNullableString(row.interested_product),
+        follow_up_required: row.follow_up_required === true,
+        follow_up_on: toNullableString(row.follow_up_on),
+        follow_up_note: toNullableString(row.follow_up_note),
+        converted_customer_id: toNullableNumber(row.converted_customer_id),
+        converted_subscription_id: toNullableNumber(row.converted_subscription_id),
+        converted_direct_sale_id: toNullableNumber(row.converted_direct_sale_id),
+        converted_direct_sale_no: toNullableString(row.converted_direct_sale_no),
+        created_at: toNullableString(row.created_at),
+        converted_at: toNullableString(row.converted_at),
+        admin_notes: toNullableString(row.admin_notes),
+        notes: toNullableString(row.notes),
       })),
     },
     partner_linkages: {
@@ -1393,10 +1543,11 @@ export default function AdminCustomerDetailPage() {
                 }
               />
               <StatCard
-                title="Receipts / Docs"
-                value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.document_count ?? 0}`}
+                title="Receipts / Invoices"
+                value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.invoice_count ?? 0}`}
                 icon={<CreditCard className="h-4 w-4" />}
                 tone="default"
+                tooltip="Receipts and invoices linked to this customer profile."
               />
             </div>
 
@@ -1716,6 +1867,24 @@ export default function AdminCustomerDetailPage() {
                       value={`${operationalProfile.receipts_documents.summary.receipt_count} receipt(s)`}
                     />
                     <DetailValue
+                      label="Retail invoices"
+                      value={`${operationalProfile.receipts_documents.summary.invoice_count} invoice(s)`}
+                    />
+                    <DetailValue
+                      label="Invoice outstanding"
+                      value={money(
+                        operationalProfile.receipts_documents.summary.invoice_outstanding_total
+                      )}
+                    />
+                    <DetailValue
+                      label="Open leads"
+                      value={String(operationalProfile.leads.summary.open_count)}
+                    />
+                    <DetailValue
+                      label="Quotation / estimate"
+                      value={`${operationalProfile.quotation_estimates.summary.quotation_count} / ${operationalProfile.quotation_estimates.summary.estimate_count}`}
+                    />
+                    <DetailValue
                       label="Ledger credits"
                       value={money(operationalProfile.ledger_summary.total_credits)}
                     />
@@ -1856,10 +2025,127 @@ export default function AdminCustomerDetailPage() {
                 </SectionCard>
 
                 <SectionCard
+                  title="Lead / Quotation History"
+                  description="Walk-in, online, quotation, and estimate lead records linked to this customer identity."
+                  actionHref={ROUTES.admin.leads}
+                  actionLabel="Lead Inbox"
+                >
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <DetailValue
+                      label="Total Leads"
+                      value={String(operationalProfile.leads.summary.total_count)}
+                    />
+                    <DetailValue
+                      label="Open Leads"
+                      value={String(operationalProfile.leads.summary.open_count)}
+                    />
+                    <DetailValue
+                      label="Quotation / Estimate"
+                      value={`${operationalProfile.quotation_estimates.summary.quotation_count} / ${operationalProfile.quotation_estimates.summary.estimate_count}`}
+                    />
+                  </div>
+
+                  {operationalProfile.leads.rows.length === 0 ? (
+                    <div className="mt-4">
+                      <EmptyState
+                        title="No lead history"
+                        description="No lead, quotation, or estimate records were returned for this customer."
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {operationalProfile.leads.rows.map((lead) => (
+                        <div
+                          key={lead.id}
+                          className="rounded-xl border border-border bg-background px-4 py-3"
+                        >
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">
+                                Lead #{lead.id} · {lead.name || "Unnamed"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {lead.phone || "No phone"} · {lead.intent || "GENERAL"} · {lead.status || "NEW"} ·{" "}
+                                {lead.source || "UNKNOWN_SOURCE"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {lead.interested_product || "No product context"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Created {formatDateTime(lead.created_at)}{" "}
+                                {lead.converted_at ? `· Converted ${formatDateTime(lead.converted_at)}` : ""}
+                              </div>
+                              {lead.follow_up_required ? (
+                                <div className="mt-1 text-xs text-amber-700">
+                                  Follow-up required {lead.follow_up_on ? `on ${formatDate(lead.follow_up_on)}` : ""}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Link
+                                href={`${ROUTES.admin.leads}/${lead.id}`}
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                              >
+                                Open Lead
+                              </Link>
+                              {typeof lead.converted_subscription_id === "number" ? (
+                                <Link
+                                  href={`${ROUTES.admin.subscriptions}/${lead.converted_subscription_id}`}
+                                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                                >
+                                  Subscription
+                                </Link>
+                              ) : null}
+                              {typeof lead.converted_direct_sale_id === "number" ? (
+                                <Link
+                                  href={`${ROUTES.admin.billingDirectSales}?focus_sale=${lead.converted_direct_sale_id}`}
+                                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                                >
+                                  Direct Sale
+                                </Link>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {(lead.notes || lead.admin_notes || lead.follow_up_note) ? (
+                            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                              {lead.notes ? (
+                                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                  <div className="font-semibold uppercase tracking-wide text-[10px]">
+                                    Lead note
+                                  </div>
+                                  <div className="mt-1 whitespace-pre-wrap">{lead.notes}</div>
+                                </div>
+                              ) : null}
+                              {lead.admin_notes ? (
+                                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                  <div className="font-semibold uppercase tracking-wide text-[10px]">
+                                    Admin remark
+                                  </div>
+                                  <div className="mt-1 whitespace-pre-wrap">{lead.admin_notes}</div>
+                                </div>
+                              ) : null}
+                              {lead.follow_up_note ? (
+                                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                  <div className="font-semibold uppercase tracking-wide text-[10px]">
+                                    Follow-up note
+                                  </div>
+                                  <div className="mt-1 whitespace-pre-wrap">{lead.follow_up_note}</div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
                   title="Receipts & Documents"
                   description="Retail receipts and subscription documents visible from the unified customer operations surface."
                 >
-                  <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="grid gap-6 xl:grid-cols-3">
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">Receipts</h3>
                       <div className="mt-3 space-y-3">
@@ -1876,6 +2162,49 @@ export default function AdminCustomerDetailPage() {
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
                                 {receipt.finance_account_name || "Finance account not labeled"} · {money(receipt.amount)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Invoices</h3>
+                      <div className="mt-3 space-y-3">
+                        {operationalProfile.receipts_documents.invoices.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No billing invoices were returned for this customer.
+                          </p>
+                        ) : (
+                          operationalProfile.receipts_documents.invoices.map((invoice) => (
+                            <div key={invoice.id} className="rounded-xl border border-border bg-background px-4 py-3">
+                              <div className="text-sm font-semibold text-foreground">
+                                {invoice.document_no || `Invoice #${invoice.id}`}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {invoice.status || "DRAFT"} · {formatDate(invoice.invoice_date)} ·{" "}
+                                {invoice.billing_channel || "DIRECT_SALE"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Total {money(invoice.grand_total)} · Received {money(invoice.received_total)} ·
+                                Balance {money(invoice.balance_total)}
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Link
+                                  href={`${ROUTES.admin.billingDocuments}/${invoice.id}`}
+                                  className="inline-flex items-center rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                                >
+                                  Open Invoice
+                                </Link>
+                                {typeof invoice.direct_sale_id === "number" ? (
+                                  <Link
+                                    href={`${ROUTES.admin.billingDirectSales}?focus_sale=${invoice.direct_sale_id}`}
+                                    className="inline-flex items-center rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                                  >
+                                    Direct Sale
+                                  </Link>
+                                ) : null}
                               </div>
                             </div>
                           ))

@@ -7,6 +7,13 @@ export type AdminLeadStatus =
   | "CONVERTED"
   | "CLOSED";
 
+export type AdminLeadIntent =
+  | "GENERAL"
+  | "QUOTATION"
+  | "ESTIMATE"
+  | "DIRECT_SALE"
+  | "SUBSCRIPTION";
+
 export type AdminLeadRow = {
   id: number;
   name: string;
@@ -19,7 +26,11 @@ export type AdminLeadRow = {
   interested_product?: string;
   preferred_emi_amount?: string | null;
   status: AdminLeadStatus;
+  intent?: AdminLeadIntent;
   source?: string;
+  follow_up_required?: boolean;
+  follow_up_on?: string | null;
+  follow_up_note?: string;
   assigned_to_id?: number | null;
   assigned_to_username?: string | null;
   assigned_to_role?: string | null;
@@ -72,6 +83,7 @@ export type AdminLeadListResponse = {
 export type AdminLeadListQuery = {
   q?: string;
   status?: AdminLeadStatus | "";
+  intent?: AdminLeadIntent | "";
   assignee?: string;
   date_from?: string;
   date_to?: string;
@@ -82,6 +94,7 @@ function buildQuery(params: AdminLeadListQuery): string {
 
   if (params.q?.trim()) search.set("q", params.q.trim());
   if (params.status) search.set("status", params.status);
+  if (params.intent) search.set("intent", params.intent);
   if (params.assignee?.trim()) search.set("assignee", params.assignee.trim());
   if (params.date_from?.trim()) search.set("date_from", params.date_from.trim());
   if (params.date_to?.trim()) search.set("date_to", params.date_to.trim());
@@ -94,6 +107,29 @@ export async function listAdminLeads(
   query: AdminLeadListQuery = {}
 ): Promise<AdminLeadListResponse> {
   return apiFetch<AdminLeadListResponse>(`/admin/leads/${buildQuery(query)}`);
+}
+
+export async function createAdminLead(payload: {
+  name: string;
+  phone: string;
+  email?: string;
+  city?: string;
+  product_id?: number | null;
+  interested_product?: string;
+  preferred_emi_amount?: string;
+  notes?: string;
+  admin_notes?: string;
+  source?: string;
+  intent?: AdminLeadIntent;
+  follow_up_required?: boolean;
+  follow_up_on?: string | null;
+  follow_up_note?: string;
+  assigned_to?: number | null;
+}): Promise<AdminLeadDetail> {
+  return apiFetch<AdminLeadDetail>("/admin/leads/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getAdminLead(id: number | string): Promise<AdminLeadDetail> {

@@ -147,15 +147,15 @@ export default function PartnerSubscriptionRequestsPage() {
       statusBadge={{ label: "Partner intake queue", tone: "info" }}
       stats={[
         { label: "Requests", value: count },
-        { label: "Page Submitted", value: summary.submitted, tone: "warning" },
-        { label: "Page Approved", value: summary.approved, tone: "success" },
-        { label: "Page Cancelled", value: summary.cancelled, tone: summary.cancelled > 0 ? "danger" : undefined },
+        { label: "Page submitted", value: summary.submitted, tone: "warning" },
+        { label: "Page approved", value: summary.approved, tone: "success" },
+        { label: "Page cancelled", value: summary.cancelled, tone: summary.cancelled > 0 ? "danger" : undefined },
       ]}
     >
       <div className="space-y-6">
         <WorkspaceSection
-          title="Partner request register"
-          description="Track submitted partner requests, filter by review posture, and keep intake workflow separate from active subscription truth."
+          title="Request register controls"
+          description="Filter partner request intake by review posture and refresh the register without leaving the partner workspace."
           action={
             <ActionButton
               variant="outline"
@@ -252,7 +252,7 @@ export default function PartnerSubscriptionRequestsPage() {
                 />
               ))}
 
-              <WorkspaceNotice tone="info" title="Request-state boundary">
+              <WorkspaceNotice tone="info" title="Why this register stays separate">
                 Request rows show intake review posture only. They do not create live subscriptions, post payments, or bypass admin approval workflow.
               </WorkspaceNotice>
 

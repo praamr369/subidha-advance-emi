@@ -37,8 +37,6 @@ const resolvePythonExecutable = () => {
   return localMatch || "python3";
 };
 
-const pythonExecutable = resolvePythonExecutable();
-
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -90,7 +88,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `bash -lc "rm -f '${smokeDbPath}' '${smokeMetaPath}' '${smokeManifestPath}' && ${pythonExecutable} ../backend/manage.py migrate --noinput --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py seed_playwright_smoke --settings core.settings.playwright && ${pythonExecutable} ../backend/manage.py runserver 127.0.0.1:8100 --settings core.settings.playwright --noreload"`,
+      command: "bash ../backend/scripts/start_playwright_backend.sh",
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: false,
       timeout: 120_000,
@@ -102,6 +100,8 @@ export default defineConfig({
         DJANGO_SETTINGS_MODULE: "core.settings.playwright",
         PLAYWRIGHT_DB_PATH: smokeDbPath,
         PLAYWRIGHT_SMOKE_META_PATH: smokeMetaPath,
+        PLAYWRIGHT_SMOKE_MANIFEST_PATH: smokeManifestPath,
+        PLAYWRIGHT_PYTHON: resolvePythonExecutable(),
         PYTHONUNBUFFERED: "1",
       },
     },

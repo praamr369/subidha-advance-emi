@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from billing.services.billing_service import create_direct_sale
 from inventory.models import InventoryItem
-from subscriptions.models import AuditLog, PublicLead, PublicLeadStatus
+from subscriptions.models import AuditLog, PublicLead, PublicLeadIntent, PublicLeadStatus
 from subscriptions.services.public_lead_service import create_public_lead
 from tests.helpers import (
     create_admin_user,
@@ -65,6 +65,53 @@ class AdminLeadApiTests(APITestCase):
                 model_name="PublicLead",
                 object_id=lead.id,
                 action_type=AuditLog.ActionType.LEAD_CREATED,
+            ).exists()
+        )
+
+    def test_admin_can_create_walk_in_quotation_lead_with_follow_up(self):
+        response = self.client.post(
+            "/api/v1/admin/leads/",
+            {
+                "name": "Walk-In Quotation",
+                "phone": "9800000011",
+                "city": "Dhaka",
+                "product_id": self.product.id,
+                "interested_product": "Wardrobe premium quote",
+                "preferred_emi_amount": "3500.00",
+                "intent": "QUOTATION",
+                "source": "OFFLINE_WALK_IN",
+                "notes": "Customer asked for quotation first.",
+                "admin_notes": "Schedule evening callback.",
+                "follow_up_required": True,
+                "follow_up_on": "2026-04-20",
+                "follow_up_note": "Confirm final quotation.",
+                "assigned_to": self.cashier.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+            msg=f"Unexpected admin lead create response: {response.status_code} {response.data}",
+        )
+        self.assertEqual(response.data["intent"], "QUOTATION")
+        self.assertEqual(response.data["source"], "OFFLINE_WALK_IN")
+        self.assertEqual(response.data["assigned_to_id"], self.cashier.id)
+        self.assertEqual(response.data["follow_up_required"], True)
+        self.assertEqual(response.data["follow_up_on"], "2026-04-20")
+
+        lead = PublicLead.objects.get(pk=response.data["id"])
+        self.assertEqual(lead.intent, PublicLeadIntent.QUOTATION)
+        self.assertEqual(lead.source, "OFFLINE_WALK_IN")
+        self.assertTrue(lead.follow_up_required)
+        self.assertEqual(str(lead.follow_up_on), "2026-04-20")
+        self.assertEqual(lead.assigned_to_id, self.cashier.id)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name="PublicLead",
+                object_id=lead.id,
+                action_type=AuditLog.ActionType.LEAD_ASSIGNED,
             ).exists()
         )
 

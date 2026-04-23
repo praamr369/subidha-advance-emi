@@ -141,8 +141,23 @@ export default function PartnerReportsPage() {
       }
     }
 
-    return Array.from(grouped.values()).sort((a, b) => a.sort_key.localeCompare(b.sort_key));
+    return Array.from(grouped.values()).sort((a, b) => b.sort_key.localeCompare(a.sort_key));
   }, [earnings]);
+
+  const selectedRangeLabel = useMemo(() => {
+    if (statementDateFrom && statementDateTo) {
+      return `${statementDateFrom} → ${statementDateTo}`;
+    }
+    if (statementDateFrom) return `From ${statementDateFrom}`;
+    if (statementDateTo) return `Until ${statementDateTo}`;
+    return "All dates";
+  }, [statementDateFrom, statementDateTo]);
+
+  function clearStatementFilters() {
+    setStatementStatus("");
+    setStatementDateFrom("");
+    setStatementDateTo("");
+  }
 
   async function handleExport(format: "csv" | "pdf") {
     setExportingFormat(format);
@@ -225,6 +240,10 @@ export default function PartnerReportsPage() {
         {
           label: "Settled Commission",
           value: moneyValue(earnings?.settled_commission),
+        },
+        {
+          label: "Latest period",
+          value: trendRows[0]?.period || "—",
         },
       ]}
       statusBadge={{ label: "Partner Report Truth", tone: "info" }}
@@ -356,6 +375,14 @@ export default function PartnerReportsPage() {
                 <div className="flex flex-wrap items-end gap-2">
                   <ActionButton
                     type="button"
+                    variant="ghost"
+                    onClick={clearStatementFilters}
+                    disabled={exportingFormat !== null}
+                  >
+                    Clear filters
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
                     variant="outline"
                     onClick={() => void handleExport("csv")}
                     disabled={exportingFormat !== null}
@@ -372,6 +399,12 @@ export default function PartnerReportsPage() {
                     {exportingFormat === "pdf" ? "Exporting..." : "PDF"}
                   </ActionButton>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <WorkspaceNotice tone="default" title="Current export scope">
+                  Status: {statementStatus || "All"} · Date range: {selectedRangeLabel}
+                </WorkspaceNotice>
               </div>
             </WorkspaceSection>
 

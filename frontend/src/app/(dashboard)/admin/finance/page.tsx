@@ -515,6 +515,35 @@ export default function AdminFinancePage() {
           onEndDateChange={setEndDate}
         />
 
+        <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Finance quick lanes</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Fast access to reconciliation, receivables/payables, and controlled posting surfaces without mixing EMI collection into finance lanes.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <Link
+              href={buildAdminReconciliationRoute({ flagged: true })}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Reconciliation queue
+            </Link>
+            <Link
+              href={ROUTES.admin.accountingVendors}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Vendor payables
+            </Link>
+            <Link
+              href={ROUTES.admin.payments}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Payment register
+            </Link>
+          </div>
+        </section>
+
         {loading ? <LoadingBlock label="Loading finance control center..." /> : null}
 
         {!loading && error ? (

@@ -510,3 +510,89 @@ test("customer can submit a subscription request from the create form", async ({
     "/customer/subscription-requests/701"
   );
 });
+
+test("customer delivery detail renders stable shipment timeline fixture", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/customer/deliveries/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        summary: {
+          total: 1,
+          pending: 0,
+          scheduled: 0,
+          in_transit: 0,
+          dispatched: 0,
+          out_for_delivery: 0,
+          delivered: 1,
+          failed: 0,
+          cancelled: 0,
+          return_requested: 0,
+          returned: 0,
+        },
+        results: [
+          {
+            id: 781,
+            subscription_id: 901,
+            subscription_number: "SUB-901",
+            product_name: "Aurora Sofa",
+            batch_code: "BATCH-901",
+            lucky_number: 8,
+            status: "DELIVERED",
+            fulfillment_status: "DELIVERED",
+            delivery_reference: "DLV-781",
+            scheduled_date: "2026-04-18",
+            dispatched_at: "2026-04-18T06:20:00Z",
+            out_for_delivery_at: "2026-04-18T07:45:00Z",
+            delivered_at: "2026-04-18T09:10:00Z",
+            created_at: "2026-04-17T08:00:00Z",
+            updated_at: "2026-04-18T09:10:00Z",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/deliveries/781/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 781,
+        subscription_id: 901,
+        subscription_number: "SUB-901",
+        product_name: "Aurora Sofa",
+        batch_code: "BATCH-901",
+        lucky_number: 8,
+        status: "DELIVERED",
+        fulfillment_status: "DELIVERED",
+        delivery_reference: "DLV-781",
+        scheduled_date: "2026-04-18",
+        dispatched_at: "2026-04-18T06:20:00Z",
+        out_for_delivery_at: "2026-04-18T07:45:00Z",
+        delivered_at: "2026-04-18T09:10:00Z",
+        receiver_name: "Customer One",
+        receiver_phone: "01700000000",
+        delivery_address_snapshot: "House 12, Road 7, Dhaka",
+        notes: "Delivered at gate with OTP confirmation.",
+        history_count: 4,
+        created_by_username: "dispatcher",
+        updated_by_username: "dispatcher",
+        created_at: "2026-04-17T08:00:00Z",
+        updated_at: "2026-04-18T09:10:00Z",
+      }),
+    });
+  });
+
+  await page.goto("/customer/deliveries");
+  await expect(page.getByRole("heading", { name: "Delivery Tracking" })).toBeVisible();
+  await page.getByRole("button", { name: "View detail" }).click();
+  await expect(page).toHaveURL(/\/customer\/deliveries\/781$/);
+  await expect(page.getByRole("heading", { name: "DLV-781" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Delivery event timeline");
+  await expect(page.locator("body")).toContainText("Customer One");
+  await expect(page.locator("body")).toContainText("Delivered");
+});

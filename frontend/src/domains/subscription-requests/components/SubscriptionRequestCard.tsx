@@ -30,6 +30,19 @@ function customerLabel(request: SubscriptionRequestRecord): string {
   );
 }
 
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function CardBody({
   request,
   showRequester,
@@ -131,6 +144,25 @@ function CardBody({
             ) : null}
           </div>
         </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/90 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Submitted
+            </div>
+            <div className="mt-2 text-sm text-slate-900">
+              {formatDateTime(request.created_at)}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/90 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Last review update
+            </div>
+            <div className="mt-2 text-sm text-slate-900">
+              {formatDateTime(request.reviewed_at || request.updated_at)}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -152,6 +184,9 @@ export default function SubscriptionRequestCard({
     return (
       <Link href={href} className={rootClassName}>
         <CardBody request={request} showRequester={showRequester} />
+        <div className="mt-4 border-t border-slate-200/80 pt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Open request detail
+        </div>
       </Link>
     );
   }

@@ -17,8 +17,8 @@ import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
-import { listCustomers, type CustomerRecord } from "@/services/customers";
-import { completeAdminLeadConversion } from "@/services/admin-leads";
+import { getCustomer, listCustomers, searchCustomers, type CustomerRecord } from "@/services/customers";
+import { completeAdminLeadConversion, createAdminLead } from "@/services/admin-leads";
 import {
   listBranches,
   listCashCounters,
@@ -84,6 +84,10 @@ function parsePositiveInteger(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function normalizePhoneDigits(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
 function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSaleLine {
   const quantity = Math.max(toNumber(line.quantity), 0);
   const unitPrice = Math.max(toNumber(line.unit_price), 0);
@@ -117,6 +121,10 @@ export default function BillingDirectSalesPage() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<DirectSale[]>([]);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  const [customerSearchResults, setCustomerSearchResults] = useState<CustomerRecord[]>([]);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
@@ -143,13 +151,35 @@ export default function BillingDirectSalesPage() {
     lines: [DEFAULT_LINE],
   });
   const leadId = parsePositiveInteger(searchParams.get("lead"));
+  const [activeLeadId, setActiveLeadId] = useState<number | null>(leadId);
+  const [creatingLead, setCreatingLead] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
+  const [leadNotice, setLeadNotice] = useState<string | null>(null);
+  const [leadForm, setLeadForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    city: "",
+    interested_product: "",
+    notes: "",
+    admin_notes: "",
+    source: "OFFLINE_WALK_IN",
+    intent: "DIRECT_SALE" as "GENERAL" | "QUOTATION" | "ESTIMATE" | "DIRECT_SALE" | "SUBSCRIPTION",
+    follow_up_required: false,
+    follow_up_on: "",
+    follow_up_note: "",
+  });
   const focusedSaleId = parsePositiveInteger(searchParams.get("focus_sale"));
+  const customerFilter = parsePositiveInteger(searchParams.get("customer"));
   const deliveryRequiredFilter = (searchParams.get("delivery_required") || "").trim().toLowerCase();
   const statusFilter = (searchParams.get("status") || "").trim().toUpperCase();
 
   const loadPage = useCallback(async () => {
     try {
       const directSaleQuery: Record<string, string> = {};
+      if (customerFilter) {
+        directSaleQuery.customer = String(customerFilter);
+      }
       if (deliveryRequiredFilter === "true" || deliveryRequiredFilter === "false") {
         directSaleQuery.delivery_required = deliveryRequiredFilter;
       }
@@ -189,11 +219,15 @@ export default function BillingDirectSalesPage() {
     } finally {
       setLoading(false);
     }
-  }, [deliveryRequiredFilter, statusFilter]);
+  }, [customerFilter, deliveryRequiredFilter, statusFilter]);
 
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  useEffect(() => {
+    setActiveLeadId(leadId);
+  }, [leadId]);
 
   useEffect(() => {
     const prefillCustomerId = parsePositiveInteger(searchParams.get("customer"));
@@ -204,6 +238,7 @@ export default function BillingDirectSalesPage() {
       "";
     const prefillLeadName = searchParams.get("lead_name") || "";
     const prefillLeadPhone = searchParams.get("lead_phone") || "";
+    const prefillLeadCity = searchParams.get("lead_city") || "";
     const prefillLeadNotes = searchParams.get("lead_notes") || "";
 
     if (!leadId && !prefillCustomerId && !prefillProductId && !prefillProductName) {
@@ -229,12 +264,108 @@ export default function BillingDirectSalesPage() {
         lines: nextLines,
       };
     });
+
+    setLeadForm((current) => ({
+      ...current,
+      name: prefillLeadName || current.name,
+      phone: prefillLeadPhone || current.phone,
+      city: prefillLeadCity || current.city,
+      interested_product: prefillProductName || current.interested_product,
+      notes:
+        prefillLeadNotes && !current.notes.includes(prefillLeadNotes)
+          ? [current.notes, prefillLeadNotes].filter(Boolean).join("\n\n")
+          : current.notes,
+    }));
   }, [leadId, searchParams]);
 
   const customerMap = useMemo(
     () => new Map(customers.map((customer) => [String(customer.id), customer])),
     [customers]
   );
+
+  const applySelectedCustomer = useCallback((customer: CustomerRecord) => {
+    setSelectedCustomer(customer);
+    setCustomers((current) => {
+      if (current.some((entry) => entry.id === customer.id)) return current;
+      return [customer, ...current];
+    });
+    setForm((current) => ({
+      ...current,
+      customer: String(customer.id),
+      customer_name_snapshot: customer.name || current.customer_name_snapshot,
+      customer_phone_snapshot: customer.phone || current.customer_phone_snapshot,
+    }));
+  }, []);
+
+  useEffect(() => {
+    const trimmed = customerSearchTerm.trim();
+    if (!trimmed) {
+      setCustomerSearchResults([]);
+      setSearchingCustomers(false);
+      return;
+    }
+    if (trimmed.length < 2) {
+      setCustomerSearchResults([]);
+      setSearchingCustomers(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        setSearchingCustomers(true);
+        const results = await searchCustomers(trimmed);
+        if (!cancelled) {
+          setCustomerSearchResults(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setCustomerSearchResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingCustomers(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [customerSearchTerm]);
+
+  useEffect(() => {
+    if (!form.customer) {
+      setSelectedCustomer(null);
+      return;
+    }
+
+    const fromLoaded = customerMap.get(form.customer);
+    if (fromLoaded) {
+      setSelectedCustomer(fromLoaded);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const payload = await getCustomer(form.customer);
+        if (!cancelled) {
+          applySelectedCustomer(payload);
+        }
+      } catch {
+        if (!cancelled) {
+          setSelectedCustomer(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applySelectedCustomer, customerMap, form.customer]);
+
   const inventoryByProduct = useMemo(() => {
     const next = new Map<string, InventoryItem>();
     for (const item of inventoryItems) {
@@ -291,6 +422,61 @@ export default function BillingDirectSalesPage() {
       }
     );
   }, [computedLines]);
+
+  const draftLeadProductId = useMemo(
+    () => parsePositiveInteger(form.lines[0]?.product || null),
+    [form.lines]
+  );
+  const draftLeadProductName = useMemo(() => {
+    const lineDescription = (form.lines[0]?.description || "").trim();
+    if (lineDescription) return lineDescription;
+    if (!draftLeadProductId) return "";
+    const product = products.find((entry) => entry.id === draftLeadProductId);
+    return product?.name || "";
+  }, [draftLeadProductId, form.lines, products]);
+
+  const selectedCustomerProfileHref = selectedCustomer
+    ? `${ROUTES.admin.customers}/${selectedCustomer.id}`
+    : null;
+
+  const leadDetailHref = activeLeadId ? `${ROUTES.admin.leads}/${activeLeadId}` : null;
+
+  const customerCreateHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (activeLeadId) params.set("lead", String(activeLeadId));
+
+    const customerNameSeed =
+      form.customer_name_snapshot.trim() || leadForm.name.trim();
+    const customerPhoneSeed =
+      form.customer_phone_snapshot.trim() || normalizePhoneDigits(leadForm.phone);
+    const customerCitySeed = leadForm.city.trim();
+    const noteSeed = [form.notes.trim(), leadForm.notes.trim()]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (customerNameSeed) params.set("name", customerNameSeed);
+    if (customerPhoneSeed) params.set("phone", customerPhoneSeed);
+    if (customerCitySeed) params.set("city", customerCitySeed);
+    if (draftLeadProductId) params.set("product", String(draftLeadProductId));
+    if (draftLeadProductName) params.set("product_name", draftLeadProductName);
+    if (noteSeed) params.set("notes", noteSeed);
+
+    const query = params.toString();
+    return query
+      ? `${ROUTES.admin.customers}/create?${query}`
+      : `${ROUTES.admin.customers}/create`;
+  }, [
+    activeLeadId,
+    draftLeadProductId,
+    draftLeadProductName,
+    form.customer_name_snapshot,
+    form.customer_phone_snapshot,
+    form.notes,
+    leadForm.city,
+    leadForm.name,
+    leadForm.notes,
+    leadForm.phone,
+  ]);
 
   const receivedTotal = Math.min(
     computedTotals.grand_total,
@@ -376,13 +562,94 @@ export default function BillingDirectSalesPage() {
     },
   ];
 
+  async function handleCreateLeadFromWorkflow() {
+    const normalizedName = leadForm.name.trim();
+    const normalizedPhone = normalizePhoneDigits(leadForm.phone);
+
+    if (!normalizedName) {
+      setLeadError("Lead name is required.");
+      return;
+    }
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      setLeadError("Lead phone must be exactly 10 digits.");
+      return;
+    }
+    if (leadForm.follow_up_required && !leadForm.follow_up_on) {
+      setLeadError("Follow-up date is required when follow-up is marked required.");
+      return;
+    }
+
+    const interestedProduct =
+      leadForm.interested_product.trim() || draftLeadProductName;
+
+    try {
+      setCreatingLead(true);
+      const createdLead = await createAdminLead({
+        name: normalizedName,
+        phone: normalizedPhone,
+        email: leadForm.email.trim() || undefined,
+        city: leadForm.city.trim() || undefined,
+        product_id: draftLeadProductId ?? undefined,
+        interested_product: interestedProduct || undefined,
+        notes: leadForm.notes.trim() || undefined,
+        admin_notes: leadForm.admin_notes.trim() || undefined,
+        source: leadForm.source,
+        intent: leadForm.intent,
+        follow_up_required: leadForm.follow_up_required,
+        follow_up_on: leadForm.follow_up_required ? leadForm.follow_up_on : null,
+        follow_up_note: leadForm.follow_up_note.trim() || undefined,
+      });
+
+      setActiveLeadId(createdLead.id);
+      setLeadError(null);
+      setLeadNotice(
+        `Lead #${createdLead.id} registered. Continue to direct-sale creation to keep conversion linking auditable.`
+      );
+
+      setLeadForm((current) => ({
+        ...current,
+        name: normalizedName,
+        phone: normalizedPhone,
+        interested_product:
+          interestedProduct || current.interested_product,
+        notes: "",
+        admin_notes: "",
+        follow_up_required: false,
+        follow_up_on: "",
+        follow_up_note: "",
+      }));
+
+      setForm((current) => {
+        const submittedNotes = (createdLead.submitted_notes || "").trim();
+        return {
+          ...current,
+          customer_name_snapshot:
+            current.customer_name_snapshot || createdLead.name || normalizedName,
+          customer_phone_snapshot:
+            current.customer_phone_snapshot || createdLead.phone || normalizedPhone,
+          notes:
+            submittedNotes && !current.notes.includes(submittedNotes)
+              ? [current.notes, submittedNotes].filter(Boolean).join("\n\n")
+              : current.notes,
+        };
+      });
+    } catch (err) {
+      setLeadError(accountingErrorMessage(err, "Failed to register walk-in lead."));
+      setLeadNotice(null);
+    } finally {
+      setCreatingLead(false);
+    }
+  }
+
   async function handleCreateDirectSale() {
     if (computedLines.length === 0) {
       setError("At least one direct-sale line is required.");
       return;
     }
 
-    const selectedCustomer = form.customer ? customerMap.get(form.customer) : undefined;
+    const selectedCustomerRecord = form.customer
+      ? customerMap.get(form.customer) ?? selectedCustomer ?? undefined
+      : undefined;
     const payload = {
       sale_date: form.sale_date,
       customer: form.customer ? Number(form.customer) : null,
@@ -400,9 +667,9 @@ export default function BillingDirectSalesPage() {
       received_total: formatMoney(receivedTotal),
       balance_total: formatMoney(computedTotals.grand_total - receivedTotal),
       customer_name_snapshot:
-        form.customer_name_snapshot.trim() || selectedCustomer?.name || "",
+        form.customer_name_snapshot.trim() || selectedCustomerRecord?.name || "",
       customer_phone_snapshot:
-        form.customer_phone_snapshot.trim() || selectedCustomer?.phone || "",
+        form.customer_phone_snapshot.trim() || selectedCustomerRecord?.phone || "",
       customer_gstin: form.customer_gstin.trim() || null,
       notes: form.notes.trim(),
       lines: computedLines.map((entry) => entry.payload),
@@ -411,18 +678,18 @@ export default function BillingDirectSalesPage() {
     try {
       setSubmitting(true);
       const created = await createDirectSale(payload);
-      if (leadId) {
+      if (activeLeadId) {
         try {
-          await completeAdminLeadConversion(leadId, {
+          await completeAdminLeadConversion(activeLeadId, {
             customer_id: created.customer ?? null,
             direct_sale_id: created.id,
           });
           setNotice(
-            `Direct sale created with a linked billing invoice draft and linked back to lead #${leadId}.`
+            `Direct sale created with a linked billing invoice draft and linked back to lead #${activeLeadId}.`
           );
         } catch (linkError) {
           setNotice(
-            `Direct sale ${created.sale_no || `#${created.id}`} was created, but lead #${leadId} still needs manual conversion linking.`
+            `Direct sale ${created.sale_no || `#${created.id}`} was created, but lead #${activeLeadId} still needs manual conversion linking.`
           );
           setError(
             accountingErrorMessage(
@@ -450,6 +717,9 @@ export default function BillingDirectSalesPage() {
         notes: "",
         lines: [DEFAULT_LINE],
       });
+      setSelectedCustomer(null);
+      setCustomerSearchTerm("");
+      setCustomerSearchResults([]);
       await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to create the direct sale."));
@@ -487,7 +757,7 @@ export default function BillingDirectSalesPage() {
         { label: "Delivery Hold", value: String(deliveryHoldCount), tone: deliveryHoldCount > 0 ? "warning" : "success" },
         { label: "Invoiced", value: String(invoicedCount), tone: invoicedCount > 0 ? "success" : "default" },
       ]}
-      statusBadge={leadId ? { label: `Lead Handoff #${leadId}`, tone: "info" } : undefined}
+      statusBadge={activeLeadId ? { label: `Lead Handoff #${activeLeadId}`, tone: "info" } : undefined}
     >
       <WorkspaceDirectory
         title="Billing route map"
@@ -500,14 +770,24 @@ export default function BillingDirectSalesPage() {
 
       {!loading && !error ? (
         <>
-          {leadId ? (
+          {activeLeadId ? (
             <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-              This draft was opened from lead handoff. Customer, product, and note context were prefilled without creating or converting anything silently.
+              Lead handoff is active for lead #{activeLeadId}. Direct-sale creation will link conversion explicitly without silently changing any customer, billing, or collection records.
             </div>
           ) : null}
           {notice ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               {notice}
+            </div>
+          ) : null}
+          {leadNotice ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              {leadNotice}
+            </div>
+          ) : null}
+          {leadError ? (
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {leadError}
             </div>
           ) : null}
 
@@ -539,6 +819,344 @@ export default function BillingDirectSalesPage() {
           </div>
 
           <WorkspaceSection
+            title="Customer and Lead Entry"
+            description="Find existing customers quickly, register walk-in quotation/estimate leads with follow-up, and keep direct-sale handoff auditable."
+          >
+            <div className="grid gap-6 xl:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Existing customer lookup</div>
+                    <div className="text-xs text-muted-foreground">
+                      Search by name, phone, or username before posting a direct sale.
+                    </div>
+                  </div>
+                  <Link
+                    href={ROUTES.admin.customers}
+                    className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Open customer register
+                  </Link>
+                </div>
+
+                <label className="mt-4 grid gap-2 text-sm">
+                  <span>Search customer</span>
+                  <input
+                    type="text"
+                    value={customerSearchTerm}
+                    onChange={(event) => setCustomerSearchTerm(event.target.value)}
+                    placeholder="Name, phone, username"
+                    className="rounded-xl border border-border bg-background px-3 py-2"
+                  />
+                </label>
+
+                <div className="mt-3 max-h-52 space-y-2 overflow-auto rounded-xl border border-border bg-card p-3">
+                  {searchingCustomers ? (
+                    <p className="text-sm text-muted-foreground">Searching customers...</p>
+                  ) : customerSearchTerm.trim().length < 2 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Enter at least 2 characters to search customer register.
+                    </p>
+                  ) : customerSearchResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No customer matched this search. Use safe new-customer onboarding if this is a new buyer.
+                    </p>
+                  ) : (
+                    customerSearchResults.slice(0, 12).map((customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => applySelectedCustomer(customer)}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left transition hover:bg-muted"
+                      >
+                        <div className="text-sm font-medium text-foreground">{customer.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {customer.phone} {customer.city ? `· ${customer.city}` : ""}{" "}
+                          {customer.user_username ? `· ${customer.user_username}` : ""}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {selectedCustomer ? (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      Selected Customer
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-emerald-900">
+                      {selectedCustomer.name}
+                    </div>
+                    <div className="mt-1 text-xs text-emerald-800">
+                      {selectedCustomer.phone} {selectedCustomer.city ? `· ${selectedCustomer.city}` : ""}{" "}
+                      {selectedCustomer.kyc_status ? `· KYC ${selectedCustomer.kyc_status}` : ""}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedCustomerProfileHref ? (
+                        <Link
+                          href={selectedCustomerProfileHref}
+                          className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100/70"
+                        >
+                          Open profile
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setForm((current) => ({ ...current, customer: "" }));
+                        }}
+                        className="inline-flex items-center rounded-md border border-border bg-white px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={customerCreateHref}
+                    className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-amber-800"
+                  >
+                    Create new customer
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.customers}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                  >
+                    Customer register
+                  </Link>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  New-customer onboarding remains centralized in the existing customer workflow so profile, auth, and audit controls stay consistent.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <div className="text-sm font-semibold text-foreground">Walk-in lead / quotation desk</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Capture quotation or estimate intent and follow-up context before sale conversion.
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-2 text-sm">
+                    <span>Lead name</span>
+                    <input
+                      type="text"
+                      value={leadForm.name}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Phone</span>
+                    <input
+                      type="text"
+                      value={leadForm.phone}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({
+                          ...current,
+                          phone: normalizePhoneDigits(event.target.value),
+                        }))
+                      }
+                      placeholder="10 digits"
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>City / area</span>
+                    <input
+                      type="text"
+                      value={leadForm.city}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, city: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Email (optional)</span>
+                    <input
+                      type="email"
+                      value={leadForm.email}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, email: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Source</span>
+                    <select
+                      value={leadForm.source}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, source: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    >
+                      <option value="OFFLINE_WALK_IN">OFFLINE_WALK_IN</option>
+                      <option value="PUBLIC_SITE">PUBLIC_SITE</option>
+                      <option value="ONLINE_LEAD">ONLINE_LEAD</option>
+                      <option value="REFERRAL">REFERRAL</option>
+                      <option value="PARTNER_REFERRAL">PARTNER_REFERRAL</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Intent</span>
+                    <select
+                      value={leadForm.intent}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({
+                          ...current,
+                          intent: event.target.value as
+                            | "GENERAL"
+                            | "QUOTATION"
+                            | "ESTIMATE"
+                            | "DIRECT_SALE"
+                            | "SUBSCRIPTION",
+                        }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    >
+                      <option value="DIRECT_SALE">Direct Sale</option>
+                      <option value="QUOTATION">Quotation</option>
+                      <option value="ESTIMATE">Estimate</option>
+                      <option value="GENERAL">General</option>
+                      <option value="SUBSCRIPTION">Subscription</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Interested product</span>
+                    <input
+                      type="text"
+                      value={leadForm.interested_product}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({
+                          ...current,
+                          interested_product: event.target.value,
+                        }))
+                      }
+                      placeholder={draftLeadProductName || "Capture customer intent"}
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Draft product context: {draftLeadProductName || "No product selected in direct-sale lines yet"}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-2 text-sm">
+                    <span>Lead notes</span>
+                    <textarea
+                      rows={3}
+                      value={leadForm.notes}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, notes: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm">
+                    <span>Admin remarks</span>
+                    <textarea
+                      rows={3}
+                      value={leadForm.admin_notes}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, admin_notes: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                  <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={leadForm.follow_up_required}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({
+                          ...current,
+                          follow_up_required: event.target.checked,
+                          follow_up_on: event.target.checked ? current.follow_up_on : "",
+                        }))
+                      }
+                    />
+                    Follow-up required
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>Follow-up on</span>
+                    <input
+                      type="date"
+                      value={leadForm.follow_up_on}
+                      disabled={!leadForm.follow_up_required}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({
+                          ...current,
+                          follow_up_on: event.target.value,
+                        }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2 disabled:opacity-60"
+                    />
+                  </label>
+                </div>
+
+                <label className="mt-3 grid gap-2 text-sm">
+                  <span>Follow-up note</span>
+                  <textarea
+                    rows={2}
+                    value={leadForm.follow_up_note}
+                    onChange={(event) =>
+                      setLeadForm((current) => ({ ...current, follow_up_note: event.target.value }))
+                    }
+                    className="rounded-xl border border-border bg-background px-3 py-2"
+                  />
+                </label>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateLeadFromWorkflow()}
+                    disabled={creatingLead}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {creatingLead ? "Registering lead..." : "Register walk-in lead"}
+                  </button>
+                  {leadDetailHref ? (
+                    <Link
+                      href={leadDetailHref}
+                      className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open lead detail
+                    </Link>
+                  ) : null}
+                  {activeLeadId ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveLeadId(null)}
+                      className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Unlink lead
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </WorkspaceSection>
+
+          <WorkspaceSection
             title="Create Direct Sale"
             description="This creates the operational direct-sale source record and a linked retail billing invoice draft. Inventory does not move until the invoice is posted."
           >
@@ -554,17 +1172,17 @@ export default function BillingDirectSalesPage() {
               </label>
 
               <label className="grid gap-2 text-sm">
-                <span>Customer</span>
+                <span>Customer (quick list)</span>
                 <select
                   value={form.customer}
                   onChange={(event) => {
                     const nextCustomer = customerMap.get(event.target.value);
-                    setForm((current) => ({
-                      ...current,
-                      customer: event.target.value,
-                      customer_name_snapshot: nextCustomer?.name || current.customer_name_snapshot,
-                      customer_phone_snapshot: nextCustomer?.phone || current.customer_phone_snapshot,
-                    }));
+                    if (nextCustomer) {
+                      applySelectedCustomer(nextCustomer);
+                      return;
+                    }
+                    setSelectedCustomer(null);
+                    setForm((current) => ({ ...current, customer: event.target.value }));
                   }}
                   className="rounded-xl border border-border bg-background px-3 py-2"
                 >
@@ -725,6 +1343,20 @@ export default function BillingDirectSalesPage() {
                 Delivery required before final invoice posting
               </label>
             </div>
+
+            {selectedCustomerProfileHref ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                <span>
+                  Linked customer: {selectedCustomer?.name || "Customer"} ({selectedCustomer?.phone || "No phone"})
+                </span>
+                <Link
+                  href={selectedCustomerProfileHref}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  Open customer profile
+                </Link>
+              </div>
+            ) : null}
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm">

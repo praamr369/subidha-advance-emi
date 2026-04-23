@@ -1,14 +1,16 @@
 export type AdminDashboardWidgetAttention = "normal" | "warning" | "urgent" | "quiet";
 
 export type AdminDashboardWidgetPrefs = {
-  version: 1;
+  version: number;
   open: string[];
   pinned: string[];
   collapsed: string[];
 };
 
+export const ADMIN_DASHBOARD_WIDGET_PREFS_VERSION = 2;
 export const ADMIN_DASHBOARD_WIDGET_PREFS_KEY =
-  "subidha:admin-dashboard-widgets:v1";
+  `subidha:admin-dashboard-widgets:v${ADMIN_DASHBOARD_WIDGET_PREFS_VERSION}`;
+const LEGACY_PREFS_KEYS = ["subidha:admin-dashboard-widgets:v1"];
 
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -36,7 +38,7 @@ export function normalizeAdminDashboardWidgetPrefs(params: {
   );
 
   return {
-    version: 1,
+    version: ADMIN_DASHBOARD_WIDGET_PREFS_VERSION,
     open: open.length > 0 ? open : defaults.open,
     pinned,
     collapsed,
@@ -51,7 +53,13 @@ export function readAdminDashboardWidgetPrefs(params: {
   if (typeof window === "undefined") return defaults;
 
   try {
-    const raw = window.localStorage.getItem(ADMIN_DASHBOARD_WIDGET_PREFS_KEY);
+    let raw = window.localStorage.getItem(ADMIN_DASHBOARD_WIDGET_PREFS_KEY);
+    if (!raw) {
+      for (const legacyKey of LEGACY_PREFS_KEYS) {
+        raw = window.localStorage.getItem(legacyKey);
+        if (raw) break;
+      }
+    }
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as unknown;
     return normalizeAdminDashboardWidgetPrefs({
@@ -72,4 +80,3 @@ export function writeAdminDashboardWidgetPrefs(prefs: AdminDashboardWidgetPrefs)
     // Ignore storage failures (private mode / quota).
   }
 }
-
