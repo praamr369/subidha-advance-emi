@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -204,8 +206,11 @@ export default function InventoryAdjustmentsPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Adjustment Control"
       title="Stock Adjustments"
       subtitle="Create counted stock corrections with explicit reasons, then approve and post them into the stock ledger without rewriting product or billing history."
+      helperNote="Counted stock corrections remain explicit inventory actions. Approval and posting stay separate to preserve stock auditability."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -222,6 +227,12 @@ export default function InventoryAdjustmentsPage() {
       ]}
       statusBadge={{ label: "Reason Required", tone: "info" }}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Move between counted-stock adjustments, movement review, ledger inspection, live stock, and stock masters from one inventory workspace."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {message ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {message}

@@ -1,12 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import {
+  WorkspaceNotice,
+  WorkspaceTimeline,
+  type WorkspaceTimelineItem,
+} from "@/components/ui/role-workspace";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
   cancelPartnerSubscriptionRequest,
@@ -38,21 +44,21 @@ function text(value?: string | null, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-2 text-sm text-slate-900">{value}</div>
-    </div>
-  );
+function statusTone(
+  status?: string | null
+): "info" | "success" | "warning" | "danger" | "default" {
+  switch ((status || "").toUpperCase()) {
+    case "APPROVED":
+      return "success";
+    case "REJECTED":
+      return "danger";
+    case "CANCELLED":
+      return "warning";
+    case "SUBMITTED":
+      return "info";
+    default:
+      return "default";
+  }
 }
 
 export default function PartnerSubscriptionRequestDetailPage() {
@@ -89,6 +95,67 @@ export default function PartnerSubscriptionRequestDetailPage() {
     void loadPage();
   }, [loadPage]);
 
+  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+    if (!request) {
+      return [];
+    }
+
+    const items: WorkspaceTimelineItem[] = [
+      {
+        id: "submitted",
+        title: "Request submitted",
+        description:
+          request.requester_username || request.partner_username
+            ? `Submitted by ${text(
+                request.requester_username || request.partner_username
+              )}.`
+            : "The partner request entered the intake queue.",
+        timestamp: formatDateTime(request.created_at),
+      },
+    ];
+
+    if (request.reviewed_at) {
+      items.push({
+        id: "reviewed",
+        title: "Review recorded",
+        description: text(
+          request.review_note,
+          request.reviewed_by_username
+            ? `Reviewed by ${request.reviewed_by_username}.`
+            : "Review metadata was recorded for this request."
+        ),
+        timestamp: formatDateTime(request.reviewed_at),
+      });
+    }
+
+    if (request.approved_subscription_id) {
+      items.push({
+        id: "approved",
+        title: "Approved into live subscription",
+        description: `Approved subscription ${text(
+          request.approved_subscription_number
+        )} is now available in the partner subscription workspace.`,
+        timestamp: formatDateTime(request.updated_at || request.reviewed_at),
+      });
+    } else if (request.status === "REJECTED") {
+      items.push({
+        id: "rejected",
+        title: "Request rejected",
+        description: text(request.review_note, "Review notes explain the rejection posture."),
+        timestamp: formatDateTime(request.updated_at || request.reviewed_at),
+      });
+    } else if (request.status === "CANCELLED") {
+      items.push({
+        id: "cancelled",
+        title: "Request cancelled",
+        description: "The partner request remains part of the audit trail even after cancellation.",
+        timestamp: formatDateTime(request.updated_at),
+      });
+    }
+
+    return items;
+  }, [request]);
+
   async function handleCancel() {
     if (!requestId) return;
     setCancelling(true);
@@ -105,8 +172,11 @@ export default function PartnerSubscriptionRequestDetailPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Intake"
       title={request ? `Partner Request #${request.id}` : "Partner Subscription Request"}
       subtitle="Review the partner intake status, requested customer scope, and admin decision history for this submission."
+      helperNote="This route shows intake and review posture only. Approval remains an admin action and is the only path that creates a live subscription."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscription Requests", href: "/partner/subscription-requests" },
@@ -126,14 +196,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
       ]}
       statusBadge={{
         label: request?.status || "Loading",
-        tone:
-          request?.status === "APPROVED"
-            ? "success"
-            : request?.status === "REJECTED"
-              ? "danger"
-              : request?.status === "CANCELLED"
-                ? "warning"
-                : "info",
+        tone: statusTone(request?.status),
       }}
       stats={[
         { label: "Status", value: request?.status || "—" },
@@ -155,62 +218,86 @@ export default function PartnerSubscriptionRequestDetailPage() {
 
         {!loading && !error && request ? (
           <>
-            {actionError ? (
-              <ErrorState title="Action failed" description={actionError} />
-            ) : null}
+            <WorkspaceSection
+              title="Request posture"
+              description="Current intake and review state for this partner request."
+            >
+              <div className="space-y-4">
+                <WorkspaceNotice
+                  tone={statusTone(request.status)}
+                  title={`Current status: ${request.status}`}
+                  action={
+                    request.status === "SUBMITTED" ? (
+                      <ActionButton
+                        variant="destructive"
+                        onClick={() => void handleCancel()}
+                        disabled={cancelling}
+                        loading={cancelling}
+                      >
+                        {cancelling ? "Cancelling..." : "Cancel Request"}
+                      </ActionButton>
+                    ) : request.approved_subscription_id ? (
+                      <ActionButton
+                        href={`/partner/subscriptions/${request.approved_subscription_id}`}
+                        variant="outline"
+                      >
+                        Open Approved Subscription
+                      </ActionButton>
+                    ) : undefined
+                  }
+                >
+                  {request.status === "APPROVED"
+                    ? "This intake request has been approved into a live subscription. Keep future payment and collection activity on the subscription workspace."
+                    : request.status === "REJECTED"
+                      ? "The request remains visible for review history and audit context. Rejection does not create a live subscription."
+                      : request.status === "CANCELLED"
+                        ? "The cancelled intake request remains visible as part of the partner request history."
+                        : "The request is still pending admin review and has not created a live subscription yet."}
+                </WorkspaceNotice>
 
-            <SubscriptionRequestCard request={request} />
-
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Review timeline
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Partner submissions remain auditable even when cancelled, rejected, or approved into a real subscription later.
-                  </p>
-                </div>
-
-                {request.status === "SUBMITTED" ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleCancel()}
-                    disabled={cancelling}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-red-50 px-4 text-sm font-medium text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {cancelling ? "Cancelling..." : "Cancel Request"}
-                  </button>
+                {actionError ? (
+                  <WorkspaceNotice tone="danger" title="Action failed">
+                    {actionError}
+                  </WorkspaceNotice>
                 ) : null}
               </div>
+            </WorkspaceSection>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <WorkspaceSection
+              title="Request snapshot"
+              description="Submitted customer, product, and intake details as currently stored for review."
+            >
+              <SubscriptionRequestCard request={request} showRequester />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Review timeline"
+              description="Partner submissions remain auditable even when cancelled, rejected, or approved into a real subscription later."
+            >
+              <WorkspaceTimeline items={timelineItems} />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Review and linkage details"
+              description="Admin review metadata and live-subscription linkage, if approval has already occurred."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailItem label="Submitted At" value={formatDateTime(request.created_at)} />
                 <DetailItem label="Updated At" value={formatDateTime(request.updated_at)} />
                 <DetailItem label="Reviewed By" value={text(request.reviewed_by_username)} />
                 <DetailItem label="Reviewed At" value={formatDateTime(request.reviewed_at)} />
+                <DetailItem
+                  label="Approved Subscription"
+                  value={text(request.approved_subscription_number)}
+                  className="md:col-span-2"
+                />
+                <DetailItem
+                  label="Review note"
+                  value={text(request.review_note, "No review note recorded yet.")}
+                  className="md:col-span-2 xl:col-span-2"
+                />
               </div>
-
-              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Review note
-                </div>
-                <div className="mt-2 text-sm text-slate-900">
-                  {text(request.review_note, "No review note recorded yet.")}
-                </div>
-              </div>
-
-              {request.approved_subscription_id ? (
-                <div className="mt-4">
-                  <Link
-                    href={`/partner/subscriptions/${request.approved_subscription_id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    Open Approved Subscription
-                  </Link>
-                </div>
-              ) : null}
-            </section>
+            </WorkspaceSection>
           </>
         ) : null}
       </div>

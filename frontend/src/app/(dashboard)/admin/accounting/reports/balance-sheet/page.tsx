@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ACCOUNTING_REPORT_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import {
   accountingErrorMessage,
   AccountingPeriodFilters,
@@ -49,8 +51,11 @@ export default function AccountingBalanceSheetPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Statements"
       title="Balance Sheet"
       subtitle="Point-in-time balance sheet over posted accounting journals, including current-period net income folded into equity."
+      helperNote="Balance sheet values come from posted accounting journals only. This surface does not merge with billing documents, collections, or cashier rails."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -73,6 +78,12 @@ export default function AccountingBalanceSheetPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Accounting statement map"
+          description="Move between point-in-time balance review, period statements, and the supporting posted books from one accounting workspace."
+          groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
+        />
+
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <AccountingPeriodFilters asOf={asOf} onAsOfChange={setAsOf} />
           <AccountingRefreshButton

@@ -2,7 +2,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
@@ -50,6 +50,8 @@ export default function DrawerShell({
 }: DrawerShellProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const portalRoot = usePopupPortalRoot();
+  const titleId = useId();
+  const descriptionId = useId();
 
   usePopupShell({
     open,
@@ -80,7 +82,8 @@ export default function DrawerShell({
           tabIndex={-1}
           role="dialog"
           aria-modal="true"
-          aria-label={title}
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
           className={cn(
             "workflow-drawer-panel pointer-events-auto relative flex h-full w-full min-h-0 flex-col outline-none animate-in slide-in-from-right duration-200",
             sizeClassNames[size],
@@ -90,9 +93,13 @@ export default function DrawerShell({
           <div className="workflow-panel-header sticky top-0 z-20 px-4 py-4 sm:px-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
+                <h2 id={titleId} className="text-lg font-semibold tracking-tight text-foreground">
+                  {title}
+                </h2>
                 {description ? (
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+                  <p id={descriptionId} className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {description}
+                  </p>
                 ) : null}
               </div>
               <button

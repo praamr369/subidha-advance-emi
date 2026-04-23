@@ -82,14 +82,15 @@ function QuickLinkCard({ title, description, href }: QuickLink) {
   return (
     <Link
       href={href}
-      className="group rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.58)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.62)]"
+      className="group workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-5 transition hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)]"
     >
+      <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
           <p className="text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
-        <span className="rounded-full border border-slate-200 bg-white/80 p-2 text-slate-500 transition group-hover:text-slate-900">
+        <span className="rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] p-2 text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition group-hover:text-slate-900">
           <ArrowRight className="h-4 w-4" />
         </span>
       </div>

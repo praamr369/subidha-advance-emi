@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
@@ -120,8 +122,11 @@ export default function BillingContractsPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Contract Mirrors"
       title="Billing Contracts"
       subtitle="Mirror contracts sourced from live subscriptions, EMI rows, delivery state, payments, and waivers. Billing remains derivative, not the operational source of truth."
+      helperNote="Billing contracts are mirrored control documents derived from subscription truth. They remain distinct from source subscription, payment, and accounting posting flows."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -141,6 +146,13 @@ export default function BillingContractsPage() {
       statusBadge={{ label: "Admin Controlled Mirror", tone: "info" }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          className="receipt-print-hide"
+          title="Billing route map"
+          description="Move between mirrored contracts, document registers, notes, receipts, and direct-sale routes from one billing control surface."
+          groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+        />
+
         {notice ? (
           <div className="receipt-print-hide rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {notice}

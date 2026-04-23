@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -61,8 +63,11 @@ export default function InventoryValuationPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Valuation Review"
       title="Inventory Valuation"
       subtitle="Current stock value is derived from tracked inventory items and purchase cost foundations without touching product selling-price or EMI contract semantics."
+      helperNote="Inventory valuation is a ledger-backed stock review surface. It is not a billing revenue view or an accounting balance substitute."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -75,6 +80,12 @@ export default function InventoryValuationPage() {
       ]}
       statusBadge={{ label: "Foundation Only", tone: "warning" }}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Move between valuation, live stock, ledger review, movements, and opening-stock control from one inventory workspace."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <WorkspaceSection
         title="Valuation Date"
         description="Use an as-of date to review the stock valuation snapshot from live ledger-backed stock."

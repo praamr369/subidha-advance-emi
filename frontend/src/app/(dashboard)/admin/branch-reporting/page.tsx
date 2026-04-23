@@ -4,9 +4,12 @@ import { BarChart3, Building2, CircleDollarSign, PackageSearch, Users } from "lu
 import { useEffect, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import TableToolbar from "@/components/ui/TableToolbar";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -68,13 +71,17 @@ export default function AdminBranchReportingPage() {
 
   return (
     <PortalPage
+      eyebrow="Branch Reporting"
       title="Branch Reporting"
       subtitle="Review branch-wise collections, direct sales, contract posture, overdue EMI, stock visibility, and people-cost signals from the existing operational and accounting truths."
+      helperNote="Branch reporting is read from live operational and accounting registers. It does not rewrite collection, stock, payroll, or ledger history."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Branch Reporting" },
       ]}
       actions={[
+        { href: ROUTES.admin.operations, label: "Operations", variant: "secondary" },
         { href: ROUTES.admin.branches, label: "Branches", variant: "secondary" },
         { href: ROUTES.admin.counters, label: "Counters", variant: "secondary" },
       ]}
@@ -87,14 +94,38 @@ export default function AdminBranchReportingPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <TableToolbar
+          title="Branch scope filters"
+          description="Switch the reporting lens by branch and date range before drilling into collections, stock, and people-cost posture."
+          actions={
+            <ActionButton
+              variant="outline"
+              onClick={() =>
+                void loadPage({
+                  branch_id: branchId,
+                  start_date: startDate,
+                  end_date: endDate,
+                })
+              }
+            >
+              Refresh scope
+            </ActionButton>
+          }
+          footer={
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{selectedBranchLabel}</span>
+              <span>·</span>
+              <span>{startDate || "Start not set"} to {endDate || "today"}</span>
+            </div>
+          }
+        >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="text-sm text-slate-700">
               <span className="mb-2 block font-medium">Branch</span>
               <select
                 value={branchId}
                 onChange={(event) => setBranchId(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
               >
                 <option value="">All branches</option>
                 {payload?.branches.map((branch) => (
@@ -110,7 +141,7 @@ export default function AdminBranchReportingPage() {
                 type="date"
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
               />
             </label>
             <label className="text-sm text-slate-700">
@@ -119,12 +150,13 @@ export default function AdminBranchReportingPage() {
                 type="date"
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
               />
             </label>
-            <div className="flex items-end gap-3">
-              <button
+            <div className="flex flex-wrap items-end gap-2">
+              <ActionButton
                 type="button"
+                variant="primary"
                 onClick={() =>
                   void loadPage({
                     branch_id: branchId,
@@ -132,25 +164,24 @@ export default function AdminBranchReportingPage() {
                     end_date: endDate,
                   })
                 }
-                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
               >
                 Apply Filters
-              </button>
-              <button
+              </ActionButton>
+              <ActionButton
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setBranchId("");
                   setStartDate("");
                   setEndDate("");
                   void loadPage();
                 }}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Reset
-              </button>
+              </ActionButton>
             </div>
           </div>
-        </div>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading branch reporting..." /> : null}
         {!loading && error ? (
@@ -207,6 +238,86 @@ export default function AdminBranchReportingPage() {
                   href: ROUTES.admin.accountingStaff,
                   icon: <Users className="h-4 w-4" />,
                   badge: "Workforce",
+                },
+              ]}
+            />
+            <WorkspaceDirectory
+              title="Branch operating lenses"
+              description="Switch between branch governance, branch performance, and branch-linked follow-up surfaces without collapsing them into one ledger or collection rail."
+              groups={[
+                {
+                  title: "Branch governance",
+                  description: "Setup and desk-level controls for real shop operations.",
+                  items: [
+                    {
+                      title: "Branches",
+                      description: "Maintain branch identity, scope, and activation posture.",
+                      href: ROUTES.admin.branches,
+                      icon: <Building2 className="h-4 w-4" />,
+                      badge: "Setup",
+                    },
+                    {
+                      title: "Counters",
+                      description: "Desk-level collection and cashier control points by branch.",
+                      href: ROUTES.admin.counters,
+                      icon: <CircleDollarSign className="h-4 w-4" />,
+                      badge: "Desk",
+                    },
+                  ],
+                },
+                {
+                  title: "Branch execution",
+                  description: "Commercial and service surfaces that matter at branch level.",
+                  items: [
+                    {
+                      title: "Operations workspace",
+                      description: "Cross-module action queues for branch-linked work.",
+                      href: ROUTES.admin.operations,
+                      icon: <BarChart3 className="h-4 w-4" />,
+                      badge: "Ops",
+                    },
+                    {
+                      title: "Collections workspace",
+                      description: "Due follow-up and collection execution by branch-linked customers.",
+                      href: ROUTES.admin.collections,
+                      icon: <CircleDollarSign className="h-4 w-4" />,
+                      badge: "Collection",
+                    },
+                    {
+                      title: "Billing operations",
+                      description: "Direct-sale and billing document posture for branch retail work.",
+                      href: ROUTES.admin.billing,
+                      icon: <BarChart3 className="h-4 w-4" />,
+                      badge: "Billing",
+                    },
+                  ],
+                },
+                {
+                  title: "Branch risk and support",
+                  description: "Supporting lanes for stock visibility and people-cost review.",
+                  items: [
+                    {
+                      title: "Stock on hand",
+                      description: "Branch-facing inventory visibility and location posture.",
+                      href: ROUTES.admin.inventoryStockOnHand,
+                      icon: <PackageSearch className="h-4 w-4" />,
+                      badge: "Stock",
+                    },
+                    {
+                      title: "Staff operations",
+                      description: "People-cost and staff posture that influence branch performance.",
+                      href: ROUTES.admin.accountingStaff,
+                      icon: <Users className="h-4 w-4" />,
+                      badge: "Workforce",
+                    },
+                    {
+                      title: "Reports overview",
+                      description: "Escalate from branch posture into broader operational reporting.",
+                      href: ROUTES.admin.reports,
+                      icon: <BarChart3 className="h-4 w-4" />,
+                      badge: "Reports",
+                    },
+                  ],
                 },
               ]}
             />

@@ -1,12 +1,21 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import {
+  WorkspaceNotice,
+  WorkspaceTimeline,
+  type WorkspaceTimelineItem,
+} from "@/components/ui/role-workspace";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   getCustomerSupportRequest,
   type CustomerSupportRequest,
@@ -29,17 +38,6 @@ function formatCategoryLabel(value: string | null | undefined): string {
   return (value || "OTHER").replaceAll("_", " ");
 }
 
-function supportStatusTone(status: string | null | undefined): string {
-  switch ((status || "").toUpperCase()) {
-    case "CLOSED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "UNDER_REVIEW":
-      return "border-sky-200 bg-sky-50 text-sky-700";
-    default:
-      return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-}
-
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -47,50 +45,12 @@ function toErrorMessage(error: unknown): string {
   return "Unable to load support request detail.";
 }
 
-function DetailValue({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-background p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-1 text-sm text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
 export default function CustomerSupportRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const requestId = Number(params?.id ?? 0);
 
-  const [supportRequest, setSupportRequest] = useState<CustomerSupportRequest | null>(
-    null
-  );
+  const [supportRequest, setSupportRequest] =
+    useState<CustomerSupportRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,14 +92,66 @@ export default function CustomerSupportRequestDetailPage() {
     void loadPage("initial");
   }, [loadPage]);
 
+  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+    if (!supportRequest) return [];
+
+    const items: WorkspaceTimelineItem[] = [
+      {
+        id: `${supportRequest.id}-submitted`,
+        title: "Support request submitted",
+        description:
+          supportRequest.payment_reference_no || supportRequest.subscription_number
+            ? "The request was created with linked receipt or subscription context."
+            : "The request was created as a general account query.",
+        timestamp: formatDateTime(supportRequest.created_at),
+        badge: <StatusBadge status="SUBMITTED" label="Submitted" />,
+        meta: (
+          <>
+            Category {formatCategoryLabel(supportRequest.category)}
+            {supportRequest.payment_reference_no
+              ? ` · Ref ${supportRequest.payment_reference_no}`
+              : ""}
+          </>
+        ),
+      },
+    ];
+
+    if (supportRequest.updated_at && supportRequest.updated_at !== supportRequest.created_at) {
+      items.push({
+        id: `${supportRequest.id}-updated`,
+        title: "Request updated",
+        description: "Branch review or case progression updated the request record.",
+        timestamp: formatDateTime(supportRequest.updated_at),
+        badge: <StatusBadge status={supportRequest.status || "OPEN"} />,
+      });
+    }
+
+    if (supportRequest.resolved_at || String(supportRequest.status).toUpperCase() === "CLOSED") {
+      items.push({
+        id: `${supportRequest.id}-resolved`,
+        title: "Resolution recorded",
+        description:
+          supportRequest.resolution_summary ||
+          "The request was closed without a customer-visible resolution summary.",
+        timestamp: formatDateTime(supportRequest.resolved_at || supportRequest.updated_at),
+        badge: <StatusBadge status="CLOSED" label="Closed" />,
+      });
+    }
+
+    return items;
+  }, [supportRequest]);
+
   return (
     <PortalPage
+      eyebrow="Customer Support"
       title={
         supportRequest
           ? `Support Request #${supportRequest.id}`
           : "Support Request Detail"
       }
-      subtitle="Track the current status of a support/dispute request submitted from your own account."
+      subtitle="Track the current state of a customer-submitted support request without leaving the customer workspace shell."
+      helperNote="Support timelines explain review progress only. Receipt, payment, and subscription records remain the source of financial truth."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Support", href: "/customer/support" },
@@ -202,19 +214,56 @@ export default function CustomerSupportRequestDetailPage() {
           value: formatDateTime(supportRequest?.updated_at),
         },
       ]}
-      statusBadge={{ label: "Customer Support Tracking", tone: "info" }}
+      statusBadge={{
+        label: supportRequest?.status || "Customer support tracking",
+        tone:
+          supportRequest?.status === "CLOSED"
+            ? "success"
+            : supportRequest?.status === "UNDER_REVIEW"
+              ? "info"
+              : "warning",
+      }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+        <WorkspaceSection
+          title="Request posture"
+          description="Current request scope and branch-visible progress from the customer support record."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DetailItem
+              label="Request reference"
+              value={supportRequest ? `Request #${supportRequest.id}` : "—"}
+            />
+            <DetailItem
+              label="Status"
+              value={
+                supportRequest ? (
+                  <StatusBadge status={supportRequest.status || "OPEN"} size="md" />
+                ) : (
+                  "—"
+                )
+              }
+            />
+            <DetailItem
+              label="Submitted at"
+              value={formatDateTime(supportRequest?.created_at)}
+            />
+            <DetailItem
+              label="Last updated"
+              value={formatDateTime(supportRequest?.updated_at)}
+            />
+          </div>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading support request..." /> : null}
 
@@ -235,120 +284,72 @@ export default function CustomerSupportRequestDetailPage() {
 
         {!loading && !error && supportRequest ? (
           <>
-            <SectionCard
-              title="Request Status"
-              description="This shows the current state of the support/dispute request submitted from your account."
+            <WorkspaceSection
+              title="Issue detail"
+              description="Exact issue scope and linked record context submitted from your customer account."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="Request Reference" value={`Request #${supportRequest.id}`} />
-                <DetailValue
-                  label="Status"
+                <DetailItem
+                  label="Category"
+                  value={formatCategoryLabel(supportRequest.category)}
+                />
+                <DetailItem
+                  label="Linked payment"
                   value={
-                    <span
-                      className={[
-                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                        supportStatusTone(supportRequest.status),
-                      ].join(" ")}
-                    >
-                      {supportRequest.status}
-                    </span>
+                    supportRequest.payment_reference_no
+                      ? `Ref ${supportRequest.payment_reference_no}`
+                      : supportRequest.payment
+                        ? `Payment #${supportRequest.payment}`
+                        : "No payment attached"
                   }
                 />
-                <DetailValue
-                  label="Submitted At"
-                  value={formatDateTime(supportRequest.created_at)}
+                <DetailItem
+                  label="Linked subscription"
+                  value={
+                    supportRequest.subscription_number ||
+                    (supportRequest.subscription
+                      ? `SUB-${supportRequest.subscription}`
+                      : "No subscription attached")
+                  }
                 />
-                <DetailValue
-                  label="Last Updated"
-                  value={formatDateTime(supportRequest.updated_at)}
+                <DetailItem
+                  label="Payment date"
+                  value={formatDateTime(supportRequest.payment_date)}
                 />
               </div>
-            </SectionCard>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
-                title="Issue Details"
-                description="The exact issue information submitted from your side."
-              >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <DetailValue
-                    label="Category"
-                    value={formatCategoryLabel(supportRequest.category)}
-                  />
-                  <DetailValue
-                    label="Linked Payment"
-                    value={
-                      supportRequest.payment_reference_no
-                        ? `Ref ${supportRequest.payment_reference_no}`
-                        : supportRequest.payment
-                          ? `Payment #${supportRequest.payment}`
-                          : "No payment attached"
-                    }
-                  />
-                  <DetailValue
-                    label="Linked Subscription"
-                    value={
-                      supportRequest.subscription_number ||
-                      (supportRequest.subscription
-                        ? `SUB-${supportRequest.subscription}`
-                        : "No subscription attached")
-                    }
-                  />
-                  <DetailValue
-                    label="Payment Date"
-                    value={formatDateTime(supportRequest.payment_date)}
-                  />
+              <div className="mt-4 rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+                <div className="enterprise-eyebrow">Submitted message</div>
+                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                  {supportRequest.message || "No message submitted."}
                 </div>
+              </div>
+            </WorkspaceSection>
 
-                <div className="mt-4 rounded-xl border border-border bg-background p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Submitted Message
+            <WorkspaceSection
+              title="Support timeline"
+              description="Case milestones derived from the customer support record itself."
+            >
+              <WorkspaceTimeline items={timelineItems} />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Resolution"
+              description="A resolution summary appears here once the request is closed."
+            >
+              {String(supportRequest.status).toUpperCase() === "CLOSED" ? (
+                <WorkspaceNotice tone="success" title="Request closed">
+                  <div>{supportRequest.resolution_summary || "The request was closed without a customer-visible resolution summary."}</div>
+                  <div className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-emerald-800">
+                    Resolved {formatDateTime(supportRequest.resolved_at || supportRequest.updated_at)}
                   </div>
-                  <div className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                    {supportRequest.message || "No message submitted."}
-                  </div>
-                </div>
-              </SectionCard>
-
-              <SectionCard
-                title="Resolution"
-                description="A resolution summary appears here once the branch closes the request."
-              >
-                {supportRequest.status === "CLOSED" ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                      This support request has been closed.
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <DetailValue
-                        label="Resolved At"
-                        value={formatDateTime(supportRequest.resolved_at)}
-                      />
-                      <DetailValue
-                        label="Current Status"
-                        value={supportRequest.status}
-                      />
-                    </div>
-
-                    <div className="rounded-xl border border-border bg-background p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Resolution Summary
-                      </div>
-                      <div className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                        {supportRequest.resolution_summary ||
-                          "The request was closed without a customer-visible summary."}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="Resolution pending"
-                    description="The branch has not closed this request yet. Check back here later for the final resolution summary."
-                  />
-                )}
-              </SectionCard>
-            </div>
+                </WorkspaceNotice>
+              ) : (
+                <WorkspaceNotice tone="info" title="Resolution pending">
+                  The branch has not closed this request yet. Check the timeline above for the latest review movement.
+                </WorkspaceNotice>
+              )}
+            </WorkspaceSection>
           </>
         ) : null}
       </div>

@@ -10,6 +10,8 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
+import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -189,8 +191,11 @@ export default function AccountingVendorsPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Payables Control"
       title="Vendor Register"
       subtitle="Maintain supplier and vendor master data for procurement, expenses, settlements, and future raw-material purchasing without mixing that truth into billing or payment tables."
+      helperNote="Vendor master and payable review remain accounting-side controls. They stay distinct from billing, cashier collection, and EMI customer operations."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -215,6 +220,11 @@ export default function AccountingVendorsPage() {
 
         {notice ? <AccountingNotice message={notice} /> : null}
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
+        <WorkspaceDirectory
+          title="Accounting control map"
+          description="Move between supplier master, purchase bills, settlements, books, and statements from one accounting workspace."
+          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+        />
 
         <WorkspaceSection
           title="Supplier payable view"

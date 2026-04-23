@@ -191,8 +191,11 @@ export default function PartnerCustomersPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Customers"
       title="Partner Customers"
       subtitle="Customers associated with your own partner subscriptions, with search and KYC visibility aligned to the refined shared workflow pattern."
+      helperNote="This route is partner-scoped and read-only for customer master data. Use it to route into partner-visible subscriptions, payments, and collection follow-up only."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Customers" },

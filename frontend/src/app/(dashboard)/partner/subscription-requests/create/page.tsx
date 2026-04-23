@@ -1,12 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
+import ActionButton from "@/components/ui/ActionButton";
+import FormActions from "@/components/ui/FormActions";
+import FormSection from "@/components/ui/FormSection";
 import PortalPage from "@/components/ui/PortalPage";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   createPartnerSubscriptionRequest,
   getSubscriptionRequestOptions,
@@ -28,6 +31,25 @@ function toErrorMessage(error: unknown): string {
 
 function money(value?: string | number | null): string {
   return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function deriveMonthlyAmount(params: {
+  product: SubscriptionRequestProductOption | null;
+  batch: SubscriptionRequestBatchOption | null;
+}): string | null {
+  const basePrice = toNumber(params.product?.base_price);
+  const months = toNumber(params.batch?.duration_months);
+
+  if (basePrice <= 0 || months <= 0) {
+    return null;
+  }
+
+  return (basePrice / months).toFixed(2);
 }
 
 export default function PartnerSubscriptionRequestCreatePage() {
@@ -126,6 +148,20 @@ export default function PartnerSubscriptionRequestCreatePage() {
     [options, customerId]
   );
 
+  const derivedMonthly = useMemo(
+    () => deriveMonthlyAmount({ product: selectedProduct, batch: selectedBatch }),
+    [selectedBatch, selectedProduct]
+  );
+
+  async function handleRetryLoad() {
+    try {
+      await loadOptions({ batchId, customerQ: customerQuery });
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err));
+    }
+  }
+
   async function handleCustomerSearch() {
     try {
       await loadOptions({
@@ -183,6 +219,7 @@ export default function PartnerSubscriptionRequestCreatePage() {
         preferred_lucky_number: Number(luckyNumber),
         notes: notes.trim() || undefined,
       });
+
       setSuccess(response);
       setNotes("");
     } catch (err) {
@@ -194,8 +231,11 @@ export default function PartnerSubscriptionRequestCreatePage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Intake"
       title="Create Partner Subscription Request"
-      subtitle="Submit a partner-led EMI subscription request for a partner-visible customer or a new customer snapshot, with admin approval required before activation."
+      subtitle="Submit a partner-led intake request for an existing partner-visible customer or a new customer snapshot. Admin approval is still required before any live subscription exists."
+      helperNote="This form creates an intake request only. Approval is the only path that creates the real subscription, EMI schedule, and related audit trail."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscription Requests", href: "/partner/subscription-requests" },
@@ -213,11 +253,11 @@ export default function PartnerSubscriptionRequestCreatePage() {
           variant: "ghost",
         },
       ]}
-      statusBadge={{ label: "Partner Request Intake", tone: "info" }}
+      statusBadge={{ label: "Partner request intake", tone: "info" }}
       stats={[
         { label: "Products", value: options?.products.length ?? 0 },
-        { label: "Open Batches", value: options?.batches.length ?? 0 },
-        { label: "Visible Customers", value: options?.customers?.length ?? 0 },
+        { label: "Open batches", value: options?.batches.length ?? 0 },
+        { label: "Visible customers", value: options?.customers?.length ?? 0 },
         { label: "Approval", value: "Admin required", tone: "warning" },
       ]}
     >
@@ -225,265 +265,348 @@ export default function PartnerSubscriptionRequestCreatePage() {
         {loading ? <LoadingBlock label="Loading partner request form..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <WorkspaceSection
             title="Unable to load partner request form"
-            description={error}
-            onRetry={() => void loadOptions({ batchId, customerQ: customerQuery })}
-          />
+            description="The request form options could not be loaded from the current partner API scope."
+          >
+            <WorkspaceNotice tone="danger" title="Request form unavailable">
+              {error}
+            </WorkspaceNotice>
+            <div className="mt-4">
+              <ActionButton variant="outline" onClick={() => void handleRetryLoad()}>
+                Retry
+              </ActionButton>
+            </div>
+          </WorkspaceSection>
         ) : null}
 
         {!loading && !error && options ? (
           <>
             {success ? (
-              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 shadow-sm">
-                <p className="font-semibold">Partner request submitted.</p>
-                <p className="mt-1">
-                  Request #{success.request.id} is waiting for admin approval.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
+              <WorkspaceNotice
+                tone="success"
+                title="Partner request submitted."
+                action={
+                  <ActionButton
                     href={`/partner/subscription-requests/${success.request.id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                    variant="outline"
                   >
                     Open Request
-                  </Link>
-                  <Link
-                    href="/partner/subscription-requests"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
-                  >
-                    Back to Register
-                  </Link>
-                </div>
-              </section>
+                  </ActionButton>
+                }
+              >
+                Request #{success.request.id} is waiting for admin approval and has not created a live subscription yet.
+              </WorkspaceNotice>
             ) : null}
 
             {submitError ? (
-              <ErrorState
-                title="Unable to submit partner request"
-                description={submitError}
-              />
+              <WorkspaceNotice tone="danger" title="Unable to submit partner request">
+                {submitError}
+              </WorkspaceNotice>
             ) : null}
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <form
-                onSubmit={handleSubmit}
-                className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+              <WorkspaceSection
+                title="Partner request intake"
+                description="Choose whether this intake is for an existing partner-visible customer or a new customer snapshot, then lock product, batch, and lucky-number context from the live options API."
               >
-                <div className="space-y-1">
-                  <h2 className="text-base font-semibold text-foreground">
-                    Request intake
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Partner submission can use a current partner-visible customer or a new-customer snapshot. Approval still creates the real subscription later.
-                  </p>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMode("existing")}
-                    className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
-                      mode === "existing"
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border bg-background text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    Existing Customer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("new")}
-                    className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
-                      mode === "new"
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border bg-background text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    New Customer Snapshot
-                  </button>
-                </div>
-
-                {mode === "existing" ? (
-                  <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                      <label className="space-y-2 text-sm text-foreground">
-                        <span className="font-medium">Search partner-visible customers</span>
-                        <input
-                          value={customerQuery}
-                          onChange={(event) => setCustomerQuery(event.target.value)}
-                          placeholder="Search by customer name or phone"
-                          className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                        />
-                      </label>
+                <form onSubmit={handleSubmit}>
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => void handleCustomerSearch()}
-                        className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                        onClick={() => setMode("existing")}
+                        className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
+                          mode === "existing"
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-background text-foreground hover:bg-muted"
+                        }`}
                       >
-                        Search
+                        Existing Customer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("new")}
+                        className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
+                          mode === "new"
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-background text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        New Customer Snapshot
                       </button>
                     </div>
 
-                    <label className="mt-4 block space-y-2 text-sm text-foreground">
-                      <span className="font-medium">Customer</span>
-                      <select
-                        value={customerId}
-                        onChange={(event) => setCustomerId(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3"
+                    <WorkspaceNotice tone="info" title="Current intake mode">
+                      {mode === "existing"
+                        ? "Select from customers already visible inside the partner scope. This does not expose any admin-only onboarding controls."
+                        : "Capture a new customer snapshot for admin review. Approval still determines whether a real customer and subscription are created."}
+                    </WorkspaceNotice>
+
+                    {mode === "existing" ? (
+                      <FormSection
+                        title="Existing customer selection"
+                        description="Search inside the current partner-visible customer scope, then select the customer for this request."
+                        columns={2}
                       >
-                        <option value="">Select customer</option>
-                        {(options.customers ?? []).map((customer) => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.name} · {customer.phone}
+                        <div className="space-y-2 md:col-span-2">
+                          <label
+                            htmlFor="customer_query"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Search partner-visible customers
+                          </label>
+                          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <input
+                              id="customer_query"
+                              value={customerQuery}
+                              onChange={(event) => setCustomerQuery(event.target.value)}
+                              placeholder="Search by customer name or phone"
+                              className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                            />
+                            <ActionButton
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleCustomerSearch()}
+                            >
+                              Search
+                            </ActionButton>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <label
+                            htmlFor="customer_id"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Customer
+                          </label>
+                          <select
+                            id="customer_id"
+                            value={customerId}
+                            onChange={(event) => setCustomerId(event.target.value)}
+                            className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          >
+                            <option value="">Select customer</option>
+                            {(options.customers ?? []).map((customer) => (
+                              <option key={customer.id} value={customer.id}>
+                                {customer.name} · {customer.phone}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </FormSection>
+                    ) : (
+                      <FormSection
+                        title="New customer snapshot"
+                        description="Capture the minimum partner-side customer details required for admin review."
+                        columns={2}
+                      >
+                        <div className="space-y-2">
+                          <label
+                            htmlFor="requested_customer_name"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Customer name
+                          </label>
+                          <input
+                            id="requested_customer_name"
+                            value={requestedCustomerName}
+                            onChange={(event) =>
+                              setRequestedCustomerName(event.target.value)
+                            }
+                            className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor="requested_customer_phone"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Phone
+                          </label>
+                          <input
+                            id="requested_customer_phone"
+                            value={requestedCustomerPhone}
+                            onChange={(event) =>
+                              setRequestedCustomerPhone(event.target.value)
+                            }
+                            className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <label
+                            htmlFor="requested_customer_email"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Email
+                          </label>
+                          <input
+                            id="requested_customer_email"
+                            type="email"
+                            value={requestedCustomerEmail}
+                            onChange={(event) =>
+                              setRequestedCustomerEmail(event.target.value)
+                            }
+                            className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <label
+                            htmlFor="requested_customer_address"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            Address
+                          </label>
+                          <textarea
+                            id="requested_customer_address"
+                            value={requestedCustomerAddress}
+                            onChange={(event) =>
+                              setRequestedCustomerAddress(event.target.value)
+                            }
+                            rows={3}
+                            className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <label
+                            htmlFor="requested_customer_city"
+                            className="text-sm font-semibold text-foreground"
+                          >
+                            City
+                          </label>
+                          <input
+                            id="requested_customer_city"
+                            value={requestedCustomerCity}
+                            onChange={(event) =>
+                              setRequestedCustomerCity(event.target.value)
+                            }
+                            className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          />
+                        </div>
+                      </FormSection>
+                    )}
+
+                    <FormSection
+                      title="Product, batch, and lucky number"
+                      description="These values come from live request options and stay constrained to the current batch scope."
+                      columns={2}
+                    >
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="product_id"
+                          className="text-sm font-semibold text-foreground"
+                        >
+                          Product
+                        </label>
+                        <select
+                          id="product_id"
+                          value={productId}
+                          onChange={(event) => setProductId(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                        >
+                          <option value="">Select product</option>
+                          {options.products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}{" "}
+                              {product.product_code ? `(${product.product_code})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="batch_id"
+                          className="text-sm font-semibold text-foreground"
+                        >
+                          Batch
+                        </label>
+                        <select
+                          id="batch_id"
+                          value={batchId}
+                          onChange={(event) => setBatchId(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                        >
+                          <option value="">Select batch</option>
+                          {options.batches.map((batch) => (
+                            <option key={batch.id} value={batch.id}>
+                              {batch.batch_code} · {batch.available_slots ?? 0} open
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label
+                          htmlFor="lucky_number"
+                          className="text-sm font-semibold text-foreground"
+                        >
+                          Lucky number
+                        </label>
+                        <select
+                          id="lucky_number"
+                          value={luckyNumber}
+                          onChange={(event) => setLuckyNumber(event.target.value)}
+                          disabled={!batchId || options.lucky_numbers.length === 0}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">
+                            {batchId
+                              ? options.lucky_numbers.length > 0
+                                ? "Select lucky number"
+                                : "No lucky numbers available"
+                              : "Select batch first"}
                           </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                ) : (
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm text-foreground">
-                      <span className="font-medium">Customer name</span>
-                      <input
-                        value={requestedCustomerName}
-                        onChange={(event) => setRequestedCustomerName(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm text-foreground">
-                      <span className="font-medium">Phone</span>
-                      <input
-                        value={requestedCustomerPhone}
-                        onChange={(event) => setRequestedCustomerPhone(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm text-foreground md:col-span-2">
-                      <span className="font-medium">Email</span>
-                      <input
-                        type="email"
-                        value={requestedCustomerEmail}
-                        onChange={(event) => setRequestedCustomerEmail(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm text-foreground md:col-span-2">
-                      <span className="font-medium">Address</span>
-                      <textarea
-                        value={requestedCustomerAddress}
-                        onChange={(event) => setRequestedCustomerAddress(event.target.value)}
-                        rows={3}
-                        className="w-full rounded-xl border border-border bg-background px-3 py-3"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm text-foreground md:col-span-2">
-                      <span className="font-medium">City</span>
-                      <input
-                        value={requestedCustomerCity}
-                        onChange={(event) => setRequestedCustomerCity(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                      />
-                    </label>
-                  </div>
-                )}
+                          {options.lucky_numbers.map((value) => (
+                            <option key={value} value={value}>
+                              #{String(value).padStart(2, "0")}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2 text-sm text-foreground">
-                    <span className="font-medium">Product</span>
-                    <select
-                      value={productId}
-                      onChange={(event) => setProductId(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                    >
-                      <option value="">Select product</option>
-                      {options.products.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} {product.product_code ? `(${product.product_code})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <div className="space-y-2 md:col-span-2">
+                        <label
+                          htmlFor="notes"
+                          className="text-sm font-semibold text-foreground"
+                        >
+                          Notes
+                        </label>
+                        <textarea
+                          id="notes"
+                          value={notes}
+                          onChange={(event) => setNotes(event.target.value)}
+                          rows={5}
+                          placeholder="Add context for admin review."
+                          className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                        />
+                      </div>
+                    </FormSection>
 
-                  <label className="space-y-2 text-sm text-foreground">
-                    <span className="font-medium">Batch</span>
-                    <select
-                      value={batchId}
-                      onChange={(event) => setBatchId(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                    >
-                      <option value="">Select batch</option>
-                      {options.batches.map((batch) => (
-                        <option key={batch.id} value={batch.id}>
-                          {batch.batch_code} · {batch.available_slots ?? 0} open
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm text-foreground md:col-span-2">
-                    <span className="font-medium">Lucky number</span>
-                    <select
-                      value={luckyNumber}
-                      onChange={(event) => setLuckyNumber(event.target.value)}
-                      disabled={!batchId || options.lucky_numbers.length === 0}
-                      className="h-11 w-full rounded-xl border border-border bg-background px-3 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="">
-                        {batchId
-                          ? options.lucky_numbers.length > 0
-                            ? "Select lucky number"
-                            : "No lucky numbers available"
-                          : "Select batch first"}
-                      </option>
-                      {options.lucky_numbers.map((value) => (
-                        <option key={value} value={value}>
-                          #{String(value).padStart(2, "0")}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm text-foreground md:col-span-2">
-                    <span className="font-medium">Notes</span>
-                    <textarea
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      rows={5}
-                      placeholder="Add context for admin review."
-                      className="w-full rounded-xl border border-border bg-background px-3 py-3"
+                    <FormActions
+                      submitLabel="Submit Partner Request"
+                      submitLoadingLabel="Submitting..."
+                      submitting={submitting}
+                      cancel={{
+                        label: "Cancel",
+                        href: "/partner/subscription-requests",
+                      }}
                     />
-                  </label>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-foreground bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submitting ? "Submitting..." : "Submit Partner Request"}
-                  </button>
-                  <Link
-                    href="/partner/subscription-requests"
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    Cancel
-                  </Link>
-                </div>
-              </form>
-
-              <aside className="space-y-4">
-                <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                  <div className="space-y-1">
-                    <h2 className="text-base font-semibold text-foreground">
-                      Request preview
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Product, batch, and partner-visible customer scope all come from live backend request options.
-                    </p>
                   </div>
+                </form>
+              </WorkspaceSection>
 
-                  <div className="mt-4 space-y-4">
+              <aside className="space-y-6">
+                <WorkspaceSection
+                  title="Request preview"
+                  description="Live summary of the current customer, product, and batch context for this request."
+                >
+                  <div className="space-y-4">
                     <PublicProductMedia
                       src={selectedProduct?.image}
                       alt={selectedProduct?.name || "Requested product"}
@@ -495,35 +618,69 @@ export default function PartnerSubscriptionRequestCreatePage() {
                       badge={selectedProduct?.product_code || "Preview"}
                     />
 
-                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Customer scope
-                      </div>
-                      <div className="mt-2 text-sm text-slate-900">
-                        {mode === "existing"
-                          ? selectedCustomer?.name || "No existing customer selected"
-                          : requestedCustomerName || "New customer snapshot"}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {mode === "existing"
-                          ? selectedCustomer?.phone || "Partner-visible customers only"
-                          : requestedCustomerPhone || requestedCustomerEmail || "Name, phone, and email are required"}
-                      </div>
-                      <div className="mt-4 text-sm text-slate-900">
-                        Product: {selectedProduct?.name || "No product selected"}
-                      </div>
-                      <div className="mt-2 text-sm text-slate-900">
-                        Base price: {money(selectedProduct?.base_price)}
-                      </div>
-                      <div className="mt-2 text-sm text-slate-900">
-                        Batch: {selectedBatch?.batch_code || "Select batch"}
-                      </div>
-                      <div className="mt-2 text-sm text-slate-900">
-                        Available slots: {selectedBatch?.available_slots ?? "—"}
-                      </div>
+                    <div className="grid gap-4">
+                      <DetailItem
+                        label="Customer scope"
+                        value={
+                          mode === "existing"
+                            ? selectedCustomer?.name || "No existing customer selected"
+                            : requestedCustomerName || "New customer snapshot"
+                        }
+                      />
+                      <DetailItem
+                        label="Customer contact"
+                        value={
+                          mode === "existing"
+                            ? selectedCustomer?.phone || "Partner-visible customers only"
+                            : requestedCustomerPhone ||
+                              requestedCustomerEmail ||
+                              "Name, phone, and email are required"
+                        }
+                      />
+                      <DetailItem
+                        label="Product"
+                        value={selectedProduct?.name || "No product selected"}
+                      />
+                      <DetailItem
+                        label="Base price"
+                        value={money(selectedProduct?.base_price)}
+                      />
+                      <DetailItem
+                        label="Batch"
+                        value={selectedBatch?.batch_code || "Select batch"}
+                      />
+                      <DetailItem
+                        label="Available slots"
+                        value={selectedBatch?.available_slots ?? "—"}
+                      />
+                      <DetailItem
+                        label="Monthly estimate"
+                        value={
+                          derivedMonthly
+                            ? `${money(derivedMonthly)} / month`
+                            : "Pending batch selection"
+                        }
+                      />
+                      <DetailItem
+                        label="Tenure snapshot"
+                        value={
+                          selectedBatch?.duration_months
+                            ? `${selectedBatch.duration_months} months`
+                            : "Pending batch selection"
+                        }
+                      />
                     </div>
                   </div>
-                </section>
+                </WorkspaceSection>
+
+                <WorkspaceSection
+                  title="Request boundary"
+                  description="Operational rules that remain in force after submission."
+                >
+                  <WorkspaceNotice tone="info" title="Approval still required">
+                    Partner submission does not activate a subscription, post a payment, or create a payout event. Approval is still the only path to live contract creation.
+                  </WorkspaceNotice>
+                </WorkspaceSection>
               </aside>
             </div>
           </>

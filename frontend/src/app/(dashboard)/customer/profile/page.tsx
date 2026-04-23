@@ -1,12 +1,24 @@
 "use client";
 
+import {
+  ClipboardList,
+  CreditCard,
+  LifeBuoy,
+  PlusCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
+import FormActions from "@/components/ui/FormActions";
+import FormSection from "@/components/ui/FormSection";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
   getCustomerProfile,
@@ -43,15 +55,28 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load customer profile.";
 }
 
+function noticeToneForKyc(
+  status: string | null | undefined
+): "info" | "success" | "warning" {
+  const token = String(status || "").toUpperCase();
+  if (token === "APPROVED" || token === "VERIFIED") {
+    return "success";
+  }
+  if (token === "PENDING") {
+    return "warning";
+  }
+  return "info";
+}
+
 export default function CustomerProfilePage() {
   const [data, setData] = useState<CustomerProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [productRows, setProductRows] = useState<Awaited<
-    ReturnType<typeof listCustomerSubscriptionsRegister>
-  >["results"]>([]);
+  const [productRows, setProductRows] = useState<
+    Awaited<ReturnType<typeof listCustomerSubscriptionsRegister>>["results"]
+  >([]);
   const [productError, setProductError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -89,7 +114,7 @@ export default function CustomerProfilePage() {
         setProductError(null);
       } else {
         setProductRows([]);
-        setProductError("Product summaries are temporarily unavailable.");
+        setProductError("Subscription product summaries are temporarily unavailable.");
       }
     } catch (err) {
       setError(toErrorMessage(err));
@@ -105,28 +130,30 @@ export default function CustomerProfilePage() {
     void loadPage();
   }, [loadPage]);
 
-  const stats = useMemo(() => {
-    if (!data) return null;
+  const headerStats = useMemo(() => {
+    if (!data) return [];
     return [
       {
-        label: "Total Subscriptions",
-        value: String(data.summary.total_subscriptions ?? 0),
-        subtext: "All-time subscriptions",
-      },
-      {
-        label: "Active",
+        label: "Active subscriptions",
         value: String(data.summary.active_subscriptions ?? 0),
-        subtext: "Live contracts",
+        tone: "success" as const,
       },
       {
-        label: "Won",
+        label: "Total subscriptions",
+        value: String(data.summary.total_subscriptions ?? 0),
+      },
+      {
+        label: "Won subscriptions",
         value: String(data.summary.won_subscriptions ?? 0),
-        subtext: "Lucky draw winners",
+        tone:
+          (data.summary.won_subscriptions ?? 0) > 0
+            ? ("info" as const)
+            : ("default" as const),
       },
       {
-        label: "Total Paid",
+        label: "Total paid",
         value: money(data.summary.total_paid_amount ?? 0),
-        subtext: "Total collected amount",
+        tone: "success" as const,
       },
     ];
   }, [data]);
@@ -154,13 +181,73 @@ export default function CustomerProfilePage() {
     }
   }
 
+  const selfServiceLanes = [
+    {
+      title: "Subscriptions",
+      description:
+        "Open contract detail, EMI posture, lucky number status, and waiver history.",
+      href: "/customer/subscriptions",
+      icon: <ClipboardList className="h-4 w-4" />,
+      badge: "Workspace",
+    },
+    {
+      title: "Payments",
+      description:
+        "Review recorded receipts and move into a receipt-specific support issue when needed.",
+      href: "/customer/payments",
+      icon: <CreditCard className="h-4 w-4" />,
+      badge: "Receipts",
+    },
+    {
+      title: "Support",
+      description:
+        "Track current requests and submit a new issue without exposing branch-only workflows.",
+      href: "/customer/support",
+      icon: <LifeBuoy className="h-4 w-4" />,
+      badge: "Follow-up",
+    },
+    {
+      title: "Subscription Requests",
+      description:
+        "Create intake-only requests that remain pending until admin approval creates the real contract.",
+      href: "/customer/subscription-requests",
+      icon: <PlusCircle className="h-4 w-4" />,
+      badge: "Approval",
+    },
+  ];
+
   return (
     <PortalPage
-      title="Profile"
-      subtitle="Your account identity and operational status for Lucky Plan."
+      eyebrow="Customer Profile"
+      title="Profile Workspace"
+      subtitle="Manage your customer identity, self-service contact details, and linked subscription context from the same operational shell."
+      helperNote="Profile maintenance changes only your own customer record. Subscription creation, payment posting, and winner logic remain separate controlled workflows."
+      helperTone="info"
       breadcrumbs={[{ label: "Customer", href: "/customer" }, { label: "Profile" }]}
+      actions={[
+        {
+          href: "/customer/subscriptions",
+          label: "Subscriptions",
+          variant: "primary",
+        },
+        {
+          href: "/customer/payments",
+          label: "Payments",
+          variant: "secondary",
+        },
+        {
+          href: "/customer/support",
+          label: "Support",
+          variant: "secondary",
+        },
+      ]}
+      stats={headerStats}
+      statusBadge={{
+        label: data?.kyc_status || "Customer profile",
+        tone: noticeToneForKyc(data?.kyc_status),
+      }}
     >
-      {loading ? <LoadingBlock label="Loading profile..." /> : null}
+      {loading ? <LoadingBlock label="Loading profile workspace..." /> : null}
 
       {!loading && error && !data ? (
         <ErrorState
@@ -172,152 +259,152 @@ export default function CustomerProfilePage() {
 
       {!loading && !error && data ? (
         <div className="space-y-6">
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Username
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {data.username}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  KYC Status
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {data.kyc_status}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Email
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {data.email || "Add email to enable password reset"}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  City
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {data.city || "—"}
-                </div>
-              </div>
-            </div>
-          </section>
+          <ControlLaneGrid
+            title="Self-service lanes"
+            description="Use the current customer-safe workspace routes without crossing into internal branch or finance controls."
+            lanes={selfServiceLanes}
+          />
 
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-foreground">
-                Account details
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Keep your profile current. Email is required for self-service password reset.
-              </p>
+          <WorkspaceSection
+            title="Account identity"
+            description="Core customer identity and KYC posture from your live profile record."
+            action={
+              <ActionButton
+                variant="outline"
+                onClick={() => void loadPage()}
+                disabled={loading || saving}
+              >
+                Refresh
+              </ActionButton>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <DetailItem label="Username" value={data.username} />
+              <DetailItem
+                label="KYC status"
+                value={<StatusBadge status={data.kyc_status || "NOT_PROVIDED"} size="md" />}
+              />
+              <DetailItem label="Phone" value={data.phone || "—"} />
+              <DetailItem label="Email" value={data.email || "Add email for password reset"} />
+              <DetailItem label="City" value={data.city || "—"} />
+              <DetailItem label="Address" value={data.address || "No address recorded"} />
             </div>
+          </WorkspaceSection>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="customer-name">
-                    Name
-                  </label>
-                  <input
-                    id="customer-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="customer-phone">
-                    Phone
-                  </label>
-                  <input
-                    id="customer-phone"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="customer-email">
-                    Email
-                  </label>
-                  <input
-                    id="customer-email"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="customer-city">
-                    City
-                  </label>
-                  <input
-                    id="customer-city"
-                    value={city}
-                    onChange={(event) => setCity(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="customer-address">
-                  Address
-                </label>
-                <textarea
-                  id="customer-address"
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  className="min-h-28 w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none focus:border-ring"
+          <WorkspaceSection
+            title="Profile maintenance"
+            description="Keep contact details current so receipts, support, and password recovery remain usable."
+          >
+            {error ? (
+              <WorkspaceNotice tone="danger" title="Unable to save profile">
+                {error}
+              </WorkspaceNotice>
+            ) : null}
+
+            {success ? (
+              <WorkspaceNotice tone="success" title="Profile updated">
+                {success}
+              </WorkspaceNotice>
+            ) : null}
+
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-5">
+                <FormSection
+                  title="Contact details"
+                  description="These fields are customer-editable and stay inside your own account scope."
+                  columns={2}
+                >
+                  <div className="space-y-2">
+                    <label htmlFor="customer-name" className="text-sm font-medium text-foreground">
+                      Name
+                    </label>
+                    <input
+                      id="customer-name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="customer-phone" className="text-sm font-medium text-foreground">
+                      Phone
+                    </label>
+                    <input
+                      id="customer-phone"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="customer-email" className="text-sm font-medium text-foreground">
+                      Email
+                    </label>
+                    <input
+                      id="customer-email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="customer-city" className="text-sm font-medium text-foreground">
+                      City
+                    </label>
+                    <input
+                      id="customer-city"
+                      value={city}
+                      onChange={(event) => setCity(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                    />
+                  </div>
+                </FormSection>
+
+                <FormSection
+                  title="Address details"
+                  description="Address is shown as stored on your customer record and does not alter subscription truth."
+                  columns={1}
+                >
+                  <div className="space-y-2">
+                    <label htmlFor="customer-address" className="text-sm font-medium text-foreground">
+                      Address
+                    </label>
+                    <textarea
+                      id="customer-address"
+                      value={address}
+                      onChange={(event) => setAddress(event.target.value)}
+                      className="min-h-28 w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none focus:border-ring"
+                    />
+                  </div>
+                </FormSection>
+
+                <FormActions
+                  submitLabel="Save profile"
+                  submitLoadingLabel="Saving profile..."
+                  submitting={saving}
+                  cancel={{ label: "Reset", onClick: () => data && hydrate(data) }}
                 />
               </div>
-
-              {error ? (
-                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                  {error}
-                </div>
-              ) : null}
-
-              {success ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  {success}
-                </div>
-              ) : null}
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save profile"}
-                </button>
-              </div>
             </form>
-          </section>
+          </WorkspaceSection>
 
-          <section className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">My Products</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Product image, batch, lucky number, and winner or waiver context come directly from your linked subscriptions.
-              </p>
-            </div>
-
+          <WorkspaceSection
+            title="Recent linked products"
+            description="Latest subscription-linked product surfaces from your own customer workspace."
+            action={
+              <ActionButton href="/customer/subscriptions" variant="outline">
+                Open all subscriptions
+              </ActionButton>
+            }
+          >
             {productError ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <WorkspaceNotice tone="warning" title="Subscription context unavailable">
                 {productError}
-              </div>
+              </WorkspaceNotice>
             ) : null}
 
             {productRows.length > 0 ? (
@@ -332,29 +419,17 @@ export default function CustomerProfilePage() {
                 ))}
               </div>
             ) : !productError ? (
-              <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-                No subscription-linked products are available yet.
-              </div>
+              <EmptyState
+                title="No linked subscriptions yet"
+                description="Subscription-linked product visibility appears here after a real customer subscription is created."
+                action={
+                  <ActionButton href="/customer/subscription-requests" variant="outline">
+                    Open subscription requests
+                  </ActionButton>
+                }
+              />
             ) : null}
-          </section>
-
-          {stats ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {stats.map((card) => (
-                <StatCard
-                  key={card.label}
-                  label={card.label}
-                  value={card.value}
-                  subtext={card.subtext}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No profile summary available"
-              description="The profile endpoint returned no summary metrics."
-            />
-          )}
+          </WorkspaceSection>
         </div>
       ) : null}
     </PortalPage>

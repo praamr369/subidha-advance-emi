@@ -23,7 +23,7 @@ type StatCardProps = {
 const toneColors = {
   default: {
     shell:
-      "border-border bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card)_84%,var(--surface-muted)_16%))]",
+      "border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))]",
     icon: "bg-[var(--surface-strong)] text-slate-700",
     accent: "bg-slate-400/55",
   },
@@ -86,7 +86,7 @@ export default function StatCard({
   const card = (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-[1.6rem] border p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.46)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.56)]",
+        "group relative overflow-hidden rounded-[1.6rem] border p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.42)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)]",
         toneStyle.shell,
         className
       )}

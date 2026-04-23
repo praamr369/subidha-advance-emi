@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -158,8 +160,11 @@ export default function InventoryLocationsPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Master Control"
       title="Stock Locations"
       subtitle="Govern store, warehouse, and showroom stock locations as explicit operational masters separate from product and contract truth."
+      helperNote="Stock locations remain inventory-only masters. They do not alter product identity, billing documents, or contract state."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -177,6 +182,12 @@ export default function InventoryLocationsPage() {
       ]}
       statusBadge={{ label: "Master Data", tone: "info" }}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Use the shared inventory directory to move between stock masters, live stock review, movement registers, and counted stock workflows."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {message ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {message}

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef, GenericRecord } from "@/components/enterprise/columns";
+import {
+  WorkspaceDirectory,
+  type WorkspaceDirectoryGroup,
+} from "@/components/admin/control-center/WorkspaceDirectory";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
@@ -24,23 +28,39 @@ type RegisterReport<T extends GenericRecord> = {
 };
 
 type BookRegisterPageProps<T extends GenericRecord> = {
+  eyebrow?: string;
   title: string;
   subtitle: string;
   printTitle: string;
+  helperNote?: string;
+  helperTone?: "default" | "info" | "warning";
   fetchReport: (params: { start_date?: string; end_date?: string }) => Promise<RegisterReport<T>>;
   columns: EnterpriseColumnDef<T>[];
   toPrintRow: (row: T) => React.ReactNode[];
   breadcrumbs?: Array<{ label: string; href?: string }>;
+  actions?: Array<{ href: string; label: string; variant?: "primary" | "secondary" | "ghost" | "danger" }>;
+  statusBadge?: { label: string; tone?: "default" | "success" | "warning" | "danger" | "info" };
+  directoryTitle?: string;
+  directoryDescription?: string;
+  directoryGroups?: WorkspaceDirectoryGroup[];
 };
 
 export default function BookRegisterPage<T extends GenericRecord>({
+  eyebrow,
   title,
   subtitle,
   printTitle,
+  helperNote,
+  helperTone = "default",
   fetchReport,
   columns,
   toPrintRow,
   breadcrumbs,
+  actions,
+  statusBadge,
+  directoryTitle,
+  directoryDescription,
+  directoryGroups,
 }: BookRegisterPageProps<T>) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +112,11 @@ export default function BookRegisterPage<T extends GenericRecord>({
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow={eyebrow}
       title={title}
       subtitle={subtitle}
+      helperNote={helperNote}
+      helperTone={helperTone}
       breadcrumbs={
         breadcrumbs ?? [
           { label: "Admin", href: ROUTES.admin.dashboard },
@@ -102,12 +125,22 @@ export default function BookRegisterPage<T extends GenericRecord>({
           { label: title },
         ]
       }
-      statusBadge={{ label: "Posted Data Only", tone: "info" }}
+      actions={actions}
+      statusBadge={statusBadge ?? { label: "Posted Data Only", tone: "info" }}
       stats={[
         { label: "Rows", value: String(rows.length) },
         { label: "Range", value: rangeLabel, tone: "info" },
       ]}
     >
+      {directoryGroups?.length ? (
+        <WorkspaceDirectory
+          className="receipt-print-hide"
+          title={directoryTitle ?? "Related routes"}
+          description={directoryDescription}
+          groups={directoryGroups}
+        />
+      ) : null}
+
       <WorkspaceSection
         className="receipt-print-hide"
         title={`${title} Filters`}

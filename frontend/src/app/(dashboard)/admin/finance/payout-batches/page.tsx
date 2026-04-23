@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { FINANCE_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -93,13 +96,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
+    <WorkspaceSection title={title} description={description}>
+      {children}
+    </WorkspaceSection>
   );
 }
 
@@ -214,8 +213,11 @@ export default function AdminPayoutBatchesPage() {
 
   return (
     <PortalPage
+      eyebrow="Finance Payout Control"
       title="Payout Batch Register"
       subtitle="Review draft, finalized, and cancelled payout batches, then open a batch for controlled finance actions."
+      helperNote="Batch creation, finalize, and cancel posture stay explicit for payout auditability. This register is separate from cashier collection and from accounting posting."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Finance", href: "/admin/finance" },
@@ -259,6 +261,12 @@ export default function AdminPayoutBatchesPage() {
       }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Finance route map"
+          description="Navigate from payout batches to commission review, payout queue, reconciliation, and accounting handoff without losing finance context."
+          groups={FINANCE_CONTROL_DIRECTORY_GROUPS}
+        />
+
         <SectionCard
           title="Register controls"
           description="Filter payout batches by status or quick search. Use batch detail for finalize, cancel, and export operations."

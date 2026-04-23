@@ -52,7 +52,7 @@ export default function StatusBadge({
       {!hideIcon ? (
         <Icon className={cn(size === "md" ? "h-4 w-4" : "h-3.5 w-3.5")} />
       ) : null}
-      <span>{presentation.label}</span>
+      <span className="tracking-[0.01em]">{presentation.label}</span>
     </span>
   );
 }

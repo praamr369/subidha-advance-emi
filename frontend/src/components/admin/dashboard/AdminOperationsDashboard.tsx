@@ -33,6 +33,7 @@ import {
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -1007,6 +1008,7 @@ export default function AdminOperationsDashboard() {
 
   return (
     <PortalPage
+      eyebrow="Operations Control"
       title="Operations Workspace"
       subtitle="Action-first workspace for finance, collections, Advance EMI, fulfillment, inventory, service desk, reminders, onboarding, and governance queues."
       helperNote="Widgets use live module data only. No synthetic operational KPIs are generated in the dashboard layer."
@@ -1148,6 +1150,115 @@ export default function AdminOperationsDashboard() {
             icon={<Banknote className="h-5 w-5" />}
           />
         </div>
+
+        <WorkspaceDirectory
+          title="Operational launch map"
+          description="Use the route-safe launcher below to move from dashboard posture into the exact workspace that owns the underlying records. Finance, billing, support, and collections stay cross-linked but operationally separate."
+          groups={[
+            {
+              title: "Customer intake and collections",
+              description: "High-frequency admin workflows for onboarding, due follow-up, and payment execution.",
+              items: [
+                {
+                  title: "Collections workspace",
+                  description: "Advance EMI, overdue follow-up, and collection execution lanes.",
+                  href: ROUTES.admin.collections,
+                  icon: <CircleDollarSign className="h-4 w-4" />,
+                  badge: "Collection",
+                },
+                {
+                  title: "Payment register",
+                  description: "Review payment history and open individual payment timelines.",
+                  href: ROUTES.admin.payments,
+                  icon: <Wallet className="h-4 w-4" />,
+                  badge: "Register",
+                },
+                {
+                  title: "Customer register",
+                  description: "Profile, KYC, subscription context, and support-aware customer routing.",
+                  href: ROUTES.admin.customers,
+                  icon: <Users className="h-4 w-4" />,
+                  badge: "Customer",
+                },
+                {
+                  title: "Lead inbox",
+                  description: "Assignment, follow-up, and conversion handoff for new enquiries.",
+                  href: ROUTES.admin.leads,
+                  icon: <Percent className="h-4 w-4" />,
+                  badge: "Onboarding",
+                },
+              ],
+            },
+            {
+              title: "Branch and service execution",
+              description: "Operational visibility for branch health, dispatch pressure, and complaint handling.",
+              items: [
+                {
+                  title: "Branch reporting",
+                  description: "Branch, desk, sales, stock, and people-cost visibility by operating scope.",
+                  href: ROUTES.admin.branchReporting,
+                  icon: <Building2 className="h-4 w-4" />,
+                  badge: "Branch",
+                },
+                {
+                  title: "Delivery workspace",
+                  description: "Pending, scheduled, in-transit, and delivery action lanes.",
+                  href: ROUTES.admin.deliveries,
+                  icon: <Truck className="h-4 w-4" />,
+                  badge: "Fulfillment",
+                },
+                {
+                  title: "Support requests",
+                  description: "Customer-submitted issue queue with payment and subscription context.",
+                  href: ROUTES.admin.supportRequests,
+                  icon: <ShieldAlert className="h-4 w-4" />,
+                  badge: "Triage",
+                },
+                {
+                  title: "Service desk",
+                  description: "Complaint escalation, return cases, and after-sales execution.",
+                  href: ROUTES.admin.serviceDesk,
+                  icon: <CheckCircle2 className="h-4 w-4" />,
+                  badge: "After-sales",
+                },
+              ],
+            },
+            {
+              title: "Commercial and business control",
+              description: "Separate operational control lanes for reporting, stock, retail billing, and finance posture.",
+              items: [
+                {
+                  title: "Reports overview",
+                  description: "Backend-prepared operational analytics, receivable posture, and report routing.",
+                  href: ROUTES.admin.reports,
+                  icon: <BadgeCheck className="h-4 w-4" />,
+                  badge: "Reports",
+                },
+                {
+                  title: "Billing operations",
+                  description: "Direct sales, invoices, receipts, contracts, and note registers.",
+                  href: ROUTES.admin.billing,
+                  icon: <ShoppingCart className="h-4 w-4" />,
+                  badge: "Billing",
+                },
+                {
+                  title: "Inventory operations",
+                  description: "Stock, location, movement, and warehouse visibility lanes.",
+                  href: ROUTES.admin.inventory,
+                  icon: <PackageSearch className="h-4 w-4" />,
+                  badge: "Stock",
+                },
+                {
+                  title: "Finance control",
+                  description: "Receivables, payout, and reconciliation posture without merging into cashier flows.",
+                  href: ROUTES.admin.finance,
+                  icon: <Banknote className="h-4 w-4" />,
+                  badge: "Finance",
+                },
+              ],
+            },
+          ]}
+        />
 
         <WidgetShell
           title="Settlement posture"

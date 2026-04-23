@@ -116,8 +116,11 @@ export default function CashierPaymentReceiptPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Cashier Desk"
       title={payment ? `Receipt #${payment.id}` : "Payment Receipt"}
       subtitle="Counter-safe payment proof for recent cashier-posted transactions."
+      helperNote="Printing or reviewing this receipt never changes payment state. New collection must still begin from the cashier collect flow with counter and finance-account controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Cashier", href: "/cashier" },
         { label: "Payment History", href: "/cashier/payments" },

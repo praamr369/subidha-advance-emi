@@ -1,13 +1,19 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   listCustomerDeliveries,
   type DeliveryRecord,
@@ -18,14 +24,24 @@ function formatDate(value?: string | null): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleDateString("en-IN");
+  return new Date(parsed).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString("en-IN");
+  return new Date(parsed).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function toErrorMessage(error: unknown): string {
@@ -33,31 +49,44 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load delivery tracking.";
 }
 
-function tone(status?: string | null): string {
-  switch ((status || "").toUpperCase()) {
-    case "DELIVERED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "FAILED":
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    case "RETURN_REQUESTED":
-    case "RETURNED":
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    case "DISPATCHED":
-    case "OUT_FOR_DELIVERY":
-      return "border-sky-200 bg-sky-50 text-sky-700";
-    case "SCHEDULED":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    default:
-      return "border-amber-200 bg-amber-50 text-amber-700";
+function resolveLatestEvent(row: DeliveryRecord): {
+  label: string;
+  value: string | null | undefined;
+} {
+  if (row.returned_at) {
+    return { label: "Returned", value: row.returned_at };
   }
+  if (row.return_requested_at) {
+    return { label: "Return requested", value: row.return_requested_at };
+  }
+  if (row.delivered_at) {
+    return { label: "Delivered", value: row.delivered_at };
+  }
+  if (row.failed_at) {
+    return { label: "Delivery failed", value: row.failed_at };
+  }
+  if (row.cancelled_at) {
+    return { label: "Cancelled", value: row.cancelled_at };
+  }
+  if (row.out_for_delivery_at) {
+    return { label: "Out for delivery", value: row.out_for_delivery_at };
+  }
+  if (row.dispatched_at) {
+    return { label: "Dispatched", value: row.dispatched_at };
+  }
+  if (row.scheduled_date) {
+    return { label: "Scheduled", value: row.scheduled_date };
+  }
+  return { label: "Last updated", value: row.updated_at || row.created_at };
 }
 
 export default function CustomerDeliveriesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const statusFilter = (searchParams.get("status") || "").trim().toUpperCase() as DeliveryStatus | "";
+  const statusFilter = (
+    (searchParams.get("status") || "").trim().toUpperCase() as DeliveryStatus | ""
+  );
   const subscriptionFilter = (searchParams.get("subscription") || "").trim();
 
   const [statusInput, setStatusInput] = useState(statusFilter);
@@ -88,8 +117,11 @@ export default function CustomerDeliveriesPage() {
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+      if (mode === "initial") {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
 
       try {
         const payload = await listCustomerDeliveries({
@@ -107,8 +139,11 @@ export default function CustomerDeliveriesPage() {
           setCount(0);
         }
       } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+        if (mode === "initial") {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
     },
     [statusFilter, subscriptionFilter]
@@ -118,7 +153,7 @@ export default function CustomerDeliveriesPage() {
     void loadPage("initial");
   }, [loadPage]);
 
-  const nextDueLike = useMemo(
+  const nextScheduled = useMemo(
     () =>
       rows
         .map((row) => row.scheduled_date)
@@ -127,10 +162,86 @@ export default function CustomerDeliveriesPage() {
     [rows]
   );
 
+  const latestVisibleEvent = useMemo(() => {
+    const candidates = rows
+      .map((row) => resolveLatestEvent(row).value)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .reverse();
+    return candidates[0] || null;
+  }, [rows]);
+
+  const columns = useMemo<Column<DeliveryRecord>[]>(
+    () => [
+      {
+        key: "delivery_reference",
+        title: "Delivery",
+        render: (row) => (
+          <div>
+            <div className="font-medium text-foreground">{row.delivery_reference}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {row.product_name || "Subscription delivery"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "subscription_number",
+        title: "Subscription",
+        render: (row) => (
+          <div>
+            <div className="font-medium text-foreground">
+              {row.subscription_number || `SUB-${row.subscription_id ?? "—"}`}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {row.batch_code || "No batch"} · Lucky #{String(row.lucky_number ?? "—")}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        title: "Shipment status",
+        render: (row) => (
+          <div className="space-y-2">
+            <StatusBadge status={row.status} />
+            <div className="text-xs text-muted-foreground">
+              {row.fulfillment_status || "Delivery workflow record"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "scheduled_date",
+        title: "Scheduled",
+        render: (row) => formatDate(row.scheduled_date),
+      },
+      {
+        key: "latest_update",
+        title: "Latest update",
+        render: (row) => {
+          const latest = resolveLatestEvent(row);
+          return (
+            <div>
+              <div className="font-medium text-foreground">
+                {formatDateTime(latest.value)}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{latest.label}</div>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
   function applyFilters() {
     const next = new URLSearchParams();
     if (statusInput) next.set("status", statusInput);
-    if (subscriptionInput.trim()) next.set("subscription", subscriptionInput.trim());
+    if (subscriptionInput.trim()) {
+      next.set("subscription", subscriptionInput.trim());
+    }
+
     const query = next.toString();
     router.replace(query ? `/customer/deliveries?${query}` : "/customer/deliveries");
   }
@@ -143,8 +254,11 @@ export default function CustomerDeliveriesPage() {
 
   return (
     <PortalPage
-      title="Deliveries"
-      subtitle="Track product delivery progress for your own subscriptions only."
+      eyebrow="Customer Deliveries"
+      title="Delivery Tracking"
+      subtitle="Track delivery history and current shipment posture for your own subscriptions without mixing delivery status into payment or contract-state screens."
+      helperNote="Delivery rows on this route reflect fulfillment events only. Payment receipts, outstanding EMI posture, and subscription lifecycle remain on their own customer workspaces."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Deliveries" },
@@ -152,78 +266,106 @@ export default function CustomerDeliveriesPage() {
       actions={[
         {
           href: "/customer/subscriptions",
-          label: "Subscriptions",
+          label: "My Subscriptions",
           variant: "secondary",
+        },
+        {
+          href: "/customer/support",
+          label: "Support",
+          variant: "ghost",
         },
       ]}
       stats={[
-        { label: "Visible", value: String(count) },
-        { label: "In Transit", value: String(summary.in_transit), tone: "info" },
-        { label: "Delivered", value: String(summary.delivered), tone: "success" },
-        { label: "Returns", value: String(summary.return_requested + summary.returned) },
-        { label: "Next Scheduled", value: formatDate(nextDueLike) },
+        { label: "Visible", value: count },
+        { label: "Scheduled", value: summary.scheduled, tone: "info" },
+        { label: "In transit", value: summary.in_transit, tone: "warning" },
+        { label: "Delivered", value: summary.delivered, tone: "success" },
+        {
+          label: "Next scheduled",
+          value: formatDate(nextScheduled),
+        },
       ]}
-      statusBadge={{ label: "Read-only Delivery Tracking", tone: "info" }}
+      statusBadge={{ label: "Read-only delivery scope", tone: "info" }}
     >
       <div className="space-y-6">
-        <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="min-w-[220px]">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Status
-            </label>
-            <select
-              value={statusInput}
-              onChange={(event) => setStatusInput(event.target.value as DeliveryStatus | "")}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+        <WorkspaceSection
+          title="Delivery register controls"
+          description="Filter shipment records by status or subscription, then open a detail view for timeline and receiver context."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
-              <option value="">All statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="SCHEDULED">Scheduled</option>
-              <option value="DISPATCHED">Dispatched</option>
-              <option value="OUT_FOR_DELIVERY">Out for delivery</option>
-              <option value="DELIVERED">Delivered</option>
-              <option value="FAILED">Failed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="RETURN_REQUESTED">Return requested</option>
-              <option value="RETURNED">Returned</option>
-            </select>
-          </div>
-          <div className="min-w-[220px]">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Subscription ID
-            </label>
-            <input
-              value={subscriptionInput}
-              onChange={(event) => setSubscriptionInput(event.target.value)}
-              placeholder="Subscription ID"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={applyFilters}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground"
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <TableToolbar
+            footer={
+              statusFilter || subscriptionFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">
+                    Active filters
+                  </span>
+                  {statusFilter ? <StatusBadge status={statusFilter} hideIcon /> : null}
+                  {subscriptionFilter ? (
+                    <StatusBadge
+                      status="ACTIVE"
+                      label={`Subscription ${subscriptionFilter}`}
+                      hideIcon
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Delivery detail stays operationally separate from receipts and contract status. Open a delivery row when you need shipment-specific updates, receiver context, or return posture.
+                </div>
+              )
+            }
           >
-            Apply Filters
-          </button>
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground"
-          >
-            Clear
-          </button>
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+            <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
+              <select
+                value={statusInput}
+                onChange={(event) =>
+                  setStatusInput(event.target.value as DeliveryStatus | "")
+                }
+                className="h-11 rounded-xl border border-border bg-background px-4 text-sm"
+              >
+                <option value="">All statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="DISPATCHED">Dispatched</option>
+                <option value="OUT_FOR_DELIVERY">Out for delivery</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="FAILED">Failed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="RETURN_REQUESTED">Return requested</option>
+                <option value="RETURNED">Returned</option>
+              </select>
+
+              <input
+                value={subscriptionInput}
+                onChange={(event) => setSubscriptionInput(event.target.value)}
+                placeholder="Filter by subscription id"
+                className="h-11 rounded-xl border border-border bg-background px-4 text-sm"
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <ActionButton type="button" onClick={applyFilters}>
+                  Apply
+                </ActionButton>
+                <ActionButton type="button" variant="outline" onClick={clearFilters}>
+                  Clear
+                </ActionButton>
+              </div>
+            </div>
+          </TableToolbar>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading deliveries..." /> : null}
+
         {!loading && error ? (
           <ErrorState
             title="Unable to load deliveries"
@@ -231,80 +373,61 @@ export default function CustomerDeliveriesPage() {
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
-        {!loading && !error && rows.length === 0 ? (
-          <EmptyState
-            title="No delivery records"
-            description="Your subscriptions do not have delivery records for the current filter set."
-          />
-        ) : null}
 
-        {!loading && !error && rows.length > 0 ? (
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
-                <thead>
-                  <tr className="text-left">
-                    {["Reference", "Subscription", "Status", "Scheduled", "Latest Update", "Actions"].map((label) => (
-                      <th
-                        key={label}
-                        className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Delivery history"
+            description="Shipment rows sourced from the customer delivery API, with direct drill-in to the delivery detail surface."
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No delivery records"
+                description={
+                  statusFilter || subscriptionFilter
+                    ? "No delivery records matched the current filters."
+                    : "No delivery records are currently available for your customer scope."
+                }
+              />
+            ) : (
+              <DataTable<DeliveryRecord>
+                rows={rows}
+                columns={columns}
+                pageSize={20}
+                onRowClick={(row) => router.push(`/customer/deliveries/${row.id}`)}
+                rowActions={(row) => (
+                  <div className="flex flex-wrap gap-2">
+                    <ActionButton
+                      href={`/customer/deliveries/${row.id}`}
+                      variant="outline"
+                    >
+                      View detail
+                    </ActionButton>
+                    {row.subscription_id ? (
+                      <ActionButton
+                        href={`/customer/subscriptions/${row.subscription_id}`}
+                        variant="ghost"
                       >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        <div className="font-medium text-foreground">{row.delivery_reference}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {row.product_name || "Subscription delivery"}
-                        </div>
-                      </td>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        <div className="font-medium text-foreground">
-                          {row.subscription_number || `SUB-${row.subscription_id ?? "—"}`}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {row.batch_code || "No batch"}
-                        </div>
-                      </td>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${tone(
-                            row.status
-                          )}`}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        {formatDate(row.scheduled_date)}
-                      </td>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        {formatDateTime(
-                          row.delivered_at ||
-                            row.out_for_delivery_at ||
-                            row.dispatched_at ||
-                            row.updated_at
-                        )}
-                      </td>
-                      <td className="border-b border-border px-4 py-3 text-sm">
-                        <Link
-                          href={`/customer/deliveries/${row.id}`}
-                          className="text-primary underline-offset-4 hover:underline"
-                        >
-                          View Detail
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        Subscription
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                )}
+              />
+            )}
+
+            <div className="mt-5 grid gap-4 xl:grid-cols-2">
+              <WorkspaceNotice tone="info" title="Delivery-only context">
+                Delivery status helps you understand shipment posture, receiver information, and return handling. It does not change payment history, winner posture, or outstanding EMI totals.
+              </WorkspaceNotice>
+              <WorkspaceNotice tone="default" title="Latest visible event">
+                {latestVisibleEvent
+                  ? `Most recent delivery activity on this screen was recorded at ${formatDateTime(
+                      latestVisibleEvent
+                    )}.`
+                  : "No delivery activity has been recorded yet."}
+              </WorkspaceNotice>
             </div>
-          </section>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

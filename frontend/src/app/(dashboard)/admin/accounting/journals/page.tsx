@@ -5,6 +5,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -153,8 +155,11 @@ export default function AccountingJournalsPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Journal Control"
       title="Journals"
       subtitle="Manual journal entries live in draft until admin posts them, and posted entries can only move to controlled void state with an explicit reason."
+      helperNote="Manual journals stay separate from cashier collection and billing execution. Posting and void remain explicit to preserve ledger auditability."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -181,6 +186,12 @@ export default function AccountingJournalsPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Accounting control map"
+          description="Use the shared accounting directory to move from manual journals into books, masters, and financial statements."
+          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+        />
+
         <div className="flex justify-end">
           <button
             type="button"

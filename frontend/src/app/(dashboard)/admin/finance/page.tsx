@@ -152,15 +152,15 @@ function MetricCard({
 }) {
   const toneClass =
     tone === "danger"
-      ? "border-red-200 bg-red-50"
+      ? "border-red-200 bg-red-50/85"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50"
+        ? "border-amber-200 bg-amber-50/88"
         : tone === "success"
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-slate-200 bg-white";
+          ? "border-emerald-200 bg-emerald-50/88"
+          : "border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_84%,var(--surface-muted)_16%))]";
 
   const content = (
-    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
+    <div className={`rounded-[1.45rem] border p-4 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.34)] ${toneClass}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{label}</div>
       <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
       <div className="mt-1 text-sm text-slate-600">{note}</div>
@@ -186,7 +186,8 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
       <div>
         <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
@@ -450,6 +451,7 @@ export default function AdminFinancePage() {
 
   return (
     <PortalPage
+      eyebrow="Finance Control"
       title="Finance Control Center"
       subtitle="Admin finance operations view for customer receivables, supplier payables, direct-sale recovery, subscription collections, account mix, and reconciliation-sensitive review."
       breadcrumbs={[

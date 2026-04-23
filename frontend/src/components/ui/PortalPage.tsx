@@ -30,6 +30,7 @@ type PortalStatusBadge = {
 };
 
 type PortalPageProps = {
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   helperNote?: string;
@@ -99,6 +100,7 @@ function normalizeStatValue(value: string | number): string | number {
 }
 
 export default function PortalPage({
+  eyebrow,
   title,
   subtitle,
   helperNote,
@@ -108,7 +110,7 @@ export default function PortalPage({
   stats = [],
   statusBadge,
   children,
-  maxWidth = 1320,
+  maxWidth = "var(--workspace-max-width-tight)",
   className,
   presentation = "page",
 }: PortalPageProps) {
@@ -119,7 +121,7 @@ export default function PortalPage({
   return (
     <main
       className={cn(
-        "portal-page mx-auto flex flex-col gap-5",
+        "portal-page mx-auto flex flex-col gap-[var(--workspace-gap)]",
         isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
         className
       )}
@@ -138,17 +140,17 @@ export default function PortalPage({
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:bg-slate-100 hover:text-foreground"
+                    className="workspace-pill inline-flex items-center px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
                   >
                     {crumb.label}
                   </Link>
                 ) : (
                   <span
                     className={cn(
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs",
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
                       isLast
-                        ? "border-primary/60 bg-primary text-primary-foreground"
-                        : "border-border bg-[var(--surface-card-elevated)] font-medium text-foreground"
+                        ? "border-primary/65 bg-primary text-primary-foreground shadow-[0_14px_30px_-24px_rgba(30,64,175,0.68)]"
+                        : "workspace-pill text-foreground"
                     )}
                   >
                     {crumb.label}
@@ -166,13 +168,14 @@ export default function PortalPage({
         <>
           <h1 className="sr-only">{title}</h1>
           {showPopupMeta ? (
-            <section className="popup-workflow-toolbar rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[0_18px_48px_-40px_rgba(15,23,42,0.48)] sm:px-5">
+            <section className="popup-workflow-toolbar workspace-header-panel rounded-[1.45rem] px-4 py-4 sm:px-5">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1">
+                  {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
                   {statusBadge ? (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+                        "workspace-pill mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                         getToneClassName(statusBadge.tone)
                       )}
                     >
@@ -185,7 +188,12 @@ export default function PortalPage({
                   ) : null}
 
                   {subtitle ? (
-                    <p className={cn("max-w-4xl text-sm leading-6 text-muted-foreground", statusBadge ? "mt-3" : "")}>
+                    <p
+                      className={cn(
+                        "max-w-4xl text-sm leading-6 text-muted-foreground",
+                        statusBadge || eyebrow ? "mt-3" : ""
+                      )}
+                    >
                       {subtitle}
                     </p>
                   ) : null}
@@ -207,7 +215,7 @@ export default function PortalPage({
                 </div>
 
                 {actions.length > 0 ? (
-                  <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
+                  <div className="portal-page-actions workspace-action-bar flex flex-wrap items-center gap-2 p-2 xl:justify-end">
                     {actions.map((action) => (
                       <Link
                         key={`${action.href}-${action.label}`}
@@ -227,19 +235,19 @@ export default function PortalPage({
           ) : null}
         </>
       ) : (
-        <section className="portal-page-header surface-panel-elevated relative overflow-hidden rounded-[1.65rem] border border-border bg-card shadow-[0_24px_56px_-44px_rgba(15,23,42,0.52)]">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),transparent_44%)]" />
+        <section className="portal-page-header workspace-header-panel">
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
           <div className="relative flex flex-col gap-5 p-4 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
+                {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="enterprise-title">{title}</h1>
 
                   {statusBadge ? (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+                        "workspace-pill inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold",
                         getToneClassName(statusBadge.tone)
                       )}
                     >
@@ -273,7 +281,7 @@ export default function PortalPage({
               </div>
 
               {actions.length > 0 ? (
-                <div className="portal-page-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:justify-end">
+                <div className="portal-page-actions workspace-action-bar flex flex-wrap items-center gap-2 p-2 xl:justify-end">
                   {actions.map((action) => (
                     <Link
                       key={`${action.href}-${action.label}`}
@@ -291,11 +299,11 @@ export default function PortalPage({
             </div>
 
             {stats.length > 0 ? (
-              <div className="portal-page-stats grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((stat, index) => (
                   <div
                     key={`${stat.label}-${index}`}
-                    className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)]"
+                    className="rounded-[1.1rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.28)]"
                   >
                     <div className="enterprise-eyebrow">{stat.label}</div>
 

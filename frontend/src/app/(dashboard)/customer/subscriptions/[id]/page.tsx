@@ -342,8 +342,11 @@ export default function CustomerSubscriptionDetailPage() {
 
   return (
     <PortalPage
+      eyebrow="Customer Subscription"
       title="Subscription Details"
       subtitle="Track contract lifecycle, winner benefit history, waiver impact, and advance EMI settlement from your live subscription record."
+      helperNote="Winner history, waiver impact, and settlement posture are shown separately so customer-visible contract status never hides payment or waiver truth."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Subscriptions", href: "/customer/subscriptions" },
@@ -370,6 +373,32 @@ export default function CustomerSubscriptionDetailPage() {
           variant: "secondary",
         },
       ]}
+      stats={[
+        {
+          label: "Contract status",
+          value: subscription?.status || "—",
+          tone: detailSemantics.contractTone,
+        },
+        {
+          label: "Outstanding",
+          value: money(financialSummary.outstanding_amount),
+          tone: detailSemantics.isSettled ? "success" : "warning",
+        },
+        {
+          label: "Paid EMI rows",
+          value: paidEmiCount,
+          tone: paidEmiCount > 0 ? "success" : "default",
+        },
+        {
+          label: "Next due",
+          value: formatDate(subscription?.next_due_date),
+          tone: pendingEmiCount > 0 ? "warning" : "success",
+        },
+      ]}
+      statusBadge={{
+        label: detailSemantics.contractStatus,
+        tone: detailSemantics.contractTone,
+      }}
     >
       <div className="mb-4 flex justify-end">
         <button

@@ -125,7 +125,7 @@ export default function SearchSelect<T>({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-10 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-11 w-full rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] py-2 pl-9 pr-10 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {value && (
           <button
@@ -134,14 +134,14 @@ export default function SearchSelect<T>({
               setQuery("");
               onChange(null);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
       {open && (
-        <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-border bg-card shadow-lg">
+        <div className="table-surface-frame absolute z-10 mt-2 max-h-60 w-full overflow-auto">
           {loading && (
             <div className="p-3 text-sm text-muted-foreground">{loadingText}</div>
           )}
@@ -155,7 +155,7 @@ export default function SearchSelect<T>({
               onMouseEnter={() => setHighlightIndex(idx)}
               className={cn(
                 "cursor-pointer px-3 py-2 text-sm transition-colors",
-                idx === highlightIndex && "bg-muted"
+                idx === highlightIndex && "bg-[var(--surface-muted)]"
               )}
             >
               {getOptionLabel(option)}

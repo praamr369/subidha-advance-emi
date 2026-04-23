@@ -1,12 +1,21 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import EmptyState from "@/components/feedback/EmptyState";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import {
+  WorkspaceNotice,
+  WorkspaceTimeline,
+  type WorkspaceTimelineItem,
+} from "@/components/ui/role-workspace";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
   cancelCustomerSubscriptionRequest,
@@ -38,52 +47,48 @@ function text(value?: string | null, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-2 text-sm text-slate-900">{value}</div>
-    </div>
-  );
-}
-
 export default function CustomerSubscriptionRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const requestId = params?.id ? String(params.id) : "";
 
   const [request, setRequest] = useState<SubscriptionRequestRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async () => {
-    if (!requestId) {
-      setError("Request id is missing.");
-      setLoading(false);
-      return;
-    }
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (!requestId) {
+        setError("Request id is missing.");
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const payload = await getSubscriptionRequest("customer", requestId);
-      setRequest(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setRequest(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [requestId]);
+      if (mode === "initial") {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      try {
+        const payload = await getSubscriptionRequest("customer", requestId);
+        setRequest(payload);
+        setError(null);
+      } catch (err) {
+        setError(toErrorMessage(err));
+        setRequest(null);
+      } finally {
+        if (mode === "initial") {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
+      }
+    },
+    [requestId]
+  );
 
   useEffect(() => {
     void loadPage();
@@ -103,13 +108,81 @@ export default function CustomerSubscriptionRequestDetailPage() {
     }
   }
 
+  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+    if (!request) return [];
+
+    const items: WorkspaceTimelineItem[] = [
+      {
+        id: `${request.id}-submitted`,
+        title: "Request submitted",
+        description:
+          "The customer intake request is stored separately from live subscription truth until admin review completes.",
+        timestamp: formatDateTime(request.created_at),
+        badge: <StatusBadge status="SUBMITTED" label="Submitted" />,
+      },
+    ];
+
+    if (request.reviewed_at) {
+      items.push({
+        id: `${request.id}-reviewed`,
+        title:
+          request.status === "APPROVED"
+            ? "Request approved"
+            : request.status === "REJECTED"
+              ? "Request rejected"
+              : "Request reviewed",
+        description: text(
+          request.review_note,
+          "Review action was recorded without a detailed note."
+        ),
+        timestamp: formatDateTime(request.reviewed_at),
+        badge: <StatusBadge status={request.status} />,
+        meta: request.reviewed_by_username
+          ? `Reviewed by ${request.reviewed_by_username}`
+          : undefined,
+      });
+    }
+
+    if (request.status === "CANCELLED") {
+      items.push({
+        id: `${request.id}-cancelled`,
+        title: "Request cancelled",
+        description:
+          "The customer cancelled the intake request before approval created a live subscription.",
+        timestamp: formatDateTime(request.updated_at),
+        badge: <StatusBadge status="CANCELLED" />,
+      });
+    }
+
+    if (request.approved_subscription_id) {
+      items.push({
+        id: `${request.id}-subscription`,
+        title: "Live subscription created",
+        description: `Approved subscription ${text(
+          request.approved_subscription_number,
+          `SUB-${request.approved_subscription_id}`
+        )} is now available in the customer subscription workspace.`,
+        timestamp: formatDateTime(request.reviewed_at || request.updated_at),
+        badge: <StatusBadge status="APPROVED" label="Subscription created" />,
+      });
+    }
+
+    return items;
+  }, [request]);
+
   return (
     <PortalPage
+      eyebrow="Customer Intake"
       title={request ? `Request #${request.id}` : "Subscription Request"}
-      subtitle="Review the pending approval status, requested product details, and admin decision history for this customer request."
+      subtitle="Review request posture, admin decision history, and any approved subscription linkage from the customer workspace."
+      helperNote="Request approval, rejection, or cancellation remains auditable here and does not silently mutate existing subscription or payment history."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
-        { label: "Subscription Requests", href: "/customer/subscription-requests" },
+        {
+          label: "Subscription Requests",
+          href: "/customer/subscription-requests",
+        },
         { label: request ? `Request #${request.id}` : "Detail" },
       ]}
       actions={[
@@ -137,12 +210,52 @@ export default function CustomerSubscriptionRequestDetailPage() {
       }}
       stats={[
         { label: "Status", value: request?.status || "—" },
-        { label: "Lucky Number", value: request?.preferred_lucky_number ?? "—" },
+        {
+          label: "Lucky number",
+          value: request?.preferred_lucky_number ?? "—",
+        },
         { label: "Batch", value: request?.batch_code || "—" },
-        { label: "Approved Subscription", value: request?.approved_subscription_number || "—" },
+        {
+          label: "Approved subscription",
+          value: request?.approved_subscription_number || "—",
+        },
       ]}
     >
       <div className="space-y-6">
+        <WorkspaceSection
+          title="Request posture"
+          description="Latest review posture and approval outcome for this customer-created intake request."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DetailItem
+              label="Submitted at"
+              value={formatDateTime(request?.created_at)}
+            />
+            <DetailItem
+              label="Updated at"
+              value={formatDateTime(request?.updated_at)}
+            />
+            <DetailItem
+              label="Reviewed by"
+              value={text(request?.reviewed_by_username)}
+            />
+            <DetailItem
+              label="Reviewed at"
+              value={formatDateTime(request?.reviewed_at)}
+            />
+          </div>
+        </WorkspaceSection>
+
         {loading ? <LoadingBlock label="Loading subscription request..." /> : null}
 
         {!loading && error ? (
@@ -153,64 +266,68 @@ export default function CustomerSubscriptionRequestDetailPage() {
           />
         ) : null}
 
+        {!loading && !error && !request ? (
+          <EmptyState
+            title="Request not found"
+            description="The requested customer intake record could not be loaded."
+          />
+        ) : null}
+
         {!loading && !error && request ? (
           <>
             {actionError ? (
-              <ErrorState title="Action failed" description={actionError} />
+              <WorkspaceNotice tone="danger" title="Action failed">
+                {actionError}
+              </WorkspaceNotice>
             ) : null}
 
             <SubscriptionRequestCard request={request} />
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Review timeline
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Approval, rejection, or cancellation stays auditable and separate from active subscription truth.
-                  </p>
-                </div>
-
-                {request.status === "SUBMITTED" ? (
-                  <button
-                    type="button"
+            <WorkspaceSection
+              title="Review timeline"
+              description="Approval, rejection, cancellation, and approved-subscription handoff remain separate and auditable."
+              action={
+                request.status === "SUBMITTED" ? (
+                  <ActionButton
+                    variant="destructive"
                     onClick={() => void handleCancel()}
                     disabled={cancelling}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-red-50 px-4 text-sm font-medium text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {cancelling ? "Cancelling..." : "Cancel Request"}
-                  </button>
-                ) : null}
-              </div>
+                  </ActionButton>
+                ) : undefined
+              }
+            >
+              <WorkspaceTimeline items={timelineItems} />
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem label="Submitted At" value={formatDateTime(request.created_at)} />
-                <DetailItem label="Updated At" value={formatDateTime(request.updated_at)} />
-                <DetailItem label="Reviewed By" value={text(request.reviewed_by_username)} />
-                <DetailItem label="Reviewed At" value={formatDateTime(request.reviewed_at)} />
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Review note
-                </div>
-                <div className="mt-2 text-sm text-slate-900">
+              <div className="mt-5">
+                <WorkspaceNotice
+                  tone={
+                    request.status === "APPROVED"
+                      ? "success"
+                      : request.status === "REJECTED"
+                        ? "danger"
+                        : request.status === "CANCELLED"
+                          ? "warning"
+                          : "info"
+                  }
+                  title="Review note"
+                >
                   {text(request.review_note, "No review note recorded yet.")}
-                </div>
+                </WorkspaceNotice>
               </div>
 
               {request.approved_subscription_id ? (
-                <div className="mt-4">
-                  <Link
+                <div className="mt-5">
+                  <ActionButton
                     href={`/customer/subscriptions/${request.approved_subscription_id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    variant="outline"
                   >
                     Open Approved Subscription
-                  </Link>
+                  </ActionButton>
                 </div>
               ) : null}
-            </section>
+            </WorkspaceSection>
           </>
         ) : null}
       </div>

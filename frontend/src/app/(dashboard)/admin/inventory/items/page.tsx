@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -161,8 +163,11 @@ export default function InventoryItemsPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Master Control"
       title="Inventory Items"
       subtitle="Govern stock-tracked product profiles from inventory without redefining the canonical product master."
+      helperNote="Inventory item profiles control stock behavior only. Product pricing, billing, and EMI contract semantics remain outside this workspace."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -179,6 +184,12 @@ export default function InventoryItemsPage() {
       ]}
       statusBadge={{ label: "Profile Governance", tone: "info" }}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Move between stock masters, live stock review, movement registers, valuation, and counted-stock workflows from one inventory control surface."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {message ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {message}

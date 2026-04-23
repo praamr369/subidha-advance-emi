@@ -7,12 +7,13 @@ import { AlertTriangle, RefreshCw, TrendingUp } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
-import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -198,20 +199,32 @@ export default function AdminReportsPage() {
     {
       title: "Revenue Report",
       description: "Collections mix and payment drill-down from register-backed rows.",
-      href: "/admin/reports/revenue",
+      href: ROUTES.admin.reportsRevenue,
       badge: "PAID",
+    },
+    {
+      title: "Collections Report",
+      description: "Windowed collection posture with drill-down into overdue and reconciliation follow-up.",
+      href: ROUTES.admin.reportsCollections,
+      badge: "COLLECTION",
     },
     {
       title: "Overdue EMI Report",
       description: "Aging exposure and overdue follow-up depth for daily collections.",
-      href: "/admin/reports/overdue",
+      href: ROUTES.admin.reportsOverdue,
       badge: "OVERDUE",
     },
     {
       title: "Batch Performance",
       description: "Subscription and winner progression by batch with draw context.",
-      href: "/admin/reports/batch-performance",
+      href: ROUTES.admin.reportsBatchPerformance,
       badge: "BATCH",
+    },
+    {
+      title: "Customer Analytics",
+      description: "Customer-facing portfolio and conversion posture grouped in a report-safe surface.",
+      href: ROUTES.admin.reportsCustomerAnalytics,
+      badge: "CUSTOMER",
     },
     {
       title: "Collections Workspace",
@@ -270,8 +283,11 @@ export default function AdminReportsPage() {
 
   return (
     <PortalPage
+      eyebrow="Report Control"
       title="Reports Overview"
       subtitle="Backend-prepared operational analytics for collections, receivables pressure, reconciliation posture, delivery readiness, and finance routing."
+      helperNote="Charts and comparison slices are backend-prepared from live operational records. Reports stay separate from collections, finance posting, and cashier execution."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reports" },
@@ -282,7 +298,8 @@ export default function AdminReportsPage() {
           label: "Open Reconciliation",
           variant: "secondary",
         },
-        { href: "/admin/reports/revenue", label: "Open Revenue", variant: "primary" },
+        { href: ROUTES.admin.reportsRevenue, label: "Open Revenue", variant: "primary" },
+        { href: ROUTES.admin.reportsCollections, label: "Collections Report", variant: "secondary" },
       ]}
       stats={[
         {
@@ -315,15 +332,15 @@ export default function AdminReportsPage() {
           title="Reporting workflow"
           description="Reports overview now consumes one admin analytics summary endpoint to keep chart calculations backend-driven and audit-aligned."
           action={
-            <button
+            <ActionButton
               type="button"
+              variant="outline"
               onClick={() => void loadPage("refresh")}
               disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
-              <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
               {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+            </ActionButton>
           }
         >
           <DashboardTimeWindowSelector
@@ -403,30 +420,70 @@ export default function AdminReportsPage() {
               ]}
             />
             <WorkspaceSection
-              title="Report shortcuts"
-              description="Launch live reporting and action surfaces without dead-end placeholders."
+              title="Report posture"
+              description="The KPI cards above summarize the active window; use the grouped route directory below to move into the exact report or action surface."
+              note="All report shortcuts below route into existing canonical pages only."
+              noteTone="info"
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {quickLinks.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-slate-300 hover:shadow"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
-                      </div>
-                      <StatusBadge status={item.badge} />
-                    </div>
-                    <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                      Open surface
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Report navigation is grouped by operator task: collections pressure, portfolio
+                analysis, and row-level follow-up surfaces.
+              </p>
             </WorkspaceSection>
+            <WorkspaceDirectory
+              title="Report directory"
+              description="Group reports by the operational question the staff member is trying to answer, not by decorative dashboard categories."
+              groups={[
+                {
+                  title: "Collections and receivables",
+                  description: "Surfaces for payment mix, overdue pressure, and execution handoff.",
+                  items: quickLinks
+                    .filter((item) =>
+                      ["Revenue Report", "Collections Report", "Overdue EMI Report"].includes(
+                        item.title
+                      )
+                    )
+                    .map((item) => ({
+                      title: item.title,
+                      description: item.description,
+                      href: item.href,
+                      badge: item.badge,
+                    })),
+                },
+                {
+                  title: "Portfolio and customer",
+                  description: "Views for batch health and customer-level analytics.",
+                  items: quickLinks
+                    .filter((item) =>
+                      ["Batch Performance", "Customer Analytics"].includes(item.title)
+                    )
+                    .map((item) => ({
+                      title: item.title,
+                      description: item.description,
+                      href: item.href,
+                      badge: item.badge,
+                    })),
+                },
+                {
+                  title: "Operational follow-up",
+                  description: "Action surfaces that own the row-level operational work behind the reports.",
+                  items: quickLinks
+                    .filter((item) =>
+                      [
+                        "Collections Workspace",
+                        "Reconciliation Workspace",
+                        "Finance Control",
+                      ].includes(item.title)
+                    )
+                    .map((item) => ({
+                      title: item.title,
+                      description: item.description,
+                      href: item.href,
+                      badge: item.badge,
+                    })),
+                },
+              ]}
+            />
 
             <WorkspaceSection
               title="Collections, receivables, and payment mix"

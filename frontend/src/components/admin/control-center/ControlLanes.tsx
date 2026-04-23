@@ -46,14 +46,14 @@ export function ControlLaneCard({ lane }: { lane: ControlLaneItem }) {
   return (
     <Link
       href={lane.href}
-      className="group rounded-[1.5rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+      className="group rounded-[1.55rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_97%,var(--surface-muted)_3%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_16px_42px_-34px_rgba(15,23,42,0.36)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:shadow-[0_24px_58px_-38px_rgba(15,23,42,0.48)]"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+        <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),color-mix(in_oklab,var(--surface-strong)_86%,white_14%))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
           {lane.icon ?? <ArrowUpRight className="h-4 w-4" />}
         </div>
         {lane.badge ? (
-          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <span className="workspace-pill px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {lane.badge}
           </span>
         ) : null}

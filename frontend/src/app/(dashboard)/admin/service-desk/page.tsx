@@ -5,6 +5,7 @@ import { MessageSquareWarning, RotateCcw, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -52,6 +53,7 @@ export default function AdminServiceDeskOverviewPage() {
 
   return (
     <PortalPage
+      eyebrow="Service Operations"
       title="Service Desk"
       subtitle="Run complaint escalation, furniture returns, exchanges, and after-sales service through explicit operational cases that link back to CRM, delivery, billing, inventory, and accounting without mutating those records directly."
       helperNote="Case actions are orchestrated through linked modules so complaint, return, stock, and finance posture remain traceable."
@@ -113,6 +115,66 @@ export default function AdminServiceDeskOverviewPage() {
                   href: ROUTES.admin.serviceDeskTickets,
                   icon: <Wrench className="h-4 w-4" />,
                   badge: "Service",
+                },
+              ]}
+            />
+            <WorkspaceDirectory
+              title="Service route map"
+              description="Use the service desk as the operational queue, then move into the exact complaint, return, service, billing, or support route that owns the next action."
+              groups={[
+                {
+                  title: "Case execution",
+                  description: "Primary lanes for service-desk case work.",
+                  items: [
+                    {
+                      title: "Complaints",
+                      description: "Complaint-linked case register for review and escalation.",
+                      href: ROUTES.admin.serviceDeskComplaints,
+                      icon: <MessageSquareWarning className="h-4 w-4" />,
+                      badge: "Complaint",
+                    },
+                    {
+                      title: "Returns",
+                      description: "Return and exchange case handling with stock-linked follow-up.",
+                      href: ROUTES.admin.serviceDeskReturns,
+                      icon: <RotateCcw className="h-4 w-4" />,
+                      badge: "Returns",
+                    },
+                    {
+                      title: "Service Tickets",
+                      description: "After-sales service work orders and technician-facing case execution.",
+                      href: ROUTES.admin.serviceDeskTickets,
+                      icon: <Wrench className="h-4 w-4" />,
+                      badge: "Service",
+                    },
+                  ],
+                },
+                {
+                  title: "Linked operational context",
+                  description: "Adjacent routes that provide the source and financial context for case work.",
+                  items: [
+                    {
+                      title: "Support Requests",
+                      description: "Customer issue intake before or alongside service-case escalation.",
+                      href: ROUTES.admin.supportRequests,
+                      icon: <MessageSquareWarning className="h-4 w-4" />,
+                      badge: "Intake",
+                    },
+                    {
+                      title: "Billing Operations",
+                      description: "Invoice and adjustment context for return and exchange cases.",
+                      href: ROUTES.admin.billing,
+                      icon: <RotateCcw className="h-4 w-4" />,
+                      badge: "Billing",
+                    },
+                    {
+                      title: "Deliveries",
+                      description: "Delivery context that often drives complaint and return follow-up.",
+                      href: ROUTES.admin.deliveries,
+                      icon: <Wrench className="h-4 w-4" />,
+                      badge: "Delivery",
+                    },
+                  ],
                 },
               ]}
             />

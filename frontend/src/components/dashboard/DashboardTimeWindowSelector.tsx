@@ -33,7 +33,7 @@ export default function DashboardTimeWindowSelector({
   onEndDateChange,
 }: Props) {
   return (
-    <div className="surface-panel-elevated flex flex-col gap-3 rounded-[1.3rem] border border-border bg-card p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+    <div className="workspace-filter-bar flex flex-col gap-3 rounded-[1.3rem] p-4 md:flex-row md:items-end md:justify-between">
       <div>
         <p className="enterprise-eyebrow">
           {title}
@@ -52,7 +52,7 @@ export default function DashboardTimeWindowSelector({
             onChange={(event) =>
               onWindowChange(event.target.value as DashboardWindowPreset)
             }
-            className="min-w-[180px] rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
+            className="min-w-[180px] rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
           >
             {OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -71,7 +71,7 @@ export default function DashboardTimeWindowSelector({
                 value={startDate}
                 disabled={loading}
                 onChange={(event) => onStartDateChange(event.target.value)}
-                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
+                className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -81,7 +81,7 @@ export default function DashboardTimeWindowSelector({
                 value={endDate}
                 disabled={loading}
                 onChange={(event) => onEndDateChange(event.target.value)}
-                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
+                className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
               />
             </label>
           </>

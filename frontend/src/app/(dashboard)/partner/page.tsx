@@ -153,6 +153,7 @@ export default function PartnerDashboardPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Operations"
       title="Partner Dashboard"
       subtitle="Partner-scoped collection truth aligned to the canonical subscription rollup, with separate operational visibility for request workflow and commission status."
       helperNote="This workspace is partner-scoped and audit-linked; collection and commission rows here are filtered from live operational records."

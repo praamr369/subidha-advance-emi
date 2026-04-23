@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -8,10 +8,18 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
-import DataTable from "@/components/ui/DataTable";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
-import { listCustomerSubscriptionsRegister, type CustomerSubscriptionRegisterResponse } from "@/services/customer/paginated-subscriptions";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
+import {
+  listCustomerSubscriptionsRegister,
+  type CustomerSubscriptionRegisterResponse,
+} from "@/services/customer/paginated-subscriptions";
 import type { CustomerSubscription } from "@/services/customer";
 
 const PAGE_SIZE = 25;
@@ -39,21 +47,6 @@ function toErrorMessage(error: unknown): string {
   }
 
   return "Failed to load customer subscriptions.";
-}
-
-function statusBadgeClass(status?: string): string {
-  switch ((status || "").toUpperCase()) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "COMPLETED":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "WON":
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
 }
 
 function winnerWaiverLabel(subscription: CustomerSubscription): string {
@@ -208,19 +201,19 @@ export default function CustomerSubscriptionsPage() {
     return nextDue ? formatDate(nextDue) : "—";
   }, [rows]);
 
-  const columns = useMemo(
+  const columns = useMemo<Column<CustomerSubscription>[]>(
     () => [
       {
         key: "subscription_number",
         title: "Subscription",
-        render: (row: CustomerSubscription) => (
+        render: (row) => (
           <div className="flex items-start gap-3">
             <div className="w-20 shrink-0">
               <PublicProductMedia
                 src={row.product_image}
                 alt={row.product_name || "Subscription product"}
                 sizes="80px"
-                className="h-20 rounded-[18px]"
+                className="h-16 w-full rounded-2xl"
                 fallbackLabel="Media pending"
                 badge={row.product_code || "Product"}
               />
@@ -229,13 +222,11 @@ export default function CustomerSubscriptionsPage() {
               <div className="font-medium text-foreground">
                 {row.subscription_number || `SUB-${row.id}`}
               </div>
-              <div className="mt-1 text-sm font-medium text-slate-900">
-                {row.product_name || row.plan_type || "Lucky Plan"}
+              <div className="mt-1 text-xs text-muted-foreground">
+                {row.product_name || "Lucky Plan"} · Batch {row.batch_code || "—"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {row.product_code || "Code pending"}
-                {row.batch_code ? ` · ${row.batch_code}` : ""}
-                {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+                Lucky #{row.lucky_number ?? "—"}
               </div>
             </div>
           </div>
@@ -244,20 +235,12 @@ export default function CustomerSubscriptionsPage() {
       {
         key: "status",
         title: "Status",
-        render: (row: CustomerSubscription) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusBadgeClass(
-              row.status
-            )}`}
-          >
-            {row.status || "—"}
-          </span>
-        ),
+        render: (row) => <StatusBadge status={row.status || "ACTIVE"} />,
       },
       {
         key: "winner_waiver",
         title: "Winner / Waiver",
-        render: (row: CustomerSubscription) => (
+        render: (row) => (
           <div>
             <div className="font-medium text-foreground">
               {winnerWaiverLabel(row)}
@@ -271,14 +254,14 @@ export default function CustomerSubscriptionsPage() {
       {
         key: "progress",
         title: "Payment Progress",
-        render: (row: CustomerSubscription) => (
+        render: (row) => (
           <div>
             <div className="font-medium text-foreground">
               {paymentProgressLabel(row)}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Paid {money(row.total_paid_amount ?? row.financial_summary?.paid_amount)} ·
-              Next due {formatDate(row.next_due_date)}
+              Paid {money(row.total_paid_amount ?? row.financial_summary?.paid_amount)} · Next due{" "}
+              {formatDate(row.next_due_date)}
             </div>
           </div>
         ),
@@ -286,19 +269,19 @@ export default function CustomerSubscriptionsPage() {
       {
         key: "monthly_amount",
         title: "Monthly",
-        align: "right" as const,
-        render: (row: CustomerSubscription) => money(row.monthly_amount),
+        align: "right",
+        render: (row) => money(row.monthly_amount),
       },
       {
         key: "total_amount",
         title: "Total",
-        align: "right" as const,
-        render: (row: CustomerSubscription) => money(row.total_amount),
+        align: "right",
+        render: (row) => money(row.total_amount),
       },
       {
         key: "start_date",
         title: "Start",
-        render: (row: CustomerSubscription) => formatDate(row.start_date),
+        render: (row) => formatDate(row.start_date),
       },
     ],
     []
@@ -332,8 +315,11 @@ export default function CustomerSubscriptionsPage() {
 
   return (
     <PortalPage
+      eyebrow="Customer Subscriptions"
       title="My Subscriptions"
-      subtitle="Customer-scoped subscription truth backed by the dedicated subscriptions API."
+      subtitle="Customer-scoped subscription truth with contract status, winner benefit visibility, and payment progress in one operational register."
+      helperNote="Winner benefit, waiver impact, and contract settlement stay visible together here, but payment proof remains on the customer payment routes."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Subscriptions" },
@@ -356,33 +342,59 @@ export default function CustomerSubscriptionsPage() {
         },
       ]}
       stats={[
-        { label: "Matching Subscriptions", value: count },
-        { label: "Page Active", value: pageActiveCount },
-        { label: "Page Winner Benefit", value: pageWinnerCount },
+        { label: "Matching subscriptions", value: count },
+        { label: "Page active", value: pageActiveCount, tone: "success" },
         {
-          label: "Page Outstanding",
+          label: "Page winner benefit",
+          value: pageWinnerCount,
+          tone: pageWinnerCount > 0 ? "info" : "default",
+        },
+        {
+          label: "Page outstanding",
           value: money(pageOutstanding),
           tone: pageOutstanding > 0 ? "warning" : "success",
         },
-        { label: "Page Next Due", value: pageNextDueLabel },
+        { label: "Page next due", value: pageNextDueLabel },
       ]}
-      statusBadge={{ label: "Customer Subscription Truth", tone: "info" }}
+      statusBadge={{ label: "Customer subscription truth", tone: "info" }}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-            <div className="w-full lg:w-72">
-              <label
-                htmlFor="customer-subscription-status"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Status
-              </label>
+        <WorkspaceSection
+          title="Subscription filters"
+          description="Narrow the register by current contract status and refresh the latest subscription truth."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <TableToolbar
+            footer={
+              statusFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">
+                    Active filter
+                  </span>
+                  <StatusBadge status={statusFilter} hideIcon />
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Open a subscription to view full EMI detail, waiver posture, delivery status, and direct payment-history navigation for that contract.
+                </div>
+              )
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[220px_auto]">
               <select
                 id="customer-subscription-status"
                 value={statusInput}
                 onChange={(event) => setStatusInput(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               >
                 <option value="">All statuses</option>
                 <option value="ACTIVE">Active</option>
@@ -390,40 +402,18 @@ export default function CustomerSubscriptionsPage() {
                 <option value="WON">Won</option>
                 <option value="DEFAULTED">Defaulted</option>
               </select>
-            </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={applyFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={loading || refreshing}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <ActionButton type="button" onClick={applyFilters}>
+                  Apply
+                </ActionButton>
+                <ActionButton type="button" variant="outline" onClick={clearFilters}>
+                  Clear
+                </ActionButton>
+              </div>
             </div>
-          </div>
-
-          {statusFilter && !loading ? (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-              Showing subscriptions filtered by status {statusFilter}.
-            </div>
-          ) : null}
-        </section>
+          </TableToolbar>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading subscriptions..." /> : null}
 
@@ -435,81 +425,71 @@ export default function CustomerSubscriptionsPage() {
           />
         ) : null}
 
-        {!loading && !error && count === 0 ? (
-          <EmptyState
-            title="No subscriptions found"
-            description={
-              statusFilter
-                ? `No customer subscriptions matched the current ${statusFilter} filter.`
-                : "No customer subscription records are currently available."
-            }
-          />
-        ) : null}
-
-        {!loading && !error && count > 0 ? (
-          <>
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-foreground">
-                  Subscription register
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This page uses the dedicated customer subscriptions API. Open
-                  a subscription for full EMI detail or jump into payment
-                  history for that contract.
-                </p>
-              </div>
-
-              {rows.length > 0 ? (
-                <DataTable<CustomerSubscription>
-                  rows={rows}
-                  columns={columns}
-                  onRowClick={(row) =>
-                    router.push(`/customer/subscriptions/${row.id}`)
-                  }
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Link
-                        href={`/customer/subscriptions/${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View
-                      </Link>
-                      <Link
-                        href={`/customer/payments?subscription=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Payments
-                      </Link>
-                    </div>
-                  )}
-                />
-              ) : (
-                <EmptyState
-                  title="No rows on this page"
-                  description="The current page has no results. Move to a previous page or change the filters."
-                />
-              )}
-
-              <PaginationControls
-                count={count}
-                page={page}
-                pageSize={PAGE_SIZE}
-                numPages={numPages}
-                hasNext={hasNext}
-                hasPrevious={hasPrevious}
-                disabled={loading || refreshing}
-                onPrevious={() => replacePage(Math.max(page - 1, 1))}
-                onNext={() => replacePage(page + 1)}
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Customer subscription register"
+            description="Dedicated customer subscription rows with safe navigation into detail and payment history."
+          >
+            {count === 0 ? (
+              <EmptyState
+                title="No subscriptions found"
+                description={
+                  statusFilter
+                    ? `No customer subscriptions matched the current ${statusFilter} filter.`
+                    : "No customer subscription records are currently available."
+                }
               />
-            </section>
+            ) : rows.length === 0 ? (
+              <EmptyState
+                title="No rows on this page"
+                description="The current page has no results. Move to a previous page or change the filters."
+              />
+            ) : (
+              <DataTable<CustomerSubscription>
+                rows={rows}
+                columns={columns}
+                onRowClick={(row) => router.push(`/customer/subscriptions/${row.id}`)}
+                rowActions={(row) => (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <ActionButton
+                      href={`/customer/subscriptions/${row.id}`}
+                      variant="outline"
+                    >
+                      View
+                    </ActionButton>
+                    <ActionButton
+                      href={`/customer/payments?subscription=${row.id}`}
+                      variant="outline"
+                    >
+                      Payments
+                    </ActionButton>
+                  </div>
+                )}
+              />
+            )}
 
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              Winner and waiver visibility on this page comes from your
-              customer-scoped subscription truth. EMI-row detail remains
-              available on the subscription detail page.
+            {count > 0 ? (
+              <div className="mt-5">
+                <PaginationControls
+                  count={count}
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  numPages={numPages}
+                  hasNext={hasNext}
+                  hasPrevious={hasPrevious}
+                  disabled={loading || refreshing}
+                  onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                  onNext={() => replacePage(page + 1)}
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-5">
+              <WorkspaceNotice tone="info" title="Winner and waiver visibility">
+                Winner and waiver posture on this page comes from customer-scoped subscription truth. EMI-row detail and exact settlement context remain on the subscription detail page.
+              </WorkspaceNotice>
             </div>
-          </>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

@@ -4,10 +4,14 @@ import { Activity, BarChart3, Building2, FileSearch, ShieldCheck, Wallet } from 
 import { useCallback, useEffect, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
@@ -81,20 +85,41 @@ export default function AnalyticsPage() {
 
   return (
     <PortalPage
+      eyebrow="Analytics Control"
       title="Analytics"
       subtitle="Operational intelligence sourced from the live admin dashboard endpoint."
+      helperNote="This page only renders live dashboard-backed aggregates and route-safe analysis entry points. Missing payloads are shown as unavailable rather than synthetic zeros."
+      helperTone="info"
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Analytics" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.reports, label: "Reports Overview", variant: "secondary" },
+        { href: ROUTES.admin.analyticsRiskMonitor, label: "Risk Monitor", variant: "secondary" },
+        { href: ROUTES.admin.analyticsChurnAnalysis, label: "Churn Analysis", variant: "secondary" },
+      ]}
+      statusBadge={{ label: "Live Analytics", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
+        <WorkspaceSection
+          title="Analytics scope"
+          description="Use analytics as an overview surface, then move into the dedicated analysis, reporting, and risk routes that own the underlying drill-downs."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <p className="text-sm leading-6 text-muted-foreground">
+            Analytics remains a read-only posture view. Operational follow-up stays inside reports,
+            branch reporting, finance, and collections workspaces.
+          </p>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading analytics dashboard..." /> : null}
 
@@ -163,65 +188,116 @@ export default function AnalyticsPage() {
                 },
               ]}
             />
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Active Subscriptions
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(snapshot.subscriptions?.active)}
-                </div>
+            <WorkspaceDirectory
+              title="Analysis route map"
+              description="Use overview, risk, and deep-analysis routes to move from aggregate posture into the right operational context."
+              groups={[
+                {
+                  title: "Overview",
+                  description: "Entry points for broad operational posture.",
+                  items: [
+                    {
+                      title: "Reports overview",
+                      description: "Backend-prepared operational analytics and reporting directory.",
+                      href: ROUTES.admin.reports,
+                      icon: <BarChart3 className="h-4 w-4" />,
+                      badge: "Reports",
+                    },
+                    {
+                      title: "Branch reporting",
+                      description: "Collections, sales, and people-cost posture by branch scope.",
+                      href: ROUTES.admin.branchReporting,
+                      icon: <Building2 className="h-4 w-4" />,
+                      badge: "Branch",
+                    },
+                  ],
+                },
+                {
+                  title: "Risk and follow-up",
+                  description: "Operational routes for exception handling and receivable pressure.",
+                  items: [
+                    {
+                      title: "Risk monitor",
+                      description: "Dedicated analytics view for risk-focused operational review.",
+                      href: ROUTES.admin.analyticsRiskMonitor,
+                      icon: <ShieldCheck className="h-4 w-4" />,
+                      badge: "Risk",
+                    },
+                    {
+                      title: "Finance control",
+                      description: "Receivable and reconciliation posture in the finance domain.",
+                      href: ROUTES.admin.finance,
+                      icon: <Wallet className="h-4 w-4" />,
+                      badge: "Finance",
+                    },
+                    {
+                      title: "Collections workspace",
+                      description: "Route from exposure into actual due follow-up and collection execution.",
+                      href: ROUTES.admin.collections,
+                      icon: <Activity className="h-4 w-4" />,
+                      badge: "Action",
+                    },
+                  ],
+                },
+                {
+                  title: "Deep analysis",
+                  description: "Dedicated pages for focused analytical reads rather than dashboard mixing.",
+                  items: [
+                    {
+                      title: "Churn analysis",
+                      description: "Focused churn posture without blending into onboarding operations.",
+                      href: ROUTES.admin.analyticsChurnAnalysis,
+                      icon: <FileSearch className="h-4 w-4" />,
+                      badge: "Trend",
+                    },
+                    {
+                      title: "Customer analytics report",
+                      description: "Report-grade customer portfolio and behavior analysis.",
+                      href: ROUTES.admin.reportsCustomerAnalytics,
+                      icon: <FileSearch className="h-4 w-4" />,
+                      badge: "Customer",
+                    },
+                  ],
+                },
+              ]}
+            />
+            <WorkspaceSection
+              title="Live analytics posture"
+              description="Current dashboard-backed aggregates. Missing values stay visible as unavailable so operators do not confuse absent data with zero."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <StatCard
+                  label="Active Subscriptions"
+                  value={metricValue(snapshot.subscriptions?.active)}
+                  tone="info"
+                />
+                <StatCard
+                  label="Completed Subscriptions"
+                  value={metricValue(snapshot.subscriptions?.completed)}
+                />
+                <StatCard
+                  label="Won Subscriptions"
+                  value={metricValue(snapshot.subscriptions?.won)}
+                  tone="success"
+                />
+                <StatCard
+                  label="Pending EMI"
+                  value={metricValue(snapshot.emi?.pending)}
+                />
+                <StatCard
+                  label="Overdue EMI"
+                  value={metricValue(snapshot.emi?.overdue)}
+                  tone={
+                    Number(snapshot.emi?.overdue ?? 0) > 0 ? "warning" : "success"
+                  }
+                />
+                <StatCard
+                  label="Total Outstanding"
+                  value={moneyValue(snapshot.financial?.total_outstanding)}
+                  tone="warning"
+                />
               </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Completed Subscriptions
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(snapshot.subscriptions?.completed)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Won Subscriptions
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(snapshot.subscriptions?.won)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Pending EMI
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(snapshot.emi?.pending)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Overdue EMI
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(snapshot.emi?.overdue)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Outstanding
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {moneyValue(snapshot.financial?.total_outstanding)}
-                </div>
-              </div>
-            </section>
-
-            <p className="text-sm text-muted-foreground">
-              This page intentionally shows only live dashboard-backed aggregates. Missing data is rendered as unavailable rather than synthetic zero.
-            </p>
+            </WorkspaceSection>
           </>
         ) : null}
       </div>

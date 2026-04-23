@@ -171,6 +171,7 @@ export default function CashierDashboardPage() {
 
   return (
     <PortalPage
+      eyebrow="Counter Operations"
       title="Cashier Dashboard"
       subtitle="Daily counter workspace with canonical financial scope visibility on top, while keeping collection posting and receipt lookup fast for shop operations."
       helperNote="Counter actions here remain branch-safe and traceable; collection posting and receipt generation continue using the existing audited payment flow."

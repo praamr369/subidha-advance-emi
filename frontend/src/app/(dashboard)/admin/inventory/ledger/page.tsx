@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
@@ -85,14 +87,23 @@ export default function InventoryLedgerPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Ledger Review"
       title="Stock Ledger"
       subtitle="Actual stock movements from approved operational documents and adjustments."
+      helperNote="The stock ledger is the authoritative inventory movement record. It remains distinct from billing documents and from accounting statement surfaces."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Ledger" },
       ]}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Use the inventory directory to move between ledger review, movements, adjustments, live stock, and valuation controls."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <WorkspaceSection
         title="Filters"
         description="Filter the stock ledger by posting date."

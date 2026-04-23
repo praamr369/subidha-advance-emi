@@ -242,8 +242,11 @@ export default function PartnerCustomerDetailPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Customers"
       title={customer ? customer.name : "Partner Customer Detail"}
       subtitle="Partner-scoped customer detail with linked subscriptions, EMI summary, and verified payment activity only."
+      helperNote="Customer master editing stays outside partner scope. This workspace is limited to partner-visible subscriptions, verified payments, and collection handoff routes."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Customers", href: "/partner/customers" },

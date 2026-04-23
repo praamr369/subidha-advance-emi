@@ -1,13 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import DataTable from "@/components/ui/DataTable";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import {
   getPartnerDashboard,
@@ -70,6 +74,7 @@ export default function PartnerReportsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
@@ -141,7 +146,7 @@ export default function PartnerReportsPage() {
 
   async function handleExport(format: "csv" | "pdf") {
     setExportingFormat(format);
-    setError(null);
+    setExportError(null);
 
     try {
       await downloadAuthenticatedFile(
@@ -154,16 +159,38 @@ export default function PartnerReportsPage() {
         `partner-earnings-statement.${format}`
       );
     } catch (err) {
-      setError(toErrorMessage(err));
+      setExportError(toErrorMessage(err));
     } finally {
       setExportingFormat(null);
     }
   }
 
+  const trendColumns = useMemo<Column<TrendRow>[]>(
+    () => [
+      { key: "period", title: "Period" },
+      {
+        key: "collected_amount",
+        title: "Collected",
+        align: "right",
+        render: (row) => moneyValue(row.collected_amount),
+      },
+      {
+        key: "commission_amount",
+        title: "Commission",
+        align: "right",
+        render: (row) => moneyValue(row.commission_amount),
+      },
+    ],
+    []
+  );
+
   return (
     <PortalPage
+      eyebrow="Partner Reports"
       title="Partner Reports"
       subtitle="Partner-scoped collection and commission report truth sourced from the live earnings and dashboard endpoints."
+      helperNote="This workspace reports only live partner-scoped data already exposed by the backend. It does not fabricate analytics or expose admin-only finance controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Reports" },
@@ -204,13 +231,14 @@ export default function PartnerReportsPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <button
+          <ActionButton
             type="button"
+            variant="outline"
             onClick={() => void loadPage("refresh")}
-            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
             {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          </ActionButton>
         </div>
 
         {loading ? <LoadingBlock label="Loading partner reports..." /> : null}
@@ -223,185 +251,158 @@ export default function PartnerReportsPage() {
           />
         ) : null}
 
+        {!loading && !error && (!dashboard || !earnings) ? (
+          <EmptyState
+            title="No partner report data"
+            description="Partner report sources are currently empty for this scope."
+          />
+        ) : null}
+
         {!loading && !error && dashboard && earnings ? (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Customers
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(summary?.total_customers)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Partner-linked customer scope only
-                </div>
-              </div>
+            <WorkspaceSection
+              title="Reporting boundary"
+              description="Partner reports stay grounded in live dashboard and earnings endpoints only."
+            >
+              <WorkspaceNotice tone="info" title="No synthetic analytics">
+                Customer counts, subscription counts, pending EMI totals, collection totals, commission totals, and exported statements on this page all come from existing partner endpoints. No frontend-only rollups are introduced here.
+              </WorkspaceNotice>
+            </WorkspaceSection>
 
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Subscriptions
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(summary?.total_subscriptions)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Active, completed, won, and defaulted contracts
-                </div>
+            <WorkspaceSection
+              title="Operational summary"
+              description="Current partner-visible counts that support day-to-day reporting and follow-up."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  label="Total Customers"
+                  value={metricValue(summary?.total_customers)}
+                  subtext="Partner-linked customer scope only"
+                />
+                <StatCard
+                  label="Total Subscriptions"
+                  value={metricValue(summary?.total_subscriptions)}
+                  subtext="Active, completed, won, and defaulted contracts"
+                />
+                <StatCard
+                  label="Pending EMIs"
+                  value={metricValue(summary?.pending_emis)}
+                  subtext="Current partner-scoped pending schedule rows"
+                  tone="warning"
+                />
+                <StatCard
+                  label="Waived EMIs"
+                  value={metricValue(summary?.waived_emis)}
+                  subtext="Waiver impact inside partner-owned subscriptions"
+                  tone="info"
+                />
               </div>
+            </WorkspaceSection>
 
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Pending EMIs
+            <WorkspaceSection
+              title="Earnings statement export"
+              description="Export partner-scoped commission visibility as CSV or PDF using the existing earnings export endpoint."
+            >
+              {exportError ? (
+                <div className="mb-4">
+                  <WorkspaceNotice tone="danger" title="Unable to export statement">
+                    {exportError}
+                  </WorkspaceNotice>
                 </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(summary?.pending_emis)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Current partner-scoped pending schedule rows
-                </div>
-              </div>
+              ) : null}
 
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Waived EMIs
-                </div>
-                <div className="mt-2 text-xl font-semibold text-foreground">
-                  {metricValue(summary?.waived_emis)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Waiver impact inside partner-owned subscriptions
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Earnings Statement Export
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Export your own commission statement as CSV or PDF using partner-scoped backend truth only.
-                  </p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-foreground">
-                      Status
-                    </label>
-                    <select
-                      value={statementStatus}
-                      onChange={(event) =>
-                        setStatementStatus(
-                          event.target.value as "" | "PENDING" | "SETTLED" | "REVERSED"
-                        )
-                      }
-                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                    >
-                      <option value="">All</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="SETTLED">Settled</option>
-                      <option value="REVERSED">Reversed</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-foreground">
-                      From
-                    </label>
-                    <input
-                      type="date"
-                      value={statementDateFrom}
-                      onChange={(event) => setStatementDateFrom(event.target.value)}
-                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-foreground">
-                      To
-                    </label>
-                    <input
-                      type="date"
-                      value={statementDateTo}
-                      onChange={(event) => setStatementDateTo(event.target.value)}
-                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleExport("csv")}
-                      disabled={exportingFormat !== null}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {exportingFormat === "csv" ? "Exporting..." : "CSV"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleExport("pdf")}
-                      disabled={exportingFormat !== null}
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {exportingFormat === "pdf" ? "Exporting..." : "PDF"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Monthly Collection And Commission Trend
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Report rows below come from the partner earnings endpoint only, not from synthetic frontend rollups.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    href="/partner/payments"
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    Status
+                  </label>
+                  <select
+                    value={statementStatus}
+                    onChange={(event) =>
+                      setStatementStatus(
+                        event.target.value as "" | "PENDING" | "SETTLED" | "REVERSED"
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                   >
+                    <option value="">All</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="SETTLED">Settled</option>
+                    <option value="REVERSED">Reversed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    From
+                  </label>
+                  <input
+                    type="date"
+                    value={statementDateFrom}
+                    onChange={(event) => setStatementDateFrom(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    To
+                  </label>
+                  <input
+                    type="date"
+                    value={statementDateTo}
+                    onChange={(event) => setStatementDateTo(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  />
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <ActionButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleExport("csv")}
+                    disabled={exportingFormat !== null}
+                    loading={exportingFormat === "csv"}
+                  >
+                    {exportingFormat === "csv" ? "Exporting..." : "CSV"}
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    onClick={() => void handleExport("pdf")}
+                    disabled={exportingFormat !== null}
+                    loading={exportingFormat === "pdf"}
+                  >
+                    {exportingFormat === "pdf" ? "Exporting..." : "PDF"}
+                  </ActionButton>
+                </div>
+              </div>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Monthly collection and commission trend"
+              description="Trend rows below come directly from the partner earnings endpoint and provide route-safe drill-in to payments and commissions."
+              action={
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton href="/partner/payments" variant="outline">
                     Payments
-                  </Link>
-                  <Link
-                    href="/partner/commissions"
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
+                  </ActionButton>
+                  <ActionButton href="/partner/commissions" variant="ghost">
                     Commissions
-                  </Link>
+                  </ActionButton>
                 </div>
-              </div>
-
-              <div className="mt-4">
-                {trendRows.length === 0 ? (
-                  <EmptyState
-                    title="No report rows yet"
-                    description="No partner-scoped collection or commission history is currently available."
-                  />
-                ) : (
-                  <DataTable<TrendRow>
-                    rows={trendRows}
-                    emptyText="No partner report rows."
-                    columns={[
-                      { key: "period", title: "Period" },
-                      {
-                        key: "collected_amount",
-                        title: "Collected",
-                        render: (row) => moneyValue(row.collected_amount),
-                      },
-                      {
-                        key: "commission_amount",
-                        title: "Commission",
-                        render: (row) => moneyValue(row.commission_amount),
-                      },
-                    ]}
-                  />
-                )}
-              </div>
-            </section>
+              }
+            >
+              {trendRows.length === 0 ? (
+                <EmptyState
+                  title="No report rows yet"
+                  description="No partner-scoped collection or commission history is currently available."
+                />
+              ) : (
+                <DataTable<TrendRow>
+                  rows={trendRows}
+                  emptyText="No partner report rows."
+                  columns={trendColumns}
+                  pageSize={12}
+                />
+              )}
+            </WorkspaceSection>
           </>
         ) : null}
       </div>

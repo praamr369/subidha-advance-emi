@@ -21,6 +21,8 @@ export const ROUTES = {
     dashboard: "/admin",
 
     analytics: "/admin/analytics",
+    analyticsRiskMonitor: "/admin/analytics/risk-monitor",
+    analyticsChurnAnalysis: "/admin/analytics/churn-analysis",
     operations: "/admin/operations",
     auditLogs: "/admin/audit-logs",
 
@@ -86,6 +88,8 @@ export const ROUTES = {
     accountingBooksCash: "/admin/accounting/books/cash",
     accountingBooksBank: "/admin/accounting/books/bank",
     accountingBooksUpi: "/admin/accounting/books/upi",
+    accountingBooksSales: "/admin/accounting/books/sales",
+    accountingBooksPurchase: "/admin/accounting/books/purchase",
     accountingGst: "/admin/accounting/gst",
     accountingTaxInvoices: "/admin/accounting/gst/tax-invoices",
     accountingCreditNotes: "/admin/accounting/gst/credit-notes",
@@ -124,6 +128,11 @@ export const ROUTES = {
     luckyDrawsCreate: "/admin/lucky-draws/create",
 
     reports: "/admin/reports",
+    reportsRevenue: "/admin/reports/revenue",
+    reportsCollections: "/admin/reports/collections",
+    reportsOverdue: "/admin/reports/overdue",
+    reportsCustomerAnalytics: "/admin/reports/customer-analytics",
+    reportsBatchPerformance: "/admin/reports/batch-performance",
     settings: "/admin/settings",
     settingsUsers: "/admin/settings/users",
     settingsUsersCreate: "/admin/settings/users/create",

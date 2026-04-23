@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
@@ -54,14 +56,23 @@ export default function InventoryStockOnHandPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Review"
       title="Stock On Hand"
       subtitle="Live stock availability by product master, SKU, and default location."
+      helperNote="Stock on hand is a live inventory snapshot from the stock ledger. It does not derive from billing totals or EMI schedules."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Stock On Hand" },
       ]}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Move between stock review, movement registers, master control, valuation, and opening-stock actions from one inventory workspace."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <EnterpriseDataTable
         data={rows}
         columns={columns}

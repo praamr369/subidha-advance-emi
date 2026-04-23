@@ -5,6 +5,7 @@ import { ClipboardList, FolderKanban, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -52,8 +53,11 @@ export default function AdminCrmOverviewPage() {
 
   return (
     <PortalPage
+      eyebrow="CRM Operations"
       title="CRM Control Center"
       subtitle="Keep lead, customer, vendor, partner, and staff continuity in one additive party directory without replacing the underlying operational source records."
+      helperNote="CRM is the continuity layer for follow-up and identity linking. Customer, billing, support, and subscription actions still happen in their own canonical modules."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM" },
@@ -115,6 +119,72 @@ export default function AdminCrmOverviewPage() {
                   href: ROUTES.admin.crmParties,
                   icon: <Users className="h-4 w-4" />,
                   badge: "Directory",
+                },
+              ]}
+            />
+            <WorkspaceDirectory
+              title="CRM route map"
+              description="Move between intake, continuity, and commercial handoff without mixing CRM review with customer, billing, or support execution."
+              groups={[
+                {
+                  title: "Lead intake",
+                  description: "Operational queues for new enquiries and lead follow-up.",
+                  items: [
+                    {
+                      title: "Lead Triage",
+                      description: "Public enquiry intake, assignment, and conversion handoff queue.",
+                      href: ROUTES.admin.leads,
+                      icon: <ClipboardList className="h-4 w-4" />,
+                      badge: "Queue",
+                    },
+                    {
+                      title: "CRM Lead Register",
+                      description: "Lead continuity view with party links and follow-up posture.",
+                      href: ROUTES.admin.crmLeads,
+                      icon: <FolderKanban className="h-4 w-4" />,
+                      badge: "Register",
+                    },
+                  ],
+                },
+                {
+                  title: "Directory and continuity",
+                  description: "Identity and relationship surfaces across the business.",
+                  items: [
+                    {
+                      title: "Party Directory",
+                      description: "Additive identity graph for customers, partners, vendors, and staff.",
+                      href: ROUTES.admin.crmParties,
+                      icon: <Users className="h-4 w-4" />,
+                      badge: "Directory",
+                    },
+                    {
+                      title: "Customer Register",
+                      description: "Customer profile workflow once CRM continuity is ready for conversion.",
+                      href: ROUTES.admin.customers,
+                      icon: <Users className="h-4 w-4" />,
+                      badge: "Customer",
+                    },
+                  ],
+                },
+                {
+                  title: "Commercial handoff",
+                  description: "Bounded action modules that stay linked to CRM rather than embedded inside it.",
+                  items: [
+                    {
+                      title: "Billing Operations",
+                      description: "Retail billing and direct-sale follow-up outside the CRM lane.",
+                      href: ROUTES.admin.billing,
+                      icon: <FolderKanban className="h-4 w-4" />,
+                      badge: "Billing",
+                    },
+                    {
+                      title: "Support Requests",
+                      description: "Customer issue intake tied back to CRM parties where relevant.",
+                      href: ROUTES.admin.supportRequests,
+                      icon: <ClipboardList className="h-4 w-4" />,
+                      badge: "Support",
+                    },
+                  ],
                 },
               ]}
             />

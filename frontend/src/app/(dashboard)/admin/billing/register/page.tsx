@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
@@ -232,8 +234,11 @@ export default function BillingDocumentRegisterPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Document Control"
       title="Billing Document Register"
       subtitle="Unified invoice, receipt, credit-note, and debit-note register for staff drill-down without turning billing into a second EMI truth source."
+      helperNote="This register is billing-document-first. It stays separate from accounting posting lanes and from cashier collection execution."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -246,6 +251,13 @@ export default function BillingDocumentRegisterPage() {
         { href: buildAdminBillingInvoicesRoute(filters), label: "Invoice Register", variant: "secondary" },
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Move between billing documents, adjustment notes, contract mirrors, and retail execution routes from one billing directory."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {loading ? <LoadingBlock label="Loading billing document register..." /> : null}
       {!loading && error ? <ErrorState title="Billing register load failed" description={error} /> : null}
 

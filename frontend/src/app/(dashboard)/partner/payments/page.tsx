@@ -231,8 +231,11 @@ export default function PartnerPaymentsPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Payments"
       title="Partner Payments"
       subtitle="Verified partner-scoped payment history without admin-wide finance leakage, with filters aligned to the shared operational list pattern."
+      helperNote="This register shows partner-visible verified payment truth only. Reversal, payout, and reconciliation controls remain outside partner scope."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Payments" },

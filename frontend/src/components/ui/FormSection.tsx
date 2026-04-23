@@ -38,7 +38,8 @@ export default function FormSection({
   };
 
   return (
-    <section className="surface-panel-elevated rounded-2xl border border-border bg-card shadow-sm">
+    <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] shadow-sm">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
       <div
         className={cn(
           "flex flex-wrap items-start justify-between gap-4 p-5",
@@ -62,7 +63,7 @@ export default function FormSection({
             <button
               type="button"
               onClick={() => setOpen(!open)}
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] p-2 text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] hover:text-foreground"
+              className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] hover:text-foreground"
             >
               {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>

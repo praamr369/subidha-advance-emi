@@ -137,8 +137,11 @@ export default function PartnerPaymentDetailPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Partner Payments"
       title={payment ? `Payment #${payment.id}` : "Partner Payment Detail"}
       subtitle="Partner-scoped payment detail for subscriptions attributed to this partner only."
+      helperNote="This receipt is visibility-only for partner scope. Admin-side payout, reversal, and reconciliation controls remain separate and are not exposed here."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Payments", href: backHref },

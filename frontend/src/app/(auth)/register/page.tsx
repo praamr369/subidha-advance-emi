@@ -279,7 +279,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="grid w-full overflow-hidden rounded-[28px] border border-border/60 bg-background/95 shadow-2xl backdrop-blur xl:grid-cols-[1fr_1fr]">
+    <div className="auth-shell grid w-full overflow-hidden bg-background/95 backdrop-blur xl:grid-cols-[1fr_1fr]">
       {/* Left Panel - Desktop Only */}
       <section className="relative hidden overflow-hidden xl:block">
         <div className="absolute inset-0 bg-slate-950" />
@@ -565,7 +565,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-2 rounded-2xl border border-border bg-background p-3">
+                  <div className="workspace-filter-bar space-y-2 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
                         Password strength
@@ -625,7 +625,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
-                  <div className="rounded-2xl border border-border bg-background p-3">
+                  <div className="workspace-filter-bar p-3">
                     <div className="text-xs text-muted-foreground">
                       Account type
                     </div>

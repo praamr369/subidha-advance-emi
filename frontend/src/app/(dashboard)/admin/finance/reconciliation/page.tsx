@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { FINANCE_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   getAdminCommissionReconciliation,
   type AdminCommissionReconciliationQuery,
@@ -34,16 +38,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[1.8rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.62)]">
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      <div className="mt-5">{children}</div>
-    </section>
+    <WorkspaceSection title={title} description={description}>
+      {children}
+    </WorkspaceSection>
   );
 }
 
@@ -216,8 +213,11 @@ export default function AdminCommissionReconciliationPage() {
 
   return (
     <PortalPage
+      eyebrow="Finance Verification"
       title="Commission Reconciliation"
       subtitle="Detect missing commission rows, invalid finance links, and partner commission drift before payout and reporting workflows break."
+      helperNote="This page is finance-side exception review only. It does not replace cashier payment collection or accounting posting controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Finance", href: "/admin/finance" },
@@ -277,6 +277,12 @@ export default function AdminCommissionReconciliationPage() {
       }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Finance route map"
+          description="Use the finance directory to move from verification into commission review, payout preparation, and related accounting handoff."
+          groups={FINANCE_CONTROL_DIRECTORY_GROUPS}
+        />
+
         <SectionCard
           title="Scope"
           description="Filter reconciliation by partner when you need a partner-specific operational snapshot."
@@ -342,17 +348,13 @@ export default function AdminCommissionReconciliationPage() {
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {warningCards.map((card) => (
-                  <div
+                  <StatCard
                     key={card.label}
-                    className="rounded-xl border border-border bg-muted/40 p-4"
-                  >
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {card.label}
-                    </div>
-                    <div className="mt-2 text-xl font-semibold text-foreground">
-                      {card.value}
-                    </div>
-                  </div>
+                    label={card.label}
+                    value={card.value}
+                    subtext="Live reconciliation warning count from backend checks."
+                    tone={Number(card.value) > 0 ? "warning" : "success"}
+                  />
                 ))}
               </div>
             </SectionCard>

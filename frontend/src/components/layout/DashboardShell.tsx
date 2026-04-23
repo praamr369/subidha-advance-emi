@@ -294,7 +294,7 @@ function UserDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-surface)] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] transition hover:border-[var(--surface-border-strong)] hover:bg-white"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--topbar-surface)_88%,var(--surface-muted)_12%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] transition hover:border-[var(--surface-border-strong)] hover:bg-white"
       >
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-xs font-semibold text-foreground">
           {displayName.charAt(0).toUpperCase()}
@@ -825,7 +825,7 @@ function Topbar({
 }) {
   return (
     <PortalHeader>
-      <div className="flex min-h-[4.4rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="flex min-h-[4.8rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
@@ -837,7 +837,12 @@ function Topbar({
           </button>
 
           <div className="min-w-0">
-            <div className="enterprise-eyebrow">{formatRoleLabel(role)} Workspace</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="enterprise-eyebrow">{formatRoleLabel(role)} Workspace</span>
+              <span className="workspace-pill px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Role Scope Active
+              </span>
+            </div>
             <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">{title}</h1>
           </div>
         </div>
@@ -855,7 +860,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white sm:inline-flex"
+            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card)_88%,var(--surface-muted)_12%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-white sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
           >
@@ -868,12 +873,12 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenQuickActions}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
             aria-label="Open quick actions"
             title="Quick actions"
           >
             <ReceiptText className="h-4 w-4" />
-            New
+            Quick Actions
           </button>
           <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
         </div>

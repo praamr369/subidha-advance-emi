@@ -1,14 +1,19 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
   listSubscriptionRequests,
@@ -24,7 +29,12 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load subscription requests.";
 }
 
-type RequestStatusFilter = "" | "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
+type RequestStatusFilter =
+  | ""
+  | "SUBMITTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED";
 
 export default function CustomerSubscriptionRequestsPage() {
   const router = useRouter();
@@ -118,8 +128,11 @@ export default function CustomerSubscriptionRequestsPage() {
 
   return (
     <PortalPage
+      eyebrow="Customer Intake"
       title="Subscription Requests"
-      subtitle="Track customer self-service subscription intake without creating a real subscription until admin approval."
+      subtitle="Track customer-created intake requests that remain separate from real subscriptions until admin approval."
+      helperNote="A submitted request is not a live contract. Approval creates the real subscription, EMI schedule, and related audit trail through the backend workflow."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Subscription Requests" },
@@ -136,58 +149,87 @@ export default function CustomerSubscriptionRequestsPage() {
           variant: "secondary",
         },
       ]}
-      statusBadge={{ label: "Approval Required", tone: "info" }}
+      statusBadge={{ label: "Approval required", tone: "info" }}
       stats={[
         { label: "Requests", value: count },
-        { label: "Page Submitted", value: summary.submitted, tone: "warning" },
-        { label: "Page Approved", value: summary.approved, tone: "success" },
-        { label: "Page Rejected", value: summary.rejected, tone: summary.rejected > 0 ? "danger" : undefined },
+        {
+          label: "Page submitted",
+          value: summary.submitted,
+          tone: summary.submitted > 0 ? "warning" : "default",
+        },
+        {
+          label: "Page approved",
+          value: summary.approved,
+          tone: summary.approved > 0 ? "success" : "default",
+        },
+        {
+          label: "Page rejected",
+          value: summary.rejected,
+          tone: summary.rejected > 0 ? "danger" : "default",
+        },
       ]}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Request register</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Submitted requests stay separate from active subscriptions until admin approval creates the real contract.
-              </p>
-            </div>
+        <WorkspaceSection
+          title="Request register controls"
+          description="Filter request intake by current review status and refresh the register without leaving the customer workspace."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <TableToolbar
+            footer={
+              statusFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">
+                    Active filter
+                  </span>
+                  <StatusBadge status={statusFilter} hideIcon />
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Requests stay operationally separate from live subscriptions. Use this register to follow review status, then open approved subscriptions from the detail view when available.
+                </div>
+              )
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[220px_auto]">
+              <select
+                value={statusInput}
+                onChange={(event) =>
+                  setStatusInput(event.target.value as RequestStatusFilter)
+                }
+                className="h-11 rounded-xl border border-border bg-background px-4 text-sm"
+              >
+                <option value="">All statuses</option>
+                <option value="SUBMITTED">Submitted</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
 
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="space-y-2 text-sm text-foreground">
-                <span className="font-medium">Status</span>
-                <select
-                  value={statusInput}
-                  onChange={(event) => setStatusInput(event.target.value as RequestStatusFilter)}
-                  className="h-10 min-w-[180px] rounded-xl border border-border bg-background px-3 text-sm"
+              <div className="flex flex-wrap gap-2">
+                <ActionButton type="button" onClick={() => applyFilter(statusInput)}>
+                  Apply
+                </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => applyFilter("")}
                 >
-                  <option value="">All statuses</option>
-                  <option value="SUBMITTED">Submitted</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </label>
-
-              <button
-                type="button"
-                onClick={() => applyFilter(statusInput)}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={loading || refreshing}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
+                  Clear
+                </ActionButton>
+              </div>
             </div>
-          </div>
-        </section>
+          </TableToolbar>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading subscription requests..." /> : null}
 
@@ -199,43 +241,58 @@ export default function CustomerSubscriptionRequestsPage() {
           />
         ) : null}
 
-        {!loading && !error && rows.length === 0 ? (
-          <EmptyState
-            title="No subscription requests yet"
-            description="Create a request when you want admin to review and activate a new subscription."
-            action={
-              <Link
-                href="/customer/subscription-requests/create"
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Create Request
-              </Link>
-            }
-          />
-        ) : null}
-
-        {!loading && !error && rows.length > 0 ? (
-          <div className="space-y-4">
-            {rows.map((request) => (
-              <SubscriptionRequestCard
-                key={request.id}
-                request={request}
-                href={`/customer/subscription-requests/${request.id}`}
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Customer request register"
+            description="Submitted requests and their latest approval posture, without collapsing them into active subscription truth."
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No subscription requests yet"
+                description="Create a request when you want admin to review and activate a new subscription."
+                action={
+                  <ActionButton
+                    href="/customer/subscription-requests/create"
+                    variant="outline"
+                  >
+                    Create request
+                  </ActionButton>
+                }
               />
-            ))}
+            ) : (
+              <div className="space-y-4">
+                {rows.map((request) => (
+                  <SubscriptionRequestCard
+                    key={request.id}
+                    request={request}
+                    href={`/customer/subscription-requests/${request.id}`}
+                  />
+                ))}
+              </div>
+            )}
 
-            <PaginationControls
-              count={count}
-              page={page}
-              pageSize={PAGE_SIZE}
-              numPages={numPages}
-              hasNext={hasNext}
-              hasPrevious={hasPrevious}
-              disabled={loading || refreshing}
-              onPrevious={() => replacePage(page - 1)}
-              onNext={() => replacePage(page + 1)}
-            />
-          </div>
+            {rows.length > 0 ? (
+              <div className="mt-5">
+                <PaginationControls
+                  count={count}
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  numPages={numPages}
+                  hasNext={hasNext}
+                  hasPrevious={hasPrevious}
+                  disabled={loading || refreshing}
+                  onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                  onNext={() => replacePage(page + 1)}
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-5">
+              <WorkspaceNotice tone="info" title="Why this register stays separate">
+                Subscription requests are intake records only. Approval or rejection remains auditable here, while actual subscription payment and EMI truth stay on the live subscription routes.
+              </WorkspaceNotice>
+            </div>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

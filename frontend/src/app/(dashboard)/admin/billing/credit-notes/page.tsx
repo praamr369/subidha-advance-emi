@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
@@ -85,14 +87,24 @@ export default function BillingCreditNotesPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Adjustment Control"
       title="Billing Credit Notes"
       subtitle="Returns and allowances linked back to original invoices with optional stock effect."
+      helperNote="Credit notes remain explicit billing adjustments with separate approve/post posture. They do not silently rewrite invoices, receipts, or stock history."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
         { label: "Credit Notes" },
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Use the shared billing directory to move from credit-note review into invoices, documents, contract mirrors, and related billing books."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <div className="receipt-print-hide">
         <EnterpriseDataTable
           data={rows}

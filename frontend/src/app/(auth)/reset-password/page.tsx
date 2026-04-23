@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 import { AuthLayoutShell } from "@/components/auth";
+import ActionButton from "@/components/ui/ActionButton";
 import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { APP_NAME } from "@/lib/constants";
 import {
@@ -128,6 +129,8 @@ export default function ResetPasswordPage() {
     <AuthLayoutShell
       formTitle="Reset password"
       formSubtitle="Enter your account identifier, OTP, and new password."
+      panelTitle="Controlled password recovery for approved account holders"
+      panelDescription="OTP verification and password change stay inside the existing Subidha CORE auth workflow."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -226,30 +229,41 @@ export default function ResetPasswordPage() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
         {resendMessage && !error && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             {resendMessage}
           </div>
         )}
 
         {success && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             Password reset successfully! Redirecting to login...
           </div>
         )}
 
-        <button
+        <ActionButton
           type="submit"
           disabled={submitting || success}
-          className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          variant="primary"
+          size="lg"
+          fullWidth
         >
           {submitting ? "Resetting..." : "Reset password"}
-        </button>
+        </ActionButton>
+
+        <div className="workspace-filter-bar flex items-start gap-3 p-4">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <p className="min-w-0 text-sm leading-6 text-muted-foreground">
+            Password reset remains explicit and OTP-backed. No authenticated session is created until the user signs in again.
+          </p>
+        </div>
       </form>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">

@@ -510,9 +510,10 @@ export default function AdminCustomersPage() {
 
   return (
     <PortalPage
+      eyebrow="Customer Operations"
       title="Customer Register"
       subtitle="Search, review, and route customer records into KYC, subscription, and payment workflows with clear operational context."
-      helperNote="Customer rows here are source-linked for onboarding and collection operations. Use filters to narrow high-volume registers before action."
+      helperNote="Customer rows here are source-linked for onboarding, subscription sale, direct sale, and collection operations. Use filters to narrow high-volume registers before action."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
@@ -520,6 +521,9 @@ export default function AdminCustomersPage() {
       ]}
       actions={[
         { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
+        { href: ROUTES.admin.subscriptionsCreate, label: "Create Subscription", variant: "secondary" },
+        { href: ROUTES.admin.paymentsCreate, label: "Collect Payment", variant: "secondary" },
+        { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
       ]}
       stats={[
@@ -533,7 +537,7 @@ export default function AdminCustomersPage() {
       <div className="space-y-6">
         <ControlLaneGrid
           title="Customer control lanes"
-          description="Customer onboarding, CRM continuity, collection operations, and support handling stay linked but operationally separate."
+          description="Customer onboarding, subscription sale, direct sale, collection operations, and support handling stay linked but operationally separate."
           lanes={[
             {
               title: "Create customer",
@@ -543,18 +547,32 @@ export default function AdminCustomersPage() {
               badge: "Setup",
             },
             {
+              title: "Create subscription",
+              description: "Route a verified customer into the canonical subscription-sale workflow.",
+              href: ROUTES.admin.subscriptionsCreate,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Sale",
+            },
+            {
+              title: "Collect payment",
+              description: "Open the admin payment workflow without blending collection into profile edits.",
+              href: ROUTES.admin.paymentsCreate,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Payment",
+            },
+            {
+              title: "Direct sales lane",
+              description: "Retail sale and billing work remain explicit and separate from EMI subscriptions.",
+              href: ROUTES.admin.billingDirectSales,
+              icon: <Users className="h-4 w-4" />,
+              badge: "Retail",
+            },
+            {
               title: "CRM directory",
               description: "Review party continuity and follow-up posture before conversion or escalation.",
               href: ROUTES.admin.crmParties,
               icon: <Users className="h-4 w-4" />,
               badge: "CRM",
-            },
-            {
-              title: "Collections workspace",
-              description: "Move into payment and EMI operations without blending profile editing with collection actions.",
-              href: ROUTES.admin.collections,
-              icon: <RefreshCw className="h-4 w-4" />,
-              badge: "Ops",
             },
             {
               title: "Support queue",
@@ -763,38 +781,38 @@ export default function AdminCustomersPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
+                <ActionButton
                   type="button"
+                  variant="primary"
                   onClick={() => void handleCustomerImportPreview()}
                   disabled={
                     !customerImportFile ||
                     customerImportPreviewing ||
                     customerImportSubmitting
                   }
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {customerImportPreviewing ? "Previewing..." : "Preview CSV"}
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="button"
+                  variant="outline"
                   onClick={() => void handleCustomerImportConfirm()}
                   disabled={
                     !customerImportCanConfirm ||
                     customerImportPreviewing ||
                     customerImportSubmitting
                   }
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {customerImportSubmitting ? "Importing..." : "Confirm Import"}
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="button"
+                  variant="ghost"
                   onClick={clearCustomerImportSelection}
                   disabled={customerImportPreviewing || customerImportSubmitting}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Clear
-                </button>
+                </ActionButton>
               </div>
 
               {customerImportMessage ? (

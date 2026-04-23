@@ -45,3 +45,55 @@ test("phase-3 books and bridge controls load with active buttons", async ({ page
   await expect(page.getByRole("button", { name: "Run EMI subscription" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run EMI payment receipts" })).toBeVisible();
 });
+
+test("phase-3 admin operational surfaces share the control-center framework", async ({
+  page,
+}) => {
+  await page.goto("/admin/operations");
+  await expect(page.getByRole("heading", { name: "Operations Workspace" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Operational launch map");
+
+  await page.goto("/admin/branch-reporting");
+  await expect(page.getByRole("heading", { name: "Branch Reporting" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Branch operating lenses");
+
+  await page.goto("/admin/analytics");
+  await expect(page.getByRole("heading", { name: "Analytics" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Analysis route map");
+
+  await page.goto("/admin/reports");
+  await expect(page.getByRole("heading", { name: "Reports Overview" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Report directory");
+
+  await page.goto("/admin/customers");
+  await expect(page.getByRole("heading", { name: "Customer Register" }).first()).toBeVisible();
+  await expect(page.locator(".portal-page-actions").getByRole("link", { name: "Create Subscription" })).toBeVisible();
+
+  await page.goto("/admin/crm");
+  await expect(page.getByRole("heading", { name: "CRM Control Center" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("CRM route map");
+
+  await page.goto("/admin/crm/leads");
+  await expect(page.getByRole("heading", { name: "CRM Lead Register" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Continuity filters");
+
+  await page.goto("/admin/leads");
+  await expect(page.getByRole("heading", { name: "Lead Inbox" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Lead queue controls");
+
+  await page.goto("/admin/crm/parties");
+  await expect(page.getByRole("heading", { name: "Party Directory" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Directory filters");
+
+  await page.goto("/admin/support-requests");
+  await expect(page.getByRole("heading", { name: "Support Requests" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Support queue controls");
+
+  await page.goto("/admin/service-desk");
+  await expect(page.getByRole("heading", { name: "Service Desk" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Service route map");
+
+  await page.goto("/admin/billing");
+  await expect(page.getByRole("heading", { name: "Billing Operations" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Billing route directory");
+});

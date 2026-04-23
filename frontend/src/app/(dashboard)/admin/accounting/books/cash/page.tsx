@@ -2,7 +2,9 @@
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import BookRegisterPage from "@/components/accounting/BookRegisterPage";
+import { ACCOUNTING_BOOK_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { accountingMoney } from "@/components/accounting/shared";
+import { ROUTES } from "@/lib/routes";
 import type { FinanceBookRow } from "@/services/accounting";
 import { getCashBook } from "@/services/accounting";
 
@@ -18,11 +20,22 @@ const columns: EnterpriseColumnDef<FinanceBookRow>[] = [
 export default function AccountingCashBookPage() {
   return (
     <BookRegisterPage
+      eyebrow="Accounting Books"
       title="Cash Book"
       subtitle="Cash-account journal rows grouped from actual finance accounts."
       printTitle="Cash Book"
+      helperNote="Accounting books remain posted-data review surfaces. They do not replace cashier collection rails or mutate source financial records."
+      helperTone="info"
       fetchReport={getCashBook}
       columns={columns}
+      actions={[
+        { href: ROUTES.admin.accountingBooksBank, label: "Bank Book", variant: "secondary" },
+        { href: ROUTES.admin.accountingJournals, label: "Journals", variant: "secondary" },
+        { href: ROUTES.admin.accountingTrialBalance, label: "Trial Balance", variant: "primary" },
+      ]}
+      directoryTitle="Accounting book map"
+      directoryDescription="Move between posted cash, bank, UPI, sales, and purchase views without leaving the accounting workspace."
+      directoryGroups={ACCOUNTING_BOOK_DIRECTORY_GROUPS}
       toPrintRow={(row) => [
         row.entry_date,
         row.finance_account_name,
@@ -34,4 +47,3 @@ export default function AccountingCashBookPage() {
     />
   );
 }
-

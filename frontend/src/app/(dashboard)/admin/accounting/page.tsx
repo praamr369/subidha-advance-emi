@@ -126,6 +126,7 @@ export default function AdminAccountingPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Control"
       title="Accounting Control Center"
       subtitle="Phase-1 accounting workspace with separate double-entry books, admin-only posting controls, and no overlap with the EMI payment ledger."
       breadcrumbs={[

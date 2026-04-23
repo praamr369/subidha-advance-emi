@@ -9,7 +9,10 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminCrmPartyRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -99,10 +102,17 @@ export default function AdminCrmPartyDirectoryPage() {
     },
   ];
 
+  const activePartyCount = rows.filter((row) => row.is_active).length;
+  const dueFollowUpCount = rows.filter((row) => row.follow_up_state === "DUE").length;
+  const customerLinkedCount = rows.filter((row) => row.role_types.includes("CUSTOMER")).length;
+
   return (
     <PortalPage
+      eyebrow="CRM Directory"
       title="Party Directory"
       subtitle="A shared additive identity layer above leads, customers, vendors, partners, and staff. It links records together; it does not replace the underlying source models."
+      helperNote="Use the party directory for identity, role, and follow-up context. Customer edits, billing, and support actions remain in their source modules."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM", href: ROUTES.admin.crm },
@@ -111,6 +121,16 @@ export default function AdminCrmPartyDirectoryPage() {
       actions={[
         { href: ROUTES.admin.crm, label: "CRM Overview", variant: "secondary" },
         { href: ROUTES.admin.crmLeads, label: "CRM Leads", variant: "secondary" },
+      ]}
+      stats={[
+        { label: "Visible Parties", value: String(rows.length), tone: "info" },
+        { label: "Active", value: String(activePartyCount), tone: "success" },
+        {
+          label: "Due Follow-Ups",
+          value: String(dueFollowUpCount),
+          tone: dueFollowUpCount > 0 ? "warning" : "success",
+        },
+        { label: "Customer Linked", value: String(customerLinkedCount) },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
@@ -155,7 +175,16 @@ export default function AdminCrmPartyDirectoryPage() {
           <WorkspaceSection
             title="Directory"
             description="The list is derived from CRM party master links and open follow-up state. Use it to drill into cross-module timelines, not to edit finance or subscription truth."
-            action={
+          >
+            <TableToolbar
+              title="Directory filters"
+              description="Focus the party register by role and follow-up posture before drilling into the full cross-module timeline."
+              footer={
+                <div className="text-sm text-muted-foreground">
+                  Showing {roleType || "all roles"} with {followUpState || "all follow-up states"}.
+                </div>
+              }
+            >
               <div className="flex flex-wrap gap-2">
                 <select
                   value={roleType}
@@ -181,16 +210,26 @@ export default function AdminCrmPartyDirectoryPage() {
                   <option value="SCHEDULED">Scheduled</option>
                   <option value="NONE">None</option>
                 </select>
-                <button
+                <ActionButton
                   type="button"
+                  variant="primary"
                   onClick={() => void loadPage(roleType, followUpState)}
-                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
                 >
                   Apply
-                </button>
+                </ActionButton>
               </div>
-            }
-          >
+            </TableToolbar>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Visible" value={String(rows.length)} tone="info" />
+              <StatCard label="Active" value={String(activePartyCount)} tone="success" />
+              <StatCard
+                label="Due Follow-Ups"
+                value={String(dueFollowUpCount)}
+                tone={dueFollowUpCount > 0 ? "warning" : "success"}
+              />
+              <StatCard label="Customer Linked" value={String(customerLinkedCount)} />
+            </div>
+            <div className="mt-5">
             <EnterpriseDataTable
               data={rows}
               columns={columns}
@@ -200,6 +239,7 @@ export default function AdminCrmPartyDirectoryPage() {
               emptyTitle="No parties found"
               emptyDescription="No CRM parties match the current directory filter."
             />
+            </div>
           </WorkspaceSection>
         </>
       ) : null}

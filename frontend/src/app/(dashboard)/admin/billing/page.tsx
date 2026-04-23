@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { FileBadge2, FileText, Receipt, RotateCcw } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
@@ -76,6 +77,7 @@ export default function BillingOverviewPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Control"
       title="Billing Operations"
       subtitle="Unified retail and EMI-facing billing registers with GST-ready structure, receipts, and controlled accounting posting."
       helperNote="Billing mirrors and extends source records without replacing subscription, payment, stock, or accounting truth."
@@ -181,6 +183,102 @@ export default function BillingOverviewPage() {
               icon={<RotateCcw className="h-5 w-5" />}
             />
           </div>
+
+          <WorkspaceDirectory
+            title="Billing route directory"
+            description="Group billing work by operator intent so staff can move between retail execution, document control, and accounting-adjacent follow-up without confusing the domains."
+            className="receipt-print-hide"
+            groups={[
+              {
+                title: "Document control",
+                description: "Primary document registers for invoice and receipt handling.",
+                items: [
+                  {
+                    title: "Document Register",
+                    description: "Canonical document rail for posted, draft, and approved billing documents.",
+                    href: ROUTES.admin.billingRegister,
+                    icon: <FileText className="h-4 w-4" />,
+                    badge: "Register",
+                    detail: `${invoices.length} invoices visible`,
+                  },
+                  {
+                    title: "Invoices",
+                    description: "Invoice register with draft, approved, and posted posture.",
+                    href: ROUTES.admin.billingInvoices,
+                    icon: <FileBadge2 className="h-4 w-4" />,
+                    badge: "Invoice",
+                    detail: `${draftInvoices} draft · ${approvedInvoices} approved`,
+                  },
+                  {
+                    title: "Receipts",
+                    description: "Receipt documents kept separate from payment posting truth.",
+                    href: ROUTES.admin.billingReceipts,
+                    icon: <Receipt className="h-4 w-4" />,
+                    badge: "Receipt",
+                    detail: `${receiptCount} receipt documents`,
+                  },
+                ],
+              },
+              {
+                title: "Retail execution",
+                description: "Operational surfaces for direct retail billing and contract linkage.",
+                items: [
+                  {
+                    title: "Direct Sales",
+                    description: "Retail orders, recovery, and billing generation without touching EMI collection rails.",
+                    href: ROUTES.admin.billingDirectSales,
+                    icon: <RotateCcw className="h-4 w-4" />,
+                    badge: "Retail",
+                    detail: `${directSaleCount} direct-sale rows`,
+                  },
+                  {
+                    title: "Contracts",
+                    description: "Billing contracts that connect delivery readiness and invoicing posture.",
+                    href: ROUTES.admin.billingContracts,
+                    icon: <FileText className="h-4 w-4" />,
+                    badge: "Contract",
+                    detail: `${contractCount} billing contracts`,
+                  },
+                  {
+                    title: "Daily Book",
+                    description: "Daily billing summary without collapsing into accounting books.",
+                    href: ROUTES.admin.billingDailyBook,
+                    icon: <FileText className="h-4 w-4" />,
+                    badge: "Daily",
+                  },
+                ],
+              },
+              {
+                title: "Adjustments and control",
+                description: "Adjustment notes and adjacent control registers.",
+                items: [
+                  {
+                    title: "Credit Notes",
+                    description: "Controlled note register for billing-side reversals and adjustments.",
+                    href: ROUTES.admin.billingCreditNotes,
+                    icon: <RotateCcw className="h-4 w-4" />,
+                    badge: "Credit",
+                    detail: `${creditCount} note rows`,
+                  },
+                  {
+                    title: "Debit Notes",
+                    description: "Incremental billing adjustments separate from accounting journals.",
+                    href: ROUTES.admin.billingDebitNotes,
+                    icon: <RotateCcw className="h-4 w-4" />,
+                    badge: "Debit",
+                    detail: `${debitCount} note rows`,
+                  },
+                  {
+                    title: "Cash Book",
+                    description: "Billing-side cashbook view for operational visibility before accounting follow-up.",
+                    href: ROUTES.admin.billingCashBook,
+                    icon: <Receipt className="h-4 w-4" />,
+                    badge: "Close",
+                  },
+                ],
+              },
+            ]}
+          />
 
           <WorkspaceSection
             title="Latest Posted Invoice"

@@ -1,14 +1,17 @@
-// frontend/src/domains/subscription-requests/pages/CustomerSubscriptionRequestCreatePage.tsx
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
+import ActionButton from "@/components/ui/ActionButton";
+import FormActions from "@/components/ui/FormActions";
+import FormSection from "@/components/ui/FormSection";
 import PortalPage from "@/components/ui/PortalPage";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   createCustomerSubscriptionRequest,
   getSubscriptionRequestOptions,
@@ -63,7 +66,9 @@ export default function CustomerSubscriptionRequestCreatePage({
   }, [queryString, runtimeSearchParams]);
 
   const canonicalSelfHref = useMemo(() => {
-    return searchParamKey ? `/customer/subscription-requests/create?${searchParamKey}` : "/customer/subscription-requests/create";
+    return searchParamKey
+      ? `/customer/subscription-requests/create?${searchParamKey}`
+      : "/customer/subscription-requests/create";
   }, [searchParamKey]);
 
   const [options, setOptions] = useState<SubscriptionRequestOptions | null>(null);
@@ -71,7 +76,8 @@ export default function CustomerSubscriptionRequestCreatePage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<SubscriptionRequestCreateResponse | null>(null);
+  const [success, setSuccess] =
+    useState<SubscriptionRequestCreateResponse | null>(null);
 
   const [productId, setProductId] = useState("");
   const [batchId, setBatchId] = useState("");
@@ -139,6 +145,7 @@ export default function CustomerSubscriptionRequestCreatePage({
     () => options?.batches.find((item) => String(item.id) === batchId) ?? null,
     [options, batchId]
   );
+
   const derivedMonthly = useMemo(
     () => deriveMonthlyAmount({ product: selectedProduct, batch: selectedBatch }),
     [selectedBatch, selectedProduct]
@@ -181,24 +188,36 @@ export default function CustomerSubscriptionRequestCreatePage({
 
   return (
     <PortalPage
+      eyebrow="Customer Intake"
       title={variant === "drawer" ? "Create request" : "Create Subscription Request"}
-      subtitle="Submit a self-service EMI request that stays pending until admin approval creates the real subscription."
-      helperNote="Requests are intake-only. Approval creates the real contract, EMI schedule, and audit records."
+      subtitle="Submit a self-service intake request that stays pending until admin approval creates the real subscription."
+      helperNote="Requests are intake-only. Approval creates the real contract, EMI schedule, and audit records through the controlled backend workflow."
       helperTone="info"
       breadcrumbs={
         variant === "drawer"
           ? []
           : [
               { label: "Customer", href: "/customer" },
-              { label: "Subscription Requests", href: "/customer/subscription-requests" },
+              {
+                label: "Subscription Requests",
+                href: "/customer/subscription-requests",
+              },
               { label: "Create" },
             ]
       }
       actions={
         variant === "drawer"
           ? [
-              { href: canonicalSelfHref, label: "Open full page", variant: "secondary" },
-              { href: "/customer/subscription-requests", label: "Request register", variant: "ghost" },
+              {
+                href: canonicalSelfHref,
+                label: "Open full page",
+                variant: "secondary",
+              },
+              {
+                href: "/customer/subscription-requests",
+                label: "Request register",
+                variant: "ghost",
+              },
             ]
           : [
               {
@@ -213,16 +232,18 @@ export default function CustomerSubscriptionRequestCreatePage({
               },
             ]
       }
-      statusBadge={{ label: "Customer Self-Request", tone: "info" }}
+      statusBadge={{ label: "Customer self-request", tone: "info" }}
       stats={
         variant === "drawer"
           ? []
           : [
               { label: "Products", value: options?.products.length ?? 0 },
-              { label: "Open Batches", value: options?.batches.length ?? 0 },
+              { label: "Open batches", value: options?.batches.length ?? 0 },
               {
-                label: "Lucky Numbers",
-                value: batchId ? options?.lucky_numbers.length ?? 0 : "Select batch",
+                label: "Lucky numbers",
+                value: batchId
+                  ? options?.lucky_numbers.length ?? 0
+                  : "Select batch",
               },
               {
                 label: "Approval",
@@ -248,157 +269,193 @@ export default function CustomerSubscriptionRequestCreatePage({
         {!loading && !error && options ? (
           <>
             {success ? (
-              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 shadow-sm">
-                <p className="font-semibold">Subscription request submitted.</p>
-                <p className="mt-1">Request #{success.request.id} is now pending admin approval.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
+              <WorkspaceNotice
+                tone="success"
+                title="Subscription request submitted."
+                action={
+                  <ActionButton
                     href={`/customer/subscription-requests/${success.request.id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                    variant="outline"
                   >
-                    Open request
-                  </Link>
-                  <Link
-                    href="/customer/subscription-requests"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
-                  >
-                    Back to register
-                  </Link>
-                </div>
-              </section>
+                    Open Request
+                  </ActionButton>
+                }
+              >
+                Request #{success.request.id} is now pending admin approval and remains separate from live subscription records until approval completes.
+              </WorkspaceNotice>
             ) : null}
 
-            {submitError ? <ErrorState title="Unable to submit request" description={submitError} /> : null}
+            {submitError ? (
+              <WorkspaceNotice tone="danger" title="Unable to submit request">
+                {submitError}
+              </WorkspaceNotice>
+            ) : null}
 
-            <div className={showAside ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
-              <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="space-y-1">
-                  <h2 className="text-base font-semibold text-foreground">Request details</h2>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Choose the product and batch. Lucky numbers stay constrained to the selected batch.
-                  </p>
-                </div>
-
-                <div className="mt-6 grid gap-4">
-                  <div>
-                    <label htmlFor="product_id" className="block text-sm font-semibold text-foreground">Product</label>
-                    <select
-                      id="product_id"
-                      value={productId}
-                      onChange={(event) => setProductId(event.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+            <div
+              className={
+                showAside
+                  ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
+                  : "grid gap-6"
+              }
+            >
+              <WorkspaceSection
+                title="Request details"
+                description="Choose the product and batch first. Lucky numbers stay constrained to the selected batch."
+              >
+                <form onSubmit={handleSubmit}>
+                  <div className="space-y-5">
+                    <FormSection
+                      title="Product and batch"
+                      description="The selected batch determines available lucky numbers and the request tenure snapshot."
+                      columns={2}
                     >
-                      <option value="">Select product</option>
-                      {options.products.map((item) => (
-                        <option key={item.id} value={String(item.id)}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div className="space-y-2">
+                        <label htmlFor="product_id" className="text-sm font-semibold text-foreground">
+                          Product
+                        </label>
+                        <select
+                          id="product_id"
+                          value={productId}
+                          onChange={(event) => setProductId(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                        >
+                          <option value="">Select product</option>
+                          {options.products.map((item) => (
+                            <option key={item.id} value={String(item.id)}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label htmlFor="batch_id" className="block text-sm font-semibold text-foreground">Batch</label>
-                    <select
-                      id="batch_id"
-                      value={batchId}
-                      onChange={(event) => setBatchId(event.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                      <div className="space-y-2">
+                        <label htmlFor="batch_id" className="text-sm font-semibold text-foreground">
+                          Batch
+                        </label>
+                        <select
+                          id="batch_id"
+                          value={batchId}
+                          onChange={(event) => setBatchId(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                        >
+                          <option value="">Select batch</option>
+                          {options.batches.map((item) => (
+                            <option key={item.id} value={String(item.id)}>
+                              {item.batch_code} · {item.duration_months} months
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </FormSection>
+
+                    <FormSection
+                      title="Allocation and notes"
+                      description="Lucky numbers are validated against the selected batch. Notes help the admin team review the request."
+                      columns={2}
                     >
-                      <option value="">Select batch</option>
-                      {options.batches.map((item) => (
-                        <option key={item.id} value={String(item.id)}>
-                          {item.batch_code} · {item.duration_months} months
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div className="space-y-2">
+                        <label htmlFor="lucky_number" className="text-sm font-semibold text-foreground">
+                          Lucky number
+                        </label>
+                        <select
+                          id="lucky_number"
+                          value={luckyNumber}
+                          onChange={(event) => setLuckyNumber(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          disabled={!batchId}
+                        >
+                          <option value="">Select lucky</option>
+                          {options.lucky_numbers.map((item) => (
+                            <option key={item} value={String(item)}>
+                              #{String(item).padStart(2, "0")}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                          Lucky numbers are allocated by batch. Admin approval confirms availability before contract creation.
+                        </p>
+                      </div>
 
-                  <div>
-                    <label htmlFor="lucky_number" className="block text-sm font-semibold text-foreground">Lucky number</label>
-                    <select
-                      id="lucky_number"
-                      value={luckyNumber}
-                      onChange={(event) => setLuckyNumber(event.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
-                      disabled={!batchId}
-                    >
-                      <option value="">Select lucky</option>
-                      {options.lucky_numbers.map((item) => (
-                        <option key={item} value={String(item)}>
-                          #{String(item).padStart(2, "0")}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Lucky numbers are allocated by batch. Admin approval confirms availability before contract creation.
-                    </p>
-                  </div>
+                      <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+                        <div className="enterprise-eyebrow">Request summary</div>
+                        <div className="mt-2 text-sm font-medium text-foreground">
+                          {derivedMonthly ? `${money(derivedMonthly)} / month` : "Monthly amount pending"}
+                        </div>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {selectedBatch
+                            ? `${selectedBatch.duration_months} months`
+                            : "Select a batch to load tenure"}
+                        </div>
+                      </div>
 
-                  <div>
-                    <label htmlFor="notes" className="block text-sm font-semibold text-foreground">Notes</label>
-                    <textarea
-                      id="notes"
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      rows={3}
-                      className="mt-2 w-full resize-none rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
-                      placeholder="Optional notes for the admin team"
+                      <div className="space-y-2 md:col-span-2">
+                        <label htmlFor="notes" className="text-sm font-semibold text-foreground">
+                          Notes
+                        </label>
+                        <textarea
+                          id="notes"
+                          value={notes}
+                          onChange={(event) => setNotes(event.target.value)}
+                          rows={4}
+                          className="w-full resize-none rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                          placeholder="Optional notes for the admin team"
+                        />
+                      </div>
+                    </FormSection>
+
+                    <FormActions
+                      submitLabel="Submit Request"
+                      submitLoadingLabel="Submitting..."
+                      submitting={submitting}
+                      sticky={variant === "drawer"}
+                      cancel={
+                        variant === "page"
+                          ? {
+                              label: "Back to register",
+                              href: "/customer/subscription-requests",
+                            }
+                          : null
+                      }
                     />
                   </div>
-
-                  <div className={variant === "drawer" ? "popup-action-bar items-center" : ""}>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-primary/80 bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {submitting ? "Submitting..." : "Submit Request"}
-                    </button>
-                  </div>
-                </div>
-              </form>
+                </form>
+              </WorkspaceSection>
 
               {showAside ? (
-                <aside className="space-y-4">
-                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Selection summary</h3>
-                    <dl className="mt-4 space-y-3 text-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground">Product</dt>
-                        <dd className="font-medium text-foreground">{selectedProduct?.name ?? "—"}</dd>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground">Batch</dt>
-                        <dd className="font-medium text-foreground">{selectedBatch?.batch_code ?? "—"}</dd>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground">Plan</dt>
-                        <dd className="font-medium text-foreground">EMI request</dd>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground">Monthly</dt>
-                        <dd className="font-medium text-foreground">{derivedMonthly ? money(derivedMonthly) : "—"}</dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Product preview</h3>
-                    <div className="mt-4">
-                      {selectedProduct ? (
-                        <PublicProductMedia
-                          src={selectedProduct.image}
-                          alt={selectedProduct.name}
-                          sizes="(max-width: 1280px) 100vw, 360px"
-                          fallbackLabel="Product media pending"
-                          badge={selectedProduct.product_code ?? null}
-                        />
-                      ) : (
-                        <div className="text-sm text-muted-foreground">Select a product</div>
-                      )}
+                <aside className="space-y-6">
+                  <WorkspaceSection
+                    title="Selection summary"
+                    description="Current request snapshot based on the selected product and batch."
+                  >
+                    <div className="grid gap-4">
+                      <DetailItem label="Product" value={selectedProduct?.name ?? "—"} />
+                      <DetailItem label="Batch" value={selectedBatch?.batch_code ?? "—"} />
+                      <DetailItem label="Plan" value="EMI request" />
+                      <DetailItem
+                        label="Monthly"
+                        value={derivedMonthly ? money(derivedMonthly) : "—"}
+                      />
                     </div>
-                  </div>
+                  </WorkspaceSection>
+
+                  <WorkspaceSection
+                    title="Product preview"
+                    description="Live product media stays read-only until approval creates a real subscription."
+                  >
+                    {selectedProduct ? (
+                      <PublicProductMedia
+                        src={selectedProduct.image}
+                        alt={selectedProduct.name}
+                        sizes="(max-width: 1280px) 100vw, 360px"
+                        fallbackLabel="Product media pending"
+                        badge={selectedProduct.product_code ?? null}
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Select a product
+                      </div>
+                    )}
+                  </WorkspaceSection>
                 </aside>
               ) : null}
             </div>

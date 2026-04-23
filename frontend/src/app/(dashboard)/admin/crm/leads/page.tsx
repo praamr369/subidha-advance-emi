@@ -9,7 +9,10 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminCrmPartyRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -126,10 +129,19 @@ export default function AdminCrmLeadRegisterPage() {
     },
   ];
 
+  const visibleConverted = rows.filter((row) => row.status === "CONVERTED").length;
+  const visibleLinkedParties = rows.filter((row) => Boolean(row.party_id)).length;
+  const visibleDueFollowUps = rows.filter(
+    (row) => row.follow_up_state === "DUE" || (row.open_follow_up_count ?? 0) > 0
+  ).length;
+
   return (
     <PortalPage
+      eyebrow="CRM Continuity"
       title="CRM Lead Register"
       subtitle="Review lead pipeline with party continuity and follow-up state, while the actual conversion, subscription, and direct-sale creation still happen in their bounded operational modules."
+      helperNote="This register is for continuity and follow-up review. Use the lead inbox for assignment and first-touch triage."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM", href: ROUTES.admin.crm },
@@ -139,6 +151,20 @@ export default function AdminCrmLeadRegisterPage() {
         { href: ROUTES.admin.crm, label: "CRM Overview", variant: "secondary" },
         { href: ROUTES.admin.crmParties, label: "Party Directory", variant: "secondary" },
         { href: ROUTES.admin.leads, label: "Lead Triage", variant: "primary" },
+      ]}
+      stats={[
+        { label: "Visible Leads", value: String(rows.length), tone: "info" },
+        {
+          label: "Linked Parties",
+          value: String(visibleLinkedParties),
+          tone: visibleLinkedParties > 0 ? "success" : "default",
+        },
+        {
+          label: "Due Follow-Ups",
+          value: String(visibleDueFollowUps),
+          tone: visibleDueFollowUps > 0 ? "warning" : "success",
+        },
+        { label: "Converted", value: String(visibleConverted), tone: "success" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
@@ -183,7 +209,16 @@ export default function AdminCrmLeadRegisterPage() {
           <WorkspaceSection
             title="Lead Register"
             description="This register mirrors the live admin lead workflow but adds party and follow-up continuity so staff can move between CRM and operational conversion screens safely."
-            action={
+          >
+            <TableToolbar
+              title="Continuity filters"
+              description="Filter by lead status to review party links, follow-up posture, and conversion outcomes."
+              footer={
+                <div className="text-sm text-muted-foreground">
+                  CRM register view: {status || "All statuses"}.
+                </div>
+              }
+            >
               <div className="flex flex-wrap gap-2">
                 <select
                   value={status}
@@ -197,16 +232,26 @@ export default function AdminCrmLeadRegisterPage() {
                   <option value="CONVERTED">Converted</option>
                   <option value="CLOSED">Closed</option>
                 </select>
-                <button
-                  type="button"
-                  onClick={() => void loadPage(status)}
-                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                >
+                <ActionButton type="button" variant="primary" onClick={() => void loadPage(status)}>
                   Apply
-                </button>
+                </ActionButton>
               </div>
-            }
-          >
+            </TableToolbar>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Visible" value={String(rows.length)} tone="info" />
+              <StatCard
+                label="Follow-Up Queue"
+                value={String(visibleDueFollowUps)}
+                tone={visibleDueFollowUps > 0 ? "warning" : "success"}
+              />
+              <StatCard
+                label="Party Linked"
+                value={String(visibleLinkedParties)}
+                tone={visibleLinkedParties > 0 ? "success" : "default"}
+              />
+              <StatCard label="Converted" value={String(visibleConverted)} tone="success" />
+            </div>
+            <div className="mt-5">
             <EnterpriseDataTable
               data={rows}
               columns={columns}
@@ -216,6 +261,7 @@ export default function AdminCrmLeadRegisterPage() {
               emptyTitle="No CRM leads found"
               emptyDescription="No lead rows match the current CRM register filter."
             />
+            </div>
           </WorkspaceSection>
         </>
       ) : null}

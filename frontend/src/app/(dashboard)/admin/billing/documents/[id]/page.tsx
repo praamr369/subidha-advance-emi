@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ShareActions from "@/components/communications/ShareActions";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -167,8 +169,11 @@ export default function BillingDocumentDetailPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Document Detail"
       title={invoice?.document_no || (documentId ? `Billing Document ${documentId}` : "Billing Document")}
       subtitle="Billing detail stays document-first: the invoice mirrors retail or subscription source state, while receipts and notes remain separate additive documents."
+      helperNote="This detail surface preserves billing-document-first review. Receipts, notes, subscriptions, and direct sales remain linked but operationally separate."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -215,6 +220,13 @@ export default function BillingDocumentDetailPage() {
           : []),
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Move between document review, related registers, notes, contracts, and posted billing books without leaving the billing workspace."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {loading ? <LoadingBlock label="Loading billing document detail..." /> : null}
       {!loading && error ? <ErrorState title="Billing detail load failed" description={error} /> : null}
 

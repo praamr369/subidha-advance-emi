@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
@@ -96,8 +98,11 @@ export default function BillingReceiptsPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Document Control"
       title="Receipt Register"
       subtitle="Retail receipts and EMI payment receipts remain separate printable documents with accounting provenance."
+      helperNote="Receipt documents are billing artifacts with posting provenance. They do not replace cashier payment capture or accounting book review."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -108,6 +113,13 @@ export default function BillingReceiptsPage() {
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Use the shared billing directory to move from receipts into invoices, documents, notes, contracts, and billing books."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <div className="receipt-print-hide">
         <EnterpriseDataTable
           data={rows}

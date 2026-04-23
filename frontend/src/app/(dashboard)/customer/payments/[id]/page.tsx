@@ -131,8 +131,11 @@ export default function CustomerPaymentReceiptPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Customer Payments"
       title={payment ? `Payment Receipt #${payment.id}` : "Payment Receipt"}
       subtitle="Customer-visible proof for a recorded payment within your own account."
+      helperNote="This receipt reflects recorded payment truth only. Contract settlement, winner benefit, waiver state, and outstanding posture remain on the related subscription routes."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Payments", href: "/customer/payments" },

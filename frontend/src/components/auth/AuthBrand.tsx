@@ -21,7 +21,7 @@ export default function AuthBrand({
     <div className={cn("min-w-0", className)}>
       <div
         className={cn(
-          "inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-3 py-2",
+          "inline-flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
           dark && "border-white/20 bg-white/10",
           compact ? "rounded-xl px-2.5 py-1.5" : ""
         )}

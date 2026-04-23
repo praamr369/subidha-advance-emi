@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
@@ -85,14 +87,24 @@ export default function BillingDebitNotesPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Adjustment Control"
       title="Billing Debit Notes"
       subtitle="Controlled upward invoice adjustments linked to original billing documents."
+      helperNote="Debit notes remain explicit billing-side increases with controlled posting. They stay separate from source invoices, receipts, and accounting reports."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
         { label: "Debit Notes" },
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Move between debit-note review, invoices, contract mirrors, receipt registers, and posted billing books from one billing workspace."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <div className="receipt-print-hide">
         <EnterpriseDataTable
           data={rows}

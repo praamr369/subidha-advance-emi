@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -86,8 +88,11 @@ export default function InventoryOpeningStockPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Opening Control"
       title="Opening Stock Import"
       subtitle="Preview and post opening stock as explicit inventory ledger movements without rewriting existing product or delivery history."
+      helperNote="Opening stock import remains additive and duplicate-safe at the ledger level. It does not backfill billing or contract history."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -100,6 +105,12 @@ export default function InventoryOpeningStockPage() {
       stats={stats}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Inventory route map"
+          description="Use the inventory directory to move between opening stock, live stock review, movement registers, valuation, and master control."
+          groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+        />
+
         <WorkspaceSection
           title="Upload Opening Stock"
           description="Accepted CSV columns: product_code or sku, quantity, optional location_code/location_name, optional notes."

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -464,8 +466,11 @@ export default function BillingDirectSalesPage() {
 
   return (
     <PortalPage
+      eyebrow="Billing Retail Control"
       title="Direct Sales Register"
       subtitle="Run non-EMI retail sales through a separate operational source record, then let billing and inventory post explicitly from the linked document flow."
+      helperNote="Direct retail sales remain billing-side operational records. They do not replace cashier EMI collection or accounting posting controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -484,6 +489,12 @@ export default function BillingDirectSalesPage() {
       ]}
       statusBadge={leadId ? { label: `Lead Handoff #${leadId}`, tone: "info" } : undefined}
     >
+      <WorkspaceDirectory
+        title="Billing route map"
+        description="Move between direct sales, billing documents, receipt registers, contract mirrors, and posted billing books from one workspace."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       {loading ? <LoadingBlock label="Loading direct-sale operations..." /> : null}
       {!loading && error ? <ErrorState title="Direct sales load failed" description={error} /> : null}
 

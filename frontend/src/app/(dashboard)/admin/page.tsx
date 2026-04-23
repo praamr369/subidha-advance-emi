@@ -209,6 +209,7 @@ export default function AdminDashboardPage() {
 
   return (
     <PortalPage
+      eyebrow="Executive Summary"
       title="Executive Dashboard"
       subtitle="Minimal decision surface for collections posture, settlement risk, urgent action, and route-safe launch points."
       helperNote="Detailed analytics and action queues live in Reports, Finance Control, and Operations Workspace. This page stays summary-only."

@@ -162,23 +162,32 @@ test.describe("cashier workflow smoke", () => {
 test.describe("partner workflow smoke", () => {
   test.use({ storageState: authStatePath("partner") });
 
-  test("partner collections and subscription requests pages load", async ({ page }) => {
+  test("partner collections, subscriptions, requests, and reports pages load", async ({ page }) => {
     await page.goto("/partner/collections");
-    await expect(page.locator("main h1", { hasText: "Partner Collections" })).toBeVisible();
+    await expect(page.locator("main h1", { hasText: "Collection Workspace" })).toBeVisible();
+
+    await page.goto("/partner/subscriptions");
+    await expect(page.locator("main h1", { hasText: "Partner Subscriptions" })).toBeVisible();
 
     await page.goto("/partner/subscription-requests");
     await expect(
       page.getByRole("heading", { name: "Partner Subscription Requests", exact: true })
     ).toBeVisible();
+
+    await page.goto("/partner/reports");
+    await expect(page.locator("main h1", { hasText: "Partner Reports" })).toBeVisible();
   });
 });
 
 test.describe("customer workflow smoke", () => {
   test.use({ storageState: authStatePath("customer") });
 
-  test("customer subscription requests, subscriptions, payments, and support pages load", async ({
+  test("customer deliveries, subscription requests, subscriptions, payments, and support pages load", async ({
     page,
   }) => {
+    await page.goto("/customer/deliveries");
+    await expect(page.locator("main h1", { hasText: "Delivery Tracking" })).toBeVisible();
+
     await page.goto("/customer/subscription-requests");
     await expect(page.locator("main h1", { hasText: "Subscription Requests" })).toBeVisible();
 

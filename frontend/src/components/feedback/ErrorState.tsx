@@ -17,9 +17,9 @@ function ErrorState({
   const resolvedMessage = description ?? message ?? "Please retry the request.";
 
   return (
-    <div className="rounded-2xl border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] p-4 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
+    <div className="rounded-[1.4rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] p-4 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
       <div className="flex items-start gap-3">
-        <div className="rounded-full border border-red-200/90 bg-white/90 p-2 text-red-700">
+        <div className="rounded-2xl border border-red-200/90 bg-white/90 p-2 text-red-700">
           <AlertTriangle className="h-4 w-4" />
         </div>
         <div className="min-w-0">

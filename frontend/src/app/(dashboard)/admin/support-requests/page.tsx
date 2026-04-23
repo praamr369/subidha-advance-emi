@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -8,8 +6,12 @@ import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes"
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatCard from "@/components/ui/StatCard";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   listAdminSupportRequests,
@@ -229,14 +231,22 @@ export default function AdminSupportRequestsPage() {
 
   return (
     <PortalPage
+      eyebrow="Support Triage"
       title="Support Requests"
       subtitle="Customer-submitted support and dispute intake with receipt and subscription context."
+      helperNote="Support intake remains distinct from service-desk case execution and from payment or accounting posting. Use this queue for first review and routing."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Control Center", href: ROUTES.admin.dashboard },
         { label: "Support Requests" },
       ]}
       actions={[
+        {
+          href: ROUTES.admin.serviceDesk,
+          label: "Service Desk",
+          variant: "primary",
+        },
         {
           href: ROUTES.admin.customers,
           label: "Customers",
@@ -282,156 +292,186 @@ export default function AdminSupportRequestsPage() {
             },
           ]}
         />
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
-            <div>
-              <label
-                htmlFor="support-request-search"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Search
-              </label>
-              <input
-                id="support-request-search"
-                type="text"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Customer, phone, payment ref, request id"
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="support-request-status"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Status
-              </label>
-              <select
-                id="support-request-status"
-                value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(
-                    normalizeStatusFilter(event.target.value.trim().toUpperCase())
-                  )
-                }
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All statuses</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="UNDER_REVIEW">Under Review</option>
-                <option value="CLOSED">Closed</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="support-request-category"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Category
-              </label>
-              <select
-                id="support-request-category"
-                value={categoryInput}
-                onChange={(event) => setCategoryInput(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All categories</option>
-                <option value="PAYMENT_ISSUE">Payment issue</option>
-                <option value="RECEIPT_ISSUE">Receipt issue</option>
-                <option value="EMI_ISSUE">EMI issue</option>
-                <option value="SUBSCRIPTION_QUERY">Subscription query</option>
-                <option value="DRAW_QUERY">Lucky draw query</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-
-            <div className="flex flex-wrap items-end gap-2">
-              <button
-                type="button"
-                onClick={applyFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={loading || refreshing}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {loading ? <LoadingBlock label="Loading support requests..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load support requests"
-            description={error}
-            onRetry={() => void loadPage("initial")}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Visible Queue" value={String(count)} tone="info" />
+          <StatCard
+            label="Submitted"
+            value={String(summary.submitted)}
+            tone={summary.submitted > 0 ? "warning" : "success"}
           />
-        ) : null}
-
-        {!loading && !error && rows.length === 0 ? (
-          <EmptyState
-            title="No support requests"
-            description="No customer-submitted support issues matched the current filters."
+          <StatCard label="Under Review" value={String(summary.under_review)} />
+          <StatCard
+            label="Unassigned"
+            value={String(summary.unassigned)}
+            tone={summary.unassigned > 0 ? "warning" : "success"}
           />
-        ) : null}
+        </div>
 
-        {!loading && !error && rows.length > 0 ? (
-          <DataTable<AdminSupportRequest>
-            rows={rows}
-            columns={columns}
-            rowActions={(row) => (
-              <div className="flex gap-2">
-                <Link
-                  href={`/admin/support-requests/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
-                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                >
-                  View Detail
-                </Link>
-                {typeof row.customer === "number" ? (
-                  <Link
-                    href={`/admin/customers/${row.customer}`}
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    Customer
-                  </Link>
-                ) : null}
-                {typeof row.subscription === "number" ? (
-                  <Link
-                    href={`/admin/subscriptions/${row.subscription}`}
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    Subscription
-                  </Link>
-                ) : null}
-                {typeof row.payment === "number" ? (
-                  <Link
-                    href={`/admin/payments/${row.payment}`}
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    Payment
-                  </Link>
-                ) : null}
+        <WorkspaceSection
+          title="Support queue controls"
+          description="Search support intake by customer, status, category, payment reference, or request id before routing the issue into detail review or service escalation."
+          action={
+            <ActionButton
+              type="button"
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
+        >
+          <TableToolbar
+            title="Filter support intake"
+            description="Keep triage fast by narrowing the queue before you jump into customer, subscription, or payment context."
+            footer={
+              <div className="text-sm text-muted-foreground">
+                {q || statusFilter || categoryFilter
+                  ? `Filtered view${statusFilter ? ` · ${statusFilter}` : ""}${categoryFilter ? ` · ${categoryFilter}` : ""}`
+                  : "Queue shows the full support intake scope."}
               </div>
-            )}
-          />
-        ) : null}
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
+              <div>
+                <label
+                  htmlFor="support-request-search"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Search
+                </label>
+                <input
+                  id="support-request-search"
+                  type="text"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Customer, phone, payment ref, request id"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="support-request-status"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Status
+                </label>
+                <select
+                  id="support-request-status"
+                  value={statusInput}
+                  onChange={(event) =>
+                    setStatusInput(
+                      normalizeStatusFilter(event.target.value.trim().toUpperCase())
+                    )
+                  }
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                >
+                  <option value="">All statuses</option>
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="UNDER_REVIEW">Under Review</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="support-request-category"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Category
+                </label>
+                <select
+                  id="support-request-category"
+                  value={categoryInput}
+                  onChange={(event) => setCategoryInput(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                >
+                  <option value="">All categories</option>
+                  <option value="PAYMENT_ISSUE">Payment issue</option>
+                  <option value="RECEIPT_ISSUE">Receipt issue</option>
+                  <option value="EMI_ISSUE">EMI issue</option>
+                  <option value="SUBSCRIPTION_QUERY">Subscription query</option>
+                  <option value="DRAW_QUERY">Lucky draw query</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2">
+                <ActionButton type="button" variant="primary" onClick={applyFilters}>
+                  Apply
+                </ActionButton>
+                <ActionButton type="button" variant="outline" onClick={clearFilters}>
+                  Clear
+                </ActionButton>
+              </div>
+            </div>
+          </TableToolbar>
+
+          <div className="mt-5">
+            {loading ? <LoadingBlock label="Loading support requests..." /> : null}
+
+            {!loading && error ? (
+              <ErrorState
+                title="Unable to load support requests"
+                description={error}
+                onRetry={() => void loadPage("initial")}
+              />
+            ) : null}
+
+            {!loading && !error && rows.length === 0 ? (
+              <EmptyState
+                title="No support requests"
+                description="No customer-submitted support issues matched the current filters."
+              />
+            ) : null}
+
+            {!loading && !error && rows.length > 0 ? (
+              <DataTable<AdminSupportRequest>
+                rows={rows}
+                columns={columns}
+                rowActions={(row) => (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <ActionButton
+                      href={`/admin/support-requests/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
+                      size="sm"
+                      variant="primary"
+                    >
+                      View Detail
+                    </ActionButton>
+                    {typeof row.customer === "number" ? (
+                      <ActionButton
+                        href={`/admin/customers/${row.customer}`}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Customer
+                      </ActionButton>
+                    ) : null}
+                    {typeof row.subscription === "number" ? (
+                      <ActionButton
+                        href={`/admin/subscriptions/${row.subscription}`}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Subscription
+                      </ActionButton>
+                    ) : null}
+                    {typeof row.payment === "number" ? (
+                      <ActionButton
+                        href={`/admin/payments/${row.payment}`}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Payment
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                )}
+              />
+            ) : null}
+          </div>
+        </WorkspaceSection>
       </div>
     </PortalPage>
   );

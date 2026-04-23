@@ -9,10 +9,13 @@ import {
   Lock,
   User,
   ArrowRight,
+  ShieldCheck,
+  BadgeCheck,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AuthLayoutShell } from "@/components/auth";
+import ActionButton from "@/components/ui/ActionButton";
 import { APP_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import { getDashboardRouteForRole } from "@/lib/auth/redirect";
@@ -210,19 +213,39 @@ export default function LoginPage() {
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         ) : null}
 
-        <button
+        <ActionButton
           type="submit"
           disabled={submitting}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          variant="primary"
+          size="lg"
+          fullWidth
+          rightIcon={!submitting ? <ArrowRight className="h-4 w-4" /> : null}
         >
-          <span>{submitting ? "Authenticating..." : "Sign in"}</span>
-          {!submitting && <ArrowRight className="h-4 w-4" />}
-        </button>
+          {submitting ? "Authenticating..." : "Sign in"}
+        </ActionButton>
+
+        <div className="workspace-filter-bar space-y-3 p-4">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">Authorized access only</div>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Internal staff and approved role accounts use this form. Public customer self-registration remains separate.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <BadgeCheck className="h-3.5 w-3.5" />
+            Login routing stays aligned to the existing role redirect contract.
+          </div>
+        </div>
 
         <div className="text-center text-sm text-slate-600">
           Don&apos;t have an account?{" "}

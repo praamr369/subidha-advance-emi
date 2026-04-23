@@ -1,12 +1,17 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   getCashierPaymentHistory,
   type CashierTransaction,
@@ -20,7 +25,13 @@ function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString();
+  return new Date(parsed).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function toErrorMessage(error: unknown): string {
@@ -28,26 +39,6 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Failed to load cashier payment history.";
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 export default function CashierPaymentsPage() {
@@ -117,10 +108,84 @@ export default function CashierPaymentsPage() {
     [rows]
   );
 
+  const latestVisiblePayment = rows[0] ?? null;
+
+  const columns = useMemo<Column<CashierTransaction>[]>(
+    () => [
+      {
+        key: "id",
+        title: "Payment",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">#{row.id}</div>
+            <div className="text-xs text-muted-foreground">
+              Ref {row.reference_no || `AUTO-${row.id}`}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "customer_name",
+        title: "Customer",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
+            <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
+          </div>
+        ),
+      },
+      {
+        key: "subscription_number",
+        title: "Subscription",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">
+              {row.subscription_number || `SUB-${row.subscription}`}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {row.batch_code || "No batch"}
+              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "method",
+        title: "Method",
+        render: (row) => row.method || "—",
+      },
+      {
+        key: "recorded_at",
+        title: "Recorded",
+        render: (row) => formatDateTime(row.created_at || row.payment_date),
+      },
+      {
+        key: "amount",
+        title: "Amount",
+        align: "right",
+        render: (row) => money(row.amount),
+      },
+      {
+        key: "status",
+        title: "Status",
+        render: (row) => (
+          <StatusBadge
+            status={row.is_reversed ? "REVERSED" : row.status_label || "RECORDED"}
+            label={row.status_label || (row.is_reversed ? "REVERSED" : "RECORDED")}
+          />
+        ),
+      },
+    ],
+    []
+  );
+
   return (
     <PortalPage
+      eyebrow="Cashier Desk"
       title="Payment History"
-      subtitle="Cashier-safe transaction lookup for receipt proof, quick dispute resolution, and recent counter activity review."
+      subtitle="Counter-safe payment lookup for receipt proof, dispute follow-up, and recent posted transaction review."
+      helperNote="New collection must still begin from the cashier collect flow, where assigned counter and finance-account controls remain enforced. This page never bypasses those controls."
+      helperTone="info"
       breadcrumbs={[
         { label: "Cashier", href: "/cashier" },
         { label: "Payment History" },
@@ -139,70 +204,97 @@ export default function CashierPaymentsPage() {
       ]}
       stats={[
         {
-          label: "Visible Payments",
+          label: "Visible payments",
           value: String(rows.length),
         },
         {
-          label: "Visible Amount",
+          label: "Visible amount",
           value: money(visibleAmount),
           tone: "success",
         },
         {
           label: "Reversed",
           value: String(reversedCount),
-          tone: reversedCount > 0 ? "warning" : undefined,
+          tone: reversedCount > 0 ? "warning" : "default",
+        },
+        {
+          label: "Latest visible",
+          value: latestVisiblePayment
+            ? formatDateTime(
+                latestVisiblePayment.created_at || latestVisiblePayment.payment_date
+              )
+            : "—",
         },
       ]}
       statusBadge={{
-        label: "Cashier Payment Lookup",
+        label: "Cashier lookup",
         tone: "info",
       }}
     >
       <div className="space-y-6">
-        <SectionCard
-          title="Search posted payments"
-          description="Search by payment ID, reference number, customer phone, customer name, subscription number, contract reference, EMI ID, or lucky number."
+        <WorkspaceSection
+          title="Counter lookup"
+          description="Search by payment ID, reference, customer phone, customer name, subscription number, EMI ID, or lucky number."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh", query)}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
         >
-          <form
-            onSubmit={handleApplySearch}
-            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+          <TableToolbar
+            footer={
+              query ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">
+                    Active search
+                  </span>
+                  <StatusBadge status="OPEN" label={query} hideIcon />
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Use this register for cashier-visible history only. Counter collection, counter assignment, and finance-account routing remain on the cashier collection surface.
+                </div>
+              )
+            }
           >
-            <div className="flex-1">
-              <label
-                htmlFor="cashier-payment-search"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Search query
+            <form
+              onSubmit={handleApplySearch}
+              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"
+            >
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="cashier-payment-search"
+                  type="text"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Payment ID, reference, phone, SUB-123, EMI id"
+                  className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-ring"
+                  disabled={loading || refreshing}
+                />
               </label>
-              <input
-                id="cashier-payment-search"
-                type="text"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Payment ID, reference, phone, SUB-123, EMI id"
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                disabled={loading || refreshing}
-              />
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading || refreshing}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Searching..." : "Search"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetSearch}
-              disabled={loading || refreshing}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Reset
-            </button>
-          </form>
-        </SectionCard>
+              <div className="flex flex-wrap gap-2">
+                <ActionButton type="submit" disabled={loading || refreshing}>
+                  Search
+                </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetSearch}
+                  disabled={loading || refreshing}
+                >
+                  Reset
+                </ActionButton>
+              </div>
+            </form>
+          </TableToolbar>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading cashier payment history..." /> : null}
 
@@ -215,115 +307,36 @@ export default function CashierPaymentsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <SectionCard
-            title="Posted payments"
+          <WorkspaceSection
+            title="Posted cashier-visible payments"
             description={
               query
                 ? `Showing cashier-visible results for "${query}".`
-                : "Showing the most recent cashier-visible payment activity."
+                : "Showing the most recent posted payments visible in cashier scope."
             }
           >
             {rows.length === 0 ? (
               <EmptyState
                 title="No matching payments"
                 description="No cashier-visible payments matched the current search."
+                action={
+                  <ActionButton href="/cashier/collect" variant="outline">
+                    Open collect flow
+                  </ActionButton>
+                }
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0">
-                  <thead>
-                    <tr className="text-left">
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Payment
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Customer
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Subscription / EMI
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Method / Reference
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                        Amount
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Posted
-                      </th>
-                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.id} className="align-top">
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <div className="font-medium">#{row.id}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {Boolean(row.is_reversed) ? "Reversed" : "Posted"}
-                          </div>
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <div className="font-medium">
-                            {row.customer_name || "Unknown customer"}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {row.customer_phone || "No phone"}
-                          </div>
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <div className="font-medium">
-                            {row.subscription_number || "—"}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            EMI {row.emi ?? "—"}
-                            {typeof row.emi_month_no === "number"
-                              ? ` · Month ${row.emi_month_no}`
-                              : ""}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {row.batch_code || "No batch"}
-                            {typeof row.lucky_number === "number"
-                              ? ` · Lucky #${row.lucky_number}`
-                              : ""}
-                          </div>
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <div className="font-medium">{row.method || "—"}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {row.reference_no || `AUTO-${row.id}`}
-                          </div>
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                          {money(row.amount)}
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          {formatDateTime(row.created_at || row.payment_date)}
-                        </td>
-
-                        <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <Link
-                            href={`/cashier/payments/${row.id}`}
-                            className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                          >
-                            View Receipt
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<CashierTransaction>
+                rows={rows}
+                columns={columns}
+                rowActions={(row) => (
+                  <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
+                    Receipt
+                  </ActionButton>
+                )}
+              />
             )}
-          </SectionCard>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

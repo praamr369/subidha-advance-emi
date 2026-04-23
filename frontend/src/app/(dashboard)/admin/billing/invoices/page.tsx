@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
@@ -99,8 +101,11 @@ export default function BillingInvoicesPage() {
   return (
     <PortalPage
       className="receipt-print-page"
+      eyebrow="Billing Document Control"
       title="Billing Invoices"
       subtitle="Retail and EMI billing documents with controlled approve/post flows."
+      helperNote="Invoices stay inside the billing document rail. Posting remains explicit and separate from accounting books and cashier collection activity."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Billing", href: ROUTES.admin.billing },
@@ -111,6 +116,13 @@ export default function BillingInvoicesPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
     >
+      <WorkspaceDirectory
+        className="receipt-print-hide"
+        title="Billing route map"
+        description="Use the shared billing directory to move from invoice review into receipts, notes, contracts, and posted billing books."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <div className="receipt-print-hide">
         <EnterpriseDataTable
           data={rows}

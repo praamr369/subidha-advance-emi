@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { RECONCILIATION_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { downloadCsv } from "@/lib/export/csv";
 import {
   buildAdminPaymentRoute,
@@ -173,16 +176,9 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[1.8rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.62)]">
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      <div className="mt-5">{children}</div>
-    </section>
+    <WorkspaceSection title={title} description={description}>
+      {children}
+    </WorkspaceSection>
   );
 }
 
@@ -439,8 +435,11 @@ export default function AdminReconciliationPage() {
 
   return (
     <PortalPage
+      eyebrow="Collections Reconciliation Control"
       title="Admin Reconciliation"
       subtitle="Canonical daily-operations reconciliation workspace for subscription attention and payment-level follow-up."
+      helperNote="This route remains the canonical collection-side reconciliation workspace. Finance commission verification stays separate and linked, not merged."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Collections & EMI", href: ROUTES.admin.collections },
@@ -508,6 +507,12 @@ export default function AdminReconciliationPage() {
       }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Reconciliation route map"
+          description="Move between collection-side reconciliation, payment review, collections workflow, and finance-side follow-up without crossing domain boundaries."
+          groups={RECONCILIATION_DIRECTORY_GROUPS}
+        />
+
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-foreground">

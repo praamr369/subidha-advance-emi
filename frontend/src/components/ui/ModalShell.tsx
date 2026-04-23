@@ -1,7 +1,7 @@
 // frontend/src/components/ui/ModalShell.tsx
 "use client";
 
-import { useMemo, useRef, type ReactNode } from "react";
+import { useId, useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ export default function ModalShell({
 }: ModalShellProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const portalRoot = usePopupPortalRoot();
+  const titleId = useId();
 
   const alignmentClassName = useMemo(() => {
     if (align === "right") return "items-start justify-end";
@@ -70,12 +71,15 @@ export default function ModalShell({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         className={cn(
           "workflow-modal-panel pointer-events-auto relative flex w-full min-h-0 max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[1.85rem] focus:outline-none sm:max-h-[calc(100dvh-3rem)]",
           panelClassName
         )}
       >
+        <div className="sr-only" id={titleId}>
+          {title}
+        </div>
         {children}
       </div>
     </div>,

@@ -12,6 +12,8 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
+import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -159,8 +161,11 @@ export default function AccountingVendorSettlementsPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Payables Control"
       title="Vendor Settlements"
       subtitle="Admin-only payable settlements from finance accounts into vendor balances, posted through the separate accounting subsystem."
+      helperNote="Vendor settlement drafts, posting, and cancellation remain explicit accounting actions with audit-safe payable clearing."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -183,6 +188,11 @@ export default function AccountingVendorSettlementsPage() {
         </div>
 
         {notice ? <AccountingNotice message={notice} /> : null}
+        <WorkspaceDirectory
+          title="Accounting control map"
+          description="Use the shared accounting directory to move between vendors, purchase bills, settlements, books, and statements."
+          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+        />
 
         <WorkspaceSection
           title="Create Settlement"

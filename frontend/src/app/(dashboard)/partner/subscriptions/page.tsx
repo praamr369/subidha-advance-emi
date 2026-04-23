@@ -1,19 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { RefreshCw, Search, Wallet } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
@@ -285,8 +285,11 @@ export default function PartnerSubscriptionsPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Contracts"
       title="Partner Subscriptions"
       subtitle="Review only the subscriptions attributed to your partner scope, with clearer contract state, outstanding amount, and next action visibility."
+      helperNote="This register is partner-scoped visibility only. Admin-only lifecycle controls, finance settlement, and payout authorization stay outside this workspace."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscriptions" },
@@ -311,37 +314,29 @@ export default function PartnerSubscriptionsPage() {
       stats={[
         { label: "Matching", value: count },
         { label: "Page Active", value: summary.pageActive, tone: "success" },
-        { label: "Page Won", value: summary.pageWon, tone: summary.pageWon > 0 ? "info" : undefined },
+        {
+          label: "Page Completed",
+          value: summary.pageCompleted,
+          tone: summary.pageCompleted > 0 ? "default" : undefined,
+        },
         { label: "Page Outstanding", value: formatMoney(summary.pageOutstanding), tone: "warning" },
       ]}
-      statusBadge={{ label: "Partner Subscription Scope", tone: "info" }}
+      statusBadge={{ label: "Partner contract scope", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Matching" value={count} />
-          <StatCard label="Page Active" value={summary.pageActive} tone="success" />
-          <StatCard label="Page Completed" value={summary.pageCompleted} />
-          <StatCard
-            label="Page Outstanding"
-            value={formatMoney(summary.pageOutstanding)}
-            tone="warning"
-            icon={<Wallet className="h-4 w-4" />}
-          />
-        </div>
-
         <WorkspaceSection
           title="Subscription workflow"
           description="Filter by contract status, search within the current partner scope, and jump directly into detail or collection actions."
           action={
-            <button
+            <ActionButton
               type="button"
+              variant="outline"
               onClick={() => void loadSubscriptions("refresh")}
               disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
-              <RefreshCw className="h-4 w-4" />
               {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+            </ActionButton>
           }
         >
           <TableToolbar
@@ -390,27 +385,20 @@ export default function PartnerSubscriptionsPage() {
               </select>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-                >
+                <ActionButton type="submit">
                   Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                >
+                </ActionButton>
+                <ActionButton type="button" variant="outline" onClick={clearFilters}>
                   Reset
-                </button>
+                </ActionButton>
                 {customerFilter ? (
-                  <button
+                  <ActionButton
                     type="button"
+                    variant="ghost"
                     onClick={() => router.replace("/partner/subscriptions")}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                   >
                     Clear Scope
-                  </button>
+                  </ActionButton>
                 ) : null}
               </div>
             </form>
@@ -446,33 +434,43 @@ export default function PartnerSubscriptionsPage() {
               <DataTable<PartnerSubscription>
                 rows={rows}
                 columns={columns}
+                pageSize={PAGE_SIZE}
                 onRowClick={(row) => router.push(`/partner/subscriptions/${row.id}`)}
                 rowActions={(row) => (
                   <div className="flex flex-wrap gap-2">
-                    <Link
+                    <ActionButton
                       href={`/partner/subscriptions/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      variant="outline"
+                      size="sm"
                     >
                       View Detail
-                    </Link>
+                    </ActionButton>
                     {row.customer ? (
-                      <Link
+                      <ActionButton
                         href={`/partner/customers/${row.customer}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        variant="ghost"
+                        size="sm"
                       >
                         Customer
-                      </Link>
+                      </ActionButton>
                     ) : null}
-                    <Link
+                    <ActionButton
                       href={`/partner/collections/create?subscription=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      variant="ghost"
+                      size="sm"
                     >
                       Collect
-                    </Link>
+                    </ActionButton>
                   </div>
                 )}
               />
             )}
+
+            <div className="mt-5">
+              <WorkspaceNotice tone="info" title="Contract follow-up boundary">
+                This register is for partner contract visibility and next-step routing only. Payment posting still flows through collection requests, while reconciliation and payout controls remain protected in separate finance workflows.
+              </WorkspaceNotice>
+            </div>
 
             {count > 0 ? (
               <PaginationControls

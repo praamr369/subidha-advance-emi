@@ -12,6 +12,8 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
+import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -290,8 +292,11 @@ export default function AccountingPurchaseBillsPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Purchase Control"
       title="Purchase Bills"
       subtitle="Draft, approve, and post purchase-side stock inward documents through controlled inventory and accounting services without touching billing, EMI, or payment truth."
+      helperNote="Purchase bills remain accounting-side source documents for stock inward and payable recognition. Billing and cashier flows remain separate."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -317,6 +322,11 @@ export default function AccountingPurchaseBillsPage() {
 
         {notice ? <AccountingNotice message={notice} /> : null}
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
+        <WorkspaceDirectory
+          title="Accounting control map"
+          description="Jump between purchase bills, vendors, settlements, books, and statements from one accounting business-control workspace."
+          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+        />
 
         <WorkspaceSection
           title={selectedBill ? "Edit Draft Purchase Bill" : "Create Draft Purchase Bill"}

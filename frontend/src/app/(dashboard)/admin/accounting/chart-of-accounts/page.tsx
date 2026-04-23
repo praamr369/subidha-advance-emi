@@ -8,6 +8,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ChartAccountEditDrawer from "@/components/accounting/ChartAccountEditDrawer";
 import FinanceAccountEditDrawer from "@/components/accounting/FinanceAccountEditDrawer";
+import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -301,8 +303,11 @@ export default function AccountingChartOfAccountsPage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Master Control"
       title="Chart of Accounts"
       subtitle="Create, review, and safely edit accounting masters without weakening posting controls, ledger integrity, or downstream reconciliation."
+      helperNote="Chart and finance account setup remain the accounting system of record for posting structure. They do not merge cashier collection, billing execution, or EMI operational truth."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -331,6 +336,11 @@ export default function AccountingChartOfAccountsPage() {
         </div>
 
         {notice ? <AccountingNotice tone="success" message={notice} /> : null}
+        <WorkspaceDirectory
+          title="Accounting control map"
+          description="Move between accounting setup, payables, books, and statements without leaving the accounting control family."
+          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+        />
         {loading ? <LoadingBlock label="Loading accounting masters..." /> : null}
 
         {!loading && error ? (

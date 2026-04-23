@@ -7,10 +7,11 @@ export function PageSection({ children, className }: { children: ReactNode; clas
   return (
     <section
       className={cn(
-        "surface-panel-elevated rounded-[1.55rem] border border-border bg-card p-4 shadow-sm sm:p-5",
+        "workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-4 sm:p-5",
         className
       )}
     >
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
       {children}
     </section>
   );
@@ -57,7 +58,7 @@ export function MetricCard({
   return (
     <article
       className={cn(
-        "rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.42)]",
+        "rounded-[1.25rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
         className
       )}
     >
@@ -78,7 +79,7 @@ export function DataToolbar({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] sm:flex-row sm:items-center sm:justify-between",
+        "workspace-filter-bar flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between",
         className
       )}
     >
@@ -137,11 +138,11 @@ export function PortalEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-[var(--surface-muted)]/45 px-6 py-10 text-center",
+        "flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_92%,var(--surface-muted)_8%),color-mix(in_oklab,var(--surface-card-soft)_72%,var(--surface-muted)_28%))] px-6 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
         className
       )}
     >
-      <div className="rounded-full border border-border bg-[var(--surface-card-elevated)] p-3 text-muted-foreground">
+      <div className="rounded-full border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] p-3 text-muted-foreground shadow-[0_12px_32px_-26px_rgba(15,23,42,0.32)]">
         {icon ?? <Inbox className="h-5 w-5" />}
       </div>
       <h3 className="mt-3 text-sm font-semibold text-foreground">{title}</h3>

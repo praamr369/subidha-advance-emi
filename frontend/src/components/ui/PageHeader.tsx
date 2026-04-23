@@ -24,7 +24,7 @@ export default function PageHeader({
   return (
     <div
       className={cn(
-        "surface-panel-elevated flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm md:flex-row md:items-start md:justify-between",
+        "workspace-header-panel flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between",
         className
       )}
     >
@@ -50,7 +50,7 @@ export default function PageHeader({
         ) : null}
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+        <div className="workspace-action-bar flex flex-wrap items-center gap-2 p-2">
           {actions}
         </div>
       )}

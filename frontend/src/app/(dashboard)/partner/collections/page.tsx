@@ -1,14 +1,17 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 
-import PortalPage from "@/components/ui/PortalPage";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import ErrorState from "@/components/feedback/ErrorState";
 import EmptyState from "@/components/feedback/EmptyState";
-import DataTable from "@/components/ui/DataTable";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { getPartnerDashboard } from "@/services/partner";
 
 type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
@@ -90,7 +93,9 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load partner collection workspace.";
 }
 
-function normalizeCollectionRequestRow(item: Record<string, unknown>): CollectionRequestRow {
+function normalizeCollectionRequestRow(
+  item: Record<string, unknown>
+): CollectionRequestRow {
   const subscriptionId =
     toNumber(item.subscription_id) ?? toNumber(item.subscription) ?? undefined;
 
@@ -111,7 +116,9 @@ function normalizeCollectionRequestRow(item: Record<string, unknown>): Collectio
   };
 }
 
-function normalizeVerifiedPaymentRow(item: Record<string, unknown>): VerifiedPaymentRow {
+function normalizeVerifiedPaymentRow(
+  item: Record<string, unknown>
+): VerifiedPaymentRow {
   const subscriptionId =
     toNumber(item.subscription_id) ?? toNumber(item.subscription) ?? undefined;
 
@@ -207,10 +214,100 @@ export default function PartnerCollectionsPage() {
   const hasAnyCollectionData =
     requests.length > 0 || verifiedPayments.length > 0 || followUpQueue.length > 0;
 
+  const requestColumns = useMemo<Column<CollectionRequestRow>[]>(
+    () => [
+      {
+        key: "subscription_code",
+        title: "Subscription",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{row.subscription_code}</div>
+            <div className="text-xs text-muted-foreground">{row.customer_name}</div>
+          </div>
+        ),
+      },
+      {
+        key: "amount",
+        title: "Amount",
+        align: "right",
+        render: (row) => money(row.amount),
+      },
+      {
+        key: "method",
+        title: "Method",
+      },
+      {
+        key: "payment_date",
+        title: "Collection Date",
+        render: (row) => formatDate(row.payment_date),
+      },
+      {
+        key: "submitted_at",
+        title: "Submitted At",
+        render: (row) => formatDateTime(row.submitted_at),
+      },
+      {
+        key: "status",
+        title: "Status",
+        render: (row) => <StatusBadge status={row.status} />,
+      },
+      {
+        key: "reference_no",
+        title: "Reference",
+        render: (row) => row.reference_no || "—",
+      },
+    ],
+    []
+  );
+
+  const verifiedColumns = useMemo<Column<VerifiedPaymentRow>[]>(
+    () => [
+      {
+        key: "subscription_code",
+        title: "Subscription",
+        render: (row) => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{row.subscription_code}</div>
+            <div className="text-xs text-muted-foreground">{row.customer_name}</div>
+          </div>
+        ),
+      },
+      {
+        key: "amount",
+        title: "Amount",
+        align: "right",
+        render: (row) => money(row.amount),
+      },
+      {
+        key: "method",
+        title: "Method",
+      },
+      {
+        key: "payment_date",
+        title: "Payment Date",
+        render: (row) => formatDate(row.payment_date),
+      },
+      {
+        key: "verified_at",
+        title: "Verified At",
+        render: (row) => formatDateTime(row.verified_at),
+      },
+      {
+        key: "reference_no",
+        title: "Reference",
+        render: (row) => row.reference_no || "—",
+      },
+    ],
+    []
+  );
+
   return (
     <PortalPage
-      title="Partner Collections"
-      subtitle="Track submitted field collections, review progress, and understand when EMI becomes finally verified."
+      eyebrow="Partner Collections"
+      title="Collection Workspace"
+      subtitle="Track submitted field collections, review progress, and the verified payment rows that become partner-visible only after controlled approval."
+      helperNote="Partner collection requests are operational intake, not final payment truth. Verified payments appear only after backend verification and admin approval complete."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Collections" },
@@ -222,321 +319,194 @@ export default function PartnerCollectionsPage() {
           variant: "primary",
         },
         {
-          label: "Subscriptions",
-          href: "/partner/subscriptions",
+          label: "Payments",
+          href: "/partner/payments",
+          variant: "secondary",
+        },
+        {
+          label: "Customers",
+          href: "/partner/customers",
           variant: "secondary",
         },
       ]}
       stats={[
         { label: "Submitted", value: submittedCount },
-        { label: "Under Review", value: underReviewCount },
-        { label: "Approved", value: approvedCount },
-        { label: "Rejected", value: rejectedCount },
+        { label: "Under review", value: underReviewCount, tone: "warning" },
+        { label: "Approved", value: approvedCount, tone: "success" },
+        {
+          label: "Rejected",
+          value: rejectedCount,
+          tone: rejectedCount > 0 ? "danger" : "default",
+        },
       ]}
+      statusBadge={{ label: "Partner collection scope", tone: "info" }}
     >
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => void loadPage("refresh")}
-          disabled={refreshing}
-          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+      <div className="space-y-6">
+        <WorkspaceSection
+          title="Collection boundary"
+          description="Use this workspace to understand where a partner-submitted collection is in the pipeline without crossing into admin finance or reconciliation controls."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
+          <WorkspaceNotice tone="info" title="Operational separation">
+            Submitted requests represent field collection activity. Verified payments below represent finalized partner-visible truth after approval. Neither surface exposes admin-only payout, reversal, or reconciliation controls.
+          </WorkspaceNotice>
+        </WorkspaceSection>
+
+        {loading ? <LoadingBlock label="Loading partner collections..." /> : null}
+
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load partner collections"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error ? (
+          <>
+            {!hasAnyCollectionData ? (
+              <WorkspaceSection
+                title="Collection activity"
+                description="No submitted requests, verified payments, or follow-up items are currently available in this partner scope."
+              >
+                <EmptyState
+                  title="No collection workflow activity"
+                  description="Create a new collection request to begin the partner collection flow."
+                  action={
+                    <ActionButton href="/partner/collections/create" variant="outline">
+                      Submit collection
+                    </ActionButton>
+                  }
+                />
+              </WorkspaceSection>
+            ) : (
+              <>
+                <WorkspaceSection
+                  title="Submitted collection requests"
+                  description="Partner-created requests waiting for review or final decision."
+                >
+                  {requests.length === 0 ? (
+                    <EmptyState
+                      title="No submitted collection requests"
+                      description="No partner collection requests matched the current workspace."
+                    />
+                  ) : (
+                    <DataTable<CollectionRequestRow>
+                      rows={requests}
+                      columns={requestColumns}
+                      rowActions={(row) => (
+                        <div className="flex flex-wrap gap-2">
+                          <ActionButton
+                            href={`/partner/collections/${row.id}`}
+                            variant="outline"
+                          >
+                            Request detail
+                          </ActionButton>
+                          {typeof row.subscription_id === "number" ? (
+                            <ActionButton
+                              href={`/partner/collections/create?subscription=${row.subscription_id}`}
+                              variant="outline"
+                            >
+                              New request
+                            </ActionButton>
+                          ) : null}
+                        </div>
+                      )}
+                    />
+                  )}
+                </WorkspaceSection>
+
+                <WorkspaceSection
+                  title="Recently verified payments"
+                  description="These rows represent finalized payment visibility after approval and verification."
+                >
+                  {verifiedPayments.length === 0 ? (
+                    <EmptyState
+                      title="No verified payments visible"
+                      description="No verified partner-visible payment rows are currently available."
+                    />
+                  ) : (
+                    <DataTable<VerifiedPaymentRow>
+                      rows={verifiedPayments}
+                      columns={verifiedColumns}
+                      rowActions={(row) => (
+                        <ActionButton
+                          href={
+                            row.subscription_id
+                              ? `/partner/payments?subscription=${row.subscription_id}`
+                              : "/partner/payments"
+                          }
+                          variant="outline"
+                        >
+                          Open payments
+                        </ActionButton>
+                      )}
+                    />
+                  )}
+                </WorkspaceSection>
+
+                <WorkspaceSection
+                  title="Follow-up queue"
+                  description="Requests needing re-submission, trace clarification, or partner action."
+                >
+                  {followUpQueue.length === 0 ? (
+                    <EmptyState
+                      title="No follow-up queue items"
+                      description="No partner follow-up items currently require action."
+                    />
+                  ) : (
+                    <DataTable<CollectionRequestRow>
+                      rows={followUpQueue}
+                      columns={[
+                        ...requestColumns.slice(0, 2),
+                        {
+                          key: "status",
+                          title: "Status",
+                          render: (row) => <StatusBadge status={row.status} />,
+                        },
+                        {
+                          key: "review_note",
+                          title: "Review Note",
+                          render: (row) => row.review_note || "—",
+                        },
+                      ]}
+                      rowActions={(row) => (
+                        <div className="flex flex-wrap gap-2">
+                          <ActionButton
+                            href={`/partner/collections/${row.id}`}
+                            variant="outline"
+                          >
+                            Request detail
+                          </ActionButton>
+                          <ActionButton
+                            href={
+                              row.subscription_id
+                                ? `/partner/collections/create?subscription=${row.subscription_id}`
+                                : "/partner/collections/create"
+                            }
+                            variant="outline"
+                          >
+                            Submit new request
+                          </ActionButton>
+                        </div>
+                      )}
+                    />
+                  )}
+                </WorkspaceSection>
+              </>
+            )}
+          </>
+        ) : null}
       </div>
-
-      {loading ? <LoadingBlock label="Loading partner collections..." /> : null}
-
-      {!loading && error ? (
-        <ErrorState
-          title="Unable to load partner collections"
-          description={error}
-          onRetry={() => void loadPage("initial")}
-        />
-      ) : null}
-
-      {!loading && !error ? (
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-card-foreground">
-              Workflow boundary
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Partner-side collection activity is operational progress, not final
-              payment truth. EMI should be treated as paid only after controlled
-              backend verification and admin approval. Submitted requests help you
-              track field activity, while verified payments reflect finalized system truth.
-            </p>
-          </section>
-
-          {!hasAnyCollectionData ? (
-            <EmptyState
-              title="No collection workflow activity"
-              description="No submitted requests, verified payments, or follow-up items are currently available in this partner scope."
-            />
-          ) : (
-            <>
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-card-foreground">
-                      Submitted collection requests
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Requests created by partner field collection workflow and waiting for
-                      admin review or final decision.
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/partner/collections/create"
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    New Request
-                  </Link>
-                </div>
-
-                {requests.length === 0 ? (
-                  <EmptyState
-                    title="No submitted collection requests"
-                    description="No partner collection requests matched the current collection workspace."
-                  />
-                ) : (
-                  <DataTable<CollectionRequestRow>
-                    rows={requests}
-                    emptyText="No collection requests available."
-                    columns={[
-                      {
-                        key: "subscription_code",
-                        title: "Subscription",
-                        render: (row) => (
-                          <div className="space-y-1">
-                            <div className="font-medium text-foreground">
-                              {row.subscription_code}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.customer_name}
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        key: "amount",
-                        title: "Amount",
-                        align: "right",
-                        render: (row) => money(row.amount),
-                      },
-                      {
-                        key: "method",
-                        title: "Method",
-                      },
-                      {
-                        key: "payment_date",
-                        title: "Collection Date",
-                        render: (row) => formatDate(row.payment_date),
-                      },
-                      {
-                        key: "submitted_at",
-                        title: "Submitted At",
-                        render: (row) => formatDateTime(row.submitted_at),
-                      },
-                      {
-                        key: "status",
-                        title: "Status",
-                        render: (row) => <StatusBadge status={row.status} />,
-                      },
-                      {
-                        key: "reference_no",
-                        title: "Reference",
-                        render: (row) => row.reference_no || "—",
-                      },
-                      {
-                        key: "actions",
-                        title: "Actions",
-                        render: (row) => (
-                          <div className="flex flex-col items-start gap-2">
-                            <Link
-                              href={`/partner/collections/${row.id}`}
-                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Request Detail
-                            </Link>
-                            {typeof row.subscription_id === "number" ? (
-                              <Link
-                                href={`/partner/collections/create?subscription=${row.subscription_id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                New Request
-                              </Link>
-                            ) : null}
-                          </div>
-                        ),
-                      },
-                    ]}
-                  />
-                )}
-              </section>
-
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-card-foreground">
-                    Recently verified payments
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    These rows represent finalized payment visibility after admin verification.
-                  </p>
-                </div>
-
-                {verifiedPayments.length === 0 ? (
-                  <EmptyState
-                    title="No verified payments visible"
-                    description="No verified partner-visible payment rows are currently available."
-                  />
-                ) : (
-                  <DataTable<VerifiedPaymentRow>
-                    rows={verifiedPayments}
-                    emptyText="No verified payments available."
-                    columns={[
-                      {
-                        key: "subscription_code",
-                        title: "Subscription",
-                        render: (row) => (
-                          <div className="space-y-1">
-                            <div className="font-medium text-foreground">
-                              {row.subscription_code}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.customer_name}
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        key: "amount",
-                        title: "Amount",
-                        align: "right",
-                        render: (row) => money(row.amount),
-                      },
-                      {
-                        key: "method",
-                        title: "Method",
-                      },
-                      {
-                        key: "payment_date",
-                        title: "Payment Date",
-                        render: (row) => formatDate(row.payment_date),
-                      },
-                      {
-                        key: "verified_at",
-                        title: "Verified At",
-                        render: (row) => formatDateTime(row.verified_at),
-                      },
-                      {
-                        key: "reference_no",
-                        title: "Reference",
-                        render: (row) => row.reference_no || "—",
-                      },
-                      {
-                        key: "actions",
-                        title: "Actions",
-                        render: (row) => (
-                          <div className="flex flex-col items-start gap-2">
-                            <Link
-                              href={
-                                row.subscription_id
-                                  ? `/partner/payments?subscription=${row.subscription_id}`
-                                  : "/partner/payments"
-                              }
-                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Open Payments
-                            </Link>
-                          </div>
-                        ),
-                      },
-                    ]}
-                  />
-                )}
-              </section>
-
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-card-foreground">
-                    Follow-up queue
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Requests needing re-submission, trace clarification, or partner action.
-                  </p>
-                </div>
-
-                {followUpQueue.length === 0 ? (
-                  <EmptyState
-                    title="No follow-up queue items"
-                    description="No partner follow-up items currently require action."
-                  />
-                ) : (
-                  <DataTable<CollectionRequestRow>
-                    rows={followUpQueue}
-                    emptyText="No follow-up queue items."
-                    columns={[
-                      {
-                        key: "subscription_code",
-                        title: "Subscription",
-                        render: (row) => (
-                          <div className="space-y-1">
-                            <div className="font-medium text-foreground">
-                              {row.subscription_code}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.customer_name}
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        key: "amount",
-                        title: "Amount",
-                        align: "right",
-                        render: (row) => money(row.amount),
-                      },
-                      {
-                        key: "status",
-                        title: "Status",
-                        render: (row) => <StatusBadge status={row.status} />,
-                      },
-                      {
-                        key: "review_note",
-                        title: "Review Note",
-                        render: (row) => row.review_note || "—",
-                      },
-                      {
-                        key: "actions",
-                        title: "Actions",
-                        render: (row) => (
-                          <div className="flex flex-col items-start gap-2">
-                            <Link
-                              href={`/partner/collections/${row.id}`}
-                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Request Detail
-                            </Link>
-                            <Link
-                              href="/partner/collections/create"
-                              className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Submit New Request
-                            </Link>
-                          </div>
-                        ),
-                      },
-                    ]}
-                  />
-                )}
-              </section>
-            </>
-          )}
-        </div>
-      ) : null}
     </PortalPage>
   );
 }

@@ -13,7 +13,10 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { FINANCE_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import { downloadCsv } from "@/lib/export/csv";
@@ -334,13 +337,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
+    <WorkspaceSection title={title} description={description}>
+      {children}
+    </WorkspaceSection>
   );
 }
 
@@ -715,8 +714,11 @@ export default function AdminFinanceCommissionsPage() {
 
   return (
     <PortalPage
+      eyebrow="Finance Commission Control"
       title="Commission Register"
       subtitle="Track commission liability, partner earning history, settlement readiness, and payout handoff with payment-linked financial context."
+      helperNote="Commission review, payout preparation, and commission reconciliation stay in finance. They are not merged into cashier collection or accounting posting lanes."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Finance", href: "/admin/finance" },
@@ -760,6 +762,12 @@ export default function AdminFinanceCommissionsPage() {
       }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Finance route map"
+          description="Move between commission review, finance verification, payout execution, and downstream accounting handoff without crossing domain boundaries."
+          groups={FINANCE_CONTROL_DIRECTORY_GROUPS}
+        />
+
         <SectionCard
           title="Finance summary"
           description="Top-level commission exposure across unsettled, settled, and reversed records."

@@ -1,15 +1,19 @@
 "use client";
 
-import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { DetailSection, MoneySummary, StatusChip } from "@/components/detail";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import DataTable from "@/components/ui/DataTable";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   listCustomerPayments,
@@ -59,10 +63,6 @@ function toErrorMessage(error: unknown): string {
 
 function paymentStatus(payment: CustomerPayment): "RECORDED" | "REVERSED" {
   return payment.is_reversed ? "REVERSED" : "RECORDED";
-}
-
-function statusBadgeTone(status: "RECORDED" | "REVERSED"): "success" | "danger" {
-  return status === "REVERSED" ? "danger" : "success";
 }
 
 export default function CustomerPaymentsPage() {
@@ -134,16 +134,14 @@ export default function CustomerPaymentsPage() {
     return rows.filter((row) => row.is_reversed).length;
   }, [rows]);
 
-  const latestPayment = useMemo(() => {
-    return rows[0] ?? null;
-  }, [rows]);
+  const latestPayment = rows[0] ?? null;
 
-  const columns = useMemo(
+  const columns = useMemo<Column<CustomerPayment>[]>(
     () => [
       {
         key: "id",
         title: "Payment",
-        render: (row: CustomerPayment) => (
+        render: (row) => (
           <div>
             <div className="font-medium text-foreground">#{row.id}</div>
             <div className="mt-1 text-xs text-muted-foreground">
@@ -155,13 +153,15 @@ export default function CustomerPaymentsPage() {
       {
         key: "subscription_number",
         title: "Subscription",
-        render: (row: CustomerPayment) => (
+        render: (row) => (
           <div>
             <div className="font-medium text-foreground">
               {row.subscription_number || `SUB-${row.subscription}`}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {row.product_name || formatPlanTypeLabel(row.subscription_plan_type) || "Lucky Plan"}
+              {row.product_name ||
+                formatPlanTypeLabel(row.subscription_plan_type) ||
+                "Lucky Plan"}
             </div>
           </div>
         ),
@@ -169,12 +169,10 @@ export default function CustomerPaymentsPage() {
       {
         key: "emi_id",
         title: "EMI",
-        render: (row: CustomerPayment) => (
+        render: (row) => (
           <div>
             <div className="font-medium text-foreground">
-              {row.emi_id
-                ? `Month ${row.emi_month_no ?? "—"}`
-                : "Subscription-level payment"}
+              {row.emi_id ? `Month ${row.emi_month_no ?? "—"}` : "Subscription-level payment"}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {row.emi_id
@@ -187,29 +185,27 @@ export default function CustomerPaymentsPage() {
       {
         key: "method",
         title: "Method",
-        render: (row: CustomerPayment) => row.method || "—",
+        render: (row) => row.method || "—",
       },
       {
         key: "payment_date",
         title: "Recorded",
-        render: (row: CustomerPayment) =>
-          formatDateTime(row.created_at || row.payment_date),
+        render: (row) => formatDateTime(row.created_at || row.payment_date),
       },
       {
         key: "amount",
         title: "Amount",
-        align: "right" as const,
-        render: (row: CustomerPayment) => money(row.amount),
+        align: "right",
+        render: (row) => money(row.amount),
       },
-        {
-          key: "status",
-          title: "Status",
-          render: (row: CustomerPayment) => {
-            const status = paymentStatus(row);
-            return <StatusChip label={status} tone={statusBadgeTone(status)} />;
-          },
-        },
-      ],
+      {
+        key: "status",
+        title: "Status",
+        render: (row) => (
+          <StatusBadge status={paymentStatus(row)} label={paymentStatus(row)} />
+        ),
+      },
+    ],
     []
   );
 
@@ -236,8 +232,11 @@ export default function CustomerPaymentsPage() {
 
   return (
     <PortalPage
+      eyebrow="Customer Payments"
       title="My Payments"
-      subtitle="Customer-scoped payment history with recorded payment rows and a net settled total."
+      subtitle="Customer-scoped recorded payment history with direct receipt access and no exposure to internal finance-only controls."
+      helperNote="This route shows posted customer payment records only. Outstanding balance, waiver posture, and contract lifecycle remain anchored to the subscription workspace."
+      helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
         { label: "Payments" },
@@ -255,54 +254,82 @@ export default function CustomerPaymentsPage() {
         },
       ]}
       stats={[
-        { label: "Payment Records", value: count },
-        { label: "Total Paid", value: money(totalPaidAmount), tone: "success" },
+        { label: "Payment records", value: count },
+        { label: "Total paid", value: money(totalPaidAmount), tone: "success" },
         { label: "Subscriptions", value: uniqueSubscriptionCount },
-        { label: "Reversed", value: reversedCount, tone: reversedCount > 0 ? "warning" : undefined },
         {
-          label: "Latest Payment",
+          label: "Reversed",
+          value: reversedCount,
+          tone: reversedCount > 0 ? "warning" : "default",
+        },
+        {
+          label: "Latest payment",
           value: latestPayment
             ? formatDateTime(latestPayment.created_at || latestPayment.payment_date)
             : "—",
         },
       ]}
-      statusBadge={{ label: "Customer Payment Truth", tone: "info" }}
+      statusBadge={{ label: "Customer payment truth", tone: "info" }}
     >
       <div className="space-y-6">
-        <DetailSection
-          title="Filter payments"
+        <WorkspaceSection
+          title="Payment filters"
           description="Narrow customer-visible payment history by subscription or collection method."
+          action={
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+          }
         >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-            <div className="flex-1">
-              <label
-                htmlFor="customer-payment-subscription"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Subscription
-              </label>
+          <TableToolbar
+            footer={
+              subscriptionFilter || methodFilter ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-[0.14em]">
+                    Active filters
+                  </span>
+                  {subscriptionFilter ? (
+                    <StatusBadge
+                      status="OPEN"
+                      label={`Subscription ${subscriptionFilter}`}
+                      hideIcon
+                    />
+                  ) : null}
+                  {methodFilter ? (
+                    <StatusBadge
+                      status="VERIFIED"
+                      label={`Method ${methodFilter}`}
+                      hideIcon
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Open a receipt to see transaction proof, then move into support from the receipt itself if something looks incorrect.
+                </div>
+              )
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
               <input
                 id="customer-payment-subscription"
                 type="text"
                 value={subscriptionInput}
                 onChange={(event) => setSubscriptionInput(event.target.value)}
                 placeholder="Filter by subscription id"
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               />
-            </div>
 
-            <div className="w-full lg:w-56">
-              <label
-                htmlFor="customer-payment-method"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Method
-              </label>
               <select
                 id="customer-payment-method"
                 value={methodInput}
                 onChange={(event) => setMethodInput(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               >
                 <option value="">All methods</option>
                 <option value="CASH">Cash</option>
@@ -310,43 +337,18 @@ export default function CustomerPaymentsPage() {
                 <option value="BANK">Bank</option>
                 <option value="CARD">Card</option>
               </select>
-            </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={applyFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={loading || refreshing}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <ActionButton type="button" onClick={applyFilters}>
+                  Apply
+                </ActionButton>
+                <ActionButton type="button" variant="outline" onClick={clearFilters}>
+                  Clear
+                </ActionButton>
+              </div>
             </div>
-          </div>
-
-          {(subscriptionFilter || methodFilter) && !loading ? (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-              Showing payment history with filters:
-              {subscriptionFilter ? ` subscription ${subscriptionFilter}` : ""}
-              {subscriptionFilter && methodFilter ? " · " : ""}
-              {methodFilter ? ` method ${methodFilter}` : ""}
-            </div>
-          ) : null}
-        </DetailSection>
+          </TableToolbar>
+        </WorkspaceSection>
 
         {loading ? <LoadingBlock label="Loading payment history..." /> : null}
 
@@ -358,68 +360,39 @@ export default function CustomerPaymentsPage() {
           />
         ) : null}
 
-        {!loading && !error && rows.length === 0 ? (
-          <EmptyState
-            title="No payment records"
-            description={
-              subscriptionFilter || methodFilter
-                ? "No recorded customer payments matched the current filters."
-                : "No recorded customer payments are currently available."
-            }
-          />
-        ) : null}
-
-        {!loading && !error && rows.length > 0 ? (
-          <>
-            <DetailSection
-              title="Settlement summary"
-              description="Customer-safe summary of payment records in the current result set."
-            >
-              <MoneySummary
-                items={[
-                  { label: "Total paid amount", value: money(totalPaidAmount), tone: "success" },
-                  { label: "Payment records", value: count },
-                  { label: "Linked subscriptions", value: uniqueSubscriptionCount },
-                  {
-                    label: "Reversed records",
-                    value: reversedCount,
-                    tone: reversedCount > 0 ? "warning" : "default",
-                  },
-                ]}
+        {!loading && !error ? (
+          <WorkspaceSection
+            title="Recorded customer payments"
+            description="Open a row to view the receipt and navigate to the related subscription or support route."
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No payment records"
+                description={
+                  subscriptionFilter || methodFilter
+                    ? "No recorded customer payments matched the current filters."
+                    : "No recorded customer payments are currently available."
+                }
               />
-            </DetailSection>
-
-            <DetailSection
-              title="Payment history"
-              description="This page shows only your recorded payments. Use View Receipt for transaction proof."
-            >
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground">
-                  Rows are customer-safe and exclude internal finance-only fields.
-                </p>
-              </div>
-
+            ) : (
               <DataTable<CustomerPayment>
                 rows={rows}
                 columns={columns}
                 onRowClick={(row) => router.push(`/customer/payments/${row.id}`)}
                 rowActions={(row) => (
-                  <Link
-                    href={`/customer/payments/${row.id}`}
-                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    View Receipt
-                  </Link>
+                  <ActionButton href={`/customer/payments/${row.id}`} variant="outline">
+                    View receipt
+                  </ActionButton>
                 )}
               />
-            </DetailSection>
+            )}
 
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              Payment rows on this page come directly from the customer payments
-              API. Subscription outstanding or waiver figures are shown on the
-              related subscription detail page.
+            <div className="mt-5">
+              <WorkspaceNotice tone="info" title="Source-of-truth boundary">
+                Payment rows on this page come directly from the customer payments API. Subscription outstanding or waiver figures stay on the related subscription detail page so receipt history is not overloaded with contract-state assumptions.
+              </WorkspaceNotice>
             </div>
-          </>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

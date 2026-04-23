@@ -496,6 +496,7 @@ export default function CashierCollectPage() {
 
   return (
     <PortalPage
+      eyebrow="Cashier Collection"
       title={
         collectionWorkflow === "direct-sale"
           ? "Collect Direct-Sale Balance"

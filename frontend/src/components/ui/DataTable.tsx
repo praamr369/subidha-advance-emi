@@ -94,7 +94,7 @@ export default function DataTable<T extends { id?: number | string }>({
 
   if (loading) {
     return (
-      <div className="surface-panel flex h-64 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+      <div className="table-surface-frame flex h-64 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <span className="ml-2 text-muted-foreground">Loading data...</span>
       </div>
@@ -110,10 +110,10 @@ export default function DataTable<T extends { id?: number | string }>({
   }
 
   return (
-    <div className="surface-panel-elevated overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <div className="table-surface-frame">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
-          <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_90%,transparent)]">
+          <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_86%,white_14%)]">
             <tr>
               {columns.map((column) => {
                 const columnKey = String(column.key);
@@ -213,7 +213,7 @@ export default function DataTable<T extends { id?: number | string }>({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="workspace-filter-bar m-3 flex flex-col gap-3 border-t-0 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="text-muted-foreground">
             Showing page{" "}
             <span className="font-semibold text-foreground">{clampedPage}</span> of{" "}
@@ -223,14 +223,14 @@ export default function DataTable<T extends { id?: number | string }>({
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={clampedPage === 1}
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={clampedPage === totalPages}
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Next
             </button>

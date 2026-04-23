@@ -173,15 +173,16 @@ function KpiCard({
   href?: string;
 }) {
   const toneColors = {
-    default: "border-border bg-card hover:border-ring",
-    success: "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300",
-    warning: "border-amber-200 bg-amber-50/50 hover:border-amber-300",
-    danger: "border-red-200 bg-red-50/50 hover:border-red-300",
+    default:
+      "border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] hover:border-[var(--surface-border-strong)]",
+    success: "border-emerald-200 bg-emerald-50/65 hover:border-emerald-300",
+    warning: "border-amber-200 bg-amber-50/72 hover:border-amber-300",
+    danger: "border-red-200 bg-red-50/70 hover:border-red-300",
   };
 
   const card = (
     <div
-      className={`rounded-2xl border p-5 shadow-sm transition-all duration-200 hover:shadow-md ${
+      className={`rounded-[1.55rem] border p-5 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.34)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_-36px_rgba(15,23,42,0.46)] ${
         toneColors[tone]
       }`}
     >
@@ -190,7 +191,7 @@ function KpiCard({
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
         </div>
-        <div className="rounded-xl bg-background/50 p-2 text-muted-foreground">
+        <div className="rounded-2xl border border-white/60 bg-white/75 p-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
           {icon}
         </div>
       </div>
@@ -253,7 +254,8 @@ function SectionCard({
   actionLabel?: string;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
@@ -262,7 +264,7 @@ function SectionCard({
         {actionHref && actionLabel && (
           <Link
             href={actionHref}
-            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-muted"
           >
             {actionLabel}
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -882,6 +884,7 @@ export default function AdminCollectionsPage() {
 
   return (
     <PortalPage
+      eyebrow="Collections Control"
       title="Collections Workspace"
       subtitle="Operational collections control center for subscription EMI follow-up, direct-sale receivables, and posted payment verification."
       breadcrumbs={[

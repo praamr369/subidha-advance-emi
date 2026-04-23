@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ACCOUNTING_REPORT_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import {
   accountingErrorMessage,
   AccountingNotice,
@@ -61,8 +63,11 @@ export default function AccountingTrialBalancePage() {
 
   return (
     <PortalPage
+      eyebrow="Accounting Statements"
       title="Trial Balance"
       subtitle="Read-only trial balance over posted accounting journals. This report stays inside the separate accounting subsystem and does not reinterpret EMI ledger history."
+      helperNote="Trial balance remains a posted accounting statement. It is not a collections dashboard and does not alter source ledgers."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -85,6 +90,12 @@ export default function AccountingTrialBalancePage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
+        <WorkspaceDirectory
+          title="Accounting statement map"
+          description="Move between trial balance, profit and loss, balance sheet, and the supporting books that explain posted totals."
+          groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
+        />
+
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <AccountingPeriodFilters
             startDate={startDate}

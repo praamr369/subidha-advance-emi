@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
 import { AuthLayoutShell } from "@/components/auth";
+import ActionButton from "@/components/ui/ActionButton";
 import { buildResetPasswordHref } from "@/lib/auth/password-reset";
 import { APP_NAME } from "@/lib/constants";
 import { requestPasswordReset } from "@/services/auth.service";
@@ -58,6 +59,8 @@ export default function ForgotPasswordPage() {
     <AuthLayoutShell
       formTitle="Forgot password"
       formSubtitle="Request a reset OTP for your account using the registered identifier."
+      panelTitle="Recover access without breaking session safety"
+      panelDescription="Password reset requests stay tied to the registered account identity and continue using the live auth workflow."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -81,13 +84,13 @@ export default function ForgotPasswordPage() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             <div>
               If an eligible account exists, a reset code has been requested.
             </div>
@@ -109,10 +112,12 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        <button
+        <ActionButton
           type="submit"
           disabled={submitting}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          variant="primary"
+          size="lg"
+          fullWidth
         >
           {submitting ? (
             <>
@@ -122,7 +127,16 @@ export default function ForgotPasswordPage() {
           ) : (
             "Send reset code"
           )}
-        </button>
+        </ActionButton>
+
+        <div className="workspace-filter-bar flex items-start gap-3 p-4">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <p className="min-w-0 text-sm leading-6 text-muted-foreground">
+            Reset requests follow the existing OTP flow and do not change the login or role-routing contract.
+          </p>
+        </div>
       </form>
 
       <div className="mt-6 text-center text-sm text-slate-600">

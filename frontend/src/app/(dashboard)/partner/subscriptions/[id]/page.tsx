@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
@@ -14,10 +13,16 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
+import {
+  WorkspaceNotice,
+  WorkspaceTimeline,
+  type WorkspaceTimelineItem,
+} from "@/components/ui/role-workspace";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
@@ -52,6 +57,19 @@ function formatDate(value?: string | null): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+  });
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -282,6 +300,79 @@ export default function PartnerSubscriptionDetailPage() {
   const pendingEmiCount =
     subscription?.pending_emi_count ?? emiRows.filter((row) => row.outstanding_amount > 0).length;
 
+  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+    if (!subscription) {
+      return [];
+    }
+
+    const items: WorkspaceTimelineItem[] = [];
+
+    if (subscription.created_at) {
+      items.push({
+        id: "created",
+        title: "Contract recorded",
+        description: "The partner-visible subscription entered the contract register.",
+        timestamp: formatDateTime(subscription.created_at),
+        badge: <StatusBadge status={subscription.status || "ACTIVE"} hideIcon />,
+      });
+    }
+
+    if (subscription.start_date) {
+      items.push({
+        id: "start",
+        title: "Contract start date",
+        description: "Start date used for the subscription lifecycle and installment schedule posture.",
+        timestamp: formatDate(subscription.start_date),
+      });
+    }
+
+    if (winnerSummary?.draw_revealed_at) {
+      items.push({
+        id: "winner",
+        title: "Winner history recorded",
+        description: `Winner status: ${detailSemantics.winnerHeadline}`,
+        timestamp: formatDateTime(winnerSummary.draw_revealed_at),
+        badge: <StatusBadge status="WON" hideIcon />,
+      });
+    }
+
+    if (subscription.last_payment_date) {
+      items.push({
+        id: "payment",
+        title: "Latest payment reference point",
+        description: "Most recent payment date visible from the partner subscription record.",
+        timestamp: formatDate(subscription.last_payment_date),
+        badge: <StatusBadge status="PAID" hideIcon />,
+      });
+    }
+
+    if (nextDueDate) {
+      items.push({
+        id: "next-due",
+        title: nextDueOverdue ? "Next due is overdue" : "Next due recorded",
+        description: nextDueOverdue
+          ? `${nextDueAge} day${nextDueAge === 1 ? "" : "s"} overdue in the current partner scope.`
+          : "Upcoming due position visible for partner follow-up.",
+        timestamp: formatDate(nextDueDate),
+        badge: (
+          <StatusBadge
+            status={nextDueOverdue ? "OVERDUE" : "PENDING"}
+            hideIcon
+          />
+        ),
+      });
+    }
+
+    return items;
+  }, [
+    detailSemantics.winnerHeadline,
+    nextDueAge,
+    nextDueDate,
+    nextDueOverdue,
+    subscription,
+    winnerSummary?.draw_revealed_at,
+  ]);
+
   const emiColumns = useMemo<Column<EmiRow>[]>(
     () => [
       {
@@ -348,12 +439,15 @@ export default function PartnerSubscriptionDetailPage() {
 
   return (
     <PortalPage
+      eyebrow="Partner Contracts"
       title={
         subscription
           ? subscription.subscription_number || `Subscription #${subscription.id}`
           : "Partner Subscription Detail"
       }
       subtitle="Partner-scoped subscription detail with contract, due-position, and advance EMI schedule visibility only."
+      helperNote="This detail page supports partner follow-up and collection routing only. Final payment posting, reconciliation, and payout settlement remain in their protected workflows."
+      helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscriptions", href: backHref },
@@ -419,15 +513,15 @@ export default function PartnerSubscriptionDetailPage() {
           title="Contract, winner, and waiver posture"
           description="Partner detail keeps contract lifecycle, winner history, and waiver settlement separate so follow-up stays operationally clear."
           action={
-            <button
+            <ActionButton
               type="button"
+              variant="outline"
               onClick={() => void loadPage("refresh")}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
-              <RefreshCw className="h-4 w-4" />
               {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+            </ActionButton>
           }
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -527,6 +621,22 @@ export default function PartnerSubscriptionDetailPage() {
 
         {!loading && !error && subscription ? (
           <>
+            <WorkspaceSection
+              title="Partner follow-up boundary"
+              description="Use this page to understand contract posture and decide whether to open payment history or start a collection request."
+            >
+              <WorkspaceNotice
+                tone={summary.outstanding_amount > 0 ? "warning" : "info"}
+                title={summary.outstanding_amount > 0 ? "Outstanding follow-up remains" : "Contract exposure is settled"}
+              >
+                {summary.outstanding_amount > 0
+                  ? `Outstanding exposure is ${money(summary.outstanding_amount)} across ${pendingEmiCount} visible Advance EMI row${
+                      pendingEmiCount === 1 ? "" : "s"
+                    }. Winner history and waiver posture remain separate from collection workflow.`
+                  : "The visible contract exposure is settled in the current partner scope. Keep winner history and prior payment evidence separate from future collection activity."}
+              </WorkspaceNotice>
+            </WorkspaceSection>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Advance EMI Total"
@@ -563,19 +673,19 @@ export default function PartnerSubscriptionDetailPage() {
               action={
                 <div className="flex flex-wrap gap-2">
                   {subscription.customer ? (
-                    <Link
+                    <ActionButton
                       href={`/partner/customers/${subscription.customer}`}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                      variant="outline"
                     >
                       View customer
-                    </Link>
+                    </ActionButton>
                   ) : null}
-                  <Link
+                  <ActionButton
                     href={`/partner/payments?subscription=${subscription.id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    variant="ghost"
                   >
                     Payment history
-                  </Link>
+                  </ActionButton>
                 </div>
               }
             >
@@ -657,18 +767,14 @@ export default function PartnerSubscriptionDetailPage() {
               description="Use this summary before a partner collection request or payment-history check."
               footer={
                 <div className="flex flex-wrap gap-2">
-                  <Link
+                  <ActionButton
                     href={`/partner/collections/create?subscription=${subscription.id}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
                   >
                     Collect payment
-                  </Link>
-                  <Link
-                    href={backHref}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
+                  </ActionButton>
+                  <ActionButton href={backHref} variant="outline">
                     Back to subscriptions
-                  </Link>
+                  </ActionButton>
                 </div>
               }
             >
@@ -697,6 +803,20 @@ export default function PartnerSubscriptionDetailPage() {
                   tone={summary.outstanding_amount > 0 ? "warning" : "success"}
                 />
               </div>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Partner contract timeline"
+              description="Major contract, winner, and follow-up checkpoints currently visible from this partner-facing detail surface."
+            >
+              {timelineItems.length === 0 ? (
+                <EmptyState
+                  title="No timeline events recorded"
+                  description="This subscription does not yet expose any partner-visible contract events."
+                />
+              ) : (
+                <WorkspaceTimeline items={timelineItems} />
+              )}
             </WorkspaceSection>
 
             <WorkspaceSection

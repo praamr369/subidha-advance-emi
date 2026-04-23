@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
+import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
@@ -88,8 +90,11 @@ export default function InventoryMovementsPage() {
 
   return (
     <PortalPage
+      eyebrow="Inventory Movement Control"
       title="Inventory Movements"
       subtitle="Read-only movement register from the additive stock ledger, covering purchase intake, sale outflow, returns, and approved adjustments."
+      helperNote="Inventory movements are ledger-backed operational facts. They remain separate from billing document review and from stock valuation summaries."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -102,6 +107,12 @@ export default function InventoryMovementsPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
     >
+      <WorkspaceDirectory
+        title="Inventory route map"
+        description="Use the shared inventory directory to move between movement review, ledger inspection, adjustments, master control, and valuation."
+        groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
+      />
+
       <WorkspaceSection
         title="Filters"
         description="Filter inventory movements by movement date."
