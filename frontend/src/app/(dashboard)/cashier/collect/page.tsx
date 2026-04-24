@@ -164,7 +164,15 @@ export default function CashierCollectPage() {
     return lookup.emis.find((item) => item.id === selectedEmiId) ?? null;
   }, [lookup, selectedEmiId]);
 
-  const pendingEmis = lookup?.emis ?? [];
+  const pendingEmis = useMemo(() => {
+    const rows = lookup?.emis ?? [];
+    return rows.filter((emi) => {
+      const status = String(emi.status || "").toUpperCase();
+      if (status === "PAID" || status === "WAIVED") return false;
+      const balance = Number(emi.balance_amount ?? emi.amount ?? 0);
+      return Number.isFinite(balance) ? balance > 0 : true;
+    });
+  }, [lookup?.emis]);
   const hasLookupResult = Boolean(lookup);
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
   const directSaleHref = "/cashier/collect?workflow=direct-sale";

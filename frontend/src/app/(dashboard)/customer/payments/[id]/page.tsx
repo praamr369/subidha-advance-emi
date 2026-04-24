@@ -56,6 +56,7 @@ function toErrorMessage(error: unknown): string {
 export default function CustomerPaymentReceiptPage() {
   const params = useParams<{ id: string }>();
   const paymentId = Number(params?.id ?? 0);
+  const hasValidPaymentId = Number.isFinite(paymentId) && paymentId > 0;
 
   const [payment, setPayment] = useState<CustomerPayment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,7 +133,13 @@ export default function CustomerPaymentReceiptPage() {
     <PortalPage
       className="receipt-print-page"
       eyebrow="Customer Payments"
-      title={payment ? `Payment Receipt #${payment.id}` : "Payment Receipt"}
+      title={
+        payment
+          ? `Payment Receipt #${payment.id}`
+          : hasValidPaymentId
+            ? `Payment Receipt #${paymentId}`
+            : "Payment Receipt"
+      }
       subtitle="Customer-visible proof for a recorded payment within your own account."
       helperNote="This receipt reflects recorded payment truth only. Contract settlement, winner benefit, waiver state, and outstanding posture remain on the related subscription routes."
       helperTone="info"
@@ -167,7 +174,10 @@ export default function CustomerPaymentReceiptPage() {
         },
       ]}
       stats={[
-        { label: "Payment ID", value: payment ? `#${payment.id}` : "—" },
+        {
+          label: "Payment ID",
+          value: payment ? `#${payment.id}` : hasValidPaymentId ? `#${paymentId}` : "—",
+        },
         { label: "Amount", value: money(payment?.amount), tone: "success" },
         { label: "Method", value: payment?.method || "—" },
         {

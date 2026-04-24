@@ -604,11 +604,27 @@ export default function AdminSubscriptionDetailPage() {
           }),
         ]);
 
-        if (subscriptionRes.status !== "fulfilled") {
-          throw subscriptionRes.reason;
+        let subscriptionPayload: Record<string, unknown> | null = null;
+        if (subscriptionRes.status === "fulfilled") {
+          subscriptionPayload = subscriptionRes.value;
+        } else {
+          const fallback = await apiFetch<Record<string, unknown>>(
+            `/admin/subscriptions/?id=${encodeURIComponent(String(subscriptionId))}`,
+            { cache: "no-store" }
+          );
+          const fallbackRows = toArray<Record<string, unknown>>(fallback.results);
+          subscriptionPayload = fallbackRows.find(
+            (row) => String(row.id ?? "") === String(subscriptionId)
+          ) ?? null;
         }
 
-        const nextSubscription = normalizeSubscriptionDetail(subscriptionRes.value);
+        if (!subscriptionPayload) {
+          throw subscriptionRes.status === "rejected"
+            ? subscriptionRes.reason
+            : new Error("Subscription detail is unavailable.");
+        }
+
+        const nextSubscription = normalizeSubscriptionDetail(subscriptionPayload);
         const nextPayments =
           paymentsRes.status === "fulfilled" ? paymentsRes.value.results ?? [] : [];
         const nextTimeline =
@@ -754,7 +770,7 @@ export default function AdminSubscriptionDetailPage() {
           ? `Subscription #${subscription.id}`
           : `Subscription #${subscriptionId ?? "—"}`
       }
-      subtitle="Contract lifecycle, winner history, waiver impact, finance, and audit context from canonical backend truth."
+      subtitle="Contract, winner, and waiver posture with contract lifecycle, winner benefit, waiver and settlement, finance, and audit context from canonical backend truth."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Subscriptions", href: "/admin/subscriptions" },
@@ -899,7 +915,7 @@ export default function AdminSubscriptionDetailPage() {
                       Contract, winner, and waiver posture
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                      Contract lifecycle, winner history, and waiver impact are shown as separate truths so completed winners stay readable without masking reconciliation issues.
+                      Contract lifecycle, winner benefit, and waiver and settlement posture are shown as separate truths so completed winners stay readable without masking reconciliation issues.
                     </p>
                   </div>
 

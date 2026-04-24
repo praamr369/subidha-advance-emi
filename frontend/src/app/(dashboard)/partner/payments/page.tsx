@@ -15,6 +15,7 @@ import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
+  getPartnerDashboard,
   listPartnerPayments,
   type PartnerPayment,
 } from "@/services/partner";
@@ -87,11 +88,33 @@ export default function PartnerPaymentsPage() {
         setTotalCollected(String(payload.total_collected || "0.00"));
         setError(null);
       } catch (err) {
-        setError(toErrorMessage(err));
+        // Primary fetch failed — attempt fallback to partner dashboard recent verified payments
         if (mode === "initial") {
-          setRows([]);
-          setCount(0);
-          setTotalCollected("0.00");
+          try {
+            const fallback = await getPartnerDashboard();
+            const fallbackRows = Array.isArray(fallback.recent_verified_payments)
+              ? fallback.recent_verified_payments
+              : [];
+            const fallbackTotal = Number(
+              fallback.summary?.total_paid_amount ??
+                fallback.summary?.total_revenue_collected ??
+                0
+            );
+
+            setRows(fallbackRows);
+            setCount(fallbackRows.length);
+            setTotalCollected(
+              Number.isFinite(fallbackTotal) ? fallbackTotal.toFixed(2) : "0.00"
+            );
+            setError(null);
+          } catch {
+            setError(toErrorMessage(err));
+            setRows([]);
+            setCount(0);
+            setTotalCollected("0.00");
+          }
+        } else {
+          setError(toErrorMessage(err));
         }
       } finally {
         if (mode === "initial") {

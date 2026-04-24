@@ -435,8 +435,9 @@ export default function AdminPaymentCollectPage({
     let cancelled = false;
     const params = new URLSearchParams(searchParamKey);
 
-    const subscriptionParam = params.get("subscription");
-    const emiParam = params.get("emi");
+    const subscriptionParam =
+      params.get("subscription") ?? params.get("subscription_id");
+    const emiParam = params.get("emi") ?? params.get("emi_id");
 
     if (!subscriptionParam && !emiParam) {
       setPrefillMessages([]);
@@ -451,6 +452,13 @@ export default function AdminPaymentCollectPage({
       const subscriptionId = parsePositiveInteger(subscriptionParam);
       const emiId = parsePositiveInteger(emiParam);
 
+      if (subscriptionId) {
+        updateField("subscription_id", String(subscriptionId));
+      }
+      if (emiId) {
+        updateField("emi_id", String(emiId));
+      }
+
       if (subscriptionParam && !subscriptionId) {
         messages.push(
           `Subscription prefill "${subscriptionParam}" was ignored because it is not a valid subscription id.`
@@ -464,6 +472,20 @@ export default function AdminPaymentCollectPage({
       }
 
       if (subscriptionId) {
+        if (emiId) {
+          setEmiOptions((prev) => {
+            if (prev.some((item) => item.id === emiId)) return prev;
+            return [
+              {
+                id: emiId,
+                subscription: subscriptionId,
+                amount: "0.00",
+                status: "PENDING",
+              },
+              ...prev,
+            ];
+          });
+        }
         const result = await loadSubscription(subscriptionId, emiId);
         if (emiId && !result.preferredEmiApplied) {
           messages.push(
@@ -511,7 +533,7 @@ export default function AdminPaymentCollectPage({
     return () => {
       cancelled = true;
     };
-  }, [loadSubscription, searchParamKey]);
+  }, [loadSubscription, searchParamKey, updateField]);
 
   function onInputChange(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

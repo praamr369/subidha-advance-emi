@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
+import { resetAdminDashboardClientState } from "./helpers/dashboard-state";
 
 test.describe("customer dashboard phase-3 smoke", () => {
   test.use({ storageState: authStatePath("customer") });
@@ -16,6 +17,10 @@ test.describe("customer dashboard phase-3 smoke", () => {
 
 test.describe("admin dashboard phase-3 smoke", () => {
   test.use({ storageState: authStatePath("admin") });
+
+  test.beforeEach(async ({ page }) => {
+    await resetAdminDashboardClientState(page);
+  });
 
   test("admin dashboard shows canonical sidebar groups and action workspace buckets", async ({ page }) => {
     await page.goto("/admin");

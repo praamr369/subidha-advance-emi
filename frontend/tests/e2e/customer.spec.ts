@@ -589,7 +589,7 @@ test("customer delivery detail renders stable shipment timeline fixture", async 
 
   await page.goto("/customer/deliveries");
   await expect(page.getByRole("heading", { name: "Delivery Tracking" })).toBeVisible();
-  await page.getByRole("button", { name: "View detail" }).click();
+  await page.getByRole("link", { name: "View detail" }).click();
   await expect(page).toHaveURL(/\/customer\/deliveries\/781$/);
   await expect(page.getByRole("heading", { name: "DLV-781" })).toBeVisible();
   await expect(page.locator("body")).toContainText("Delivery event timeline");

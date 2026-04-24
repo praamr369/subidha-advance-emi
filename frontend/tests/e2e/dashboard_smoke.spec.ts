@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
+import { resetAdminDashboardClientState } from "./helpers/dashboard-state";
 
 test.describe("admin dashboard smoke", () => {
   test.use({ storageState: authStatePath("admin") });
+
+  test.beforeEach(async ({ page }) => {
+    await resetAdminDashboardClientState(page);
+  });
 
   test("admin dashboard renders canonical finance panels", async ({ page }) => {
     await page.goto("/admin");
@@ -22,7 +27,12 @@ test.describe("admin dashboard smoke", () => {
 
     const quickActionsRow = page
       .locator("div")
-      .filter({ hasText: "Quick actionsHigh-frequency workflow launchers with service-layer safeguards." })
+      .filter({
+        has: page.getByText("Quick actions", { exact: true }),
+      })
+      .filter({
+        has: page.getByRole("button", { name: /Hide|Show/ }),
+      })
       .first();
     await quickActionsRow.getByRole("button", { name: "Hide" }).click();
     await expect(page.locator("body")).toContainText("1 widget is currently hidden.");

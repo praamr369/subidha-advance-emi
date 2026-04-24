@@ -24,6 +24,7 @@ import { formatPlanTypeLabel } from "@/lib/plan-labels";
 
 import {
   getCustomerSubscription,
+  listCustomerSubscriptions,
   type CustomerSubscription,
   type CustomerEmi,
 } from "@/services/customer";
@@ -106,8 +107,21 @@ export default function CustomerSubscriptionDetailPage() {
           throw new Error("Missing subscription id.");
         }
 
-        const payload = await getCustomerSubscription(subscriptionId);
-        setSubscription(payload);
+        try {
+          const payload = await getCustomerSubscription(subscriptionId);
+          setSubscription(payload);
+        } catch (primaryError) {
+          const listPayload = await listCustomerSubscriptions();
+          const fallback = listPayload.results.find(
+            (item) => String(item.id) === String(subscriptionId)
+          );
+
+          if (!fallback) {
+            throw primaryError;
+          }
+
+          setSubscription(fallback);
+        }
       } catch (err) {
         setError(
           err instanceof Error

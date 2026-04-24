@@ -135,13 +135,13 @@ export default function CustomerDashboardPage() {
 
       try {
         const [
-          legacyPayload,
-          canonicalPayload,
-          overduePayload,
-          upcomingPayload,
-          recentPaymentsPayload,
-          winnersPayload,
-        ] = await Promise.all([
+          legacyResult,
+          canonicalResult,
+          overdueResult,
+          upcomingResult,
+          recentPaymentsResult,
+          winnersResult,
+        ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
           listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
@@ -149,17 +149,34 @@ export default function CustomerDashboardPage() {
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
         ]);
-        setLegacy(legacyPayload);
-        setCanonical(canonicalPayload);
-        setOverdue(overduePayload);
-        setUpcoming(upcomingPayload);
-        setRecentPayments(recentPaymentsPayload);
-        setWinnerItems(winnersPayload);
+
+        if (legacyResult.status !== "fulfilled") {
+          throw legacyResult.reason;
+        }
+
+        setLegacy(legacyResult.value);
+        setCanonical(
+          canonicalResult.status === "fulfilled" ? canonicalResult.value : null
+        );
+        setOverdue(overdueResult.status === "fulfilled" ? overdueResult.value : null);
+        setUpcoming(
+          upcomingResult.status === "fulfilled" ? upcomingResult.value : null
+        );
+        setRecentPayments(
+          recentPaymentsResult.status === "fulfilled"
+            ? recentPaymentsResult.value
+            : null
+        );
+        setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
         setLegacy(null);
         setCanonical(null);
+        setOverdue(null);
+        setUpcoming(null);
+        setRecentPayments(null);
+        setWinnerItems(null);
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
