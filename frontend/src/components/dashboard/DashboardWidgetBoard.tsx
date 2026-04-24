@@ -266,6 +266,7 @@ export default function DashboardWidgetBoard({
             return (
               <div
                 key={`control-${id}`}
+                data-testid={`dashboard-widget-control-row:${id}`}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm"
               >
                 <div>
@@ -307,6 +308,7 @@ export default function DashboardWidgetBoard({
           return (
             <article
               key={id}
+              data-testid={`dashboard-widget:${id}`}
               draggable
               onDragStart={() => setActiveDragId(id)}
               onDragOver={(event) => event.preventDefault()}

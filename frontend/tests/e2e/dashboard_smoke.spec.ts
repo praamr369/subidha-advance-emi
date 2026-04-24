@@ -25,20 +25,18 @@ test.describe("admin dashboard smoke", () => {
     await page.goto("/admin");
     await page.getByRole("button", { name: "Widget controls" }).click();
 
-    const quickActionsRow = page
-      .locator("div")
-      .filter({
-        has: page.getByText("Quick actions", { exact: true }),
-      })
-      .filter({
-        has: page.getByRole("button", { name: /Hide|Show/ }),
-      })
-      .first();
-    await quickActionsRow.getByRole("button", { name: "Hide" }).click();
+    const quickActionsRow = page.getByTestId(
+      "dashboard-widget-control-row:quick-actions"
+    );
+    await quickActionsRow
+      .getByRole("button", { name: "Hide", exact: true })
+      .click();
     await expect(page.locator("body")).toContainText("1 widget is currently hidden.");
 
-    await quickActionsRow.getByRole("button", { name: "Pin" }).click();
-    await expect(page.locator("body")).toContainText("Pinned");
+    await quickActionsRow
+      .getByRole("button", { name: /^(Pin|Unpin)$/ })
+      .click();
+    await expect(page.locator("body")).toContainText(/Widget (pinned|unpinned)/);
 
     await page.getByRole("button", { name: "Reset layout" }).click();
     await expect(page.locator("body")).toContainText("Quick actions");

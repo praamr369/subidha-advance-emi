@@ -42,8 +42,12 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(
       sidebar.getByRole("link", { name: "Analytics", exact: true }).first()
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Urgent Attention" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Launch Points" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Urgent Attention", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Launch Points", exact: true })
+    ).toBeVisible();
     await expect(page.locator("body")).toContainText("Overdue Advance EMI follow-up");
     await expect(page.locator("body")).toContainText("Finance Control");
     await expect(page.locator("body")).toContainText("Reports Center");
