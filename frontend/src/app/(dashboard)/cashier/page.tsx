@@ -586,7 +586,7 @@ export default function CashierDashboardPage() {
                           </div>
                           <Link
                             href="/cashier/collect"
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
                           >
                             Open collect
                             <ArrowRight className="h-4 w-4" />

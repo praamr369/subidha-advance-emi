@@ -5,6 +5,7 @@ import { CircleDollarSign } from "lucide-react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import EmptyState from "@/components/feedback/EmptyState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import CollectPaymentDrawer from "@/features/collections/components/CollectPaymentDrawer";
 import { useTodayQueue } from "@/features/admin-dashboard/hooks/useTodayQueue";
 import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
@@ -80,8 +81,8 @@ export default function TodayQueuePanel({
         />
 
         {isLoading && !items ? (
-          <div className="mt-4 rounded-xl border border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground">
-            Loading today queue...
+          <div className="mt-4">
+            <LoadingBlock label="Loading today collection queue" compact />
           </div>
         ) : isError && !items ? (
           <div className="mt-4">
@@ -125,7 +126,7 @@ export default function TodayQueuePanel({
                     <button
                       type="button"
                       onClick={() => setSelectedItem(item)}
-                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
                     >
                       Collect
                     </button>

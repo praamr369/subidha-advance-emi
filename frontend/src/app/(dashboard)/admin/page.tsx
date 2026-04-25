@@ -81,7 +81,7 @@ function LaunchCard({
   return (
     <Link
       href={href}
-      className="group rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_14px_40px_-32px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+      className="group rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_14px_40px_-32px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] text-foreground">
