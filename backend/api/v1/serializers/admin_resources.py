@@ -183,6 +183,11 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     city = serializers.CharField(required=False, allow_blank=True)
     user_is_active = serializers.BooleanField(source="user.is_active", read_only=True)
 
+    # Phase 1 – additive read-only fields
+    customer_source = serializers.CharField(read_only=True)
+    customer_code = serializers.CharField(read_only=True)
+    profile_photo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Customer
         fields = (
@@ -192,7 +197,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "user_is_active",
             "name",
             "phone",
-            "address",           # added
+            "address",
             "city",
             "kyc_status",
             "kyc_reviewed_by_username",
@@ -205,6 +210,9 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "status",
             "active_subscription_count",
             "total_subscription_value",
+            "customer_source",
+            "customer_code",
+            "profile_photo_url",
         )
         read_only_fields = (
             "id",
@@ -215,8 +223,22 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "kyc_rejection_reason",
             "active_subscription_count",
             "total_subscription_value",
+            "customer_source",
+            "customer_code",
+            "profile_photo_url",
         )
         extra_kwargs = {"user": {"required": False}}
+
+    def get_profile_photo_url(self, obj):
+        request = self.context.get("request")
+        if not obj.profile_photo:
+            return None
+        try:
+            if request:
+                return request.build_absolute_uri(obj.profile_photo.url)
+            return obj.profile_photo.url
+        except Exception:
+            return None
 
     def get_status(self, obj):
         return "ACTIVE" if obj.user.is_active else "INACTIVE"
@@ -402,8 +424,19 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
 
 
 class CustomerKycDecisionSerializer(serializers.Serializer):
+    """
+    Backward-compatible KYC decision serializer.
+    Accepts VERIFIED (legacy), APPROVED (Phase 1 alias), REJECTED, PENDING, SUBMITTED.
+    """
+
     status = serializers.ChoiceField(
-        choices=[KycStatus.VERIFIED, KycStatus.REJECTED]
+        choices=[
+            KycStatus.VERIFIED,
+            KycStatus.APPROVED,
+            KycStatus.REJECTED,
+            KycStatus.PENDING,
+            KycStatus.SUBMITTED,
+        ]
     )
     reason = serializers.CharField(
         required=False,

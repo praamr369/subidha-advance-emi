@@ -14,6 +14,30 @@ export type CustomerRecord = {
   total_subscription_value?: string;
   created_at?: string;
   user?: number | null;
+  // Phase 1 additive fields
+  customer_source?: string;
+  customer_code?: string;
+  profile_photo_url?: string | null;
+};
+
+export type CustomerSearchResult = CustomerRecord & {
+  /** True when the result was returned as an exact phone match. */
+  exact_match?: boolean;
+};
+
+export type CustomerQuickCreatePayload = {
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  source?: "ADMIN" | "PARTNER" | "PUBLIC" | "IMPORT";
+};
+
+export type CustomerQuickCreateResponse = {
+  created: boolean;
+  detail: string;
+  customer: CustomerRecord;
 };
 
 type PaginatedResponse<T> = {
@@ -127,4 +151,94 @@ export async function getCustomer(
   );
 
   return normalizeCustomer(payload ?? {});
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: Phone-first search (shared endpoint for admin + partner)
+// ---------------------------------------------------------------------------
+
+export async function searchByPhone(phone: string): Promise<{
+  exact_match: boolean;
+  count: number;
+  results: CustomerRecord[];
+}> {
+  const trimmed = phone.trim();
+  if (!trimmed) return { exact_match: false, count: 0, results: [] };
+
+  const payload = await request<{
+    exact_match?: boolean;
+    count?: number;
+    results?: Record<string, unknown>[];
+  }>(`/customers/search/?phone=${encodeURIComponent(trimmed)}`, {
+    method: "GET",
+  } as RequestInit);
+
+  const results = (payload?.results ?? []).map(normalizeCustomer);
+  return {
+    exact_match: Boolean(payload?.exact_match),
+    count: Number(payload?.count ?? results.length),
+    results,
+  };
+}
+
+export async function searchCustomersShared(q: string): Promise<{
+  exact_match: boolean;
+  count: number;
+  results: CustomerRecord[];
+}> {
+  const trimmed = q.trim();
+  if (!trimmed) return { exact_match: false, count: 0, results: [] };
+
+  const payload = await request<{
+    exact_match?: boolean;
+    count?: number;
+    results?: Record<string, unknown>[];
+  }>(`/customers/search/?q=${encodeURIComponent(trimmed)}`, {
+    method: "GET",
+  } as RequestInit);
+
+  const results = (payload?.results ?? []).map(normalizeCustomer);
+  return {
+    exact_match: Boolean(payload?.exact_match),
+    count: Number(payload?.count ?? results.length),
+    results,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: Quick-create (email optional)
+// ---------------------------------------------------------------------------
+
+export async function createCustomerQuick(
+  payload: CustomerQuickCreatePayload
+): Promise<CustomerQuickCreateResponse> {
+  const response = await request<{
+    created?: boolean;
+    detail?: string;
+    customer?: Record<string, unknown>;
+  }>("/customers/create/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  } as RequestInit);
+
+  return {
+    created: Boolean(response?.created),
+    detail: typeof response?.detail === "string" ? response.detail : "",
+    customer: normalizeCustomer(response?.customer ?? {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: Customer profile summary (admin)
+// ---------------------------------------------------------------------------
+
+export async function getCustomerProfileSummary(
+  id: number | string
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(
+    `/customers/${id}/profile-summary/`,
+    {
+      method: "GET",
+    } as RequestInit
+  );
 }

@@ -1,10 +1,18 @@
 from django.db.models import Count, Prefetch, Q, Sum
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsCustomer
 from api.v1.serializers.customer_profile import CustomerProfileSerializer
+from api.v1.serializers.customers import (
+    CustomerKycDocumentReadSerializer,
+    CustomerKycDocumentUploadSerializer,
+    CustomerReferralCreateSerializer,
+    CustomerReferralReadSerializer,
+    CustomerSearchSerializer,
+)
 from api.v1.serializers.delivery import CustomerSubscriptionDeliveryReadSerializer
 from api.v1.serializers.payment import PaymentSerializer
 from api.v1.serializers.support_requests import (
@@ -17,6 +25,10 @@ from api.v1.serializers.subscription import (
     SubscriptionListSerializer,
 )
 from subscriptions.models import (
+    AuditLog,
+    Customer,
+    CustomerKycDocument,
+    CustomerReferral,
     CustomerSupportRequest,
     Emi,
     EmiStatus,
@@ -29,6 +41,12 @@ from subscriptions.services.customer_support_service import (
     create_customer_support_request,
 )
 from subscriptions.services.customer_account_service import build_customer_profile_summary
+from subscriptions.services.customer_service import (
+    approve_kyc,
+    create_kyc_update_request,
+    create_referral,
+    reject_kyc,
+)
 from subscriptions.services.dashboard_canonical_financial_summary_service import (
     get_dashboard_summary,
 )
@@ -441,3 +459,241 @@ class CustomerSupportRequestDetailView(APIView):
             )
 
         return Response(CustomerSupportRequestReadSerializer(support_request).data)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 – Customer Self-Service: Photo, KYC, Referrals
+# ---------------------------------------------------------------------------
+
+class CustomerPhotoUploadView(APIView):
+    """
+    POST /api/v1/customer/profile/photo/
+
+    Customer uploads or replaces their profile photo.
+    Audited. Does not touch financial records.
+    """
+
+    permission_classes = [IsCustomer]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        photo = request.FILES.get("photo")
+        if not photo:
+            return Response(
+                {"detail": "Photo file is required. Send as 'photo' in multipart/form-data."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        allowed_types = {"image/jpeg", "image/png", "image/webp"}
+        if photo.content_type not in allowed_types:
+            return Response(
+                {"detail": "Only JPEG, PNG, or WebP images are accepted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        max_size = 5 * 1024 * 1024  # 5 MB
+        if photo.size > max_size:
+            return Response(
+                {"detail": "Photo must be smaller than 5 MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Delete old photo file if it exists to avoid orphaned files
+        old_photo = customer.profile_photo
+        customer.profile_photo = photo
+        customer.save(update_fields=["profile_photo"])
+
+        if old_photo:
+            try:
+                old_photo.delete(save=False)
+            except Exception:
+                pass  # Non-fatal – orphaned files can be cleaned up later
+
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.CUSTOMER_PHOTO_UPDATED,
+            model_name="Customer",
+            object_id=customer.pk,
+            performed_by=request.user,
+            metadata={"filename": photo.name},
+        )
+
+        photo_url = None
+        if customer.profile_photo:
+            try:
+                photo_url = request.build_absolute_uri(customer.profile_photo.url)
+            except Exception:
+                photo_url = customer.profile_photo.url
+
+        return Response(
+            {
+                "detail": "Profile photo updated.",
+                "photo_url": photo_url,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CustomerKycDocumentListView(APIView):
+    """
+    GET /api/v1/customer/kyc/documents/
+
+    Customer views own KYC documents.
+    """
+
+    permission_classes = [IsCustomer]
+
+    def get(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        docs = (
+            CustomerKycDocument.objects.filter(customer=customer)
+            .select_related("reviewed_by")
+            .order_by("-created_at")
+        )
+        return Response(
+            {
+                "count": docs.count(),
+                "kyc_status": customer.kyc_status,
+                "results": CustomerKycDocumentReadSerializer(
+                    docs, many=True, context={"request": request}
+                ).data,
+            }
+        )
+
+
+class CustomerKycUpdateRequestView(APIView):
+    """
+    POST /api/v1/customer/kyc/request-update/
+
+    Customer submits a KYC document for review.
+    Status is set to SUBMITTED – never auto-approved.
+    """
+
+    permission_classes = [IsCustomer]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        serializer = CustomerKycDocumentUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            doc = create_kyc_update_request(
+                customer,
+                document_type=serializer.validated_data["document_type"],
+                file=serializer.validated_data["file"],
+                notes=serializer.validated_data.get("notes", ""),
+                uploaded_by=request.user,
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        customer.refresh_from_db(fields=["kyc_status"])
+        return Response(
+            {
+                "detail": "KYC document submitted for review. Admin approval required.",
+                "kyc_status": customer.kyc_status,
+                "document": CustomerKycDocumentReadSerializer(
+                    doc, context={"request": request}
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CustomerReferralListView(APIView):
+    """
+    GET /api/v1/customer/referrals/
+
+    Customer views own referrals (customers they referred).
+    Commission is shown only if commission is enabled on the referral record.
+    """
+
+    permission_classes = [IsCustomer]
+
+    def get(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        referrals = (
+            CustomerReferral.objects.filter(referrer=customer)
+            .select_related("referred", "referred__user")
+            .order_by("-created_at")
+        )
+
+        total_commission_approved = sum(
+            r.commission_amount
+            for r in referrals
+            if r.commission_approved
+        )
+
+        return Response(
+            {
+                "count": referrals.count(),
+                "commission_summary": {
+                    "total_referrals": referrals.count(),
+                    "approved_commissions": referrals.filter(commission_approved=True).count(),
+                    "total_approved_commission_amount": str(total_commission_approved),
+                },
+                "results": CustomerReferralReadSerializer(referrals, many=True).data,
+            }
+        )
+
+
+class CustomerReferralCreateView(APIView):
+    """
+    POST /api/v1/customer/referrals/
+
+    Customer creates a referral.  Commission is NOT auto-enabled.
+    """
+
+    permission_classes = [IsCustomer]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+
+        serializer = CustomerReferralCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        referred_id = serializer.validated_data["referred_customer_id"]
+        try:
+            referred = Customer.objects.get(pk=referred_id)
+        except Customer.DoesNotExist:
+            return Response(
+                {"detail": "Referred customer not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            referral = create_referral(
+                customer,
+                referred,
+                created_by=request.user,
+                notes=serializer.validated_data.get("notes", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "detail": "Referral recorded. Commission requires admin approval.",
+                "referral": CustomerReferralReadSerializer(referral).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )

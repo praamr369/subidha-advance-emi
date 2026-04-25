@@ -501,36 +501,41 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @action(detail=True, methods=["post"], url_path="kyc-decision")
     @transaction.atomic
     def kyc_decision(self, request, pk=None):
+        from subscriptions.services.customer_service import approve_kyc, reject_kyc
+
         customer = self.get_object()
         serializer = CustomerKycDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        old_status = customer.kyc_status
         new_status = serializer.validated_data["status"]
         reason = serializer.validated_data.get("reason", "")
 
-        customer.kyc_status = new_status
-        customer.kyc_reviewed_by = request.user
-        customer.kyc_reviewed_at = timezone.now()
-        customer.kyc_rejection_reason = (
-            reason if new_status == KycStatus.REJECTED else ""
-        )
-        customer.save(
-            update_fields=[
-                "kyc_status",
-                "kyc_reviewed_by",
-                "kyc_reviewed_at",
-                "kyc_rejection_reason",
-            ]
-        )
-
-        log_customer_kyc_decision(
-            customer=customer,
-            performed_by=request.user,
-            old_status=old_status,
-            new_status=new_status,
-            reason=reason,
-        )
+        if new_status in (KycStatus.APPROVED, KycStatus.VERIFIED):
+            customer = approve_kyc(customer, performed_by=request.user)
+        elif new_status == KycStatus.REJECTED:
+            customer = reject_kyc(customer, reason=reason, performed_by=request.user)
+        else:
+            # PENDING / SUBMITTED – direct status update
+            old_status = customer.kyc_status
+            customer.kyc_status = new_status
+            customer.kyc_reviewed_by = request.user
+            customer.kyc_reviewed_at = timezone.now()
+            customer.kyc_rejection_reason = ""
+            customer.save(
+                update_fields=[
+                    "kyc_status",
+                    "kyc_reviewed_by",
+                    "kyc_reviewed_at",
+                    "kyc_rejection_reason",
+                ]
+            )
+            log_customer_kyc_decision(
+                customer=customer,
+                performed_by=request.user,
+                old_status=old_status,
+                new_status=new_status,
+                reason=reason,
+            )
 
         return Response(
             {
@@ -588,6 +593,45 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         return Response(
             build_customer_operational_profile(customer),
             status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["get"], url_path="kyc-documents")
+    def kyc_documents(self, request, pk=None):
+        from api.v1.serializers.customers import CustomerKycDocumentReadSerializer
+        from subscriptions.models import CustomerKycDocument
+
+        customer = self.get_object()
+        docs = (
+            CustomerKycDocument.objects.filter(customer=customer)
+            .select_related("reviewed_by", "uploaded_by")
+            .order_by("-created_at")
+        )
+        return Response(
+            {
+                "count": docs.count(),
+                "kyc_status": customer.kyc_status,
+                "results": CustomerKycDocumentReadSerializer(
+                    docs, many=True, context={"request": request}
+                ).data,
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="referrals")
+    def referrals(self, request, pk=None):
+        from api.v1.serializers.customers import CustomerReferralReadSerializer
+        from subscriptions.models import CustomerReferral
+
+        customer = self.get_object()
+        referrals = (
+            CustomerReferral.objects.filter(referrer=customer)
+            .select_related("referred", "referred__user")
+            .order_by("-created_at")
+        )
+        return Response(
+            {
+                "count": referrals.count(),
+                "results": CustomerReferralReadSerializer(referrals, many=True).data,
+            }
         )
 
     @action(detail=False, methods=["post"], url_path="import-preview")

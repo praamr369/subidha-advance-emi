@@ -890,3 +890,160 @@ export async function createCustomerSupportRequest(payload: {
     request: normalizeCustomerSupportRequest(root.request),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 – Customer Self-Service: Photo, KYC, Referrals
+// ---------------------------------------------------------------------------
+
+export type CustomerKycDocumentRecord = {
+  id: number;
+  customer: number;
+  document_type: string;
+  file: string | null;
+  notes: string;
+  status: string;
+  reviewed_by_username: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string;
+  created_at: string;
+};
+
+export type CustomerKycDocumentListResponse = {
+  count: number;
+  kyc_status: string;
+  results: CustomerKycDocumentRecord[];
+};
+
+export type CustomerKycSubmitResponse = {
+  detail: string;
+  kyc_status: string;
+  document: CustomerKycDocumentRecord;
+};
+
+export type CustomerReferralRecord = {
+  id: number;
+  referrer: number;
+  referrer_name: string;
+  referred: number;
+  referred_name: string;
+  referred_phone: string;
+  notes: string;
+  commission_enabled: boolean;
+  commission_amount: string;
+  commission_approved: boolean;
+  commission_approved_at: string | null;
+  created_at: string;
+};
+
+export type CustomerReferralListResponse = {
+  count: number;
+  commission_summary: {
+    total_referrals: number;
+    approved_commissions: number;
+    total_approved_commission_amount: string;
+  };
+  results: CustomerReferralRecord[];
+};
+
+function normalizeKycDocument(raw: unknown): CustomerKycDocumentRecord {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    id: Number(r.id ?? 0),
+    customer: Number(r.customer ?? 0),
+    document_type: typeof r.document_type === "string" ? r.document_type : "",
+    file: typeof r.file === "string" ? r.file : null,
+    notes: typeof r.notes === "string" ? r.notes : "",
+    status: typeof r.status === "string" ? r.status : "PENDING",
+    reviewed_by_username:
+      typeof r.reviewed_by_username === "string" ? r.reviewed_by_username : null,
+    reviewed_at: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
+    rejection_reason: typeof r.rejection_reason === "string" ? r.rejection_reason : "",
+    created_at: typeof r.created_at === "string" ? r.created_at : "",
+  };
+}
+
+export async function uploadCustomerPhoto(photoFile: File): Promise<{
+  detail: string;
+  photo_url: string | null;
+}> {
+  const form = new FormData();
+  form.append("photo", photoFile);
+  const response = await apiFetch<unknown>("/customer/profile/photo/", {
+    method: "POST",
+    body: form,
+  });
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    detail: typeof root.detail === "string" ? root.detail : "",
+    photo_url: typeof root.photo_url === "string" ? root.photo_url : null,
+  };
+}
+
+export async function listCustomerKycDocuments(): Promise<CustomerKycDocumentListResponse> {
+  const response = await apiFetch<unknown>("/customer/kyc/documents/");
+  const root = (response ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results)
+    ? (root.results as unknown[]).map(normalizeKycDocument)
+    : [];
+  return {
+    count: Number(root.count ?? results.length),
+    kyc_status: typeof root.kyc_status === "string" ? root.kyc_status : "PENDING",
+    results,
+  };
+}
+
+export async function submitCustomerKycDocument(payload: {
+  document_type: string;
+  file: File;
+  notes?: string;
+}): Promise<CustomerKycSubmitResponse> {
+  const form = new FormData();
+  form.append("document_type", payload.document_type);
+  form.append("file", payload.file);
+  if (payload.notes) form.append("notes", payload.notes);
+  const response = await apiFetch<unknown>("/customer/kyc/request-update/", {
+    method: "POST",
+    body: form,
+  });
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    detail: typeof root.detail === "string" ? root.detail : "",
+    kyc_status: typeof root.kyc_status === "string" ? root.kyc_status : "SUBMITTED",
+    document: normalizeKycDocument(root.document),
+  };
+}
+
+export async function listCustomerReferrals(): Promise<CustomerReferralListResponse> {
+  const response = await apiFetch<unknown>("/customer/referrals/");
+  const root = (response ?? {}) as Record<string, unknown>;
+  const summaryRaw = (root.commission_summary ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results)
+    ? (root.results as Record<string, unknown>[]).map((r) => ({
+        id: Number(r.id ?? 0),
+        referrer: Number(r.referrer ?? 0),
+        referrer_name: typeof r.referrer_name === "string" ? r.referrer_name : "",
+        referred: Number(r.referred ?? 0),
+        referred_name: typeof r.referred_name === "string" ? r.referred_name : "",
+        referred_phone: typeof r.referred_phone === "string" ? r.referred_phone : "",
+        notes: typeof r.notes === "string" ? r.notes : "",
+        commission_enabled: Boolean(r.commission_enabled),
+        commission_amount: typeof r.commission_amount === "string" ? r.commission_amount : "0.00",
+        commission_approved: Boolean(r.commission_approved),
+        commission_approved_at:
+          typeof r.commission_approved_at === "string" ? r.commission_approved_at : null,
+        created_at: typeof r.created_at === "string" ? r.created_at : "",
+      }))
+    : [];
+  return {
+    count: Number(root.count ?? results.length),
+    commission_summary: {
+      total_referrals: Number(summaryRaw.total_referrals ?? results.length),
+      approved_commissions: Number(summaryRaw.approved_commissions ?? 0),
+      total_approved_commission_amount:
+        typeof summaryRaw.total_approved_commission_amount === "string"
+          ? summaryRaw.total_approved_commission_amount
+          : "0.00",
+    },
+    results,
+  };
+}

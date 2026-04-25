@@ -44,7 +44,9 @@ type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
 type KycStatus =
   | "NOT_PROVIDED"
   | "PENDING"
+  | "SUBMITTED"
   | "VERIFIED"
+  | "APPROVED"
   | "REJECTED"
   | "UNKNOWN";
 type SubscriptionStatus =
@@ -71,6 +73,10 @@ type CustomerDetailRecord = {
   kyc_reviewed_by_username?: string | null;
   kyc_reviewed_at?: string | null;
   kyc_rejection_reason?: string | null;
+  // Phase 1 additive fields
+  customer_source?: string | null;
+  customer_code?: string | null;
+  profile_photo_url?: string | null;
 };
 
 type SubscriptionPreviewRow = {
@@ -320,8 +326,9 @@ function normalizeKycStatus(raw: Record<string, unknown>): KycStatus {
 
   if (status === "NOT_PROVIDED") return "NOT_PROVIDED";
   if (status === "PENDING") return "PENDING";
+  if (status === "SUBMITTED") return "SUBMITTED";
   if (status === "VERIFIED") return "VERIFIED";
-  if (status === "APPROVED") return "VERIFIED";
+  if (status === "APPROVED") return "APPROVED";
   if (status === "REJECTED") return "REJECTED";
   return "UNKNOWN";
 }
@@ -1334,7 +1341,9 @@ export default function AdminCustomerDetailPage() {
     return nextActions;
   }, [customer, firstOutstandingDirectSale, latestSubscription]);
 
-  async function handleKycDecision(status: "VERIFIED" | "REJECTED") {
+  async function handleKycDecision(
+    status: "APPROVED" | "VERIFIED" | "REJECTED" | "PENDING" | "SUBMITTED"
+  ) {
     if (!customerId) return;
 
     if (status === "REJECTED" && !kycReason.trim()) {
@@ -1349,7 +1358,7 @@ export default function AdminCustomerDetailPage() {
 
     try {
       const response = await submitCustomerKycDecision(customerId, {
-        status,
+        status: status as "VERIFIED" | "REJECTED",
         reason: kycReason.trim() || undefined,
       });
 
@@ -1357,10 +1366,7 @@ export default function AdminCustomerDetailPage() {
         current
           ? {
               ...current,
-              kyc_status:
-                response.kyc_status === "APPROVED"
-                  ? "VERIFIED"
-                  : response.kyc_status,
+              kyc_status: response.kyc_status as KycStatus,
               kyc_reviewed_by_username: response.kyc_reviewed_by_username ?? null,
               kyc_reviewed_at: response.kyc_reviewed_at ?? null,
               kyc_rejection_reason: response.kyc_rejection_reason ?? null,
@@ -1369,9 +1375,11 @@ export default function AdminCustomerDetailPage() {
       );
 
       setKycSuccess(
-        status === "VERIFIED"
-          ? "KYC verified successfully."
-          : "KYC rejected successfully."
+        status === "APPROVED" || status === "VERIFIED"
+          ? "KYC approved successfully."
+          : status === "REJECTED"
+          ? "KYC rejected successfully."
+          : "KYC status updated."
       );
       setKycReason("");
       await loadPage("refresh");
@@ -1387,10 +1395,12 @@ export default function AdminCustomerDetailPage() {
   }
 
   const kycTone: "success" | "warning" | "danger" | "default" =
-    customer?.kyc_status === "VERIFIED"
+    customer?.kyc_status === "VERIFIED" || customer?.kyc_status === "APPROVED"
       ? "success"
       : customer?.kyc_status === "REJECTED"
       ? "danger"
+      : customer?.kyc_status === "SUBMITTED"
+      ? "warning"
       : customer?.kyc_status === "PENDING"
       ? "warning"
       : "default";
@@ -1520,7 +1530,7 @@ export default function AdminCustomerDetailPage() {
                 title="KYC Status"
                 value={customer.kyc_status}
                 icon={
-                  customer.kyc_status === "VERIFIED" ? (
+                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED" ? (
                     <CheckCircle2 className="h-4 w-4" />
                   ) : customer.kyc_status === "REJECTED" ? (
                     <X className="h-4 w-4" />
@@ -1577,6 +1587,12 @@ export default function AdminCustomerDetailPage() {
                     label="Created At"
                     value={formatDateTime(customer.created_at)}
                   />
+                  {customer.customer_source && (
+                    <DetailValue label="Source" value={customer.customer_source} />
+                  )}
+                  {customer.customer_code && (
+                    <DetailValue label="Customer Code" value={customer.customer_code} />
+                  )}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <StatusBadge status={customer.status} tone={customerStatusTone} />
@@ -1711,12 +1727,12 @@ export default function AdminCustomerDetailPage() {
                   <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => void handleKycDecision("VERIFIED")}
+                      onClick={() => void handleKycDecision("APPROVED")}
                       disabled={savingKyc}
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Check className="h-4 w-4" />
-                      {savingKyc ? "Saving..." : "Verify KYC"}
+                      {savingKyc ? "Saving..." : "Approve KYC"}
                     </button>
 
                     <button
@@ -1727,6 +1743,15 @@ export default function AdminCustomerDetailPage() {
                     >
                       <X className="h-4 w-4" />
                       {savingKyc ? "Saving..." : "Reject KYC"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleKycDecision("PENDING")}
+                      disabled={savingKyc}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Reset to Pending
                     </button>
                   </div>
                 </div>

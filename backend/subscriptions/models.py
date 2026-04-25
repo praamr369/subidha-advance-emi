@@ -64,6 +64,27 @@ def subscription_document_upload_to(instance, filename: str) -> str:
     return f"subscriptions/{identity}/{doc_type}-{token}{extension}"
 
 
+def customer_photo_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".jpg"
+    customer_id = getattr(instance, "id", None) or getattr(instance, "pk", None)
+    token = uuid4().hex[:10]
+    identity = f"cust-{customer_id}" if customer_id else "customer"
+    return f"customers/photos/{identity}/{token}{extension}"
+
+
+def customer_kyc_doc_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".bin"
+    customer_id = getattr(instance, "customer_id", None)
+    doc_type = (getattr(instance, "document_type", "") or "KYC").strip().lower()
+    token = uuid4().hex[:12]
+    identity = f"cust-{customer_id}" if customer_id else "customer"
+    return f"customers/kyc/{identity}/{doc_type}-{token}{extension}"
+
+
 # =====================================================
 # ENUMS
 # =====================================================
@@ -159,8 +180,17 @@ class PaymentMethod(models.TextChoices):
 class KycStatus(models.TextChoices):
     NOT_PROVIDED = "NOT_PROVIDED", "Not Provided"
     PENDING = "PENDING", "Pending Verification"
+    SUBMITTED = "SUBMITTED", "Submitted – Awaiting Review"
     VERIFIED = "VERIFIED", "Verified"
+    APPROVED = "APPROVED", "Approved"
     REJECTED = "REJECTED", "Rejected"
+
+
+class CustomerSource(models.TextChoices):
+    PUBLIC = "PUBLIC", "Public Self-Registration"
+    ADMIN = "ADMIN", "Admin Created"
+    PARTNER = "PARTNER", "Partner Created"
+    IMPORT = "IMPORT", "Imported"
 
 
 class BatchStatus(models.TextChoices):
@@ -257,9 +287,45 @@ class Customer(TimeStampedModel):
         blank=True,
     )
     kyc_reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
-    kyc_rejection_reason = models.TextField(blank=True, default="") 
+    kyc_rejection_reason = models.TextField(blank=True, default="")
     address = models.TextField(blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
+
+    # Phase 1 – additive fields (all nullable/blank-safe for existing rows)
+    customer_source = models.CharField(
+        max_length=20,
+        choices=CustomerSource.choices,
+        default=CustomerSource.ADMIN,
+        blank=True,
+        db_index=True,
+    )
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="customers_created",
+        null=True,
+        blank=True,
+    )
+    created_by_partner_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="partner_created_customers",
+        null=True,
+        blank=True,
+    )
+    profile_photo = models.ImageField(
+        upload_to=customer_photo_upload_to,
+        null=True,
+        blank=True,
+    )
+    customer_code = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Human-readable short code for receipts/contracts (auto-generated if blank).",
+    )
+
     class Meta:
         db_table = "customers"
         ordering = ["-created_at"]
@@ -269,6 +335,8 @@ class Customer(TimeStampedModel):
             models.Index(fields=["name"]),
             models.Index(fields=["kyc_reviewed_at"]),
             models.Index(fields=["city"]),
+            models.Index(fields=["customer_source"]),
+            models.Index(fields=["customer_code"]),
         ]
 
     def clean(self):
@@ -2786,6 +2854,24 @@ class AuditLog(models.Model):
         PASSWORD_RESET_RESENT = "PASSWORD_RESET_RESENT", "Password Reset Resent"
         PASSWORD_RESET_INVALIDATED = "PASSWORD_RESET_INVALIDATED", "Password Reset Invalidated"
 
+        # Phase 1 – Customer lifecycle audit types
+        CUSTOMER_CREATED = "CUSTOMER_CREATED", "Customer Created"
+        CUSTOMER_QUICK_CREATED = "CUSTOMER_QUICK_CREATED", "Customer Quick-Created (No Email)"
+        CUSTOMER_EMAIL_ADDED = "CUSTOMER_EMAIL_ADDED", "Customer Email Added"
+        CUSTOMER_EMAIL_CHANGED = "CUSTOMER_EMAIL_CHANGED", "Customer Email Changed"
+        CUSTOMER_PHOTO_UPDATED = "CUSTOMER_PHOTO_UPDATED", "Customer Profile Photo Updated"
+        CUSTOMER_KYC_DOCUMENT_SUBMITTED = (
+            "CUSTOMER_KYC_DOCUMENT_SUBMITTED",
+            "Customer KYC Document Submitted",
+        )
+        CUSTOMER_KYC_APPROVED = "CUSTOMER_KYC_APPROVED", "Customer KYC Approved"
+        CUSTOMER_KYC_REJECTED = "CUSTOMER_KYC_REJECTED", "Customer KYC Rejected"
+        CUSTOMER_REFERRAL_CREATED = "CUSTOMER_REFERRAL_CREATED", "Customer Referral Created"
+        CUSTOMER_REFERRAL_COMMISSION_APPROVED = (
+            "CUSTOMER_REFERRAL_COMMISSION_APPROVED",
+            "Customer Referral Commission Approved",
+        )
+
     action_type = models.CharField(
         max_length=50,
         choices=ActionType.choices,
@@ -3111,3 +3197,175 @@ class CommissionPayoutLine(models.Model):
 
     def __str__(self):
         return f"Batch {self.payout_batch_id} → Commission {self.commission_id}"
+
+
+# =====================================================
+# CUSTOMER REFERRAL
+# =====================================================
+
+class CustomerReferral(TimeStampedModel):
+    """
+    Tracks referral relationships between customers.
+    Commission is NOT payable automatically – admin must approve.
+    """
+
+    referrer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="referrals_made",
+    )
+    referred = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="referred_by_referrals",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_customer_referrals",
+    )
+    notes = models.TextField(blank=True, default="")
+
+    commission_enabled = models.BooleanField(
+        default=False,
+        help_text="Set true only when admin global referral commission feature is enabled.",
+    )
+    commission_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    commission_approved = models.BooleanField(default=False)
+    commission_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_referral_commissions",
+    )
+    commission_approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "customer_referrals"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["referrer", "referred"],
+                name="uq_customer_referral_pair",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["referrer", "created_at"]),
+            models.Index(fields=["referred"]),
+            models.Index(fields=["commission_approved"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.referrer_id and self.referred_id and self.referrer_id == self.referred_id:
+            errors["referred"] = "A customer cannot refer themselves."
+        if self.commission_amount < Decimal("0.00"):
+            errors["commission_amount"] = "Commission amount cannot be negative."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Referral: {self.referrer_id} → {self.referred_id}"
+
+
+# =====================================================
+# CUSTOMER KYC DOCUMENT
+# =====================================================
+
+class CustomerKycDocumentType(models.TextChoices):
+    AADHAAR = "AADHAAR", "Aadhaar Card"
+    PAN = "PAN", "PAN Card"
+    PASSPORT = "PASSPORT", "Passport"
+    DRIVING_LICENSE = "DRIVING_LICENSE", "Driving License"
+    VOTER_ID = "VOTER_ID", "Voter ID"
+    OTHER = "OTHER", "Other"
+
+
+class CustomerKycDocumentStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending Review"
+    SUBMITTED = "SUBMITTED", "Submitted"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+
+
+class CustomerKycDocument(TimeStampedModel):
+    """
+    Customer-level KYC documents.
+    Separate from SubscriptionDocument (which is linked to a specific subscription).
+    Upload does NOT auto-approve; admin must approve/reject.
+    """
+
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="kyc_documents",
+    )
+    document_type = models.CharField(
+        max_length=30,
+        choices=CustomerKycDocumentType.choices,
+        default=CustomerKycDocumentType.OTHER,
+        db_index=True,
+    )
+    file = models.FileField(upload_to=customer_kyc_doc_upload_to)
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=CustomerKycDocumentStatus.choices,
+        default=CustomerKycDocumentStatus.SUBMITTED,
+        db_index=True,
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_kyc_documents",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_kyc_documents",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "customer_kyc_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["customer", "document_type"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.customer_id:
+            errors["customer"] = "Customer is required."
+        if not self.file:
+            errors["file"] = "Document file is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.rejection_reason = (self.rejection_reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"KYC {self.document_type} for customer {self.customer_id} [{self.status}]"

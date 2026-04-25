@@ -11,6 +11,8 @@ import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import CustomerSelector from "@/components/admin/customers/CustomerSelector";
+import type { CustomerRecord } from "@/services/customers";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -385,20 +387,18 @@ export default function SubscriptionCreatePage({
   const [docUploadBusy, setDocUploadBusy] = useState(false);
   const [docUploadError, setDocUploadError] = useState<string | null>(null);
 
-  const [customerQuery, setCustomerQuery] = useState("");
+  // customerQuery / customerResults / customerLoading removed – handled by CustomerSelector
   const [productQuery, setProductQuery] = useState("");
   const [batchQuery, setBatchQuery] = useState("");
   const [luckyQuery, setLuckyQuery] = useState("");
   const [partnerQuery, setPartnerQuery] = useState("");
 
-  const [customerResults, setCustomerResults] = useState<CustomerOption[]>([]);
   const [productResults, setProductResults] = useState<ProductOption[]>([]);
   const [batchResults, setBatchResults] = useState<BatchOption[]>([]);
   const [luckyResults, setLuckyResults] = useState<LuckyIdOption[]>([]);
   const [partnerResults, setPartnerResults] = useState<PartnerOption[]>([]);
   const [availableLuckyCount, setAvailableLuckyCount] = useState<number | null>(null);
 
-  const [customerLoading, setCustomerLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
   const [luckyLoading, setLuckyLoading] = useState(false);
@@ -553,25 +553,6 @@ export default function SubscriptionCreatePage({
   function nextLuckyRequestToken(): number {
     luckyRequestSequence.current += 1;
     return luckyRequestSequence.current;
-  }
-
-  async function runCustomerSearch() {
-    if (!customerQuery.trim()) return;
-    setCustomerLoading(true);
-    setError(null);
-    try {
-      const payload = await apiFetch<unknown>(
-        `/admin/customers/search/?q=${encodeURIComponent(customerQuery.trim())}`
-      );
-      setCustomerResults(
-        toArray<Record<string, unknown>>(payload).map(normalizeCustomer)
-      );
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setCustomerResults([]);
-    } finally {
-      setCustomerLoading(false);
-    }
   }
 
   async function runProductSearch() {
@@ -770,8 +751,7 @@ export default function SubscriptionCreatePage({
             if (!cancelled) {
               const normalized = normalizeCustomer(payload);
               setCustomer(normalized);
-              setCustomerQuery(`${normalized.name} ${normalized.phone}`.trim());
-              setCustomerResults([]);
+              // CustomerSelector manages its own query/results state
             }
           } catch {
             messages.push(
@@ -974,13 +954,12 @@ export default function SubscriptionCreatePage({
     setLuckyId(null);
     setPartner(null);
 
-    setCustomerQuery("");
+    // customerQuery/customerResults managed by CustomerSelector
     setProductQuery("");
     setBatchQuery("");
     setLuckyQuery("");
     setPartnerQuery("");
 
-    setCustomerResults([]);
     setProductResults([]);
     setBatchResults([]);
     setLuckyResults([]);
@@ -999,10 +978,9 @@ export default function SubscriptionCreatePage({
     setCustomer(null);
     setLuckyId(null);
 
-    setCustomerQuery("");
+    // customerQuery/customerResults managed by CustomerSelector
     setLuckyQuery("");
 
-    setCustomerResults([]);
     setLuckyResults([]);
 
     setError(null);
@@ -1277,47 +1255,28 @@ export default function SubscriptionCreatePage({
           description="Select the customer, product, and optional partner context for this subscription."
         >
           <div className="grid gap-4 lg:grid-cols-2">
-            <SearchPanel<CustomerOption>
-              title="Customer"
-              description="Search by customer name or phone. Press Enter to search."
-              query={customerQuery}
-              setQuery={setCustomerQuery}
-              onSearch={runCustomerSearch}
-              loading={customerLoading}
-              selected={customer}
-              onClear={() => {
-                setCustomer(null);
-                setCustomerResults([]);
-              }}
-              results={customerResults}
-              renderSelected={(item) => (
-                <div>
-                  <div className="font-medium text-foreground">
-                    {item.name} ({item.phone})
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    KYC {item.kyc_status || "—"}
-                  </div>
-                </div>
-              )}
-              renderOption={(item) => (
-                <div>
-                  <div className="font-medium text-foreground">
-                    {item.name} ({item.phone})
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    KYC {item.kyc_status || "—"}
-                  </div>
-                </div>
-              )}
-              onSelect={(item) => {
-                setCustomer(item);
-                setCustomerResults([]);
-                setError(null);
-                setSuccess(null);
-              }}
-              placeholder="Search customer by name or phone"
-            />
+            <div className="space-y-1.5">
+              <div className="text-sm font-medium">Customer</div>
+              <div className="text-xs text-muted-foreground mb-2">
+                Phone-first search with inline quick-create. Duplicate phones return the existing customer.
+              </div>
+              <CustomerSelector
+                selected={
+                  customer
+                    ? ({ ...customer } as CustomerRecord)
+                    : null
+                }
+                onSelect={(rec: CustomerRecord) => {
+                  setCustomer({ id: rec.id, name: rec.name, phone: rec.phone, kyc_status: rec.kyc_status });
+                  setError(null);
+                  setSuccess(null);
+                }}
+                onClear={() => {
+                  setCustomer(null);
+                }}
+                placeholder="Search customer by phone, name, or code…"
+              />
+            </div>
 
             <SearchPanel<ProductOption>
               title="Product"
