@@ -20,7 +20,14 @@ const DEFAULT_PRICE_RANGE: PriceRange = {
   max: Infinity,
 };
 
-export default function ProductGrid({ products }: { products: PublicProduct[] }) {
+export default function ProductGrid({ products, locale = "en" }: { products: PublicProduct[]; locale?: "en" | "hi" | "bn" }) {
+  const labels = locale === "hi" ? {
+    hideFilters: "फ़िल्टर छिपाएँ", showFilters: "फ़िल्टर दिखाएँ", filters: "कैटलॉग फ़िल्टर", narrow: "लाइव कैटलॉग को फ़िल्टर करें", reset: "फ़िल्टर रीसेट करें", search: "खोज", searchPlaceholder: "नाम, कोड, या विवरण", category: "श्रेणी", allCategories: "सभी श्रेणियाँ", subcategory: "उप-श्रेणी", allSubcategories: "सभी उप-श्रेणियाँ", priceBand: "कीमत सीमा", min: "न्यूनतम", max: "अधिकतम", results: "लाइव परिणाम", showing: "दिखा रहा है", of: "में से", published: "प्रकाशित उत्पाद", liveView: "लाइव कैटलॉग", any: "कोई भी"
+  } : locale === "bn" ? {
+    hideFilters: "ফিল্টার লুকান", showFilters: "ফিল্টার দেখুন", filters: "ক্যাটালগ ফিল্টার", narrow: "লাইভ ক্যাটালগ ছাঁকুন", reset: "ফিল্টার রিসেট", search: "সার্চ", searchPlaceholder: "নাম, কোড, বা বিবরণ", category: "ক্যাটাগরি", allCategories: "সব ক্যাটাগরি", subcategory: "সাব-ক্যাটাগরি", allSubcategories: "সব সাব-ক্যাটাগরি", priceBand: "দামের সীমা", min: "ন্যূনতম", max: "সর্বোচ্চ", results: "লাইভ ফলাফল", showing: "দেখানো হচ্ছে", of: "মোট", published: "প্রকাশিত পণ্য", liveView: "লাইভ ক্যাটালগ", any: "যেকোনো"
+  } : {
+    hideFilters: "Hide filters", showFilters: "Show filters", filters: "Catalogue Filters", narrow: "Narrow the live furniture catalogue", reset: "Reset filters", search: "Search", searchPlaceholder: "Name, code, or description", category: "Category", allCategories: "All categories", subcategory: "Subcategory", allSubcategories: "All subcategories", priceBand: "Price band", min: "Min", max: "Max", results: "Live results", showing: "Showing", of: "of", published: "published products", liveView: "Live catalogue view", any: "Any"
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
@@ -107,7 +114,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/75 bg-white/85 px-4 py-3 text-sm font-medium text-foreground shadow-[0_22px_48px_-36px_rgba(15,23,42,0.76)]"
         >
           <SlidersHorizontal className="h-4 w-4" />
-          {showFilters ? "Hide filters" : "Show filters"}
+          {showFilters ? labels.hideFilters : labels.showFilters}
         </button>
       </div>
 
@@ -121,10 +128,10 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Catalogue Filters
+                {labels.filters}
               </div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">
-                Narrow the live furniture catalogue
+                {labels.narrow}
               </h2>
             </div>
 
@@ -135,26 +142,26 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-medium text-foreground shadow-[0_18px_36px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white"
               >
                 <X className="h-4 w-4" />
-                Reset filters
+                {labels.reset}
               </button>
             ) : null}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,0.8fr))]">
-            <FieldShell label="Search">
+            <FieldShell label={labels.search}>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Name, code, or description"
+                  placeholder={labels.searchPlaceholder}
                   className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                 />
               </div>
             </FieldShell>
 
-            <FieldShell label="Category">
+            <FieldShell label={labels.category}>
               <select
                 value={selectedCategory}
                 onChange={(event) => {
@@ -163,7 +170,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
                 }}
                 className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               >
-                <option value="">All categories</option>
+                <option value="">{labels.allCategories}</option>
                 {categories.map((category) => (
                   <option key={category} value={category}>
                     {category}
@@ -172,14 +179,14 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
               </select>
             </FieldShell>
 
-            <FieldShell label="Subcategory">
+            <FieldShell label={labels.subcategory}>
               <select
                 value={selectedSubcategory}
                 onChange={(event) => setSelectedSubcategory(event.target.value)}
                 className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                 disabled={!selectedCategory && subcategories.length === 0}
               >
-                <option value="">All subcategories</option>
+                <option value="">{labels.allSubcategories}</option>
                 {subcategories.map((subcategory) => (
                   <option key={subcategory} value={subcategory}>
                     {subcategory}
@@ -188,7 +195,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
               </select>
             </FieldShell>
 
-            <FieldShell label="Price band">
+            <FieldShell label={labels.priceBand}>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
@@ -201,7 +208,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
                       min: Number.isFinite(value) ? value : 0,
                     }));
                   }}
-                  placeholder="Min"
+                  placeholder={labels.min}
                   className="h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                 />
                 <input
@@ -215,7 +222,7 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
                       max: Number.isFinite(value) ? value : Infinity,
                     }));
                   }}
-                  placeholder="Max"
+                  placeholder={labels.max}
                   className="h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                 />
               </div>
@@ -227,10 +234,10 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
       <section className="flex flex-col gap-3 rounded-[1.9rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] px-5 py-4 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.72)] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Live results
+            {labels.results}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
-            Showing {filteredProducts.length} of {products.length} published products.
+            {labels.showing} {filteredProducts.length} {labels.of} {products.length} {labels.published}.
           </div>
         </div>
 
@@ -240,14 +247,14 @@ export default function ProductGrid({ products }: { products: PublicProduct[] })
           {priceRange.min > 0 || priceRange.max !== Infinity ? (
             <FilterChip
               label={`₹${priceRange.min || 0} - ${
-                priceRange.max === Infinity ? "Any" : `₹${priceRange.max}`
+                priceRange.max === Infinity ? labels.any : `₹${priceRange.max}`
               }`}
             />
           ) : null}
           {!hasActiveFilters ? (
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
               <Sparkles className="h-3.5 w-3.5" />
-              Live catalogue view
+              {labels.liveView}
             </div>
           ) : null}
         </div>

@@ -2,17 +2,53 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import PublicPageShell from "@/components/public/PublicPageShell";
+<<<<<<< ours
+<<<<<<< ours
+import {
+  buildPublicMetadata,
+  getPublicDictionary,
+} from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+>>>>>>> theirs
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+>>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
 import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
 import ProductGrid from "./ProductGrid";
 
-export const metadata: Metadata = {
+<<<<<<< ours
+<<<<<<< ours
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+  return buildPublicMetadata({
+    title: `${dictionary.common.products} | Furniture, Electronics, Appliances`,
+    description: "Browse furniture, electronics, and home appliances from Subidha Furniture with easy monthly plan enquiry support.",
+    path: "/products",
+  });
+}
+=======
+=======
+>>>>>>> theirs
+import { buildPublicMetadata } from "@/lib/public-seo";
+
+export const metadata: Metadata = buildPublicMetadata({
   title: "Products",
-  description:
-    "Browse Subidha Furniture’s live public catalogue. Products are loaded from the real backend product master and rendered with safe empty states.",
-};
+  description: "Browse furniture, electronics, and appliances from the live public catalogue.",
+  path: "/products",
+});
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 
 export default async function ProductsPage() {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+
   let products: PublicProduct[] = [];
   let count = 0;
   let error: string | null = null;
@@ -29,86 +65,60 @@ export default async function ProductsPage() {
 
   return (
     <PublicPageShell
-      title="Products"
-      subtitle="Browse the live catalogue and carry the product context into the Lucky Plan enquiry flow."
+      title={dictionary.common.products}
+      subtitle="Explore real catalog items and enquire with your preferred product in one flow."
       breadcrumbs={[
-        { label: "Home", href: ROUTES.public.home },
-        { label: "Products" },
+        { label: dictionary.common.home, href: ROUTES.public.home },
+        { label: dictionary.common.products },
       ]}
       actions={[
-        { label: "Lucky Plan", href: ROUTES.public.luckyPlan, variant: "secondary" },
-        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
+        { label: dictionary.common.luckyPlan, href: ROUTES.public.luckyPlan, variant: "secondary" },
+        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
+      <PublicMarketingBanner
+        eyebrow="Category bands"
+        title="Browse realistic home categories"
+        description="Find sofas, beds, wardrobes, dining sets, refrigerators, washing machines, TVs, and kitchen appliances."
+        items={[
+          { title: "Furniture essentials", description: "Sofas, beds, wardrobes, and dining sets." },
+          { title: "Electronics", description: "TV and household electronics for daily needs." },
+          { title: "Home appliances", description: "Refrigerator, washing machine, and kitchen appliances." },
+        ]}
+      />
+
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Published products
-            </div>
+          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Published products</div>
             <div className="mt-2 text-3xl font-semibold text-foreground">{count}</div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Products currently visible to customers on the public website.
-            </p>
           </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Media-ready cards
-            </div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">
-              {mediaReadyCount}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Catalogue entries currently carrying uploaded product media.
-            </p>
+          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Media-ready cards</div>
+            <div className="mt-2 text-3xl font-semibold text-foreground">{mediaReadyCount}</div>
           </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Workflow
-            </div>
-            <div className="mt-2 text-lg font-semibold text-foreground">
-              Browse → Inspect → Enquire
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Product context stays attached when you open the enquiry form.
-            </p>
+          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Workflow</div>
+            <div className="mt-2 text-lg font-semibold text-foreground">Browse → Inspect → Enquire</div>
           </div>
         </div>
 
-        {error ? (
-          <div className="mt-6 rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-            {error}
-          </div>
-        ) : (
-          <div className="mt-6">
-            <ProductGrid products={products} />
-          </div>
-        )}
+        {error ? <div className="mt-6 rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div> : <div className="mt-6"><ProductGrid products={products} locale={locale} /></div>}
       </section>
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Note
-        </div>
-        <p className="mt-3 text-sm leading-7 text-muted-foreground">
-          Product price shown here is the base price from the live master. Batch availability and plan onboarding details are confirmed by the branch during follow-up.
+      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6">
+        <p className="text-sm leading-7 text-muted-foreground">
+          Product prices come from live product records. Final monthly plan and batch availability are confirmed by branch staff.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={ROUTES.public.apply}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5"
-          >
-            Apply / Enquire
+          <Link href={ROUTES.public.apply} className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white">
+            {dictionary.common.apply}
           </Link>
-          <Link
-            href={ROUTES.public.contact}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-          >
-            Contact branch
+          <Link href={ROUTES.public.contact} className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground">
+            {dictionary.common.contact}
           </Link>
         </div>
       </section>
     </PublicPageShell>
   );
 }
-

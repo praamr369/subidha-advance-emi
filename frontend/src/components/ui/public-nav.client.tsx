@@ -6,32 +6,22 @@ import { Menu, X, MessageCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import BrandLockup from "@/components/public/BrandLockup";
+<<<<<<< ours
+<<<<<<< ours
+import PublicLanguageSwitcher from "@/components/ui/public-language-switcher";
+import type { PublicLocale } from "@/lib/public-i18n";
+=======
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+>>>>>>> theirs
+=======
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+>>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
+import { getText, publicContent, type PublicLanguage } from "@/lib/public-i18n";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: ROUTES.public.home, label: "Home" },
-  { href: ROUTES.public.products, label: "Products" },
-  { href: ROUTES.public.luckyPlan, label: "Lucky Plan" },
-  { href: ROUTES.public.howItWorks, label: "How It Works" },
-  { href: ROUTES.public.winners, label: "Winners" },
-  { href: ROUTES.public.winnerHistory, label: "Winner History" },
-  { href: ROUTES.public.about, label: "About" },
-  { href: ROUTES.public.contact, label: "Contact" },
-  { href: ROUTES.public.blog, label: "Blog" },
-];
-
-const actions = [
-  { href: ROUTES.public.apply, label: "Apply", variant: "primary" as const },
-  { href: ROUTES.public.register, label: "Register", variant: "secondary" as const },
-  { href: ROUTES.public.login, label: "Login", variant: "secondary" as const },
-];
-
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === ROUTES.public.home) {
-    return pathname === href;
-  }
-
+  if (href === ROUTES.public.home) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -40,6 +30,25 @@ type PublicNavClientProps = {
   companyName?: string;
   brandSubtitle?: string;
   whatsappLink?: string | null;
+<<<<<<< ours
+<<<<<<< ours
+  locale: PublicLocale;
+  dictionary: {
+    links: readonly string[];
+    apply: string;
+    register: string;
+    login: string;
+    whatsapp: string;
+    navigate: string;
+    quickActions: string;
+    language: string;
+  };
+=======
+  language: PublicLanguage;
+>>>>>>> theirs
+=======
+  language: PublicLanguage;
+>>>>>>> theirs
 };
 
 export default function PublicNavClient({
@@ -47,28 +56,51 @@ export default function PublicNavClient({
   companyName,
   brandSubtitle,
   whatsappLink,
+<<<<<<< ours
+<<<<<<< ours
+  locale,
+  dictionary,
+=======
+  language,
+>>>>>>> theirs
+=======
+  language,
+>>>>>>> theirs
 }: PublicNavClientProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const links = [
+    { href: ROUTES.public.home, label: dictionary.links[0] },
+    { href: ROUTES.public.products, label: dictionary.links[1] },
+    { href: ROUTES.public.luckyPlan, label: dictionary.links[2] },
+    { href: ROUTES.public.howItWorks, label: dictionary.links[3] },
+    { href: ROUTES.public.winners, label: dictionary.links[4] },
+    { href: ROUTES.public.winnerHistory, label: dictionary.links[5] },
+    { href: ROUTES.public.about, label: dictionary.links[6] },
+    { href: ROUTES.public.contact, label: dictionary.links[7] },
+    { href: ROUTES.public.blog, label: dictionary.links[8] },
+  ];
+
+  const actions = [
+    { href: ROUTES.public.apply, label: dictionary.apply, variant: "primary" as const },
+    { href: ROUTES.public.register, label: dictionary.register, variant: "secondary" as const },
+    { href: ROUTES.public.login, label: dictionary.login, variant: "secondary" as const },
+  ];
+
   const showWhatsApp = useMemo(() => Boolean((whatsappLink || "").trim()), [whatsappLink]);
+  const trustBadge = getText(publicContent.nav.trustBadge, language);
 
   return (
     <nav className="public-nav">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:gap-0 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href={ROUTES.public.home}
-            className="min-w-0"
-            onClick={() => setMobileOpen(false)}
-          >
-            <BrandLockup
-              compact
-              logoSrc={logoSrc}
-              companyName={companyName}
-              subtitle={brandSubtitle}
-            />
+          <Link href={ROUTES.public.home} className="min-w-0" onClick={() => setMobileOpen(false)}>
+            <BrandLockup compact logoSrc={logoSrc} companyName={companyName} subtitle={brandSubtitle} />
           </Link>
+          <div className="hidden lg:flex">
+            <LanguageSwitcher value={language} />
+          </div>
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
@@ -98,13 +130,14 @@ export default function PublicNavClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <PublicLanguageSwitcher locale={locale} label={dictionary.language} />
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white"
               >
                 <MessageCircle className="h-4 w-4" />
-                WhatsApp
+                {dictionary.whatsapp}
               </Link>
             ) : null}
 
@@ -125,11 +158,27 @@ export default function PublicNavClient({
           </div>
         </div>
 
+        <div className="hidden rounded-xl border border-white/80 bg-white/70 px-4 py-2 text-xs font-semibold text-slate-600 lg:block">
+          {trustBadge}
+        </div>
+
         <div className={cn("grid gap-3 lg:hidden", mobileOpen ? "grid" : "hidden")}>
+          <div className="rounded-xl border border-white/75 bg-white/82 p-3">
+            <LanguageSwitcher value={language} />
+            <div className="mt-2 text-xs font-semibold text-slate-600">{trustBadge}</div>
+          </div>
           <div className="rounded-2xl border border-white/75 bg-white/82 p-3">
+<<<<<<< ours
+<<<<<<< ours
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Navigate
+              {dictionary.navigate}
             </div>
+=======
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Navigate</div>
+>>>>>>> theirs
+=======
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Navigate</div>
+>>>>>>> theirs
             <div className="mt-2 grid gap-1">
               {links.map((link) => (
                 <Link
@@ -150,10 +199,19 @@ export default function PublicNavClient({
           </div>
 
           <div className="grid gap-2 rounded-2xl border border-white/75 bg-white/82 p-3">
+<<<<<<< ours
+<<<<<<< ours
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Quick actions
+              {dictionary.quickActions}
             </div>
+            <PublicLanguageSwitcher locale={locale} label={dictionary.language} />
 
+=======
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quick actions</div>
+>>>>>>> theirs
+=======
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quick actions</div>
+>>>>>>> theirs
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
@@ -161,10 +219,9 @@ export default function PublicNavClient({
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition"
               >
                 <MessageCircle className="h-4 w-4" />
-                WhatsApp
+                {dictionary.whatsapp}
               </Link>
             ) : null}
-
             {actions.map((action) => (
               <Link
                 key={action.href}

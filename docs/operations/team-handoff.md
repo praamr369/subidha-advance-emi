@@ -1,91 +1,53 @@
-# SUBIDHA CORE Team Handoff
+# SUBIDHA CORE — Team Handoff (Production Operations Pack)
 
-This handoff is for the current production-ready Lucky Plan EMI system after RC validation and hardening.
+This handoff is for the post-RC, hardened Lucky Plan EMI production system.
 
-## Scope
+## 1) What this handoff covers
 
-- Backend and frontend are both live-operation code paths.
-- Financial truth must continue to flow through existing Django service and API layers.
-- Do not bypass payment, waiver, commission, payout, or reconciliation code with direct database edits.
+- Operational ownership boundaries across Admin, Cashier, Partner, and Customer surfaces.
+- Source-of-truth code locations for onboarding, subscriptions, payments, lucky draw, and reconciliation.
+- Safe onboarding/import guidance that **does not bypass** audited financial flows.
 
-## Source of truth in the codebase
+## 2) Source-of-truth code map
 
-- Core domain models: `backend/subscriptions/models.py`
-- User and role model: `backend/accounts/models.py`
-- Admin serializers for customers, products, subscriptions, payments: `backend/api/v1/serializers/admin_resources.py`
-- Customer and product import flows: `backend/api/v1/views/admin_resources.py`
-- Subscription creation logic: `backend/api/v1/serializers/admin_resources.py` and `backend/subscriptions/services/subscription_service.py`
+- Domain models: `backend/subscriptions/models.py`
+- Admin serializers (customer/product/subscription/payment): `backend/api/v1/serializers/admin_resources.py`
+- Admin import views (customer/product): `backend/api/v1/views/admin_resources.py`
 - Admin routes: `backend/api/v1/routes/admin.py`
-- Cashier routes: `backend/api/v1/routes/cashier.py`
-- Partner routes: `backend/api/v1/routes/partner.py`
+- Subscription service and financial snapshots: `backend/subscriptions/services/subscription_service.py`, `backend/subscriptions/services/subscription_financial_service.py`
+- Payment posting/reversal service layer: `backend/api/v1/services/payment_service.py`
+- Reconciliation flows: `backend/subscriptions/management/commands/reconcile_financials.py`, `backend/api/v1/views/admin_reconciliation.py`
 
-## Current operational roles
+## 3) Role boundaries (live operations)
 
-| Role | Current operational scope |
-| --- | --- |
-| Admin | Products, batches, lucky IDs, customers, subscriptions, payment reversal, reports, reconciliation, partner collection approvals, internal users |
-| Cashier | Pending EMI lookup, EMI search, payment collection, payment history, receipt lookup |
-| Partner | Customer/subscription visibility, payment history visibility, collection request submission, earnings and commission exports |
-| Customer | Self-service views for subscriptions, payments, deliveries, profile, and support requests |
+| Role | Must do | Must not do |
+|---|---|---|
+| Admin | Customer/product/batch/lucky-ID setup, subscription onboarding, reversals, reconciliation | Manual DB edits for payment/EMI corrections |
+| Cashier | Counter collections, receipt verification, payment lookup | Direct subscription edits, reversal bypass |
+| Partner | Partner-scoped collection requests and visibility | Final payment posting without admin/canonical flow |
+| Customer | Self-service profile/subscription/payment visibility | Any privileged financial mutation |
 
-## Supported onboarding and import surfaces today
+## 4) Supported onboarding paths today
 
-| Data type | Current safe path | Notes |
-| --- | --- | --- |
-| Customer | Admin UI create or customer CSV import | CSV import is real, requires `name`, `phone`, and `email`, and generates credentials server-side |
-| Product | Admin UI create/edit or product CSV import | CSV import is real and supports controlled product create/update with SKU and UOM |
-| Vendor | Admin settings import hub or vendor admin workspace | Preview-first import now exists |
-| Staff | Admin settings import hub or staff admin workspace | Preview-first import now exists |
-| Branch / Counter | Admin settings import hub or branch-control workspaces | Preview-first import now exists |
-| Subscription | Admin UI create or POST `/api/v1/admin/subscriptions/` | No confirmed bulk CSV subscription importer found in the current code |
+| Domain | Supported path | Notes |
+|---|---|---|
+| Customers | Admin UI or `/api/v1/admin/customers/import-csv/` | Requires `name,phone,email`; preview available |
+| Products | Admin UI or `/api/v1/admin/products/import-csv/` | Requires `name,base_price`; preview available |
+| Subscriptions | Admin UI `/admin/subscriptions/create` or `POST /api/v1/admin/subscriptions/` | No confirmed bulk subscription CSV importer |
 
-## Important operational constraints
+## 5) Operational rules to preserve
 
-- Product base price is the contract total for Lucky Plan EMI subscriptions.
-- For EMI subscriptions, `batch` and `lucky_id` belong together and tenure must equal the batch duration.
-- A batch in `OPEN` status must have exactly 100 slots, and lucky numbers are constrained to `00` through `99`.
-- Payments and waived EMI states are distinct and must stay distinguishable.
-- Winner state is not a generic edit; it is assigned through lucky draw flow only.
-- Partner collection submission is not the same as final payment posting. Partner flows create collection requests that admins review.
+1. **Do not mutate financial history in-place.** Use reversal and audit-safe correction flows.
+2. **Do not bypass EMI generation.** EMI rows are generated by subscription create logic.
+3. **Do not assign winner state manually.** Winner state must come from lucky draw flow.
+4. **Do not mix batch and lucky ID across batches.**
+5. **Do not run bulk onboarding directly against database tables.** Use preview + post surfaces.
 
-## Team rules for live operations
+## 6) Deployment handoff pointers
 
-- Use admin workspaces for any action that changes financial state or audit state.
-- Use cashier workspaces for counter collection only.
-- Use partner workspaces for partner-scoped visibility and collection requests only.
-- Do not “fix” money records by editing rows manually in the database.
-- Do not delete or overwrite payment history to correct mistakes. Use the existing reversal and review flows.
-
-## Environment and deployment references
-
-- Production env contract: `backend/.env.production.template`
-- Frontend env contract: `frontend/.env.production.template`
-- Deployment handoff: `docs/deployment/PRODUCTION_HANDOFF.md`
-- Production checklist: `docs/deployment/production-checklist.md`
-- RC and smoke references: `docs/deployment/RELEASE_CANDIDATE_VALIDATION.md` and `docs/deployment/RELEASE_SMOKE_CHECKLIST.md`
-
-## Data onboarding references
-
-- Customer import template: `docs/imports/customer-import-template.csv`
-- Product import template: `docs/imports/product-import-template.csv`
-- Vendor import template: `docs/imports/vendor-import-template.csv`
-- Employee import template: `docs/imports/employee-import-template.csv`
-- Branch import template: `docs/imports/branch-import-template.csv`
-- Counter import template: `docs/imports/counter-import-template.csv`
-- Subscription onboarding reference template: `docs/imports/subscription-import-template.csv`
-- Field mapping and behavior notes: `docs/imports/import-field-mapping.md`
-- Go-live checklist: `docs/operations/go-live-checklist.md`
-- Migration rehearsal checklist: `docs/operations/migration-rehearsal-checklist.md`
-- First-week checklist: `docs/operations/first-week-operations-checklist.md`
-- Counter opening/closing checklist: `docs/operations/cashier-counter-opening-closing.md`
-- Branch day-close checklist: `docs/operations/branch-day-close-checklist.md`
-- UAT checklist: `docs/operations/uat-checklist.md`
-- Daily process guide: `docs/operations/daily-shop-workflows.md`
-
-## Known operational cautions
-
-- Customer CSV import generates a username automatically, but the generated password is not returned in the response. If imported customers need portal login, plan an immediate password-reset step or use the admin create-customer flow instead.
-- Product CSV import does not manage `is_active`, `is_emi_enabled`, `is_rent_enabled`, or `is_lease_enabled`. Review those flags in admin after import.
-- In real multi-branch mode, do not use cashier users without active counter assignment.
-- Subscription onboarding is currently a controlled create flow, not a confirmed bulk importer.
-- The active production settings contract is defined in `backend/core/settings/base.py`. Use the new production env template rather than older local examples when preparing deployment secrets.
+- Backend env template: `backend/.env.production.template`
+- Frontend env template: `frontend/.env.production.template`
+- Production deployment checklist: `docs/deployment/production-checklist.md`
+- Production handoff runbook: `docs/deployment/PRODUCTION_HANDOFF.md`
+- Daily operations guide: `docs/operations/daily-shop-workflows.md`
+- Data onboarding checklist: `docs/operations/data-onboarding-checklist.md`

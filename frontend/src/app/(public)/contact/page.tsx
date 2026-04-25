@@ -4,114 +4,70 @@ import Link from "next/link";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
+<<<<<<< ours
+<<<<<<< ours
+import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+>>>>>>> theirs
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+>>>>>>> theirs
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
+import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 import ContactLeadForm from "./ContactLeadForm";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicMetadata({
+<<<<<<< ours
+<<<<<<< ours
+  title: "Contact | Subidha Furniture Asansol",
+  description: "Get help for products, Lucky Plan enrollment, monthly budget guidance, and branch support.",
+=======
   title: "Contact",
-  description:
-    "Contact Subidha Furniture, Asansol. Send an enquiry about products, batches, and Lucky Plan monthly plans.",
-};
+  description: "Contact Subidha Furniture for product, batch, and easy monthly plan guidance.",
+>>>>>>> theirs
+=======
+  title: "Contact",
+  description: "Contact Subidha Furniture for product, batch, and easy monthly plan guidance.",
+>>>>>>> theirs
+  path: "/contact",
+});
 
 export default async function ContactPage() {
   const profile = await getResolvedPublicBusinessProfile();
-  const contactEmail = (profile.support_email || "").trim();
-  const contactPhone = (profile.support_phone || "").trim();
-  const contactAddress = (profile.address_text || "").trim();
-  const businessHours = (profile.business_hours || "").trim();
-  const mapUrl = (profile.map_url || "").trim();
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
 
   return (
     <PublicPageShell
-      title="Contact"
-      subtitle="Ask about products, active batches, and monthly plan comfort. The branch can guide you through enrollment after your enquiry."
-      breadcrumbs={[
-        { label: "Home", href: ROUTES.public.home },
-        { label: "Contact" },
-      ]}
-      actions={[
-        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
-        { label: "Products", href: ROUTES.public.products, variant: "secondary" },
-      ]}
+      title={dictionary.common.contact}
+      subtitle="Call, visit, or send an enquiry. Our team will guide you in simple steps."
+      breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.contact }]}
+      actions={[{ label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }, { label: dictionary.common.products, href: ROUTES.public.products, variant: "secondary" }]}
     >
+      <PublicMarketingBanner
+        eyebrow="Help section"
+        title="Talk to us in simple language"
+        description="Our branch team guides customers through products, plan options, required documents, and next steps."
+        items={[
+          { title: "Plan clarity", description: "Understand monthly amount and tenure before joining." },
+          { title: "Document guidance", description: "Know what to carry for quicker onboarding." },
+          { title: "Follow-up support", description: "Get branch-level help after enquiry submission." },
+        ]}
+      />
+
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-6">
-          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]">
-            <SectionHeader
-              eyebrow="Branch"
-              title="Visit Subidha Furniture"
-              description="Asansol, West Bengal"
-            />
-            {contactAddress ? (
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                {contactAddress}
-              </p>
-            ) : null}
+          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">
+            <SectionHeader eyebrow="Branch" title="Visit our store" description="Asansol, West Bengal" />
+            {profile.address_text ? <p className="mt-4 text-sm leading-6 text-muted-foreground">{profile.address_text}</p> : null}
             <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-              {contactPhone ? (
-                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                  Phone: {contactPhone}
-                </div>
-              ) : null}
-              {contactEmail ? (
-                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                  Email: {contactEmail}
-                </div>
-              ) : null}
-              {businessHours ? (
-                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                  Hours: {businessHours}
-                </div>
-              ) : null}
-              {mapUrl ? (
-                <Link
-                  href={mapUrl}
-                  className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 transition hover:bg-white"
-                >
-                  Open map
-                </Link>
-              ) : null}
-              {!contactPhone && !contactEmail ? (
-                <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                  Contact details are provided by the branch during follow-up.
-                </div>
-              ) : null}
-            </div>
-            {profile.resolved_whatsapp_link ? (
-              <div className="mt-4">
-                <Link
-                  href={profile.resolved_whatsapp_link}
-                  className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5"
-                >
-                  WhatsApp the branch
-                </Link>
-              </div>
-            ) : null}
-            <p className="mt-5 text-sm leading-7 text-muted-foreground">
-              For in-person product browsing, enrollment assistance, and Lucky Plan clarification, visit the branch with your product preference and phone number.
-            </p>
-          </div>
-
-          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]">
-            <SectionHeader
-              eyebrow="Existing customers"
-              title="Already enrolled?"
-              description="Use your account for subscriptions, payments, and support guidance."
-            />
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link
-                href={ROUTES.public.login}
-                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Login
-              </Link>
-              <Link
-                href={ROUTES.public.register}
-                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Register
-              </Link>
+              {profile.support_phone ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Phone: {profile.support_phone}</div> : null}
+              {profile.support_email ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Email: {profile.support_email}</div> : null}
+              {profile.business_hours ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Hours: {profile.business_hours}</div> : null}
+              {profile.map_url ? <Link href={profile.map_url} className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 transition hover:bg-white">Open map</Link> : null}
             </div>
           </div>
         </section>
@@ -119,14 +75,7 @@ export default async function ContactPage() {
         <ContactLeadForm />
       </section>
 
-      <CtaBanner
-        title="Want to include a product in your enquiry?"
-        description="Browse the live catalogue first, then open Apply to carry the product context directly into the enquiry."
-        actions={[
-          { href: ROUTES.public.products, label: "Browse products", variant: "secondary" },
-          { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
-        ]}
-      />
+      <CtaBanner title="Need product-first assistance?" description="Browse products first, then submit an enquiry with product context." actions={[{ href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" }, { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" }]} />
     </PublicPageShell>
   );
 }

@@ -1,33 +1,66 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import BrandLockup from "@/components/public/BrandLockup";
-import BlogCard from "@/components/public/BlogCard";
+<<<<<<< ours
 import CtaBanner from "@/components/public/CtaBanner";
-import PublicProductMedia from "@/components/public/PublicProductMedia";
+import PublicSeoJsonLd from "@/components/public/PublicSeoJsonLd";
+=======
+import BrandLockup from "@/components/public/BrandLockup";
+import CtaBanner from "@/components/public/CtaBanner";
 import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import SectionHeader from "@/components/public/SectionHeader";
+>>>>>>> theirs
 import TrustStrip from "@/components/public/TrustStrip";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
 import { brandConfig } from "@/config/brand";
-import { getAllBlogPosts } from "@/lib/blog-data";
 import { formatCurrency } from "@/lib/format";
+<<<<<<< ours
+<<<<<<< ours
+import {
+  buildPublicMetadata,
+  getPublicDictionary,
+} from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
+=======
+import { getText, publicContent } from "@/lib/public-i18n";
+import { getPublicLanguage } from "@/lib/public-i18n.server";
+>>>>>>> theirs
+=======
+import { getText, publicContent } from "@/lib/public-i18n";
+import { getPublicLanguage } from "@/lib/public-i18n.server";
+>>>>>>> theirs
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
+import { buildOrganizationJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
-export const metadata: Metadata = {
+<<<<<<< ours
+<<<<<<< ours
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+  return buildPublicMetadata({
+    title: dictionary.seo.homeTitle,
+    description: dictionary.seo.homeDescription,
+    path: "/",
+  });
+}
+
+export default async function PublicHome() {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+=======
+=======
+>>>>>>> theirs
+export const metadata: Metadata = buildPublicMetadata({
   title: "Home",
   description:
-    "Subidha Furniture in Asansol offers furniture access through a structured monthly plan and a transparent Lucky Plan winner process with future EMI waiver.",
-};
+    "Bring home furniture, electronics, and home appliances with easy monthly plans and transparent Lucky Plan winner publication.",
+  path: "/",
+});
 
-function buildApplyHref(product: {
-  id: number;
-  name: string;
-  product_code: string;
-  base_price: string;
-}) {
+function buildApplyHref(product: { id: number; name: string; product_code: string; base_price: string }) {
   const params = new URLSearchParams();
   params.set("product", String(product.id));
   params.set("product_name", product.name);
@@ -37,9 +70,12 @@ function buildApplyHref(product: {
 }
 
 export default async function PublicHome() {
-  const blogPosts = getAllBlogPosts().slice(0, 3);
+  const language = await getPublicLanguage();
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
   const profile = await getResolvedPublicBusinessProfile();
-
   const [statsResult, latestWinnerResult, productsResult] = await Promise.allSettled([
     getPublicStats(),
     getPublicLatestWinner(),
@@ -47,152 +83,170 @@ export default async function PublicHome() {
   ]);
 
   const stats = statsResult.status === "fulfilled" ? statsResult.value : null;
-  const latestWinner =
-    latestWinnerResult.status === "fulfilled" ? latestWinnerResult.value.winner : null;
-  const products =
-    productsResult.status === "fulfilled" ? productsResult.value.products.slice(0, 6) : [];
+  const latestWinner = latestWinnerResult.status === "fulfilled" ? latestWinnerResult.value.winner : null;
+  const products = productsResult.status === "fulfilled" ? productsResult.value.products.slice(0, 6) : [];
+<<<<<<< ours
+<<<<<<< ours
 
   return (
     <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <PublicSeoJsonLd
+        payload={{
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          name: profile.resolved_display_name,
+          areaServed: brandConfig.publicBranchLocation,
+          telephone: profile.support_phone || undefined,
+          address: profile.address_text || undefined,
+          url: "https://subidhafurniture.com",
+        }}
+      />
+
       <section className="public-hero p-8 sm:p-10">
-        <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-slate-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute left-0 top-24 h-40 w-40 rounded-full bg-amber-200/25 blur-3xl" />
-        <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+        <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.2rem]">
+          {dictionary.homePage.title}
+        </h1>
+        <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
+          {dictionary.homePage.subtitle}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href={ROUTES.public.products} className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-medium text-white">
+            {dictionary.homePage.ctaProducts}
+          </Link>
+          <Link href={ROUTES.public.luckyPlan} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground">
+            {dictionary.homePage.ctaPlan}
+          </Link>
+          <Link href={ROUTES.public.contact} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground">
+            {dictionary.homePage.ctaContact}
+          </Link>
+=======
+=======
+>>>>>>> theirs
+
+  const heroTitle = (profile.hero_title || "").trim() || getText(publicContent.homeHero.title, language);
+  const heroSubtitle = (profile.hero_subtitle || "").trim() || getText(publicContent.homeHero.subtitle, language);
+
+  return (
+    <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }}
+      />
+
+      <section className="public-hero p-8 sm:p-10">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
             <BrandLockup
               logoSrc={profile.resolved_logo_src}
               companyName={profile.resolved_display_name}
               subtitle={`${profile.resolved_tagline} · ${brandConfig.publicBranchLocation}`}
             />
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.4rem]">
-              {(profile.hero_title || "").trim() || "Bring Home Furniture with a Smarter Monthly Plan"}
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-              {(profile.hero_subtitle || "").trim() ||
-                "Subidha Furniture helps families access furniture through a structured monthly plan and a transparent Lucky Plan system: join a batch, receive a Lucky ID, pay Advance EMI month by month, and see published winners with a future Advance EMI waiver benefit."}
-            </p>
+            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.2rem]">{heroTitle}</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{heroSubtitle}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href={ROUTES.public.products}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.82)] transition hover:-translate-y-0.5"
-              >
-                View Products
-              </Link>
-              {profile.resolved_whatsapp_link ? (
-                <Link
-                  href={profile.resolved_whatsapp_link}
-                  className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  WhatsApp
-                </Link>
-              ) : null}
-              <Link
-                href={ROUTES.public.luckyPlan}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Explore Lucky Plan
-              </Link>
-              <Link
-                href={ROUTES.public.contact}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Contact
-              </Link>
+              <Link href={ROUTES.public.apply} className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-semibold text-white">Apply now</Link>
+              <Link href={ROUTES.public.products} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">Explore products</Link>
+              <Link href={ROUTES.public.luckyPlan} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">See Lucky Plan</Link>
+              <Link href={ROUTES.public.winners} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">Visit winners</Link>
             </div>
           </div>
 
-          <div className="public-card p-6 shadow-[0_26px_60px_-44px_rgba(15,23,42,0.64)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Quick overview
-            </div>
-            <div className="mt-4 grid gap-3">
-              <div className="public-card-sm p-4">
-                <div className="font-medium text-foreground">Typical cycle</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  15-month structured plan with clear monthly EMI tracking.
-                </p>
-              </div>
-              <div className="public-card-sm p-4">
-                <div className="font-medium text-foreground">Lucky IDs</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  00–99 per batch, assigned based on availability.
-                </p>
-              </div>
-              <div className="public-card-sm p-4">
-                <div className="font-medium text-foreground">Winner benefit</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Waiver of remaining future EMI only (no refund of past EMI).
-                </p>
-              </div>
-            </div>
-          </div>
+          <PublicMarketingBanner
+            eyebrow="Featured categories"
+            title="Designed for family shopping"
+            description="Realistic product categories our customers ask for every day."
+            items={[
+              { title: "Furniture", description: "Sofas, beds, wardrobes, dining sets." },
+              { title: "Electronics", description: "TV and essential home electronics." },
+              { title: "Home appliances", description: "Refrigerator, washing machine, kitchen appliances." },
+            ]}
+          />
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
         </div>
       </section>
 
       <TrustStrip />
 
-      <PlanCategoryShowcase />
-
-      <section className="public-surface grid gap-6 p-6">
-        <SectionHeader
-          eyebrow="Lucky Plan, explained"
-          title="What is Lucky Plan?"
-          description="A structured monthly purchase plan with a transparent monthly winner publication cycle."
-        />
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="rounded-[1.8rem] border border-white/75 bg-white/82 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              The flow
-            </div>
-            <ol className="mt-4 grid gap-2 text-sm leading-6 text-muted-foreground">
-              <li className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                1) Join a batch and receive a Lucky ID (00–99).
-              </li>
-              <li className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                2) Pay EMI month by month on a clear schedule.
-              </li>
-              <li className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                3) One winner is selected per batch per month and published when revealed.
-              </li>
-              <li className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                4) Winner benefit applies to future EMI waiver only (no refund of past paid EMI).
-              </li>
-            </ol>
-          </div>
-          <div className="rounded-[1.8rem] border border-white/75 bg-white/82 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Fairness & transparency
-            </div>
-            <p className="mt-4 text-sm leading-7 text-muted-foreground">
-              The monthly draw is designed for verifiable transparency using a commit–reveal approach.
-              In simple terms, a commitment is published first (SHA-256 hash), and the reveal is published later.
-              This helps ensure the published outcome matches what was committed earlier.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link
-                href={ROUTES.public.howItWorks}
-                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                See steps
-              </Link>
-              <Link
-                href={ROUTES.public.winnerHistory}
-                className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-              >
-                Winner history
-              </Link>
-            </div>
-          </div>
+<<<<<<< ours
+<<<<<<< ours
+      <section className="public-surface space-y-4 p-6">
+        <h2 className="text-2xl font-semibold text-foreground">Why local families choose Subidha Furniture</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            "Easy monthly payment plans",
+            "Clear Lucky Plan rules",
+            "Branch support before and after purchase",
+            "Transparent winner publication",
+          ].map((item) => (
+            <div key={item} className="public-card p-5 text-sm text-muted-foreground">{item}</div>
+          ))}
         </div>
       </section>
 
       <section className="public-surface space-y-4 p-6">
-        <SectionHeader
-          eyebrow="Live public stats"
-          title="Live public business signals"
-          description="These indicators come from the live public API and reflect real production records."
-        />
+        <h2 className="text-2xl font-semibold text-foreground">Featured categories for your home upgrade</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {["Sofas & living room furniture", "Beds & wardrobes", "Refrigerators & washing machines", "TVs and home appliances"].map((category) => (
+            <div key={category} className="rounded-2xl border border-white/80 bg-white/80 p-4 text-sm font-medium text-foreground">{category}</div>
+          ))}
+        </div>
+      </section>
+
+      <section className="public-surface space-y-4 p-6">
+        <h2 className="text-2xl font-semibold text-foreground">Easy monthly plan in 3 steps</h2>
+        <ol className="grid gap-3 lg:grid-cols-3">
+          {[
+            "Choose product and preferred monthly budget.",
+            "Join Lucky Plan batch and get your Lucky ID.",
+            "Pay monthly EMI and track winner updates transparently.",
+          ].map((step, index) => (
+            <li key={step} className="public-card p-5 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">Step {index + 1}.</span> {step}
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="public-surface space-y-4 p-6">
+        <h2 className="text-2xl font-semibold text-foreground">Popular products from live catalogue</h2>
+        {products.length === 0 ? (
+          <div className="public-card-sm px-5 py-4 text-sm text-muted-foreground">Catalogue items will appear as soon as published from the live backend.</div>
+=======
+      <PublicMarketingBanner
+        eyebrow="Easy monthly plan"
+        title="Simple process, transparent records"
+        description="Choose a product, join an active batch, pay monthly EMI, and track published winners with no fake claims."
+        items={[
+          { title: "Clear monthly amount", description: "Know your monthly commitment before enrollment." },
+          { title: "Transparent winner process", description: "Published records come from revealed draws only." },
+          { title: "Support-first onboarding", description: "Branch team helps with product and document readiness." },
+        ]}
+      />
+
+      <PlanCategoryShowcase />
+
+      <section className="public-surface space-y-4 p-6">
+=======
+      <PublicMarketingBanner
+        eyebrow="Easy monthly plan"
+        title="Simple process, transparent records"
+        description="Choose a product, join an active batch, pay monthly EMI, and track published winners with no fake claims."
+        items={[
+          { title: "Clear monthly amount", description: "Know your monthly commitment before enrollment." },
+          { title: "Transparent winner process", description: "Published records come from revealed draws only." },
+          { title: "Support-first onboarding", description: "Branch team helps with product and document readiness." },
+        ]}
+      />
+
+      <PlanCategoryShowcase />
+
+      <section className="public-surface space-y-4 p-6">
+>>>>>>> theirs
+        <SectionHeader eyebrow="Live public stats" title="Live public business signals" description="These indicators come from live public APIs and reflect production records." />
         {stats ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
@@ -201,140 +255,101 @@ export default async function PublicHome() {
               { label: "Active subscriptions", value: stats.active_subscriptions },
               { label: "Published winners", value: stats.total_winners },
             ].map((item) => (
-              <div
-                key={item.label}
-                className="public-card p-5 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.6)]"
-              >
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {item.label}
-                </div>
-                <div className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-                  {item.value.toLocaleString("en-IN")}
-                </div>
+              <div key={item.label} className="public-card p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</div>
+                <div className="mt-4 text-3xl font-semibold tracking-tight text-foreground">{item.value.toLocaleString("en-IN")}</div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="public-card-sm px-5 py-4 text-sm text-muted-foreground">
-            Live public stats are currently unavailable.
-          </div>
+          <div className="public-card-sm px-5 py-4 text-sm text-muted-foreground">Live public stats are currently unavailable.</div>
         )}
       </section>
 
       <section className="space-y-4">
-        <SectionHeader
-          eyebrow="Winner spotlight"
-          title="Latest winner"
-          description="Published only from revealed lucky draw records. If no draw has been published yet, the public site shows that directly."
-        />
+        <SectionHeader eyebrow="Winner spotlight" title="Latest winner" description="Published from revealed lucky draw records only." />
         <WinnerSpotlight winner={latestWinner} />
       </section>
 
       <section className="public-surface space-y-4 p-6">
-        <SectionHeader
-          eyebrow="Live catalogue"
-          title="Featured products"
-          description="These products are loaded from the live public catalogue. If the catalogue is empty, the site shows an honest empty state."
-        >
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href={ROUTES.public.products}
-              className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-            >
-              Browse all products
-            </Link>
-            <Link
-              href={ROUTES.public.apply}
-              className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5"
-            >
-              Apply / Enquire
-            </Link>
-          </div>
-        </SectionHeader>
-
+        <SectionHeader eyebrow="Live catalogue" title="Featured products" description="Products are loaded from the real backend catalogue." />
         {products.length === 0 ? (
-          <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">
-            No products are currently published in the public catalogue. You can still contact the branch to ask about available batches and product options.
-          </div>
+          <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">No products are currently published in the public catalogue.</div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => (
-              <div
-                key={product.id}
-                className="public-card group p-5 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]"
-              >
-                <Link href={`${ROUTES.public.products}/${product.id}`}>
-                  <PublicProductMedia
-                    src={product.image}
-                    alt={product.name}
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="aspect-[5/4]"
-                    imageClassName="transition duration-500 group-hover:scale-[1.02]"
-                    badge={product.category || "Product"}
-                  />
+              <article key={product.id} className="public-card p-5">
+                <h3 className="text-base font-semibold text-foreground">{product.name}</h3>
+<<<<<<< ours
+<<<<<<< ours
+                <p className="mt-1 text-sm text-muted-foreground">{product.category || "General"}</p>
+                <p className="mt-3 text-sm font-semibold text-foreground">{formatCurrency(product.base_price)}</p>
+                <Link href={`${ROUTES.public.products}/${product.id}`} className="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">
+                  View details
                 </Link>
-                <div className="mt-4">
-                  <div className="text-lg font-semibold text-foreground">
-                    {product.name}
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {product.product_code}
-                  </div>
-                  <div className="mt-3 text-base font-semibold text-foreground">
-                    {formatCurrency(product.base_price)}
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                    {product.description?.trim() ||
-                      "Published in the live Subidha Furniture catalogue."}
-                  </p>
+=======
+=======
+>>>>>>> theirs
+                <p className="mt-2 text-sm text-muted-foreground">Code: {product.product_code}</p>
+                <p className="mt-2 text-sm font-semibold">Base price: {formatCurrency(product.base_price)}</p>
+                <div className="mt-4 flex gap-2">
+                  <Link href={`${ROUTES.public.products}/${product.id}`} className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold">View</Link>
+                  <Link href={buildApplyHref(product)} className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white">Apply</Link>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    href={buildApplyHref(product)}
-                    className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:bg-white"
-                  >
-                    Enquire
-                  </Link>
-                  <Link
-                    href={`${ROUTES.public.products}/${product.id}`}
-                    className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:bg-white"
-                  >
-                    View
-                  </Link>
-                </div>
-              </div>
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+              </article>
             ))}
           </div>
         )}
       </section>
 
-      <section className="public-surface space-y-4 p-6">
-        <SectionHeader
-          eyebrow="Learn"
-          title="Blog"
-          description="Plain-language guidance on Lucky Plan rules, winner transparency, and choosing furniture with a monthly plan."
-        />
-        <div className="grid gap-6 lg:grid-cols-3">
-          {blogPosts.map((post) => (
-            <BlogCard key={post.slug} post={post} />
+<<<<<<< ours
+<<<<<<< ours
+      <WinnerSpotlight winner={latestWinner} />
+
+      {stats ? (
+        <section className="public-surface grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Published batches", value: stats.total_batches },
+            { label: "Active subscriptions", value: stats.active_subscriptions },
+            { label: "Published winners", value: stats.total_winners },
+            { label: "Total subscriptions", value: stats.total_subscriptions },
+          ].map((item) => (
+            <div key={item.label} className="public-card p-5">
+              <div className="text-xs uppercase text-muted-foreground">{item.label}</div>
+              <div className="mt-2 text-3xl font-semibold text-foreground">{item.value.toLocaleString("en-IN")}</div>
+            </div>
           ))}
-        </div>
-        <div>
-          <Link
-            href={ROUTES.public.blog}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-          >
-            View all articles
-          </Link>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <CtaBanner
-        title="Ready to check products or join a batch?"
-        description="Browse the live catalogue, learn the Lucky Plan rules, and submit an enquiry so the branch can follow up with batch availability and plan guidance."
+        title="Need help selecting the right plan for your family?"
+        description="Talk to our branch team for product guidance, monthly budget matching, and Lucky Plan enrollment support."
         actions={[
-          { href: ROUTES.public.products, label: "View Products", variant: "primary" },
-          { href: ROUTES.public.contact, label: "Contact", variant: "secondary" },
+          { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
+          { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
+=======
+      <CtaBanner
+=======
+      <CtaBanner
+>>>>>>> theirs
+        title="Need guidance in your preferred language?"
+        description="Use the language switcher in the header for English, हिन्दी, or বাংলা, then connect with the branch for assisted enrollment."
+        actions={[
+          { href: ROUTES.public.contact, label: "Contact us", variant: "secondary" },
+          { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
         ]}
       />
     </main>

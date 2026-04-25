@@ -2,140 +2,107 @@ import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
 import FaqBlock from "@/components/public/FaqBlock";
-import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
+<<<<<<< ours
+<<<<<<< ours
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+>>>>>>> theirs
 import PublicPageShell from "@/components/public/PublicPageShell";
-import SectionHeader from "@/components/public/SectionHeader";
 import { LUCKY_PLAN_FAQ } from "@/lib/public-content";
+<<<<<<< ours
+import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ROUTES } from "@/lib/routes";
 
-export const metadata: Metadata = {
-  title: "Lucky Plan",
-  description:
-    "Understand Lucky Plan at Subidha Furniture: batches, Lucky IDs, monthly EMI structure, monthly winners, and the future EMI waiver rule.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildPublicMetadata({
+    title: "Lucky Plan | Easy Monthly Plan for Furniture and Appliances",
+    description: "Understand batches, Lucky IDs, EMI schedule, winner benefits, and transparent Lucky Plan rules.",
+    path: "/lucky-plan",
+  });
+}
+=======
+import { buildPublicMetadata } from "@/lib/public-seo";
+import { ROUTES } from "@/lib/routes";
 
-export default function LuckyPlanPage() {
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import PublicPageShell from "@/components/public/PublicPageShell";
+import { LUCKY_PLAN_FAQ } from "@/lib/public-content";
+import { buildPublicMetadata } from "@/lib/public-seo";
+import { ROUTES } from "@/lib/routes";
+
+>>>>>>> theirs
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Lucky Plan",
+  description: "Understand batches, Lucky IDs, EMI payments, winner publication, and future EMI waiver rules.",
+  path: "/lucky-plan",
+});
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+
+export default async function LuckyPlanPage() {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
   return (
     <PublicPageShell
-      title="Lucky Plan"
-      subtitle="A structured monthly purchase plan with batch-based participation, Lucky IDs (00–99), and transparent winner publication. Winning waives future EMI only."
+<<<<<<< ours
+<<<<<<< ours
+      title={dictionary.common.luckyPlan}
+      subtitle="Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication."
       breadcrumbs={[
-        { label: "Home", href: ROUTES.public.home },
-        { label: "Lucky Plan" },
+        { label: dictionary.common.home, href: ROUTES.public.home },
+        { label: dictionary.common.luckyPlan },
       ]}
+=======
+      title="Lucky Plan"
+      subtitle="A simple and transparent monthly purchase flow: choose product, join batch, pay EMI, and track published winners."
+      breadcrumbs={[{ label: "Home", href: ROUTES.public.home }, { label: "Lucky Plan" }]}
+>>>>>>> theirs
+=======
+      title="Lucky Plan"
+      subtitle="A simple and transparent monthly purchase flow: choose product, join batch, pay EMI, and track published winners."
+      breadcrumbs={[{ label: "Home", href: ROUTES.public.home }, { label: "Lucky Plan" }]}
+>>>>>>> theirs
       actions={[
-        { label: "How it works", href: ROUTES.public.howItWorks, variant: "secondary" },
-        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
+        { label: dictionary.common.howItWorks, href: ROUTES.public.howItWorks, variant: "secondary" },
+        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
-      <section className="public-surface grid gap-6 p-6 lg:grid-cols-2">
-        <div className="public-card p-6">
-          <SectionHeader
-            eyebrow="Overview"
-            title="What the Lucky Plan is"
-            description="A structured plan for purchasing furniture with predictable monthly EMI, plus a transparent monthly winner benefit."
-          />
-          <div className="mt-5 grid gap-2 text-sm leading-6 text-muted-foreground">
-            <div className="public-card-sm px-4 py-3">
-              Join a batch and receive a Lucky ID (00–99).
-            </div>
-            <div className="public-card-sm px-4 py-3">
-              Pay monthly EMI on a clear schedule (typically a 15-month cycle).
-            </div>
-            <div className="public-card-sm px-4 py-3">
-              One winner is selected per batch per month and published when revealed.
-            </div>
-            <div className="public-card-sm px-4 py-3">
-              Winner benefit: waiver of remaining future EMI only.
-            </div>
-          </div>
-        </div>
-
-        <div className="public-card p-6">
-          <SectionHeader
-            eyebrow="Clear rule"
-            title="Future EMI waiver only"
-            description="Winning does not refund past EMI and does not rewrite payment history."
-          />
-          <div className="mt-5 grid gap-3">
-            <div className="rounded-[1.6rem] border border-emerald-200/80 bg-emerald-50/80 px-5 py-4 text-sm leading-6 text-emerald-900 shadow-[0_18px_50px_-40px_rgba(6,95,70,0.35)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                What winning means
-              </div>
-              <p className="mt-2">
-                Remaining future EMI obligations may be waived according to plan rules and eligibility.
-              </p>
-            </div>
-            <div className="rounded-[1.6rem] border border-amber-200/80 bg-amber-50/80 px-5 py-4 text-sm leading-6 text-amber-900 shadow-[0_18px_50px_-40px_rgba(120,53,15,0.25)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                What does not happen
-              </div>
-              <p className="mt-2">
-                EMI already paid remains valid and is not refunded. Past payment history stays recorded and auditable.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <PlanCategoryShowcase />
-
+<<<<<<< ours
+<<<<<<< ours
       <section className="public-surface p-6">
-        <SectionHeader
-          eyebrow="Plan structure"
-          title="Batches, Lucky IDs, and the monthly draw"
-          description="The batch model keeps participation and winner publication consistent and explainable."
-        />
-        <div className="mt-6 grid gap-3 lg:grid-cols-3">
-          <div className="public-card p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Typical tenure
-            </div>
-            <div className="mt-3 text-xl font-semibold text-foreground">15 months</div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              EMI is structured across the tenure so monthly obligations stay predictable.
-            </p>
-          </div>
-          <div className="public-card p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Lucky IDs
-            </div>
-            <div className="mt-3 text-xl font-semibold text-foreground">00–99</div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Lucky IDs are assigned within a batch based on availability at enrollment.
-            </p>
-          </div>
-          <div className="public-card p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Winner rhythm
-            </div>
-            <div className="mt-3 text-xl font-semibold text-foreground">
-              One winner / batch / month
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Winner publication is based on revealed draw records to support transparency.
-            </p>
-          </div>
-        </div>
+        <SectionHeader eyebrow="Lucky Plan" title="Simple and transparent for families" description="Winner benefit is future EMI waiver only. Paid EMI stays in payment history." />
       </section>
-
-      <section className="space-y-4">
-        <SectionHeader
-          eyebrow="FAQ"
-          title="Common questions"
-          description="Clear answers that match the real Lucky Plan operating rules."
-        />
-        <FaqBlock items={LUCKY_PLAN_FAQ} />
-      </section>
-
-      <CtaBanner
-        title="Want to check product options first?"
-        description="Browse the live catalogue, then submit an enquiry with your preferred product and EMI comfort so the branch can guide you on batch availability."
-        actions={[
-          { href: ROUTES.public.products, label: "Browse Products", variant: "secondary" },
-          { href: ROUTES.public.apply, label: "Apply", variant: "primary" },
+      <FaqBlock items={LUCKY_PLAN_FAQ} />
+      <CtaBanner title="Ready to start your plan?" description="Pick a product and submit an enquiry for branch follow-up." actions={[{ href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" }, { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" }]} />
+=======
+=======
+>>>>>>> theirs
+      <PublicMarketingBanner
+        eyebrow="Plan benefits"
+        title="Easy monthly plan with clear financial boundaries"
+        description="Winning waives remaining future EMI obligations only; already paid EMI stays recorded and valid."
+        items={[
+          { title: "Deterministic schedule", description: "EMI schedule remains reproducible and auditable." },
+          { title: "Transparent draw workflow", description: "Published winner records come from reveal events only." },
+          { title: "No hidden retroactive edits", description: "Settled payment history is never silently rewritten." },
         ]}
       />
+
+      <FaqBlock items={LUCKY_PLAN_FAQ} />
+
+      <CtaBanner
+        title="Talk to the branch before you enroll"
+        description="Get help on product selection, batch availability, tenure, and monthly amount comfort."
+        actions={[
+          { href: ROUTES.public.contact, label: "Contact us", variant: "secondary" },
+          { href: ROUTES.public.apply, label: "Apply now", variant: "primary" },
+        ]}
+      />
+>>>>>>> theirs
     </PublicPageShell>
   );
 }

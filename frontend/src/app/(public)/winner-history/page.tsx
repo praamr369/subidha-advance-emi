@@ -3,44 +3,76 @@ import type { Metadata } from "next";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
+<<<<<<< ours
+<<<<<<< ours
+import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import { buildPublicMetadata } from "@/lib/public-seo";
+>>>>>>> theirs
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import { buildPublicMetadata } from "@/lib/public-seo";
+>>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
-import {
-  getPublicWinnerHistory,
-  type PublicWinner,
-} from "@/lib/public-api";
+import { getPublicWinnerHistory, type PublicWinner } from "@/lib/public-api";
 import WinnerHistoryTableClient from "./WinnerHistoryTableClient";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicMetadata({
+<<<<<<< ours
+<<<<<<< ours
+  title: "Winner History | Lucky Plan Transparency",
+  description: "Browse long-term Lucky Plan winner history sourced from revealed draw events.",
+=======
   title: "Winner History",
-  description:
-    "Read the public winner history sourced from real revealed lucky draw events.",
-};
+  description: "Public archive of winner history sourced from revealed lucky draw events.",
+>>>>>>> theirs
+=======
+  title: "Winner History",
+  description: "Public archive of winner history sourced from revealed lucky draw events.",
+>>>>>>> theirs
+  path: "/winner-history",
+});
 
 export default async function WinnerHistoryPage() {
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
   let winners: PublicWinner[] = [];
-  let error: string | null = null;
 
   try {
     const payload = await getPublicWinnerHistory(50);
     winners = payload.results;
-  } catch (err) {
-    error =
-      err instanceof Error ? err.message : "Unable to load winner history right now.";
+  } catch {
+    winners = [];
   }
 
   return (
     <PublicPageShell
-      title="Winner History"
-      subtitle="A long-term transparency archive sourced from revealed draw records. Winner benefit applies to future EMI waiver only."
-      breadcrumbs={[
-        { label: "Home", href: ROUTES.public.home },
-        { label: "Winner History" },
-      ]}
-      actions={[
-        { label: "Winners", href: ROUTES.public.winners, variant: "secondary" },
-        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
-      ]}
+      title={dictionary.common.winnerHistory}
+      subtitle="Archive from live draw records."
+      breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winnerHistory }]}
+      actions={[{ label: dictionary.common.winners, href: ROUTES.public.winners, variant: "secondary" }, { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }]}
     >
+<<<<<<< ours
+<<<<<<< ours
+      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6">
+        <SectionHeader eyebrow="Archive" title="Published records" description="Search by batch, month, Lucky ID, and winner." />
+        <WinnerHistoryTableClient winners={winners} />
+=======
+=======
+>>>>>>> theirs
+      <PublicMarketingBanner
+        eyebrow="Archive trust"
+        title="Long-term winner transparency"
+        description="This section helps customers validate past winner publication patterns over time."
+        items={[
+          { title: "Chronological records", description: "Entries are listed from real backend responses." },
+          { title: "Honest system status", description: "Errors and empty states are shown directly." },
+          { title: "Business rule continuity", description: "Winner benefit remains future-EMI-only." },
+        ]}
+      />
+
       <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
         <SectionHeader
           eyebrow="Archive"
@@ -58,16 +90,10 @@ export default async function WinnerHistoryPage() {
         ) : (
           <WinnerHistoryTableClient winners={winners} />
         )}
+>>>>>>> theirs
       </section>
 
-      <CtaBanner
-        title="Want to understand the rules behind the archive?"
-        description="Read how batches, Lucky IDs (00–99), and the monthly winner publication work—and why the waiver applies to future EMI only."
-        actions={[
-          { href: ROUTES.public.howItWorks, label: "How it works", variant: "secondary" },
-          { href: ROUTES.public.luckyPlan, label: "Lucky Plan", variant: "primary" },
-        ]}
-      />
+      <CtaBanner title="Want to understand the full process?" description="Read how batches, Lucky IDs, and winner publishing works." actions={[{ href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks, variant: "secondary" }, { href: ROUTES.public.luckyPlan, label: dictionary.common.luckyPlan, variant: "primary" }]} />
     </PublicPageShell>
   );
 }

@@ -3,18 +3,35 @@ import type { Metadata } from "next";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
+<<<<<<< ours
+<<<<<<< ours
+import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import { buildPublicMetadata } from "@/lib/public-seo";
+>>>>>>> theirs
+=======
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import { buildPublicMetadata } from "@/lib/public-seo";
+>>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
-import {
-  getPublicLatestWinner,
-  getPublicWinners,
-  type PublicWinner,
-} from "@/lib/public-api";
+import { getPublicLatestWinner, getPublicWinners, type PublicWinner } from "@/lib/public-api";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPublicMetadata({
+<<<<<<< ours
+<<<<<<< ours
+  title: "Winners | Lucky Plan",
+  description: "Recent Lucky Plan winners published from revealed draw records.",
+  path: "/winners",
+});
+=======
+=======
+>>>>>>> theirs
   title: "Winners",
-  description:
-    "Recent Lucky Plan winners published from revealed draw records. Winner benefit applies to future EMI waiver only.",
-};
+  description: "Recent Lucky Plan winners from revealed draw records.",
+  path: "/winners",
+});
 
 function formatDrawDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -30,77 +47,60 @@ function formatDrawDate(value: string | null | undefined): string {
     minute: "2-digit",
   });
 }
+>>>>>>> theirs
 
 function WinnerCard({ winner }: { winner: PublicWinner }) {
-  const commitment = (winner.committed_hash || "").trim();
-  const commitmentPreview =
-    commitment.length > 16 ? `${commitment.slice(0, 10)}…${commitment.slice(-6)}` : commitment;
-
   return (
-    <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_60px_-46px_rgba(15,23,42,0.62)]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        Batch {winner.batch_code} · Month {winner.draw_month}
-      </div>
-      <div className="mt-3 text-xl font-semibold text-foreground">
-        {winner.customer_name || "Winner published"}
-      </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Lucky ID {winner.lucky_id || "—"} · Published {formatDrawDate(winner.draw_date)}
-      </p>
-      {winner.product_name ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          Product context: {winner.product_name}
-        </p>
-      ) : null}
-      <div className="mt-4 grid gap-2 text-sm">
-        <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 text-muted-foreground">
-          Winner benefit: future EMI waiver only (no refund of past paid EMI).
-        </div>
-        {commitmentPreview ? (
-          <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 text-muted-foreground">
-            Commitment hash: {commitmentPreview}
-          </div>
-        ) : null}
-      </div>
+    <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Batch {winner.batch_code} · Month {winner.draw_month}</div>
+      <div className="mt-3 text-xl font-semibold text-foreground">{winner.customer_name || "Winner published"}</div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Lucky ID {winner.lucky_id || "—"}</p>
     </div>
   );
 }
 
 export default async function WinnersPage() {
-  const [latestResult, winnersResult] = await Promise.allSettled([
-    getPublicLatestWinner(),
-    getPublicWinners(12),
-  ]);
-
-  const latestWinner =
-    latestResult.status === "fulfilled" ? latestResult.value.winner : null;
-  const winners =
-    winnersResult.status === "fulfilled" ? winnersResult.value.results : [];
-  const error =
-    winnersResult.status === "rejected"
-      ? winnersResult.reason instanceof Error
-        ? winnersResult.reason.message
-        : "Unable to load winners right now."
-      : null;
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+  const [latestResult, winnersResult] = await Promise.allSettled([getPublicLatestWinner(), getPublicWinners(12)]);
+  const latestWinner = latestResult.status === "fulfilled" ? latestResult.value.winner : null;
+  const winners = winnersResult.status === "fulfilled" ? winnersResult.value.results : [];
 
   return (
     <PublicPageShell
-      title="Winners"
-      subtitle="Recent winners published from revealed draw records. The public site shows real records or honest empty states."
-      breadcrumbs={[
-        { label: "Home", href: ROUTES.public.home },
-        { label: "Winners" },
-      ]}
-      actions={[
-        {
-          label: "Winner history",
-          href: ROUTES.public.winnerHistory,
-          variant: "secondary",
-        },
-        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
-      ]}
+      title={dictionary.common.winners}
+      subtitle="Real winner records only."
+      breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winners }]}
+      actions={[{ label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" }, { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }]}
     >
       <WinnerSpotlight winner={latestWinner} />
+<<<<<<< ours
+      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6">
+        <SectionHeader eyebrow="Recent" title="Recent published winners" description="From revealed draw records." />
+        <div className="grid gap-4 lg:grid-cols-2">{winners.map((winner) => <WinnerCard key={winner.id} winner={winner} />)}</div>
+=======
+
+      <PublicMarketingBanner
+        eyebrow="Winner highlight"
+        title="Transparency first, always"
+        description="Published entries are sourced from revealed events and shown with clear rule context."
+        items={[
+          { title: "Public evidence", description: "Commitment references are shown when available." },
+          { title: "No fake records", description: "If nothing is published, page shows empty state." },
+          { title: "Future-EMI waiver only", description: "Past settled payments remain unchanged." },
+        ]}
+      />
+
+      <PublicMarketingBanner
+        eyebrow="Winner highlight"
+        title="Transparency first, always"
+        description="Published entries are sourced from revealed events and shown with clear rule context."
+        items={[
+          { title: "Public evidence", description: "Commitment references are shown when available." },
+          { title: "No fake records", description: "If nothing is published, page shows empty state." },
+          { title: "Future-EMI waiver only", description: "Past settled payments remain unchanged." },
+        ]}
+      />
 
       <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
         <SectionHeader
@@ -123,6 +123,7 @@ export default async function WinnersPage() {
             ))}
           </div>
         )}
+>>>>>>> theirs
       </section>
     </PublicPageShell>
   );

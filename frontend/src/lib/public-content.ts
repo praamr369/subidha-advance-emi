@@ -5,7 +5,7 @@ export const LUCKY_PLAN_FAQ: FaqItem[] = [
   {
     question: "How do batches work?",
     answer:
-      "A batch is a group of subscriptions managed together for the Lucky Plan draw cycle. It defines the participant set and keeps the monthly winner process consistent and explainable.",
+      "A batch is a managed customer group for a monthly Lucky Plan cycle. It keeps participation and winner publication consistent and easy to explain.",
   },
   {
     question: "How are Lucky IDs assigned?",
@@ -13,52 +13,69 @@ export const LUCKY_PLAN_FAQ: FaqItem[] = [
       "Lucky IDs are allocated within a batch from 00 to 99 based on availability at the time of enrollment.",
   },
   {
-    question: "Is there a winner every month?",
+    question: "How do monthly payments work?",
     answer:
-      "Each batch is designed for one winner per month when the draw is published. If a draw is not published for a given month, the public site will reflect that (it will not invent records).",
+      "You pay monthly EMI according to your contract schedule. Payment entries are posted as auditable records and not silently overwritten.",
   },
   {
-    question: "What happens after winning?",
+    question: "What happens when a winner is declared?",
     answer:
-      "When a winner is confirmed, remaining future EMI obligations are waived according to the plan rules and eligibility. Your already-paid EMI stays recorded as part of your payment history.",
+      "When a winner is confirmed, remaining future EMI obligations are waived according to business rules. Previously paid EMI remains valid.",
   },
   {
     question: "Is previously paid EMI refunded if I win?",
     answer:
-      "No. Winning waives future EMI only. EMI already paid remains valid and is not refunded.",
+      "No. Winning waives future EMI only. Past paid EMI is not refunded.",
   },
 ] as const;
 
 export const HOW_IT_WORKS_STEPS: TimelineStep[] = [
   {
-    title: "Choose your furniture",
+    title: "Choose product category",
     description:
-      "Browse published products or visit the branch. Shortlist what fits your room, usage, and monthly comfort.",
+      "Select furniture, electronics, or home appliances that match your family needs and monthly comfort.",
   },
   {
     title: "Join an active batch",
     description:
-      "The branch helps you join an active batch where Lucky IDs are available and the onboarding timeline fits.",
+      "The branch helps you join an active batch where Lucky IDs are available and timeline is suitable.",
   },
   {
     title: "Receive your Lucky ID (00–99)",
     description:
-      "You are assigned a Lucky ID in the batch. This Lucky ID is used for the monthly draw for that batch.",
+      "A Lucky ID is assigned in the selected batch and used for monthly draw participation.",
   },
   {
     title: "Pay EMI month by month",
     description:
-      "EMI payments are recorded as transactions, keeping your history auditable and easy to explain.",
+      "EMI payments are recorded as transactions to keep history auditable and easy to verify.",
   },
   {
-    title: "Monthly winner is selected transparently",
+    title: "Winner is published transparently",
     description:
-      "A winner is selected through a process designed for verifiable transparency (commit–reveal) and published when revealed.",
+      "Winners are published from revealed draw records; the site does not invent results.",
   },
   {
-    title: "Winner gets remaining future EMI waived",
+    title: "Winner benefit applies to future EMI",
     description:
-      "The benefit applies to future EMI obligations only. Past paid EMI remains part of the completed payment history.",
+      "Future EMI may be waived by plan rule, while already settled EMI remains unchanged.",
   },
 ] as const;
 
+export const PUBLIC_MULTILINGUAL_COPY = {
+  en: {
+    hero: "Bring Home Furniture, Electronics, and Home Appliances with Easy Monthly Plans.",
+    subtitle:
+      "Choose your product, join the plan, and enjoy a simple, transparent path to ownership.",
+  },
+  hi: {
+    hero: "फर्नीचर, इलेक्ट्रॉनिक्स और होम अप्लायंसेज़ अब आसान मासिक योजना के साथ घर लाएँ।",
+    subtitle:
+      "अपना पसंदीदा सामान चुनें, योजना में शामिल हों और आसान किस्तों में खरीदारी करें।",
+  },
+  bn: {
+    hero: "সহজ মাসিক পরিকল্পনায় ফার্নিচার, ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্সস ঘরে আনুন।",
+    subtitle:
+      "আপনার পছন্দের পণ্য বেছে নিন, পরিকল্পনায় যুক্ত হন, আর সহজ কিস্তিতে ঘরে তুলুন।",
+  },
+} as const;
