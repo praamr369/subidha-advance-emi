@@ -40,6 +40,15 @@ function compareValues(
   return asc ? -1 : 1;
 }
 
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      'a, button, input, select, textarea, summary, [role="button"], [role="link"], [data-row-action="true"]'
+    )
+  );
+}
+
 export default function DataTable<T extends { id?: number | string }>({
   columns,
   rows,
@@ -127,27 +136,44 @@ export default function DataTable<T extends { id?: number | string }>({
                 return (
                   <th
                     key={columnKey}
-                    onClick={() => handleSort(columnKey, column.sortable)}
                     className={cn(
                       "px-4 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground",
-                      column.sortable && "cursor-pointer select-none hover:text-foreground",
                       column.align === "right" && "text-right",
                       column.align === "center" && "text-center"
                     )}
                     style={{ width: column.width }}
+                    aria-sort={
+                      column.sortable && isActiveSort
+                        ? sortAsc
+                          ? "ascending"
+                          : "descending"
+                        : undefined
+                    }
                   >
-                    <div
-                      className={cn(
-                        "flex items-center gap-1",
-                        column.align === "right" && "justify-end",
-                        column.align === "center" && "justify-center"
-                      )}
-                    >
-                      {column.title}
-                      {column.sortable && (
-                        <SortIcon className="h-3.5 w-3.5" />
-                      )}
-                    </div>
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(columnKey, column.sortable)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md text-left transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35",
+                          column.align === "right" && "justify-end text-right",
+                          column.align === "center" && "justify-center text-center"
+                        )}
+                      >
+                        <span>{column.title}</span>
+                        <SortIcon className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex items-center gap-1",
+                          column.align === "right" && "justify-end",
+                          column.align === "center" && "justify-center"
+                        )}
+                      >
+                        {column.title}
+                      </div>
+                    )}
                   </th>
                 );
               })}
@@ -172,9 +198,13 @@ export default function DataTable<T extends { id?: number | string }>({
               pageRows.map((row, index) => (
                 <tr
                   key={row.id ?? index}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={(event) => {
+                    if (!onRowClick || isInteractiveTarget(event.target)) return;
+                    onRowClick(row);
+                  }}
                   onKeyDown={(event) => {
                     if (!onRowClick) return;
+                    if (isInteractiveTarget(event.target)) return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       onRowClick(row);

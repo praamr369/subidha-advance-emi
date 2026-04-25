@@ -92,7 +92,7 @@ export default function StatCard({
       )}
     >
       <div className={cn("absolute inset-x-5 top-0 h-px rounded-full", toneStyle.accent)} />
-      <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-white/40 blur-2xl" />
+      <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-[color-mix(in_oklab,var(--surface-card-elevated)_42%,transparent)] blur-2xl" />
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="enterprise-eyebrow">{label}</div>
@@ -143,10 +143,21 @@ export default function StatCard({
       ) : null}
 
       {footer ? <div className="mt-4">{footer}</div> : null}
+      {href && footer ? (
+        <div className="mt-4 border-t border-[color-mix(in_oklab,var(--surface-border-strong)_70%,white_30%)] pt-3">
+          <Link
+            href={href}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground transition hover:text-primary"
+          >
+            Open details
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 
-  if (href) {
+  if (href && !footer) {
     return (
       <Link href={href} className="block">
         {card}

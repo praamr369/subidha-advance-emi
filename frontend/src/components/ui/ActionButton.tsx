@@ -107,6 +107,7 @@ export default function ActionButton({
         aria-disabled={resolvedDisabled}
         aria-busy={resolvedLoading}
         aria-label={ariaLabel}
+        tabIndex={resolvedDisabled ? -1 : nativeButtonProps.tabIndex}
         className={cn(resolvedClassName, resolvedDisabled && "pointer-events-none")}
       >
         {content}

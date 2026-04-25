@@ -100,7 +100,7 @@ export function LoadingSkeleton({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-4", className)} aria-busy="true" aria-live="polite">
+    <div className={cn("surface-glass rounded-2xl p-4", className)} aria-busy="true" aria-live="polite">
       <div className="flex items-center gap-3">
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -138,7 +138,7 @@ export function PortalEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_92%,var(--surface-muted)_8%),color-mix(in_oklab,var(--surface-card-soft)_72%,var(--surface-muted)_28%))] px-6 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
+        "surface-inset flex flex-col items-center justify-center rounded-[1.5rem] border-dashed px-6 py-10 text-center",
         className
       )}
     >

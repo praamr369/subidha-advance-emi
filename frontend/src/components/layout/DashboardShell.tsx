@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -135,6 +136,7 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
+const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
   if (!sessionId) return SIDEBAR_COLLAPSED_LEGACY_KEY;
@@ -149,6 +151,37 @@ function readBooleanSetting(key: string, fallback: boolean) {
     return raw === "true";
   } catch {
     return fallback;
+  }
+}
+
+function subscribeDashboardShell(callback: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+
+  window.addEventListener("storage", callback);
+  window.addEventListener("subidha:session", callback);
+  window.addEventListener(DASHBOARD_SHELL_EVENT, callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("subidha:session", callback);
+    window.removeEventListener(DASHBOARD_SHELL_EVENT, callback);
+  };
+}
+
+function notifyDashboardShellChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DASHBOARD_SHELL_EVENT));
+}
+
+function readSessionSnapshot() {
+  return JSON.stringify(getStoredSession());
+}
+
+function parseSessionSnapshot(snapshot: string): ReturnType<typeof getStoredSession> {
+  try {
+    return JSON.parse(snapshot) as ReturnType<typeof getStoredSession>;
+  } catch {
+    return null;
   }
 }
 
@@ -294,7 +327,7 @@ function UserDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--topbar-surface)_88%,var(--surface-muted)_12%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] transition hover:border-[var(--surface-border-strong)] hover:bg-white"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
       >
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-xs font-semibold text-foreground">
           {displayName.charAt(0).toUpperCase()}
@@ -307,7 +340,7 @@ function UserDropdown({
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl border border-[var(--surface-border-strong)] bg-white p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)] duration-100">
+        <div className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100">
           <div className="border-b border-border px-3 py-2">
             <div className="text-sm font-semibold text-foreground">{displayName}</div>
             <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
@@ -832,7 +865,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] md:hidden"
             aria-label="Open menu"
             aria-expanded={mobileOpen}
             aria-controls="mobile-sidebar-nav"
@@ -855,7 +888,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white sm:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
             aria-label="Open command palette"
             title="Command palette"
           >
@@ -864,13 +897,13 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card)_88%,var(--surface-muted)_12%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-white sm:inline-flex"
+            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
           >
             <Search className="h-4 w-4" />
             Command
-            <span className="ml-1 rounded-lg border border-border bg-white px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+            <span className="ml-1 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-2 py-1 text-[11px] font-semibold text-muted-foreground">
               Ctrl K
             </span>
           </button>
@@ -895,13 +928,18 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [session, setSession] = useState(() => getStoredSession());
+  const sessionSnapshot = useSyncExternalStore(subscribeDashboardShell, readSessionSnapshot, () => "null");
+  const session = useMemo(() => parseSessionSnapshot(sessionSnapshot), [sessionSnapshot]);
   const { logout, isLoggingOut } = useLogout();
   const role = normalizeRole(session?.role);
   const sessionId = session?.id ?? null;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
-    readBooleanSetting(sidebarCollapsedKey(sessionId, role), false)
+  const collapsedStorageKey = sidebarCollapsedKey(sessionId, role);
+  const sidebarCollapsedSnapshot = useSyncExternalStore(
+    subscribeDashboardShell,
+    () => (readBooleanSetting(collapsedStorageKey, false) ? "true" : "false"),
+    () => "false"
   );
+  const sidebarCollapsed = sidebarCollapsedSnapshot === "true";
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandEpoch, setCommandEpoch] = useState(0);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -909,33 +947,17 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const openCommandPalette = useCallback(() => {
     setCommandEpoch((prev) => prev + 1);
     setCommandOpen(true);
-  }, []);
+  }, [setCommandEpoch, setCommandOpen]);
 
-  const toggleSidebarCollapse = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
-  }, []);
-
-  const collapsedStorageKey = sidebarCollapsedKey(sessionId, role);
-
-  useEffect(() => {
+  function toggleSidebarCollapse() {
+    const next = !sidebarCollapsed;
     try {
-      window.localStorage.setItem(collapsedStorageKey, String(sidebarCollapsed));
+      window.localStorage.setItem(collapsedStorageKey, String(next));
     } catch {
       // Non-critical preference persistence.
     }
-  }, [collapsedStorageKey, sidebarCollapsed]);
-
-  useEffect(() => {
-    function handleStorage() {
-      const nextSession = getStoredSession();
-      setSession(nextSession);
-      const nextRole = normalizeRole(nextSession?.role);
-      const nextSessionId = nextSession?.id ?? null;
-      setSidebarCollapsed(readBooleanSetting(sidebarCollapsedKey(nextSessionId, nextRole), false));
-    }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+    notifyDashboardShellChanged();
+  }
 
   const displayName = session?.name || "User";
   const title = pathname === getRoleBasePath(role) ? "Dashboard" : buildPageTitle(pathname);

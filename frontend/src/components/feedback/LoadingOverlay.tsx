@@ -20,7 +20,7 @@ export default function LoadingOverlay({
       role="status"
       aria-live="polite"
       className={cn(
-        "absolute inset-0 z-20 flex items-center justify-center rounded-inherit bg-white/65 backdrop-blur-[1px]",
+        "absolute inset-0 z-20 flex items-center justify-center rounded-inherit bg-[color-mix(in_oklab,var(--surface-card-elevated)_66%,transparent)] backdrop-blur-[2px]",
         className
       )}
     >

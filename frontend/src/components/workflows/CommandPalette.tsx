@@ -208,7 +208,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
               type="button"
               onClick={() => handleToggleFavorite(item.href)}
               className={cn(
-                "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-white",
+                "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
                 isFavorite ? "text-amber-700" : ""
               )}
               aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
@@ -231,7 +231,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
             type="button"
             onClick={() => handleToggleFavorite(item.href)}
             className={cn(
-              "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-white",
+              "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
               isFavorite ? "text-amber-700" : ""
             )}
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}

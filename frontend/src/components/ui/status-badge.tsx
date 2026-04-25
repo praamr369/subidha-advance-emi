@@ -12,17 +12,17 @@ type StatusBadgeProps = {
 
 const toneClassName = {
   default:
-    "border-border bg-[var(--surface-muted)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-border bg-[color-mix(in_oklab,var(--surface-muted)_88%,var(--surface-card-elevated)_12%)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   neutral:
-    "border-border bg-[var(--surface-muted)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-border bg-[color-mix(in_oklab,var(--surface-muted)_88%,var(--surface-card-elevated)_12%)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   success:
-    "border-emerald-200/80 bg-emerald-50/90 text-emerald-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-emerald-200/80 bg-[color-mix(in_oklab,oklch(0.96_0.04_155)_88%,var(--surface-card-elevated)_12%)] text-emerald-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   warning:
-    "border-amber-200/80 bg-amber-50/90 text-amber-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-amber-200/80 bg-[color-mix(in_oklab,oklch(0.96_0.05_86)_88%,var(--surface-card-elevated)_12%)] text-amber-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   danger:
-    "border-red-200/80 bg-red-50/90 text-red-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-red-200/80 bg-[color-mix(in_oklab,oklch(0.96_0.035_25)_88%,var(--surface-card-elevated)_12%)] text-red-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
   info:
-    "border-sky-200/80 bg-sky-50/90 text-sky-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+    "border-sky-200/80 bg-[color-mix(in_oklab,oklch(0.95_0.035_235)_88%,var(--surface-card-elevated)_12%)] text-sky-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
 } as const;
 
 export default function StatusBadge({
