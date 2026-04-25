@@ -408,6 +408,8 @@ export type AdminAnalyticsSummaryResponse = {
     delivery_action_count: number;
     direct_sales_window_count: number;
     direct_sales_window_gross_total: string;
+    invoice_balance: string;
+    open_lead_count: number;
     pending_commission_amount: string;
     pending_commission_count: number;
   };
@@ -473,6 +475,47 @@ export type AdminAnalyticsSummaryResponse = {
       monthly_booked_value: string;
     }>;
   };
+  contract_performance: {
+    status_by_plan: Array<{
+      plan_type: string;
+      statuses: Record<string, number>;
+    }>;
+    value_by_plan: Array<{
+      plan_type: string;
+      count: number;
+      active_count: number;
+      completed_count: number;
+      defaulted_count: number;
+      contract_value: string;
+      monthly_value: string;
+      waived_value: string;
+    }>;
+    schedule_totals_by_plan: Array<{
+      plan_type: string;
+      pending_count: number;
+      pending_amount: string;
+      paid_count: number;
+      paid_amount: string;
+      waived_count: number;
+      waived_amount: string;
+      total_count: number;
+      total_amount: string;
+    }>;
+  };
+  crm_customer_posture: {
+    leads: {
+      total_count: number;
+      open_count: number;
+      converted_count: number;
+      by_status: Array<{ status: string; count: number }>;
+      by_intent: Array<{ intent: string; count: number }>;
+    };
+    customers: {
+      new_count: number;
+      kyc_pending_count: number;
+      kyc_verified_count: number;
+    };
+  };
   reconciliation_posture: {
     checked_count: number;
     flagged_count: number;
@@ -504,6 +547,47 @@ export type AdminAnalyticsSummaryResponse = {
       date: string | null;
       count: number;
       gross_total: string;
+    }>;
+  };
+  invoice_document_posture: {
+    supported: boolean;
+    summary: {
+      invoice_count: number;
+      invoice_total: string;
+      invoice_balance: string;
+      direct_sale_invoice_count: number;
+      direct_sale_invoice_total: string;
+      receipt_count: number;
+      receipt_total: string;
+    };
+    invoice_status: Array<{ status: string; count: number; total: string }>;
+    receipt_status: Array<{ status: string; count: number; total: string }>;
+    print_status: {
+      invoices_printed: number;
+      invoices_unprinted: number;
+      receipts_printed: number;
+      receipts_unprinted: number;
+    };
+    contract_documents: {
+      rent_contract_pdf_count: number;
+      lease_contract_pdf_count: number;
+      by_verification_status: Array<{ verification_status: string; count: number }>;
+    };
+  };
+  inventory_movement_posture: {
+    supported: boolean;
+    active_item_count: number;
+    tracked_item_count: number;
+    movement_summary: {
+      count: number;
+      quantity_in: string;
+      quantity_out: string;
+    };
+    movement_type: Array<{
+      movement_type: string;
+      count: number;
+      quantity_in: string;
+      quantity_out: string;
     }>;
   };
   finance_posture: {
