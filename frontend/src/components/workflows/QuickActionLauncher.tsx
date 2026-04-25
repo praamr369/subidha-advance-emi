@@ -198,7 +198,7 @@ export default function QuickActionLauncher({
                       </Link>
                       <button
                         type="button"
-                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground opacity-100 transition hover:border-[var(--surface-border-strong)] hover:bg-white md:opacity-0 md:group-hover:opacity-100"
+                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground opacity-100 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] md:opacity-0 md:group-hover:opacity-100"
                         onClick={() => handleToggleFavorite(href)}
                         aria-label="Remove from favorites"
                         title="Remove from favorites"

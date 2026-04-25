@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import DocumentSequence
 from billing.models import DirectSale, DirectSaleStatus
+from subscriptions.models import PlanType, PublicLead, PublicLeadIntent, Subscription, SubscriptionStatus
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
@@ -116,6 +117,48 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
             customer_name_snapshot=self.customer.name,
             customer_phone_snapshot=self.customer.phone,
         )
+        self.rent_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            batch=None,
+            lucky_id=None,
+            plan_type=PlanType.RENT,
+            total_amount=Decimal("3000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=3,
+            start_date=self.today - timedelta(days=2),
+            status=SubscriptionStatus.ACTIVE,
+        )
+        self.lease_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            batch=None,
+            lucky_id=None,
+            plan_type=PlanType.LEASE,
+            total_amount=Decimal("9000.00"),
+            monthly_amount=Decimal("1500.00"),
+            tenure_months=6,
+            start_date=self.today - timedelta(days=1),
+            status=SubscriptionStatus.DEFAULTED,
+        )
+        create_emi(
+            subscription=self.rent_subscription,
+            month_no=1,
+            amount=Decimal("1000.00"),
+            due_date=self.today - timedelta(days=1),
+        )
+        create_emi(
+            subscription=self.lease_subscription,
+            month_no=1,
+            amount=Decimal("1500.00"),
+            due_date=self.today - timedelta(days=1),
+        )
+        PublicLead.objects.create(
+            name="Analytics Direct Lead",
+            phone="7355000012",
+            intent=PublicLeadIntent.DIRECT_SALE,
+            status="NEW",
+        )
 
     def test_admin_analytics_summary_returns_report_sections(self):
         self.client.force_authenticate(user=self.admin)
@@ -128,9 +171,13 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
         self.assertIn("payment_method_mix", response.data)
         self.assertIn("receivables_pressure", response.data)
         self.assertIn("subscription_mix", response.data)
+        self.assertIn("contract_performance", response.data)
+        self.assertIn("crm_customer_posture", response.data)
         self.assertIn("reconciliation_posture", response.data)
         self.assertIn("delivery_posture", response.data)
         self.assertIn("direct_sales_posture", response.data)
+        self.assertIn("invoice_document_posture", response.data)
+        self.assertIn("inventory_movement_posture", response.data)
         self.assertIn("finance_posture", response.data)
 
         self.assertEqual(
@@ -141,6 +188,20 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
             response.data["direct_sales_posture"]["summary"]["count"],
             1,
         )
+        rent_plan = next(
+            row
+            for row in response.data["contract_performance"]["value_by_plan"]
+            if row["plan_type"] == "RENT"
+        )
+        lease_plan = next(
+            row
+            for row in response.data["contract_performance"]["value_by_plan"]
+            if row["plan_type"] == "LEASE"
+        )
+        self.assertEqual(rent_plan["active_count"], 1)
+        self.assertEqual(lease_plan["defaulted_count"], 1)
+        self.assertEqual(response.data["crm_customer_posture"]["leads"]["open_count"], 1)
+        self.assertTrue(response.data["invoice_document_posture"]["supported"])
 
     def test_custom_window_filters_collection_and_direct_sales_rows(self):
         self.client.force_authenticate(user=self.admin)

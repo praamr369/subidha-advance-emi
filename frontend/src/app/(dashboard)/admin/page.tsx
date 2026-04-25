@@ -11,12 +11,17 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  FileText,
   Landmark,
   LayoutGrid,
+  Package,
   RefreshCw,
+  ReceiptText,
   ShieldCheck,
+  ShoppingCart,
   Sparkles,
   Truck,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -47,6 +52,10 @@ import { getAdminDashboard, type AdminDashboardResponse } from "@/services/admin
 import { getBranchReportingOverview, type BranchReportingOverview } from "@/services/branch-control";
 import { getAdminDeliverySummary } from "@/services/deliveries";
 import { getDashboardSummaryV2 } from "@/services/dashboards";
+import {
+  getAdminAnalyticsSummary,
+  type AdminAnalyticsSummaryResponse,
+} from "@/services/reports";
 import { cn } from "@/lib/utils";
 
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
@@ -125,6 +134,7 @@ export default function AdminDashboardPage() {
   const { openWorkflow } = useWorkflowLauncher();
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
   const [legacy, setLegacy] = useState<AdminDashboardResponse | null>(null);
+  const [analytics, setAnalytics] = useState<AdminAnalyticsSummaryResponse | null>(null);
   const [deliverySummary, setDeliverySummary] = useState<DeliverySummaryPayload | null>(null);
   const [todayBranch, setTodayBranch] = useState<BranchReportingOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,16 +147,18 @@ export default function AdminDashboardPage() {
 
     try {
       const today = todayIso();
-      const [canonicalPayload, legacyPayload, deliveryPayload, todayBranchPayload] =
+      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload] =
         await Promise.all([
           getDashboardSummaryV2({ window: "THIS_MONTH" }),
           getAdminDashboard(),
+          getAdminAnalyticsSummary({ window: "THIS_MONTH" }),
           getAdminDeliverySummary(),
           getBranchReportingOverview({ start_date: today, end_date: today }),
         ]);
 
       setCanonical(canonicalPayload);
       setLegacy(legacyPayload);
+      setAnalytics(analyticsPayload);
       setDeliverySummary(deliveryPayload);
       setTodayBranch(todayBranchPayload);
       setError(null);
@@ -177,6 +189,17 @@ export default function AdminDashboardPage() {
   const widgetStorageKey = "subidha:dashboard-widgets:admin:v1";
   const outstandingRaw = summary?.outstanding_amount ?? legacy?.financial?.total_outstanding ?? "0.00";
   const outstandingNum = toNumber(outstandingRaw);
+  const analyticsOverview = analytics?.overview;
+  const contractRows = analytics?.contract_performance.value_by_plan ?? [];
+  const scheduleRows = analytics?.contract_performance.schedule_totals_by_plan ?? [];
+  const paymentMethodRows = analytics?.payment_method_mix.rows ?? [];
+  const directSalesCount =
+    analyticsOverview?.direct_sales_window_count ?? analytics?.direct_sales_posture.summary.count ?? 0;
+  const directSalesTotal =
+    analyticsOverview?.direct_sales_window_gross_total ?? analytics?.direct_sales_posture.summary.gross_total ?? "0.00";
+  const invoiceBalance = analyticsOverview?.invoice_balance ?? analytics?.invoice_document_posture.summary.invoice_balance ?? "0.00";
+  const openLeadCount = analyticsOverview?.open_lead_count ?? analytics?.crm_customer_posture.leads.open_count ?? 0;
+  const trackedInventoryItems = analytics?.inventory_movement_posture.tracked_item_count ?? 0;
 
   const attentionItems = useMemo(
     () =>
@@ -289,14 +312,30 @@ export default function AdminDashboardPage() {
               id: "collections-heavy",
               label: "Collections heavy",
               description: "Prioritize due follow-up, quick actions, and launch access to collections.",
-              order: ["quick-actions", "urgent-attention", "settlement-posture", "launch-points"],
+              order: [
+                "quick-actions",
+                "urgent-attention",
+                "settlement-posture",
+                "finance-accounting",
+                "contract-performance",
+                "crm-customer",
+                "launch-points",
+              ],
               pinned: ["quick-actions", "urgent-attention"],
             },
             {
               id: "finance-watch",
               label: "Finance watch",
               description: "Keep settlement and attention widgets dominant for close/reconciliation windows.",
-              order: ["settlement-posture", "urgent-attention", "launch-points", "quick-actions"],
+              order: [
+                "settlement-posture",
+                "finance-accounting",
+                "urgent-attention",
+                "contract-performance",
+                "crm-customer",
+                "launch-points",
+                "quick-actions",
+              ],
               pinned: ["settlement-posture", "urgent-attention"],
             },
           ]}
@@ -308,15 +347,24 @@ export default function AdminDashboardPage() {
               group: "quick-actions",
               defaultPinned: true,
               content: (
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   <ActionButton variant="primary" onClick={() => openWorkflow("admin.createSubscription")}>
-                    New Subscription
+                    New Advance EMI Contract
+                  </ActionButton>
+                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createSubscription")}>
+                    New Rent Contract
+                  </ActionButton>
+                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createSubscription")}>
+                    New Lease Contract
+                  </ActionButton>
+                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createDirectSale")}>
+                    New Direct Sale
                   </ActionButton>
                   <ActionButton variant="secondary" onClick={() => openWorkflow("admin.collectPayment")}>
                     Collect Payment
                   </ActionButton>
-                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createCustomer")}>
-                    New Customer
+                  <ActionButton variant="secondary" href={ROUTES.admin.deliveries}>
+                    Prepare Delivery
                   </ActionButton>
                 </div>
               ),
@@ -431,6 +479,114 @@ export default function AdminDashboardPage() {
                 </div>
               ),
             },
+            {
+              id: "contract-performance",
+              title: "Contract Performance",
+              subtitle: "Advance EMI, rent, and lease contract posture from subscription and schedule records.",
+              group: "operational",
+              content:
+                contractRows.length === 0 ? (
+                  <div className="rounded-2xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                    No contract rows returned by the analytics aggregate for this window.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {contractRows.map((row) => {
+                      const schedule = scheduleRows.find((item) => item.plan_type === row.plan_type);
+                      return (
+                        <LaunchCard
+                          key={row.plan_type}
+                          title={`${row.plan_type} Contracts`}
+                          description={`${row.active_count} active · ${row.completed_count} completed · ${row.defaulted_count} defaulted`}
+                          href={`${ROUTES.admin.subscriptions}?plan_type=${row.plan_type}`}
+                          icon={<FileText className="h-5 w-5" />}
+                          meta={`${money(row.contract_value)} value · ${schedule?.pending_count ?? 0} due rows`}
+                          badge="Contract"
+                        />
+                      );
+                    })}
+                  </div>
+                ),
+            },
+            {
+              id: "finance-accounting",
+              title: "Finance & Accounting",
+              subtitle: "Collections, invoice balance, receipts, and ledger-facing finance posture.",
+              group: "core",
+              content: (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <StatCard
+                    label="Window Collections"
+                    value={money(analyticsOverview?.window_net_collections ?? todayNet)}
+                    subtext={`${analyticsOverview?.window_active_collection_count ?? 0} active receipt rows`}
+                    tone="success"
+                    href={ROUTES.admin.payments}
+                    icon={<Wallet className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="Invoice Balance"
+                    value={money(invoiceBalance)}
+                    subtext={`${analytics?.invoice_document_posture.summary.invoice_count ?? 0} invoices · ${analytics?.invoice_document_posture.summary.receipt_count ?? 0} receipts`}
+                    tone={toNumber(invoiceBalance) > 0 ? "warning" : "success"}
+                    href={ROUTES.admin.billingInvoices}
+                    icon={<ReceiptText className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="Cash / UPI / Bank"
+                    value={money(analytics?.payment_method_mix.summary.total_net_amount ?? "0.00")}
+                    subtext={paymentMethodRows.map((row) => `${row.method}: ${money(row.net_amount)}`).join(" · ") || "No method rows"}
+                    href={ROUTES.admin.billingCashBook}
+                    icon={<Landmark className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="Pending Commission"
+                    value={money(analyticsOverview?.pending_commission_amount ?? "0.00")}
+                    subtext={`${analyticsOverview?.pending_commission_count ?? 0} commission rows`}
+                    tone={(analyticsOverview?.pending_commission_count ?? 0) > 0 ? "warning" : "success"}
+                    href={ROUTES.admin.financeCommissions}
+                    icon={<Banknote className="h-5 w-5" />}
+                  />
+                </div>
+              ),
+            },
+            {
+              id: "crm-customer",
+              title: "CRM & Customer Activity",
+              subtitle: "Lead pipeline and customer readiness, kept separate from posted financial flows.",
+              group: "operational",
+              content: (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <StatCard
+                    label="Open Leads"
+                    value={String(openLeadCount)}
+                    subtext={`${analytics?.crm_customer_posture.leads.converted_count ?? 0} converted in window`}
+                    href={ROUTES.admin.leads}
+                    icon={<Users className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="New Customers"
+                    value={String(analytics?.crm_customer_posture.customers.new_count ?? 0)}
+                    subtext={`${analytics?.crm_customer_posture.customers.kyc_pending_count ?? 0} KYC pending`}
+                    href={ROUTES.admin.customers}
+                    icon={<Users className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="Direct Sales"
+                    value={String(directSalesCount)}
+                    subtext={money(directSalesTotal)}
+                    href={ROUTES.admin.billingDirectSales}
+                    icon={<ShoppingCart className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    label="Inventory Movement"
+                    value={String(analytics?.inventory_movement_posture.movement_summary.count ?? 0)}
+                    subtext={`${trackedInventoryItems} tracked items`}
+                    href={ROUTES.admin.inventoryMovements}
+                    icon={<Package className="h-5 w-5" />}
+                  />
+                </div>
+              ),
+            },
           ] satisfies DashboardWidgetDefinition[]}
         />
 
@@ -467,6 +623,15 @@ export default function AdminDashboardPage() {
               icon={<AlertTriangle className="h-5 w-5" />}
               trend="neutral"
               trendValue={overdueCount > 0 ? "Action needed" : "Clear"}
+            />
+            <StatCard
+              label="Direct sales"
+              value={money(directSalesTotal)}
+              subtext={`${directSalesCount} direct sale rows this month`}
+              href={ROUTES.admin.billingDirectSales}
+              icon={<ShoppingCart className="h-5 w-5" />}
+              trend="neutral"
+              trendValue="Retail"
             />
             <StatCard
               label="Reconciliation"

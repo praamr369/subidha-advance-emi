@@ -55,14 +55,14 @@ export default function FormField({
   const errorId = fieldId ? `${fieldId}-error` : undefined;
   const helpId = fieldId ? `${fieldId}-help` : undefined;
   const describedBy = error ? errorId : helpText ? helpId : undefined;
-  let didDecorateFieldControl = false;
-  const decoratedChildren = Children.map(children, (child) => {
-    if (!isValidElement(child) || didDecorateFieldControl) return child;
+  const childArray = Children.toArray(children);
+  const firstControlIndex = childArray.findIndex((child) => {
+    if (!isValidElement(child)) return false;
+    return !(typeof child.type === "string" && !["input", "textarea", "select"].includes(child.type));
+  });
+  const decoratedChildren = childArray.map((child, index) => {
+    if (!isValidElement(child) || index !== firstControlIndex) return child;
     const element = child as ReactElement<Record<string, unknown>>;
-    if (typeof child.type === "string" && !["input", "textarea", "select"].includes(child.type)) {
-      return child;
-    }
-    didDecorateFieldControl = true;
     return cloneElement(element, {
       id: fieldId ?? element.props.id,
       "aria-invalid": Boolean(error) || element.props["aria-invalid"],

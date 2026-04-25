@@ -18,7 +18,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     };
 
     const variantClasses = {
-      default: "surface-panel border border-border bg-card shadow-sm",
+      default: "surface-panel-elevated border border-border bg-card shadow-sm",
       bordered: "surface-panel border border-border bg-card",
       ghost: "border-0 bg-transparent shadow-none",
     };
@@ -27,7 +27,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       <section
         ref={ref}
         className={cn(
-          "rounded-2xl",
+          "relative overflow-hidden rounded-[1.45rem]",
           variantClasses[variant],
           sizeClasses[size],
           className

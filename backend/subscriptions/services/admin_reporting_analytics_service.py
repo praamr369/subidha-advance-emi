@@ -11,11 +11,19 @@ from subscriptions.models import (
     Commission,
     CommissionPayoutBatch,
     CommissionStatus,
+    Customer,
+    Emi,
     EmiStatus,
     MONEY_ZERO,
     Payment,
     PlanType,
+    PublicLead,
+    PublicLeadIntent,
+    PublicLeadStatus,
     Subscription,
+    SubscriptionDocument,
+    SubscriptionDocumentType,
+    SubscriptionStatus,
 )
 from subscriptions.services.dashboard_canonical_financial_summary_service import (
     DashboardWindowParams,
@@ -405,6 +413,150 @@ def _build_subscription_mix(window_params: DashboardWindowParams) -> dict[str, o
     }
 
 
+def _build_contract_performance(window_params: DashboardWindowParams) -> dict[str, object]:
+    subscription_queryset = _apply_activity_window(
+        Subscription.objects.all(),
+        window_params=window_params,
+    )
+    schedule_queryset = _apply_date_window_to_queryset(
+        Emi.objects.select_related("subscription"),
+        field_name="due_date",
+        window_params=window_params,
+    )
+
+    status_by_plan = {
+        plan_type: {
+            status: 0
+            for status in SubscriptionStatus.values
+        }
+        for plan_type in PlanType.values
+    }
+    contract_value_by_plan = {
+        plan_type: {
+            "plan_type": plan_type,
+            "count": 0,
+            "active_count": 0,
+            "completed_count": 0,
+            "defaulted_count": 0,
+            "contract_value": "0.00",
+            "monthly_value": "0.00",
+            "waived_value": "0.00",
+        }
+        for plan_type in PlanType.values
+    }
+
+    contract_rows = (
+        subscription_queryset.values("plan_type")
+        .annotate(
+            count=Count("id"),
+            active_count=Count("id", filter=Q(status=SubscriptionStatus.ACTIVE)),
+            completed_count=Count("id", filter=Q(status=SubscriptionStatus.COMPLETED)),
+            defaulted_count=Count("id", filter=Q(status=SubscriptionStatus.DEFAULTED)),
+            contract_value=Coalesce(Sum("total_amount"), Value(DECIMAL_ZERO)),
+            monthly_value=Coalesce(Sum("monthly_amount"), Value(DECIMAL_ZERO)),
+            waived_value=Coalesce(Sum("waived_amount"), Value(DECIMAL_ZERO)),
+        )
+        .order_by("plan_type")
+    )
+    for row in contract_rows:
+        plan_type = str(row["plan_type"] or PlanType.EMI)
+        contract_value_by_plan.setdefault(
+            plan_type,
+            {
+                "plan_type": plan_type,
+                "count": 0,
+                "active_count": 0,
+                "completed_count": 0,
+                "defaulted_count": 0,
+                "contract_value": "0.00",
+                "monthly_value": "0.00",
+                "waived_value": "0.00",
+            },
+        )
+        contract_value_by_plan[plan_type].update(
+            {
+                "count": int(row["count"] or 0),
+                "active_count": int(row["active_count"] or 0),
+                "completed_count": int(row["completed_count"] or 0),
+                "defaulted_count": int(row["defaulted_count"] or 0),
+                "contract_value": _money(row["contract_value"]),
+                "monthly_value": _money(row["monthly_value"]),
+                "waived_value": _money(row["waived_value"]),
+            }
+        )
+
+    for row in (
+        subscription_queryset.values("plan_type", "status")
+        .annotate(count=Count("id"))
+        .order_by("plan_type", "status")
+    ):
+        plan_type = str(row["plan_type"] or PlanType.EMI)
+        status = str(row["status"] or "")
+        status_by_plan.setdefault(plan_type, {})
+        status_by_plan[plan_type][status] = int(row["count"] or 0)
+
+    schedule_totals: dict[str, dict[str, object]] = {
+        plan_type: {
+            "plan_type": plan_type,
+            "pending_count": 0,
+            "pending_amount": "0.00",
+            "paid_count": 0,
+            "paid_amount": "0.00",
+            "waived_count": 0,
+            "waived_amount": "0.00",
+            "total_count": 0,
+            "total_amount": "0.00",
+        }
+        for plan_type in PlanType.values
+    }
+    for row in (
+        schedule_queryset.values("subscription__plan_type", "status")
+        .annotate(count=Count("id"), amount=Coalesce(Sum("amount"), Value(DECIMAL_ZERO)))
+        .order_by("subscription__plan_type", "status")
+    ):
+        plan_type = str(row["subscription__plan_type"] or PlanType.EMI)
+        status = str(row["status"] or "")
+        bucket = schedule_totals.setdefault(
+            plan_type,
+            {
+                "plan_type": plan_type,
+                "pending_count": 0,
+                "pending_amount": "0.00",
+                "paid_count": 0,
+                "paid_amount": "0.00",
+                "waived_count": 0,
+                "waived_amount": "0.00",
+                "total_count": 0,
+                "total_amount": "0.00",
+            },
+        )
+        count = int(row["count"] or 0)
+        amount = _decimal(row["amount"])
+        bucket["total_count"] = int(bucket["total_count"]) + count
+        bucket["total_amount"] = _money(_decimal(bucket["total_amount"]) + amount)
+        if status == EmiStatus.PENDING:
+            bucket["pending_count"] = int(bucket["pending_count"]) + count
+            bucket["pending_amount"] = _money(_decimal(bucket["pending_amount"]) + amount)
+        elif status == EmiStatus.PAID:
+            bucket["paid_count"] = int(bucket["paid_count"]) + count
+            bucket["paid_amount"] = _money(_decimal(bucket["paid_amount"]) + amount)
+        elif status == EmiStatus.WAIVED:
+            bucket["waived_count"] = int(bucket["waived_count"]) + count
+            bucket["waived_amount"] = _money(_decimal(bucket["waived_amount"]) + amount)
+
+    return {
+        "status_by_plan": [
+            {
+                "plan_type": plan_type,
+                "statuses": status_counts,
+            }
+            for plan_type, status_counts in status_by_plan.items()
+        ],
+        "value_by_plan": list(contract_value_by_plan.values()),
+        "schedule_totals_by_plan": list(schedule_totals.values()),
+    }
+
+
 def _build_reconciliation_posture(window_params: DashboardWindowParams) -> dict[str, object]:
     scoped_queryset = _apply_activity_window(
         Subscription.objects.all(),
@@ -424,6 +576,54 @@ def _build_reconciliation_posture(window_params: DashboardWindowParams) -> dict[
     }
 
 
+def _build_crm_customer_posture(window_params: DashboardWindowParams) -> dict[str, object]:
+    lead_queryset = _apply_date_window_to_queryset(
+        PublicLead.objects.all(),
+        field_name="created_at__date",
+        window_params=window_params,
+    )
+    customer_queryset = _apply_date_window_to_queryset(
+        Customer.objects.all(),
+        field_name="created_at__date",
+        window_params=window_params,
+    )
+
+    status_counts = {status: 0 for status in PublicLeadStatus.values}
+    for row in lead_queryset.values("status").annotate(count=Count("id")).order_by("status"):
+        status_counts[str(row["status"] or "")] = int(row["count"] or 0)
+
+    intent_counts = {intent: 0 for intent in PublicLeadIntent.values}
+    for row in lead_queryset.values("intent").annotate(count=Count("id")).order_by("intent"):
+        intent_counts[str(row["intent"] or "")] = int(row["count"] or 0)
+
+    return {
+        "leads": {
+            "total_count": lead_queryset.count(),
+            "open_count": lead_queryset.filter(
+                status__in=[
+                    PublicLeadStatus.NEW,
+                    PublicLeadStatus.IN_PROGRESS,
+                    PublicLeadStatus.CONTACTED,
+                ]
+            ).count(),
+            "converted_count": lead_queryset.filter(status=PublicLeadStatus.CONVERTED).count(),
+            "by_status": [
+                {"status": status, "count": count}
+                for status, count in status_counts.items()
+            ],
+            "by_intent": [
+                {"intent": intent, "count": count}
+                for intent, count in intent_counts.items()
+            ],
+        },
+        "customers": {
+            "new_count": customer_queryset.count(),
+            "kyc_pending_count": Customer.objects.filter(kyc_status="PENDING").count(),
+            "kyc_verified_count": Customer.objects.filter(kyc_status="VERIFIED").count(),
+        },
+    }
+
+
 def _build_delivery_posture(window_params: DashboardWindowParams) -> dict[str, object]:
     queryset = _apply_date_window_to_queryset(
         get_delivery_queryset(),
@@ -434,6 +634,125 @@ def _build_delivery_posture(window_params: DashboardWindowParams) -> dict[str, o
     return {
         "supported": True,
         "summary": summary,
+    }
+
+
+def _build_invoice_document_posture(window_params: DashboardWindowParams) -> dict[str, object]:
+    invoice_posture = {
+        "supported": False,
+        "summary": {
+            "invoice_count": 0,
+            "invoice_total": "0.00",
+            "invoice_balance": "0.00",
+            "direct_sale_invoice_count": 0,
+            "direct_sale_invoice_total": "0.00",
+            "receipt_count": 0,
+            "receipt_total": "0.00",
+        },
+        "invoice_status": [],
+        "receipt_status": [],
+        "print_status": {
+            "invoices_printed": 0,
+            "invoices_unprinted": 0,
+            "receipts_printed": 0,
+            "receipts_unprinted": 0,
+        },
+        "contract_documents": {
+            "rent_contract_pdf_count": 0,
+            "lease_contract_pdf_count": 0,
+            "by_verification_status": [],
+        },
+    }
+
+    try:
+        from billing.models import BillingInvoice, BillingSourceType, ReceiptDocument
+    except Exception:
+        return invoice_posture
+
+    invoice_queryset = _apply_date_window_to_queryset(
+        BillingInvoice.objects.all(),
+        field_name="invoice_date",
+        window_params=window_params,
+    )
+    receipt_queryset = _apply_date_window_to_queryset(
+        ReceiptDocument.objects.all(),
+        field_name="receipt_date",
+        window_params=window_params,
+    )
+
+    invoice_summary = invoice_queryset.aggregate(
+        count=Count("id"),
+        total=Coalesce(Sum("grand_total"), Value(DECIMAL_ZERO)),
+        balance=Coalesce(Sum("balance_total"), Value(DECIMAL_ZERO)),
+        direct_sale_count=Count("id", filter=Q(source_type=BillingSourceType.DIRECT_SALE)),
+        direct_sale_total=Coalesce(
+            Sum("grand_total", filter=Q(source_type=BillingSourceType.DIRECT_SALE)),
+            Value(DECIMAL_ZERO),
+        ),
+    )
+    receipt_summary = receipt_queryset.aggregate(
+        count=Count("id"),
+        total=Coalesce(Sum("amount"), Value(DECIMAL_ZERO)),
+    )
+
+    verification_rows = (
+        SubscriptionDocument.objects.values("verification_status")
+        .annotate(count=Count("id"))
+        .order_by("verification_status")
+    )
+
+    return {
+        "supported": True,
+        "summary": {
+            "invoice_count": int(invoice_summary["count"] or 0),
+            "invoice_total": _money(invoice_summary["total"]),
+            "invoice_balance": _money(invoice_summary["balance"]),
+            "direct_sale_invoice_count": int(invoice_summary["direct_sale_count"] or 0),
+            "direct_sale_invoice_total": _money(invoice_summary["direct_sale_total"]),
+            "receipt_count": int(receipt_summary["count"] or 0),
+            "receipt_total": _money(receipt_summary["total"]),
+        },
+        "invoice_status": [
+            {
+                "status": str(row["status"] or ""),
+                "count": int(row["count"] or 0),
+                "total": _money(row["total"]),
+            }
+            for row in invoice_queryset.values("status")
+            .annotate(count=Count("id"), total=Coalesce(Sum("grand_total"), Value(DECIMAL_ZERO)))
+            .order_by("status")
+        ],
+        "receipt_status": [
+            {
+                "status": str(row["status"] or ""),
+                "count": int(row["count"] or 0),
+                "total": _money(row["total"]),
+            }
+            for row in receipt_queryset.values("status")
+            .annotate(count=Count("id"), total=Coalesce(Sum("amount"), Value(DECIMAL_ZERO)))
+            .order_by("status")
+        ],
+        "print_status": {
+            "invoices_printed": invoice_queryset.filter(printed_count__gt=0).count(),
+            "invoices_unprinted": invoice_queryset.filter(printed_count=0).count(),
+            "receipts_printed": receipt_queryset.filter(printed_count__gt=0).count(),
+            "receipts_unprinted": receipt_queryset.filter(printed_count=0).count(),
+        },
+        "contract_documents": {
+            "rent_contract_pdf_count": SubscriptionDocument.objects.filter(
+                document_type=SubscriptionDocumentType.RENT_CONTRACT_PDF
+            ).count(),
+            "lease_contract_pdf_count": SubscriptionDocument.objects.filter(
+                document_type=SubscriptionDocumentType.LEASE_CONTRACT_PDF
+            ).count(),
+            "by_verification_status": [
+                {
+                    "verification_status": str(row["verification_status"] or ""),
+                    "count": int(row["count"] or 0),
+                }
+                for row in verification_rows
+            ],
+        },
     }
 
 
@@ -483,6 +802,60 @@ def _build_direct_sales_posture(window_params: DashboardWindowParams) -> dict[st
             "gross_total": _money(summary["gross_total"]),
         },
         "trend": _trim_trend_points(trend),
+    }
+
+
+def _build_inventory_movement_posture(window_params: DashboardWindowParams) -> dict[str, object]:
+    try:
+        from inventory.models import InventoryItem, StockLedger
+    except Exception:
+        return {
+            "supported": False,
+            "active_item_count": 0,
+            "tracked_item_count": 0,
+            "movement_summary": {
+                "count": 0,
+                "quantity_in": "0.000",
+                "quantity_out": "0.000",
+            },
+            "movement_type": [],
+        }
+
+    ledger_queryset = _apply_date_window_to_queryset(
+        StockLedger.objects.all(),
+        field_name="movement_date",
+        window_params=window_params,
+    )
+    summary = ledger_queryset.aggregate(
+        count=Count("id"),
+        quantity_in=Coalesce(Sum("quantity_in"), Value(Decimal("0.000"))),
+        quantity_out=Coalesce(Sum("quantity_out"), Value(Decimal("0.000"))),
+    )
+
+    return {
+        "supported": True,
+        "active_item_count": InventoryItem.objects.filter(is_active=True).count(),
+        "tracked_item_count": InventoryItem.objects.filter(stock_tracking_enabled=True).count(),
+        "movement_summary": {
+            "count": int(summary["count"] or 0),
+            "quantity_in": f"{Decimal(str(summary['quantity_in'] or 0)).quantize(Decimal('0.001')):.3f}",
+            "quantity_out": f"{Decimal(str(summary['quantity_out'] or 0)).quantize(Decimal('0.001')):.3f}",
+        },
+        "movement_type": [
+            {
+                "movement_type": str(row["movement_type"] or ""),
+                "count": int(row["count"] or 0),
+                "quantity_in": f"{Decimal(str(row['quantity_in'] or 0)).quantize(Decimal('0.001')):.3f}",
+                "quantity_out": f"{Decimal(str(row['quantity_out'] or 0)).quantize(Decimal('0.001')):.3f}",
+            }
+            for row in ledger_queryset.values("movement_type")
+            .annotate(
+                count=Count("id"),
+                quantity_in=Coalesce(Sum("quantity_in"), Value(Decimal("0.000"))),
+                quantity_out=Coalesce(Sum("quantity_out"), Value(Decimal("0.000"))),
+            )
+            .order_by("movement_type")
+        ],
     }
 
 
@@ -617,9 +990,13 @@ def build_admin_reporting_analytics_summary(
     payment_method_mix = _build_payment_method_mix(window_params)
     receivables_pressure = _build_receivables_pressure(window_params)
     subscription_mix = _build_subscription_mix(window_params)
+    contract_performance = _build_contract_performance(window_params)
+    crm_customer_posture = _build_crm_customer_posture(window_params)
     reconciliation_posture = _build_reconciliation_posture(window_params)
     delivery_posture = _build_delivery_posture(window_params)
     direct_sales_posture = _build_direct_sales_posture(window_params)
+    invoice_document_posture = _build_invoice_document_posture(window_params)
+    inventory_movement_posture = _build_inventory_movement_posture(window_params)
     finance_posture = _build_finance_posture(window_params)
 
     delivery_summary = delivery_posture["summary"]
@@ -644,6 +1021,8 @@ def build_admin_reporting_analytics_summary(
             ),
             "direct_sales_window_count": direct_sales_posture["summary"]["count"],
             "direct_sales_window_gross_total": direct_sales_posture["summary"]["gross_total"],
+            "invoice_balance": invoice_document_posture["summary"]["invoice_balance"],
+            "open_lead_count": crm_customer_posture["leads"]["open_count"],
             "pending_commission_amount": commission_summary["pending_amount"],
             "pending_commission_count": commission_summary["pending_count"],
         },
@@ -651,8 +1030,12 @@ def build_admin_reporting_analytics_summary(
         "payment_method_mix": payment_method_mix,
         "receivables_pressure": receivables_pressure,
         "subscription_mix": subscription_mix,
+        "contract_performance": contract_performance,
+        "crm_customer_posture": crm_customer_posture,
         "reconciliation_posture": reconciliation_posture,
         "delivery_posture": delivery_posture,
         "direct_sales_posture": direct_sales_posture,
+        "invoice_document_posture": invoice_document_posture,
+        "inventory_movement_posture": inventory_movement_posture,
         "finance_posture": finance_posture,
     }
