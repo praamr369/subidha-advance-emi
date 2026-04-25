@@ -1,49 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
-<<<<<<< ours
-<<<<<<< ours
-import {
-  buildPublicMetadata,
-  getPublicDictionary,
-} from "@/lib/public-i18n";
+import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
->>>>>>> theirs
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
->>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
 import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
-import ProductGrid from "./ProductGrid";
-
-<<<<<<< ours
-<<<<<<< ours
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getPublicLocale();
-  const dictionary = getPublicDictionary(locale);
-  return buildPublicMetadata({
-    title: `${dictionary.common.products} | Furniture, Electronics, Appliances`,
-    description: "Browse furniture, electronics, and home appliances from Subidha Furniture with easy monthly plan enquiry support.",
-    path: "/products",
-  });
-}
-=======
-=======
->>>>>>> theirs
 import { buildPublicMetadata } from "@/lib/public-seo";
+import ProductGrid from "./ProductGrid";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Products",
   description: "Browse furniture, electronics, and appliances from the live public catalogue.",
   path: "/products",
 });
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
 
 export default async function ProductsPage() {
   const locale = await getPublicLocale();

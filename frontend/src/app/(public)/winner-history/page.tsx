@@ -1,37 +1,19 @@
 import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
-<<<<<<< ours
-<<<<<<< ours
-import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import { buildPublicMetadata } from "@/lib/public-seo";
->>>>>>> theirs
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
-import { buildPublicMetadata } from "@/lib/public-seo";
->>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
 import { getPublicWinnerHistory, type PublicWinner } from "@/lib/public-api";
 import WinnerHistoryTableClient from "./WinnerHistoryTableClient";
 
 export const metadata: Metadata = buildPublicMetadata({
-<<<<<<< ours
-<<<<<<< ours
-  title: "Winner History | Lucky Plan Transparency",
-  description: "Browse long-term Lucky Plan winner history sourced from revealed draw events.",
-=======
   title: "Winner History",
   description: "Public archive of winner history sourced from revealed lucky draw events.",
->>>>>>> theirs
-=======
-  title: "Winner History",
-  description: "Public archive of winner history sourced from revealed lucky draw events.",
->>>>>>> theirs
   path: "/winner-history",
 });
 
@@ -39,12 +21,13 @@ export default async function WinnerHistoryPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
   let winners: PublicWinner[] = [];
+  let error: string | null = null;
 
   try {
     const payload = await getPublicWinnerHistory(50);
     winners = payload.results;
-  } catch {
-    winners = [];
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Unable to load winner history right now.";
   }
 
   return (
@@ -52,16 +35,11 @@ export default async function WinnerHistoryPage() {
       title={dictionary.common.winnerHistory}
       subtitle="Archive from live draw records."
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winnerHistory }]}
-      actions={[{ label: dictionary.common.winners, href: ROUTES.public.winners, variant: "secondary" }, { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }]}
+      actions={[
+        { label: dictionary.common.winners, href: ROUTES.public.winners, variant: "secondary" },
+        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
+      ]}
     >
-<<<<<<< ours
-<<<<<<< ours
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6">
-        <SectionHeader eyebrow="Archive" title="Published records" description="Search by batch, month, Lucky ID, and winner." />
-        <WinnerHistoryTableClient winners={winners} />
-=======
-=======
->>>>>>> theirs
       <PublicMarketingBanner
         eyebrow="Archive trust"
         title="Long-term winner transparency"
@@ -90,10 +68,16 @@ export default async function WinnerHistoryPage() {
         ) : (
           <WinnerHistoryTableClient winners={winners} />
         )}
->>>>>>> theirs
       </section>
 
-      <CtaBanner title="Want to understand the full process?" description="Read how batches, Lucky IDs, and winner publishing works." actions={[{ href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks, variant: "secondary" }, { href: ROUTES.public.luckyPlan, label: dictionary.common.luckyPlan, variant: "primary" }]} />
+      <CtaBanner
+        title="Want to understand the full process?"
+        description="Read how batches, Lucky IDs, and winner publishing works."
+        actions={[
+          { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks, variant: "secondary" },
+          { href: ROUTES.public.luckyPlan, label: dictionary.common.luckyPlan, variant: "primary" },
+        ]}
+      />
     </PublicPageShell>
   );
 }

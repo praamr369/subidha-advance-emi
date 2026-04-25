@@ -2,36 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import CtaBanner from "@/components/public/CtaBanner";
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
-<<<<<<< ours
-<<<<<<< ours
-import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
->>>>>>> theirs
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
->>>>>>> theirs
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 import ContactLeadForm from "./ContactLeadForm";
 
 export const metadata: Metadata = buildPublicMetadata({
-<<<<<<< ours
-<<<<<<< ours
-  title: "Contact | Subidha Furniture Asansol",
-  description: "Get help for products, Lucky Plan enrollment, monthly budget guidance, and branch support.",
-=======
   title: "Contact",
   description: "Contact Subidha Furniture for product, batch, and easy monthly plan guidance.",
->>>>>>> theirs
-=======
-  title: "Contact",
-  description: "Contact Subidha Furniture for product, batch, and easy monthly plan guidance.",
->>>>>>> theirs
   path: "/contact",
 });
 
@@ -45,7 +28,10 @@ export default async function ContactPage() {
       title={dictionary.common.contact}
       subtitle="Call, visit, or send an enquiry. Our team will guide you in simple steps."
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.contact }]}
-      actions={[{ label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }, { label: dictionary.common.products, href: ROUTES.public.products, variant: "secondary" }]}
+      actions={[
+        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
+        { label: dictionary.common.products, href: ROUTES.public.products, variant: "secondary" },
+      ]}
     >
       <PublicMarketingBanner
         eyebrow="Help section"
@@ -75,7 +61,14 @@ export default async function ContactPage() {
         <ContactLeadForm />
       </section>
 
-      <CtaBanner title="Need product-first assistance?" description="Browse products first, then submit an enquiry with product context." actions={[{ href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" }, { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" }]} />
+      <CtaBanner
+        title="Need product-first assistance?"
+        description="Browse products first, then submit an enquiry with product context."
+        actions={[
+          { href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" },
+          { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
+        ]}
+      />
     </PublicPageShell>
   );
 }

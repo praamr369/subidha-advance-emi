@@ -1,5 +1,3 @@
-<<<<<<< ours
-<<<<<<< ours
 import type { Metadata } from "next";
 
 export const PUBLIC_LOCALES = ["en", "hi", "bn"] as const;
@@ -60,9 +58,8 @@ export function getPublicDictionary(locale: PublicLocale) {
     },
   } as const;
   return content[locale];
-=======
-=======
->>>>>>> theirs
+}
+
 export const PUBLIC_LANGUAGES = ["en", "hi", "bn"] as const;
 export type PublicLanguage = (typeof PUBLIC_LANGUAGES)[number];
 
@@ -112,8 +109,4 @@ export const publicContent = {
 
 export function getText(content: LocalizedText, language: PublicLanguage): string {
   return content[language] || content.en;
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
 }

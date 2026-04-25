@@ -1,53 +1,20 @@
 import type { Metadata } from "next";
 
+import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
-<<<<<<< ours
-<<<<<<< ours
-import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import { buildPublicMetadata } from "@/lib/public-seo";
->>>>>>> theirs
-=======
-import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
-import { buildPublicMetadata } from "@/lib/public-seo";
->>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
 import { getPublicLatestWinner, getPublicWinners, type PublicWinner } from "@/lib/public-api";
 
 export const metadata: Metadata = buildPublicMetadata({
-<<<<<<< ours
-<<<<<<< ours
-  title: "Winners | Lucky Plan",
-  description: "Recent Lucky Plan winners published from revealed draw records.",
-  path: "/winners",
-});
-=======
-=======
->>>>>>> theirs
   title: "Winners",
   description: "Recent Lucky Plan winners from revealed draw records.",
   path: "/winners",
 });
-
-function formatDrawDate(value: string | null | undefined): string {
-  if (!value) return "—";
-
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-
-  return new Date(parsed).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
->>>>>>> theirs
 
 function WinnerCard({ winner }: { winner: PublicWinner }) {
   return (
@@ -62,34 +29,29 @@ function WinnerCard({ winner }: { winner: PublicWinner }) {
 export default async function WinnersPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
-  const [latestResult, winnersResult] = await Promise.allSettled([getPublicLatestWinner(), getPublicWinners(12)]);
-  const latestWinner = latestResult.status === "fulfilled" ? latestResult.value.winner : null;
-  const winners = winnersResult.status === "fulfilled" ? winnersResult.value.results : [];
+  let error: string | null = null;
+  let latestWinner: PublicWinner | null = null;
+  let winners: PublicWinner[] = [];
+
+  try {
+    const [latestResult, winnersResult] = await Promise.all([getPublicLatestWinner(), getPublicWinners(12)]);
+    latestWinner = latestResult.winner;
+    winners = winnersResult.results;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Unable to load winner data right now.";
+  }
 
   return (
     <PublicPageShell
       title={dictionary.common.winners}
       subtitle="Real winner records only."
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winners }]}
-      actions={[{ label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" }, { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" }]}
+      actions={[
+        { label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" },
+        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
+      ]}
     >
       <WinnerSpotlight winner={latestWinner} />
-<<<<<<< ours
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6">
-        <SectionHeader eyebrow="Recent" title="Recent published winners" description="From revealed draw records." />
-        <div className="grid gap-4 lg:grid-cols-2">{winners.map((winner) => <WinnerCard key={winner.id} winner={winner} />)}</div>
-=======
-
-      <PublicMarketingBanner
-        eyebrow="Winner highlight"
-        title="Transparency first, always"
-        description="Published entries are sourced from revealed events and shown with clear rule context."
-        items={[
-          { title: "Public evidence", description: "Commitment references are shown when available." },
-          { title: "No fake records", description: "If nothing is published, page shows empty state." },
-          { title: "Future-EMI waiver only", description: "Past settled payments remain unchanged." },
-        ]}
-      />
 
       <PublicMarketingBanner
         eyebrow="Winner highlight"
@@ -123,7 +85,6 @@ export default async function WinnersPage() {
             ))}
           </div>
         )}
->>>>>>> theirs
       </section>
     </PublicPageShell>
   );

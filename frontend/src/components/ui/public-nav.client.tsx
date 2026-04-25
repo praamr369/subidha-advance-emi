@@ -6,16 +6,7 @@ import { Menu, X, MessageCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import BrandLockup from "@/components/public/BrandLockup";
-<<<<<<< ours
-<<<<<<< ours
-import PublicLanguageSwitcher from "@/components/ui/public-language-switcher";
-import type { PublicLocale } from "@/lib/public-i18n";
-=======
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
->>>>>>> theirs
-=======
-import LanguageSwitcher from "@/components/public/LanguageSwitcher";
->>>>>>> theirs
 import { ROUTES } from "@/lib/routes";
 import { getText, publicContent, type PublicLanguage } from "@/lib/public-i18n";
 import { cn } from "@/lib/utils";
@@ -30,9 +21,6 @@ type PublicNavClientProps = {
   companyName?: string;
   brandSubtitle?: string;
   whatsappLink?: string | null;
-<<<<<<< ours
-<<<<<<< ours
-  locale: PublicLocale;
   dictionary: {
     links: readonly string[];
     apply: string;
@@ -43,12 +31,7 @@ type PublicNavClientProps = {
     quickActions: string;
     language: string;
   };
-=======
   language: PublicLanguage;
->>>>>>> theirs
-=======
-  language: PublicLanguage;
->>>>>>> theirs
 };
 
 export default function PublicNavClient({
@@ -56,16 +39,8 @@ export default function PublicNavClient({
   companyName,
   brandSubtitle,
   whatsappLink,
-<<<<<<< ours
-<<<<<<< ours
-  locale,
   dictionary,
-=======
   language,
->>>>>>> theirs
-=======
-  language,
->>>>>>> theirs
 }: PublicNavClientProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -130,7 +105,7 @@ export default function PublicNavClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <PublicLanguageSwitcher locale={locale} label={dictionary.language} />
+            <LanguageSwitcher value={language} />
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
@@ -168,17 +143,9 @@ export default function PublicNavClient({
             <div className="mt-2 text-xs font-semibold text-slate-600">{trustBadge}</div>
           </div>
           <div className="rounded-2xl border border-white/75 bg-white/82 p-3">
-<<<<<<< ours
-<<<<<<< ours
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {dictionary.navigate}
             </div>
-=======
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Navigate</div>
->>>>>>> theirs
-=======
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Navigate</div>
->>>>>>> theirs
             <div className="mt-2 grid gap-1">
               {links.map((link) => (
                 <Link
@@ -199,19 +166,9 @@ export default function PublicNavClient({
           </div>
 
           <div className="grid gap-2 rounded-2xl border border-white/75 bg-white/82 p-3">
-<<<<<<< ours
-<<<<<<< ours
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {dictionary.quickActions}
             </div>
-            <PublicLanguageSwitcher locale={locale} label={dictionary.language} />
-
-=======
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quick actions</div>
->>>>>>> theirs
-=======
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quick actions</div>
->>>>>>> theirs
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
