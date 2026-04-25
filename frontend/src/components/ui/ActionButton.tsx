@@ -23,6 +23,7 @@ type ActionButtonProps = Omit<
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   loading?: boolean;
+  isLoading?: boolean;
   fullWidth?: boolean;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
@@ -70,6 +71,7 @@ export default function ActionButton({
   size = "md",
   disabled = false,
   loading = false,
+  isLoading,
   fullWidth = false,
   leftIcon,
   rightIcon,
@@ -78,11 +80,12 @@ export default function ActionButton({
   className,
   ...nativeButtonProps
 }: ActionButtonProps) {
-  const resolvedDisabled = disabled || loading;
+  const resolvedLoading = loading || Boolean(isLoading);
+  const resolvedDisabled = disabled || resolvedLoading;
   const content = (
     <>
-      {leftIcon && !loading ? <span className="inline-flex shrink-0">{leftIcon}</span> : null}
-      {loading ? (
+      {leftIcon && !resolvedLoading ? <span className="inline-flex shrink-0">{leftIcon}</span> : null}
+      {resolvedLoading ? (
         <span className="inline-flex h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
       ) : null}
       <span>{children}</span>
@@ -102,6 +105,7 @@ export default function ActionButton({
       <Link
         href={href}
         aria-disabled={resolvedDisabled}
+        aria-busy={resolvedLoading}
         aria-label={ariaLabel}
         className={cn(resolvedClassName, resolvedDisabled && "pointer-events-none")}
       >
@@ -117,7 +121,7 @@ export default function ActionButton({
       onClick={onClick}
       disabled={resolvedDisabled}
       aria-label={ariaLabel ?? nativeButtonProps["aria-label"]}
-      aria-busy={loading}
+      aria-busy={resolvedLoading}
       className={resolvedClassName}
     >
       {content}

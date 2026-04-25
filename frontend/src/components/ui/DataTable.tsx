@@ -173,8 +173,16 @@ export default function DataTable<T extends { id?: number | string }>({
                 <tr
                   key={row.id ?? index}
                   onClick={() => onRowClick?.(row)}
+                  onKeyDown={(event) => {
+                    if (!onRowClick) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onRowClick(row);
+                    }
+                  }}
+                  tabIndex={onRowClick ? 0 : undefined}
                   className={cn(
-                    "border-b border-border/80 transition-colors hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)]",
+                    "border-b border-border/80 transition-colors-smooth hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--surface-muted)_68%,transparent)]",
                     onRowClick && "cursor-pointer"
                   )}
                 >

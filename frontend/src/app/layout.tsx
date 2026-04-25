@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { brandConfig } from "@/config/brand";
 import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
+import SkipNav from "@/components/ui/SkipNav";
 
 const publicLogoSrc = brandConfig.publicLogoSrc || undefined;
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground antialiased">
+        <SkipNav />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

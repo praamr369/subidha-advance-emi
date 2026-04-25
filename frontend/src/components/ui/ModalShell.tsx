@@ -10,6 +10,7 @@ import { usePopupPortalRoot, usePopupShell } from "@/components/ui/usePopupShell
 type ModalShellProps = {
   open: boolean;
   title: string;
+  descriptionId?: string;
   onClose: () => void;
   children: ReactNode;
   panelClassName?: string;
@@ -22,6 +23,7 @@ type ModalShellProps = {
 export default function ModalShell({
   open,
   title,
+  descriptionId,
   onClose,
   children,
   panelClassName,
@@ -72,6 +74,7 @@ export default function ModalShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         className={cn(
           "workflow-modal-panel pointer-events-auto relative flex w-full min-h-0 max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[1.85rem] focus:outline-none sm:max-h-[calc(100dvh-3rem)]",
           panelClassName

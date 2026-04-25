@@ -9,6 +9,7 @@ type EmptyStateProps = {
   description?: string;
   action?: ReactNode;
   icon?: ReactNode;
+  illustration?: ReactNode;
   tone?: "default" | "info";
 };
 
@@ -17,6 +18,7 @@ export default function EmptyState({
   description,
   action,
   icon,
+  illustration,
   tone = "default",
 }: EmptyStateProps) {
   return (
@@ -24,7 +26,7 @@ export default function EmptyState({
       title={title}
       description={description}
       action={action}
-      icon={icon ?? <Inbox className="h-5 w-5" />}
+      icon={icon ?? illustration ?? <Inbox className="h-5 w-5" />}
       className={cn(
         tone === "info"
           ? "border-sky-200/80 bg-sky-50/65"
