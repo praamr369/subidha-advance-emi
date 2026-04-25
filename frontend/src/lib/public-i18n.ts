@@ -83,7 +83,7 @@ export const publicContent = {
   },
   homeHero: {
     title: {
-      en: "Bring Home Furniture, Electronics, and Home Appliances with Easy Monthly Plans.",
+      en: "Bring Home Furniture with a Smarter Monthly Plan",
       hi: "फर्नीचर, इलेक्ट्रॉनिक्स और होम अप्लायंसेज़ अब आसान मासिक योजना के साथ घर लाएँ।",
       bn: "সহজ মাসিক পরিকল্পনায় ফার্নিচার, ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্সস ঘরে আনুন।",
     },

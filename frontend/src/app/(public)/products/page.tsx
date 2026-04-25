@@ -37,7 +37,7 @@ export default async function ProductsPage() {
   return (
     <PublicPageShell
       title={dictionary.common.products}
-      subtitle="Explore real catalog items and enquire with your preferred product in one flow."
+      subtitle="Browse the live catalogue and enquire with your preferred product in one flow."
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.products },
@@ -59,6 +59,9 @@ export default async function ProductsPage() {
       />
 
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+        <p className="mb-4 text-sm leading-6 text-muted-foreground">
+          Browse the live catalogue sourced from production product records.
+        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Published products</div>

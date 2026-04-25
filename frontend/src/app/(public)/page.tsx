@@ -41,8 +41,8 @@ export default async function PublicHome() {
   const latestWinner = latestWinnerResult.status === "fulfilled" ? latestWinnerResult.value.winner : null;
   const products = productsResult.status === "fulfilled" ? productsResult.value.products.slice(0, 6) : [];
 
-  const heroTitle = (profile.hero_title || "").trim() || getText(publicContent.homeHero.title, language);
-  const heroSubtitle = (profile.hero_subtitle || "").trim() || getText(publicContent.homeHero.subtitle, language);
+  const heroTitle = getText(publicContent.homeHero.title, language);
+  const heroSubtitle = getText(publicContent.homeHero.subtitle, language);
 
   return (
     <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
