@@ -1060,6 +1060,9 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "is_lease_enabled",
             "is_rent_ready",
             "is_lease_ready",
+            # Phase 2 additive fields
+            "is_direct_sale_enabled",
+            "lifecycle_status",
             "inventory_profile_id",
             "inventory_ready",
             "created_at",
@@ -1442,6 +1445,25 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
         if not product:
             raise serializers.ValidationError({"product": "Product is required."})
+
+        # Phase 2: lifecycle status and plan-type eligibility guards (run before other checks)
+        lifecycle = getattr(product, "lifecycle_status", "ACTIVE") or "ACTIVE"
+        if lifecycle == "DISCONTINUED":
+            raise serializers.ValidationError(
+                {"product": f"Product '{product.name}' is discontinued and cannot be used for new contracts."}
+            )
+        if plan_type == "EMI" and not product.is_emi_enabled:
+            raise serializers.ValidationError(
+                {"product": f"Product '{product.name}' is not eligible for Advance EMI subscriptions."}
+            )
+        if plan_type == "RENT" and not product.is_rent_enabled:
+            raise serializers.ValidationError(
+                {"product": f"Product '{product.name}' is not eligible for Rent contracts."}
+            )
+        if plan_type == "LEASE" and not product.is_lease_enabled:
+            raise serializers.ValidationError(
+                {"product": f"Product '{product.name}' is not eligible for Lease contracts."}
+            )
 
         if not tenure_months or tenure_months <= 0:
             raise serializers.ValidationError(

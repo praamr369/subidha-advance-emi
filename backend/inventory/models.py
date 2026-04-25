@@ -71,18 +71,54 @@ class StockLocationType(models.TextChoices):
 class StockMovementType(models.TextChoices):
     OPENING_BALANCE_IN = "OPENING_BALANCE_IN", "Opening Balance In"
     PURCHASE_IN = "PURCHASE_IN", "Purchase In"
+    # Phase 2 alias kept for API compatibility: PURCHASE_RECEIVE → PURCHASE_IN
+    PURCHASE_RECEIVE = "PURCHASE_RECEIVE", "Purchase Receive"
     SALE_OUT = "SALE_OUT", "Sale Out"
     EMI_DELIVERY_OUT = "EMI_DELIVERY_OUT", "EMI Delivery Out"
+    # Phase 2 alias: DELIVERY_OUT → EMI_DELIVERY_OUT (physical stock reduction)
+    DELIVERY_OUT = "DELIVERY_OUT", "Delivery Out"
     EMI_RETURN_IN = "EMI_RETURN_IN", "EMI Return In"
+    # Phase 2: CUSTOMER_RETURN → maps to customer-returned stock
+    CUSTOMER_RETURN = "CUSTOMER_RETURN", "Customer Return"
     SALE_RETURN_IN = "SALE_RETURN_IN", "Sale Return In"
     PRODUCTION_ISSUE_OUT = "PRODUCTION_ISSUE_OUT", "Production Issue Out"
+    # Phase 2 alias: PRODUCTION_CONSUME → PRODUCTION_ISSUE_OUT
+    PRODUCTION_CONSUME = "PRODUCTION_CONSUME", "Production Consume"
     PRODUCTION_RETURN_IN = "PRODUCTION_RETURN_IN", "Production Return In"
     PRODUCTION_RECEIPT_IN = "PRODUCTION_RECEIPT_IN", "Production Receipt In"
+    # Phase 2 alias: PRODUCTION_OUTPUT → PRODUCTION_RECEIPT_IN
+    PRODUCTION_OUTPUT = "PRODUCTION_OUTPUT", "Production Output"
     PURCHASE_RETURN_OUT = "PURCHASE_RETURN_OUT", "Purchase Return Out"
+    # Phase 2 alias: VENDOR_RETURN → PURCHASE_RETURN_OUT
+    VENDOR_RETURN = "VENDOR_RETURN", "Vendor Return"
     ADJUSTMENT_IN = "ADJUSTMENT_IN", "Adjustment In"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT", "Adjustment Out"
+    # Phase 2 alias: STOCK_ADJUSTMENT covers both in/out
+    STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT", "Stock Adjustment"
     TRANSFER_IN = "TRANSFER_IN", "Transfer In"
     TRANSFER_OUT = "TRANSFER_OUT", "Transfer Out"
+    # Phase 2: soft-hold / release for committed orders (does not reduce physical stock)
+    SALE_RESERVE = "SALE_RESERVE", "Sale Reserve (Soft Hold)"
+    SALE_RELEASE = "SALE_RELEASE", "Sale Release (Reservation Released)"
+    # Phase 2: damage, quality, maintenance holds
+    DAMAGE = "DAMAGE", "Damage Write-off"
+    MAINTENANCE_HOLD = "MAINTENANCE_HOLD", "Maintenance Hold"
+    MAINTENANCE_RELEASE = "MAINTENANCE_RELEASE", "Maintenance Release"
+    QUALITY_HOLD = "QUALITY_HOLD", "Quality Hold"
+    QUALITY_RELEASE = "QUALITY_RELEASE", "Quality Release"
+
+
+# Movement types that are soft holds / releases and do NOT affect physical stock.
+# Used by StockMovementService and current_stock_quantity() to exclude reservation
+# entries from physical-stock calculations.
+SOFT_HOLD_MOVEMENT_TYPES: frozenset[str] = frozenset([
+    StockMovementType.SALE_RESERVE,
+    StockMovementType.SALE_RELEASE,
+    StockMovementType.MAINTENANCE_HOLD,
+    StockMovementType.MAINTENANCE_RELEASE,
+    StockMovementType.QUALITY_HOLD,
+    StockMovementType.QUALITY_RELEASE,
+])
 
 
 class StockAdjustmentStatus(models.TextChoices):
@@ -222,13 +258,47 @@ class InventoryItem(InventoryTimeStampedModel):
             )
 
     def current_stock_quantity(self) -> Decimal:
-        aggregate = self.stock_ledger.aggregate(
+        """Physical stock: excludes soft-hold (reservation) entries."""
+        aggregate = self.stock_ledger.exclude(
+            movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES)
+        ).aggregate(
             total_in=Sum("quantity_in"),
             total_out=Sum("quantity_out"),
         )
         total_in = Decimal(str(aggregate["total_in"] or QUANTITY_ZERO))
         total_out = Decimal(str(aggregate["total_out"] or QUANTITY_ZERO))
         return total_in - total_out + Decimal(str(self.opening_stock_qty or QUANTITY_ZERO))
+
+    def reserved_qty(self) -> Decimal:
+        """
+        Quantity currently soft-reserved via SALE_RESERVE minus SALE_RELEASE.
+        This represents committed stock not yet physically consumed.
+        """
+        aggregate = self.stock_ledger.filter(
+            movement_type__in=[
+                StockMovementType.SALE_RESERVE,
+                StockMovementType.SALE_RELEASE,
+            ]
+        ).aggregate(
+            reserved_in=Sum("quantity_in"),
+            reserved_out=Sum("quantity_out"),
+        )
+        reserved_in = Decimal(str(aggregate["reserved_in"] or QUANTITY_ZERO))
+        reserved_out = Decimal(str(aggregate["reserved_out"] or QUANTITY_ZERO))
+        # SALE_RESERVE uses quantity_in; SALE_RELEASE uses quantity_out
+        return max(QUANTITY_ZERO, reserved_in - reserved_out)
+
+    def available_qty(self) -> Decimal:
+        """
+        Available-to-promise: physical stock minus soft reservations.
+        This is the actionable quantity for new commitments.
+        """
+        return max(QUANTITY_ZERO, self.current_stock_quantity() - self.reserved_qty())
+
+    @property
+    def low_stock_threshold(self) -> Decimal:
+        """Alias for reorder_level_qty — used in Phase 2 purchase suggestion logic."""
+        return self.reorder_level_qty
 
     def __str__(self):
         return self.sku or self.product.product_code

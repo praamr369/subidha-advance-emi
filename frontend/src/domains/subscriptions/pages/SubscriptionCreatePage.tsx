@@ -34,6 +34,13 @@ type ProductOption = {
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
   is_lease_enabled?: boolean;
+  // Phase 2
+  is_direct_sale_enabled?: boolean;
+  lifecycle_status?: string;
+  on_hand_qty?: string;
+  reserved_qty?: string;
+  available_qty?: string;
+  stock_status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "FULLY_RESERVED";
 };
 
 type BatchOption = {
@@ -154,6 +161,10 @@ function normalizeProduct(raw: Record<string, unknown>): ProductOption {
       typeof raw.is_rent_enabled === "boolean" ? raw.is_rent_enabled : undefined,
     is_lease_enabled:
       typeof raw.is_lease_enabled === "boolean" ? raw.is_lease_enabled : undefined,
+    // Phase 2
+    is_direct_sale_enabled:
+      typeof raw.is_direct_sale_enabled === "boolean" ? raw.is_direct_sale_enabled : undefined,
+    lifecycle_status: toOptionalString(raw.lifecycle_status),
   };
 }
 
@@ -565,6 +576,8 @@ export default function SubscriptionCreatePage({
       );
       const normalized = toArray<Record<string, unknown>>(payload).map(normalizeProduct);
       const filtered = normalized.filter((item) => {
+        // Phase 2: filter out DISCONTINUED products from selector
+        if (item.lifecycle_status === "DISCONTINUED") return false;
         if (isEmiPlan) return Boolean(item.is_emi_enabled);
         if (isRentPlan) return Boolean(item.is_rent_enabled);
         if (isLeasePlan) return Boolean(item.is_lease_enabled);
@@ -578,6 +591,16 @@ export default function SubscriptionCreatePage({
       setProductLoading(false);
     }
   }
+
+  // Phase 2: debounce auto-search on productQuery changes (300ms)
+  useEffect(() => {
+    if (!productQuery.trim()) return;
+    const timer = setTimeout(() => {
+      void runProductSearch();
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productQuery]);
 
   async function runBatchSearch() {
     if (!batchQuery.trim()) return;
@@ -1301,11 +1324,35 @@ export default function SubscriptionCreatePage({
               results={productResults}
               renderSelected={(item) => (
                 <div>
-                  <div className="font-medium text-foreground">
-                    {item.name} {item.product_code ? `(${item.product_code})` : ""}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {item.name} {item.product_code ? `(${item.product_code})` : ""}
+                    </span>
+                    {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" && (
+                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                        item.lifecycle_status === "DISCONTINUED" ? "bg-red-100 text-red-700" :
+                        item.lifecycle_status === "MAINTENANCE" ? "bg-yellow-100 text-yellow-700" :
+                        "bg-blue-100 text-blue-700"
+                      }`}>
+                        {item.lifecycle_status}
+                      </span>
+                    )}
+                    {item.stock_status && (
+                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                        item.stock_status === "IN_STOCK" ? "bg-green-100 text-green-700" :
+                        item.stock_status === "LOW_STOCK" ? "bg-yellow-100 text-yellow-700" :
+                        "bg-red-100 text-red-700"
+                      }`}>
+                        {item.stock_status === "IN_STOCK" ? "In Stock" :
+                         item.stock_status === "LOW_STOCK" ? "Low Stock" :
+                         item.stock_status === "OUT_OF_STOCK" ? "Out of Stock" :
+                         "Fully Reserved"}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Base price {money(item.base_price)}
+                    {item.available_qty && ` · Available: ${item.available_qty}`}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Enabled modes {enabledPlanModes(item).join(" / ") || "—"}
@@ -1314,12 +1361,36 @@ export default function SubscriptionCreatePage({
               )}
               renderOption={(item) => (
                 <div>
-                  <div className="font-medium text-foreground">
-                    {item.name} {item.product_code ? `(${item.product_code})` : ""}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {item.name} {item.product_code ? `(${item.product_code})` : ""}
+                    </span>
+                    {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" && (
+                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                        item.lifecycle_status === "DISCONTINUED" ? "bg-red-100 text-red-700" :
+                        item.lifecycle_status === "MAINTENANCE" ? "bg-yellow-100 text-yellow-700" :
+                        "bg-blue-100 text-blue-700"
+                      }`}>
+                        {item.lifecycle_status}
+                      </span>
+                    )}
+                    {item.stock_status && (
+                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                        item.stock_status === "IN_STOCK" ? "bg-green-100 text-green-700" :
+                        item.stock_status === "LOW_STOCK" ? "bg-yellow-100 text-yellow-700" :
+                        "bg-red-100 text-red-700"
+                      }`}>
+                        {item.stock_status === "IN_STOCK" ? "In Stock" :
+                         item.stock_status === "LOW_STOCK" ? "Low Stock" :
+                         item.stock_status === "OUT_OF_STOCK" ? "Out of Stock" :
+                         "Fully Reserved"}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Base price {money(item.base_price)} · {item.category || "—"} /{" "}
                     {item.subcategory || "—"}
+                    {item.available_qty && ` · Avail: ${item.available_qty}`}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Enabled modes {enabledPlanModes(item).join(" / ") || "—"}

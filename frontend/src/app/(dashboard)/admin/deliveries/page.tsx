@@ -55,6 +55,9 @@ function statusTone(status?: string | null): string {
     case "FAILED":
     case "CANCELLED":
       return "border-red-200 bg-red-50 text-red-700";
+    // Phase 2: blocked delivery styling — prominent orange-red for visibility
+    case "BLOCKED_STOCK_UNAVAILABLE":
+      return "border-orange-400 bg-orange-50 text-orange-800 font-semibold";
     case "DISPATCHED":
     case "OUT_FOR_DELIVERY":
       return "border-sky-200 bg-sky-50 text-sky-700";
@@ -449,6 +452,7 @@ export default function AdminDeliveriesPage() {
               <option value="">All statuses</option>
               <option value="PENDING">Pending</option>
               <option value="SCHEDULED">Scheduled</option>
+              <option value="BLOCKED_STOCK_UNAVAILABLE">Blocked – Stock Unavailable</option>
               <option value="DISPATCHED">Dispatched</option>
               <option value="OUT_FOR_DELIVERY">Out for delivery</option>
               <option value="DELIVERED">Delivered</option>

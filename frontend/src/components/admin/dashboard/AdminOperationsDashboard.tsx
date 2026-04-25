@@ -1691,9 +1691,19 @@ export default function AdminOperationsDashboard() {
                   case "inventory-alerts": {
                     const rows = stockSummary?.results ?? [];
                     const lowStock = rows.filter((row) => row.is_below_reorder);
+                    // Phase 2: reserved stock aggregation
+                    const totalReserved = rows.reduce(
+                      (sum, row) => sum + parseFloat(row.reserved_qty ?? "0"),
+                      0
+                    );
+                    const totalAvailable = rows.reduce(
+                      (sum, row) => sum + parseFloat(row.available_qty ?? row.on_hand_qty ?? "0"),
+                      0
+                    );
+                    const outOfStock = rows.filter((row) => parseFloat(row.on_hand_qty ?? "0") <= 0);
                     return (
                       <div className="space-y-4">
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                           <StatCard
                             label="Low stock items"
                             value={String(lowStock.length)}
@@ -1707,6 +1717,19 @@ export default function AdminOperationsDashboard() {
                             subtext="From stock summary"
                             tone="default"
                           />
+                          {/* Phase 2: reserved stock widgets */}
+                          <StatCard
+                            label="Total reserved"
+                            value={totalReserved.toFixed(0)}
+                            subtext="Units soft-held for orders"
+                            tone={totalReserved > 0 ? "warning" : "default"}
+                          />
+                          <StatCard
+                            label="Available to promise"
+                            value={totalAvailable.toFixed(0)}
+                            subtext={outOfStock.length > 0 ? `${outOfStock.length} items out of stock` : "All items have stock"}
+                            tone={outOfStock.length > 0 ? "danger" : "success"}
+                          />
                         </div>
                         {lowStock.length > 0 ? (
                           <div className="grid gap-2">
@@ -1719,7 +1742,10 @@ export default function AdminOperationsDashboard() {
                                   {row.product_name ?? "Inventory item"}
                                 </div>
                                 <div className="mt-1 text-xs text-muted-foreground">
-                                  On hand {row.on_hand_qty} • Reorder {row.reorder_level_qty ?? "—"}
+                                  On hand {row.on_hand_qty}
+                                  {row.reserved_qty && ` • Reserved ${row.reserved_qty}`}
+                                  {row.available_qty && ` • Available ${row.available_qty}`}
+                                  {` • Reorder ${row.reorder_level_qty ?? "—"}`}
                                 </div>
                               </div>
                             ))}

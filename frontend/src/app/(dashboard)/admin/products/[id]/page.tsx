@@ -33,6 +33,9 @@ type ProductDetailRecord = {
   is_lease_enabled?: boolean;
   is_rent_ready?: boolean;
   is_lease_ready?: boolean;
+  // Phase 2
+  is_direct_sale_enabled?: boolean;
+  lifecycle_status?: string | null;
 };
 
 type SubscriptionStatus =
@@ -161,6 +164,8 @@ function normalizeProductDetail(
     is_lease_enabled: toBoolean(raw.is_lease_enabled, false),
     is_rent_ready: toBoolean(raw.is_rent_ready, false),
     is_lease_ready: toBoolean(raw.is_lease_ready, false),
+    is_direct_sale_enabled: toBoolean(raw.is_direct_sale_enabled, true),
+    lifecycle_status: typeof raw.lifecycle_status === "string" ? raw.lifecycle_status : "ACTIVE",
   };
 }
 
@@ -647,6 +652,23 @@ export default function AdminProductDetailPage() {
                     />
                   )}
 
+                  {/* Phase 2: lifecycle status badge */}
+                  {product.lifecycle_status && (
+                    <div className="mb-3">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        product.lifecycle_status === "ACTIVE"
+                          ? "border-green-300 bg-green-50 text-green-800"
+                          : product.lifecycle_status === "DISCONTINUED"
+                          ? "border-red-300 bg-red-50 text-red-800"
+                          : product.lifecycle_status === "MAINTENANCE"
+                          ? "border-yellow-300 bg-yellow-50 text-yellow-800"
+                          : "border-blue-300 bg-blue-50 text-blue-800"
+                      }`}>
+                        Lifecycle: {product.lifecycle_status}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap gap-2">
                     <span
                       className={[
@@ -671,6 +693,15 @@ export default function AdminProductDetailPage() {
                       ].join(" ")}
                     >
                       Lease {product.is_lease_enabled ? "Enabled" : "Disabled"}
+                    </span>
+                    {/* Phase 2: Direct Sale eligibility */}
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                        capabilityTone(product.is_direct_sale_enabled !== false),
+                      ].join(" ")}
+                    >
+                      Direct Sale {product.is_direct_sale_enabled !== false ? "Enabled" : "Disabled"}
                     </span>
                     <span
                       className={[

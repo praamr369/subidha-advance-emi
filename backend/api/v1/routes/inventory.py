@@ -12,6 +12,11 @@ from api.v1.views.inventory import (
     StockLedgerViewSet,
     StockSummaryView,
 )
+from api.v1.views.inventory_phase2 import (
+    DemandSummaryView,
+    ProductStockStatusView,
+    PurchaseSuggestionView,
+)
 
 router = DefaultRouter()
 router.register(r"items", InventoryItemViewSet, basename="inventory-items")
@@ -26,5 +31,9 @@ urlpatterns = [
     path("valuation/", InventoryValuationView.as_view()),
     path("opening-stock/preview/", OpeningStockImportPreviewView.as_view()),
     path("opening-stock/post/", OpeningStockImportPostView.as_view()),
+    # Phase 2: stock status per product, demand summary, purchase suggestions
+    path("products/<int:product_id>/stock-status/", ProductStockStatusView.as_view(), name="inventory-product-stock-status"),
+    path("demand-summary/", DemandSummaryView.as_view(), name="inventory-demand-summary"),
+    path("purchase-suggestions/", PurchaseSuggestionView.as_view(), name="inventory-purchase-suggestions"),
     path("", include(router.urls)),
 ]

@@ -3,6 +3,8 @@ import { apiFetch } from "@/lib/api";
 export type DeliveryStatus =
   | "PENDING"
   | "SCHEDULED"
+  // Phase 2: blocked when stock is unavailable at time of scheduling
+  | "BLOCKED_STOCK_UNAVAILABLE"
   | "DISPATCHED"
   | "OUT_FOR_DELIVERY"
   | "DELIVERED"
@@ -45,6 +47,8 @@ export type DeliveryRecord = {
   delivery_address_snapshot?: string | null;
   notes?: string | null;
   failure_reason?: string | null;
+  // Phase 2: reason populated when status = BLOCKED_STOCK_UNAVAILABLE
+  stock_blocked_reason?: string | null;
   created_by_id?: number | null;
   created_by_username?: string | null;
   updated_by_id?: number | null;

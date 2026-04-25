@@ -39,6 +39,12 @@ type ProductRow = {
   base_price: string;
   image?: string | null;
   created_at?: string | null;
+  // Phase 2
+  lifecycle_status?: string | null;
+  is_direct_sale_enabled?: boolean;
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -112,6 +118,11 @@ function normalizeProductRow(raw: Record<string, unknown>): ProductRow {
           ? null
           : undefined,
     inventory_ready: typeof raw.inventory_ready === "boolean" ? raw.inventory_ready : false,
+    lifecycle_status: toNullableString(raw.lifecycle_status) ?? "ACTIVE",
+    is_direct_sale_enabled: typeof raw.is_direct_sale_enabled === "boolean" ? raw.is_direct_sale_enabled : true,
+    is_emi_enabled: typeof raw.is_emi_enabled === "boolean" ? raw.is_emi_enabled : undefined,
+    is_rent_enabled: typeof raw.is_rent_enabled === "boolean" ? raw.is_rent_enabled : undefined,
+    is_lease_enabled: typeof raw.is_lease_enabled === "boolean" ? raw.is_lease_enabled : undefined,
     category: toNullableString(raw.category),
     subcategory: toNullableString(raw.subcategory) ?? toNullableString(raw.sub_category),
     description: toNullableString(raw.description),
@@ -448,9 +459,21 @@ export default function AdminProductsPage() {
       },
       {
         key: "image",
-        title: "Readiness",
+        title: "Readiness & Status",
         render: (row) => (
           <div className="flex flex-wrap gap-2">
+            {/* Phase 2: lifecycle status badge */}
+            {row.lifecycle_status && row.lifecycle_status !== "ACTIVE" && (
+              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                row.lifecycle_status === "DISCONTINUED"
+                  ? "bg-red-100 text-red-800 ring-1 ring-red-200"
+                  : row.lifecycle_status === "MAINTENANCE"
+                  ? "bg-yellow-100 text-yellow-800 ring-1 ring-yellow-200"
+                  : "bg-blue-100 text-blue-800 ring-1 ring-blue-200"
+              }`}>
+                {row.lifecycle_status}
+              </span>
+            )}
             <StatusBadge
               status={row.image ? "AVAILABLE" : "NOT_PROVIDED"}
               label={row.image ? "Image Ready" : "No Image"}

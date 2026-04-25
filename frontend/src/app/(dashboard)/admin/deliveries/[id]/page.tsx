@@ -58,6 +58,9 @@ function statusTone(status?: string | null): string {
     case "FAILED":
     case "CANCELLED":
       return "border-red-200 bg-red-50 text-red-700";
+    // Phase 2: blocked delivery
+    case "BLOCKED_STOCK_UNAVAILABLE":
+      return "border-orange-400 bg-orange-50 text-orange-800 font-semibold";
     case "DISPATCHED":
     case "OUT_FOR_DELIVERY":
       return "border-sky-200 bg-sky-50 text-sky-700";
@@ -419,6 +422,13 @@ export default function AdminDeliveryDetailPage() {
                 <DetailValue label="Delivered" value={formatDateTime(delivery.delivered_at)} />
                 <DetailValue label="Failed" value={formatDateTime(delivery.failed_at)} />
                 <DetailValue label="Cancelled" value={formatDateTime(delivery.cancelled_at)} />
+                {/* Phase 2: show block reason when BLOCKED_STOCK_UNAVAILABLE */}
+                {delivery.status === "BLOCKED_STOCK_UNAVAILABLE" && delivery.stock_blocked_reason && (
+                  <div className="col-span-full rounded-md border border-orange-200 bg-orange-50 p-3">
+                    <p className="text-xs font-semibold text-orange-800">Blocked – Stock Unavailable</p>
+                    <p className="mt-1 text-xs text-orange-700">{delivery.stock_blocked_reason}</p>
+                  </div>
+                )}
                 <DetailValue
                   label="Return Requested"
                   value={formatDateTime(delivery.return_requested_at)}

@@ -74,6 +74,9 @@ export type StockSummaryRow = {
   opening_stock_qty: string;
   reorder_level_qty: string;
   on_hand_qty: string;
+  // Phase 2: reserved and available-to-promise quantities
+  reserved_qty?: string;
+  available_qty?: string;
   is_below_reorder: boolean;
   default_stock_location_id?: number | null;
   default_stock_location_code?: string | null;

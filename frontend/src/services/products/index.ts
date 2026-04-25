@@ -27,6 +27,9 @@ export type ProductRecord = {
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
   is_lease_enabled?: boolean;
+  // Phase 2: direct sale eligibility and lifecycle status
+  is_direct_sale_enabled?: boolean;
+  lifecycle_status?: "ACTIVE" | "UPCOMING" | "DISCONTINUED" | "MAINTENANCE";
 
   // legacy flags retained for compatibility if backend still returns them
   is_rent_ready?: boolean;
@@ -81,6 +84,20 @@ export type ProductUnitOfMeasureMasterRecord = {
   name: string;
   description?: string;
   is_active: boolean;
+};
+
+// Phase 2: stock status response from /api/v1/inventory/products/<id>/stock-status/
+export type ProductStockStatus = {
+  product_id: number;
+  physical_stock: string;
+  reserved_stock: string;
+  available_stock: string;
+  low_stock_threshold: string;
+  total_demand: string;
+  shortage: string;
+  has_shortage: boolean;
+  stock_status: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "FULLY_RESERVED";
+  demand_detail?: Record<string, number>;
 };
 
 export type ProductInventoryProfilePreparePayload = {
@@ -241,5 +258,13 @@ export async function prepareProductInventoryProfile(
       body: JSON.stringify(payload),
       retryCount: 0,
     }
+  );
+}
+
+export async function getProductStockStatus(
+  productId: number
+): Promise<ProductStockStatus> {
+  return request<ProductStockStatus>(
+    `/inventory/products/${productId}/stock-status/`
   );
 }

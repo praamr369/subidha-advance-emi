@@ -257,6 +257,17 @@ class ProductionJob(ManufacturingTimeStampedModel):
     total_received_cost = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     total_scrap_cost = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     wip_cost = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    # Phase 2: additional cost components for full production cost tracking
+    labor_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+        help_text="Direct labor cost for this production job.",
+    )
+    overhead_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+        help_text="Overhead (factory/admin) cost allocated to this job.",
+    )
     costing_status = models.CharField(
         max_length=12,
         choices=ManufacturingCostingStatus.choices,
@@ -304,6 +315,28 @@ class ProductionJob(ManufacturingTimeStampedModel):
     )
     cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
     cancel_reason = models.TextField(blank=True, default="")
+
+    @property
+    def raw_material_cost_total(self) -> Decimal:
+        """Total material cost from issued materials (Phase 2 alias for total_issued_cost)."""
+        return self.total_issued_cost or MONEY_ZERO
+
+    @property
+    def total_production_cost(self) -> Decimal:
+        """Sum of material, labor, and overhead costs for this job."""
+        return (
+            (self.total_issued_cost or MONEY_ZERO)
+            + (self.labor_cost or MONEY_ZERO)
+            + (self.overhead_cost or MONEY_ZERO)
+        )
+
+    @property
+    def finished_goods_unit_cost(self) -> Decimal:
+        """Per-unit cost for completed output. Returns zero if no output recorded."""
+        output_qty = self.completed_output_qty or QUANTITY_ZERO
+        if output_qty <= QUANTITY_ZERO:
+            return MONEY_ZERO
+        return (self.total_production_cost / Decimal(str(output_qty))).quantize(Decimal("0.01"))
 
     class Meta:
         db_table = "manufacturing_production_jobs"

@@ -143,6 +143,8 @@ class FulfillmentStatus(models.TextChoices):
 class DeliveryStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     SCHEDULED = "SCHEDULED", "Scheduled"
+    # Phase 2: delivery blocked because stock is unavailable (reserved or physical)
+    BLOCKED_STOCK_UNAVAILABLE = "BLOCKED_STOCK_UNAVAILABLE", "Blocked – Stock Unavailable"
     DISPATCHED = "DISPATCHED", "Dispatched"
     OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY", "Out for Delivery"
     DELIVERED = "DELIVERED", "Delivered"
@@ -487,6 +489,20 @@ class Product(TimeStampedModel):
     is_lease_enabled = models.BooleanField(default=False, db_index=True)
     is_rent_ready = models.BooleanField(default=False, db_index=True)
     is_lease_ready = models.BooleanField(default=False, db_index=True)
+    # Phase 2: direct sale eligibility flag (additive, defaults to true for existing products)
+    is_direct_sale_enabled = models.BooleanField(default=True, db_index=True)
+    # Phase 2: product lifecycle / PLM status
+    lifecycle_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("ACTIVE", "Active"),
+            ("UPCOMING", "Upcoming"),
+            ("DISCONTINUED", "Discontinued"),
+            ("MAINTENANCE", "Maintenance"),
+        ],
+        default="ACTIVE",
+        db_index=True,
+    )
 
     class Meta:
         db_table = "products"
@@ -529,6 +545,10 @@ class Product(TimeStampedModel):
             errors["plan_type_default"] = "Default plan type RENT requires rent to be enabled."
         if self.plan_type_default == PlanType.LEASE and not self.is_lease_enabled:
             errors["plan_type_default"] = "Default plan type LEASE requires lease to be enabled."
+
+        valid_lifecycle = {"ACTIVE", "UPCOMING", "DISCONTINUED", "MAINTENANCE"}
+        if self.lifecycle_status and self.lifecycle_status not in valid_lifecycle:
+            errors["lifecycle_status"] = f"Invalid lifecycle status. Must be one of: {', '.join(sorted(valid_lifecycle))}."
 
         if errors:
             raise ValidationError(errors)
@@ -1666,6 +1686,8 @@ class SubscriptionDelivery(TimeStampedModel):
     delivery_address_snapshot = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
     failure_reason = models.TextField(blank=True, default="")
+    # Phase 2: reason set when delivery is moved to BLOCKED_STOCK_UNAVAILABLE
+    stock_blocked_reason = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1780,6 +1802,7 @@ class SubscriptionDelivery(TimeStampedModel):
         self.receiver_phone = (self.receiver_phone or "").strip()
         self.delivery_address_snapshot = (self.delivery_address_snapshot or "").strip()
         self.failure_reason = (self.failure_reason or "").strip()
+        self.stock_blocked_reason = (self.stock_blocked_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

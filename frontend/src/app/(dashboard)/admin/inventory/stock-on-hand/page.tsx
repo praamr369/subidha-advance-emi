@@ -18,12 +18,53 @@ const columns: EnterpriseColumnDef<StockSummaryRow>[] = [
   { key: "sku", header: "SKU" },
   { key: "default_stock_location_name", header: "Default Location", render: (row) => row.default_stock_location_name || "Unassigned" },
   { key: "on_hand_qty", header: "On Hand" },
+  // Phase 2: reserved and available-to-promise
+  {
+    key: "reserved_qty",
+    header: "Reserved",
+    render: (row) => row.reserved_qty ?? "—",
+  },
+  {
+    key: "available_qty",
+    header: "Available",
+    render: (row) => row.available_qty ?? row.on_hand_qty,
+  },
   { key: "reorder_level_qty", header: "Reorder Level" },
   { key: "unit_of_measure", header: "Unit" },
   {
     key: "is_below_reorder",
-    header: "Status",
-    render: (row) => (row.is_below_reorder ? "Reorder needed" : "Healthy"),
+    header: "Stock Status",
+    render: (row) => {
+      const onHand = parseFloat(row.on_hand_qty || "0");
+      const available = parseFloat(row.available_qty || row.on_hand_qty || "0");
+      const reorder = parseFloat(row.reorder_level_qty || "0");
+      if (onHand <= 0) {
+        return (
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+            Out of Stock
+          </span>
+        );
+      }
+      if (reorder > 0 && onHand <= reorder) {
+        return (
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
+            Low Stock
+          </span>
+        );
+      }
+      if (available <= 0 && onHand > 0) {
+        return (
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-800">
+            Fully Reserved
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+          In Stock
+        </span>
+      );
+    },
   },
 ];
 
