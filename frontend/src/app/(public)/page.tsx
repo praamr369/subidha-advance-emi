@@ -55,10 +55,30 @@ export default async function PublicHome() {
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.2rem]">{heroTitle}</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{heroSubtitle}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href={ROUTES.public.apply} className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-semibold text-white">Apply now</Link>
-              <Link href={ROUTES.public.products} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">Explore products</Link>
-              <Link href={ROUTES.public.luckyPlan} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">See Lucky Plan</Link>
-              <Link href={ROUTES.public.winners} className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground">Visit winners</Link>
+              <Link
+                href={ROUTES.public.apply}
+                className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+              >
+                Apply now
+              </Link>
+              <Link
+                href={ROUTES.public.products}
+                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+              >
+                Explore products
+              </Link>
+              <Link
+                href={ROUTES.public.luckyPlan}
+                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+              >
+                See Lucky Plan
+              </Link>
+              <Link
+                href={ROUTES.public.winners}
+                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+              >
+                Visit winners
+              </Link>
             </div>
           </div>
 
@@ -128,8 +148,18 @@ export default async function PublicHome() {
                 <p className="mt-2 text-sm text-muted-foreground">Code: {product.product_code}</p>
                 <p className="mt-2 text-sm font-semibold">Base price: {formatCurrency(product.base_price)}</p>
                 <div className="mt-4 flex gap-2">
-                  <Link href={`${ROUTES.public.products}/${product.id}`} className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold">View</Link>
-                  <Link href={buildApplyHref(product)} className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white">Apply</Link>
+                  <Link
+                    href={`${ROUTES.public.products}/${product.id}`}
+                    className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                  >
+                    View
+                  </Link>
+                  <Link
+                    href={buildApplyHref(product)}
+                    className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                  >
+                    Apply
+                  </Link>
                 </div>
               </article>
             ))}

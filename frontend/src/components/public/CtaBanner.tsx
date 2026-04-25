@@ -42,10 +42,10 @@ export default function CtaBanner({ title, description, actions, className }: Ct
               key={action.href}
               href={action.href}
               className={cn(
-                "inline-flex h-11 items-center rounded-xl border px-5 text-sm font-semibold shadow-[0_18px_40px_-30px_rgba(15,23,42,0.7)] transition hover:-translate-y-0.5",
+                "inline-flex h-11 items-center rounded-xl border px-5 text-sm font-semibold shadow-[0_18px_40px_-30px_rgba(15,23,42,0.7)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                 action.variant === "primary"
-                  ? "border-slate-950/10 bg-slate-950 text-white"
-                  : "border-white/80 bg-white/80 text-foreground hover:bg-white"
+                  ? "border-slate-950/10 bg-slate-950 text-white focus-visible:ring-slate-900"
+                  : "border-white/80 bg-white/80 text-foreground hover:bg-white focus-visible:ring-slate-400/60"
               )}
             >
               {action.label}

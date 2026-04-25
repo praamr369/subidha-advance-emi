@@ -100,7 +100,7 @@ export function LoadingSkeleton({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-4", className)}>
+    <div className={cn("rounded-2xl border border-border bg-card p-4", className)} aria-busy="true" aria-live="polite">
       <div className="flex items-center gap-3">
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -111,7 +111,7 @@ export function LoadingSkeleton({
             <div
               key={`loading-row-${index}`}
               className={cn(
-                "h-2 rounded bg-[var(--surface-muted)]",
+                "animate-skeleton-pulse h-2 rounded bg-[var(--surface-muted)]",
                 index === rows - 1 ? "w-4/5" : index % 2 === 0 ? "w-full" : "w-11/12"
               )}
             />

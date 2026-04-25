@@ -542,7 +542,7 @@ function SidebarContent({
         </div>
       ) : null}
 
-      <nav className="flex-1 overflow-y-auto px-4 py-5">
+      <nav className="flex-1 overflow-y-auto px-4 py-5" role="navigation" aria-label={`${formatRoleLabel(role)} sidebar navigation`}>
         <div className="space-y-3">
           {visibleGroups.length === 0 && !collapsed ? (
             <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
@@ -813,6 +813,7 @@ function Topbar({
   onOpenQuickActions,
   onLogout,
   isLoggingOut,
+  mobileOpen,
 }: {
   title: string;
   role: NavigationRole;
@@ -822,6 +823,7 @@ function Topbar({
   onOpenQuickActions: () => void;
   onLogout: () => void;
   isLoggingOut: boolean;
+  mobileOpen: boolean;
 }) {
   return (
     <PortalHeader>
@@ -832,6 +834,8 @@ function Topbar({
             onClick={onOpenSidebar}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--surface-card)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-white md:hidden"
             aria-label="Open menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-sidebar-nav"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -997,6 +1001,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                 onOpenQuickActions={() => setQuickActionsOpen(true)}
                 onLogout={logout}
                 isLoggingOut={isLoggingOut}
+                mobileOpen={mobileOpen}
               />
             }
           >
@@ -1007,6 +1012,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           </PortalShell>
 
           <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
+            <div id="mobile-sidebar-nav">
             <SidebarContent
               key={`sidebar-mobile:${role}:${sessionId ?? "anon"}`}
               role={role}
@@ -1019,6 +1025,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               onToggleCollapse={toggleSidebarCollapse}
               onClose={() => setMobileOpen(false)}
             />
+            </div>
           </RoleSidebar>
 
           <QuickActionLauncher

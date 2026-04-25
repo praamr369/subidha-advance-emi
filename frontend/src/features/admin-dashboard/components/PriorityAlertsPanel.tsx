@@ -1,7 +1,8 @@
 "use client";
 
-import EmptyState from "@/components/ui/EmptyState";
-import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 import { usePriorityAlerts } from "@/features/admin-dashboard/hooks/usePriorityAlerts";
 
@@ -32,7 +33,9 @@ export default function PriorityAlertsPanel() {
       </div>
 
       {isLoading ? (
-        <div className="px-6 py-8 text-sm text-muted-foreground">Loading alerts...</div>
+        <div className="px-6 py-4">
+          <LoadingBlock label="Loading priority alerts" compact />
+        </div>
       ) : isError ? (
         <div className="px-6 py-6">
           <ErrorState

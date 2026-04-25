@@ -2,7 +2,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ReactNode } from "react";
+import { Children, cloneElement, isValidElement, ReactNode, type ReactElement } from "react";
 
 type Tone = "default" | "danger" | "success" | "warning" | "info";
 
@@ -51,6 +51,24 @@ export default function FormField({
   direction = "column",
 }: FormFieldProps) {
   const effectiveTone = error ? "danger" : tone;
+  const fieldId = htmlFor ?? undefined;
+  const errorId = fieldId ? `${fieldId}-error` : undefined;
+  const helpId = fieldId ? `${fieldId}-help` : undefined;
+  const describedBy = error ? errorId : helpText ? helpId : undefined;
+  let didDecorateFieldControl = false;
+  const decoratedChildren = Children.map(children, (child) => {
+    if (!isValidElement(child) || didDecorateFieldControl) return child;
+    const element = child as ReactElement<Record<string, unknown>>;
+    if (typeof child.type === "string" && !["input", "textarea", "select"].includes(child.type)) {
+      return child;
+    }
+    didDecorateFieldControl = true;
+    return cloneElement(element, {
+      id: fieldId ?? element.props.id,
+      "aria-invalid": Boolean(error) || element.props["aria-invalid"],
+      "aria-describedby": describedBy ?? element.props["aria-describedby"],
+    });
+  });
 
   return (
     <div className="w-full">
@@ -77,7 +95,7 @@ export default function FormField({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          {children}
+          {decoratedChildren}
         </div>
         {suffix && (
           <div className="flex items-center border-l border-border bg-[var(--surface-muted)] px-3 text-muted-foreground">
@@ -86,10 +104,14 @@ export default function FormField({
         )}
       </div>
       {error && (
-        <p className="mt-1 text-xs font-medium text-red-700">{error}</p>
+        <p id={errorId} className="mt-1 text-xs font-medium text-red-700" role="alert">
+          {error}
+        </p>
       )}
       {helpText && !error && (
-        <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>
+        <p id={helpId} className="mt-1 text-xs text-muted-foreground">
+          {helpText}
+        </p>
       )}
     </div>
   );

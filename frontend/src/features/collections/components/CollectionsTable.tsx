@@ -1,7 +1,8 @@
 "use client";
 
-import EmptyState from "@/components/ui/EmptyState";
-import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import RiskBadge from "@/components/ui/RiskBadge";
 import type { CollectionQueueItem } from "@/services/collections.service";
 
@@ -27,7 +28,9 @@ export default function CollectionsTable({
       </div>
 
       {loading ? (
-        <div className="px-6 py-8 text-sm text-muted-foreground">Loading collection items...</div>
+        <div className="px-6 py-4">
+          <LoadingBlock label="Loading collection items" compact />
+        </div>
       ) : error ? (
         <div className="px-6 py-6">
           <ErrorState

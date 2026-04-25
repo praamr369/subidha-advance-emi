@@ -46,7 +46,7 @@ export default function PublicPageShell({
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
-                    className="inline-flex items-center rounded-full border border-white/75 bg-white/80 px-3 py-1 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:bg-white hover:text-foreground"
+                    className="inline-flex items-center rounded-full border border-white/75 bg-white/80 px-3 py-1 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:bg-white hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/45 focus-visible:ring-offset-2"
                   >
                     {crumb.label}
                   </Link>
@@ -86,10 +86,10 @@ export default function PublicPageShell({
                   key={action.href}
                   href={action.href}
                   className={cn(
-                    "inline-flex h-11 items-center rounded-xl border px-5 text-sm font-semibold shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5",
+                    "inline-flex h-11 items-center rounded-xl border px-5 text-sm font-semibold shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                     action.variant === "primary"
-                      ? "border-slate-950/10 bg-slate-950 text-white"
-                      : "border-white/80 bg-white/80 text-foreground hover:bg-white"
+                      ? "border-slate-950/10 bg-slate-950 text-white focus-visible:ring-slate-900"
+                      : "border-white/80 bg-white/80 text-foreground hover:bg-white focus-visible:ring-slate-400/60"
                   )}
                 >
                   {action.label}
