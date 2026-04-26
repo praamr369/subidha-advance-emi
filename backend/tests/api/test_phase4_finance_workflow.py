@@ -5,7 +5,10 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounting.models import ChartOfAccount, ChartOfAccountType
 from subscriptions.models import Payment, PaymentMethod
+from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from subscriptions.services.rent_lease_billing_service import collect_security_deposit
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -55,6 +58,28 @@ class Phase4FinanceWorkflowApiTests(APITestCase):
             reference_no=f"P4-REF-{timezone.now().timestamp():.0f}",
         )
 
+        self.rent_product = create_product(
+            name="Phase4 Rent Product",
+            product_code="P4-RENT-001",
+            base_price=Decimal("24000.00"),
+        )
+        self.rent_product.is_rent_enabled = True
+        self.rent_product.save(update_fields=["is_rent_enabled"])
+        self.rent_subscription = create_rent_contract(
+            customer=self.customer,
+            product=self.rent_product,
+            tenure_months=6,
+            start_date=timezone.localdate().replace(day=1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        collect_security_deposit(
+            subscription=self.rent_subscription,
+            amount=Decimal("3000.00"),
+            performed_by=self.admin,
+            reference_no="P4-DEP-001",
+        )
+
     def test_admin_finance_dashboard_endpoint_for_admin(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.get("/api/v1/admin/finance/dashboard/")
@@ -102,3 +127,56 @@ class Phase4FinanceWorkflowApiTests(APITestCase):
         self.client.force_authenticate(user=self.customer.user)
         response = self.client.get(f"/api/v1/admin/customer/{self.customer.id}/statement/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_deposit_operations_and_mapping_endpoints(self):
+        self.client.force_authenticate(user=self.admin)
+
+        register = self.client.get("/api/v1/admin/finance/deposits/")
+        self.assertEqual(register.status_code, status.HTTP_200_OK)
+        self.assertIn("results", register.data)
+
+        deduction = self.client.post(
+            "/api/v1/admin/finance/deposits/deduct/",
+            {
+                "subscription_id": self.rent_subscription.id,
+                "amount": "200.00",
+                "reason": "Minor surface mark",
+            },
+            format="json",
+        )
+        self.assertEqual(deduction.status_code, status.HTTP_200_OK)
+
+        monthly = ChartOfAccount.objects.create(
+            code="P4INC001",
+            name="Rent Lease Monthly Income",
+            account_type=ChartOfAccountType.INCOME,
+        )
+        liability = ChartOfAccount.objects.create(
+            code="P4LIA001",
+            name="Security Deposit Liability",
+            account_type=ChartOfAccountType.LIABILITY,
+        )
+        refund = ChartOfAccount.objects.create(
+            code="P4AST001",
+            name="Deposit Refund Clearing",
+            account_type=ChartOfAccountType.ASSET,
+        )
+        damage = ChartOfAccount.objects.create(
+            code="P4INC002",
+            name="Damage Recovery Income",
+            account_type=ChartOfAccountType.INCOME,
+        )
+        mapping_payload = {
+            "monthly_income_account_id": monthly.id,
+            "deposit_liability_account_id": liability.id,
+            "deposit_refund_account_id": refund.id,
+            "damage_recovery_income_account_id": damage.id,
+            "notes": "Phase 4 slice 3 mapping",
+        }
+
+        mapping_save = self.client.post(
+            "/api/v1/admin/finance/account-mapping/",
+            mapping_payload,
+            format="json",
+        )
+        self.assertEqual(mapping_save.status_code, status.HTTP_200_OK)

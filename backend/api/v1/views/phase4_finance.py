@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
+from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
 from subscriptions.models import Subscription, SubscriptionDocument
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.contract_pdf_service import (
@@ -29,6 +30,13 @@ from subscriptions.services.phase4_finance_service import (
     reconciliation_report,
     waiver_loss_report,
 )
+from subscriptions.services.rent_lease_billing_service import (
+    list_admin_deposit_register,
+    record_damage_deduction,
+    approve_deposit_refund,
+    record_deposit_refund,
+)
+from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
 
 
 class AdminFinanceDashboardView(APIView):
@@ -85,6 +93,172 @@ class AdminFinanceWaiverLossView(APIView):
     def get(self, request):
         flt = FinanceFilter.from_query_params(request.query_params)
         return Response(waiver_loss_report(flt=flt))
+
+
+class AdminFinanceDepositRegisterView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        subscription_raw = (request.query_params.get("subscription_id") or "").strip()
+        subscription_id = int(subscription_raw) if subscription_raw.isdigit() else None
+        return Response(list_admin_deposit_register(subscription_id=subscription_id))
+
+
+class AdminFinanceDepositDeductionView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        subscription_id = int(request.data.get("subscription_id") or 0)
+        amount = request.data.get("amount")
+        reason = (request.data.get("reason") or "").strip()
+        subscription = Subscription.objects.filter(pk=subscription_id).first()
+        if subscription is None:
+            return Response({"detail": "Subscription not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            demand = record_damage_deduction(
+                subscription=subscription,
+                amount=amount,
+                reason=reason,
+                performed_by=request.user,
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "detail": "Deposit deduction recorded.",
+                "subscription_id": subscription.id,
+                "reference_key": demand.reference_key,
+                "deducted_amount": f"{demand.deducted_amount:.2f}",
+                "refundable_amount": f"{demand.refundable_amount:.2f}",
+            }
+        )
+
+
+class AdminFinanceDepositRefundApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        subscription_id = int(request.data.get("subscription_id") or 0)
+        amount = request.data.get("amount")
+        subscription = Subscription.objects.filter(pk=subscription_id).first()
+        if subscription is None:
+            return Response({"detail": "Subscription not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            tx = approve_deposit_refund(
+                subscription=subscription,
+                amount=amount,
+                approved_by=request.user,
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "detail": "Deposit refund approved.",
+                "subscription_id": subscription.id,
+                "transaction_id": tx.id,
+                "approved_amount": f"{tx.amount:.2f}",
+            }
+        )
+
+
+class AdminFinanceDepositRefundRecordView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        subscription_id = int(request.data.get("subscription_id") or 0)
+        amount = request.data.get("amount")
+        approval_transaction_id = request.data.get("approval_transaction_id")
+        subscription = Subscription.objects.filter(pk=subscription_id).first()
+        if subscription is None:
+            return Response({"detail": "Subscription not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            demand = record_deposit_refund(
+                subscription=subscription,
+                amount=amount,
+                performed_by=request.user,
+                approval_transaction_id=int(approval_transaction_id) if str(approval_transaction_id or "").isdigit() else None,
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "detail": "Deposit refund recorded.",
+                "subscription_id": subscription.id,
+                "reference_key": demand.reference_key,
+                "refundable_amount": f"{demand.refundable_amount:.2f}",
+            }
+        )
+
+
+class AdminFinanceAccountMappingView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        mapping = get_active_account_mapping()
+        return Response(
+            {
+                "mapping": None
+                if mapping is None
+                else {
+                    "id": mapping.id,
+                    "monthly_income_account_id": mapping.monthly_income_account_id,
+                    "monthly_income_account_code": mapping.monthly_income_account.code,
+                    "deposit_liability_account_id": mapping.deposit_liability_account_id,
+                    "deposit_liability_account_code": mapping.deposit_liability_account.code,
+                    "deposit_refund_account_id": mapping.deposit_refund_account_id,
+                    "deposit_refund_account_code": mapping.deposit_refund_account.code,
+                    "damage_recovery_income_account_id": mapping.damage_recovery_income_account_id,
+                    "damage_recovery_income_account_code": mapping.damage_recovery_income_account.code,
+                    "settlement_finance_account_id": mapping.settlement_finance_account_id,
+                    "is_active": mapping.is_active,
+                    "notes": mapping.notes,
+                },
+                "chart_accounts": [
+                    {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type}
+                    for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
+                ],
+                "finance_accounts": [
+                    {"id": row.id, "name": row.name, "kind": row.kind}
+                    for row in FinanceAccount.objects.filter(is_active=True).order_by("name")[:200]
+                ],
+            }
+        )
+
+    def post(self, request):
+        payload = request.data
+        mapping = get_active_account_mapping()
+        if mapping is None:
+            mapping = RentLeaseAccountingAccountMapping(is_active=True)
+        monthly_income_account_id = int(payload.get("monthly_income_account_id") or 0)
+        deposit_liability_account_id = int(payload.get("deposit_liability_account_id") or 0)
+        deposit_refund_account_id = int(payload.get("deposit_refund_account_id") or 0)
+        damage_recovery_income_account_id = int(payload.get("damage_recovery_income_account_id") or 0)
+        settlement_finance_account_id_raw = payload.get("settlement_finance_account_id")
+        mapping.monthly_income_account = ChartOfAccount.objects.get(pk=monthly_income_account_id)
+        mapping.deposit_liability_account = ChartOfAccount.objects.get(pk=deposit_liability_account_id)
+        mapping.deposit_refund_account = ChartOfAccount.objects.get(pk=deposit_refund_account_id)
+        mapping.damage_recovery_income_account = ChartOfAccount.objects.get(pk=damage_recovery_income_account_id)
+        mapping.settlement_finance_account = (
+            FinanceAccount.objects.get(pk=int(settlement_finance_account_id_raw))
+            if str(settlement_finance_account_id_raw or "").isdigit()
+            else None
+        )
+        mapping.notes = (payload.get("notes") or "").strip()
+        mapping.is_active = True
+        try:
+            mapping.save()
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        log_audit(
+            action_type="PAYMENT_FLAGGED",
+            instance=mapping,
+            performed_by=request.user,
+            metadata={
+                "event": "RENT_LEASE_ACCOUNT_MAPPING_UPDATED",
+                "mapping_id": mapping.id,
+            },
+        )
+        return Response({"detail": "Rent/lease account mapping saved.", "mapping_id": mapping.id})
 
 
 class AdminInvoiceRegisterView(APIView):

@@ -443,3 +443,34 @@ def build_deposit_snapshot(*, subscription: Subscription) -> DepositSnapshot:
         refund_status=profile.refund_status,
     )
 
+
+def list_admin_deposit_register(*, subscription_id: int | None = None, limit: int = 200) -> dict:
+    qs = RentLeaseBillingDemand.objects.filter(
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT
+    ).select_related("subscription", "subscription__customer", "subscription__product")
+    if subscription_id:
+        qs = qs.filter(subscription_id=subscription_id)
+    rows = list(qs.order_by("-created_at", "-id")[:limit])
+    return {
+        "count": qs.count(),
+        "results": [
+            {
+                "demand_id": row.id,
+                "reference_key": row.reference_key,
+                "subscription_id": row.subscription_id,
+                "subscription_number": getattr(row.subscription, "subscription_number", None),
+                "plan_type": row.subscription.plan_type,
+                "customer_name": row.subscription.customer.name,
+                "product_name": getattr(row.subscription.product, "name", ""),
+                "deposit_amount": f"{q2(row.amount):.2f}",
+                "collected_amount": f"{q2(row.collected_amount):.2f}",
+                "held_amount": f"{q2(row.held_amount):.2f}",
+                "refundable_amount": f"{q2(row.refundable_amount):.2f}",
+                "deducted_amount": f"{q2(row.deducted_amount):.2f}",
+                "status": row.status,
+                "due_date": row.due_date,
+            }
+            for row in rows
+        ],
+    }
+

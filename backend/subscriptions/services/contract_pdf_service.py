@@ -16,6 +16,10 @@ from subscriptions.models import (
 )
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.services.audit_service import log_audit
+from subscriptions.services.pdf_branding_service import (
+    draw_brand_header_footer,
+    get_branding_context,
+)
 
 
 def _subscription_number(subscription: Subscription) -> str:
@@ -96,6 +100,7 @@ def generate_contract_pdf_for_subscription(*, subscription: Subscription, perfor
 
     generated_at = timezone.now()
     generated_date = timezone.localdate().strftime("%d %b %Y")
+    branding = get_branding_context()
 
     customer = subscription.customer
     product = subscription.product
@@ -107,7 +112,7 @@ def generate_contract_pdf_for_subscription(*, subscription: Subscription, perfor
     width, height = A4
 
     margin_x = 16 * mm
-    cursor_y = height - (18 * mm)
+    cursor_y = height - (52 * mm)
 
     def draw_line(text: str, *, size: int = 10, leading: float = 13.5):
         nonlocal cursor_y
@@ -122,15 +127,22 @@ def generate_contract_pdf_for_subscription(*, subscription: Subscription, perfor
         c.line(margin_x, cursor_y, width - margin_x, cursor_y)
         cursor_y -= 10
 
-    # Header
     c.setTitle(f"{contract_title} {contract_no}")
-    for line in _business_header_lines():
-        draw_line(line, size=11, leading=14.5)
+    draw_brand_header_footer(
+        canvas=c,
+        width=width,
+        height=height,
+        margin_x=margin_x,
+        branding=branding,
+        document_no=contract_no,
+        generated_at=generated_date,
+    )
 
     draw_rule()
     draw_line(f"{contract_title}", size=13, leading=16)
     draw_line(f"Contract No: {contract_no}", size=10)
     draw_line(f"Generated: {generated_date}", size=10)
+    draw_line(f"Version: 1", size=10)
     draw_rule()
 
     # Party + product
@@ -240,6 +252,7 @@ def generate_advance_emi_contract_pdf(
 
     generated_at = timezone.now()
     generated_date = timezone.localdate().strftime("%d %b %Y")
+    branding = get_branding_context()
 
     customer = subscription.customer
     product = subscription.product
@@ -252,7 +265,7 @@ def generate_advance_emi_contract_pdf(
     c = rl_canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     mx = 16 * mm
-    cy = height - (18 * mm)
+    cy = height - (52 * mm)
 
     def line(text: str, size: int = 10, lead: float = 14.0):
         nonlocal cy
@@ -268,8 +281,15 @@ def generate_advance_emi_contract_pdf(
         cy -= 10
 
     c.setTitle(f"Advance EMI Contract {contract_no}")
-    for header_line in _business_header_lines():
-        line(header_line, size=11, lead=15)
+    draw_brand_header_footer(
+        canvas=c,
+        width=width,
+        height=height,
+        margin_x=mx,
+        branding=branding,
+        document_no=contract_no,
+        generated_at=generated_date,
+    )
 
     rule()
     line("ADVANCE EMI CONTRACT — LUCKY PLAN", size=13, lead=17)

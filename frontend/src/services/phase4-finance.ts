@@ -129,6 +129,75 @@ export async function listAdminFinanceDocuments(subscriptionId?: number | string
   return apiFetch<{ count: number; results: FinanceDocumentRow[] }>(`/admin/documents/${query}`);
 }
 
+export type AdminDepositRow = {
+  demand_id: number;
+  reference_key: string;
+  subscription_id: number;
+  subscription_number: string | null;
+  plan_type: string;
+  customer_name: string;
+  product_name: string;
+  deposit_amount: Money;
+  collected_amount: Money;
+  held_amount: Money;
+  refundable_amount: Money;
+  deducted_amount: Money;
+  status: string;
+  due_date: string;
+};
+
+export async function listAdminDepositRegister(subscriptionId?: number | string) {
+  const query = subscriptionId ? `?subscription_id=${subscriptionId}` : "";
+  return apiFetch<{ count: number; results: AdminDepositRow[] }>(`/admin/finance/deposits/${query}`);
+}
+
+export async function createAdminDepositDeduction(input: {
+  subscription_id: number;
+  amount: string | number;
+  reason: string;
+}) {
+  return apiFetch<{ detail: string }>(`/admin/finance/deposits/deduct/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function approveAdminDepositRefund(input: {
+  subscription_id: number;
+  amount: string | number;
+}) {
+  return apiFetch<{ detail: string; transaction_id: number }>(`/admin/finance/deposits/refund-approve/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function recordAdminDepositRefund(input: {
+  subscription_id: number;
+  amount: string | number;
+  approval_transaction_id?: number;
+}) {
+  return apiFetch<{ detail: string }>(`/admin/finance/deposits/refund/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAdminRentLeaseAccountMapping() {
+  return apiFetch<{
+    mapping: Record<string, unknown> | null;
+    chart_accounts: Array<Record<string, unknown>>;
+    finance_accounts: Array<Record<string, unknown>>;
+  }>(`/admin/finance/account-mapping/`);
+}
+
+export async function saveAdminRentLeaseAccountMapping(input: Record<string, unknown>) {
+  return apiFetch<{ detail: string; mapping_id: number }>(`/admin/finance/account-mapping/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function regenerateAdminDocument(documentId: number, reason = "") {
   return apiFetch<{
     detail: string;

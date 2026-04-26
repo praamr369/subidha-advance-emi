@@ -541,6 +541,12 @@ export default function AdminFinancePage() {
             >
               Payment register
             </Link>
+            <Link
+              href="/admin/finance/deposits"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Rent/Lease deposits
+            </Link>
           </div>
         </section>
 

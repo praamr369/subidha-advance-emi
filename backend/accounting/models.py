@@ -486,6 +486,76 @@ class FinanceAccount(AccountingTimeStampedModel):
         return self.name
 
 
+class RentLeaseAccountingAccountMapping(AccountingTimeStampedModel):
+    """Configurable account map for live rent/lease finance sync events."""
+
+    monthly_income_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_monthly_income_mappings",
+    )
+    deposit_liability_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_deposit_liability_mappings",
+    )
+    deposit_refund_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_deposit_refund_mappings",
+    )
+    damage_recovery_income_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_damage_recovery_mappings",
+    )
+    settlement_finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_account_mappings",
+        null=True,
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_rent_lease_account_mappings"
+        ordering = ["-is_active", "-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=Q(is_active=True),
+                name="uq_single_active_rent_lease_account_mapping",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.monthly_income_account_id and self.monthly_income_account.account_type != ChartOfAccountType.INCOME:
+            errors["monthly_income_account"] = "Monthly income account must be an INCOME chart account."
+        if self.deposit_liability_account_id and self.deposit_liability_account.account_type != ChartOfAccountType.LIABILITY:
+            errors["deposit_liability_account"] = "Deposit liability account must be a LIABILITY chart account."
+        if self.deposit_refund_account_id and self.deposit_refund_account.account_type not in {
+            ChartOfAccountType.ASSET,
+            ChartOfAccountType.LIABILITY,
+            ChartOfAccountType.EXPENSE,
+        }:
+            errors["deposit_refund_account"] = "Deposit refund account must be an ASSET, LIABILITY, or EXPENSE chart account."
+        if (
+            self.damage_recovery_income_account_id
+            and self.damage_recovery_income_account.account_type != ChartOfAccountType.INCOME
+        ):
+            errors["damage_recovery_income_account"] = "Damage recovery account must be an INCOME chart account."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class JournalEntry(AccountingTimeStampedModel):
     entry_no = models.CharField(
         max_length=40,
