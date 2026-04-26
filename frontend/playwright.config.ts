@@ -90,7 +90,7 @@ export default defineConfig({
     {
       command: "bash ../backend/scripts/start_playwright_backend.sh",
       url: `${backendRootUrl}/healthz/`,
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       cwd: ".",
       env: {
@@ -108,7 +108,7 @@ export default defineConfig({
     {
       command: "npm run start:smoke",
       url: `${frontendBaseUrl}/login`,
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 240_000,
       cwd: ".",
       env: {
