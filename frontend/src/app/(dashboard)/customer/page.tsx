@@ -246,6 +246,16 @@ export default function CustomerDashboardPage() {
       href: ROUTES.customer.payments,
     },
     {
+      title: "Finance Summary",
+      description: "Track invoices, receipts, outstanding balance, and payment method split.",
+      href: "/customer/finance",
+    },
+    {
+      title: "Account Statement",
+      description: "View statement totals across invoices, receipts, and recorded payments.",
+      href: "/customer/account-statement",
+    },
+    {
       title: "Support",
       description: "Raise a support request if a payment or contract detail needs follow-up.",
       href: ROUTES.customer.support,

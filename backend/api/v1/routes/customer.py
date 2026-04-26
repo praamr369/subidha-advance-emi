@@ -16,6 +16,14 @@ from api.v1.views.customer import (
     CustomerSupportRequestListCreateView,
     CustomerSubscriptionDetailView,
 )
+from api.v1.views.phase4_finance import (
+    CustomerAccountStatementView,
+    CustomerDocumentListView,
+    CustomerFinanceSummaryView,
+    CustomerInvoiceListView,
+    CustomerPaymentScheduleView,
+    CustomerReceiptListView,
+)
 from api.v1.views.paginated_registers import PaginatedCustomerSubscriptionListView
 from api.v1.views.subscription_requests import (
     CustomerSubscriptionRequestCancelView,
@@ -42,6 +50,13 @@ urlpatterns = [
     path("deliveries/<int:pk>/", CustomerDeliveryDetailView.as_view()),
     path("payments/", CustomerPaymentListView.as_view()),
     path("payments/<int:pk>/", CustomerPaymentDetailView.as_view()),
+    # Phase 4: customer finance + documents
+    path("finance/summary/", CustomerFinanceSummaryView.as_view()),
+    path("invoices/", CustomerInvoiceListView.as_view()),
+    path("receipts/", CustomerReceiptListView.as_view()),
+    path("documents/", CustomerDocumentListView.as_view()),
+    path("payment-schedule/", CustomerPaymentScheduleView.as_view()),
+    path("account-statement/", CustomerAccountStatementView.as_view()),
     path("support-requests/", CustomerSupportRequestListCreateView.as_view()),
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
 ]

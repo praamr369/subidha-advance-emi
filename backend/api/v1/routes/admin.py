@@ -96,6 +96,19 @@ from api.v1.views.finance_operations import (
     AdminFinanceTransferView,
     AdminReconciliationOverviewView,
 )
+from api.v1.views.phase4_finance import (
+    AdminCustomerStatementView,
+    AdminDocumentCenterView,
+    AdminDocumentRegenerateView,
+    AdminFinanceCollectionsView,
+    AdminFinanceDashboardView,
+    AdminFinanceDuesView,
+    AdminFinanceOverdueView,
+    AdminFinanceReconciliationView,
+    AdminFinanceWaiverLossView,
+    AdminInvoiceRegisterView,
+    AdminReceiptRegisterView,
+)
 from api.v1.views.admin_contracts import (
     AdminLeaseContractCreateView,
     AdminRentContractCreateView,
@@ -231,6 +244,18 @@ urlpatterns = [
     path("finance-transfers/", AdminFinanceTransferView.as_view()),
     path("reconciliation/overview/", AdminReconciliationOverviewView.as_view()),
     path("finance-accounts/operational-summary/", AdminFinanceAccountOperationalSummaryView.as_view()),
+    # Phase 4: finance dashboard + registers + document center
+    path("finance/dashboard/", AdminFinanceDashboardView.as_view()),
+    path("finance/collections/", AdminFinanceCollectionsView.as_view()),
+    path("finance/dues/", AdminFinanceDuesView.as_view()),
+    path("finance/overdue/", AdminFinanceOverdueView.as_view()),
+    path("finance/reconciliation/", AdminFinanceReconciliationView.as_view()),
+    path("finance/waiver-loss/", AdminFinanceWaiverLossView.as_view()),
+    path("invoices/", AdminInvoiceRegisterView.as_view()),
+    path("receipts/", AdminReceiptRegisterView.as_view()),
+    path("documents/", AdminDocumentCenterView.as_view()),
+    path("documents/<int:pk>/regenerate/", AdminDocumentRegenerateView.as_view()),
+    path("customer/<int:pk>/statement/", AdminCustomerStatementView.as_view()),
     path("commission-payout-batches/", AdminPayoutBatchCreateView.as_view()),
     path("commission-payout-batches/list/", AdminPayoutBatchListView.as_view()),
     path("commission-payout-batches/preview/", AdminPayoutBatchPreviewView.as_view()),

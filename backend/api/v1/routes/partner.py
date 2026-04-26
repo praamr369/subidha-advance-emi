@@ -22,6 +22,11 @@ from api.v1.views.partner_dashboard import (
     PartnerPaymentListView,
     PartnerSubscriptionDetailView,
 )
+from api.v1.views.phase4_finance import (
+    PartnerFinanceSummaryView,
+    PartnerLinkedCustomerPaymentsView,
+    PartnerReceiptListView,
+)
 from api.v1.views.subscription_requests import (
     PartnerSubscriptionRequestCancelView,
     PartnerSubscriptionRequestDetailView,
@@ -41,6 +46,10 @@ urlpatterns = [
     path("customers/<int:pk>/", PartnerCustomerDetailView.as_view()),
     path("payments/", PartnerPaymentListView.as_view()),
     path("payments/<int:pk>/", PartnerPaymentDetailView.as_view()),
+    # Phase 4: partner finance scope
+    path("finance/summary/", PartnerFinanceSummaryView.as_view()),
+    path("linked-customer-payments/", PartnerLinkedCustomerPaymentsView.as_view()),
+    path("receipts/", PartnerReceiptListView.as_view()),
     path("payments/collect/", LegacyPartnerPaymentCollectView.as_view()),
     path("earnings/", PartnerEarningsSummaryView.as_view()),
     path("earnings/export/", PartnerCommissionStatementExportView.as_view()),

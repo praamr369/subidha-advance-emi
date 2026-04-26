@@ -162,6 +162,11 @@ export default function PartnerDashboardPage() {
       breadcrumbs={[{ label: "Partner" }]}
       actions={[
         {
+          href: "/partner/finance",
+          label: "Finance Summary",
+          variant: "secondary",
+        },
+        {
           href: "/partner/collections/create",
           label: "Submit Collection",
           variant: "primary",
