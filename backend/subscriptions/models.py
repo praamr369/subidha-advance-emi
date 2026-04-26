@@ -259,6 +259,8 @@ class SubscriptionDocumentType(models.TextChoices):
     DELIVERY_HANDOVER_NOTE = "DELIVERY_HANDOVER_NOTE", "Delivery / Handover Note"
     RETURN_INSPECTION_REPORT = "RETURN_INSPECTION_REPORT", "Return Inspection Report"
     AMENDMENT_RECORD = "AMENDMENT_RECORD", "Contract Amendment Record"
+    DIRECT_SALE_INVOICE_PDF = "DIRECT_SALE_INVOICE_PDF", "Direct Sale Invoice PDF"
+    SECURITY_DEPOSIT_RECEIPT_PDF = "SECURITY_DEPOSIT_RECEIPT_PDF", "Security Deposit Receipt PDF"
 
 
 class DocumentVerificationStatus(models.TextChoices):
@@ -1638,6 +1640,188 @@ class LeaseSubscriptionProfile(TimeStampedModel):
 
     def __str__(self):
         return f"LeaseProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+class RentLeaseDemandType(models.TextChoices):
+    RENT_MONTHLY = "RENT_MONTHLY", "Rent Monthly Demand"
+    LEASE_MONTHLY = "LEASE_MONTHLY", "Lease Monthly Demand"
+    SECURITY_DEPOSIT = "SECURITY_DEPOSIT", "Security Deposit Demand"
+
+
+class RentLeaseDemandStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    PARTIAL = "PARTIAL", "Partially Paid"
+    PAID = "PAID", "Paid"
+    WAIVED = "WAIVED", "Waived"
+    OVERDUE = "OVERDUE", "Overdue"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class RentLeaseBillingDemand(TimeStampedModel):
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_demands",
+    )
+    demand_type = models.CharField(
+        max_length=24,
+        choices=RentLeaseDemandType.choices,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=RentLeaseDemandStatus.choices,
+        default=RentLeaseDemandStatus.PENDING,
+        db_index=True,
+    )
+    billing_period_start = models.DateField(null=True, blank=True, db_index=True)
+    billing_period_end = models.DateField(null=True, blank=True, db_index=True)
+    due_date = models.DateField(db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    collected_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    held_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    refundable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    deducted_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    reference_key = models.CharField(max_length=80, unique=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "rent_lease_billing_demands"
+        ordering = ["-due_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "demand_type"]),
+            models.Index(fields=["status", "due_date"]),
+            models.Index(fields=["billing_period_start", "billing_period_end"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gte=MONEY_ZERO),
+                name="chk_rent_lease_demand_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(collected_amount__gte=MONEY_ZERO),
+                name="chk_rent_lease_demand_collected_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(deducted_amount__gte=MONEY_ZERO),
+                name="chk_rent_lease_demand_deducted_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.subscription_id and self.subscription.plan_type not in {PlanType.RENT, PlanType.LEASE}:
+            errors["subscription"] = "Rent/lease billing demands can only be linked to RENT or LEASE subscriptions."
+        if self.amount < MONEY_ZERO:
+            errors["amount"] = "Demand amount cannot be negative."
+        if self.collected_amount < MONEY_ZERO:
+            errors["collected_amount"] = "Collected amount cannot be negative."
+        if self.collected_amount > self.amount:
+            errors["collected_amount"] = "Collected amount cannot exceed demand amount."
+        if self.deducted_amount < MONEY_ZERO:
+            errors["deducted_amount"] = "Deducted amount cannot be negative."
+        if self.refundable_amount < MONEY_ZERO:
+            errors["refundable_amount"] = "Refundable amount cannot be negative."
+        if self.demand_type == RentLeaseDemandType.SECURITY_DEPOSIT:
+            if self.billing_period_start or self.billing_period_end:
+                errors["billing_period_start"] = "Security deposit demand must not set monthly billing period."
+        else:
+            if not self.billing_period_start or not self.billing_period_end:
+                errors["billing_period_start"] = "Monthly demands require billing period start/end."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_key = (self.reference_key or "").strip().upper()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def outstanding_amount(self) -> Decimal:
+        return q2(max(q2(self.amount) - q2(self.collected_amount), MONEY_ZERO))
+
+
+class RentLeaseDepositTransactionType(models.TextChoices):
+    DEMAND_CREATED = "DEMAND_CREATED", "Demand Created"
+    COLLECTED = "COLLECTED", "Deposit Collected"
+    REFUND_APPROVED = "REFUND_APPROVED", "Refund Approved"
+    REFUNDED = "REFUNDED", "Refunded"
+    DEDUCTION = "DEDUCTION", "Deduction"
+
+
+class RentLeaseDepositTransaction(TimeStampedModel):
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="deposit_transactions",
+    )
+    demand = models.ForeignKey(
+        RentLeaseBillingDemand,
+        on_delete=models.PROTECT,
+        related_name="deposit_transactions",
+        null=True,
+        blank=True,
+    )
+    inspection = models.ForeignKey(
+        "RentLeaseReturnInspection",
+        on_delete=models.PROTECT,
+        related_name="deposit_transactions",
+        null=True,
+        blank=True,
+    )
+    transaction_type = models.CharField(
+        max_length=24,
+        choices=RentLeaseDepositTransactionType.choices,
+        db_index=True,
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    reason = models.TextField(blank=True, default="")
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_deposit_transactions",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="performed_deposit_transactions",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "rent_lease_deposit_transactions"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "transaction_type"]),
+            models.Index(fields=["created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gte=MONEY_ZERO),
+                name="chk_deposit_transaction_amount_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.subscription_id and self.subscription.plan_type not in {PlanType.RENT, PlanType.LEASE}:
+            errors["subscription"] = "Deposit transactions are supported only for RENT/LEASE subscriptions."
+        if self.amount < MONEY_ZERO:
+            errors["amount"] = "Amount cannot be negative."
+        if self.transaction_type == RentLeaseDepositTransactionType.DEDUCTION and not (self.reason or "").strip():
+            errors["reason"] = "Deduction requires a reason."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reason = (self.reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class SubscriptionDocument(TimeStampedModel):
@@ -3098,7 +3282,7 @@ class Commission(models.Model):
     Design principles:
     - One commission per payment (enforced via OneToOne)
     - Immutable financial record (status transitions only)
-    - Safe for future rental/leasing extension
+    - Safe for live rent/lease operational compatibility
     """
 
     partner = models.ForeignKey(

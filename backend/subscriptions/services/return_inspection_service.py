@@ -110,6 +110,27 @@ def approve_inspection(
         "status", "approved_by", "approved_at", "deposit_refund_approved", "updated_at"
     ])
 
+    # Keep deposit deductions/refunds append-only and auditable.
+    from subscriptions.services.rent_lease_billing_service import (
+        approve_deposit_refund,
+        record_damage_deduction,
+    )
+    if inspection.damage_deduction_amount > MONEY_ZERO:
+        record_damage_deduction(
+            subscription=inspection.subscription,
+            amount=inspection.damage_deduction_amount,
+            reason=(inspection.damage_notes or "Damage deduction from approved return inspection."),
+            performed_by=approved_by,
+            inspection=inspection,
+        )
+    if inspection.deposit_refund_amount > MONEY_ZERO:
+        approve_deposit_refund(
+            subscription=inspection.subscription,
+            amount=inspection.deposit_refund_amount,
+            approved_by=approved_by,
+            inspection=inspection,
+        )
+
     _route_returned_stock(inspection, approved_by)
 
     log_audit(

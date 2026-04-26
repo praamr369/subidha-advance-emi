@@ -34,7 +34,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
   {
     id: "subscription-ops",
     title: "Subscription sale control",
-    description: "Lucky ID allocation, batch linkage, contract activation, delivery readiness, and future rent/lease compatibility.",
+    description: "Lucky ID allocation, batch linkage, contract activation, delivery readiness, and live rent/lease operational compatibility.",
     href: "/admin/subscriptions",
     owner: "Subscription desk",
     health: "attention",

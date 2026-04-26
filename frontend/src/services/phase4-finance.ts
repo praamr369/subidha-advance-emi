@@ -37,6 +37,16 @@ export type AdminFinanceDashboardResponse = {
     overdue_payments: Money;
     advance_emi_collection: Money;
     rent_lease_monthly_collection: Money;
+    rent_monthly_invoices_pending?: number;
+    lease_monthly_invoices_pending?: number;
+    rent_lease_overdue?: number;
+    deposits_held?: Money;
+    deposit_refunds_pending?: Money;
+    deposit_deductions?: Money;
+    rent_lease_income?: Money;
+    upcoming_rent_lease_due_dates?: number;
+    contracts_nearing_return_date?: number;
+    return_inspections_pending?: number;
     waiver_loss_exposure: Money;
     direct_sale_revenue: Money;
     direct_sale_outstanding: Money;
@@ -149,6 +159,7 @@ export async function getCustomerFinanceSummary() {
     customer_id: number;
     summary: Record<string, unknown>;
     payment_method_split: Array<{ payment_method: string; count: number; amount: Money }>;
+    deposit_summary?: Array<Record<string, unknown>>;
   }>("/customer/finance/summary/");
 }
 

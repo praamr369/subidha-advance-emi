@@ -92,6 +92,22 @@ export default function PartnerFinancePage() {
               <div className="text-xs text-muted-foreground">Commission Total</div>
               <div className="text-xl font-semibold">{money(summary.commission_total)}</div>
             </div>
+            <div className="rounded-xl border p-4">
+              <div className="text-xs text-muted-foreground">Live Rent/Lease Contracts</div>
+              <div className="text-xl font-semibold">{String(summary.rent_lease_contracts ?? 0)}</div>
+            </div>
+            <div className="rounded-xl border p-4 md:col-span-2">
+              <div className="text-xs text-muted-foreground">Linked Rent/Lease Payment Status</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                Pending {String((summary.linked_rent_lease_payment_status as Record<string, unknown> | undefined)?.pending ?? 0)}
+                {" • "}
+                Partial {String((summary.linked_rent_lease_payment_status as Record<string, unknown> | undefined)?.partial ?? 0)}
+                {" • "}
+                Overdue {String((summary.linked_rent_lease_payment_status as Record<string, unknown> | undefined)?.overdue ?? 0)}
+                {" • "}
+                Paid {String((summary.linked_rent_lease_payment_status as Record<string, unknown> | undefined)?.paid ?? 0)}
+              </div>
+            </div>
           </div>
         )}
       </WorkspaceSection>

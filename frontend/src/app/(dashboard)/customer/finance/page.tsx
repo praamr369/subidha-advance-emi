@@ -18,6 +18,7 @@ export default function CustomerFinanceSummaryPage() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
   const [split, setSplit] = useState<Array<{ payment_method: string; count: number; amount: string }>>([]);
+  const [depositRows, setDepositRows] = useState<Array<Record<string, unknown>>>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,6 +26,7 @@ export default function CustomerFinanceSummaryPage() {
       const payload = await getCustomerFinanceSummary();
       setSummary(payload.summary ?? {});
       setSplit(payload.payment_method_split ?? []);
+      setDepositRows(payload.deposit_summary ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load finance summary.");
@@ -97,6 +99,35 @@ export default function CustomerFinanceSummaryPage() {
                 <div className="text-sm font-medium">{row.payment_method}</div>
                 <div className="text-sm text-muted-foreground">
                   {row.count} payments • {money(row.amount)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </WorkspaceSection>
+
+      <WorkspaceSection
+        title="Live Rent/Lease Deposit Status"
+        description="Security deposit paid, held, refundable, deducted, and refunded values from live rent/lease module records."
+      >
+        {loading ? (
+          <LoadingBlock label="Loading deposit status..." />
+        ) : depositRows.length === 0 ? (
+          <EmptyState
+            title="No rent/lease deposit records"
+            description="No active rent/lease deposit ledger is currently linked to this customer."
+          />
+        ) : (
+          <div className="space-y-2">
+            {depositRows.map((row, idx) => (
+              <div key={String(row.subscription_id ?? idx)} className="rounded-xl border px-4 py-3">
+                <div className="text-sm font-medium">
+                  {String(row.subscription_number ?? "Contract")} • {String(row.plan_type ?? "RENT/LEASE")}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Paid {money(row.collected_amount)} • Held {money(row.held_amount)} • Refundable{" "}
+                  {money(row.refundable_amount)} • Deducted {money(row.deducted_amount)} • Refunded{" "}
+                  {money(row.refunded_amount)} • Status {String(row.refund_status ?? "PENDING")}
                 </div>
               </div>
             ))}
