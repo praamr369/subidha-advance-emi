@@ -809,6 +809,20 @@ export default function AdminDashboardPage() {
                 badge="Finance"
               />
               <LaunchCard
+                title="Accounting Control Center"
+                description="Global accounting KPI control, liability posture, and reconciliation command."
+                href="/admin/accounting/control-center"
+                icon={<Landmark className="h-5 w-5" />}
+                badge="Phase 5"
+              />
+              <LaunchCard
+                title="Operations Command Center"
+                description="Cross-module queue control for contracts, delivery, returns, KYC, and partner follow-up."
+                href="/admin/operations/command-center"
+                icon={<ClipboardCheck className="h-5 w-5" />}
+                badge="Phase 5"
+              />
+              <LaunchCard
                 title="Reports"
                 description="Performance, exposure, and operational health from live data."
                 href={ROUTES.admin.reports}
@@ -834,6 +848,8 @@ export default function AdminDashboardPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <MoreLink href={buildAdminCollectionsRoute()} label="Collections" />
             <MoreLink href={ROUTES.admin.accounting} label="Accounting" />
+            <MoreLink href="/admin/accounting/control-center" label="Accounting control center" />
+            <MoreLink href="/admin/operations/command-center" label="Operations command center" />
             <MoreLink href={ROUTES.admin.billingDirectSales} label="Direct sales" />
             <MoreLink href={ROUTES.admin.settingsBusinessSetup} label="Setup & readiness" />
           </div>

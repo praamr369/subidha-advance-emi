@@ -197,6 +197,24 @@ export default function AdminReportsPage() {
 
   const quickLinks = [
     {
+      title: "Finance BI",
+      description: "Phase 5 finance performance analytics with typed chart payload.",
+      href: "/admin/reports/finance",
+      badge: "PHASE5",
+    },
+    {
+      title: "Contract BI",
+      description: "Cross-module contract analytics for EMI, rent, and lease.",
+      href: "/admin/reports/contracts",
+      badge: "PHASE5",
+    },
+    {
+      title: "Waiver/Loss BI",
+      description: "Waiver and loss trend for reconciliation-safe reporting.",
+      href: "/admin/reports/waiver-loss",
+      badge: "PHASE5",
+    },
+    {
       title: "Revenue Report",
       description: "Collections mix and payment drill-down from register-backed rows.",
       href: ROUTES.admin.reportsRevenue,
