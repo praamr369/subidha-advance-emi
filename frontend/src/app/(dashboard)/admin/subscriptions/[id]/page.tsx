@@ -789,6 +789,11 @@ export default function AdminSubscriptionDetailPage() {
         ...(subscription
           ? [
               {
+                href: `/admin/subscriptions/${subscription.id}/lifecycle`,
+                label: "Contract Lifecycle",
+                variant: "primary" as const,
+              },
+              {
                 href: `/admin/payments/create?subscription=${subscription.id}`,
                 label: "Collect Payment",
                 variant: "primary" as const,

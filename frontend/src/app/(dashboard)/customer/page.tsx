@@ -231,6 +231,11 @@ export default function CustomerDashboardPage() {
 
   const quickLinks: QuickLink[] = [
     {
+      title: "My Contracts",
+      description: "View all Advance EMI, Rent, and Lease contracts grouped by type with status.",
+      href: "/customer/contracts",
+    },
+    {
       title: "My Subscriptions",
       description: "Open contract detail, winner posture, and product status by subscription.",
       href: ROUTES.customer.subscriptions,

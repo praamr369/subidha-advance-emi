@@ -155,10 +155,24 @@ class DeliveryStatus(models.TextChoices):
 
 
 class SubscriptionStatus(models.TextChoices):
+    # Pre-activation states (Phase 3)
+    DRAFT = "DRAFT", "Draft"
+    REQUESTED = "REQUESTED", "Requested"
+    PENDING_APPROVAL = "PENDING_APPROVAL", "Pending Approval"
+    APPROVED = "APPROVED", "Approved"
+    # Core operational states (pre-existing)
     ACTIVE = "ACTIVE", "Active"
     WON = "WON", "Won"
     COMPLETED = "COMPLETED", "Completed"
     DEFAULTED = "DEFAULTED", "Defaulted"
+    # Extended lifecycle states (Phase 3)
+    PAYMENT_PENDING = "PAYMENT_PENDING", "Payment Pending"
+    DELIVERY_PENDING = "DELIVERY_PENDING", "Delivery Pending"
+    HANDED_OVER = "HANDED_OVER", "Handed Over"
+    RETURN_PENDING = "RETURN_PENDING", "Return Pending"
+    RETURNED = "RETURNED", "Returned"
+    CANCELLED = "CANCELLED", "Cancelled"
+    CLOSED = "CLOSED", "Closed"
 
 
 class LuckyIdStatus(models.TextChoices):
@@ -237,8 +251,14 @@ class ContractRefundStatus(models.TextChoices):
 class SubscriptionDocumentType(models.TextChoices):
     CUSTOMER_KYC_ID = "CUSTOMER_KYC_ID", "Customer KYC ID"
     CUSTOMER_SIGNATURE = "CUSTOMER_SIGNATURE", "Customer Signature"
+    ADMIN_SIGNATURE = "ADMIN_SIGNATURE", "Admin / Company Signature"
     RENT_CONTRACT_PDF = "RENT_CONTRACT_PDF", "Rent Contract PDF"
     LEASE_CONTRACT_PDF = "LEASE_CONTRACT_PDF", "Lease Contract PDF"
+    ADVANCE_EMI_CONTRACT_PDF = "ADVANCE_EMI_CONTRACT_PDF", "Advance EMI Contract PDF"
+    PAYMENT_RECEIPT_PDF = "PAYMENT_RECEIPT_PDF", "Payment Receipt PDF"
+    DELIVERY_HANDOVER_NOTE = "DELIVERY_HANDOVER_NOTE", "Delivery / Handover Note"
+    RETURN_INSPECTION_REPORT = "RETURN_INSPECTION_REPORT", "Return Inspection Report"
+    AMENDMENT_RECORD = "AMENDMENT_RECORD", "Contract Amendment Record"
 
 
 class DocumentVerificationStatus(models.TextChoices):
@@ -1180,6 +1200,29 @@ class Subscription(TimeStampedModel):
     )
     product_snapshot = models.JSONField(null=True, blank=True)
     pricing_snapshot = models.JSONField(null=True, blank=True)
+    # Phase 3: immutable contract number (ADV-EMI / RENT / LEASE prefix + year + seq)
+    subscription_number = models.CharField(
+        max_length=40, unique=True, null=True, blank=True, db_index=True
+    )
+    # Phase 3: financial term lock
+    terms_locked_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    terms_locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="locked_subscription_terms",
+    )
+    # Phase 3: cancellation tracking
+    cancellation_reason = models.TextField(blank=True, default="")
+    cancelled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_subscriptions",
+    )
 
     class Meta:
         db_table = "subscriptions"
@@ -1624,6 +1667,16 @@ class SubscriptionDocument(TimeStampedModel):
     )
     notes = models.TextField(blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    # Phase 3: document versioning
+    document_version = models.PositiveIntegerField(default=1)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="generated_subscription_documents",
+    )
+    regeneration_reason = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "subscription_documents"
@@ -2894,6 +2947,22 @@ class AuditLog(models.Model):
             "CUSTOMER_REFERRAL_COMMISSION_APPROVED",
             "Customer Referral Commission Approved",
         )
+        # Phase 3: contract lifecycle audit events
+        CONTRACT_NUMBERED = "CONTRACT_NUMBERED", "Contract Number Assigned"
+        CONTRACT_TERMS_LOCKED = "CONTRACT_TERMS_LOCKED", "Contract Financial Terms Locked"
+        CONTRACT_APPROVED = "CONTRACT_APPROVED", "Contract Approved"
+        CONTRACT_ACTIVATED = "CONTRACT_ACTIVATED", "Contract Activated"
+        CONTRACT_CANCELLED = "CONTRACT_CANCELLED", "Contract Cancelled"
+        CONTRACT_CLOSED = "CONTRACT_CLOSED", "Contract Closed"
+        CONTRACT_AMENDMENT_REQUESTED = "CONTRACT_AMENDMENT_REQUESTED", "Contract Amendment Requested"
+        CONTRACT_AMENDMENT_APPROVED = "CONTRACT_AMENDMENT_APPROVED", "Contract Amendment Approved"
+        CONTRACT_AMENDMENT_REJECTED = "CONTRACT_AMENDMENT_REJECTED", "Contract Amendment Rejected"
+        CONTRACT_AMENDMENT_APPLIED = "CONTRACT_AMENDMENT_APPLIED", "Contract Amendment Applied"
+        CONTRACT_POSSESSION_CREATED = "CONTRACT_POSSESSION_CREATED", "Product Possession Record Created"
+        CONTRACT_POSSESSION_UPDATED = "CONTRACT_POSSESSION_UPDATED", "Product Possession Status Updated"
+        CONTRACT_RETURN_INSPECTION_CREATED = "CONTRACT_RETURN_INSPECTION_CREATED", "Return Inspection Created"
+        CONTRACT_RETURN_INSPECTION_APPROVED = "CONTRACT_RETURN_INSPECTION_APPROVED", "Return Inspection Approved"
+        CONTRACT_DOCUMENT_REGENERATED = "CONTRACT_DOCUMENT_REGENERATED", "Contract Document Regenerated"
 
     action_type = models.CharField(
         max_length=50,
@@ -3392,3 +3461,234 @@ class CustomerKycDocument(TimeStampedModel):
 
     def __str__(self):
         return f"KYC {self.document_type} for customer {self.customer_id} [{self.status}]"
+
+
+# =============================================================================
+# Phase 3: Contract Amendment, Product Possession, Return Inspection
+# =============================================================================
+
+class ContractAmendmentType(models.TextChoices):
+    TENURE_EXTENSION = "TENURE_EXTENSION", "Tenure Extension"
+    PRODUCT_UPGRADE = "PRODUCT_UPGRADE", "Product Upgrade"
+    ADDRESS_CHANGE = "ADDRESS_CHANGE", "Address Change"
+    SCHEDULE_CORRECTION = "SCHEDULE_CORRECTION", "Schedule Correction"
+    DEPOSIT_ADJUSTMENT = "DEPOSIT_ADJUSTMENT", "Deposit Adjustment"
+    LEGAL_DOCUMENT_CORRECTION = "LEGAL_DOCUMENT_CORRECTION", "Legal Document Correction"
+    OTHER = "OTHER", "Other"
+
+
+class ContractAmendmentStatus(models.TextChoices):
+    REQUESTED = "REQUESTED", "Requested"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    APPLIED = "APPLIED", "Applied"
+
+
+class ContractAmendment(models.Model):
+    created_at = models.DateTimeField(db_index=True, default=timezone.now)
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="amendments",
+    )
+    amendment_type = models.CharField(
+        max_length=40,
+        choices=ContractAmendmentType.choices,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=ContractAmendmentStatus.choices,
+        default=ContractAmendmentStatus.REQUESTED,
+        db_index=True,
+    )
+    previous_values = models.JSONField(default=dict)
+    new_values = models.JSONField(default=dict)
+    reason = models.TextField()
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_contract_amendments",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_contract_amendments",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    applied_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "contract_amendments"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "status"], name="contract_am_subscri_b9ee13_idx"),
+            models.Index(fields=["amendment_type", "status"], name="contract_am_amendme_c02dce_idx"),
+        ]
+
+    def __str__(self):
+        return f"Amendment [{self.amendment_type}] on Sub#{self.subscription_id} [{self.status}]"
+
+
+class PossessionStatus(models.TextChoices):
+    PENDING_HANDOVER = "PENDING_HANDOVER", "Pending Handover"
+    WITH_CUSTOMER = "WITH_CUSTOMER", "With Customer"
+    RETURN_DUE = "RETURN_DUE", "Return Due"
+    RETURNED = "RETURNED", "Returned"
+    UNDER_INSPECTION = "UNDER_INSPECTION", "Under Inspection"
+    MAINTENANCE = "MAINTENANCE", "Maintenance"
+    CLOSED = "CLOSED", "Closed"
+
+
+class ProductPossession(models.Model):
+    created_at = models.DateTimeField(db_index=True, default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="product_possession",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="possessions",
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="product_possessions",
+    )
+    status = models.CharField(
+        max_length=25,
+        choices=PossessionStatus.choices,
+        default=PossessionStatus.PENDING_HANDOVER,
+        db_index=True,
+    )
+    handover_date = models.DateField(null=True, blank=True, db_index=True)
+    expected_return_date = models.DateField(null=True, blank=True, db_index=True)
+    actual_return_date = models.DateField(null=True, blank=True, db_index=True)
+    handover_condition_notes = models.TextField(blank=True, default="")
+    return_condition_notes = models.TextField(blank=True, default="")
+    serial_number = models.CharField(max_length=80, blank=True, default="")
+    handed_over_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="handed_over_possessions",
+    )
+    returned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="received_possession_returns",
+    )
+
+    class Meta:
+        db_table = "product_possessions"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "expected_return_date"], name="product_pos_status_d5b8a4_idx"),
+            models.Index(fields=["customer", "status"], name="product_pos_custome_6f49c5_idx"),
+            models.Index(fields=["product", "status"], name="product_pos_product_b48bed_idx"),
+        ]
+
+    def __str__(self):
+        return f"Possession of {self.product_id} by Customer#{self.customer_id} [{self.status}]"
+
+
+class InspectionStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending Inspection"
+    IN_PROGRESS = "IN_PROGRESS", "In Progress"
+    COMPLETED = "COMPLETED", "Completed"
+    APPROVED = "APPROVED", "Inspection Approved"
+
+
+class InspectionOutcome(models.TextChoices):
+    SELLABLE = "SELLABLE", "Sellable – Return to stock"
+    MAINTENANCE_REQUIRED = "MAINTENANCE_REQUIRED", "Maintenance Required"
+    DAMAGED = "DAMAGED", "Damaged – Damage recovery"
+    SCRAPPED = "SCRAPPED", "Scrapped – Write off"
+
+
+class InspectionCondition(models.TextChoices):
+    NOT_ASSESSED = "NOT_ASSESSED", "Not Assessed"
+    GOOD = "GOOD", "Good"
+    FAIR = "FAIR", "Fair"
+    DAMAGED = "DAMAGED", "Damaged"
+
+
+class RentLeaseReturnInspection(models.Model):
+    created_at = models.DateTimeField(db_index=True, default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="return_inspection",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=InspectionStatus.choices,
+        default=InspectionStatus.PENDING,
+        db_index=True,
+    )
+    outcome = models.CharField(
+        max_length=25,
+        choices=InspectionOutcome.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    inspection_date = models.DateField(null=True, blank=True, db_index=True)
+    condition_recorded = models.CharField(
+        max_length=30,
+        choices=InspectionCondition.choices,
+        default=InspectionCondition.NOT_ASSESSED,
+        db_index=True,
+    )
+    damage_notes = models.TextField(blank=True, default="")
+    damage_deduction_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    deposit_refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    deposit_refund_approved = models.BooleanField(default=False)
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    stock_routing_notes = models.TextField(blank=True, default="")
+    inspected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="conducted_return_inspections",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_return_inspections",
+    )
+
+    class Meta:
+        db_table = "rent_lease_return_inspections"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "outcome"], name="rent_lease__status_999cb0_idx"),
+            models.Index(fields=["subscription", "status"], name="rent_lease__subscri_07d329_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(damage_deduction_amount__gte=Decimal("0.00")),
+                name="chk_return_inspection_deduction_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(deposit_refund_amount__gte=Decimal("0.00")),
+                name="chk_return_inspection_refund_non_negative",
+            ),
+        ]
+
+    def __str__(self):
+        return f"ReturnInspection for Sub#{self.subscription_id} [{self.status}]"

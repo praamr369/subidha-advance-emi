@@ -87,6 +87,10 @@ def create_emi_subscription(
     generate_emi_schedule(subscription, rounding_difference=rounding_difference)
     reconcile_subscription_emis(subscription)
 
+    # Assign immutable ADV-EMI contract number
+    from subscriptions.services.contract_number_service import assign_subscription_number
+    assign_subscription_number(subscription)
+
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,
         instance=subscription,

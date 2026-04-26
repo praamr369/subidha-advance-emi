@@ -99,6 +99,20 @@ from api.v1.views.finance_operations import (
 from api.v1.views.admin_contracts import (
     AdminLeaseContractCreateView,
     AdminRentContractCreateView,
+    ContractApproveView,
+    ContractActivateView,
+    ContractCancelView,
+    ContractCloseView,
+    ContractAmendmentListCreateView,
+    ContractAmendmentApproveView,
+    ContractAmendmentRejectView,
+    ContractAmendmentApplyView,
+    ContractPossessionView,
+    ContractHandoverView,
+    ContractInitiateReturnView,
+    ContractReturnInspectionView,
+    ContractReturnInspectionRecordView,
+    ContractReturnInspectionApproveView,
 )
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
@@ -143,6 +157,24 @@ router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="a
 urlpatterns = [
     path("contracts/rent/", AdminRentContractCreateView.as_view()),
     path("contracts/lease/", AdminLeaseContractCreateView.as_view()),
+    # Phase 3: contract lifecycle transitions
+    path("contracts/<int:pk>/approve/", ContractApproveView.as_view()),
+    path("contracts/<int:pk>/activate/", ContractActivateView.as_view()),
+    path("contracts/<int:pk>/cancel/", ContractCancelView.as_view()),
+    path("contracts/<int:pk>/close/", ContractCloseView.as_view()),
+    # Phase 3: contract amendments
+    path("contracts/<int:pk>/amendments/", ContractAmendmentListCreateView.as_view()),
+    path("contracts/amendments/<int:amendment_id>/approve/", ContractAmendmentApproveView.as_view()),
+    path("contracts/amendments/<int:amendment_id>/reject/", ContractAmendmentRejectView.as_view()),
+    path("contracts/amendments/<int:amendment_id>/apply/", ContractAmendmentApplyView.as_view()),
+    # Phase 3: product possession
+    path("contracts/<int:pk>/possession/", ContractPossessionView.as_view()),
+    path("contracts/<int:pk>/possession/handover/", ContractHandoverView.as_view()),
+    path("contracts/<int:pk>/possession/return/", ContractInitiateReturnView.as_view()),
+    # Phase 3: return inspection
+    path("contracts/<int:pk>/return-inspection/", ContractReturnInspectionView.as_view()),
+    path("contracts/<int:pk>/return-inspection/record/", ContractReturnInspectionRecordView.as_view()),
+    path("contracts/<int:pk>/return-inspection/approve/", ContractReturnInspectionApproveView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),

@@ -107,8 +107,16 @@ def create_rent_contract(
         contract_terms_snapshot=terms_snapshot,
     )
 
+    # Assign immutable contract number
+    from subscriptions.services.contract_number_service import assign_subscription_number
+    assign_subscription_number(subscription)
+
+    # Create possession record
+    from subscriptions.services.product_possession_service import create_possession_record
+    create_possession_record(subscription=subscription, performed_by=performed_by)
+
     log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        action_type=AuditLog.ActionType.SUB_CREATED,
         instance=subscription,
         performed_by=performed_by,
         metadata={
@@ -190,8 +198,16 @@ def create_lease_contract(
         contract_terms_snapshot=terms_snapshot,
     )
 
+    # Assign immutable contract number
+    from subscriptions.services.contract_number_service import assign_subscription_number
+    assign_subscription_number(subscription)
+
+    # Create possession record
+    from subscriptions.services.product_possession_service import create_possession_record
+    create_possession_record(subscription=subscription, performed_by=performed_by)
+
     log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        action_type=AuditLog.ActionType.SUB_CREATED,
         instance=subscription,
         performed_by=performed_by,
         metadata={
