@@ -28,6 +28,11 @@ export const ROUTES = {
     analyticsRiskMonitor: "/admin/analytics/risk-monitor",
     analyticsChurnAnalysis: "/admin/analytics/churn-analysis",
     operations: "/admin/operations",
+    erp: "/admin/erp",
+    crmWorkspace: "/admin/crm",
+    salesWorkspace: "/admin/sales",
+    serviceWorkspace: "/admin/service",
+    workspace: "/admin/workspace",
     operationsCommandCenter: "/admin/operations/command-center",
     partnerPaymentRequests: "/admin/partner-payment-requests",
     auditLogs: "/admin/audit-logs",
@@ -72,6 +77,7 @@ export const ROUTES = {
     inventoryLedger: "/admin/inventory/ledger",
     inventoryMovements: "/admin/inventory/movements",
     inventoryValuation: "/admin/inventory/valuation",
+    inventoryWorkspace: "/admin/inventory/workspace",
     inventoryAdjustments: "/admin/inventory/adjustments",
     inventoryOpeningStock: "/admin/inventory/opening-stock",
     inventoryStockOnHand: "/admin/inventory/stock-on-hand",
@@ -124,6 +130,7 @@ export const ROUTES = {
     branchReporting: "/admin/branch-reporting",
 
     finance: "/admin/finance",
+    financeWorkspace: "/admin/finance/workspace",
     financeReconciliation: "/admin/finance/reconciliation",
     paymentReconciliation: "/admin/payments/reconciliation",
     financeCommissions: "/admin/finance/commissions",
@@ -158,6 +165,9 @@ export const ROUTES = {
 
     luckyDraw: "/admin/lucky-draws",
     reconciliation: "/admin/reconciliation",
+    deliveryWorkspace: "/admin/delivery/workspace",
+    productsWorkspace: "/admin/products/workspace",
+    partnersWorkspace: "/admin/partners/workspace",
 
     legacyLuckyDraw: "/admin/lucky-draw",
     legacyLuckyDrawHistory: "/admin/lucky-draw/history",

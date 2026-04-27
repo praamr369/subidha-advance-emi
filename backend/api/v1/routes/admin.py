@@ -210,6 +210,18 @@ from api.v1.views.admin_support_requests import (
     AdminSupportRequestResolveView,
     AdminSupportRequestStatusUpdateView,
 )
+from api.v1.views.admin_erp import (
+    AdminCrmWorkspaceView,
+    AdminDeliveryWorkspaceView,
+    AdminErpSummaryView,
+    AdminErpTodayWorkView,
+    AdminFinanceWorkspaceView,
+    AdminGlobalSearchView,
+    AdminInventoryWorkspaceView,
+    AdminPartnerOperationsWorkspaceView,
+    AdminProductOperationsWorkspaceView,
+    AdminSalesWorkspaceView,
+)
 from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
@@ -411,5 +423,15 @@ urlpatterns = [
     path("accounting/finance-account-mappings/", FinanceAccountMappingListCreateView.as_view()),
     path("accounting/finance-account-mappings/<int:pk>/", FinanceAccountMappingPatchView.as_view()),
     path("accounting/mapping-suggestions/", AccountingMappingSuggestionsView.as_view()),
+    path("erp/summary/", AdminErpSummaryView.as_view()),
+    path("erp/today-work/", AdminErpTodayWorkView.as_view()),
+    path("crm/workspace/", AdminCrmWorkspaceView.as_view()),
+    path("sales/workspace/", AdminSalesWorkspaceView.as_view()),
+    path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
+    path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
+    path("finance/workspace/", AdminFinanceWorkspaceView.as_view()),
+    path("delivery/workspace/", AdminDeliveryWorkspaceView.as_view()),
+    path("partner-operations/workspace/", AdminPartnerOperationsWorkspaceView.as_view()),
+    path("global-search/", AdminGlobalSearchView.as_view()),
     path("", include(router.urls)),
 ]

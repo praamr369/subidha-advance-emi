@@ -12,10 +12,13 @@ export type AdminRouteRegistryItem = {
 
 export const ADMIN_ROUTE_REGISTRY: AdminRouteRegistryItem[] = [
   { label: "Dashboard", href: ROUTES.admin.dashboard, group: "Command Center", permission: "ADMIN", description: "Executive dashboard", status: "active" },
+  { label: "ERP Home", href: ROUTES.admin.erp, group: "Command Center", permission: "ADMIN", description: "Unified CRM + ERP command center", status: "active" },
+  { label: "Solo Admin Workspace", href: ROUTES.admin.workspace, group: "Command Center", permission: "ADMIN", description: "Prioritized solo-admin action surface", status: "active" },
   { label: "Operations Command Center", href: ROUTES.admin.operationsCommandCenter, group: "Command Center", permission: "ADMIN", description: "Cross-module queue control", status: "active" },
   { label: "Accounting Control Center", href: "/admin/accounting/control-center", group: "Command Center", permission: "ADMIN", description: "Accounting KPIs and controls", status: "active" },
   { label: "Reports & Analytics", href: ROUTES.admin.reports, group: "Command Center", permission: "ADMIN", description: "Operational reports and BI", status: "active" },
 
+  { label: "CRM Workspace", href: ROUTES.admin.crmWorkspace, group: "Customer & CRM", permission: "ADMIN", description: "Customer 360 and follow-up pipeline", status: "active" },
   { label: "Customers", href: ROUTES.admin.customers, group: "Customer & CRM", permission: "ADMIN", description: "Customer register", status: "active" },
   { label: "KYC Verification", href: ROUTES.admin.customers, group: "Customer & CRM", permission: "ADMIN", description: "Customer KYC review", status: "active", badgeSource: "queue.customer_kyc_pending" },
   { label: "Leads", href: ROUTES.admin.leads, group: "Customer & CRM", permission: "ADMIN", description: "Lead intake queue", status: "active" },
@@ -38,6 +41,7 @@ export const ADMIN_ROUTE_REGISTRY: AdminRouteRegistryItem[] = [
 
   { label: "Invoices", href: ROUTES.admin.billingInvoices, group: "Finance & Billing", permission: "ADMIN", description: "Invoice register", status: "active" },
   { label: "Receipts", href: ROUTES.admin.billingReceipts, group: "Finance & Billing", permission: "ADMIN", description: "Receipt register", status: "active" },
+  { label: "Sales Workspace", href: ROUTES.admin.salesWorkspace, group: "Finance & Billing", permission: "ADMIN", description: "Connected sales operations workspace", status: "active" },
   { label: "Direct Sales", href: ROUTES.admin.billingDirectSales, group: "Finance & Billing", permission: "ADMIN", description: "Direct sale desk", status: "active" },
   { label: "Deposits", href: "/admin/finance/deposits", group: "Finance & Billing", permission: "ADMIN", description: "Deposit register", status: "active" },
   { label: "Reconciliation", href: ROUTES.admin.reconciliation, group: "Finance & Billing", permission: "ADMIN", description: "Reconciliation queue", status: "active", badgeSource: "queue.reconciliation_pending" },
@@ -45,11 +49,15 @@ export const ADMIN_ROUTE_REGISTRY: AdminRouteRegistryItem[] = [
   { label: "Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts, group: "Finance & Billing", permission: "ADMIN", description: "Finance account setup", status: "active" },
   { label: "Chart of Accounts", href: ROUTES.admin.accountingChartOfAccounts, group: "Finance & Billing", permission: "ADMIN", description: "COA register", status: "active" },
 
+  { label: "Product Workspace", href: ROUTES.admin.productsWorkspace, group: "Inventory", permission: "ADMIN", description: "Product demand and stock posture", status: "active" },
+  { label: "Inventory Workspace", href: ROUTES.admin.inventoryWorkspace, group: "Inventory", permission: "ADMIN", description: "Stock operations workspace", status: "active" },
   { label: "Products", href: ROUTES.admin.products, group: "Inventory", permission: "ADMIN", description: "Product catalog", status: "active" },
   { label: "Stock", href: ROUTES.admin.inventoryStockOnHand, group: "Inventory", permission: "ADMIN", description: "Current stock view", status: "active" },
   { label: "Low Stock", href: ROUTES.admin.inventoryStockOnHand, group: "Inventory", permission: "ADMIN", description: "Low stock focus", status: "active" },
   { label: "Stock Movement", href: ROUTES.admin.inventoryMovements, group: "Inventory", permission: "ADMIN", description: "Stock movement register", status: "active" },
 
+  { label: "Service Workspace", href: ROUTES.admin.serviceWorkspace, group: "Delivery", permission: "ADMIN", description: "Support and service pipeline", status: "active" },
+  { label: "Delivery Workspace", href: ROUTES.admin.deliveryWorkspace, group: "Delivery", permission: "ADMIN", description: "Delivery and return operations", status: "active" },
   { label: "Deliveries", href: ROUTES.admin.deliveries, group: "Delivery", permission: "ADMIN", description: "Delivery management", status: "active" },
   { label: "Delivery Requests", href: ROUTES.admin.deliveries, group: "Delivery", permission: "ADMIN", description: "Delivery request queue", status: "active" },
   { label: "Returns", href: ROUTES.admin.serviceDeskReturns, group: "Delivery", permission: "ADMIN", description: "Return workflow queue", status: "active" },
