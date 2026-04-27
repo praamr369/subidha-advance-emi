@@ -29,19 +29,17 @@ test.describe("admin dashboard phase-3 smoke", () => {
       page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
     ).toBeVisible();
     // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
-    await expect(sidebar.getByText("Executive Overview", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Command Center", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Customer & CRM", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Direct Sale Workflow", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Subscription Sale Workflow", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Collections & Cash Desk", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Finance & Ledger Control", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Reports & Analytics", { exact: true })).toBeVisible();
-    await expect(
-      sidebar.getByRole("link", { name: "Business Control Center", exact: true })
-    ).toBeVisible();
-    await expect(
-      sidebar.getByRole("link", { name: "Analytics", exact: true }).first()
-    ).toBeVisible();
+    await expect(sidebar.getByText("Contracts", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Partner Operations", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Finance & Billing", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Inventory", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Delivery", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Lucky Plan", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Operations Command Center", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Urgent Attention", exact: true })
     ).toBeVisible();

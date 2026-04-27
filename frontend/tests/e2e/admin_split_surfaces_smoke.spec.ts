@@ -58,7 +58,7 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
   ];
 
   for (const link of financeLaunchpadLinks) {
-    const launch = page.getByRole("link", { name: link.label }).first();
+    const launch = page.getByRole("link", { name: link.label, exact: true }).first();
     await expect(launch).toBeVisible();
     await expect(launch).toHaveAttribute("href", new RegExp(`^${link.hrefPrefix}`));
   }
