@@ -9,7 +9,7 @@ export default function AdminReportContractsPage() {
       title="Contract Performance Report"
       subtitle="Cross-plan contract and schedule analytics for EMI, rent, and lease."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Contracts" }]}
-      fetcher={() => getAdminReportContractPerformance()}
+      fetcher={(query) => getAdminReportContractPerformance(query)}
     />
   );
 }

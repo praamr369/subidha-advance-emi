@@ -9,7 +9,7 @@ export default function AdminReportCrmPage() {
       title="CRM Performance"
       subtitle="Customer lifecycle and lead-conversion analytics with KYC status signals."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "CRM" }]}
-      fetcher={() => getAdminReportCrmPerformance()}
+      fetcher={(query) => getAdminReportCrmPerformance(query)}
     />
   );
 }

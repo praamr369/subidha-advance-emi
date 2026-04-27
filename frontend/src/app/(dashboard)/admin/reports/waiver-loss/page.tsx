@@ -9,7 +9,8 @@ export default function AdminReportWaiverLossPage() {
       title="Waiver/Loss Analysis"
       subtitle="Waived EMI and loss-exposure analytics with auditable source references."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Waiver/Loss" }]}
-      fetcher={() => getAdminReportWaiverLossAnalysis()}
+      fetcher={(query) => getAdminReportWaiverLossAnalysis(query)}
+      exportType="waiver_loss"
     />
   );
 }

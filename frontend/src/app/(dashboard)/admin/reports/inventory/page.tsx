@@ -9,7 +9,8 @@ export default function AdminReportInventoryPage() {
       title="Inventory Performance"
       subtitle="Stock movement and inventory analytics for operations and finance visibility."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Inventory" }]}
-      fetcher={() => getAdminReportInventoryPerformance()}
+      fetcher={(query) => getAdminReportInventoryPerformance(query)}
+      exportType="inventory"
     />
   );
 }

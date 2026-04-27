@@ -146,9 +146,12 @@ from api.v1.views.admin_phase5_control import (
     AdminAccountingAuditTrailView,
     AdminAccountingCashBankSummaryView,
     AdminAccountingChartSummaryView,
+    AdminAccountingReconciliationAttachReferenceView,
     AdminAccountingControlCenterView,
     AdminAccountingDepositLiabilityView,
     AdminAccountingLedgerSummaryView,
+    AdminAccountingReconciliationMarkReconciledView,
+    AdminAccountingReconciliationMarkUnreconciledView,
     AdminAccountingPayablesView,
     AdminAccountingPaymentMethodSplitView,
     AdminAccountingReceivablesView,
@@ -182,7 +185,9 @@ from api.v1.views.admin_phase5_control import (
     AdminReportsReconciliationAnalysisView,
     AdminReportsRentLeasePerformanceView,
     AdminReportsRevenueTrendView,
+    AdminReportsSourceMapView,
     AdminReportsWaiverLossAnalysisView,
+    AdminReportExportView,
 )
 from api.v1.views.admin_support_requests import (
     AdminSupportRequestAssignView,
@@ -350,6 +355,9 @@ urlpatterns = [
     path("accounting/revenue-breakdown/", AdminAccountingRevenueBreakdownView.as_view()),
     path("accounting/payment-method-split/", AdminAccountingPaymentMethodSplitView.as_view()),
     path("accounting/audit-trail/", AdminAccountingAuditTrailView.as_view()),
+    path("accounting/reconciliation/<int:pk>/mark-reconciled/", AdminAccountingReconciliationMarkReconciledView.as_view()),
+    path("accounting/reconciliation/<int:pk>/mark-unreconciled/", AdminAccountingReconciliationMarkUnreconciledView.as_view()),
+    path("accounting/reconciliation/<int:pk>/attach-reference/", AdminAccountingReconciliationAttachReferenceView.as_view()),
     # Phase 5: operations command center
     path("operations/command-center/", AdminOperationsCommandCenterView.as_view()),
     path("operations/alerts/", AdminOperationsAlertsView.as_view()),
@@ -379,5 +387,7 @@ urlpatterns = [
     path("reports/revenue-trend/", AdminReportsRevenueTrendView.as_view()),
     path("reports/collection-trend/", AdminReportsCollectionTrendView.as_view()),
     path("reports/product-demand-analysis/", AdminReportsProductDemandAnalysisView.as_view()),
+    path("reports/source-map/", AdminReportsSourceMapView.as_view()),
+    path("reports/export/", AdminReportExportView.as_view()),
     path("", include(router.urls)),
 ]

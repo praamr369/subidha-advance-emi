@@ -9,7 +9,8 @@ export default function AdminReportPartnersPage() {
       title="Partner Performance"
       subtitle="Partner-linked customers, contracts, collections, and commission posture analytics."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Partners" }]}
-      fetcher={() => getAdminReportPartnerPerformance()}
+      fetcher={(query) => getAdminReportPartnerPerformance(query)}
+      exportType="partners"
     />
   );
 }

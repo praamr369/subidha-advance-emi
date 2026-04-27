@@ -55,3 +55,24 @@ export async function getAdminReportReconciliationAnalysis(query?: Query) {
 export async function getAdminReportWaiverLossAnalysis(query?: Query) {
   return request(`/admin/reports/waiver-loss-analysis/${toQuery(query)}`);
 }
+export async function getAdminReportSourceMap() {
+  return request(`/admin/reports/source-map/`);
+}
+export async function markAdminReconciliationReconciled(id: number, reason: string) {
+  return request(`/admin/accounting/reconciliation/${id}/mark-reconciled/`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+export async function markAdminReconciliationUnreconciled(id: number, reason: string) {
+  return request(`/admin/accounting/reconciliation/${id}/mark-unreconciled/`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+export async function attachAdminReconciliationReference(id: number, reference: string, reason: string) {
+  return request(`/admin/accounting/reconciliation/${id}/attach-reference/`, {
+    method: "POST",
+    body: JSON.stringify({ reference, reason }),
+  });
+}

@@ -9,7 +9,7 @@ export default function AdminReportDirectSalesPage() {
       title="Direct Sale Performance"
       subtitle="Retail direct-sale trend and revenue analytics from authoritative sales records."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Direct Sales" }]}
-      fetcher={() => getAdminReportDirectSalesPerformance()}
+      fetcher={(query) => getAdminReportDirectSalesPerformance(query)}
     />
   );
 }

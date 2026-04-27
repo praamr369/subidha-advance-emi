@@ -13,7 +13,7 @@ export default function AdminAccountingControlCenterPage() {
         { label: "Accounting", href: "/admin/accounting" },
         { label: "Control Center" },
       ]}
-      fetcher={() => getAdminAccountingControlCenter()}
+      fetcher={(query) => getAdminAccountingControlCenter(query)}
     />
   );
 }

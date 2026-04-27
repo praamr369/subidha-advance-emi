@@ -9,7 +9,8 @@ export default function AdminReportFinancePage() {
       title="Finance Performance Report"
       subtitle="Collection and payment-method BI metrics from authoritative payment records."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Finance" }]}
-      fetcher={() => getAdminReportFinancePerformance()}
+      fetcher={(query) => getAdminReportFinancePerformance(query)}
+      exportType="finance"
     />
   );
 }

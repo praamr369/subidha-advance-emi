@@ -9,7 +9,7 @@ export default function AdminReportRentLeasePage() {
       title="Rent/Lease Performance"
       subtitle="Live rent and lease billing/deposit workflow analytics."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Rent/Lease" }]}
-      fetcher={() => getAdminReportRentLeasePerformance()}
+      fetcher={(query) => getAdminReportRentLeasePerformance(query)}
     />
   );
 }

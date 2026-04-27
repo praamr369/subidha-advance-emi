@@ -9,7 +9,8 @@ export default function AdminReportDeliveryPage() {
       title="Delivery Performance"
       subtitle="Delivery, handover, return, and inspection analytics for operational command."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Delivery" }]}
-      fetcher={() => getAdminReportDeliveryPerformance()}
+      fetcher={(query) => getAdminReportDeliveryPerformance(query)}
+      exportType="delivery"
     />
   );
 }

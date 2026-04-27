@@ -9,7 +9,8 @@ export default function AdminReportReconciliationPage() {
       title="Reconciliation Analysis"
       subtitle="Unreconciled and flagged payment-reconciliation analytics."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Reconciliation" }]}
-      fetcher={() => getAdminReportReconciliationAnalysis()}
+      fetcher={(query) => getAdminReportReconciliationAnalysis(query)}
+      exportType="reconciliation"
     />
   );
 }

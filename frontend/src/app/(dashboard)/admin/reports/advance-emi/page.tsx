@@ -9,7 +9,7 @@ export default function AdminReportAdvanceEmiPage() {
       title="Advance EMI Performance"
       subtitle="Advance EMI KPI and trend analytics from subscription and EMI schedule records."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Advance EMI" }]}
-      fetcher={() => getAdminReportAdvanceEmiPerformance()}
+      fetcher={(query) => getAdminReportAdvanceEmiPerformance(query)}
     />
   );
 }

@@ -13,7 +13,7 @@ export default function AdminOperationsCommandCenterPage() {
         { label: "Operations", href: "/admin/operations" },
         { label: "Command Center" },
       ]}
-      fetcher={() => getAdminOperationsCommandCenter()}
+      fetcher={(query) => getAdminOperationsCommandCenter(query)}
     />
   );
 }
