@@ -37,7 +37,9 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(sidebar.getByText("Inventory", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Delivery", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Lucky Plan", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(
+      sidebar.getByRole("button", { name: "Admin", exact: true })
+    ).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Operations Command Center", exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
     await expect(
