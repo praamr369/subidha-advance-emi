@@ -24,6 +24,8 @@ export const ROUTES = {
     analyticsRiskMonitor: "/admin/analytics/risk-monitor",
     analyticsChurnAnalysis: "/admin/analytics/churn-analysis",
     operations: "/admin/operations",
+    operationsCommandCenter: "/admin/operations/command-center",
+    partnerPaymentRequests: "/admin/partner-payment-requests",
     auditLogs: "/admin/audit-logs",
 
     collections: "/admin/collections",
@@ -81,6 +83,7 @@ export const ROUTES = {
     serviceDeskTickets: "/admin/service-desk/tickets",
 
     accounting: "/admin/accounting",
+    accountingSetup: "/admin/accounting/setup",
     accountingChartOfAccounts: "/admin/accounting/chart-of-accounts",
     accountingJournals: "/admin/accounting/journals",
     accountingPeriods: "/admin/accounting/periods",

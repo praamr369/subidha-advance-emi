@@ -189,6 +189,19 @@ from api.v1.views.admin_phase5_control import (
     AdminReportsWaiverLossAnalysisView,
     AdminReportExportView,
 )
+from api.v1.views.admin_accounting_setup import (
+    AccountingMappingSuggestionsView,
+    AccountingSetupBootstrapView,
+    AccountingSetupStatusView,
+    FinanceAccountMappingListCreateView,
+    FinanceAccountMappingPatchView,
+)
+from api.v1.views.admin_operations_queues import (
+    AdminOperationsQueueSummaryView,
+    AdminOperationsRequestQueuesView,
+    AdminPartnerOperationsSummaryView,
+    AdminPartnerPaymentRequestsView,
+)
 from api.v1.views.admin_support_requests import (
     AdminSupportRequestAssignView,
     AdminSupportRequestDetailView,
@@ -370,6 +383,10 @@ urlpatterns = [
     path("operations/inventory/", AdminOperationsInventoryView.as_view()),
     path("operations/partners/", AdminOperationsPartnersView.as_view()),
     path("operations/crm/", AdminOperationsCrmView.as_view()),
+    path("operations/queue-summary/", AdminOperationsQueueSummaryView.as_view()),
+    path("operations/request-queues/", AdminOperationsRequestQueuesView.as_view()),
+    path("partner-operations/summary/", AdminPartnerOperationsSummaryView.as_view()),
+    path("partner-payment-requests/", AdminPartnerPaymentRequestsView.as_view()),
     # Phase 5: report and analytics suite
     path("reports/executive-summary/", AdminReportsExecutiveSummaryView.as_view()),
     path("reports/finance-performance/", AdminReportsFinancePerformanceView.as_view()),
@@ -389,5 +406,10 @@ urlpatterns = [
     path("reports/product-demand-analysis/", AdminReportsProductDemandAnalysisView.as_view()),
     path("reports/source-map/", AdminReportsSourceMapView.as_view()),
     path("reports/export/", AdminReportExportView.as_view()),
+    path("accounting/setup/status/", AccountingSetupStatusView.as_view()),
+    path("accounting/setup/bootstrap/", AccountingSetupBootstrapView.as_view()),
+    path("accounting/finance-account-mappings/", FinanceAccountMappingListCreateView.as_view()),
+    path("accounting/finance-account-mappings/<int:pk>/", FinanceAccountMappingPatchView.as_view()),
+    path("accounting/mapping-suggestions/", AccountingMappingSuggestionsView.as_view()),
     path("", include(router.urls)),
 ]

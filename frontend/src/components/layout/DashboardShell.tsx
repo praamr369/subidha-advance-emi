@@ -72,6 +72,7 @@ import {
 } from "@/config/navigation";
 import { pushRecent, readFavorites, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
+import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 
 const DashboardShellContext = createContext(false);
 
@@ -84,6 +85,7 @@ type ShellNavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   disabled?: boolean;
+  badgeSource?: string;
 };
 
 type ShellNavGroup = {
@@ -253,6 +255,7 @@ function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
           href: item.href,
           icon: ICON_MAP[item.icon],
           disabled: Boolean(item.disabled),
+          badgeSource: item.badgeSource,
         })),
     }))
     .filter((group) => group.items.length > 0);
@@ -414,6 +417,7 @@ function SidebarContent({
   const [navQuery, setNavQuery] = useState("");
   const normalizedNavQuery = navQuery.trim().toLowerCase();
   const [favorites, setFavorites] = useState<string[]>(() => (sessionId ? readFavorites(sessionId, role) : []));
+  const [queueBadges, setQueueBadges] = useState<Record<string, number>>({});
 
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
@@ -438,6 +442,32 @@ function SidebarContent({
       })
       .filter((group) => group.items.length > 0);
   }, [navGroups, normalizedNavQuery]);
+
+  useEffect(() => {
+    if (role !== "ADMIN") return;
+    let cancelled = false;
+    const loadBadges = async () => {
+      try {
+        const payload = (await getAdminOperationsQueueSummary()) as {
+          results?: { key: string; badge_source?: string; count: number }[];
+        };
+        if (cancelled) return;
+        const next: Record<string, number> = {};
+        (payload.results ?? []).forEach((row) => {
+          if (row.badge_source) {
+            next[row.badge_source] = Number(row.count || 0);
+          }
+        });
+        setQueueBadges(next);
+      } catch {
+        if (!cancelled) setQueueBadges({});
+      }
+    };
+    void loadBadges();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   useEffect(() => {
     try {
@@ -693,6 +723,11 @@ function SidebarContent({
                               )}
                             />
                             <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+                            {item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
+                              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+                                {queueBadges[item.badgeSource]}
+                              </span>
+                            ) : null}
                           </Link>
                         );
                       })}
@@ -736,6 +771,11 @@ function SidebarContent({
                               )}
                             />
                             <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
+                            {item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
+                              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+                                {queueBadges[item.badgeSource]}
+                              </span>
+                            ) : null}
                           </Link>
                           {sessionId && !collapsed ? (
                             <button

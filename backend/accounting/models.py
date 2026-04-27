@@ -134,6 +134,22 @@ class FinanceAccountKind(models.TextChoices):
     UPI = "UPI", "UPI"
 
 
+class FinanceAccountMappingPurpose(models.TextChoices):
+    CASH_COLLECTION = "CASH_COLLECTION", "Cash Collection"
+    UPI_COLLECTION = "UPI_COLLECTION", "UPI Collection"
+    BANK_COLLECTION = "BANK_COLLECTION", "Bank Collection"
+    CUSTOMER_RECEIVABLE = "CUSTOMER_RECEIVABLE", "Customer Receivable"
+    SECURITY_DEPOSIT_LIABILITY = "SECURITY_DEPOSIT_LIABILITY", "Security Deposit Liability"
+    EMI_INCOME = "EMI_INCOME", "Advance EMI Income"
+    RENT_INCOME = "RENT_INCOME", "Rent Income"
+    LEASE_INCOME = "LEASE_INCOME", "Lease Income"
+    DIRECT_SALE_INCOME = "DIRECT_SALE_INCOME", "Direct Sale Income"
+    WAIVER_LOSS = "WAIVER_LOSS", "Waiver/Loss"
+    COMMISSION_PAYABLE = "COMMISSION_PAYABLE", "Commission Payable"
+    DAMAGE_RECOVERY = "DAMAGE_RECOVERY", "Damage Recovery"
+    INVENTORY_ASSET = "INVENTORY_ASSET", "Inventory Asset"
+
+
 class JournalEntryType(models.TextChoices):
     MANUAL = "MANUAL", "Manual"
     EXPENSE = "EXPENSE", "Expense"
@@ -484,6 +500,98 @@ class FinanceAccount(AccountingTimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class FinanceAccountCoaMapping(AccountingTimeStampedModel):
+    finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        related_name="coa_mappings",
+    )
+    chart_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="finance_account_mappings",
+    )
+    purpose = models.CharField(
+        max_length=50,
+        choices=FinanceAccountMappingPurpose.choices,
+        db_index=True,
+    )
+    is_default = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_finance_coa_mappings",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="updated_finance_coa_mappings",
+    )
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_finance_account_coa_mappings"
+        ordering = ["purpose", "-is_default", "-is_active", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["finance_account", "purpose"],
+                condition=Q(is_active=True),
+                name="uq_active_finance_account_purpose_mapping",
+            ),
+            models.UniqueConstraint(
+                fields=["purpose"],
+                condition=Q(is_default=True, is_active=True),
+                name="uq_default_mapping_per_purpose",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["purpose", "is_active"]),
+            models.Index(fields=["is_default", "is_active"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        account_type = self.chart_account.account_type if self.chart_account_id else None
+        if self.purpose in {
+            FinanceAccountMappingPurpose.CASH_COLLECTION,
+            FinanceAccountMappingPurpose.UPI_COLLECTION,
+            FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,
+            FinanceAccountMappingPurpose.INVENTORY_ASSET,
+        } and account_type != ChartOfAccountType.ASSET:
+            errors["chart_account"] = "This purpose must map to an ASSET chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,
+            FinanceAccountMappingPurpose.COMMISSION_PAYABLE,
+        } and account_type != ChartOfAccountType.LIABILITY:
+            errors["chart_account"] = "This purpose must map to a LIABILITY chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.EMI_INCOME,
+            FinanceAccountMappingPurpose.RENT_INCOME,
+            FinanceAccountMappingPurpose.LEASE_INCOME,
+            FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,
+            FinanceAccountMappingPurpose.DAMAGE_RECOVERY,
+        } and account_type != ChartOfAccountType.INCOME:
+            errors["chart_account"] = "This purpose must map to an INCOME chart account."
+        if self.purpose == FinanceAccountMappingPurpose.WAIVER_LOSS and account_type not in {
+            ChartOfAccountType.EXPENSE,
+            ChartOfAccountType.EQUITY,
+        }:
+            errors["chart_account"] = "Waiver/Loss must map to an EXPENSE or EQUITY chart account."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class RentLeaseAccountingAccountMapping(AccountingTimeStampedModel):

@@ -16,6 +16,8 @@ from accounting.models import (
     ExpenseClaimStatus,
     ExpenseVoucherStatus,
     FinanceAccount,
+    FinanceAccountCoaMapping,
+    FinanceAccountMappingPurpose,
     JournalEntry,
     JournalEntryLine,
     JournalEntryStatus,
@@ -280,6 +282,36 @@ class FinanceAccountUpdateSerializer(serializers.ModelSerializer):
         updated.refresh_from_db()
         return updated
 
+
+class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
+    chart_account_type = serializers.CharField(source="chart_account.account_type", read_only=True)
+
+    class Meta:
+        model = FinanceAccountCoaMapping
+        fields = [
+            "id",
+            "finance_account",
+            "finance_account_name",
+            "chart_account",
+            "chart_account_name",
+            "chart_account_type",
+            "purpose",
+            "is_default",
+            "is_active",
+            "notes",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_by", "updated_by", "created_at", "updated_at"]
+
+    def validate_purpose(self, value):
+        if value not in FinanceAccountMappingPurpose.values:
+            raise serializers.ValidationError("Invalid mapping purpose.")
+        return value
 
 class JournalEntryLineSerializer(serializers.ModelSerializer):
     chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)

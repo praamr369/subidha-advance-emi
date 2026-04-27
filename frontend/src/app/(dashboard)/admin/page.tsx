@@ -56,10 +56,12 @@ import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
 } from "@/services/reports";
+import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 import { cn } from "@/lib/utils";
 
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
 type DeliverySummaryPayload = Awaited<ReturnType<typeof getAdminDeliverySummary>>;
+type QueueSummaryPayload = { results?: { key: string; count: number; severity: string; oldest_pending_date?: string | null; detail_url?: string }[] };
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -137,6 +139,7 @@ export default function AdminDashboardPage() {
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummaryResponse | null>(null);
   const [deliverySummary, setDeliverySummary] = useState<DeliverySummaryPayload | null>(null);
   const [todayBranch, setTodayBranch] = useState<BranchReportingOverview | null>(null);
+  const [queueSummary, setQueueSummary] = useState<QueueSummaryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,13 +150,14 @@ export default function AdminDashboardPage() {
 
     try {
       const today = todayIso();
-      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload] =
+      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload, queuePayload] =
         await Promise.all([
           getDashboardSummaryV2({ window: "THIS_MONTH" }),
           getAdminDashboard(),
           getAdminAnalyticsSummary({ window: "THIS_MONTH" }),
           getAdminDeliverySummary(),
           getBranchReportingOverview({ start_date: today, end_date: today }),
+          getAdminOperationsQueueSummary(),
         ]);
 
       setCanonical(canonicalPayload);
@@ -161,6 +165,7 @@ export default function AdminDashboardPage() {
       setAnalytics(analyticsPayload);
       setDeliverySummary(deliveryPayload);
       setTodayBranch(todayBranchPayload);
+      setQueueSummary(queuePayload as QueueSummaryPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -645,6 +650,23 @@ export default function AdminDashboardPage() {
             />
           </div>
         </section>
+        <PageSection>
+          <h2 className="text-sm font-semibold text-foreground">Request & Approval Queues</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Live admin queues with severity and deep links.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {(queueSummary?.results ?? []).map((row) => (
+              <LaunchCard
+                key={row.key}
+                title={row.key.replaceAll("_", " ")}
+                description={row.oldest_pending_date ? `Oldest pending: ${row.oldest_pending_date}` : "No pending row"}
+                href={row.detail_url || ROUTES.admin.operations}
+                icon={<ClipboardCheck className="h-5 w-5" />}
+                meta={`Count: ${row.count}`}
+                badge={row.severity}
+              />
+            ))}
+          </div>
+        </PageSection>
 
         {/* Quick actions */}
         <PageSection className="p-0">
