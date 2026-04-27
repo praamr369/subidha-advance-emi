@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
+import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import PublicTrustBadgeGrid from "@/components/public/PublicTrustBadgeGrid";
 import SectionHeader from "@/components/public/SectionHeader";
 import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
+import { PUBLIC_LEGAL_DISCLAIMER_POINTS, PUBLIC_PURPOSE_BADGES } from "@/lib/public-content";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ROUTES } from "@/lib/routes";
 
@@ -36,15 +39,17 @@ export default async function AboutPage() {
       ]}
     >
       <PublicMarketingBanner
-        eyebrow="Our commitment"
-        title="Real local support with clear rules"
-        description="We avoid fake statistics and demo claims. Public pages show either live records or honest empty states."
+        eyebrow="Our purpose"
+        title="A trusted local furniture business with transparent customer paths"
+        description="Subidha Furniture helps customers choose Advance EMI, Rent, Lease, or Direct Sale based on need and eligibility."
         items={[
-          { title: "Family affordability", description: "Plans are presented in simple monthly terms." },
-          { title: "Audit-friendly process", description: "Payment, winner, and contract states are kept transparent." },
-          { title: "Branch accountability", description: "Enrollment and follow-up are handled by the local team." },
+          { title: "Structured options", description: "Advance EMI, Rent, Lease, and Direct Sale for different household needs." },
+          { title: "Transparent records", description: "Contracts, invoices, receipts, delivery notes, and support history remain traceable." },
+          { title: "Verification-first", description: "KYC and admin checks can be required before activation, handover, or delivery." },
         ]}
       />
+
+      <PublicTrustBadgeGrid items={PUBLIC_PURPOSE_BADGES} />
 
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6">
         <SectionHeader
@@ -54,12 +59,16 @@ export default async function AboutPage() {
         />
       </section>
 
+      <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
+
       <CtaBanner
         title="Ready to explore current options?"
         description="See the public catalogue and contact the branch to check active batches and monthly plan comfort."
         actions={[
           { href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" },
-          { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "primary" },
+          { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
+          { href: ROUTES.public.policies, label: "View policies", variant: "secondary" },
+          { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "primary" },
         ]}
       />
     </PublicPageShell>

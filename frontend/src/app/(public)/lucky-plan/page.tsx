@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
 import FaqBlock from "@/components/public/FaqBlock";
+import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicPageShell from "@/components/public/PublicPageShell";
-import { LUCKY_PLAN_FAQ } from "@/lib/public-content";
+import { ADVANCE_EMI_POLICY, LUCKY_PLAN_FAQ, PUBLIC_LEGAL_DISCLAIMER_POINTS, READ_BEFORE_APPLY } from "@/lib/public-content";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
@@ -43,13 +45,26 @@ export default async function LuckyPlanPage() {
         ]}
       />
 
+      <PublicDisclaimerBox title="Read before applying" points={READ_BEFORE_APPLY.advanceEmi} />
+
+      <PublicPolicySection
+        id="advance-emi-policy"
+        title={ADVANCE_EMI_POLICY.title}
+        intro={ADVANCE_EMI_POLICY.intro}
+        cards={ADVANCE_EMI_POLICY.cards}
+      />
+
       <FaqBlock items={LUCKY_PLAN_FAQ} />
+
+      <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
 
       <CtaBanner
         title="Talk to the branch before you enroll"
         description="Get help on product selection, batch availability, tenure, and monthly amount comfort."
         actions={[
           { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
+          { href: ROUTES.public.products, label: "View Products", variant: "secondary" },
+          { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "secondary" },
           { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
         ]}
       />

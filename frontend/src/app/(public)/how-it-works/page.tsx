@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
-import ProcessTimeline from "@/components/public/ProcessTimeline";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
+import PublicProcessTimeline from "@/components/public/PublicProcessTimeline";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { HOW_IT_WORKS_STEPS } from "@/lib/public-content";
 import { getPublicDictionary } from "@/lib/public-i18n";
@@ -32,7 +32,7 @@ export default async function HowItWorksPage() {
         { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
-      <ProcessTimeline steps={HOW_IT_WORKS_STEPS} />
+      <PublicProcessTimeline steps={HOW_IT_WORKS_STEPS} />
 
       <PublicMarketingBanner
         eyebrow="Trust process"
@@ -51,6 +51,7 @@ export default async function HowItWorksPage() {
         actions={[
           { href: ROUTES.public.winners, label: dictionary.common.winners, variant: "primary" },
           { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory, variant: "secondary" },
+          { href: ROUTES.public.policies, label: "Business policies", variant: "secondary" },
         ]}
       />
     </PublicPageShell>

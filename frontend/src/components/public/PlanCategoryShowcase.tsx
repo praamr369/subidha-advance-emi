@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Landmark, Home, Handshake } from "lucide-react";
+import { Landmark, Home, Handshake, ShoppingBag } from "lucide-react";
 
 import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
@@ -22,7 +22,7 @@ const categories = [
     summary:
       "Flexible access where you pay for usage over time. Availability and eligibility depend on product readiness and branch workflow.",
     forWho: "Best for customers who want flexibility with shorter commitments.",
-    cta: { href: ROUTES.public.contact, label: "Ask about rent" },
+    cta: { href: ROUTES.public.rent, label: "Read rent policy" },
   },
   {
     key: "lease",
@@ -31,7 +31,16 @@ const categories = [
     summary:
       "Longer-term access with structured documentation and controlled operational steps. Availability depends on product readiness and branch workflow.",
     forWho: "Best for customers and partners who need longer-term, documented access.",
-    cta: { href: ROUTES.public.contact, label: "Ask about lease" },
+    cta: { href: ROUTES.public.lease, label: "Read lease policy" },
+  },
+  {
+    key: "direct-sale",
+    title: "Direct Sale",
+    icon: ShoppingBag,
+    summary:
+      "Standard purchase flow with invoice, receipt, delivery controls, and warranty/service terms based on product and policy.",
+    forWho: "Best for customers ready for normal purchase against invoice and receipt.",
+    cta: { href: ROUTES.public.directSale, label: "Read direct sale policy" },
   },
 ] as const;
 
@@ -40,8 +49,8 @@ export default function PlanCategoryShowcase({ className }: { className?: string
     <section className={cn("public-surface space-y-6 p-6", className)}>
       <SectionHeader
         eyebrow="Plan categories"
-        title="Advance EMI, Rent, and Lease"
-        description="The public site explains plan categories clearly. Availability depends on the product and branch readiness."
+        title="Advance EMI, Rent, Lease, and Direct Sale"
+        description="Public pages explain each path clearly. Availability and approval depend on product, records, and branch readiness."
       >
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
@@ -59,7 +68,7 @@ export default function PlanCategoryShowcase({ className }: { className?: string
         </div>
       </SectionHeader>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {categories.map((category) => {
           const Icon = category.icon;
           return (

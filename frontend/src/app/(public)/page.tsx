@@ -79,6 +79,12 @@ export default async function PublicHome() {
               >
                 Visit winners
               </Link>
+              <Link
+                href={ROUTES.public.policies}
+                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+              >
+                Business policies
+              </Link>
             </div>
           </div>
 
@@ -172,6 +178,7 @@ export default async function PublicHome() {
         description="Use the language switcher in the header for English, हिन्दी, or বাংলা, then connect with the branch for assisted enrollment."
         actions={[
           { href: ROUTES.public.contact, label: "Contact us", variant: "secondary" },
+          { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "secondary" },
           { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
         ]}
       />
