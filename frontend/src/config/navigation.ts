@@ -71,6 +71,11 @@ function iconForGroup(group: string): NavIconKey {
   if (key.includes("contract")) return "subscriptions";
   if (key.includes("partner")) return "partners";
   if (key.includes("billing")) return "finance";
+  if (key.includes("finance")) return "finance";
+  if (key.includes("inventory")) return "inventory";
+  if (key.includes("delivery")) return "deliveries";
+  if (key.includes("lucky")) return "luckyDraws";
+  if (key.includes("admin")) return "settings";
   return "operations";
 }
 

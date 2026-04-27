@@ -25,6 +25,7 @@ class AdminOperationsQueueApiTests(APITestCase):
         self.assertIn("customer_kyc_pending", keys)
         self.assertIn("deposit_refunds_pending", keys)
         self.assertIn("reconciliation_pending", keys)
+        self.assertIn("overdue_payments", keys)
 
     def test_admin_partner_payment_requests_permissions(self):
         self.client.force_authenticate(user=self.partner)

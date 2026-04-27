@@ -57,11 +57,21 @@ import {
   type AdminAnalyticsSummaryResponse,
 } from "@/services/reports";
 import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
+import { getStockSummary } from "@/services/inventory";
 import { cn } from "@/lib/utils";
 
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
 type DeliverySummaryPayload = Awaited<ReturnType<typeof getAdminDeliverySummary>>;
-type QueueSummaryPayload = { results?: { key: string; count: number; severity: string; oldest_pending_date?: string | null; detail_url?: string }[] };
+type StockSummaryPayload = Awaited<ReturnType<typeof getStockSummary>>;
+type QueueSummaryPayload = {
+  results?: {
+    key: string;
+    count: number;
+    severity: string;
+    oldest_pending_date?: string | null;
+    detail_url?: string;
+  }[];
+};
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -132,6 +142,32 @@ function MoreLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+const REQUIRED_QUEUE_KEYS = [
+  "partner_payment_requests_pending",
+  "subscription_requests_pending",
+  "customer_kyc_pending",
+  "deposit_refunds_pending",
+  "reconciliation_pending",
+  "delivery_blocked",
+  "return_inspections_pending",
+  "overdue_payments",
+  "low_stock_alerts",
+  "support_requests_pending",
+] as const;
+
+const QUEUE_LABELS: Record<string, string> = {
+  partner_payment_requests_pending: "Partner Payment Requests",
+  subscription_requests_pending: "Subscription Requests",
+  customer_kyc_pending: "KYC Pending",
+  deposit_refunds_pending: "Deposit Refund Pending",
+  reconciliation_pending: "Reconciliation Pending",
+  delivery_blocked: "Delivery Blocked",
+  return_inspections_pending: "Return Inspection Pending",
+  overdue_payments: "Overdue Payments",
+  low_stock_alerts: "Low Stock Alerts",
+  support_requests_pending: "Support Requests Pending",
+};
+
 export default function AdminDashboardPage() {
   const { openWorkflow } = useWorkflowLauncher();
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
@@ -140,6 +176,7 @@ export default function AdminDashboardPage() {
   const [deliverySummary, setDeliverySummary] = useState<DeliverySummaryPayload | null>(null);
   const [todayBranch, setTodayBranch] = useState<BranchReportingOverview | null>(null);
   const [queueSummary, setQueueSummary] = useState<QueueSummaryPayload | null>(null);
+  const [stockSummary, setStockSummary] = useState<StockSummaryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +187,7 @@ export default function AdminDashboardPage() {
 
     try {
       const today = todayIso();
-      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload, queuePayload] =
+      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload, queuePayload, stockPayload] =
         await Promise.all([
           getDashboardSummaryV2({ window: "THIS_MONTH" }),
           getAdminDashboard(),
@@ -158,6 +195,7 @@ export default function AdminDashboardPage() {
           getAdminDeliverySummary(),
           getBranchReportingOverview({ start_date: today, end_date: today }),
           getAdminOperationsQueueSummary(),
+          getStockSummary(),
         ]);
 
       setCanonical(canonicalPayload);
@@ -166,6 +204,7 @@ export default function AdminDashboardPage() {
       setDeliverySummary(deliveryPayload);
       setTodayBranch(todayBranchPayload);
       setQueueSummary(queuePayload as QueueSummaryPayload);
+      setStockSummary(stockPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -654,17 +693,43 @@ export default function AdminDashboardPage() {
           <h2 className="text-sm font-semibold text-foreground">Request & Approval Queues</h2>
           <p className="mt-1 text-sm text-muted-foreground">Live admin queues with severity and deep links.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {(queueSummary?.results ?? []).map((row) => (
-              <LaunchCard
-                key={row.key}
-                title={row.key.replaceAll("_", " ")}
-                description={row.oldest_pending_date ? `Oldest pending: ${row.oldest_pending_date}` : "No pending row"}
-                href={row.detail_url || ROUTES.admin.operations}
-                icon={<ClipboardCheck className="h-5 w-5" />}
-                meta={`Count: ${row.count}`}
-                badge={row.severity}
-              />
-            ))}
+            {REQUIRED_QUEUE_KEYS.map((key) => {
+              const row = (queueSummary?.results ?? []).find((item) => item.key === key);
+              const isLowStock = key === "low_stock_alerts";
+              const lowStockCount =
+                stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
+              const href = isLowStock
+                ? ROUTES.admin.inventoryStockOnHand
+                : row?.detail_url || ROUTES.admin.operationsCommandCenter;
+              const count = isLowStock ? lowStockCount : row?.count ?? 0;
+              const severity = isLowStock
+                ? lowStockCount > 0
+                  ? "HIGH"
+                  : "INFO"
+                : row?.severity ?? "INFO";
+              return (
+                <div key={key} className="rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-semibold text-foreground">{QUEUE_LABELS[key] || key}</div>
+                    <span className="rounded-full border border-border/80 bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {severity}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Count: {count}
+                    {row?.oldest_pending_date ? ` • Oldest: ${row.oldest_pending_date}` : ""}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <ActionButton href={href} size="sm" variant="secondary">
+                      Open Queue
+                    </ActionButton>
+                    <ActionButton href={href} size="sm" variant="outline">
+                      Take Action
+                    </ActionButton>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </PageSection>
 

@@ -6,6 +6,8 @@ from django.db.models import Min, Q
 from django.utils import timezone
 
 from subscriptions.models import (
+    Emi,
+    EmiStatus,
     CustomerSupportRequest,
     CustomerKycDocument,
     CustomerKycDocumentStatus,
@@ -47,6 +49,7 @@ def build_admin_queue_summary() -> dict:
     reconciliation_qs = PaymentReconciliation.objects.filter(Q(status=ReconciliationStatus.PENDING) | Q(is_flagged=True))
     contract_approval_qs = Subscription.objects.filter(status="PENDING_APPROVAL")
     contract_activation_qs = Subscription.objects.filter(status="APPROVED")
+    overdue_payment_qs = Emi.objects.filter(status=EmiStatus.PENDING, due_date__lt=today)
     support_qs = CustomerSupportRequest.objects.filter(status__in=[SupportRequestStatus.SUBMITTED, SupportRequestStatus.UNDER_REVIEW])
     blocked_delivery_qs = SubscriptionDelivery.objects.filter(status=DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE)
 
@@ -113,6 +116,13 @@ def build_admin_queue_summary() -> dict:
             oldest_date=reconciliation_qs.aggregate(oldest=Min("created_at"))["oldest"],
             detail_url="/admin/accounting/reconciliation",
             badge_source="queue.reconciliation_pending",
+        ),
+        _queue_payload(
+            key="overdue_payments",
+            count=overdue_payment_qs.count(),
+            oldest_date=overdue_payment_qs.aggregate(oldest=Min("due_date"))["oldest"],
+            detail_url="/admin/emis/overdue",
+            badge_source="queue.overdue_payments",
         ),
         _queue_payload(
             key="delivery_blocked",
