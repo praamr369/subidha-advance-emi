@@ -46,7 +46,7 @@ class SetupChecklistSerializer(serializers.Serializer):
 
 
 class BusinessResetRequestSerializer(serializers.Serializer):
-    confirm = serializers.CharField()
+    confirm = serializers.BooleanField()
     preserve_username = serializers.CharField()
     delete_non_preserved_users = serializers.BooleanField(default=True)
     clear_auth_artifacts = serializers.BooleanField(default=True)
@@ -58,6 +58,12 @@ class BusinessResetRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError("Preserve username is required.")
         return cleaned
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not attrs.get("confirm", False):
+            raise serializers.ValidationError({"confirm": "confirm must be true to execute business reset."})
+        return attrs
+
 
 class BusinessResetResponseSerializer(serializers.Serializer):
     mode = serializers.CharField()
@@ -67,3 +73,6 @@ class BusinessResetResponseSerializer(serializers.Serializer):
     deletable_user_count = serializers.IntegerField()
     targets = serializers.DictField()
     auth_artifacts = serializers.DictField()
+    deleted_counts = serializers.DictField(required=False)
+    post_reset_checklist = serializers.DictField(required=False)
+    next_setup_steps = serializers.ListField(child=serializers.CharField(), required=False)

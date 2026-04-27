@@ -71,7 +71,7 @@ export async function getResetPreview(preserveUsername?: string): Promise<Record
 }
 
 export type BusinessResetExecuteRequest = {
-  confirm: string;
+  confirm: boolean;
   preserve_username: string;
   delete_non_preserved_users?: boolean;
   clear_auth_artifacts?: boolean;

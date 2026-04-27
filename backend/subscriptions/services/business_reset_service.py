@@ -205,11 +205,19 @@ def execute_business_reset(*, options: BusinessResetOptions, confirm: str, dry_r
                         f"TRUNCATE TABLE {', '.join(auth_tables)} RESTART IDENTITY CASCADE;"
                     )
         else:
-            for model in target_models:
-                model.objects.all().delete()
+            # SQLite and other lightweight DBs can raise ProtectedError during ORM
+            # cascade order resolution. Use table-level deletes to keep reset behavior
+            # aligned with the PostgreSQL truncate path.
+            tables = [model._meta.db_table for model in target_models]
             if options.clear_auth_artifacts:
-                for model in auth_models:
-                    model.objects.all().delete()
+                tables.extend(model._meta.db_table for model in auth_models)
+            with connection.cursor() as cursor:
+                if connection.vendor == "sqlite":
+                    cursor.execute("PRAGMA foreign_keys = OFF;")
+                for table in tables:
+                    cursor.execute(f"DELETE FROM {_quote_table(table)};")
+                if connection.vendor == "sqlite":
+                    cursor.execute("PRAGMA foreign_keys = ON;")
 
         if options.delete_non_preserved_users:
             User.objects.exclude(id__in=preserved_user_ids).delete()

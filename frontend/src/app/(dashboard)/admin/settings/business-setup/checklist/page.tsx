@@ -14,6 +14,8 @@ import {
   type SetupChecklist,
 } from "@/services/business-setup";
 
+const RESET_CONFIRM_PHRASE = "RESET_SUBIDHA_CORE";
+
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to load checklist.";
 }
@@ -63,8 +65,14 @@ export default function BusinessSetupChecklistPage() {
   }
 
   async function runReset() {
+    const isPhraseConfirmed = confirm.trim() === RESET_CONFIRM_PHRASE;
+    if (!isPhraseConfirmed) {
+      setError(`Type ${RESET_CONFIRM_PHRASE} exactly before running reset.`);
+      return;
+    }
+
     const payload: BusinessResetExecuteRequest = {
-      confirm,
+      confirm: true,
       preserve_username: resetUsername,
       delete_non_preserved_users: true,
       clear_auth_artifacts: true,
@@ -201,7 +209,7 @@ export default function BusinessSetupChecklistPage() {
                   value={confirm}
                   onChange={(event) => setConfirm(event.target.value)}
                   className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  placeholder="RESET_SUBIDHA_CORE"
+                  placeholder={RESET_CONFIRM_PHRASE}
                 />
               </label>
               <label className="flex items-center gap-3 text-sm text-muted-foreground">
