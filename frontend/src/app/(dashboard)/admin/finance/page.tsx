@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -492,6 +493,27 @@ export default function AdminFinancePage() {
       maxWidth={1440}
     >
       <div className="space-y-6">
+        <Phase7Guidance
+          items={[
+            {
+              label: "Collect Payment",
+              href: ROUTES.admin.financeCollect,
+              note: "Fastest route for EMI, subscription, and direct-sale collection posting.",
+              warning: "Use reconciliation before closing disputed or flagged money records.",
+            },
+            {
+              label: "Reconcile Payment",
+              href: ROUTES.admin.financeCanonicalReconciliation,
+              note: "Clear flagged payments, unapplied advances, and settlement-sensitive rows.",
+            },
+            {
+              label: "Review Overdue EMI",
+              href: ROUTES.admin.emisOverdue,
+              note: "Follow up overdue EMI before delivery or contract closure decisions.",
+              warning: "Overdue EMI is a customer-risk signal, not a destructive payment mutation.",
+            },
+          ]}
+        />
         <section className="flex justify-end">
           <button
             type="button"
@@ -629,7 +651,7 @@ export default function AdminFinancePage() {
                 label="Direct Sale Unpaid"
                 value={money(directSalesOutstandingTotal)}
                 note={`${directSales.length} receivable bills`}
-                href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale`}
+                href={`${ROUTES.admin.financeCollect}?workflow=direct-sale`}
                 tone={directSalesOutstandingTotal > 0 ? "warning" : "default"}
               />
               <MetricCard
@@ -1025,7 +1047,7 @@ export default function AdminFinancePage() {
                               Outstanding {money(sale.balance_total)}
                             </div>
                             <Link
-                              href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale&direct_sale=${sale.id}`}
+                              href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&direct_sale=${sale.id}`}
                               className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                             >
                               Collect

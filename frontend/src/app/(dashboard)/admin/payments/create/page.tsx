@@ -1,5 +1,13 @@
-import AdminPaymentCollectPage from "@/domains/payments/pages/AdminPaymentCollectPage";
+import {
+  type AsyncRouteSearchParams,
+  redirectToCanonicalPath,
+} from "@/lib/route-redirect";
+import { ROUTES } from "@/lib/routes";
 
-export default function AdminPaymentCollectRoutePage() {
-  return <AdminPaymentCollectPage />;
+type PageProps = {
+  searchParams?: AsyncRouteSearchParams;
+};
+
+export default async function AdminPaymentCreateCompatibilityPage({ searchParams }: PageProps) {
+  await redirectToCanonicalPath(ROUTES.admin.financeCollect, searchParams);
 }

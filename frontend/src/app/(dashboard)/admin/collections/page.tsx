@@ -446,7 +446,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                       </Link>
 
                       <Link
-                        href={`/admin/payments/create?subscription=${row.subscription}&emi=${row.id}`}
+                        href={`/admin/finance/collect?subscription=${row.subscription}&emi=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Collect
@@ -901,7 +901,7 @@ export default function AdminCollectionsPage() {
           variant: "primary",
         },
         {
-          href: `${ROUTES.admin.paymentsCreate}?workflow=direct-sale`,
+          href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
           label: "Direct-Sale Collect",
           variant: "secondary",
         },
@@ -1034,7 +1034,7 @@ export default function AdminCollectionsPage() {
                 value={money(directSaleOutstandingTotal)}
                 icon={<Wallet className="h-4 w-4" />}
                 tone={directSaleRows.length > 0 ? "warning" : "default"}
-                href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale`}
+                href={`${ROUTES.admin.financeCollect}?workflow=direct-sale`}
               />
             </div>
 
@@ -1073,8 +1073,8 @@ export default function AdminCollectionsPage() {
                 <Link
                   href={
                     subscriptionFilter
-                      ? `/admin/payments/create?subscription=${subscriptionFilter}`
-                      : "/admin/payments/create"
+                      ? `/admin/finance/collect?subscription=${subscriptionFilter}`
+                      : "/admin/finance/collect"
                   }
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
@@ -1082,7 +1082,7 @@ export default function AdminCollectionsPage() {
                 </Link>
 
                 <Link
-                  href="/admin/payments/create?workflow=direct-sale"
+                  href="/admin/finance/collect?workflow=direct-sale"
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
                   Open Direct-Sale Collection
@@ -1093,7 +1093,7 @@ export default function AdminCollectionsPage() {
             <SectionCard
               title="Direct-sale receivables"
               description="Outstanding invoiced direct sales stay separate from the EMI queue but remain collectible from the same operational control layer."
-              actionHref="/admin/payments/create?workflow=direct-sale"
+              actionHref="/admin/finance/collect?workflow=direct-sale"
               actionLabel="Collect Direct Sale"
             >
               {directSalePreview.length === 0 ? (
@@ -1126,7 +1126,7 @@ export default function AdminCollectionsPage() {
                             Outstanding {money(sale.balance_total)}
                           </div>
                           <Link
-                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${sale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${sale.id}`}
                             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                           >
                             Collect

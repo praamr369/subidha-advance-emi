@@ -13,7 +13,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
   BellRing,
@@ -35,6 +35,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Plus,
   Receipt,
   ReceiptText,
   Search,
@@ -86,6 +87,7 @@ type ShellNavItem = {
   icon: React.ComponentType<{ className?: string }>;
   disabled?: boolean;
   badgeSource?: string;
+  children?: ShellNavItem[];
 };
 
 type ShellNavGroup = {
@@ -215,17 +217,26 @@ function buildPageTitle(pathname: string) {
   return segmentToLabel(last);
 }
 
-function isActivePath(pathname: string, href: string) {
-  if (href === pathname) return true;
+function hrefPathname(href: string) {
+  return href.split("?")[0] || href;
+}
+
+function isActivePath(pathname: string, currentUrl: string, href: string) {
+  const cleanHref = hrefPathname(href);
+  if (href.includes("?")) {
+    if (currentUrl === href || currentUrl.startsWith(`${href}&`)) return true;
+  } else if (cleanHref === pathname) {
+    return true;
+  }
   if (
-    href === ROUTES.admin.dashboard ||
-    href === ROUTES.partner.dashboard ||
-    href === ROUTES.customer.dashboard ||
-    href === ROUTES.cashier.dashboard
+    cleanHref === ROUTES.admin.dashboard ||
+    cleanHref === ROUTES.partner.dashboard ||
+    cleanHref === ROUTES.customer.dashboard ||
+    cleanHref === ROUTES.cashier.dashboard
   ) {
     return false;
   }
-  return pathname.startsWith(`${href}/`);
+  return pathname.startsWith(`${cleanHref}/`);
 }
 
 function getRoleBasePath(role: NavigationRole) {
@@ -244,21 +255,42 @@ function getRoleBasePath(role: NavigationRole) {
 }
 
 function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
+  const mapItem = (item: NavGroup["items"][number]): ShellNavItem => ({
+    label: item.label,
+    href: item.href,
+    icon: ICON_MAP[item.icon],
+    disabled: Boolean(item.disabled),
+    badgeSource: item.badgeSource,
+    children: item.children
+      ?.filter((child) => !child.hidden && typeof child.href === "string" && child.href.trim().length > 0)
+      .map(mapItem),
+  });
+
   return groups
     .map((group) => ({
       title: group.title,
       icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
       items: group.items
         .filter((item) => !item.hidden && typeof item.href === "string" && item.href.trim().length > 0)
-        .map((item) => ({
-          label: item.label,
-          href: item.href,
-          icon: ICON_MAP[item.icon],
-          disabled: Boolean(item.disabled),
-          badgeSource: item.badgeSource,
-        })),
+        .map(mapItem),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+function flattenShellItems(items: ShellNavItem[]): ShellNavItem[] {
+  return items.flatMap((item) => [item, ...(item.children ? flattenShellItems(item.children) : [])]);
+}
+
+function filterShellItems(items: ShellNavItem[], query: string): ShellNavItem[] {
+  const matches: ShellNavItem[] = [];
+  for (const item of items) {
+    const selfMatch = item.label.toLowerCase().includes(query) || item.href.toLowerCase().includes(query);
+    const children = item.children ? filterShellItems(item.children, query) : undefined;
+    if (selfMatch || (children && children.length > 0)) {
+      matches.push({ ...item, children });
+    }
+  }
+  return matches;
 }
 
 function formatRoleLabel(role: NavigationRole) {
@@ -404,14 +436,19 @@ function SidebarContent({
   onClose?: () => void;
 }) {
   const isMobile = typeof onClose === "function";
+  const searchParams = useSearchParams();
   const navGroups = useMemo(() => mapNavGroups(getNavigationGroupsForRole(role)), [role]);
+  const currentUrl = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const activeHref = useMemo(() => {
     const matches = navGroups
-      .flatMap((group) => group.items)
-      .filter((item) => isActivePath(pathname, item.href))
+      .flatMap((group) => flattenShellItems(group.items))
+      .filter((item) => isActivePath(pathname, currentUrl, item.href))
       .sort((left, right) => right.href.length - left.href.length);
     return matches[0]?.href ?? null;
-  }, [navGroups, pathname]);
+  }, [currentUrl, navGroups, pathname]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readExpandedGroups());
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
   const [navQuery, setNavQuery] = useState("");
@@ -421,7 +458,7 @@ function SidebarContent({
 
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
-    const allItems = navGroups.flatMap((group) => group.items);
+    const allItems = navGroups.flatMap((group) => flattenShellItems(group.items));
     return favorites
       .map((href) => allItems.find((item) => item.href === href))
       .filter((item): item is ShellNavItem => Boolean(item))
@@ -437,7 +474,7 @@ function SidebarContent({
         if (groupMatch) return group;
         return {
           ...group,
-          items: group.items.filter((item) => item.label.toLowerCase().includes(normalizedNavQuery)),
+          items: filterShellItems(group.items, normalizedNavQuery),
         };
       })
       .filter((group) => group.items.length > 0);
@@ -490,6 +527,168 @@ function SidebarContent({
     },
     [collapsed, isMobile]
   );
+
+  const toggleNestedItem = useCallback((key: string, defaultOpen: boolean) => {
+    setExpandedGroups((current) => ({
+      ...current,
+      [key]: !(current[key] ?? defaultOpen),
+    }));
+  }, []);
+
+  const renderBadge = useCallback(
+    (item: ShellNavItem) =>
+      item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+          {queueBadges[item.badgeSource]}
+        </span>
+      ) : null,
+    [queueBadges]
+  );
+
+  function renderFlyoutItem(groupTitle: string, item: ShellNavItem, depth = 0): ReactNode {
+      const active = item.href === activeHref;
+      const childActive = item.children?.some((child) =>
+        flattenShellItems([child]).some((candidate) => candidate.href === activeHref)
+      );
+      const Icon = item.icon;
+      const classes = cn(
+        "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
+        depth > 0 ? "ml-3" : "",
+        item.disabled
+          ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
+          : active || childActive
+            ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+            : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+      );
+
+      const key = `${groupTitle}:${item.href}:${item.label}:${depth}`;
+      const row = item.disabled ? (
+        <div key={key} className={classes} aria-disabled="true" title="Not available yet">
+          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+          {renderBadge(item)}
+        </div>
+      ) : (
+        <Link
+          key={key}
+          href={item.href}
+          onClick={isMobile ? onClose : undefined}
+          className={classes}
+          role="menuitem"
+        >
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+            )}
+          />
+          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+          {renderBadge(item)}
+        </Link>
+      );
+
+      return (
+        <div key={key}>
+          {row}
+          {item.children && item.children.length > 0 ? (
+            <div className="mt-1 space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+              {item.children.map((child) => renderFlyoutItem(groupTitle, child, depth + 1))}
+            </div>
+          ) : null}
+        </div>
+      );
+  }
+
+  function renderExpandedItem(groupTitle: string, item: ShellNavItem, depth = 0): ReactNode {
+      const active = item.href === activeHref;
+      const descendants = item.children ? flattenShellItems(item.children) : [];
+      const childActive = descendants.some((child) => child.href === activeHref);
+      const hasChildren = Boolean(item.children?.length);
+      const itemKey = `${groupTitle}:${item.href}:${item.label}`;
+      const defaultOpen = childActive || normalizedNavQuery.length > 0;
+      const itemOpen = hasChildren && (childActive || (expandedGroups[itemKey] ?? defaultOpen));
+      const Icon = item.icon;
+      const rowBase = cn(
+        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
+        depth > 0 ? "ml-3" : "",
+        active || childActive
+          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+      );
+
+      const rowContent = (
+        <>
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
+            )}
+          />
+          <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
+          {renderBadge(item)}
+        </>
+      );
+
+      const row = item.disabled ? (
+        <div className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
+          {rowContent}
+        </div>
+      ) : (
+        <div className={rowBase} title={collapsed ? item.label : undefined}>
+          <Link
+            href={item.href}
+            onClick={isMobile ? onClose : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2.5"
+            aria-label={item.label}
+          >
+            {rowContent}
+          </Link>
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleNestedItem(itemKey, defaultOpen);
+              }}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] transition hover:bg-black/10 hover:text-white"
+              aria-label={itemOpen ? `Collapse ${item.label}` : `Expand ${item.label}`}
+            >
+              {itemOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+          ) : sessionId && !collapsed ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
+                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
+              )}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const next = toggleFavorite(sessionId, role, item.href);
+                setFavorites(next);
+              }}
+              aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
+              title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
+            >
+              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
+            </button>
+          ) : null}
+        </div>
+      );
+
+      return (
+        <div key={itemKey} className="space-y-1">
+          {row}
+          {itemOpen ? (
+            <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+              {item.children!.map((child) => renderExpandedItem(groupTitle, child, depth + 1))}
+            </div>
+          ) : null}
+        </div>
+      );
+  }
 
   return (
     <div className="flex h-full flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
@@ -614,7 +813,7 @@ function SidebarContent({
           ) : null}
           {visibleGroups.map((group) => {
             const GroupIcon = group.icon;
-            const groupActive = group.items.some((item) => item.href === activeHref);
+            const groupActive = flattenShellItems(group.items).some((item) => item.href === activeHref);
             const defaultOpen = true;
             const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
             const flyoutOpen = collapsed && flyoutGroup === group.title;
@@ -687,118 +886,14 @@ function SidebarContent({
                       <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">Select a module</div>
                     </div>
                     <div className="mt-2 space-y-1">
-                      {group.items.map((item) => {
-                        const active = item.href === activeHref;
-                        const Icon = item.icon;
-                        const classes = cn(
-                          "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
-                          item.disabled
-                            ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
-                            : active
-                              ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                              : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                        );
-
-                        if (item.disabled) {
-                          return (
-                            <div key={`${group.title}:${item.href}:${item.label}`} className={classes} aria-disabled="true" title="Not available yet">
-                              <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                              <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <Link
-                            key={`${group.title}:${item.href}:${item.label}`}
-                            href={item.href}
-                            onClick={isMobile ? onClose : undefined}
-                            className={classes}
-                            role="menuitem"
-                          >
-                            <Icon
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
-                              )}
-                            />
-                            <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                            {item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
-                              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
-                                {queueBadges[item.badgeSource]}
-                              </span>
-                            ) : null}
-                          </Link>
-                        );
-                      })}
+                      {group.items.map((item) => renderFlyoutItem(group.title, item))}
                     </div>
                   </div>
                 ) : null}
 
                 {groupOpen ? (
                   <div className="space-y-1.5 border-l border-[var(--sidebar-rail-border)]/80 pl-4">
-                    {group.items.map((item) => {
-                      const active = item.href === activeHref;
-                      const Icon = item.icon;
-                      const rowBase = cn(
-                        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
-                        active
-                          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                      );
-
-                      return item.disabled ? (
-                        <div key={`${group.title}:${item.href}:${item.label}`} className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
-                          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                        </div>
-                      ) : (
-                        <div
-                          key={`${group.title}:${item.href}:${item.label}`}
-                          className={rowBase}
-                          title={collapsed ? item.label : undefined}
-                        >
-                          <Link
-                            href={item.href}
-                            onClick={isMobile ? onClose : undefined}
-                            className="flex min-w-0 flex-1 items-center gap-2.5"
-                            aria-label={item.label}
-                          >
-                            <Icon
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
-                              )}
-                            />
-                            <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
-                            {item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
-                              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
-                                {queueBadges[item.badgeSource]}
-                              </span>
-                            ) : null}
-                          </Link>
-                          {sessionId && !collapsed ? (
-                            <button
-                              type="button"
-                              className={cn(
-                                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
-                                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
-                              )}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const next = toggleFavorite(sessionId, role, item.href);
-                                setFavorites(next);
-                              }}
-                              aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
-                              title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
-                            >
-                              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
-                            </button>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                    {group.items.map((item) => renderExpandedItem(group.title, item))}
                   </div>
                 ) : null}
               </section>
@@ -925,6 +1020,27 @@ function Topbar({
         </div>
 
         <div className="flex items-center gap-2">
+          {role === "ADMIN" ? (
+            <div className="hidden items-center gap-1.5 2xl:flex">
+              {[
+                { label: "Customer", href: `${ROUTES.admin.customers}/create` },
+                { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
+                { label: "Direct Sale", href: ROUTES.admin.salesDirectSaleCreate },
+                { label: "Payment", href: ROUTES.admin.financeCollect },
+                { label: "Delivery", href: ROUTES.admin.deliveryCreate },
+              ].map((action) => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  title={`Create ${action.label}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={onOpenCommandPalette}

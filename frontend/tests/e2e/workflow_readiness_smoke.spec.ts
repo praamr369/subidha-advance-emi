@@ -65,8 +65,8 @@ test.describe("admin readiness banner", () => {
     const sensitiveRoutes = [
       "/admin",
       "/admin/subscriptions",
-      "/admin/subscriptions/create",
-      "/admin/payments/create",
+      "/admin/subscriptions/advance-emi/create",
+      "/admin/finance/collect",
       "/admin/billing/register",
       "/admin/lucky-draws",
       "/admin/products",
@@ -122,20 +122,54 @@ test.describe("admin readiness banner", () => {
   });
 
   test("admin workflow pages for requests, subscriptions, and payments load", async ({ page }) => {
+    await page.goto("/admin/erp");
+    await expect(page.locator("main h1", { hasText: "ERP Home" })).toBeVisible();
+
+    await page.goto("/admin/crm");
+    await expect(page.locator("main h1", { hasText: "CRM Workspace" })).toBeVisible();
+
+    await page.goto("/admin/sales");
+    await expect(page.locator("main h1", { hasText: "Sales Workspace" })).toBeVisible();
+
     await page.goto("/admin/subscription-requests");
     await expect(page.locator("main h1", { hasText: "Subscription Requests" })).toBeVisible();
 
     await page.goto("/admin/subscriptions");
-    await expect(page.locator("main h1", { hasText: "Subscription Register" })).toBeVisible();
+    await expect(page.locator("main h1", { hasText: "Subscriptions" })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Advance EMI");
+    await expect(page.locator("body")).toContainText("Rent does not expose Lucky ID or Lucky Draw workflows.");
 
-    await page.goto("/admin/subscriptions/create");
+    await page.goto("/admin/subscriptions/advance-emi/create");
     await expect(page.locator("main h1", { hasText: "Create Subscription" })).toBeVisible();
+
+    await page.goto("/admin/finance");
+    await expect(page.locator("main h1", { hasText: "Finance Control Center" })).toBeVisible();
+
+    await page.goto("/admin/inventory");
+    await expect(page.locator("main h1", { hasText: "Inventory Operations" })).toBeVisible();
+
+    await page.goto("/admin/delivery");
+    await expect(page.locator("main h1", { hasText: "Delivery Workspace" })).toBeVisible();
 
     await page.goto("/admin/payments");
     await expect(page.locator("main h1", { hasText: "Payments Register" })).toBeVisible();
 
-    await page.goto("/admin/payments/create");
+    await page.goto("/admin/finance/collect");
     await expect(page.locator("main h1", { hasText: "Admin Collection Entry" })).toBeVisible();
+  });
+
+  test("legacy admin duplicate routes redirect to canonical workflow pages", async ({ page }) => {
+    await page.goto("/admin/lucky-draw/history");
+    await expect(page).toHaveURL(/\/admin\/lucky-draws$/);
+
+    await page.goto("/admin/payments/history");
+    await expect(page).toHaveURL(/\/admin\/payments$/);
+
+    await page.goto("/admin/finance/commisions");
+    await expect(page).toHaveURL(/\/admin\/finance\/commissions$/);
+
+    await page.goto("/admin/emi/overdue");
+    await expect(page).toHaveURL(/\/admin\/emis\/overdue$/);
   });
 });
 

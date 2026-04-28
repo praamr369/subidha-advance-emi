@@ -1,5 +1,12 @@
-import AdminLuckyDrawListPage from "@/domains/lucky-draw/pages/AdminLuckyDrawListPage";
+import {
+  type AsyncRouteSearchParams,
+  redirectAliasToCanonicalPath,
+} from "@/lib/route-redirect";
 
-export default function AdminLuckyDrawHistoryRoute() {
-  return <AdminLuckyDrawListPage historyOnly />;
+type PageProps = {
+  searchParams?: AsyncRouteSearchParams;
+};
+
+export default async function AdminLuckyDrawHistoryRoute({ searchParams }: PageProps) {
+  await redirectAliasToCanonicalPath("/admin/lucky-draw/history", searchParams);
 }

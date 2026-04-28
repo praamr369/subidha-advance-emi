@@ -222,6 +222,18 @@ from api.v1.views.admin_erp import (
     AdminProductOperationsWorkspaceView,
     AdminSalesWorkspaceView,
 )
+from api.v1.views.admin_hr import (
+    AdminHrAttendanceListCreateView,
+    AdminHrExpenseClaimPatchView,
+    AdminHrExpenseClaimsListCreateView,
+    AdminHrLeaveRequestPatchView,
+    AdminHrLeaveRequestsListCreateView,
+    AdminHrPayrollView,
+    AdminHrSalaryPaymentsListCreateView,
+    AdminHrStaffListCreateView,
+    AdminHrStaffPatchView,
+    AdminHrSummaryView,
+)
 from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
@@ -433,5 +445,16 @@ urlpatterns = [
     path("delivery/workspace/", AdminDeliveryWorkspaceView.as_view()),
     path("partner-operations/workspace/", AdminPartnerOperationsWorkspaceView.as_view()),
     path("global-search/", AdminGlobalSearchView.as_view()),
+    # Phase 7B: HR workspace (admin-only aggregation and actions)
+    path("hr/summary/", AdminHrSummaryView.as_view()),
+    path("hr/staff/", AdminHrStaffListCreateView.as_view()),
+    path("hr/staff/<int:staff_id>/", AdminHrStaffPatchView.as_view()),
+    path("hr/attendance/", AdminHrAttendanceListCreateView.as_view()),
+    path("hr/leave-requests/", AdminHrLeaveRequestsListCreateView.as_view()),
+    path("hr/leave-requests/<int:leave_request_id>/", AdminHrLeaveRequestPatchView.as_view()),
+    path("hr/expense-claims/", AdminHrExpenseClaimsListCreateView.as_view()),
+    path("hr/expense-claims/<int:expense_claim_id>/", AdminHrExpenseClaimPatchView.as_view()),
+    path("hr/payroll/", AdminHrPayrollView.as_view()),
+    path("hr/salary-payments/", AdminHrSalaryPaymentsListCreateView.as_view()),
     path("", include(router.urls)),
 ]

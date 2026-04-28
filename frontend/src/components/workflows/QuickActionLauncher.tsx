@@ -36,17 +36,22 @@ type LaunchItem =
 function flattenNav(groups: NavGroup[]): LaunchItem[] {
   const items: LaunchItem[] = [];
   groups.forEach((group) => {
-    group.items.forEach((item) => {
+    const visit = (item: NavGroup["items"][number], parents: string[]) => {
       if (item.hidden || item.disabled) return;
       const href = item.href?.trim();
       if (!href) return;
       items.push({
         kind: "nav",
         label: item.label,
-        description: item.description ?? group.title,
+        description: item.description ?? [...parents, group.title].join(" / "),
         href,
         groupTitle: group.title,
       });
+      item.children?.forEach((child) => visit(child, [...parents, item.label]));
+    };
+
+    group.items.forEach((item) => {
+      visit(item, []);
     });
   });
   return items;

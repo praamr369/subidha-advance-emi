@@ -521,8 +521,8 @@ export default function AdminCustomersPage() {
       ]}
       actions={[
         { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
-        { href: ROUTES.admin.subscriptionsCreate, label: "Create Subscription", variant: "secondary" },
-        { href: ROUTES.admin.paymentsCreate, label: "Collect Payment", variant: "secondary" },
+        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create Subscription", variant: "secondary" },
+        { href: ROUTES.admin.financeCollect, label: "Collect Payment", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
       ]}
@@ -549,14 +549,14 @@ export default function AdminCustomersPage() {
             {
               title: "Create subscription",
               description: "Route a verified customer into the canonical subscription-sale workflow.",
-              href: ROUTES.admin.subscriptionsCreate,
+              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
               icon: <RefreshCw className="h-4 w-4" />,
               badge: "Sale",
             },
             {
               title: "Collect payment",
               description: "Open the admin payment workflow without blending collection into profile edits.",
-              href: ROUTES.admin.paymentsCreate,
+              href: ROUTES.admin.financeCollect,
               icon: <RefreshCw className="h-4 w-4" />,
               badge: "Payment",
             },

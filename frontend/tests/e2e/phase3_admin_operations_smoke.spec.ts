@@ -70,8 +70,8 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   await expect(page.locator(".portal-page-actions").getByRole("link", { name: "Create Subscription" })).toBeVisible();
 
   await page.goto("/admin/crm");
-  await expect(page.getByRole("heading", { name: "CRM Control Center" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("CRM route map");
+  await expect(page.getByRole("heading", { name: "CRM Workspace" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("CRM Pipeline");
 
   await page.goto("/admin/crm/leads");
   await expect(page.getByRole("heading", { name: "CRM Lead Register" }).first()).toBeVisible();

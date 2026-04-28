@@ -457,8 +457,8 @@ export default function AdminReconciliationPage() {
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.financeReconciliation,
-          label: "Commission Reconciliation",
+          href: ROUTES.admin.financeCommissions,
+          label: "Commission Register",
           variant: "ghost",
         },
       ]}

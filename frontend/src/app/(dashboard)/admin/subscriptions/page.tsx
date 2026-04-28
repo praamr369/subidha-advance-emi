@@ -7,11 +7,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
+import { ROUTES } from "@/lib/routes";
 
 const PAGE_SIZE = 25;
 
@@ -222,6 +224,130 @@ function SectionCard({
   );
 }
 
+function WorkflowCard({
+  title,
+  description,
+  href,
+  action,
+  countLabel,
+  recentActivity,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+  countLabel: string;
+  recentActivity: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+    >
+      <div className="flex min-h-full flex-col">
+        <div>
+          <div className="text-base font-semibold text-foreground">{title}</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+        </div>
+        <div className="mt-4 grid gap-2 text-sm">
+          <div className="rounded-xl border border-border bg-background px-3 py-2">
+            <span className="font-semibold text-foreground">Primary action:</span>{" "}
+            <span className="text-muted-foreground">{action}</span>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-3 py-2">
+            <span className="font-semibold text-foreground">Queue:</span>{" "}
+            <span className="text-muted-foreground">{countLabel}</span>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-3 py-2">
+            <span className="font-semibold text-foreground">Recent activity:</span>{" "}
+            <span className="text-muted-foreground">{recentActivity}</span>
+          </div>
+        </div>
+        <div className="mt-4 text-sm font-semibold text-primary">Open workflow</div>
+      </div>
+    </Link>
+  );
+}
+
+function SubscriptionWorkflowLanding() {
+  return (
+    <PortalPage
+      title="Subscriptions"
+      subtitle="Canonical contract workflow entry point for Advance EMI, rent, lease, and partner Advance EMI operations."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Subscriptions" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create EMI", variant: "primary" },
+        { href: ROUTES.admin.subscriptionsRentCreate, label: "Create Rent", variant: "secondary" },
+        { href: ROUTES.admin.subscriptionsLeaseCreate, label: "Create Lease", variant: "secondary" },
+        { href: ROUTES.admin.subscriptionRequests, label: "Subscription Requests", variant: "secondary" },
+      ]}
+      statusBadge={{ label: "Workflow Landing", tone: "info" }}
+    >
+      <div className="space-y-5">
+        <Phase7Guidance
+          items={[
+            {
+              label: "Create EMI",
+              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
+              note: "Start Lucky Plan contract creation with batch and Lucky ID checks.",
+              warning: "Assign Lucky ID only inside the Advance EMI workflow.",
+            },
+            {
+              label: "Collect first EMI",
+              href: ROUTES.admin.financeCollect,
+              note: "Post the first collection through the canonical finance collection route.",
+              warning: "Payments remain backend-allocated and reconciliation-safe.",
+            },
+            {
+              label: "Schedule delivery",
+              href: ROUTES.admin.deliveryCreate,
+              note: "Create delivery only after stock/source readiness is confirmed.",
+              warning: "Stock unavailable deliveries stay blocked by delivery controls.",
+            },
+          ]}
+        />
+        <div className="grid gap-4 lg:grid-cols-2">
+        <WorkflowCard
+          title="Advance EMI"
+          description="Lucky Plan EMI contracts, batches, lucky IDs, EMI register, payments, draws, winners, waivers, and delivery requests."
+          href={`${ROUTES.admin.subscriptions}?plan_type=EMI`}
+          action="Create Advance EMI contract"
+          countLabel="Pending requests and overdue EMI appear in the sidebar badges."
+          recentActivity="Use the register for current subscription rows and detail drill-down."
+        />
+        <WorkflowCard
+          title="Rent"
+          description="Rent contracts, monthly demands, rent payments, security deposits, possession, handover, and return inspections."
+          href={`${ROUTES.admin.subscriptions}?plan_type=RENT`}
+          action="Create rent contract"
+          countLabel="Rent queues are contract, demand, payment, deposit, and return oriented."
+          recentActivity="Rent does not expose Lucky ID or Lucky Draw workflows."
+        />
+        <WorkflowCard
+          title="Lease"
+          description="Lease contracts, monthly demands, lease payments, security deposits, possession, handover, and return inspections."
+          href={`${ROUTES.admin.subscriptions}?plan_type=LEASE`}
+          action="Create lease contract"
+          countLabel="Lease queues are contract, demand, payment, deposit, and return oriented."
+          recentActivity="Lease does not expose Lucky ID or Lucky Draw workflows."
+        />
+        <WorkflowCard
+          title="Partner Operations"
+          description="Partner register, partner customers, subscription requests, payment requests, collections, commissions, payouts, and performance."
+          href={ROUTES.admin.partnersWorkspace}
+          action="Review partner payment requests"
+          countLabel="Partner payment and collection badges stay under this workflow."
+          recentActivity="Partner operations remain tied to Advance EMI workflows."
+        />
+        </div>
+      </div>
+    </PortalPage>
+  );
+}
+
 function statusBadgeClass(status: SubscriptionStatus): string {
   switch (status) {
     case "ACTIVE":
@@ -254,6 +380,7 @@ export default function AdminSubscriptionsPage() {
   const currentPartnerFilter = parseIdFilter(searchParams.get("partner"));
   const currentBatchFilter = parseIdFilter(searchParams.get("batch"));
   const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
+  const isWorkflowLanding = searchParams.toString().trim().length === 0;
 
   const [rows, setRows] = useState<SubscriptionRow[]>([]);
   const [count, setCount] = useState(0);
@@ -319,6 +446,10 @@ export default function AdminSubscriptionsPage() {
   ]);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (isWorkflowLanding) {
+      setLoading(false);
+      return;
+    }
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
@@ -346,7 +477,7 @@ export default function AdminSubscriptionsPage() {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }, [listQueryString]);
+  }, [isWorkflowLanding, listQueryString]);
 
   useEffect(() => {
     void loadPage("initial");
@@ -436,9 +567,13 @@ export default function AdminSubscriptionsPage() {
 
     const queryString = params.toString();
     return queryString
-      ? `/admin/subscriptions/create?${queryString}`
-      : "/admin/subscriptions/create";
+      ? `/admin/subscriptions/advance-emi/create?${queryString}`
+      : "/admin/subscriptions/advance-emi/create";
   }, [currentBatchFilter, currentCustomerFilter, currentPartnerFilter, currentProductFilter]);
+
+  if (isWorkflowLanding) {
+    return <SubscriptionWorkflowLanding />;
+  }
 
   return (
     <PortalPage

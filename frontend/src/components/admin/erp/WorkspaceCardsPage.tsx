@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { PipelineBoard } from "@/components/admin/erp/PipelineBoard";
+import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import { ROUTES } from "@/lib/routes";
 import type { WorkspacePayload } from "@/services/admin-erp";
 
 export function WorkspaceCardsPage({
@@ -40,6 +42,40 @@ export function WorkspaceCardsPage({
   return (
     <WorkspaceShell title={title} subtitle={subtitle}>
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {title === "Sales Workspace" ? (
+        <Phase7Guidance
+          items={[
+            {
+              label: "Create Direct Sale",
+              href: ROUTES.admin.salesDirectSaleCreate,
+              note: "Start the retail sale and invoice draft in one controlled workflow.",
+              warning: "Delivery and invoice posting stay separate from payment collection.",
+            },
+            {
+              label: "Collect Payment",
+              href: ROUTES.admin.financeCollect,
+              note: "Use the finance collection route for customer payment posting.",
+            },
+          ]}
+        />
+      ) : null}
+      {title === "Delivery Workspace" ? (
+        <Phase7Guidance
+          items={[
+            {
+              label: "Create Delivery",
+              href: ROUTES.admin.deliveryCreate,
+              note: "Open delivery from a real subscription or direct-sale source.",
+              warning: "Cannot complete stock-sensitive delivery while stock is unavailable.",
+            },
+            {
+              label: "Process Return",
+              href: ROUTES.admin.deliveryReturns,
+              note: "Route rent/lease returns into the return inspection queue.",
+            },
+          ]}
+        />
+      ) : null}
       {payload ? <PipelineBoard title={boardTitle} cards={payload.cards} /> : <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">Loading workspace...</div>}
     </WorkspaceShell>
   );

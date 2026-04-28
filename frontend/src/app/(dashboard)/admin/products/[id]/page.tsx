@@ -408,7 +408,7 @@ export default function AdminProductDetailPage() {
         variant: "secondary",
       },
       {
-        href: productId ? `/admin/subscriptions/create?product=${productId}` : "/admin/subscriptions/create",
+        href: productId ? `/admin/subscriptions/advance-emi/create?product=${productId}` : "/admin/subscriptions/advance-emi/create",
         label: "Use in Subscription",
         variant: "secondary",
       },
@@ -863,7 +863,7 @@ export default function AdminProductDetailPage() {
                               </Link>
 
                               <Link
-                                href={productId ? `/admin/subscriptions/create?product=${productId}` : "/admin/subscriptions/create"}
+                                href={productId ? `/admin/subscriptions/advance-emi/create?product=${productId}` : "/admin/subscriptions/advance-emi/create"}
                                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                               >
                                 Create Another

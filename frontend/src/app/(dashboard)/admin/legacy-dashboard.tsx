@@ -825,7 +825,7 @@ export default function AdminDashboardPage() {
       breadcrumbs={[{ label: "Admin" }]}
       actions={[
         {
-          href: ROUTES.admin.paymentsCreate,
+          href: ROUTES.admin.financeCollect,
           label: "Collect Payment",
           variant: "primary",
         },
@@ -1300,12 +1300,12 @@ export default function AdminDashboardPage() {
                   {[
                     {
                       label: "Create subscription",
-                      href: ROUTES.admin.subscriptionsCreate,
+                      href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
                       icon: <Users className="h-4 w-4" />,
                     },
                     {
                       label: "Collect EMI",
-                      href: ROUTES.admin.paymentsCreate,
+                      href: ROUTES.admin.financeCollect,
                       icon: <CreditCard className="h-4 w-4" />,
                     },
                     {

@@ -508,8 +508,8 @@ export default function AdminPaymentsPage() {
 
     const queryString = params.toString();
     return queryString
-      ? `/admin/payments/create?${queryString}`
-      : "/admin/payments/create";
+      ? `/admin/finance/collect?${queryString}`
+      : "/admin/finance/collect";
   }, [emiFilter, subscriptionFilter]);
 
   const activeRate = summary.visible_payments > 0

@@ -559,7 +559,7 @@ export default function AdminProductCreatePage() {
           variant: "secondary",
         },
         {
-          href: "/admin/subscriptions/create",
+          href: "/admin/subscriptions/advance-emi/create",
           label: "Create Subscription",
           variant: "secondary",
         },
@@ -1003,7 +1003,7 @@ export default function AdminProductCreatePage() {
               </Link>
 
               <Link
-                href="/admin/subscriptions/create"
+                href="/admin/subscriptions/advance-emi/create"
                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
               >
                 Use in Subscription

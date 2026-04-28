@@ -1,3 +1,12 @@
-import AdminPaymentListPage from "@/modules/payments/pages/AdminPaymentListPage";
+import {
+  type AsyncRouteSearchParams,
+  redirectToCanonicalPath,
+} from "@/lib/route-redirect";
 
-export default AdminPaymentListPage;
+type PageProps = {
+  searchParams?: AsyncRouteSearchParams;
+};
+
+export default async function AdminPaymentHistoryRoute({ searchParams }: PageProps) {
+  await redirectToCanonicalPath("/admin/payments", searchParams);
+}

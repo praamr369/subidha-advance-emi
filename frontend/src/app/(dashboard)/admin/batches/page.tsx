@@ -395,7 +395,7 @@ export default function AdminBatchesPage() {
       actions={[
         { href: "/admin/batches/create", label: "Create Batch", variant: "primary" },
         {
-          href: "/admin/subscriptions/create",
+          href: "/admin/subscriptions/advance-emi/create",
           label: "Create Subscription",
           variant: "secondary",
         },
@@ -593,7 +593,7 @@ export default function AdminBatchesPage() {
                       Edit
                     </Link>
                     <Link
-                      href="/admin/subscriptions/create"
+                      href="/admin/subscriptions/advance-emi/create"
                       className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                     >
                       Create Subscription

@@ -203,7 +203,7 @@ export default function AdminSubscriptionRequestDetailPage() {
           variant: "secondary",
         },
         {
-          href: "/admin/subscriptions/create",
+          href: "/admin/subscriptions/advance-emi/create",
           label: "Direct Create",
           variant: "ghost",
         },

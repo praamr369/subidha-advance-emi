@@ -794,7 +794,7 @@ export default function AdminSubscriptionDetailPage() {
                 variant: "primary" as const,
               },
               {
-                href: `/admin/payments/create?subscription=${subscription.id}`,
+                href: `/admin/finance/collect?subscription=${subscription.id}`,
                 label: "Collect Payment",
                 variant: "primary" as const,
               },

@@ -85,7 +85,7 @@ export default function AdminPartnerPaymentRequestsPage() {
                     <td className="px-3 py-2">{row.payment_date || "—"}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-2">
-                        <ActionButton href={ROUTES.admin.paymentsCreate} size="sm" variant="secondary">
+                        <ActionButton href={ROUTES.admin.financeCollect} size="sm" variant="secondary">
                           Process
                         </ActionButton>
                         <ActionButton href={ROUTES.admin.reconciliation} size="sm" variant="outline">

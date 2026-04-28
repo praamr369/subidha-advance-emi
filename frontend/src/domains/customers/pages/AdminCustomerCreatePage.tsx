@@ -317,7 +317,7 @@ export default function AdminCustomerCreatePage({
   }, [searchParamKey, searchParams]);
 
   const nextSubscriptionHref = useMemo(() => {
-    if (!success) return "/admin/subscriptions/create";
+    if (!success) return "/admin/subscriptions/advance-emi/create";
 
     const params = new URLSearchParams();
     params.set("customer", String(success.id));
@@ -329,7 +329,7 @@ export default function AdminCustomerCreatePage({
     if (leadNotes) params.set("lead_notes", leadNotes);
 
     const query = params.toString();
-    return query ? `/admin/subscriptions/create?${query}` : "/admin/subscriptions/create";
+    return query ? `/admin/subscriptions/advance-emi/create?${query}` : "/admin/subscriptions/advance-emi/create";
   }, [success, leadId, leadNotes, leadProductId, leadProductName]);
 
   const returnToLeadHref = useMemo(() => {
@@ -477,7 +477,7 @@ export default function AdminCustomerCreatePage({
                   ]
                 : []),
               {
-                href: "/admin/subscriptions/create",
+                href: "/admin/subscriptions/advance-emi/create",
                 label: "Create Subscription",
                 variant: "secondary",
               },

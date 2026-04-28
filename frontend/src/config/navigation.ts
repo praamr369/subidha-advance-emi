@@ -1,5 +1,5 @@
 import { ROUTES } from "@/lib/routes";
-import { ADMIN_ROUTE_REGISTRY } from "@/config/admin-route-registry";
+import { ADMIN_ROUTE_TREE, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
 export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER";
 
@@ -52,6 +52,7 @@ export type NavItem = {
   disabled?: boolean;
   description?: string;
   badgeSource?: string;
+  children?: NavItem[];
 };
 
 export type NavGroup = {
@@ -61,36 +62,43 @@ export type NavGroup = {
 };
 
 function flattenGroups(groups: NavGroup[]): NavItem[] {
-  return groups.flatMap((group) => group.items);
+  const flattenItems = (items: NavItem[]): NavItem[] =>
+    items.flatMap((item) => [item, ...(item.children ? flattenItems(item.children) : [])]);
+  return groups.flatMap((group) => flattenItems(group.items));
 }
 
 function iconForGroup(group: string): NavIconKey {
   const key = group.toLowerCase();
   if (key.includes("command")) return "dashboard";
-  if (key.includes("customer")) return "crm";
-  if (key.includes("contract")) return "subscriptions";
+  if (key.includes("crm") || key.includes("customer")) return "crm";
+  if (key.includes("sales")) return "billing";
+  if (key.includes("subscription") || key.includes("contract")) return "subscriptions";
   if (key.includes("partner")) return "partners";
   if (key.includes("billing")) return "finance";
   if (key.includes("finance")) return "finance";
-  if (key.includes("inventory")) return "inventory";
+  if (key.includes("product") || key.includes("inventory")) return "inventory";
+  if (key.includes("manufacturing") || key.includes("quality") || key.includes("maintenance")) return "manufacturing";
   if (key.includes("delivery")) return "deliveries";
   if (key.includes("lucky")) return "luckyDraws";
-  if (key.includes("admin")) return "settings";
+  if (key.includes("staff") || key.includes("setup") || key.includes("admin")) return "settings";
   return "operations";
 }
 
 function buildAdminNavigationGroups(): NavGroup[] {
   const grouped = new Map<string, NavItem[]>();
-  ADMIN_ROUTE_REGISTRY.forEach((row) => {
+  const toNavItem = (row: AdminRouteRegistryItem): NavItem => ({
+    label: row.label,
+    href: row.href,
+    icon: iconForGroup(row.group),
+    disabled: row.status === "deferred",
+    description: row.description,
+    badgeSource: row.badgeSource,
+    children: row.children?.map(toNavItem),
+  });
+
+  ADMIN_ROUTE_TREE.forEach((row) => {
     if (!grouped.has(row.group)) grouped.set(row.group, []);
-    grouped.get(row.group)!.push({
-      label: row.label,
-      href: row.href,
-      icon: iconForGroup(row.group),
-      disabled: row.status === "deferred",
-      description: row.description,
-      badgeSource: row.badgeSource,
-    });
+    grouped.get(row.group)!.push(toNavItem(row));
   });
   return Array.from(grouped.entries()).map(([title, items]) => ({
     title,

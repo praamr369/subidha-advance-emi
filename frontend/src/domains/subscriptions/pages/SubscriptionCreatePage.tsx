@@ -11,6 +11,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import { ROUTES } from "@/lib/routes";
 import CustomerSelector from "@/components/admin/customers/CustomerSelector";
 import type { CustomerRecord } from "@/services/customers";
 
@@ -471,8 +472,14 @@ export default function SubscriptionCreatePage({
   }, [leadContext, product?.id, product?.name, product?.product_code]);
 
   const canonicalSelfHref = useMemo(() => {
-    return searchParamKey ? `/admin/subscriptions/create?${searchParamKey}` : "/admin/subscriptions/create";
-  }, [searchParamKey]);
+    const canonicalPath =
+      planType === "RENT"
+        ? ROUTES.admin.subscriptionsRentCreate
+        : planType === "LEASE"
+          ? ROUTES.admin.subscriptionsLeaseCreate
+          : ROUTES.admin.subscriptionsAdvanceEmiCreate;
+    return searchParamKey ? `${canonicalPath}?${searchParamKey}` : canonicalPath;
+  }, [planType, searchParamKey]);
 
   const returnToLeadHref = useMemo(() => {
     if (!success || !leadContext?.lead) return null;

@@ -8,6 +8,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import { apiFetch } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import { normalizeApiError } from "@/services/api/errors";
 import AdminDirectSaleCollectForm from "@/features/direct-sale/components/AdminDirectSaleCollectForm";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
@@ -189,7 +190,7 @@ export default function AdminPaymentCollectPage({
     return runtimeSearchParams.toString();
   }, [queryString, runtimeSearchParams]);
   const canonicalSelfHref = useMemo(() => {
-    return searchParamKey ? `/admin/payments/create?${searchParamKey}` : "/admin/payments/create";
+    return searchParamKey ? `${ROUTES.admin.financeCollect}?${searchParamKey}` : ROUTES.admin.financeCollect;
   }, [searchParamKey]);
   const collectionWorkflow = useMemo(
     () =>

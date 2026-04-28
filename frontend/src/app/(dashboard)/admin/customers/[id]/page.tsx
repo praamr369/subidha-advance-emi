@@ -1306,7 +1306,7 @@ export default function AdminCustomerDetailPage() {
 
     if (customer) {
       nextActions.push({
-        href: `/admin/subscriptions/create?customer=${customer.id}`,
+        href: `/admin/subscriptions/advance-emi/create?customer=${customer.id}`,
         label: "Create Subscription",
         variant: "secondary",
       });
@@ -1324,7 +1324,7 @@ export default function AdminCustomerDetailPage() {
 
     if (firstOutstandingDirectSale) {
       nextActions.push({
-        href: `/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`,
+        href: `/admin/finance/collect?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`,
         label: "Collect Direct Sale",
         variant: "primary",
       });
@@ -1332,7 +1332,7 @@ export default function AdminCustomerDetailPage() {
 
     if (latestSubscription) {
       nextActions.push({
-        href: `/admin/payments/create?subscription=${latestSubscription.id}`,
+        href: `/admin/finance/collect?subscription=${latestSubscription.id}`,
         label: "Collect Subscription",
         variant: "secondary",
       });
@@ -1758,7 +1758,7 @@ export default function AdminCustomerDetailPage() {
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
-                    href={`/admin/subscriptions/create?customer=${customer.id}`}
+                    href={`/admin/subscriptions/advance-emi/create?customer=${customer.id}`}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
                     Create Subscription
@@ -1815,7 +1815,7 @@ export default function AdminCustomerDetailPage() {
                         </Link>
                         {firstOutstandingDirectSale ? (
                           <Link
-                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`}
                             className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                           >
                             Collect Balance
@@ -1850,14 +1850,14 @@ export default function AdminCustomerDetailPage() {
                           Open Subscriptions
                         </Link>
                         <Link
-                          href={`/admin/subscriptions/create?customer=${customer.id}`}
+                          href={`/admin/subscriptions/advance-emi/create?customer=${customer.id}`}
                           className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
                         >
                           Create Subscription
                         </Link>
                         {latestSubscription ? (
                           <Link
-                            href={`/admin/payments/create?subscription=${latestSubscription.id}`}
+                            href={`/admin/finance/collect?subscription=${latestSubscription.id}`}
                             className="inline-flex items-center rounded-md border border-emerald-900 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
                           >
                             Collect EMI
@@ -2036,7 +2036,7 @@ export default function AdminCustomerDetailPage() {
                             </Link>
                             {Number(row.balance_total || 0) > 0 ? (
                               <Link
-                                href={`/admin/payments/create?workflow=direct-sale&direct_sale=${row.id}`}
+                                href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${row.id}`}
                                 className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                               >
                                 Collect Balance

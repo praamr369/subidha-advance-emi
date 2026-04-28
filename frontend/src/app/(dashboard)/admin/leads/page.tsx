@@ -356,7 +356,7 @@ export default function AdminLeadsPage() {
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.subscriptionsCreate,
+          href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
           label: "Create Subscription",
           variant: "secondary",
         },

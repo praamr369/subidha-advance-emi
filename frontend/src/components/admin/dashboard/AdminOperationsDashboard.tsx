@@ -988,7 +988,7 @@ export default function AdminOperationsDashboard() {
         ]}
         actions={[
           {
-            href: ROUTES.admin.paymentsCreate,
+            href: ROUTES.admin.financeCollect,
             label: "Collect Payment",
             variant: "primary",
           },
@@ -1027,7 +1027,7 @@ export default function AdminOperationsDashboard() {
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.paymentsCreate,
+          href: ROUTES.admin.financeCollect,
           label: "Collect Payment",
           variant: "primary",
         },

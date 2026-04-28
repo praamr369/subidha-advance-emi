@@ -436,7 +436,7 @@ export default function OverdueEmiPage() {
                   rowActions={(row) => (
                     <div className="flex flex-col items-end gap-2">
                       <Link
-                        href={`/admin/payments/create?subscription=${row.subscription}`}
+                        href={`/admin/finance/collect?subscription=${row.subscription}`}
                         className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
                       >
                         Collect Payment

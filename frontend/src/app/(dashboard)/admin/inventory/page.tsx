@@ -12,6 +12,7 @@ import {
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
 import PortalPage from "@/components/ui/PortalPage";
@@ -165,6 +166,21 @@ export default function AdminInventoryPage() {
 
       {!loading && !error ? (
         <>
+          <Phase7Guidance
+            items={[
+              {
+                label: "Review Low Stock",
+                href: `${ROUTES.admin.inventoryStockOnHand}?below_reorder=1`,
+                note: "Check stock before creating delivery or direct-sale commitments.",
+                warning: "Stock unavailable alerts must stay visible before delivery handoff.",
+              },
+              {
+                label: "Post Stock Adjustment",
+                href: ROUTES.admin.inventoryAdjustments,
+                note: "Use adjustment workflow for audited stock corrections.",
+              },
+            ]}
+          />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Tracked Items"

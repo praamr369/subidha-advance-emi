@@ -108,7 +108,7 @@ test.describe("admin release smoke", () => {
     const target = meta.entities.admin_collection;
     const referenceNo = `SMOKE-ADMIN-${Date.now()}`;
 
-    await page.goto(`/admin/payments/create?subscription=${target.subscription_id}&emi=${target.emi_id}`);
+    await page.goto(`/admin/finance/collect?subscription=${target.subscription_id}&emi=${target.emi_id}`);
     await expect(page.getByRole("heading", { name: /admin collection entry/i })).toBeVisible();
     await expect(page.locator("#subscription_id")).toHaveValue(String(target.subscription_id));
     await expect(page.locator("#emi_id")).toHaveValue(String(target.emi_id));

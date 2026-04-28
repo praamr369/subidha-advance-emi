@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { ADMIN_ROUTE_ALIASES } from "@/config/admin-route-registry";
+
 type SearchParamValue = string | string[] | undefined;
 type RouteSearchParamsRecord = Record<string, SearchParamValue>;
 
@@ -46,4 +48,11 @@ export async function redirectToCanonicalPath(
 
   const query = params.toString();
   redirect(query ? `${destination}?${query}` : destination);
+}
+
+export async function redirectAliasToCanonicalPath(
+  alias: keyof typeof ADMIN_ROUTE_ALIASES,
+  searchParams?: RouteSearchParams
+) {
+  await redirectToCanonicalPath(ADMIN_ROUTE_ALIASES[alias], searchParams);
 }

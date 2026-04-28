@@ -12,8 +12,8 @@ test("phase-4 finance and accounting control surfaces share the business-control
   await expect(page.locator("body")).toContainText("Finance route map");
 
   await page.goto("/admin/finance/reconciliation");
-  await expect(page.getByRole("heading", { name: "Commission Reconciliation" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Finance route map");
+  await expect(page.getByRole("heading", { name: "Admin Reconciliation" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("collection-side reconciliation workspace");
 
   await page.goto("/admin/finance/payout-batches");
   await expect(page.getByRole("heading", { name: "Payout Batch Register" }).first()).toBeVisible();

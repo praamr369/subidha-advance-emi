@@ -9,6 +9,7 @@ import { workflowsForRole, type WorkflowDefinition, type WorkflowId } from "@/co
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ModalShell from "@/components/ui/ModalShell";
 import { cn } from "@/lib/utils";
+import { searchAdminGlobal, type AdminGlobalSearchResult } from "@/services/admin-erp";
 import {
   readFavoritesSnapshot,
   readRecentsSnapshot,
@@ -39,22 +40,35 @@ type PaletteItem =
       description: string;
       href: string;
       groupTitle: string;
+    }
+  | {
+      kind: "global";
+      label: string;
+      description: string;
+      href: string;
+      type: string;
+      status: string;
     };
 
 function flattenNav(groups: NavGroup[]): PaletteItem[] {
   const items: PaletteItem[] = [];
   groups.forEach((group) => {
-    group.items.forEach((item) => {
+    const visit = (item: NavGroup["items"][number], parents: string[]) => {
       if (item.hidden || item.disabled) return;
       const href = item.href?.trim();
       if (!href) return;
       items.push({
         kind: "nav",
         label: item.label,
-        description: item.description ?? group.title,
+        description: item.description ?? [...parents, group.title].join(" / "),
         href,
         groupTitle: group.title,
       });
+      item.children?.forEach((child) => visit(child, [...parents, item.label]));
+    };
+
+    group.items.forEach((item) => {
+      visit(item, []);
     });
   });
   return items;
@@ -74,6 +88,8 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   const { openWorkflow } = useWorkflowLauncher();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [globalResults, setGlobalResults] = useState<AdminGlobalSearchResult[]>([]);
+  const [globalLoading, setGlobalLoading] = useState(false);
   const favoritesSnapshot = useSyncExternalStore(
     subscribeWorkspacePrefs,
     () => (sessionId ? readFavoritesSnapshot(sessionId, role) : "[]"),
@@ -134,6 +150,33 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   }, [onClose, open]);
 
   const normalized = normalizeQuery(query);
+  const canSearchGlobal = role === "ADMIN" && normalized.length >= 2;
+  useEffect(() => {
+    if (!canSearchGlobal) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setGlobalLoading(true);
+      void searchAdminGlobal(normalized)
+        .then((payload) => {
+          if (!active) return;
+          setGlobalResults(payload.results ?? []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setGlobalResults([]);
+        })
+        .finally(() => {
+          if (active) setGlobalLoading(false);
+        });
+    }, 220);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [canSearchGlobal, normalized]);
+
   const matches = useMemo(() => {
     if (!normalized) return allItems;
     return allItems.filter((item) => {
@@ -141,6 +184,22 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
       return haystack.includes(normalized);
     });
   }, [allItems, normalized]);
+  const globalMatches = useMemo<PaletteItem[]>(
+    () =>
+      globalResults.map((result) => ({
+        kind: "global",
+        label: result.title,
+        description: result.subtitle,
+        href: result.deep_link,
+        type: result.type,
+        status: result.status,
+      })),
+    [globalResults]
+  );
+  const displayedMatches = useMemo(() => {
+    if (!normalized) return matches;
+    return [...(canSearchGlobal ? globalMatches : []), ...matches];
+  }, [canSearchGlobal, globalMatches, matches, normalized]);
 
   const favoriteItems = useMemo(
     () =>
@@ -181,6 +240,16 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
             </span>
           </span>
           <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.description}</span>
+          {item.kind === "global" ? (
+            <span className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                {item.type}
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                {item.status || "Open"}
+              </span>
+            </span>
+          ) : null}
           <span className="mt-2 block truncate text-[11px] font-medium text-muted-foreground">{item.href}</span>
         </span>
       </>
@@ -312,12 +381,17 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
               <CommandIcon className="h-4 w-4" />
               Results
             </div>
-            {matches.length === 0 ? (
+            {canSearchGlobal && globalLoading ? (
+              <div className="mb-2 rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+                Searching customers, subscriptions, invoices, receipts, products, partners, and payments…
+              </div>
+            ) : null}
+            {displayedMatches.length === 0 ? (
               <div className="rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
                 No matches for &quot;{query.trim()}&quot;.
               </div>
             ) : (
-              <div className="grid gap-2">{matches.slice(0, 20).map(renderRow)}</div>
+              <div className="grid gap-2">{displayedMatches.slice(0, 20).map(renderRow)}</div>
             )}
           </section>
         </div>

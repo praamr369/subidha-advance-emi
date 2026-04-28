@@ -58,7 +58,7 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
   await page.getByRole("link", { name: "Collect Payment" }).click();
   await expect(page).toHaveURL(
     new RegExp(
-      `/admin/payments/create\\?subscription=${manifest.entities.admin.subscription_id}$`
+      `/admin/finance/collect\\?subscription=${manifest.entities.admin.subscription_id}$`
     )
   );
   await expect(page.locator("#subscription_id")).toHaveValue(
@@ -597,7 +597,7 @@ test("admin payment create search uses q query contract and returns results", as
     }
   });
 
-  await page.goto("/admin/payments/create");
+  await page.goto("/admin/finance/collect");
   await page.getByLabel("Search subscription").fill(
     manifest.entities.admin.search_query
   );
@@ -640,13 +640,13 @@ test("admin customer detail handoff preserves subscription-create customer prefi
 
   await page
     .locator(
-      `a[href="/admin/subscriptions/create?customer=${manifest.entities.admin.customer_id}"]`
+      `a[href="/admin/subscriptions/advance-emi/create?customer=${manifest.entities.admin.customer_id}"]`
     )
     .first()
     .click();
   await expect(page).toHaveURL(
     new RegExp(
-      `/admin/subscriptions/create\\?customer=${manifest.entities.admin.customer_id}$`
+      `/admin/subscriptions/advance-emi/create\\?customer=${manifest.entities.admin.customer_id}$`
     )
   );
   await expect(
@@ -1047,7 +1047,7 @@ test("admin subscription create speeds up repeated onboarding without changing b
     });
   });
 
-  await page.goto("/admin/subscriptions/create");
+  await page.goto("/admin/subscriptions/advance-emi/create");
 
   const customerInput = page.locator(
     'input[placeholder="Search customer by phone, name, or code…"]'

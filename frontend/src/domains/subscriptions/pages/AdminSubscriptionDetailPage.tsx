@@ -114,7 +114,7 @@ export default function AdminSubscriptionDetailPage() {
       <section style={{ marginBottom: 12, display: "flex", gap: 8 }}>
         <button type="button" onClick={() => router.push("/admin/subscriptions")}>Back</button>
         {subscription ? (
-          <button type="button" onClick={() => router.push(`/admin/payments/create?subscription=${subscription.id}`)}>
+          <button type="button" onClick={() => router.push(`/admin/finance/collect?subscription=${subscription.id}`)}>
             Collect Payment
           </button>
         ) : null}

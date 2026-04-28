@@ -517,7 +517,7 @@ export default function AdminDashboardPage() {
                   <LaunchCard
                     title="Collect Payment"
                     description="Open controlled payment collection without bypassing backend posting logic."
-                    href={ROUTES.admin.paymentsCreate}
+                    href={ROUTES.admin.financeCollect}
                     icon={<Banknote className="h-5 w-5" />}
                   />
                 </div>
@@ -919,7 +919,7 @@ export default function AdminDashboardPage() {
               <LaunchCard
                 title="Record payment"
                 description="Open payment collection with the same server posting rules."
-                href={ROUTES.admin.paymentsCreate}
+                href={ROUTES.admin.financeCollect}
                 icon={<Banknote className="h-5 w-5" />}
                 meta="Service-layer"
                 badge="Post"

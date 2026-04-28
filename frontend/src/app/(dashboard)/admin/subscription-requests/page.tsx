@@ -146,7 +146,7 @@ export default function AdminSubscriptionRequestsPage() {
       ]}
       actions={[
         {
-          href: ROUTES.admin.subscriptionsCreate,
+          href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
           label: "Direct Subscription Create",
           variant: "secondary",
         },
