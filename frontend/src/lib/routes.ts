@@ -31,6 +31,7 @@ export const ROUTES = {
     erp: "/admin/erp",
     todayWork: "/admin/operations/today-work",
     globalSearch: "/admin/global-search",
+    bi: "/admin/bi",
     crmWorkspace: "/admin/crm",
     salesWorkspace: "/admin/sales",
     serviceWorkspace: "/admin/service",

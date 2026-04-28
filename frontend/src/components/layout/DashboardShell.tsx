@@ -140,7 +140,9 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
+const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
+type OperatorMode = "SIMPLE" | "ADVANCED";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
   if (!sessionId) return SIDEBAR_COLLAPSED_LEGACY_KEY;
@@ -198,6 +200,16 @@ function readExpandedGroups(): Record<string, boolean> {
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
+  }
+}
+
+function readOperatorMode(): OperatorMode {
+  if (typeof window === "undefined") return "ADVANCED";
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_MODE_KEY);
+    return raw === "SIMPLE" ? "SIMPLE" : "ADVANCED";
+  } catch {
+    return "ADVANCED";
   }
 }
 
@@ -455,6 +467,9 @@ function SidebarContent({
   const normalizedNavQuery = navQuery.trim().toLowerCase();
   const [favorites, setFavorites] = useState<string[]>(() => (sessionId ? readFavorites(sessionId, role) : []));
   const [queueBadges, setQueueBadges] = useState<Record<string, number>>({});
+  const [operatorMode, setOperatorMode] = useState<OperatorMode>(() =>
+    role === "ADMIN" ? readOperatorMode() : "ADVANCED"
+  );
 
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
@@ -465,10 +480,43 @@ function SidebarContent({
       .slice(0, 6);
   }, [favorites, navGroups]);
 
-  const visibleGroups = useMemo(() => {
-    if (!normalizedNavQuery) return navGroups;
-
+  const modeFilteredGroups = useMemo(() => {
+    if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
+    const allowedGroupTitles = new Set([
+      "Command Center",
+      "Staff & Business Setup",
+      "CRM",
+      "Sales",
+      "Subscriptions",
+      "Product & Inventory",
+      "Delivery & Returns",
+      "Finance & Accounting",
+    ]);
+    const simpleFinanceAllowed = new Set([
+      "Finance Workspace",
+      "Collections",
+      "Dues",
+      "Overdue",
+      "Payment Collection",
+      "Reconciliation",
+      "Deposits",
+    ]);
     return navGroups
+      .filter((group) => allowedGroupTitles.has(group.title))
+      .map((group) => {
+        if (group.title !== "Finance & Accounting") return group;
+        return {
+          ...group,
+          items: group.items.filter((item) => simpleFinanceAllowed.has(item.label)),
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [navGroups, operatorMode, role]);
+
+  const visibleGroups = useMemo(() => {
+    if (!normalizedNavQuery) return modeFilteredGroups;
+
+    return modeFilteredGroups
       .map((group) => {
         const groupMatch = group.title.toLowerCase().includes(normalizedNavQuery);
         if (groupMatch) return group;
@@ -478,7 +526,7 @@ function SidebarContent({
         };
       })
       .filter((group) => group.items.length > 0);
-  }, [navGroups, normalizedNavQuery]);
+  }, [modeFilteredGroups, normalizedNavQuery]);
 
   useEffect(() => {
     if (role !== "ADMIN") return;
@@ -801,6 +849,33 @@ function SidebarContent({
               />
             </div>
           </div>
+          {role === "ADMIN" ? (
+            <div className="mt-3.5 flex items-center justify-between rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-2.5">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+                  Operator Mode
+                </div>
+                <div className="text-xs text-[var(--sidebar-item-muted)]">
+                  {operatorMode === "SIMPLE" ? "Simple workflow view" : "Advanced ERP view"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next: OperatorMode = operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE";
+                  setOperatorMode(next);
+                  try {
+                    window.localStorage.setItem(OPERATOR_MODE_KEY, next);
+                  } catch {
+                    // preference-only
+                  }
+                }}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
+              >
+                {operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

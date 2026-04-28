@@ -52,6 +52,7 @@ import { getAdminDashboard, type AdminDashboardResponse } from "@/services/admin
 import { getBranchReportingOverview, type BranchReportingOverview } from "@/services/branch-control";
 import { getAdminDeliverySummary } from "@/services/deliveries";
 import { getDashboardSummaryV2 } from "@/services/dashboards";
+import { getHrSummary, type HrSummary } from "@/services/admin-hr";
 import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
@@ -59,6 +60,9 @@ import {
 import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 import { getStockSummary } from "@/services/inventory";
 import { cn } from "@/lib/utils";
+
+const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
+type OperatorMode = "SIMPLE" | "ADVANCED";
 
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
 type DeliverySummaryPayload = Awaited<ReturnType<typeof getAdminDeliverySummary>>;
@@ -177,9 +181,20 @@ export default function AdminDashboardPage() {
   const [todayBranch, setTodayBranch] = useState<BranchReportingOverview | null>(null);
   const [queueSummary, setQueueSummary] = useState<QueueSummaryPayload | null>(null);
   const [stockSummary, setStockSummary] = useState<StockSummaryPayload | null>(null);
+  const [hrSummary, setHrSummary] = useState<HrSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [operatorMode, setOperatorMode] = useState<OperatorMode>("SIMPLE");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(OPERATOR_MODE_KEY);
+      setOperatorMode(stored === "ADVANCED" ? "ADVANCED" : "SIMPLE");
+    } catch {
+      setOperatorMode("SIMPLE");
+    }
+  }, []);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") setLoading(true);
@@ -187,7 +202,16 @@ export default function AdminDashboardPage() {
 
     try {
       const today = todayIso();
-      const [canonicalPayload, legacyPayload, analyticsPayload, deliveryPayload, todayBranchPayload, queuePayload, stockPayload] =
+      const [
+        canonicalPayload,
+        legacyPayload,
+        analyticsPayload,
+        deliveryPayload,
+        todayBranchPayload,
+        queuePayload,
+        stockPayload,
+        hrPayload,
+      ] =
         await Promise.all([
           getDashboardSummaryV2({ window: "THIS_MONTH" }),
           getAdminDashboard(),
@@ -196,6 +220,7 @@ export default function AdminDashboardPage() {
           getBranchReportingOverview({ start_date: today, end_date: today }),
           getAdminOperationsQueueSummary(),
           getStockSummary(),
+          getHrSummary(),
         ]);
 
       setCanonical(canonicalPayload);
@@ -205,6 +230,7 @@ export default function AdminDashboardPage() {
       setTodayBranch(todayBranchPayload);
       setQueueSummary(queuePayload as QueueSummaryPayload);
       setStockSummary(stockPayload);
+      setHrSummary(hrPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -284,6 +310,13 @@ export default function AdminDashboardPage() {
       ),
     [deliveryActions, overdueAmount, overdueCount, reconciliationFlags]
   );
+  const pendingTasksToday =
+    attentionItems.length +
+    overdueCount +
+    reconciliationFlags +
+    (hrSummary?.pending_leave_requests ?? 0) +
+    (hrSummary?.pending_expense_claims ?? 0) +
+    (hrSummary?.today_absent ?? 0);
 
   if (loading) {
     return (
@@ -301,6 +334,70 @@ export default function AdminDashboardPage() {
         breadcrumbs={[{ label: "Admin" }]}
       >
         <ErrorState title="Unable to load executive dashboard" description={error} onRetry={() => void loadPage("initial")} />
+      </PortalPage>
+    );
+  }
+
+  if (operatorMode === "SIMPLE") {
+    return (
+      <PortalPage
+        eyebrow="Admin"
+        title="Daily Operator Dashboard"
+        subtitle="Today’s summary, urgent alerts, and quick actions for daily shop operations."
+        helperNote="This is the primary daily dashboard. Use Advanced mode for deeper ERP and accounting surfaces."
+        helperTone="info"
+        breadcrumbs={[{ label: "Admin" }]}
+        actions={[
+          { href: ROUTES.admin.operations, label: "Open Operations", variant: "primary" },
+          { href: ROUTES.admin.erp, label: "ERP Home", variant: "secondary" },
+          { href: ROUTES.admin.bi, label: "BI", variant: "secondary" },
+        ]}
+      >
+        <div className="space-y-6">
+          <section className="rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4">
+            <div className="text-base font-semibold text-amber-900">
+              You have {pendingTasksToday} tasks pending today
+            </div>
+            <div className="mt-1 text-sm text-amber-900/80">
+              Prioritize payment collection, delivery actions, KYC, and HR approvals first.
+            </div>
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Collections today" value={money(todayNet)} subtext="Branch reporting (today)" icon={<Wallet className="h-5 w-5" />} />
+            <StatCard label="Overdue follow-up" value={String(overdueCount)} subtext={money(overdueAmount)} tone={overdueCount > 0 ? "warning" : "success"} icon={<AlertTriangle className="h-5 w-5" />} href={ROUTES.admin.financeCollect} />
+            <StatCard label="Delivery actions" value={String(deliveryActions)} subtext={`${deliverySummary?.pending ?? 0} pending`} tone={deliveryActions > 0 ? "warning" : "success"} icon={<Truck className="h-5 w-5" />} href={ROUTES.admin.deliveries} />
+            <StatCard label="HR actions" value={String((hrSummary?.pending_leave_requests ?? 0) + (hrSummary?.pending_expense_claims ?? 0))} subtext={`${hrSummary?.today_absent ?? 0} absent today`} tone="warning" icon={<Users className="h-5 w-5" />} href={ROUTES.admin.hr} />
+          </section>
+
+          <PageSection>
+            <h2 className="text-sm font-semibold text-foreground">Urgent alerts</h2>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              {attentionItems.length === 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">No urgent alerts in current snapshot.</div>
+              ) : (
+                attentionItems.map((item, index) => (
+                  <Link key={`urgent-${item.title}-${index}`} href={item.href} className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 hover:bg-[var(--surface-muted)]">
+                    <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </PageSection>
+
+          <PageSection>
+            <h2 className="text-sm font-semibold text-foreground">Quick actions</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <LaunchCard title="Collect payment" description="Open payment collection workflow." href={ROUTES.admin.financeCollect} icon={<Banknote className="h-5 w-5" />} />
+              <LaunchCard title="Open operations" description="Resolve queue actions with one click." href={ROUTES.admin.operations} icon={<ClipboardCheck className="h-5 w-5" />} />
+              <LaunchCard title="Prepare delivery" description="Schedule or update delivery tasks." href={ROUTES.admin.deliveries} icon={<Truck className="h-5 w-5" />} />
+              <LaunchCard title="Review KYC" description="Resolve customer KYC pending queue." href={`${ROUTES.admin.customers}?kyc_status=PENDING`} icon={<ShieldCheck className="h-5 w-5" />} />
+              <LaunchCard title="HR approvals" description="Leave and expense approvals." href={ROUTES.admin.hr} icon={<Users className="h-5 w-5" />} />
+              <LaunchCard title="Global search" description="Jump directly to record workflows." href={ROUTES.admin.globalSearch} icon={<Sparkles className="h-5 w-5" />} />
+            </div>
+          </PageSection>
+        </div>
       </PortalPage>
     );
   }
@@ -880,12 +977,31 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-muted-foreground">Jump to daily workspaces. Counts are contextual hints, not separate analytics.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <LaunchCard
+                title="ERP Home"
+                description="Unified launchpad for CRM, sales, finance, inventory, delivery, and partner workflows."
+                href={ROUTES.admin.erp}
+                icon={<LayoutGrid className="h-5 w-5" />}
+                badge="Core"
+              />
+              <LaunchCard
                 title="Operations"
                 description="Queues for collections, support, delivery, and onboarding."
                 href={ROUTES.admin.operations}
                 icon={<ClipboardCheck className="h-5 w-5" />}
                 meta={`${overdueCount + deliveryActions + reconciliationFlags} active signals`}
                 badge="Core"
+              />
+              <LaunchCard
+                title="Staff & HR"
+                description="Staff register, attendance, leave, expenses, and payroll posture."
+                href={ROUTES.admin.hr}
+                icon={<Users className="h-5 w-5" />}
+                meta={
+                  hrSummary
+                    ? `${hrSummary.pending_leave_requests} leave · ${hrSummary.pending_expense_claims} expenses`
+                    : "HR summary"
+                }
+                badge="HR"
               />
               <LaunchCard
                 title="Finance control"
@@ -917,6 +1033,13 @@ export default function AdminDashboardPage() {
                 badge="Analytics"
               />
               <LaunchCard
+                title="BI Control Center"
+                description="Read-only trends and posture charts."
+                href={ROUTES.admin.bi}
+                icon={<BarChart3 className="h-5 w-5" />}
+                badge="BI"
+              />
+              <LaunchCard
                 title="Record payment"
                 description="Open payment collection with the same server posting rules."
                 href={ROUTES.admin.financeCollect}
@@ -938,6 +1061,8 @@ export default function AdminDashboardPage() {
             <MoreLink href="/admin/accounting/control-center" label="Accounting control center" />
             <MoreLink href="/admin/operations/command-center" label="Operations command center" />
             <MoreLink href={ROUTES.admin.billingDirectSales} label="Direct sales" />
+            <MoreLink href={ROUTES.admin.hr} label="Staff & HR" />
+            <MoreLink href={ROUTES.admin.bi} label="BI control center" />
             <MoreLink href={ROUTES.admin.settingsBusinessSetup} label="Setup & readiness" />
           </div>
         </PageSection>

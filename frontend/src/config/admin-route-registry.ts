@@ -31,10 +31,12 @@ function item(
 }
 
 export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
+  item("Command Center", "Admin Dashboard", ROUTES.admin.dashboard, "Daily overview, critical KPIs, urgent queues, and quick actions."),
   item("Command Center", "ERP Home", ROUTES.admin.erp, "Unified CRM and ERP command center."),
   item("Command Center", "Today's Work", ROUTES.admin.todayWork, "Daily exception and action queue."),
   item("Command Center", "Operations Command Center", ROUTES.admin.operationsCommandCenter, "Cross-module operational controls."),
   item("Command Center", "Reports & Analytics", ROUTES.admin.reports, "Business reports and analytics."),
+  item("Command Center", "BI Control Center", ROUTES.admin.bi, "Read-only chart and trend control center."),
   item("Command Center", "Global Search", ROUTES.admin.globalSearch, "Search across customers, contracts, payments, and operations."),
 
   item("Staff & Business Setup", "Staff Workspace", ROUTES.admin.hr, "Daily HR command center for staff, attendance, leave, expenses, and payroll."),
@@ -188,16 +190,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance & Accounting", "P&L", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Finance & Accounting", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),
   item("Finance & Accounting", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
-
-  item("Staff & Business Setup", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
-  item("Staff & Business Setup", "Roles / Groups", ROUTES.admin.settingsRoles, "Role and group setup."),
-  item("Staff & Business Setup", "Branches", ROUTES.admin.settingsBusinessSetupBranches, "Branch setup."),
-  item("Staff & Business Setup", "Counters / Cash Desks", ROUTES.admin.settingsBusinessSetupCashDesks, "Cash desk setup."),
-  item("Staff & Business Setup", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
-  item("Staff & Business Setup", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
-  item("Staff & Business Setup", "Accounting Setup", ROUTES.admin.settingsBusinessSetup, "Accounting and business setup entry point."),
-  item("Staff & Business Setup", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
-  item("Staff & Business Setup", "Backup / Export / System Readiness", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
+  item("Settings & Setup", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
+  item("Settings & Setup", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
+  item("Settings & Setup", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
+  item("Settings & Setup", "Accounting Setup", ROUTES.admin.settingsBusinessSetup, "Accounting and business setup entry point."),
+  item("Settings & Setup", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
+  item("Settings & Setup", "Backup / Export / System Readiness", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
 ];
 
 export const ADMIN_ROUTE_ALIASES: Record<string, string> = {

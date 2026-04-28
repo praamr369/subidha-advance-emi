@@ -909,6 +909,27 @@ export default function AdminSubscriptionDetailPage() {
 
         {!loading && !error && subscription && financialSummary && reconciliationFlags ? (
           <>
+            <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-900">Process Flow</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                {[
+                  "Customer",
+                  "Batch",
+                  "Lucky ID",
+                  "Contract",
+                  "EMI",
+                  "Payment",
+                  "Delivery",
+                ].map((step, index) => (
+                  <div key={`flow-step-${step}-${index}`} className="flex items-center gap-2">
+                    <span className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900">
+                      {step}
+                    </span>
+                    {index < 6 ? <span className="text-amber-700">→</span> : null}
+                  </div>
+                ))}
+              </div>
+            </section>
             <section className="grid gap-4">
               <div className="rounded-[30px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.22),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_30px_120px_-48px_rgba(15,23,42,0.4)] backdrop-blur-xl">
                 <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

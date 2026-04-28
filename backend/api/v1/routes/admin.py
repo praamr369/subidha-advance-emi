@@ -234,6 +234,7 @@ from api.v1.views.admin_hr import (
     AdminHrStaffPatchView,
     AdminHrSummaryView,
 )
+from api.v1.views.admin_bi import AdminBiSummaryView
 from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
@@ -445,6 +446,8 @@ urlpatterns = [
     path("delivery/workspace/", AdminDeliveryWorkspaceView.as_view()),
     path("partner-operations/workspace/", AdminPartnerOperationsWorkspaceView.as_view()),
     path("global-search/", AdminGlobalSearchView.as_view()),
+    # Phase 7C: BI control center snapshot (admin-only, read-only)
+    path("bi/summary/", AdminBiSummaryView.as_view()),
     # Phase 7B: HR workspace (admin-only aggregation and actions)
     path("hr/summary/", AdminHrSummaryView.as_view()),
     path("hr/staff/", AdminHrStaffListCreateView.as_view()),
