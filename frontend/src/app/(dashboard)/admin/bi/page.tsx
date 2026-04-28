@@ -52,8 +52,20 @@ export default function AdminBiControlCenterPage() {
       ) : null}
 
       {!payload ? (
-        <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
-          Loading BI control center...
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
+            {error ? "BI summary is temporarily unavailable." : "Loading BI control center..."}
+          </div>
+          <BiChartCard
+            title="BI chart actions"
+            source="BI Control Center"
+            asOf={new Date().toISOString()}
+            href={ROUTES.admin.reports}
+            actionHref={ROUTES.admin.operations}
+            emptyReason={error || "Waiting for BI snapshot data."}
+          >
+            <div />
+          </BiChartCard>
         </div>
       ) : (
         <div className="space-y-6">

@@ -8,16 +8,16 @@ export function BiChartCard({
   title,
   source,
   asOf,
-  href,
-  actionHref,
+  href = "/admin/reports",
+  actionHref = "/admin/operations",
   emptyReason,
   children,
 }: {
   title: string;
   source: string;
   asOf: string;
-  href: string;
-  actionHref: string;
+  href?: string;
+  actionHref?: string;
   emptyReason?: string | null;
   children: ReactNode;
 }) {
@@ -31,10 +31,10 @@ export function BiChartCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <a href={href} className="text-xs font-semibold text-primary hover:underline">
+          <a href={href} aria-label="View Details" className="text-xs font-semibold text-primary hover:underline">
             View Details
           </a>
-          <a href={actionHref} className="text-xs font-semibold text-amber-700 hover:underline">
+          <a href={actionHref} aria-label="Take Action" className="text-xs font-semibold text-amber-700 hover:underline">
             Take Action
           </a>
         </div>

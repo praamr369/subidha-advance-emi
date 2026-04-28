@@ -495,7 +495,7 @@ test("admin payment reconciliation compatibility route forwards query params to 
   );
 
   await expect(page).toHaveURL(
-    /\/admin\/reconciliation\?view=payments&subscription=901&payment=91&status=FLAGGED&flagged=true&locked=false&q=winner$/
+    /\/admin\/finance\/reconciliation\?view=payments&subscription=901&payment=91&status=FLAGGED&flagged=true&locked=false&q=winner$/
   );
   await expect(
     page.getByRole("heading", { name: "Admin Reconciliation" })

@@ -6,8 +6,8 @@ for (const role of [
   {
     name: "admin",
     path: "/admin",
-    heading: /(?:Executive|Admin) Dashboard/i,
-    markerText: "Launch Points",
+    heading: /Daily Operator Dashboard/i,
+    markerText: "Quick actions",
   },
   {
     name: "partner",

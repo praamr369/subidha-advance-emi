@@ -9,6 +9,7 @@ const DASHBOARD_STORAGE_PREFIXES = [
 const DASHBOARD_STORAGE_KEYS = [
   "subidha:dashboard-sidebar-collapsed:v1",
   "subidha:dashboard-sidebar-groups:v1",
+  "subidha:operator-mode:v1",
 ];
 
 export async function resetAdminDashboardClientState(page: Page): Promise<void> {

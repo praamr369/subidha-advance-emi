@@ -871,6 +871,9 @@ function SidebarContent({
                   }
                 }}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
+                title={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
+                data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
               >
                 {operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
               </button>

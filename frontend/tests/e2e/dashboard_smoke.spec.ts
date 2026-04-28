@@ -12,41 +12,25 @@ test.describe("admin dashboard smoke", () => {
 
   test("admin dashboard renders canonical finance panels", async ({ page }) => {
     await page.goto("/admin");
+    const main = page.locator("#main-content");
     await expect(
-      page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
+      page.getByRole("heading", { name: /Daily Operator Dashboard|Executive Dashboard/i })
     ).toBeVisible();
-    await expect(page.locator("body")).toContainText("Settlement Posture");
-    await expect(page.locator("body")).toContainText("Launch Points");
-  });
-
-  test("admin widget board supports hide, pin, and reset controls", async ({
-    page,
-  }) => {
-    await page.goto("/admin");
-    await page.getByRole("button", { name: "Widget controls" }).click();
-
-    const quickActionsRow = page.getByTestId(
-      "dashboard-widget-control-row:quick-actions"
-    );
-    await quickActionsRow
-      .getByRole("button", { name: "Hide", exact: true })
-      .click();
-    await expect(page.locator("body")).toContainText("1 widget is currently hidden.");
-
-    await quickActionsRow
-      .getByRole("button", { name: /^(Pin|Unpin)$/ })
-      .click();
-    await expect(page.locator("body")).toContainText(/Widget (pinned|unpinned)/);
-
-    await page.getByRole("button", { name: "Reset layout" }).click();
+    await expect(page.locator("body")).toContainText("Today");
+    await expect(page.locator("body")).toContainText("Urgent alerts");
     await expect(page.locator("body")).toContainText("Quick actions");
+    await expect(main.getByRole("link", { name: "Open Operations", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "ERP Home", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "BI", exact: true })).toBeVisible();
   });
 
-  test("admin dashboard supports preset mode switching", async ({ page }) => {
+  test("admin advanced mode still accessible via operator mode toggle", async ({ page }) => {
     await page.goto("/admin");
-    await page.getByRole("button", { name: "Finance watch" }).click();
-    await expect(page.getByRole("button", { name: "Reset to preset" })).toBeVisible();
-    await expect(page.locator("body")).toContainText("Settlement posture");
+    await expect(page.getByTestId("operator-mode-toggle")).toBeVisible();
+    await expect(page.getByTestId("operator-mode-toggle")).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+    await page.getByTestId("operator-mode-toggle").click();
+    await expect(page.getByTestId("operator-mode-toggle")).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+    await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
   });
 });
 

@@ -390,7 +390,7 @@ export default function AdminDashboardPage() {
             <h2 className="text-sm font-semibold text-foreground">Quick actions</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <LaunchCard title="Collect payment" description="Open payment collection workflow." href={ROUTES.admin.financeCollect} icon={<Banknote className="h-5 w-5" />} />
-              <LaunchCard title="Open operations" description="Resolve queue actions with one click." href={ROUTES.admin.operations} icon={<ClipboardCheck className="h-5 w-5" />} />
+              <LaunchCard title="Open operations queue" description="Resolve queue actions with one click." href={ROUTES.admin.operations} icon={<ClipboardCheck className="h-5 w-5" />} />
               <LaunchCard title="Prepare delivery" description="Schedule or update delivery tasks." href={ROUTES.admin.deliveries} icon={<Truck className="h-5 w-5" />} />
               <LaunchCard title="Review KYC" description="Resolve customer KYC pending queue." href={`${ROUTES.admin.customers}?kyc_status=PENDING`} icon={<ShieldCheck className="h-5 w-5" />} />
               <LaunchCard title="HR approvals" description="Leave and expense approvals." href={ROUTES.admin.hr} icon={<Users className="h-5 w-5" />} />

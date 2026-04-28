@@ -26,10 +26,10 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await page.goto("/admin");
     const sidebar = page.getByRole("complementary");
     await expect(
-      page.getByRole("heading", { name: /(?:Executive|Admin) Dashboard/i })
+      page.getByRole("heading", { name: /Daily Operator Dashboard/i })
     ).toBeVisible();
     // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
-    await expect(sidebar.getByText("Command Center", { exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("button", { name: "Command Center", exact: true })).toBeVisible();
     await expect(sidebar.getByText("CRM", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Sales", { exact: true })).toBeVisible();
     await expect(sidebar.getByText("Subscriptions", { exact: true })).toBeVisible();
@@ -67,15 +67,11 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await sidebar.getByPlaceholder("Filter modules").fill("Partner Payment Requests");
     await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
     await sidebar.getByPlaceholder("Filter modules").clear();
-    await expect(
-      page.getByRole("heading", { name: "Urgent Attention", exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Launch Points", exact: true })
-    ).toBeVisible();
-    await expect(page.locator("body")).toContainText("Overdue Advance EMI follow-up");
-    await expect(page.locator("body")).toContainText("Finance Control");
-    await expect(page.locator("body")).toContainText("Reports Center");
+    await expect(page.getByRole("heading", { name: "Urgent alerts", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Quick actions", exact: true })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Collect payment");
+    await expect(page.locator("body")).toContainText("Open operations");
+    await expect(page.locator("body")).toContainText("Prepare delivery");
   });
 
   test("admin command palette opens with Ctrl+K and searches nested workflow entries", async ({ page }) => {

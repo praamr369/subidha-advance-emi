@@ -176,7 +176,7 @@ test.describe("admin release smoke", () => {
     );
     await expect(page).toHaveURL(
       new RegExp(
-        `/admin/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
+        `/admin/finance/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
       )
     );
     await expect(

@@ -1,13 +1,5 @@
-import {
-  type AsyncRouteSearchParams,
-  redirectToCanonicalPath,
-} from "@/lib/route-redirect";
-import { ROUTES } from "@/lib/routes";
+import AdminReconciliationPage from "@/app/(dashboard)/admin/reconciliation/page";
 
-type PageProps = {
-  searchParams?: AsyncRouteSearchParams;
-};
-
-export default async function AdminFinanceReconciliationCompatibilityPage({ searchParams }: PageProps) {
-  await redirectToCanonicalPath(ROUTES.admin.reconciliation, searchParams);
+export default function AdminFinanceReconciliationPage() {
+  return <AdminReconciliationPage />;
 }

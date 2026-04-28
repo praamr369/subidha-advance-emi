@@ -50,8 +50,13 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   page,
 }) => {
   await page.goto("/admin/operations");
-  await expect(page.getByRole("heading", { name: "Operations Workspace" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Operational launch map");
+  await expect(page.getByRole("heading", { name: "Operations Working Screen" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Action-first queues");
+  await expect(page.locator("body")).toContainText("HR Actions");
+  await expect(page.getByRole("link", { name: "Mark Attendance" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Approve Leave" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Approve Expense" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Payroll" })).toBeVisible();
 
   await page.goto("/admin/branch-reporting");
   await expect(page.getByRole("heading", { name: "Branch Reporting" }).first()).toBeVisible();
