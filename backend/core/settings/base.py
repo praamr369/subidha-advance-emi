@@ -380,6 +380,10 @@ HEALTHCHECK_INCLUDE_DETAILS = _parse_bool(
     os.getenv("HEALTHCHECK_INCLUDE_DETAILS"),
     default=_is_local_dev_mode(),
 )
+AI_ASSISTANT_ENABLED = _parse_bool(
+    os.getenv("AI_ASSISTANT_ENABLED"),
+    default=False,
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -394,6 +398,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "api",
+    "ai_assistant",
     "branch_control",
     "crm",
     "service_desk",

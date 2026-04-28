@@ -284,6 +284,7 @@ urlpatterns = [
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("business-setup/reset/", BusinessSetupResetExecuteView.as_view()),
     path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
+    path("ai/", include("ai_assistant.urls")),
     path("dashboard/", AdminDashboardView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
