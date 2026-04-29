@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from django.http import HttpResponse
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
 from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
+from billing.models import BillingInvoice, ReceiptDocument
 from subscriptions.models import Subscription, SubscriptionDocument
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.contract_pdf_service import (
@@ -30,6 +32,7 @@ from subscriptions.services.phase4_finance_service import (
     reconciliation_report,
     waiver_loss_report,
 )
+from subscriptions.services.document_pdf_service import render_invoice_pdf, render_receipt_pdf
 from subscriptions.services.rent_lease_billing_service import (
     list_admin_deposit_register,
     record_damage_deduction,
@@ -269,12 +272,46 @@ class AdminInvoiceRegisterView(APIView):
         return Response(list_admin_invoices(flt=flt))
 
 
+class AdminInvoicePdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        invoice = BillingInvoice.objects.select_related("customer", "direct_sale").filter(pk=pk).first()
+        if invoice is None:
+            return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_invoice_pdf(invoice=invoice)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="invoice-{invoice.document_no or invoice.id}.pdf"'
+        )
+        return response
+
+
 class AdminReceiptRegisterView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
         flt = FinanceFilter.from_query_params(request.query_params)
         return Response(list_admin_receipts(flt=flt))
+
+
+class AdminReceiptPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        receipt = (
+            ReceiptDocument.objects.select_related("customer", "finance_account", "payment")
+            .filter(pk=pk)
+            .first()
+        )
+        if receipt is None:
+            return Response({"detail": "Receipt not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_receipt_pdf(receipt=receipt)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="receipt-{receipt.receipt_no or receipt.id}.pdf"'
+        )
+        return response
 
 
 class AdminDocumentCenterView(APIView):
@@ -379,6 +416,28 @@ class CustomerInvoiceListView(APIView):
         return Response(customer_invoice_list(customer=customer))
 
 
+class CustomerInvoicePdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        invoice = (
+            BillingInvoice.objects.select_related("customer", "direct_sale")
+            .filter(pk=pk, customer=customer)
+            .first()
+        )
+        if invoice is None:
+            return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_invoice_pdf(invoice=invoice)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="invoice-{invoice.document_no or invoice.id}.pdf"'
+        )
+        return response
+
+
 class CustomerReceiptListView(APIView):
     permission_classes = [IsCustomer]
 
@@ -387,6 +446,28 @@ class CustomerReceiptListView(APIView):
         if customer is None:
             return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
         return Response(customer_receipt_list(customer=customer))
+
+
+class CustomerReceiptPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        receipt = (
+            ReceiptDocument.objects.select_related("customer", "finance_account", "payment")
+            .filter(pk=pk, customer=customer)
+            .first()
+        )
+        if receipt is None:
+            return Response({"detail": "Receipt not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_receipt_pdf(receipt=receipt)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="receipt-{receipt.receipt_no or receipt.id}.pdf"'
+        )
+        return response
 
 
 class CustomerDocumentListView(APIView):

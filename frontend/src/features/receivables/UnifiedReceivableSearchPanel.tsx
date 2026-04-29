@@ -158,6 +158,12 @@ export default function UnifiedReceivableSearchPanel({
                       {row.product_summary || "No product summary"} · Status{" "}
                       {row.status || "—"}
                     </div>
+                    {row.source_type === "DIRECT_SALE" ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Paid {money(row.paid_amount)} of {money(row.total_amount)} ·{" "}
+                        {row.payment_state || "UNPAID"}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
                     <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">

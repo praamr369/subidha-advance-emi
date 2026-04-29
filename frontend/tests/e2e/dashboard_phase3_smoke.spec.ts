@@ -76,13 +76,15 @@ test.describe("admin dashboard phase-3 smoke", () => {
 
   test("admin command palette opens with Ctrl+K and searches nested workflow entries", async ({ page }) => {
     await page.goto("/admin");
-
-    await page.keyboard.press("Control+K");
-    await expect(page.getByRole("dialog", { name: "Command palette" })).toBeVisible();
-
-    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale");
+    const trigger = page.getByLabel("Open command palette (Ctrl+K)");
+    await expect(trigger).toBeVisible();
+    await trigger.click();
 
     const dialog = page.getByRole("dialog", { name: "Command palette" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Ctrl K");
+
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale");
     await expect(dialog.getByRole("link", { name: "Create Direct Sale Enter" })).toBeVisible();
     await expect(dialog).toContainText(
       "/admin/sales/direct-sale/create"

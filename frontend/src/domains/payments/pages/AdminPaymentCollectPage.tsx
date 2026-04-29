@@ -77,6 +77,18 @@ function parsePositiveInteger(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Request timed out. Please retry.")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function buildDefaultForm(): FormState {
   return {
     subscription_id: "",
@@ -384,7 +396,7 @@ export default function AdminPaymentCollectPage({
 
     setUnifiedSearchLoading(true);
     try {
-      const payload = await searchAdminReceivables(trimmed);
+      const payload = await withTimeout(searchAdminReceivables(trimmed));
       setUnifiedSearchResults(payload.results);
     } catch (error) {
       setUnifiedSearchResults([]);
@@ -683,7 +695,7 @@ export default function AdminPaymentCollectPage({
     setIsSubmitting(true);
 
     try {
-      const result = await collectPayment({
+      const result = await withTimeout(collectPayment({
         emi: Number(form.emi_id),
         amount: form.amount,
         payment_method: form.payment_method,
@@ -695,7 +707,7 @@ export default function AdminPaymentCollectPage({
           : undefined,
         reference_no: form.reference_no.trim() || undefined,
         notes: form.notes.trim() || undefined,
-      });
+      }));
 
       setSubmitResult(result);
       setSuccessMessage(

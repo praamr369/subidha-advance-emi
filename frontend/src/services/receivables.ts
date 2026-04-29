@@ -23,9 +23,12 @@ export type UnifiedReceivableResult = {
   phone_masked: string;
   product_summary: string;
   due_amount: string;
+  paid_amount: string;
+  total_amount: string;
   overdue_amount: string;
   next_due_date: string | null;
   status: string;
+  payment_state: string;
   primary_action: CollectionPrimaryAction;
   allowed_actions: string[];
   disabled_reason: string | null;
@@ -92,12 +95,15 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
     phone_masked: toStringValue(row.phone_masked),
     product_summary: toStringValue(row.product_summary),
     due_amount: toMoneyString(row.due_amount),
+    paid_amount: toMoneyString(row.paid_amount),
+    total_amount: toMoneyString(row.total_amount),
     overdue_amount: toMoneyString(row.overdue_amount),
     next_due_date:
       typeof row.next_due_date === "string" || row.next_due_date === null
         ? row.next_due_date
         : null,
     status: toStringValue(row.status),
+    payment_state: toStringValue(row.payment_state),
     primary_action: normalizePrimaryAction(row.primary_action),
     allowed_actions: Array.isArray(row.allowed_actions)
       ? row.allowed_actions.filter((item): item is string => typeof item === "string")

@@ -64,6 +64,18 @@ function parsePositiveInteger(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Request timed out. Please retry.")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function isEmiOverdue(emi: PendingEmiRecord | null | undefined): boolean {
   if (!emi) return false;
   if (typeof emi.is_overdue === "boolean") return emi.is_overdue;
@@ -441,7 +453,7 @@ export default function CashierCollectPage() {
 
     setUnifiedSearchLoading(true);
     try {
-      const payload = await searchCashierReceivables(trimmed);
+      const payload = await withTimeout(searchCashierReceivables(trimmed));
       setUnifiedSearchResults(payload.results);
     } catch (error) {
       setUnifiedSearchResults([]);
@@ -531,14 +543,14 @@ export default function CashierCollectPage() {
     setSuccess(null);
 
     try {
-      const response = await collectPayment({
+      const response = await withTimeout(collectPayment({
         emi_id: selectedEmi.id,
         amount: parsedAmount,
         method,
         finance_account_id: Number(selectedFinanceAccountId),
         reference_no: referenceNo.trim() || undefined,
         note: note.trim() || undefined,
-      });
+      }));
 
       setSuccess(response);
       const statusNote = response.created
@@ -547,7 +559,7 @@ export default function CashierCollectPage() {
       setUnifiedLastPaymentSummary(
         `${response.message || "Payment recorded."} Payment #${response.payment.id} · EMI #${response.emi.id}. ${statusNote}`
       );
-      await refreshLookupAfterCollection(selectedEmi.id);
+      await withTimeout(refreshLookupAfterCollection(selectedEmi.id));
     } catch (error) {
       setCollectError(toErrorMessage(error));
     } finally {

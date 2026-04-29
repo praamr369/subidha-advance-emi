@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -17,6 +18,7 @@ from api.v1.serializers.delivery import (
 )
 from subscriptions.models import DeliveryStatus, Subscription
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
+from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
 from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     cancel_subscription_delivery,
@@ -244,6 +246,21 @@ class AdminDeliveryDetailView(APIView):
     def get(self, request, pk):
         delivery = self.get_object(pk)
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class AdminDeliveryPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        delivery = get_delivery_queryset().filter(pk=pk).first()
+        if delivery is None:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_delivery_handover_pdf(delivery=delivery)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="delivery-{delivery.delivery_reference or delivery.id}.pdf"'
+        )
+        return response
 
     def patch(self, request, pk):
         delivery = self.get_object(pk)

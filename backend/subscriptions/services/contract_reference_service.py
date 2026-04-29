@@ -700,12 +700,24 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
     invoice = position.get("invoice")
     service_ready = bool(position.get("collection_supported"))
     disabled_reason = position.get("disabled_reason")
+    collected_total = _money(position.get("collected_total"))
+    outstanding = _money(position["outstanding"])
+    total_amount = collected_total + outstanding
+    if outstanding <= MONEY_ZERO:
+        payment_state = "FULLY_PAID"
+    elif collected_total > MONEY_ZERO:
+        payment_state = "PARTIALLY_PAID"
+    else:
+        payment_state = "UNPAID"
     return {
         "due_amount": outstanding,
         "overdue_amount": MONEY_ZERO,
         "next_due_date": None,
         "status": getattr(sale, "status", "") or getattr(invoice, "status", "") or "",
         "invoice_id": getattr(invoice, "id", None),
+        "paid_amount": collected_total,
+        "total_amount": total_amount,
+        "payment_state": payment_state,
         "allowed_actions": ["COLLECT_DIRECT_SALE"] if service_ready and outstanding > MONEY_ZERO else [],
         "disabled_reason": None if service_ready and outstanding > MONEY_ZERO else disabled_reason,
     }
@@ -739,9 +751,12 @@ def build_receivable_result(
         "phone_masked": _mask_phone(reference.phone_snapshot),
         "product_summary": reference.product_summary_snapshot,
         "due_amount": _money_string(position.get("due_amount")),
+        "paid_amount": _money_string(position.get("paid_amount")),
+        "total_amount": _money_string(position.get("total_amount")),
         "overdue_amount": _money_string(position.get("overdue_amount")),
         "next_due_date": position.get("next_due_date"),
         "status": position.get("status") or "",
+        "payment_state": position.get("payment_state") or "",
         "primary_action": state["primary_action"],
         "allowed_actions": state["allowed_actions"],
         "disabled_reason": state["disabled_reason"],

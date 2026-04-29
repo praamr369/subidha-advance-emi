@@ -1125,6 +1125,7 @@ function Topbar({
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
             aria-label="Open command palette"
             title="Command palette"
+            data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
           </button>
@@ -1134,6 +1135,7 @@ function Topbar({
             className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
+            data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
             Command

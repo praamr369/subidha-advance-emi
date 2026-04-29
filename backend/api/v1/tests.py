@@ -2,6 +2,8 @@ from datetime import date
 from decimal import Decimal
 
 from accounting.models import FinanceAccountKind
+from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -16,6 +18,7 @@ from subscriptions.models import (
     PlanType,
     Product,
     Subscription,
+    SubscriptionDelivery,
     SubscriptionDocument,
     SubscriptionStatus,
 )
@@ -686,6 +689,55 @@ class Phase9AContractReferenceApiTests(TestCase):
         )
         self.reference = ContractReference.objects.get(subscription=self.subscription)
 
+    def _create_direct_sale_reference(self, *, received_total: str = "0.00", grand_total: str = "100.00"):
+        fy = financial_year_for(date(2099, 1, 1))
+        sequence = ensure_document_sequence(
+            series_code="DIRSALE",
+            financial_year=fy,
+            prefix=f"SALE-{fy}",
+            padding=5,
+        )
+        sale = DirectSale.objects.create(
+            sale_no=f"SALE-P9C-{DirectSale.objects.count()+1:04d}",
+            sale_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=sequence,
+            customer=self.customer,
+            status="INVOICED",
+            grand_total=Decimal(grand_total),
+            received_total=Decimal(received_total),
+            balance_total=Decimal(grand_total) - Decimal(received_total),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        BillingInvoice.objects.create(
+            document_no=f"INV-P9C-{BillingInvoice.objects.count()+1:04d}",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=sequence,
+            customer=self.customer,
+            direct_sale=sale,
+            billing_channel="RETAIL",
+            source_type="DIRECT_SALE",
+            status=BillingDocumentStatus.DRAFT,
+            grand_total=Decimal(grand_total),
+            received_total=Decimal(received_total),
+            balance_total=Decimal(grand_total) - Decimal(received_total),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        reference = ContractReference.objects.create(
+            reference_no=f"SAL/RET/{self.batch.batch_code}/L00/2099/{ContractReference.objects.count()+1:05d}",
+            display_reference=f"Direct Sale {sale.id}",
+            contract_type="DIRECT_SALE",
+            customer=self.customer,
+            direct_sale=sale,
+            phone_snapshot=self.customer.phone,
+            customer_name_snapshot=self.customer.name,
+            product_summary_snapshot="Retail Direct Sale",
+        )
+        return sale, reference
+
     def _assert_reference_in_admin_search(self, query):
         self.client.force_authenticate(self.admin)
         response = self.client.get(
@@ -772,6 +824,17 @@ class Phase9AContractReferenceApiTests(TestCase):
             {row["reference_no"] for row in response.data["results"]},
         )
 
+    def test_admin_receivables_search_supports_batch_and_lucky_queries(self):
+        self.client.force_authenticate(self.admin)
+        for query in [self.batch.batch_code, "09", self.reference.reference_no]:
+            with self.subTest(query=query):
+                response = self.client.get("/api/v1/admin/receivables/search/", {"q": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(
+                    self.reference.reference_no,
+                    {row["reference_no"] for row in response.data["results"]},
+                )
+
     def test_admin_receivables_collect_advances_emi_via_payment_service(self):
         accounts = ensure_default_payment_collection_accounts()
         cash_id = accounts[FinanceAccountKind.CASH].id
@@ -823,6 +886,7 @@ class Phase9AContractReferenceApiTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
+
     def test_admin_contract_reference_resolve_returns_route_and_primary_action(self):
         self.client.force_authenticate(self.admin)
         response = self.client.get(
@@ -835,6 +899,43 @@ class Phase9AContractReferenceApiTests(TestCase):
         self.assertEqual(response.data["primary_action"], "COLLECT_EMI")
         self.assertEqual(response.data["allowed_actions"], ["COLLECT_EMI"])
         self.assertIn("/admin/finance/collect", response.data["route"])
+
+    def test_cashier_cannot_access_admin_contract_reference_resolve(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(
+            f"/api/v1/admin/contract-references/{self.reference.id}/resolve/",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_direct_sale_result_uses_direct_sale_source_id(self):
+        sale, ds_reference = self._create_direct_sale_reference(received_total="25.00")
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["source_type"], "DIRECT_SALE")
+        self.assertEqual(row["source_id"], sale.id)
+        self.assertEqual(row["paid_amount"], "25.00")
+        self.assertEqual(row["payment_state"], "PARTIALLY_PAID")
+
+    def test_full_paid_direct_sale_disables_collect_action(self):
+        _, ds_reference = self._create_direct_sale_reference(received_total="100.00")
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertEqual(row["primary_action"], "VIEW_ONLY")
+        self.assertEqual(row["allowed_actions"], [])
+        self.assertEqual(row["due_amount"], "0.00")
+        self.assertEqual(row["payment_state"], "FULLY_PAID")
+        self.assertIn("no outstanding balance", (row.get("disabled_reason") or "").lower())
 
     def test_unified_collect_idempotency_replays_identical_request(self):
         accounts = ensure_default_payment_collection_accounts()
@@ -904,3 +1005,228 @@ class Phase9AContractReferenceApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_cashier_unified_collect_rejects_unsupported_source_type(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.cashier)
+        response = self.client.post(
+            "/api/v1/cashier/receivables/collect/",
+            {
+                "source_type": "LEASE",
+                "source_id": self.subscription.id,
+                "amount": "10.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class Phase9DPdfDocumentSafetyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="admin_phase9d", password="pass1234", role="ADMIN", phone="9800092000", is_staff=True
+        )
+        self.cashier = User.objects.create_user(
+            username="cashier_phase9d", password="pass1234", role="CASHIER", phone="9800092001", is_staff=True
+        )
+        self.customer_user = User.objects.create_user(
+            username="customer_phase9d", password="pass1234", role="CUSTOMER", phone="9800092002"
+        )
+        self.other_customer_user = User.objects.create_user(
+            username="customer_phase9d_other", password="pass1234", role="CUSTOMER", phone="9800092003"
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase9D Customer",
+            phone="9800092002",
+            customer_code="KYC-P9D-001",
+        )
+        self.other_customer = Customer.objects.create(
+            user=self.other_customer_user,
+            name="Phase9D Other Customer",
+            phone="9800092003",
+            customer_code="KYC-P9D-002",
+        )
+        self.product = Product.objects.create(
+            product_code="P9D-PRD",
+            name="Phase9D Sofa",
+            base_price=Decimal("800.00"),
+        )
+        self.batch = Batch.objects.create(
+            batch_code="P9D-BATCH",
+            total_slots=100,
+            duration_months=10,
+            draw_day=5,
+            start_date=date(2099, 1, 1),
+            status="OPEN",
+        )
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=1,
+            tenure_months=10,
+            partner=self.admin,
+            start_date=date(2099, 1, 1),
+            performed_by=self.admin,
+        )
+        self.other_subscription = create_subscription(
+            customer=self.other_customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=2,
+            tenure_months=10,
+            partner=self.admin,
+            start_date=date(2099, 1, 1),
+            performed_by=self.admin,
+        )
+        fy = financial_year_for(date(2099, 1, 1))
+        seq = ensure_document_sequence(
+            series_code="DIRSALE",
+            financial_year=fy,
+            prefix=f"SALE-{fy}",
+            padding=5,
+        )
+        self.sale = DirectSale.objects.create(
+            sale_no="SALE-P9D-0001",
+            sale_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.customer,
+            status="INVOICED",
+            grand_total=Decimal("200.00"),
+            received_total=Decimal("50.00"),
+            balance_total=Decimal("150.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.invoice = BillingInvoice.objects.create(
+            document_no="INV-P9D-0001",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.customer,
+            direct_sale=self.sale,
+            billing_channel="RETAIL",
+            source_type="DIRECT_SALE",
+            status=BillingDocumentStatus.DRAFT,
+            source_reference="CR-P9D-REF-0001",
+            grand_total=Decimal("200.00"),
+            received_total=Decimal("50.00"),
+            balance_total=Decimal("150.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.other_invoice = BillingInvoice.objects.create(
+            document_no="INV-P9D-0002",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.other_customer,
+            billing_channel="RETAIL",
+            source_type="MANUAL",
+            status=BillingDocumentStatus.DRAFT,
+            grand_total=Decimal("120.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("120.00"),
+            customer_name_snapshot=self.other_customer.name,
+            customer_phone_snapshot=self.other_customer.phone,
+        )
+        self.receipt = ReceiptDocument.objects.create(
+            receipt_no="RCT-P9D-0001",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.DRAFT,
+            receipt_date=date(2099, 1, 2),
+            customer=self.customer,
+            billing_invoice=self.invoice,
+            direct_sale=self.sale,
+            source_type="DIRECT_SALE",
+            source_reference="CR-P9D-REF-0001",
+            amount=Decimal("50.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.other_receipt = ReceiptDocument.objects.create(
+            receipt_no="RCT-P9D-0002",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.DRAFT,
+            receipt_date=date(2099, 1, 2),
+            customer=self.other_customer,
+            source_type="MANUAL",
+            source_reference="CR-P9D-REF-0002",
+            amount=Decimal("20.00"),
+            customer_name_snapshot=self.other_customer.name,
+            customer_phone_snapshot=self.other_customer.phone,
+        )
+        self.delivery = SubscriptionDelivery.objects.create(
+            subscription=self.subscription,
+            delivery_reference="DLV-P9D-0001",
+            status="PENDING",
+            receiver_name=self.customer.name,
+            receiver_phone=self.customer.phone,
+            delivery_address_snapshot="Dhaka, Test Address",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+        self.other_delivery = SubscriptionDelivery.objects.create(
+            subscription=self.other_subscription,
+            delivery_reference="DLV-P9D-0002",
+            status="PENDING",
+            receiver_name=self.other_customer.name,
+            receiver_phone=self.other_customer.phone,
+            delivery_address_snapshot="Other Address",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+
+    def test_admin_invoice_pdf_contains_document_number(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/invoices/{self.invoice.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.invoice.document_no.encode(), response.content)
+
+    def test_admin_receipt_pdf_contains_receipt_number(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/receipts/{self.receipt.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.receipt.receipt_no.encode(), response.content)
+
+    def test_admin_delivery_pdf_contains_delivery_reference(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/deliveries/{self.delivery.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.delivery.delivery_reference.encode(), response.content)
+
+    def test_customer_can_download_own_invoice_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/invoices/{self.invoice.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/invoices/{self.other_invoice.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_customer_can_download_own_receipt_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/receipts/{self.receipt.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/receipts/{self.other_receipt.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_customer_can_download_own_delivery_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/deliveries/{self.delivery.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/deliveries/{self.other_delivery.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_cashier_cannot_access_admin_pdf_routes(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(f"/api/v1/admin/invoices/{self.invoice.id}/pdf/")
+        self.assertEqual(response.status_code, 403)
