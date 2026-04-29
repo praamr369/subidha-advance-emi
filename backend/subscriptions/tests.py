@@ -401,6 +401,7 @@ class ContractReferenceServiceTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["due_amount"], "60.00")
         self.assertEqual(rows[0]["allowed_actions"], ["COLLECT_EMI"])
+        self.assertEqual(rows[0]["primary_action"], "COLLECT_EMI")
 
     def test_rent_and_lease_collection_actions_are_disabled_safely(self):
         rent_subscription = Subscription.objects.create(
@@ -441,5 +442,7 @@ class ContractReferenceServiceTests(TestCase):
         self.assertEqual(lease_row["source_type"], ContractReferenceType.LEASE)
         self.assertEqual(rent_row["allowed_actions"], [])
         self.assertEqual(lease_row["allowed_actions"], [])
+        self.assertEqual(rent_row["primary_action"], "VIEW_ONLY")
+        self.assertEqual(lease_row["primary_action"], "VIEW_ONLY")
         self.assertIn("production-safe", rent_row["disabled_reason"])
         self.assertIn("production-safe", lease_row["disabled_reason"])

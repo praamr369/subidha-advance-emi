@@ -42,10 +42,10 @@ export default function UnifiedReceivableSearchPanel({
   error,
   searched,
   actionLoadingKey,
+  lastPaymentSummary,
   onQueryChange,
   onSearch,
   onAdvanceEmiSelect,
-  directSaleHref,
 }: {
   title: string;
   description: string;
@@ -55,10 +55,10 @@ export default function UnifiedReceivableSearchPanel({
   error: string | null;
   searched: boolean;
   actionLoadingKey?: string | null;
+  lastPaymentSummary?: string | null;
   onQueryChange: (value: string) => void;
   onSearch: (query: string) => void;
   onAdvanceEmiSelect?: (row: UnifiedReceivableResult) => void;
-  directSaleHref?: (row: UnifiedReceivableResult) => string;
 }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,6 +92,12 @@ export default function UnifiedReceivableSearchPanel({
         </button>
       </form>
 
+      {lastPaymentSummary ? (
+        <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-foreground">
+          {lastPaymentSummary}
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="mt-4">
           <LoadingBlock label="Searching receivables..." />
@@ -117,14 +123,13 @@ export default function UnifiedReceivableSearchPanel({
         <div className="mt-5 space-y-3">
           {results.map((row) => {
             const key = `${row.source_type}-${row.source_id ?? row.reference_no}`;
-            const canCollectEmi =
-              row.source_type === "ADVANCE_EMI" &&
-              row.allowed_actions.includes("COLLECT_EMI") &&
-              Boolean(onAdvanceEmiSelect);
-            const canCollectDirectSale =
-              row.source_type === "DIRECT_SALE" &&
-              row.allowed_actions.includes("COLLECT_DIRECT_SALE") &&
-              Boolean(directSaleHref);
+            const route = row.collection_route?.trim() || "";
+            const canEmiInline =
+              row.primary_action === "COLLECT_EMI" && Boolean(onAdvanceEmiSelect);
+            const canEmiRoute =
+              row.primary_action === "COLLECT_EMI" && !onAdvanceEmiSelect && Boolean(route);
+            const canDirectRoute =
+              row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
             const disabledReason =
               row.disabled_reason || "Collection is not available for this receivable.";
 
@@ -136,7 +141,9 @@ export default function UnifiedReceivableSearchPanel({
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(row.source_type)}`}>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(row.source_type)}`}
+                      >
                         {sourceLabel(row.source_type)}
                       </span>
                       <span className="break-all text-sm font-semibold text-foreground">
@@ -144,10 +151,12 @@ export default function UnifiedReceivableSearchPanel({
                       </span>
                     </div>
                     <div className="mt-2 text-sm text-foreground">
-                      {row.customer_name || "Customer not linked"} · {row.phone_masked || "No phone"}
+                      {row.customer_name || "Customer not linked"} ·{" "}
+                      {row.phone_masked || "No phone"}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {row.product_summary || "No product summary"} · Status {row.status || "—"}
+                      {row.product_summary || "No product summary"} · Status{" "}
+                      {row.status || "—"}
                     </div>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
@@ -179,42 +188,50 @@ export default function UnifiedReceivableSearchPanel({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {canCollectEmi ? (
+                  {canEmiInline ? (
                     <button
                       type="button"
                       onClick={() => onAdvanceEmiSelect?.(row)}
                       disabled={actionLoadingKey === key}
+                      title="Opens the in-page EMI collection workflow using the canonical route from the server."
                       className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {actionLoadingKey === key ? "Loading EMI..." : "Use EMI Flow"}
                     </button>
                   ) : null}
 
-                  {canCollectDirectSale ? (
+                  {canEmiRoute ? (
                     <Link
-                      href={directSaleHref?.(row) || "#"}
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
+                      href={route}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800"
                     >
-                      Open Direct-Sale Flow
+                      Open EMI collection
                     </Link>
                   ) : null}
 
-                  {!canCollectEmi && !canCollectDirectSale ? (
+                  {canDirectRoute ? (
+                    <Link
+                      href={route}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
+                    >
+                      Open direct-sale collection
+                    </Link>
+                  ) : null}
+
+                  {!canEmiInline && !canEmiRoute && !canDirectRoute ? (
                     <button
                       type="button"
                       disabled
                       title={disabledReason}
                       className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-xl border border-border bg-muted px-4 text-sm font-semibold text-muted-foreground"
                     >
-                      Collection disabled
+                      {row.primary_action === "VIEW_ONLY" ? "View only" : "Collection disabled"}
                     </button>
                   ) : null}
                 </div>
 
-                {!canCollectEmi && !canCollectDirectSale && disabledReason ? (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {disabledReason}
-                  </div>
+                {!canEmiInline && !canEmiRoute && !canDirectRoute && disabledReason ? (
+                  <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div>
                 ) : null}
               </div>
             );
@@ -224,4 +241,3 @@ export default function UnifiedReceivableSearchPanel({
     </SectionCard>
   );
 }
-

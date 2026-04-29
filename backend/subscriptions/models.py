@@ -1801,6 +1801,49 @@ class ContractReference(TimeStampedModel):
         return self.reference_no
 
 
+class UnifiedCollectionIdempotencyStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    COMPLETED = "COMPLETED", "Completed"
+
+
+class UnifiedCollectionIdempotency(TimeStampedModel):
+    """
+    Binds an optional client idempotency key to at most one successful unified collection
+    response per user (Phase 9B).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="unified_collection_idempotency_keys",
+    )
+    key = models.CharField(max_length=160)
+    fingerprint = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=16,
+        choices=UnifiedCollectionIdempotencyStatus.choices,
+        default=UnifiedCollectionIdempotencyStatus.PENDING,
+        db_index=True,
+    )
+    response_body = models.JSONField(default=dict, blank=True)
+    response_status = models.PositiveSmallIntegerField(default=200)
+
+    class Meta:
+        db_table = "unified_collection_idempotency"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "key"],
+                name="uniq_unified_collection_idem_user_key",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.key[:24]}"
+
+
 class RentLeaseDemandType(models.TextChoices):
     RENT_MONTHLY = "RENT_MONTHLY", "Rent Monthly Demand"
     LEASE_MONTHLY = "LEASE_MONTHLY", "Lease Monthly Demand"

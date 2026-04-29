@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,8 +11,10 @@ from api.v1.serializers.contract_references import (
     ContractReferenceSerializer,
     UnifiedReceivableCollectSerializer,
 )
+from subscriptions.models import ContractReference
 from subscriptions.services.contract_reference_service import (
     collect_unified_receivable,
+    resolve_contract_reference_row,
     search_contract_references,
     search_receivables,
 )
@@ -74,6 +77,15 @@ class CashierReceivablesSearchView(APIView):
         return Response({"count": len(rows), "results": rows}, status=status.HTTP_200_OK)
 
 
+class AdminContractReferenceResolveView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk, *args, **kwargs):
+        reference = get_object_or_404(ContractReference, pk=pk)
+        payload = resolve_contract_reference_row(reference, audience="admin")
+        return Response(payload, status=status.HTTP_200_OK)
+
+
 class UnifiedReceivableCollectView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
     audience = "cashier"
@@ -84,7 +96,7 @@ class UnifiedReceivableCollectView(APIView):
         validated = serializer.validated_data
 
         try:
-            result = collect_unified_receivable(
+            result, response_status = collect_unified_receivable(
                 source_type=validated["source_type"],
                 source_id=validated["source_id"],
                 amount=validated["amount"],
@@ -96,6 +108,8 @@ class UnifiedReceivableCollectView(APIView):
                 branch_id=validated.get("branch_id"),
                 cash_counter_id=validated.get("cash_counter_id"),
                 note=validated.get("note"),
+                idempotency_key=validated.get("idempotency_key"),
+                contract_reference_id=validated.get("contract_reference_id"),
             )
         except ValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
@@ -103,7 +117,6 @@ class UnifiedReceivableCollectView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        response_status = status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK
         return Response(result, status=response_status)
 
 

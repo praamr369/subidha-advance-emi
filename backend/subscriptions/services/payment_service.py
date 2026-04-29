@@ -407,6 +407,9 @@ def record_emi_payment(
     branch_id: int | None = None,
     cash_counter_id: int | None = None,
     finance_account_id: int | None = None,
+    contract_reference_id: int | None = None,
+    unified_collection_source_type: str | None = None,
+    unified_collection_source_id: int | None = None,
 ):
     """
     Canonical payment collection entrypoint.
@@ -522,6 +525,17 @@ def record_emi_payment(
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
+            **(
+                {
+                    "contract_reference_id": contract_reference_id,
+                    "unified_collection_source_type": unified_collection_source_type,
+                    "unified_collection_source_id": unified_collection_source_id,
+                }
+                if contract_reference_id is not None
+                or unified_collection_source_type is not None
+                or unified_collection_source_id is not None
+                else {}
+            ),
         },
     )
 

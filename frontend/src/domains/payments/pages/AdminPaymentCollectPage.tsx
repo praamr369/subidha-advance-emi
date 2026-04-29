@@ -244,6 +244,7 @@ export default function AdminPaymentCollectPage({
   const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
   const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
   const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
+  const [unifiedLastPaymentSummary, setUnifiedLastPaymentSummary] = useState<string | null>(null);
 
   const selectedMethodLabel =
     PAYMENT_METHOD_OPTIONS.find(
@@ -373,6 +374,7 @@ export default function AdminPaymentCollectPage({
     const trimmed = query.trim();
     setUnifiedSearchSubmitted(true);
     setUnifiedSearchError(null);
+    setUnifiedLastPaymentSummary(null);
 
     if (!trimmed) {
       setUnifiedSearchResults([]);
@@ -699,6 +701,9 @@ export default function AdminPaymentCollectPage({
       setSuccessMessage(
         `Payment #${result.payment.id} recorded successfully for EMI #${result.emi.id}.`
       );
+      setUnifiedLastPaymentSummary(
+        `Last payment status: success — payment #${result.payment.id} for EMI #${result.emi.id} (${formatCurrency(result.payment.amount)} · ${String(result.payment.method ?? result.payment.payment_method ?? form.payment_method).toUpperCase()}).`
+      );
       onCreated?.(result.payment.id);
 
       if (selectedSubscription?.id) {
@@ -819,14 +824,10 @@ export default function AdminPaymentCollectPage({
           error={unifiedSearchError}
           searched={unifiedSearchSubmitted}
           actionLoadingKey={unifiedActionLoadingKey}
+          lastPaymentSummary={unifiedLastPaymentSummary}
           onQueryChange={setUnifiedSearchQuery}
           onSearch={handleUnifiedReceivableSearch}
           onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
-          directSaleHref={(row) =>
-            row.source_id
-              ? `/admin/finance/collect?workflow=direct-sale&direct_sale=${row.source_id}`
-              : "/admin/finance/collect?workflow=direct-sale"
-          }
         />
 
       <div className={showAside ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>

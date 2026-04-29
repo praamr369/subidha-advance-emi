@@ -36,6 +36,7 @@ import {
 } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import type { CollectionPrimaryAction } from "@/services/receivables";
 
 // =====================================================
 // TYPES
@@ -110,6 +111,7 @@ type ContractReferenceSourceType =
   | "DIRECT_SALE";
 
 type ContractReferenceOperationalRow = {
+  contract_reference_id: number | null;
   source_type: ContractReferenceSourceType;
   source_id: number | null;
   reference_no: string;
@@ -122,8 +124,10 @@ type ContractReferenceOperationalRow = {
   overdue_amount: string;
   next_due_date?: string | null;
   status: string;
+  primary_action: CollectionPrimaryAction;
   allowed_actions: string[];
   disabled_reason?: string | null;
+  collection_route: string;
 };
 
 type DirectSaleOperationalRow = {
@@ -389,6 +393,16 @@ function normalizeContractReferenceSourceType(
   return "ADVANCE_EMI";
 }
 
+function normalizeContractReferencePrimaryAction(
+  value: unknown
+): CollectionPrimaryAction {
+  const v = String(value || "").toUpperCase();
+  if (v === "COLLECT_DIRECT_SALE") return "COLLECT_DIRECT_SALE";
+  if (v === "VIEW_ONLY") return "VIEW_ONLY";
+  if (v === "DISABLED") return "DISABLED";
+  return "COLLECT_EMI";
+}
+
 function normalizeCustomerDetail(
   raw: Record<string, unknown>
 ): CustomerDetailRecord {
@@ -546,6 +560,7 @@ function normalizeCustomerOperationalProfile(
         direct_sale_count: toNumber(contractReferenceSummary.direct_sale_count),
       },
       rows: extractNestedArray(contractReferences, ["rows"]).map((row) => ({
+        contract_reference_id: toNullableNumber(row.contract_reference_id) ?? null,
         source_type: normalizeContractReferenceSourceType(row.source_type),
         source_id: toNullableNumber(row.source_id) ?? null,
         reference_no: toStringValue(row.reference_no),
@@ -559,12 +574,14 @@ function normalizeCustomerOperationalProfile(
         overdue_amount: toMoneyString(row.overdue_amount),
         next_due_date: toNullableString(row.next_due_date),
         status: toStringValue(row.status),
+        primary_action: normalizeContractReferencePrimaryAction(row.primary_action),
         allowed_actions: Array.isArray(row.allowed_actions)
           ? row.allowed_actions.filter(
               (item): item is string => typeof item === "string"
             )
           : [],
         disabled_reason: toNullableString(row.disabled_reason),
+        collection_route: toStringValue(row.collection_route),
       })),
     },
     ledger_summary: {
@@ -826,14 +843,13 @@ function ContractReferenceList({
     <div className="space-y-3">
       {rows.map((row) => {
         const key = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+        const route = row.collection_route?.trim() || "";
         const canCollectEmi =
-          row.source_type === "ADVANCE_EMI" &&
-          row.source_id !== null &&
-          row.allowed_actions.includes("COLLECT_EMI");
+          row.primary_action === "COLLECT_EMI" && Boolean(route);
         const canCollectDirectSale =
-          row.source_type === "DIRECT_SALE" &&
-          row.source_id !== null &&
-          row.allowed_actions.includes("COLLECT_DIRECT_SALE");
+          row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
+        const disabledReason =
+          row.disabled_reason || "Collection is not available for this contract.";
 
         return (
           <div
@@ -890,7 +906,8 @@ function ContractReferenceList({
             <div className="mt-4 flex flex-wrap gap-2">
               {canCollectEmi ? (
                 <Link
-                  href={`/admin/finance/collect?subscription=${row.source_id}`}
+                  href={route}
+                  title="Opens the collection desk using the canonical route from ContractReference."
                   className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
                 >
                   Collect EMI
@@ -899,7 +916,8 @@ function ContractReferenceList({
 
               {canCollectDirectSale ? (
                 <Link
-                  href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${row.source_id}`}
+                  href={route}
+                  title="Opens the collection desk using the canonical route from ContractReference."
                   className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                 >
                   Collect Direct Sale
@@ -907,16 +925,17 @@ function ContractReferenceList({
               ) : null}
 
               {!canCollectEmi && !canCollectDirectSale ? (
-                <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
-                  Collection disabled
+                <span
+                  title={disabledReason}
+                  className="inline-flex cursor-not-allowed items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground"
+                >
+                  {row.primary_action === "VIEW_ONLY" ? "View only" : "Collection disabled"}
                 </span>
               ) : null}
             </div>
 
-            {!canCollectEmi && !canCollectDirectSale && row.disabled_reason ? (
-              <div className="mt-2 text-xs text-muted-foreground">
-                {row.disabled_reason}
-              </div>
+            {!canCollectEmi && !canCollectDirectSale ? (
+              <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div>
             ) : null}
           </div>
         );

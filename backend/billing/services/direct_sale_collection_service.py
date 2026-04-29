@@ -197,6 +197,9 @@ def collect_direct_sale_payment(
     cash_counter_id: int | None = None,
     reference_no: str | None = None,
     notes: str | None = None,
+    contract_reference_id: int | None = None,
+    unified_collection_source_type: str | None = None,
+    unified_collection_source_id: int | None = None,
 ):
     amount = _money(amount)
     if amount <= Decimal("0.00"):
@@ -314,6 +317,14 @@ def collect_direct_sale_payment(
         ]
     )
 
+    audit_extra = {}
+    if contract_reference_id is not None:
+        audit_extra["contract_reference_id"] = contract_reference_id
+    if unified_collection_source_type is not None:
+        audit_extra["unified_collection_source_type"] = unified_collection_source_type
+    if unified_collection_source_id is not None:
+        audit_extra["unified_collection_source_id"] = unified_collection_source_id
+
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=sale,
@@ -332,6 +343,7 @@ def collect_direct_sale_payment(
             "branch_id": resolved_branch_id,
             "cash_counter_id": getattr(cash_counter, "id", None),
             "reference_no": normalized_reference or None,
+            **audit_extra,
         },
     )
 

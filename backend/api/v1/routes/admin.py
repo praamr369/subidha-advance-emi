@@ -18,6 +18,7 @@ from api.v1.views.admin_commissions import (
 from api.v1.views.admin_dashboard import AdminDashboardView
 from api.v1.views.contract_references import (
     AdminContractReferenceListView,
+    AdminContractReferenceResolveView,
     AdminReceivablesSearchView,
     AdminUnifiedReceivableCollectView,
 )
@@ -284,6 +285,7 @@ urlpatterns = [
     path("contracts/<int:pk>/return-inspection/record/", ContractReturnInspectionRecordView.as_view()),
     path("contracts/<int:pk>/return-inspection/approve/", ContractReturnInspectionApproveView.as_view()),
     path("contract-references/", AdminContractReferenceListView.as_view()),
+    path("contract-references/<int:pk>/resolve/", AdminContractReferenceResolveView.as_view()),
     path("receivables/search/", AdminReceivablesSearchView.as_view()),
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),

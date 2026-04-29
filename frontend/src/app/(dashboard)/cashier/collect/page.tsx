@@ -180,6 +180,7 @@ export default function CashierCollectPage() {
   const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
   const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
   const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
+  const [unifiedLastPaymentSummary, setUnifiedLastPaymentSummary] = useState<string | null>(null);
 
   const selectedEmi = useMemo<PendingEmiRecord | null>(() => {
     if (!lookup || !selectedEmiId) return null;
@@ -428,6 +429,7 @@ export default function CashierCollectPage() {
     const trimmed = query.trim();
     setUnifiedSearchSubmitted(true);
     setUnifiedSearchError(null);
+    setUnifiedLastPaymentSummary(null);
 
     if (!trimmed) {
       setUnifiedSearchResults([]);
@@ -539,6 +541,12 @@ export default function CashierCollectPage() {
       });
 
       setSuccess(response);
+      const statusNote = response.created
+        ? "Posted successfully."
+        : "Idempotent replay — existing payment returned (no duplicate post).";
+      setUnifiedLastPaymentSummary(
+        `${response.message || "Payment recorded."} Payment #${response.payment.id} · EMI #${response.emi.id}. ${statusNote}`
+      );
       await refreshLookupAfterCollection(selectedEmi.id);
     } catch (error) {
       setCollectError(toErrorMessage(error));
@@ -720,11 +728,7 @@ export default function CashierCollectPage() {
           onQueryChange={setUnifiedSearchQuery}
           onSearch={handleUnifiedReceivableSearch}
           onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
-          directSaleHref={(row) =>
-            row.source_id
-              ? `/cashier/collect?workflow=direct-sale&direct_sale=${row.source_id}`
-              : "/cashier/collect?workflow=direct-sale"
-          }
+          lastPaymentSummary={unifiedLastPaymentSummary}
         />
 
         <SectionCard

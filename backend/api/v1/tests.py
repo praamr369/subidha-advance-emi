@@ -731,6 +731,9 @@ class Phase9AContractReferenceApiTests(TestCase):
         self.assertEqual(row["due_amount"], "100.00")
         self.assertEqual(row["overdue_amount"], "0.00")
         self.assertEqual(row["allowed_actions"], ["COLLECT_EMI"])
+        self.assertEqual(row["primary_action"], "COLLECT_EMI")
+        self.assertEqual(row["contract_reference_id"], self.reference.id)
+        self.assertIn("/admin/finance/collect", row["collection_route"])
 
     def test_cashier_receivables_search_is_role_scoped_and_masks_admin_fields(self):
         self.client.force_authenticate(self.cashier)
@@ -818,4 +821,86 @@ class Phase9AContractReferenceApiTests(TestCase):
             format="json",
         )
 
+        self.assertEqual(response.status_code, 400)
+
+    def test_admin_contract_reference_resolve_returns_route_and_primary_action(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            f"/api/v1/admin/contract-references/{self.reference.id}/resolve/",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["contract_reference_id"], self.reference.id)
+        self.assertEqual(response.data["source_type"], "ADVANCE_EMI")
+        self.assertEqual(response.data["source_id"], self.subscription.id)
+        self.assertEqual(response.data["primary_action"], "COLLECT_EMI")
+        self.assertEqual(response.data["allowed_actions"], ["COLLECT_EMI"])
+        self.assertIn("/admin/finance/collect", response.data["route"])
+
+    def test_unified_collect_idempotency_replays_identical_request(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        body = {
+            "source_type": "ADVANCE_EMI",
+            "source_id": self.subscription.id,
+            "amount": "15.00",
+            "payment_method": "CASH",
+            "finance_account": cash_id,
+            "reference": "P9B-IDEM-1",
+            "idempotency_key": "idem-phase-9b-001",
+            "contract_reference_id": self.reference.id,
+        }
+        first = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            body,
+            format="json",
+        )
+        second = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            body,
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.data.get("payment_id"), second.data.get("payment_id"))
+
+    def test_unified_collect_idempotency_rejects_conflicting_payload(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        base = {
+            "source_type": "ADVANCE_EMI",
+            "source_id": self.subscription.id,
+            "payment_method": "CASH",
+            "finance_account": cash_id,
+            "idempotency_key": "idem-phase-9b-conflict",
+        }
+        first = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {**base, "amount": "10.00", "reference": "P9B-A"},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {**base, "amount": "11.00", "reference": "P9B-B"},
+            format="json",
+        )
+        self.assertEqual(second.status_code, 400)
+
+    def test_unified_collect_rejects_mismatched_source_type_for_subscription(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": "LEASE",
+                "source_id": self.subscription.id,
+                "amount": "10.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+            },
+            format="json",
+        )
         self.assertEqual(response.status_code, 400)

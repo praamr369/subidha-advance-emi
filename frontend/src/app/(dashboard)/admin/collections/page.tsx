@@ -984,11 +984,6 @@ export default function AdminCollectionsPage() {
           onQueryChange={setUnifiedSearchQuery}
           onSearch={handleUnifiedReceivableSearch}
           onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
-          directSaleHref={(row) =>
-            row.source_id
-              ? `${ROUTES.admin.financeCollect}?workflow=direct-sale&direct_sale=${row.source_id}`
-              : `${ROUTES.admin.financeCollect}?workflow=direct-sale`
-          }
         />
 
         {/* Top Bar with Actions */}

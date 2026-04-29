@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -22,9 +23,10 @@ from subscriptions.models import (
     RentLeaseDemandStatus,
     RentLeaseDemandType,
     Subscription,
+    UnifiedCollectionIdempotency,
+    UnifiedCollectionIdempotencyStatus,
     q2,
 )
-from subscriptions.services.payment_service import record_emi_payment
 
 
 REFERENCE_SEQUENCE_PADDING = 5
@@ -32,6 +34,13 @@ RENT_LEASE_DISABLED_REASON = (
     "Rent/lease monthly collection is not exposed through a production-safe "
     "posting service in the unified collection flow yet."
 )
+
+
+class CollectionPrimaryAction:
+    COLLECT_EMI = "COLLECT_EMI"
+    COLLECT_DIRECT_SALE = "COLLECT_DIRECT_SALE"
+    VIEW_ONLY = "VIEW_ONLY"
+    DISABLED = "DISABLED"
 
 
 @dataclass(frozen=True)
@@ -534,6 +543,153 @@ def rent_lease_receivable_position(subscription: Subscription) -> dict[str, obje
     }
 
 
+def _receivable_position_bundle(reference: ContractReference) -> dict[str, object]:
+    source_type = reference.contract_type
+    if source_type == ContractReferenceType.ADVANCE_EMI and reference.subscription_id:
+        return _advance_emi_position(reference.subscription)
+    if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE} and reference.subscription_id:
+        return rent_lease_receivable_position(reference.subscription)
+    if source_type == ContractReferenceType.DIRECT_SALE and reference.direct_sale_id:
+        return direct_sale_receivable_position(reference.direct_sale)
+    return {
+        "due_amount": MONEY_ZERO,
+        "overdue_amount": MONEY_ZERO,
+        "next_due_date": None,
+        "status": "UNSUPPORTED",
+        "allowed_actions": [],
+        "disabled_reason": "Source record is not linked to a supported receivable.",
+    }
+
+
+def _derive_collection_action_state(
+    contract_type: str,
+    position: dict[str, object],
+) -> dict[str, object]:
+    allowed = list(position.get("allowed_actions") or [])
+    dr = position.get("disabled_reason")
+    if contract_type == ContractReferenceType.ADVANCE_EMI:
+        if "COLLECT_EMI" in allowed:
+            return {
+                "primary_action": CollectionPrimaryAction.COLLECT_EMI,
+                "allowed_actions": allowed,
+                "disabled_reason": None,
+            }
+        return {
+            "primary_action": CollectionPrimaryAction.DISABLED,
+            "allowed_actions": [],
+            "disabled_reason": dr,
+        }
+    if contract_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
+        return {
+            "primary_action": CollectionPrimaryAction.VIEW_ONLY,
+            "allowed_actions": [],
+            "disabled_reason": dr,
+        }
+    if contract_type == ContractReferenceType.DIRECT_SALE:
+        if "COLLECT_DIRECT_SALE" in allowed:
+            return {
+                "primary_action": CollectionPrimaryAction.COLLECT_DIRECT_SALE,
+                "allowed_actions": allowed,
+                "disabled_reason": None,
+            }
+        if dr:
+            return {
+                "primary_action": CollectionPrimaryAction.VIEW_ONLY,
+                "allowed_actions": [],
+                "disabled_reason": dr,
+            }
+        return {
+            "primary_action": CollectionPrimaryAction.DISABLED,
+            "allowed_actions": [],
+            "disabled_reason": dr or "Direct sale has no collectible balance in this flow.",
+        }
+    return {
+        "primary_action": CollectionPrimaryAction.DISABLED,
+        "allowed_actions": [],
+        "disabled_reason": str(dr or "Unsupported contract type."),
+    }
+
+
+def get_collection_action_state(reference: ContractReference) -> dict[str, object]:
+    position = _receivable_position_bundle(reference)
+    return _derive_collection_action_state(reference.contract_type, position)
+
+
+def build_canonical_collection_route(
+    reference: ContractReference,
+    primary_action: str,
+    *,
+    audience: str = "admin",
+) -> str:
+    aud = (audience or "admin").strip().lower()
+    is_cashier = aud == "cashier"
+    sub_id = reference.subscription_id
+    ds_id = reference.direct_sale_id
+    if primary_action == CollectionPrimaryAction.COLLECT_EMI and sub_id:
+        return (
+            f"/cashier/collect?subscription={sub_id}"
+            if is_cashier
+            else f"/admin/finance/collect?subscription={sub_id}"
+        )
+    if primary_action == CollectionPrimaryAction.COLLECT_DIRECT_SALE and ds_id:
+        return (
+            f"/cashier/collect?workflow=direct-sale&direct_sale={ds_id}"
+            if is_cashier
+            else f"/admin/finance/collect?workflow=direct-sale&direct_sale={ds_id}"
+        )
+    if sub_id:
+        return (
+            f"/admin/subscriptions/{sub_id}"
+            if not is_cashier
+            else "/cashier/collect"
+        )
+    if ds_id:
+        return (
+            f"/admin/billing/direct-sales/{ds_id}"
+            if not is_cashier
+            else "/cashier/collect?workflow=direct-sale"
+        )
+    return "/cashier/collect" if is_cashier else "/admin/finance/collect"
+
+
+def resolve_contract_reference_row(
+    reference: ContractReference,
+    *,
+    audience: str = "admin",
+) -> dict[str, object]:
+    state = get_collection_action_state(reference)
+    source_id = (
+        reference.direct_sale_id
+        or reference.subscription_id
+        or reference.invoice_id
+    )
+    route = build_canonical_collection_route(
+        reference, str(state["primary_action"]), audience=audience
+    )
+    return {
+        "contract_reference_id": reference.id,
+        "source_type": reference.contract_type,
+        "source_id": source_id,
+        "route": route,
+        "primary_action": state["primary_action"],
+        "allowed_actions": state["allowed_actions"],
+        "disabled_reason": state["disabled_reason"],
+    }
+
+
+def _unified_collection_fingerprint(
+    *,
+    source_type: str,
+    source_id: int,
+    amount,
+    payment_method: str,
+    finance_account_id: int,
+) -> str:
+    amt = q2(Decimal(str(amount)))
+    raw = f"{(source_type or '').strip().upper()}|{source_id}|{amt}|{(payment_method or '').strip().upper()}|{finance_account_id}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def direct_sale_receivable_position(sale) -> dict[str, object]:
     from billing.services.direct_sale_collection_service import (
         get_direct_sale_receivable_position,
@@ -566,24 +722,14 @@ def build_receivable_result(
         or reference.subscription_id
         or reference.invoice_id
     )
-    position: dict[str, object]
-    if source_type == ContractReferenceType.ADVANCE_EMI and reference.subscription_id:
-        position = _advance_emi_position(reference.subscription)
-    elif source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE} and reference.subscription_id:
-        position = rent_lease_receivable_position(reference.subscription)
-    elif source_type == ContractReferenceType.DIRECT_SALE and reference.direct_sale_id:
-        position = direct_sale_receivable_position(reference.direct_sale)
-    else:
-        position = {
-            "due_amount": MONEY_ZERO,
-            "overdue_amount": MONEY_ZERO,
-            "next_due_date": None,
-            "status": "UNSUPPORTED",
-            "allowed_actions": [],
-            "disabled_reason": "Source record is not linked to a supported receivable.",
-        }
+    position = _receivable_position_bundle(reference)
+    state = _derive_collection_action_state(source_type, position)
+    collection_route = build_canonical_collection_route(
+        reference, str(state["primary_action"]), audience=audience
+    )
 
     return {
+        "contract_reference_id": reference.id,
         "source_type": source_type,
         "source_id": source_id,
         "reference_no": reference.reference_no,
@@ -596,8 +742,10 @@ def build_receivable_result(
         "overdue_amount": _money_string(position.get("overdue_amount")),
         "next_due_date": position.get("next_due_date"),
         "status": position.get("status") or "",
-        "allowed_actions": position.get("allowed_actions") or [],
-        "disabled_reason": position.get("disabled_reason"),
+        "primary_action": state["primary_action"],
+        "allowed_actions": state["allowed_actions"],
+        "disabled_reason": state["disabled_reason"],
+        "collection_route": collection_route,
     }
 
 
@@ -633,71 +781,85 @@ def collect_unified_receivable(
     branch_id: int | None = None,
     cash_counter_id: int | None = None,
     note: str | None = None,
-) -> dict[str, object]:
+    idempotency_key: str | None = None,
+    contract_reference_id: int | None = None,
+) -> tuple[dict[str, object], int]:
+    from services.collection_router import route_collection
+
     source_type = (source_type or "").strip().upper()
     payment_method = (payment_method or "CASH").strip().upper()
-    if source_type == ContractReferenceType.ADVANCE_EMI:
-        subscription = (
-            Subscription.objects.select_related("customer", "branch")
-            .filter(pk=source_id, plan_type=PlanType.EMI)
-            .first()
-        )
-        if not subscription:
-            raise ValidationError({"source_id": "Advance EMI subscription was not found."})
-        position = _advance_emi_position(subscription)
-        emi_id = position.get("emi_id")
-        if not emi_id:
-            raise ValidationError("No collectible EMI is currently pending.")
-        result = record_emi_payment(
-            emi_id=emi_id,
-            amount=amount,
+    idem = (idempotency_key or "").strip()
+
+    fingerprint = _unified_collection_fingerprint(
+        source_type=source_type,
+        source_id=source_id,
+        amount=amount,
+        payment_method=payment_method,
+        finance_account_id=finance_account_id,
+    )
+
+    def _dispatch() -> tuple[dict[str, object], int]:
+        result = route_collection(
+            source_type=source_type,
+            source_id=source_id,
             collected_by=collected_by,
-            method=payment_method,
+            amount=amount,
+            payment_method=payment_method,
+            finance_account_id=finance_account_id,
             reference_no=reference_no,
-            note=note,
             payment_date=payment_date,
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,
-            finance_account_id=finance_account_id,
+            note=note,
+            contract_reference_id=contract_reference_id,
         )
-        return {
-            "source_type": source_type,
-            "created": result.get("created", True),
-            "payment_id": result["payment"].id,
-            "emi_id": result["emi"].id,
-            "subscription_id": result["subscription"].id,
-            "message": "Advance EMI collection posted through the existing payment service.",
-        }
+        status_code = 201 if result.get("created", True) else 200
+        return result, status_code
 
-    if source_type == ContractReferenceType.DIRECT_SALE:
-        from billing.services.direct_sale_collection_service import collect_direct_sale_payment
-
-        result = collect_direct_sale_payment(
-            direct_sale_id=source_id,
-            amount=amount,
-            collected_by=collected_by,
-            receipt_date=payment_date,
-            finance_account_id=finance_account_id,
-            branch_id=branch_id,
-            cash_counter_id=cash_counter_id,
-            reference_no=reference_no,
-            notes=note,
-        )
-        return {
-            "source_type": source_type,
-            "created": result.get("created", True),
-            "receipt_id": result["receipt"].id,
-            "direct_sale_id": result["direct_sale"].id,
-            "invoice_id": result["invoice"].id,
-            "message": "Direct-sale collection posted through the existing retail receipt service.",
-        }
-
-    raise ValidationError(
-        {
-            "source_type": (
-                "Unified collection posting is enabled only for Advance EMI and "
-                "production-safe direct-sale receivables in Phase 9A."
+    if idem:
+        with transaction.atomic():
+            row = (
+                UnifiedCollectionIdempotency.objects.select_for_update()
+                .filter(user_id=collected_by.id, key=idem)
+                .first()
             )
-        }
-    )
+            if row:
+                if row.fingerprint != fingerprint:
+                    raise ValidationError(
+                        {
+                            "idempotency_key": (
+                                "Idempotency key was reused with different collection parameters."
+                            )
+                        }
+                    )
+                if row.status == UnifiedCollectionIdempotencyStatus.COMPLETED:
+                    return dict(row.response_body), 200
+                raise ValidationError(
+                    {
+                        "idempotency_key": (
+                            "A collection request with this idempotency key is already in progress."
+                        )
+                    }
+                )
+            UnifiedCollectionIdempotency.objects.create(
+                user=collected_by,
+                key=idem,
+                fingerprint=fingerprint,
+                status=UnifiedCollectionIdempotencyStatus.PENDING,
+            )
+            try:
+                result, status_code = _dispatch()
+            except Exception:
+                UnifiedCollectionIdempotency.objects.filter(user=collected_by, key=idem).delete()
+                raise
+            body = {k: v for k, v in result.items()}
+            UnifiedCollectionIdempotency.objects.filter(user=collected_by, key=idem).update(
+                status=UnifiedCollectionIdempotencyStatus.COMPLETED,
+                response_body=body,
+                response_status=status_code,
+            )
+            return result, status_code
+
+    result, status_code = _dispatch()
+    return result, status_code
 

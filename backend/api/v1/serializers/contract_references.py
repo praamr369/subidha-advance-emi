@@ -63,6 +63,8 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
     payment_date = serializers.DateField(required=False)
     note = serializers.CharField(required=False, allow_blank=True, max_length=500)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    contract_reference_id = serializers.IntegerField(required=False, min_value=1)
 
     def validate(self, attrs):
         finance_account_id = attrs.get("finance_account_id") or attrs.get("finance_account")
@@ -75,4 +77,7 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
             attrs.get("reference_no") or attrs.get("reference") or ""
         ).strip() or None
         attrs["note"] = (attrs.get("note") or attrs.get("notes") or "").strip() or None
+        attrs["idempotency_key"] = (attrs.get("idempotency_key") or "").strip() or None
+        crid = attrs.get("contract_reference_id")
+        attrs["contract_reference_id"] = int(crid) if crid else None
         return attrs
