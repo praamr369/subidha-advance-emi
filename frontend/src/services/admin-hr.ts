@@ -23,9 +23,39 @@ export type HrStaff = {
   branch_name?: string | null;
   designation?: string;
   department?: string;
+  employment_type?: string;
+  salary_effective_from?: string | null;
+  temporary_contract_end_date?: string | null;
+  daily_wage_rate?: string | null;
+  hourly_wage_rate?: string | null;
+  piece_rate_amount?: string | null;
+  piece_rate_unit_label?: string;
+  kyc_id_type?: string;
+  kyc_id_number?: string;
+  kyc_verified?: boolean;
+  address?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  cost_center_code?: string;
+  payroll_expense_account?: number | null;
   joining_date: string;
   base_salary?: string | null;
   is_active: boolean;
+};
+
+export type HrStaffDocument = {
+  id: number;
+  employee: number;
+  employee_name: string;
+  employee_code: string;
+  document_type: string;
+  title: string;
+  document_no: string;
+  file_url?: string | null;
+  status: string;
+  notes: string;
+  uploaded_by_username?: string | null;
+  created_at: string;
 };
 
 export type HrAttendance = {
@@ -83,6 +113,30 @@ export async function createHrStaff(payload: {
   joining_date?: string | null;
   is_active?: boolean;
   base_salary?: string | null;
+  designation?: string;
+  department?: string;
+  employment_type?:
+    | "PERMANENT_MONTHLY"
+    | "TEMPORARY"
+    | "DAILY_WAGE"
+    | "HOURLY"
+    | "PIECE_RATE"
+    | "MANUFACTURING"
+    | "SERVICE";
+  salary_effective_from?: string | null;
+  temporary_contract_end_date?: string | null;
+  daily_wage_rate?: string | null;
+  hourly_wage_rate?: string | null;
+  piece_rate_amount?: string | null;
+  piece_rate_unit_label?: string;
+  kyc_id_type?: string;
+  kyc_id_number?: string;
+  kyc_verified?: boolean;
+  address?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  cost_center_code?: string;
+  payroll_expense_account?: number | null;
   notes?: string;
 }) {
   return apiFetch("/admin/hr/staff/", { method: "POST", body: JSON.stringify(payload) });
@@ -129,5 +183,31 @@ export async function getHrPayroll() {
 
 export async function listHrSalaryPayments() {
   return apiFetch<{ count: number; results: unknown[] }>("/admin/hr/salary-payments/");
+}
+
+export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE") {
+  return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export async function listHrStaffDocuments(staffId?: number) {
+  const query = staffId ? `?staff=${staffId}` : "";
+  return apiFetch<{ count: number; results: HrStaffDocument[] }>(`/admin/hr/staff-documents/${query}`);
+}
+
+export async function createHrStaffDocument(payload: FormData) {
+  return apiFetch<HrStaffDocument>("/admin/hr/staff-documents/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function patchHrStaffDocument(documentId: number, payload: Record<string, unknown>) {
+  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 

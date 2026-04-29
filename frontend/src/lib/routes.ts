@@ -43,6 +43,7 @@ export const ROUTES = {
     hrSalaryPayments: "/admin/hr/salary-payments",
     hrLeave: "/admin/hr/leave",
     hrExpenses: "/admin/hr/expenses",
+    hrStaffDocuments: "/admin/hr/staff-documents",
     operationsCommandCenter: "/admin/operations/command-center",
     aiAssistant: "/admin/ai",
     aiSources: "/admin/ai/sources",

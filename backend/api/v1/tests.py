@@ -4,6 +4,7 @@ from decimal import Decimal
 from accounting.models import FinanceAccountKind
 from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
+from accounting.models import EmployeeAttendance, EmployeeDocument, EmployeeProfile
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -48,11 +49,129 @@ class PermissionTests(TestCase):
         response = self.client.get("/api/public/stats/")
         self.assertIn(response.status_code, [200, 401, 403, 404])
 
-    def test_authenticated_user_can_access(self):
-        self.client.force_authenticate(self.customer_user)
-        response = self.client.get("/api/public/stats/")
-        self.assertIn(response.status_code, [200, 401, 403, 404])
 
+class FinalPreDeployHrStaffHardeningTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="hrh_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9811111001",
+            is_staff=True,
+        )
+        self.cashier = User.objects.create_user(
+            username="hrh_cashier",
+            password="pass1234",
+            role="CASHIER",
+            phone="9811111002",
+            is_staff=True,
+        )
+        self.client.force_authenticate(self.admin)
+
+    def test_admin_can_create_and_edit_staff_full_fields(self):
+        created = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Staff Hardening",
+                "phone": "9811111099",
+                "designation": "Supervisor",
+                "department": "Service",
+                "employment_type": "SERVICE",
+                "base_salary": "25000.00",
+                "daily_wage_rate": "900.00",
+                "hourly_wage_rate": "150.00",
+                "piece_rate_amount": "100.00",
+                "piece_rate_unit_label": "repair-job",
+                "kyc_id_type": "NID",
+                "kyc_id_number": "ABC123",
+                "address": "Main Road",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 200, created.data)
+        staff_id = created.data["employee"]["id"]
+
+        edited = self.client.patch(
+            f"/api/v1/admin/hr/staff/{staff_id}/",
+            {
+                "phone": "9811111010",
+                "address": "Updated Address",
+                "kyc_verified": True,
+                "base_salary": "27000.00",
+                "cost_center_code": "SERVICE-OPS",
+            },
+            format="json",
+        )
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data["phone"], "9811111010")
+        self.assertTrue(edited.data["kyc_verified"])
+
+    def test_duplicate_phone_blocked(self):
+        EmployeeProfile.objects.create(name="Staff A", phone="9811111222", joining_date=date(2026, 1, 1))
+        dup = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {"name": "Staff B", "phone": "9811111222"},
+            format="json",
+        )
+        self.assertEqual(dup.status_code, 400)
+
+    def test_deactivate_preserves_attendance_history(self):
+        employee = EmployeeProfile.objects.create(name="Staff Hist", phone="9811111333", joining_date=date(2026, 1, 1))
+        EmployeeAttendance.objects.create(
+            employee=employee,
+            attendance_date=date(2026, 1, 10),
+            status="PRESENT",
+            worked_hours="8.00",
+        )
+        response = self.client.post(
+            f"/api/v1/admin/hr/staff/{employee.id}/status/",
+            {"action": "DEACTIVATE"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(EmployeeProfile.objects.get(pk=employee.id).is_active)
+        self.assertEqual(EmployeeAttendance.objects.filter(employee=employee).count(), 1)
+
+    def test_staff_document_metadata_and_pdf_endpoints(self):
+        employee = EmployeeProfile.objects.create(name="Staff Doc", phone="9811111444", joining_date=date(2026, 1, 1))
+        upload = self.client.post(
+            "/api/v1/admin/hr/staff-documents/",
+            {
+                "employee": employee.id,
+                "document_type": "ID_PROOF",
+                "title": "National ID",
+                "document_no": "NID-001",
+                "notes": "Verified copy",
+                "file": SimpleUploadedFile("id-proof.txt", b"id proof content", content_type="text/plain"),
+            },
+        )
+        self.assertEqual(upload.status_code, 200, upload.data)
+        self.assertTrue(EmployeeDocument.objects.filter(employee=employee).exists())
+
+        profile_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/profile-pdf/")
+        salary_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/salary-agreement-pdf/")
+        self.assertEqual(profile_pdf.status_code, 200)
+        self.assertEqual(salary_pdf.status_code, 200)
+        self.assertIn("application/pdf", profile_pdf["Content-Type"])
+        self.assertIn("application/pdf", salary_pdf["Content-Type"])
+
+    def test_non_admin_blocked_and_no_accounting_posting_side_effect(self):
+        employee = EmployeeProfile.objects.create(name="Staff Block", phone="9811111555", joining_date=date(2026, 1, 1))
+        self.client.force_authenticate(self.cashier)
+        blocked = self.client.get("/api/v1/admin/hr/staff/")
+        self.assertEqual(blocked.status_code, 403)
+        # Payroll setup updates must not create salary/accounting postings directly.
+        self.client.force_authenticate(self.admin)
+        pre_salary_sheet_count = employee.salary_sheets.count()
+        patch = self.client.patch(
+            f"/api/v1/admin/hr/staff/{employee.id}/",
+            {"base_salary": "32000.00", "employment_type": "PERMANENT_MONTHLY"},
+            format="json",
+        )
+        self.assertEqual(patch.status_code, 200, patch.data)
+        self.assertEqual(employee.salary_sheets.count(), pre_salary_sheet_count)
 
 class Phase9FOperationalReadinessTests(TestCase):
     def setUp(self):

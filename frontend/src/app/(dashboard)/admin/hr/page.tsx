@@ -43,6 +43,7 @@ export default function AdminHrWorkspacePage() {
         { href: ROUTES.admin.hrAttendance, label: "Mark Attendance", variant: "secondary" },
         { href: ROUTES.admin.hrLeave, label: "Leave Requests", variant: "secondary" },
         { href: ROUTES.admin.hrExpenses, label: "Expense Claims", variant: "secondary" },
+        { href: ROUTES.admin.hrStaffDocuments, label: "Staff Documents", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
       stats={[
@@ -75,6 +76,7 @@ export default function AdminHrWorkspacePage() {
                 ["Salary Payments", ROUTES.admin.hrSalaryPayments],
                 ["Leave Requests", ROUTES.admin.hrLeave],
                 ["Expense Claims", ROUTES.admin.hrExpenses],
+                ["Staff Documents", ROUTES.admin.hrStaffDocuments],
               ].map(([label, href]) => (
                 <Link key={String(label)} href={String(href)} className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-foreground hover:bg-white">
                   {label}

@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, serializers
 from rest_framework.response import Response
@@ -12,8 +15,10 @@ from rest_framework.views import APIView
 from accounting.models import (
     AttendanceStatus,
     EmployeeAttendance,
+    EmployeeDocument,
     EmployeeExpenseClaim,
     EmployeeProfile,
+    EmploymentType,
     LeaveRequest,
     PayrollPeriod,
     SalaryPayment,
@@ -34,9 +39,14 @@ from api.v1.serializers.accounting import (
     EmployeeAttendanceSerializer,
     EmployeeExpenseClaimSerializer,
     EmployeeProfileSerializer,
+    EmployeeDocumentSerializer,
     LeaveRequestSerializer,
     SalaryPaymentSerializer,
     SalarySheetSerializer,
+)
+from accounting.services.staff_pdf_service import (
+    render_salary_agreement_pdf,
+    render_staff_profile_pdf,
 )
 
 
@@ -60,6 +70,23 @@ class HrStaffCreateSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(required=False, default=True)
     base_salary = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    designation = serializers.CharField(required=False, allow_blank=True)
+    department = serializers.CharField(required=False, allow_blank=True)
+    employment_type = serializers.ChoiceField(choices=EmploymentType.choices, required=False)
+    salary_effective_from = serializers.DateField(required=False, allow_null=True)
+    temporary_contract_end_date = serializers.DateField(required=False, allow_null=True)
+    daily_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    hourly_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    piece_rate_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    piece_rate_unit_label = serializers.CharField(required=False, allow_blank=True)
+    kyc_id_type = serializers.CharField(required=False, allow_blank=True)
+    kyc_id_number = serializers.CharField(required=False, allow_blank=True)
+    kyc_verified = serializers.BooleanField(required=False)
+    address = serializers.CharField(required=False, allow_blank=True)
+    emergency_contact_name = serializers.CharField(required=False, allow_blank=True)
+    emergency_contact_phone = serializers.CharField(required=False, allow_blank=True)
+    cost_center_code = serializers.CharField(required=False, allow_blank=True)
+    payroll_expense_account = serializers.IntegerField(required=False, allow_null=True)
 
 
 class AdminHrStaffListCreateView(_AdminBase):
@@ -73,7 +100,13 @@ class AdminHrStaffListCreateView(_AdminBase):
         if branch_id:
             qs = qs.filter(branch_id=branch_id)
         if q:
-            qs = qs.filter(name__icontains=q) | qs.filter(phone__icontains=q) | qs.filter(employee_code__icontains=q)
+            qs = qs.filter(
+                Q(name__icontains=q)
+                | Q(phone__icontains=q)
+                | Q(employee_code__icontains=q)
+                | Q(department__icontains=q)
+                | Q(designation__icontains=q)
+            )
         qs = qs[:200]
         return Response({"count": qs.count(), "results": EmployeeProfileSerializer(qs, many=True, context={"request": request}).data})
 
@@ -98,6 +131,32 @@ class AdminHrStaffListCreateView(_AdminBase):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         employee = payload["employee"]
+        profile_serializer = EmployeeProfileSerializer(
+            employee,
+            data={
+                "designation": serializer.validated_data.get("designation") or "",
+                "department": serializer.validated_data.get("department") or "",
+                "employment_type": serializer.validated_data.get("employment_type") or EmploymentType.PERMANENT_MONTHLY,
+                "salary_effective_from": serializer.validated_data.get("salary_effective_from"),
+                "temporary_contract_end_date": serializer.validated_data.get("temporary_contract_end_date"),
+                "daily_wage_rate": serializer.validated_data.get("daily_wage_rate"),
+                "hourly_wage_rate": serializer.validated_data.get("hourly_wage_rate"),
+                "piece_rate_amount": serializer.validated_data.get("piece_rate_amount"),
+                "piece_rate_unit_label": serializer.validated_data.get("piece_rate_unit_label") or "",
+                "kyc_id_type": serializer.validated_data.get("kyc_id_type") or "",
+                "kyc_id_number": serializer.validated_data.get("kyc_id_number") or "",
+                "kyc_verified": serializer.validated_data.get("kyc_verified", False),
+                "address": serializer.validated_data.get("address") or "",
+                "emergency_contact_name": serializer.validated_data.get("emergency_contact_name") or "",
+                "emergency_contact_phone": serializer.validated_data.get("emergency_contact_phone") or "",
+                "cost_center_code": serializer.validated_data.get("cost_center_code") or "",
+                "payroll_expense_account": serializer.validated_data.get("payroll_expense_account"),
+            },
+            partial=True,
+            context={"request": request},
+        )
+        profile_serializer.is_valid(raise_exception=True)
+        employee = profile_serializer.save()
         return Response(
             {
                 "employee": EmployeeProfileSerializer(employee, context={"request": request}).data,
@@ -109,6 +168,9 @@ class AdminHrStaffListCreateView(_AdminBase):
 class AdminHrStaffPatchView(_AdminBase):
     def patch(self, request, staff_id: int):
         employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        next_phone = (request.data.get("phone") or "").strip()
+        if next_phone and EmployeeProfile.objects.filter(phone=next_phone, is_active=True).exclude(pk=employee.id).exists():
+            raise serializers.ValidationError({"phone": "An active staff profile already exists with this phone number."})
         serializer = EmployeeProfileSerializer(
             employee,
             data=request.data,
@@ -116,8 +178,83 @@ class AdminHrStaffPatchView(_AdminBase):
             context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
-        updated = serializer.save()
+        try:
+            updated = serializer.save()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
         return Response(EmployeeProfileSerializer(updated, context={"request": request}).data)
+
+
+class HrStaffStatusSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=[("DEACTIVATE", "DEACTIVATE"), ("REACTIVATE", "REACTIVATE")])
+
+
+class AdminHrStaffStatusView(_AdminBase):
+    def post(self, request, staff_id: int):
+        employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        serializer = HrStaffStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        action = serializer.validated_data["action"]
+        employee.is_active = action == "REACTIVATE"
+        employee.save(update_fields=["is_active", "updated_at"])
+        return Response(EmployeeProfileSerializer(employee, context={"request": request}).data)
+
+
+class AdminHrStaffProfilePdfView(_AdminBase):
+    def get(self, request, staff_id: int):
+        employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        pdf_bytes = render_staff_profile_pdf(employee=employee)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="staff-profile-{employee.employee_code or employee.id}.pdf"'
+        )
+        return response
+
+
+class AdminHrSalaryAgreementPdfView(_AdminBase):
+    def get(self, request, staff_id: int):
+        employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        pdf_bytes = render_salary_agreement_pdf(employee=employee)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="salary-agreement-{employee.employee_code or employee.id}.pdf"'
+        )
+        return response
+
+
+class AdminHrStaffDocumentsListCreateView(_AdminBase):
+    def get(self, request):
+        qs = EmployeeDocument.objects.select_related("employee", "uploaded_by").order_by("-created_at", "-id")
+        staff_id = request.query_params.get("staff")
+        if staff_id:
+            qs = qs.filter(employee_id=staff_id)
+        results = list(qs[:200])
+        return Response(
+            {
+                "count": qs.count(),
+                "results": EmployeeDocumentSerializer(results, many=True, context={"request": request}).data,
+            }
+        )
+
+    def post(self, request):
+        serializer = EmployeeDocumentSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        document = serializer.save(uploaded_by=request.user)
+        return Response(EmployeeDocumentSerializer(document, context={"request": request}).data)
+
+
+class AdminHrStaffDocumentPatchView(_AdminBase):
+    def patch(self, request, document_id: int):
+        document = get_object_or_404(EmployeeDocument, pk=document_id)
+        serializer = EmployeeDocumentSerializer(
+            document,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(EmployeeDocumentSerializer(updated, context={"request": request}).data)
 
 
 class HrAttendanceCreateSerializer(serializers.Serializer):
@@ -242,7 +379,7 @@ class AdminHrExpenseClaimPatchView(_AdminBase):
 class AdminHrPayrollView(_AdminBase):
     def get(self, request):
         period = PayrollPeriod.objects.order_by("-year", "-month", "-id").first()
-        sheets = SalarySheet.objects.select_related("employee", "period").order_by("-created_at", "-id")[:50]
+        sheets = SalarySheet.objects.select_related("employee", "payroll_period").order_by("-created_at", "-id")[:50]
         return Response(
             {
                 "current_period": None if period is None else {"id": period.id, "code": period.code, "status": period.status},

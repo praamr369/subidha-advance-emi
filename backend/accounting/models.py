@@ -191,6 +191,29 @@ class AttendanceStatus(models.TextChoices):
     LEAVE = "LEAVE", "Leave"
 
 
+class EmploymentType(models.TextChoices):
+    PERMANENT_MONTHLY = "PERMANENT_MONTHLY", "Permanent Monthly Staff"
+    TEMPORARY = "TEMPORARY", "Temporary Staff"
+    DAILY_WAGE = "DAILY_WAGE", "Daily Wage Worker"
+    HOURLY = "HOURLY", "Hourly Worker"
+    PIECE_RATE = "PIECE_RATE", "Piece-rate Worker"
+    MANUFACTURING = "MANUFACTURING", "Manufacturing Worker"
+    SERVICE = "SERVICE", "Service Worker"
+
+
+class EmployeeDocumentType(models.TextChoices):
+    ID_PROOF = "ID_PROOF", "ID Proof"
+    ADDRESS_PROOF = "ADDRESS_PROOF", "Address Proof"
+    SALARY_AGREEMENT = "SALARY_AGREEMENT", "Salary Agreement"
+    APPOINTMENT_LETTER = "APPOINTMENT_LETTER", "Appointment Letter"
+    OTHER = "OTHER", "Other"
+
+
+class EmployeeDocumentStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    INACTIVE = "INACTIVE", "Inactive"
+
+
 class CompensationComponentType(models.TextChoices):
     EARNING = "EARNING", "Earning"
     DEDUCTION = "DEDUCTION", "Deduction"
@@ -1231,6 +1254,50 @@ class EmployeeProfile(AccountingTimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     is_active = models.BooleanField(default=True, db_index=True)
+    employment_type = models.CharField(
+        max_length=30,
+        choices=EmploymentType.choices,
+        default=EmploymentType.PERMANENT_MONTHLY,
+        db_index=True,
+    )
+    salary_effective_from = models.DateField(null=True, blank=True)
+    temporary_contract_end_date = models.DateField(null=True, blank=True)
+    daily_wage_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    hourly_wage_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    piece_rate_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    piece_rate_unit_label = models.CharField(max_length=60, blank=True, default="")
+    kyc_id_type = models.CharField(max_length=40, blank=True, default="")
+    kyc_id_number = models.CharField(max_length=80, blank=True, default="")
+    kyc_verified = models.BooleanField(default=False, db_index=True)
+    address = models.TextField(blank=True, default="")
+    emergency_contact_name = models.CharField(max_length=120, blank=True, default="")
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, default="")
+    cost_center_code = models.CharField(max_length=60, blank=True, default="")
+    payroll_expense_account = models.ForeignKey(
+        "ChartOfAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_profiles_payroll_expense",
+    )
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -1249,6 +1316,13 @@ class EmployeeProfile(AccountingTimeStampedModel):
         self.phone = (self.phone or "").strip()
         self.designation = (self.designation or "").strip()
         self.department = (self.department or "").strip()
+        self.piece_rate_unit_label = (self.piece_rate_unit_label or "").strip()
+        self.kyc_id_type = (self.kyc_id_type or "").strip().upper()
+        self.kyc_id_number = (self.kyc_id_number or "").strip()
+        self.address = (self.address or "").strip()
+        self.emergency_contact_name = (self.emergency_contact_name or "").strip()
+        self.emergency_contact_phone = (self.emergency_contact_phone or "").strip()
+        self.cost_center_code = (self.cost_center_code or "").strip().upper()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = _default_branch()
@@ -1257,6 +1331,59 @@ class EmployeeProfile(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"{self.employee_code} - {self.name}"
+
+
+def employee_document_upload_to(instance: "EmployeeDocument", filename: str) -> str:
+    ext = (filename or "").split(".")[-1].lower() if "." in (filename or "") else "bin"
+    return f"employee-documents/emp-{instance.employee_id}/{timezone.now().strftime('%Y%m%d%H%M%S%f')}.{ext}"
+
+
+class EmployeeDocument(AccountingTimeStampedModel):
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="documents",
+    )
+    document_type = models.CharField(
+        max_length=30,
+        choices=EmployeeDocumentType.choices,
+        default=EmployeeDocumentType.OTHER,
+        db_index=True,
+    )
+    title = models.CharField(max_length=160)
+    document_no = models.CharField(max_length=80, blank=True, default="")
+    file = models.FileField(upload_to=employee_document_upload_to)
+    status = models.CharField(
+        max_length=12,
+        choices=EmployeeDocumentStatus.choices,
+        default=EmployeeDocumentStatus.ACTIVE,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="uploaded_employee_documents",
+    )
+
+    class Meta:
+        db_table = "accounting_employee_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["employee", "status", "document_type"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.title = (self.title or "").strip()
+        self.document_no = (self.document_no or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.employee_code} - {self.title}"
 
 
 class PayrollPeriod(AccountingTimeStampedModel):

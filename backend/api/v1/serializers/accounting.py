@@ -12,6 +12,7 @@ from accounting.models import (
     EmployeeExpenseClaim,
     EmployeeExpenseClaimPayment,
     EmployeeProfile,
+    EmployeeDocument,
     ExpenseVoucher,
     ExpenseClaimStatus,
     ExpenseVoucherStatus,
@@ -564,6 +565,21 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "base_salary",
             "standard_daily_hours",
             "overtime_rate_per_hour",
+            "employment_type",
+            "salary_effective_from",
+            "temporary_contract_end_date",
+            "daily_wage_rate",
+            "hourly_wage_rate",
+            "piece_rate_amount",
+            "piece_rate_unit_label",
+            "kyc_id_type",
+            "kyc_id_number",
+            "kyc_verified",
+            "address",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "cost_center_code",
+            "payroll_expense_account",
             "is_active",
             "notes",
             "compensation_components",
@@ -571,6 +587,50 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "employee_code", "created_at", "updated_at"]
+
+
+class EmployeeDocumentSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeDocument
+        fields = [
+            "id",
+            "employee",
+            "employee_name",
+            "employee_code",
+            "document_type",
+            "title",
+            "document_no",
+            "file",
+            "file_url",
+            "status",
+            "notes",
+            "uploaded_by",
+            "uploaded_by_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "uploaded_by",
+            "uploaded_by_username",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if not obj.file:
+            return None
+        try:
+            url = obj.file.url
+        except Exception:
+            return None
+        return request.build_absolute_uri(url) if request else url
 
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):

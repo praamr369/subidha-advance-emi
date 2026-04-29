@@ -49,3 +49,22 @@ test("sidebar includes phase 7D groups without duplicate dashboard href links", 
   const dashboardLinks = sidebar.locator('a[href="/admin"]');
   await expect(dashboardLinks).toHaveCount(1);
 });
+
+test("staff register and payroll setup render hardening controls", async ({ page }) => {
+  await page.goto("/admin/hr/staff");
+  await expect(page.getByRole("heading", { name: /staff register/i })).toBeVisible();
+  await expect(page.getByText(/Quick create staff/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create staff" })).toBeVisible();
+  await expect(page.getByText(/Profile PDF|Salary PDF/i)).toHaveCount(0);
+
+  await page.goto("/admin/hr/payroll");
+  await expect(page.getByRole("heading", { name: /salary \/ payroll/i })).toBeVisible();
+  await expect(page.getByText(/Payroll Setup \(Staff Master\)/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Save payroll setup/i })).toBeVisible();
+});
+
+test("staff documents workspace renders real upload controls", async ({ page }) => {
+  await page.goto("/admin/hr/staff-documents");
+  await expect(page.getByRole("banner").getByRole("heading", { name: "Staff Documents" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /upload document/i })).toBeVisible();
+});
