@@ -60,6 +60,9 @@ class BusinessResetRequestSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        raw_confirm = getattr(self, "initial_data", {}).get("confirm", serializers.empty)
+        if not isinstance(raw_confirm, bool):
+            raise serializers.ValidationError({"confirm": "confirm must be a JSON boolean true."})
         if not attrs.get("confirm", False):
             raise serializers.ValidationError({"confirm": "confirm must be true to execute business reset."})
         return attrs

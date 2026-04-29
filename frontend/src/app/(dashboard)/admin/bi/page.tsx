@@ -58,11 +58,10 @@ export default function AdminBiControlCenterPage() {
             {error ? "BI summary is temporarily unavailable." : "Loading BI control center..."}
           </div>
           <BiChartCard
-            title="BI chart actions"
+            title="BI report links"
             source="BI Control Center"
             asOf={new Date().toISOString()}
             href={ROUTES.admin.reports}
-            actionHref={ROUTES.admin.operations}
             emptyReason={error || "Waiting for BI snapshot data."}
           >
             <div />
@@ -100,7 +99,6 @@ export default function AdminBiControlCenterPage() {
               source={payload.finance.collection_trend.meta?.source || "unknown"}
               asOf={payload.as_of}
               href={ROUTES.admin.reportsCollections}
-              actionHref={ROUTES.admin.financeCollect}
               emptyReason={payload.finance.collection_trend.meta?.empty_reason}
             >
               <Phase5ChartBlock payload={payload.finance.collection_trend} />
@@ -111,7 +109,6 @@ export default function AdminBiControlCenterPage() {
               source={payload.finance.overdue_aging.meta?.source || "unknown"}
               asOf={payload.as_of}
               href={ROUTES.admin.reportsOverdue}
-              actionHref={ROUTES.admin.financeCollect}
               emptyReason={payload.finance.overdue_aging.meta?.empty_reason}
             >
               <Phase5ChartBlock payload={payload.finance.overdue_aging} />
@@ -122,7 +119,6 @@ export default function AdminBiControlCenterPage() {
               source={payload.finance.payment_method_split.meta?.source || "unknown"}
               asOf={payload.as_of}
               href={ROUTES.admin.accountingControlCenter}
-              actionHref={ROUTES.admin.collections}
               emptyReason={payload.finance.payment_method_split.meta?.empty_reason}
             >
               <Phase5ChartBlock payload={payload.finance.payment_method_split} />
@@ -133,7 +129,6 @@ export default function AdminBiControlCenterPage() {
               source={payload.subscriptions.product_demand.meta?.source || "unknown"}
               asOf={payload.as_of}
               href={ROUTES.admin.reportsBatchPerformance}
-              actionHref={ROUTES.admin.subscriptions}
               emptyReason={payload.subscriptions.product_demand.meta?.empty_reason}
             >
               <Phase5ChartBlock payload={payload.subscriptions.product_demand} />
@@ -171,4 +166,3 @@ export default function AdminBiControlCenterPage() {
     </PortalPage>
   );
 }
-

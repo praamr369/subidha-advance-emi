@@ -12,7 +12,9 @@ from rest_framework.test import APIClient
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import (
     Batch,
+    BatchStatus,
     ContractReference,
+    ContractReferenceType,
     Customer,
     Emi,
     PlanType,
@@ -27,6 +29,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionStatus,
 )
+from subscriptions.services.contract_reference_service import ensure_contract_reference_for_subscription
 from tests.helpers import ensure_default_payment_collection_accounts
 
 
@@ -49,6 +52,204 @@ class PermissionTests(TestCase):
         self.client.force_authenticate(self.customer_user)
         response = self.client.get("/api/public/stats/")
         self.assertIn(response.status_code, [200, 401, 403, 404])
+
+
+class Phase9FOperationalReadinessTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.accounts = ensure_default_payment_collection_accounts()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="phase9f_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800090001",
+            is_staff=True,
+        )
+        self.other_admin = User.objects.create_user(
+            username="phase9f_other_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800090002",
+            is_staff=True,
+        )
+        self.cashier = User.objects.create_user(
+            username="phase9f_cashier",
+            password="pass1234",
+            role="CASHIER",
+            phone="9800090003",
+            is_staff=True,
+        )
+        self.customer_user = User.objects.create_user(
+            username="phase9f_customer",
+            password="pass1234",
+            role="CUSTOMER",
+            phone="9800090004",
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase 9F Customer",
+            phone="9800090004",
+            customer_code="KYC-PHASE9F-001",
+        )
+        self.product = Product.objects.create(
+            product_code="P9F-PROD",
+            name="Phase 9F Sofa",
+            base_price=Decimal("1200.00"),
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_lease_enabled=True,
+        )
+        self.batch = Batch.objects.create(
+            batch_code="P9F-BATCH",
+            total_slots=100,
+            duration_months=12,
+            draw_day=5,
+            start_date=date(2026, 1, 1),
+            status=BatchStatus.OPEN,
+        )
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=1,
+            tenure_months=12,
+            start_date=date(2026, 1, 1),
+            performed_by=self.admin,
+        )
+        self.reference = ContractReference.objects.get(subscription=self.subscription)
+
+    def test_business_reset_requires_json_boolean_and_preserves_one_admin(self):
+        self.client.force_authenticate(self.admin)
+
+        preview = self.client.get(
+            "/api/v1/admin/business-setup/reset-preview/?preserve_username=phase9f_admin"
+        )
+        self.assertEqual(preview.status_code, 200, preview.data)
+        self.assertEqual(preview.data["mode"], "read_only_preview")
+        self.assertGreater(preview.data["reset_plan"]["targets"]["total_rows"], 0)
+        self.assertEqual(len(preview.data["reset_plan"]["preserved_users"]), 1)
+
+        string_confirm = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": "true",
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(string_confirm.status_code, 400)
+        self.assertIn("confirm", string_confirm.data)
+
+        false_confirm = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": False,
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(false_confirm.status_code, 400)
+
+        executed = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": True,
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(executed.status_code, 200, executed.data)
+        self.assertEqual(executed.data["mode"], "executed")
+
+        User = get_user_model()
+        self.assertEqual(User.objects.filter(role="ADMIN").count(), 1)
+        self.assertTrue(User.objects.filter(username="phase9f_admin").exists())
+        self.assertFalse(User.objects.filter(username="phase9f_other_admin").exists())
+        self.assertEqual(Product.objects.count(), 0)
+        self.assertEqual(Customer.objects.count(), 0)
+        self.assertEqual(Subscription.objects.count(), 0)
+        self.assertFalse(executed.data["post_reset_checklist"]["is_ready_for_go_live"])
+
+    def test_bi_summary_is_admin_only_and_empty_safe(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/admin/bi/summary/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("finance", response.data)
+        self.assertIn("subscriptions", response.data)
+        self.assertIn("operations", response.data)
+
+        self.client.force_authenticate(self.cashier)
+        forbidden = self.client.get("/api/v1/admin/bi/summary/")
+        self.assertEqual(forbidden.status_code, 403)
+
+    def test_unified_receivable_search_supports_staff_queries_and_blocks_rent_lease_collection(self):
+        self.client.force_authenticate(self.admin)
+
+        for query in [
+            self.customer.phone,
+            self.reference.reference_no,
+            self.batch.batch_code,
+            "01",
+        ]:
+            response = self.client.get(f"/api/v1/admin/receivables/search/?q={query}")
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertGreaterEqual(response.data["count"], 1)
+
+        self.client.force_authenticate(self.cashier)
+        cashier_phone = self.client.get(
+            f"/api/v1/cashier/receivables/search/?q={self.customer.phone}"
+        )
+        self.assertEqual(cashier_phone.status_code, 200, cashier_phone.data)
+        self.assertGreaterEqual(cashier_phone.data["count"], 1)
+
+        rent_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=12,
+            start_date=date(2026, 1, 1),
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+        )
+        rent_reference = ensure_contract_reference_for_subscription(rent_subscription)
+
+        self.client.force_authenticate(self.admin)
+        rent_search = self.client.get(
+            f"/api/v1/admin/receivables/search/?q={rent_reference.reference_no}"
+        )
+        self.assertEqual(rent_search.status_code, 200, rent_search.data)
+        rent_row = rent_search.data["results"][0]
+        self.assertEqual(rent_row["source_type"], ContractReferenceType.RENT)
+        self.assertEqual(rent_row["allowed_actions"], [])
+        self.assertEqual(rent_row["primary_action"], "VIEW_ONLY")
+        self.assertIn("production-safe", rent_row["disabled_reason"])
+
+        blocked_collect = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": ContractReferenceType.RENT,
+                "source_id": rent_subscription.id,
+                "amount": "100.00",
+                "payment_method": "CASH",
+                "finance_account_id": self.accounts[FinanceAccountKind.CASH].id,
+                "contract_reference_id": rent_reference.id,
+            },
+            format="json",
+        )
+        self.assertEqual(blocked_collect.status_code, 400)
+        self.assertIn("source_type", str(blocked_collect.data))
 
 
 class PaymentFlowIntegrationTests(TestCase):

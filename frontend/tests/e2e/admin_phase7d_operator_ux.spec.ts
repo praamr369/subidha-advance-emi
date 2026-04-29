@@ -32,11 +32,12 @@ test("operations workspace is action-first and HR tasks visible", async ({ page 
   await expect(page.getByRole("link", { name: "Approve Expense" })).toBeVisible();
 });
 
-test("bi charts show details and action links", async ({ page }) => {
+test("bi charts show read-only report links", async ({ page }) => {
   await page.goto("/admin/bi");
   await expect(page.getByRole("heading", { name: /Business Intelligence/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: "View Details" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Take Action" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open report" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
 });
 
 test("sidebar includes phase 7D groups without duplicate dashboard href links", async ({ page }) => {
@@ -48,4 +49,3 @@ test("sidebar includes phase 7D groups without duplicate dashboard href links", 
   const dashboardLinks = sidebar.locator('a[href="/admin"]');
   await expect(dashboardLinks).toHaveCount(1);
 });
-

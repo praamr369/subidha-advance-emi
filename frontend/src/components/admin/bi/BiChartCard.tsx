@@ -9,7 +9,6 @@ export function BiChartCard({
   source,
   asOf,
   href = "/admin/reports",
-  actionHref = "/admin/operations",
   emptyReason,
   children,
 }: {
@@ -17,7 +16,6 @@ export function BiChartCard({
   source: string;
   asOf: string;
   href?: string;
-  actionHref?: string;
   emptyReason?: string | null;
   children: ReactNode;
 }) {
@@ -31,11 +29,8 @@ export function BiChartCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <a href={href} aria-label="View Details" className="text-xs font-semibold text-primary hover:underline">
-            View Details
-          </a>
-          <a href={actionHref} aria-label="Take Action" className="text-xs font-semibold text-amber-700 hover:underline">
-            Take Action
+          <a href={href} aria-label="Open Report" className="text-xs font-semibold text-primary hover:underline">
+            Open report
           </a>
         </div>
       </div>
@@ -45,4 +40,3 @@ export function BiChartCard({
     </section>
   );
 }
-

@@ -112,6 +112,18 @@ class BusinessSetupResetApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("confirm", response.data)
 
+    def test_reset_post_with_string_confirm_returns_400(self):
+        payload = {
+            "confirm": "true",
+            "preserve_username": "subidhafurniture",
+            "delete_non_preserved_users": True,
+            "clear_auth_artifacts": True,
+            "dry_run": False,
+        }
+        response = self.client.post("/api/v1/admin/business-setup/reset/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("confirm", response.data)
+
     def test_reset_post_with_confirm_executes_and_preserves_admin(self):
         self._seed_operational_data()
         payload = {
@@ -136,4 +148,3 @@ class BusinessSetupResetApiTests(APITestCase):
         self.assertEqual(Customer.objects.count(), 0)
         self.assertEqual(Subscription.objects.count(), 0)
         self.assertEqual(FinanceAccountCoaMapping.objects.count(), 0)
-

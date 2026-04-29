@@ -199,6 +199,7 @@ test.describe("admin AI assistant", () => {
     await expect(page.getByRole("link", { name: "Open payment queue" })).toHaveAttribute("href", "/admin/finance/collect");
     await expect(page.getByText("Source: /api/v1/admin/dashboard/")).toBeVisible();
     await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
   });
 
   test("BI explanation disabled state is handled", async ({ page }) => {
@@ -244,6 +245,7 @@ test.describe("admin AI assistant", () => {
     await page.goto("/admin/bi");
     await page.getByRole("button", { name: "Explain BI" }).click();
     await expect(page.getByRole("heading", { name: "AI assistant is disabled" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
   });
 
   test("AI readiness page renders", async ({ page }) => {
@@ -291,6 +293,7 @@ test.describe("admin AI assistant", () => {
     await expect(page.getByText("Default mode: KEYWORD")).toBeVisible();
     await expect(page.getByText("Activate one more source.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
   });
 });
 

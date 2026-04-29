@@ -56,6 +56,5 @@ export type BiSummary = {
 };
 
 export async function getAdminBiSummary(): Promise<BiSummary> {
-  return apiFetch("/api/v1/admin/bi/summary/");
+  return apiFetch("/admin/bi/summary/");
 }
-
