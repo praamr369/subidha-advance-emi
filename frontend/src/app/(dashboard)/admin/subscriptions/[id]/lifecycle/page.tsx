@@ -411,6 +411,12 @@ export default function ContractLifecyclePage() {
   const canActivate = status === "APPROVED";
   const canCancel = !["CANCELLED", "CLOSED", "COMPLETED"].includes(status);
   const canClose = ["COMPLETED", "RETURNED"].includes(status);
+  const contractPdfHref =
+    sub?.plan_type === "RENT"
+      ? `/api/v1/admin/rent-contracts/${subscriptionId}/pdf/`
+      : sub?.plan_type === "LEASE"
+        ? `/api/v1/admin/lease-contracts/${subscriptionId}/pdf/`
+        : null;
 
   return (
     <PortalPage
@@ -435,6 +441,31 @@ export default function ContractLifecyclePage() {
       statusBadge={{ label: "Contract Lifecycle", tone: "info" }}
     >
       <div className="space-y-6">
+        {(contractPdfHref || inspection?.id) && (
+          <div className="flex flex-wrap gap-2">
+            {contractPdfHref ? (
+              <a
+                href={contractPdfHref}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                Download Contract PDF
+              </a>
+            ) : null}
+            {inspection?.id ? (
+              <a
+                href={`/api/v1/admin/returns/${inspection.id}/inspection-pdf/`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                Download Inspection PDF
+              </a>
+            ) : null}
+          </div>
+        )}
+
         {/* Feedback banners */}
         {actionSuccess && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">

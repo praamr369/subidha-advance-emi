@@ -17,6 +17,11 @@ from subscriptions.models import (
     Emi,
     PlanType,
     Product,
+    RentLeaseBillingDemand,
+    RentLeaseDemandType,
+    RentLeaseDepositTransaction,
+    RentLeaseDepositTransactionType,
+    RentLeaseReturnInspection,
     Subscription,
     SubscriptionDelivery,
     SubscriptionDocument,
@@ -1230,3 +1235,223 @@ class Phase9DPdfDocumentSafetyTests(TestCase):
         self.client.force_authenticate(self.cashier)
         response = self.client.get(f"/api/v1/admin/invoices/{self.invoice.id}/pdf/")
         self.assertEqual(response.status_code, 403)
+
+
+class Phase9EPdfParityTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="admin_phase9e", password="pass1234", role="ADMIN", phone="9800093000", is_staff=True
+        )
+        self.cashier = User.objects.create_user(
+            username="cashier_phase9e", password="pass1234", role="CASHIER", phone="9800093001", is_staff=True
+        )
+        self.customer_user = User.objects.create_user(
+            username="customer_phase9e", password="pass1234", role="CUSTOMER", phone="9800093002"
+        )
+        self.other_customer_user = User.objects.create_user(
+            username="customer_phase9e_other", password="pass1234", role="CUSTOMER", phone="9800093003"
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase9E Customer",
+            phone="9800093002",
+            customer_code="KYC-P9E-001",
+            address="Rent Street 1",
+        )
+        self.other_customer = Customer.objects.create(
+            user=self.other_customer_user,
+            name="Phase9E Other Customer",
+            phone="9800093003",
+            customer_code="KYC-P9E-002",
+        )
+        self.product = Product.objects.create(
+            product_code="P9E-PRD",
+            name="Phase9E Wardrobe",
+            base_price=Decimal("1500.00"),
+        )
+        self.rent_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=12,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="RC-P9E-001",
+            subscription_number="SUB-P9E-R-001",
+        )
+        self.lease_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.LEASE,
+            tenure_months=10,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("2000.00"),
+            monthly_amount=Decimal("200.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="LC-P9E-001",
+            subscription_number="SUB-P9E-L-001",
+        )
+        self.other_rent_subscription = Subscription.objects.create(
+            customer=self.other_customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=6,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("600.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="RC-P9E-002",
+            subscription_number="SUB-P9E-R-002",
+        )
+        from subscriptions.models import RentSubscriptionProfile, LeaseSubscriptionProfile
+
+        self.rent_profile = RentSubscriptionProfile.objects.create(
+            subscription=self.rent_subscription,
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("240.00"),
+            refundable_security_deposit=Decimal("200.00"),
+            deduction_amount=Decimal("40.00"),
+            refund_amount=Decimal("160.00"),
+            return_inspection_notes="Inspect for scratches",
+            handover_notes="Handle with care",
+            contract_terms_snapshot="Return policy applies",
+        )
+        self.lease_profile = LeaseSubscriptionProfile.objects.create(
+            subscription=self.lease_subscription,
+            security_deposit_percent=Decimal("25.00"),
+            security_deposit_amount=Decimal("500.00"),
+            refundable_security_deposit=Decimal("450.00"),
+            deduction_amount=Decimal("50.00"),
+            refund_amount=Decimal("400.00"),
+            contract_terms_snapshot="Renewal available",
+        )
+        self.deposit_demand = RentLeaseBillingDemand.objects.create(
+            subscription=self.rent_subscription,
+            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+            status="PAID",
+            due_date=date(2099, 1, 1),
+            amount=Decimal("240.00"),
+            collected_amount=Decimal("240.00"),
+            held_amount=Decimal("240.00"),
+            refundable_amount=Decimal("180.00"),
+            deducted_amount=Decimal("60.00"),
+            reference_key="RL-P9E-DEP-001",
+            metadata={"payment_method": "CASH"},
+        )
+        self.other_deposit_demand = RentLeaseBillingDemand.objects.create(
+            subscription=self.other_rent_subscription,
+            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+            status="PAID",
+            due_date=date(2099, 1, 1),
+            amount=Decimal("200.00"),
+            collected_amount=Decimal("200.00"),
+            held_amount=Decimal("200.00"),
+            refundable_amount=Decimal("200.00"),
+            deducted_amount=Decimal("0.00"),
+            reference_key="RL-P9E-DEP-002",
+            metadata={},
+        )
+        self.refund_tx = RentLeaseDepositTransaction.objects.create(
+            subscription=self.rent_subscription,
+            demand=self.deposit_demand,
+            transaction_type=RentLeaseDepositTransactionType.REFUND_APPROVED,
+            amount=Decimal("180.00"),
+            approved_by=self.admin,
+            performed_by=self.admin,
+            metadata={},
+        )
+        RentLeaseDepositTransaction.objects.create(
+            subscription=self.rent_subscription,
+            demand=self.deposit_demand,
+            transaction_type=RentLeaseDepositTransactionType.DEDUCTION,
+            amount=Decimal("60.00"),
+            reason="Damage on panel",
+            approved_by=self.admin,
+            performed_by=self.admin,
+            metadata={},
+        )
+        self.inspection = RentLeaseReturnInspection.objects.create(
+            subscription=self.rent_subscription,
+            status="APPROVED",
+            outcome="DAMAGED",
+            inspection_date=date(2099, 2, 1),
+            condition_recorded="DAMAGED",
+            damage_notes="Panel scratch",
+            damage_deduction_amount=Decimal("60.00"),
+            deposit_refund_amount=Decimal("180.00"),
+            deposit_refund_approved=True,
+            inspected_by=self.admin,
+            approved_by=self.admin,
+            stock_routing_notes="Missing hinge",
+        )
+        self.other_inspection = RentLeaseReturnInspection.objects.create(
+            subscription=self.other_rent_subscription,
+            status="COMPLETED",
+            outcome="GOOD",
+            inspection_date=date(2099, 2, 1),
+            condition_recorded="GOOD",
+        )
+
+    def test_admin_rent_contract_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/rent-contracts/{self.rent_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"RC-P9E-001", response.content)
+
+    def test_admin_lease_contract_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/lease-contracts/{self.lease_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"LC-P9E-001", response.content)
+
+    def test_admin_deposit_pdf_and_refund_deduction_pdfs_return_pdf(self):
+        self.client.force_authenticate(self.admin)
+        dep = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/pdf/")
+        refund = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/refund-pdf/")
+        deduction = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/deduction-pdf/")
+        self.assertEqual(dep.status_code, 200)
+        self.assertEqual(refund.status_code, 200)
+        self.assertEqual(deduction.status_code, 200)
+        self.assertIn(b"RL-P9E-DEP-001", dep.content)
+        self.assertIn(b"RL-P9E-DEP-001", refund.content)
+        self.assertIn(b"RL-P9E-DEP-001", deduction.content)
+
+    def test_admin_return_inspection_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/returns/{self.inspection.id}/inspection-pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"INSPECT-", response.content)
+
+    def test_customer_document_access_enforces_ownership(self):
+        self.client.force_authenticate(self.customer_user)
+        rent_own = self.client.get(f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/")
+        lease_own = self.client.get(f"/api/v1/customer/lease-contracts/{self.lease_subscription.id}/pdf/")
+        dep_own = self.client.get(f"/api/v1/customer/deposits/{self.deposit_demand.id}/pdf/")
+        insp_own = self.client.get(f"/api/v1/customer/returns/{self.inspection.id}/inspection-pdf/")
+        dep_other = self.client.get(f"/api/v1/customer/deposits/{self.other_deposit_demand.id}/pdf/")
+        insp_other = self.client.get(f"/api/v1/customer/returns/{self.other_inspection.id}/inspection-pdf/")
+        self.assertEqual(rent_own.status_code, 200)
+        self.assertEqual(lease_own.status_code, 200)
+        self.assertEqual(dep_own.status_code, 200)
+        self.assertEqual(insp_own.status_code, 200)
+        self.assertEqual(dep_other.status_code, 404)
+        self.assertEqual(insp_other.status_code, 404)
+
+    def test_cashier_blocked_from_admin_phase9e_pdf_routes(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(f"/api/v1/admin/rent-contracts/{self.rent_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_deposit_pdf_uses_authoritative_values(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"240.00", response.content)
+        self.assertIn(b"180.00", response.content)

@@ -162,6 +162,7 @@ export default function AdminFinanceDepositsPage() {
                   <th className="px-3 py-2">Held</th>
                   <th className="px-3 py-2">Refundable</th>
                   <th className="px-3 py-2">Deducted</th>
+                  <th className="px-3 py-2">PDFs</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,6 +175,34 @@ export default function AdminFinanceDepositsPage() {
                     <td className="px-3 py-2">{money(row.held_amount)}</td>
                     <td className="px-3 py-2">{money(row.refundable_amount)}</td>
                     <td className="px-3 py-2">{money(row.deducted_amount)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        <a
+                          href={`/api/v1/admin/finance/deposits/${row.demand_id}/pdf/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border px-2 py-1 text-xs"
+                        >
+                          Deposit PDF
+                        </a>
+                        <a
+                          href={`/api/v1/admin/finance/deposits/${row.demand_id}/refund-pdf/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border px-2 py-1 text-xs"
+                        >
+                          Refund PDF
+                        </a>
+                        <a
+                          href={`/api/v1/admin/finance/deposits/${row.demand_id}/deduction-pdf/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border px-2 py-1 text-xs"
+                        >
+                          Deduction PDF
+                        </a>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

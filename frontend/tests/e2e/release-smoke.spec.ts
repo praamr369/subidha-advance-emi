@@ -91,6 +91,18 @@ test.describe("admin release smoke", () => {
     await expect(page.locator("#unified-receivable-search")).toBeVisible();
   });
 
+  test("admin deposits page exposes real deposit PDF links", async ({ page }) => {
+    await page.goto("/admin/finance/deposits");
+    await expect(page.getByRole("heading", { name: /rent\/lease deposit operations/i })).toBeVisible();
+    const depositLink = page.getByRole("link", { name: /deposit pdf/i }).first();
+    if ((await depositLink.count()) > 0) {
+      await expect(depositLink).toBeVisible();
+      await expect(depositLink).toHaveAttribute("href", /\/api\/v1\/admin\/finance\/deposits\/\d+\/pdf\//);
+    } else {
+      await expect(page.locator("body")).toContainText(/no deposit rows/i);
+    }
+  });
+
   test("admin batch lifecycle entry flow works", async ({ page }) => {
     const meta = getMeta();
     const batchCode = `SMOKEE2E${Date.now().toString().slice(-6)}`;
@@ -287,5 +299,17 @@ test.describe("customer release smoke", () => {
     await expect(page.locator("body")).toContainText(/contract lifecycle/i);
     await expect(page.locator("body")).toContainText(/winner benefit/i);
     await expect(page.locator("body")).toContainText(/waiver and settlement impact/i);
+  });
+
+  test("customer contracts page shows rent/lease contract PDF links", async ({ page }) => {
+    await page.goto("/customer/contracts");
+    await expect(page.getByRole("heading", { name: /my contracts/i })).toBeVisible();
+    const contractPdfLink = page.getByRole("link", { name: "Contract PDF" }).first();
+    if ((await contractPdfLink.count()) > 0) {
+      await expect(contractPdfLink).toHaveAttribute(
+        "href",
+        /\/api\/v1\/customer\/(rent-contracts|lease-contracts)\/\d+\/pdf\//
+      );
+    }
   });
 });

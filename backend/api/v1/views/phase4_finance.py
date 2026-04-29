@@ -8,7 +8,14 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
 from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
 from billing.models import BillingInvoice, ReceiptDocument
-from subscriptions.models import Subscription, SubscriptionDocument
+from subscriptions.models import (
+    PlanType,
+    RentLeaseBillingDemand,
+    RentLeaseDemandType,
+    RentLeaseReturnInspection,
+    Subscription,
+    SubscriptionDocument,
+)
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.contract_pdf_service import (
     generate_advance_emi_contract_pdf,
@@ -32,7 +39,16 @@ from subscriptions.services.phase4_finance_service import (
     reconciliation_report,
     waiver_loss_report,
 )
-from subscriptions.services.document_pdf_service import render_invoice_pdf, render_receipt_pdf
+from subscriptions.services.document_pdf_service import (
+    render_deposit_deduction_pdf,
+    render_deposit_refund_pdf,
+    render_invoice_pdf,
+    render_lease_contract_pdf,
+    render_receipt_pdf,
+    render_rent_contract_pdf,
+    render_return_inspection_pdf,
+    render_security_deposit_pdf,
+)
 from subscriptions.services.rent_lease_billing_service import (
     list_admin_deposit_register,
     record_damage_deduction,
@@ -105,6 +121,57 @@ class AdminFinanceDepositRegisterView(APIView):
         subscription_raw = (request.query_params.get("subscription_id") or "").strip()
         subscription_id = int(subscription_raw) if subscription_raw.isdigit() else None
         return Response(list_admin_deposit_register(subscription_id=subscription_id))
+
+
+class AdminFinanceDepositPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        demand = (
+            RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer", "subscription__product")
+            .filter(pk=pk, demand_type=RentLeaseDemandType.SECURITY_DEPOSIT)
+            .first()
+        )
+        if demand is None:
+            return Response({"detail": "Deposit record not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_security_deposit_pdf(deposit_or_contract=demand)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="deposit-{demand.reference_key}.pdf"'
+        return response
+
+
+class AdminFinanceDepositRefundPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        demand = (
+            RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer")
+            .filter(pk=pk, demand_type=RentLeaseDemandType.SECURITY_DEPOSIT)
+            .first()
+        )
+        if demand is None:
+            return Response({"detail": "Deposit record not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_deposit_refund_pdf(refund_or_deposit_action=demand)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="deposit-refund-{demand.reference_key}.pdf"'
+        return response
+
+
+class AdminFinanceDepositDeductionPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        demand = (
+            RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer")
+            .filter(pk=pk, demand_type=RentLeaseDemandType.SECURITY_DEPOSIT)
+            .first()
+        )
+        if demand is None:
+            return Response({"detail": "Deposit record not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_deposit_deduction_pdf(deduction_or_deposit_action=demand)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="deposit-deduction-{demand.reference_key}.pdf"'
+        return response
 
 
 class AdminFinanceDepositDeductionView(APIView):
@@ -438,6 +505,50 @@ class CustomerInvoicePdfView(APIView):
         return response
 
 
+class CustomerRentContractPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        subscription = (
+            Subscription.objects.select_related("customer", "product", "rent_profile")
+            .filter(pk=pk, customer=customer, plan_type=PlanType.RENT)
+            .first()
+        )
+        if subscription is None or not hasattr(subscription, "rent_profile"):
+            return Response({"detail": "Rent contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_rent_contract_pdf(contract=subscription.rent_profile)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="rent-contract-{subscription.id}.pdf"'
+        )
+        return response
+
+
+class CustomerLeaseContractPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        subscription = (
+            Subscription.objects.select_related("customer", "product", "lease_profile")
+            .filter(pk=pk, customer=customer, plan_type=PlanType.LEASE)
+            .first()
+        )
+        if subscription is None or not hasattr(subscription, "lease_profile"):
+            return Response({"detail": "Lease contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_lease_contract_pdf(contract=subscription.lease_profile)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="lease-contract-{subscription.id}.pdf"'
+        )
+        return response
+
+
 class CustomerReceiptListView(APIView):
     permission_classes = [IsCustomer]
 
@@ -466,6 +577,52 @@ class CustomerReceiptPdfView(APIView):
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = (
             f'attachment; filename="receipt-{receipt.receipt_no or receipt.id}.pdf"'
+        )
+        return response
+
+
+class CustomerDepositPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        demand = (
+            RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer", "subscription__product")
+            .filter(
+                pk=pk,
+                demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+                subscription__customer=customer,
+            )
+            .first()
+        )
+        if demand is None:
+            return Response({"detail": "Deposit not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_security_deposit_pdf(deposit_or_contract=demand)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="deposit-{demand.reference_key}.pdf"'
+        return response
+
+
+class CustomerReturnInspectionPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = getattr(request.user, "customer_profile", None)
+        if customer is None:
+            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
+        inspection = (
+            RentLeaseReturnInspection.objects.select_related("subscription", "subscription__customer")
+            .filter(pk=pk, subscription__customer=customer)
+            .first()
+        )
+        if inspection is None:
+            return Response({"detail": "Return inspection not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_return_inspection_pdf(return_or_inspection_record=inspection)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="return-inspection-{inspection.id}.pdf"'
         )
         return response
 

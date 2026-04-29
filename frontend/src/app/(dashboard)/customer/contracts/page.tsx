@@ -147,12 +147,34 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           </div>
         </div>
 
-        <Link
-          href={`/customer/subscriptions/${sub.id}`}
-          className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-        >
-          View Detail
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/customer/subscriptions/${sub.id}`}
+            className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+          >
+            View Detail
+          </Link>
+          {planType === "RENT" ? (
+            <a
+              href={`/api/v1/customer/rent-contracts/${sub.id}/pdf/`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+            >
+              Contract PDF
+            </a>
+          ) : null}
+          {planType === "LEASE" ? (
+            <a
+              href={`/api/v1/customer/lease-contracts/${sub.id}/pdf/`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+            >
+              Contract PDF
+            </a>
+          ) : null}
+        </div>
       </div>
     </div>
   );
