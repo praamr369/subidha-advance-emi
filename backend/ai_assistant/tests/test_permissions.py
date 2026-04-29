@@ -33,7 +33,7 @@ class AIAssistantPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
-    def test_admin_gets_stub_response_when_enabled(self):
+    def test_admin_gets_no_source_query_response_when_enabled(self):
         self.client.force_authenticate(self.admin)
 
         health_response = self.client.get("/api/v1/admin/ai/health/")
@@ -44,6 +44,16 @@ class AIAssistantPermissionTests(APITestCase):
             format="json",
         )
 
-        for response in [health_response, sources_response, query_response]:
-            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-            self.assertEqual(response.data["detail"], "AI assistant not yet active")
+        self.assertEqual(health_response.status_code, status.HTTP_200_OK, health_response.data)
+        self.assertEqual(health_response.data["detail"], "AI assistant ingestion controls are active")
+        self.assertEqual(sources_response.status_code, status.HTTP_200_OK, sources_response.data)
+        self.assertEqual(sources_response.data, [])
+        self.assertEqual(query_response.status_code, status.HTTP_200_OK, query_response.data)
+        self.assertEqual(
+            query_response.data["answer"],
+            "I do not have enough approved source material to answer this.",
+        )
+        self.assertEqual(query_response.data["citations"], [])
+        self.assertEqual(query_response.data["confidence"], "LOW")
+        self.assertEqual(query_response.data["retrieval_mode"], "KEYWORD")
+        self.assertFalse(query_response.data["safety"]["source_grounded"])

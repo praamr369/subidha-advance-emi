@@ -59,6 +59,7 @@ class AIKnowledgeSource(models.Model):
         null=True,
         blank=True,
     )
+    content_text = models.TextField(blank=True, default="")
     source_url = models.CharField(max_length=500, blank=True, default="")
     checksum = models.CharField(max_length=128, blank=True, default="", db_index=True)
     version = models.PositiveIntegerField(default=1)
@@ -84,6 +85,7 @@ class AIKnowledgeSource(models.Model):
 
     def save(self, *args, **kwargs):
         self.title = (self.title or "").strip()
+        self.content_text = self.content_text or ""
         self.source_url = (self.source_url or "").strip()
         self.checksum = (self.checksum or "").strip()
         super().save(*args, **kwargs)

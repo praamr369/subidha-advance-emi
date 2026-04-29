@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import AiBiExplanationPanel from "@/components/admin/ai/AiBiExplanationPanel";
 import Phase5ChartBlock from "@/components/admin/Phase5ChartBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
@@ -69,6 +70,8 @@ export default function AdminBiControlCenterPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <AiBiExplanationPanel />
+
           <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
             <h2 className="text-base font-semibold text-foreground">HR Snapshot</h2>
             <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

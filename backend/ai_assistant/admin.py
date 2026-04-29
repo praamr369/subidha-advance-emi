@@ -18,7 +18,7 @@ class AIKnowledgeSourceAdmin(NoBulkActionsAdmin):
     list_display = ("id", "title", "source_type", "status", "visibility", "version", "updated_at")
     list_filter = ("source_type", "status", "visibility")
     search_fields = ("title", "source_url", "checksum")
-    readonly_fields = ("checksum", "created_at", "updated_at")
+    readonly_fields = ("checksum", "created_at", "updated_at", "metadata")
 
 
 @admin.register(AIKnowledgeChunk)
@@ -26,7 +26,13 @@ class AIKnowledgeChunkAdmin(NoBulkActionsAdmin):
     list_display = ("id", "source", "chunk_index", "heading", "visibility", "token_count", "created_at")
     list_filter = ("visibility", "created_at")
     search_fields = ("heading", "content", "source__title")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("source", "chunk_index", "heading", "content", "token_count", "visibility", "metadata", "created_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AIEmbedding)
