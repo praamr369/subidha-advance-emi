@@ -12,6 +12,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
 import {
   collectAdvance,
   collectPayment,
@@ -25,6 +26,10 @@ import {
   type PendingEmiLookupResponse,
   type PendingEmiRecord,
 } from "@/services/cashier";
+import {
+  searchCashierReceivables,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 
 function money(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -49,6 +54,14 @@ function formatDateTime(value: string | null | undefined): string {
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
   return new Date(parsed).toLocaleString();
+}
+
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function isEmiOverdue(emi: PendingEmiRecord | null | undefined): boolean {
@@ -119,6 +132,7 @@ const SECONDARY_BUTTON_CLASS_NAME =
 export default function CashierCollectPage() {
   const searchParams = useSearchParams();
   const workflowQueryParam = searchParams.get("workflow");
+  const directSaleQueryParam = searchParams.get("direct_sale");
   const [collectionWorkflow, setCollectionWorkflow] =
     useState<CollectionWorkflow>("subscription");
   const [searchMode, setSearchMode] = useState<CashierSearchMode>("phone");
@@ -158,6 +172,14 @@ export default function CashierCollectPage() {
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [advanceSuccess, setAdvanceSuccess] =
     useState<CashierCollectAdvanceResponse | null>(null);
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
+  const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
 
   const selectedEmi = useMemo<PendingEmiRecord | null>(() => {
     if (!lookup || !selectedEmiId) return null;
@@ -177,6 +199,10 @@ export default function CashierCollectPage() {
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
   const directSaleHref = "/cashier/collect?workflow=direct-sale";
   const subscriptionHref = "/cashier/collect";
+  const prefillDirectSaleId = useMemo(
+    () => parsePositiveInteger(directSaleQueryParam),
+    [directSaleQueryParam]
+  );
   const availableFinanceAccounts = useMemo(
     () => financeAccounts.filter((account) => account.kind === method),
     [financeAccounts, method]
@@ -398,6 +424,73 @@ export default function CashierCollectPage() {
     await loadLookupByPhone(result.customer_phone, result.emi_id);
   }
 
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        "Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference."
+      );
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await searchCashierReceivables(trimmed);
+      setUnifiedSearchResults(payload.results);
+    } catch (error) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(toErrorMessage(error));
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  async function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    const searchValue = row.reference_no || (row.source_id ? String(row.source_id) : "");
+    if (!searchValue) {
+      setUnifiedSearchError("This Advance EMI receivable does not include a searchable reference.");
+      return;
+    }
+
+    const actionKey = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+    setUnifiedActionLoadingKey(actionKey);
+    setCollectionWorkflow("subscription");
+    setSearchMode("subscription");
+    setSearchInput(searchValue);
+    setSubmittedSearch(searchValue);
+    setLookup(null);
+    setLookupError(null);
+    setSearchResultsError(null);
+    clearSelectionForNewLookup();
+
+    try {
+      const payload = await searchCashierCollectibleEmis(searchValue, "subscription");
+      setSearchResults(payload.results);
+      const match =
+        payload.results.find((result) => result.subscription_id === row.source_id) ??
+        payload.results[0] ??
+        null;
+
+      if (!match) {
+        setSearchResultsError(
+          "No collectible EMI row is available for this contract reference."
+        );
+        return;
+      }
+
+      await handleSearchResultSelect(match);
+    } catch (error) {
+      setSearchResults([]);
+      setSearchResultsError(toErrorMessage(error));
+    } finally {
+      setUnifiedActionLoadingKey(null);
+    }
+  }
+
   function selectEmi(emi: PendingEmiRecord) {
     setSelectedEmiId(emi.id);
     setCollectError(null);
@@ -615,6 +708,25 @@ export default function CashierCollectPage() {
       }}
     >
       <div className="space-y-6">
+        <UnifiedReceivableSearchPanel
+          title="Universal receivable search"
+          description="Search Advance EMI, rent, lease, and direct-sale contract references before opening the supported collection workflow."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          actionLoadingKey={unifiedActionLoadingKey}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          directSaleHref={(row) =>
+            row.source_id
+              ? `/cashier/collect?workflow=direct-sale&direct_sale=${row.source_id}`
+              : "/cashier/collect?workflow=direct-sale"
+          }
+        />
+
         <SectionCard
           title="Workflow selection"
           description="Keep retail direct-sale collections separate from subscription EMI collections so each path stays operationally clear and financially safe."
@@ -666,7 +778,7 @@ export default function CashierCollectPage() {
         </SectionCard>
 
         {collectionWorkflow === "direct-sale" ? (
-          <CashierDirectSaleCollectPanel />
+          <CashierDirectSaleCollectPanel prefillDirectSaleId={prefillDirectSaleId} />
         ) : (
           <>
         <SectionCard

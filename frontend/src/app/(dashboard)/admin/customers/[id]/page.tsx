@@ -103,6 +103,29 @@ type PaymentPreviewRow = {
   is_reversed: boolean;
 };
 
+type ContractReferenceSourceType =
+  | "ADVANCE_EMI"
+  | "RENT"
+  | "LEASE"
+  | "DIRECT_SALE";
+
+type ContractReferenceOperationalRow = {
+  source_type: ContractReferenceSourceType;
+  source_id: number | null;
+  reference_no: string;
+  display_reference: string;
+  customer_id: number | null;
+  customer_name: string;
+  phone_masked: string;
+  product_summary: string;
+  due_amount: string;
+  overdue_amount: string;
+  next_due_date?: string | null;
+  status: string;
+  allowed_actions: string[];
+  disabled_reason?: string | null;
+};
+
 type DirectSaleOperationalRow = {
   id: number;
   sale_no?: string | null;
@@ -197,6 +220,16 @@ type CustomerOperationalProfile = {
       outstanding_total: string;
     };
     rows: DirectSaleOperationalRow[];
+  };
+  contract_references: {
+    summary: {
+      total_count: number;
+      advance_emi_count: number;
+      rent_count: number;
+      lease_count: number;
+      direct_sale_count: number;
+    };
+    rows: ContractReferenceOperationalRow[];
   };
   ledger_summary: {
     entry_count: number;
@@ -346,6 +379,16 @@ function normalizeSubscriptionStatus(
   return "UNKNOWN";
 }
 
+function normalizeContractReferenceSourceType(
+  value: unknown
+): ContractReferenceSourceType {
+  const sourceType = String(value || "").toUpperCase();
+  if (sourceType === "RENT") return "RENT";
+  if (sourceType === "LEASE") return "LEASE";
+  if (sourceType === "DIRECT_SALE") return "DIRECT_SALE";
+  return "ADVANCE_EMI";
+}
+
 function normalizeCustomerDetail(
   raw: Record<string, unknown>
 ): CustomerDetailRecord {
@@ -443,6 +486,8 @@ function normalizeCustomerOperationalProfile(
   const overview = toObject(raw.overview) ?? {};
   const directSales = toObject(raw.direct_sales) ?? {};
   const directSaleSummary = toObject(directSales.summary) ?? {};
+  const contractReferences = toObject(raw.contract_references) ?? {};
+  const contractReferenceSummary = toObject(contractReferences.summary) ?? {};
   const ledgerSummary = toObject(raw.ledger_summary) ?? {};
   const receiptsDocuments = toObject(raw.receipts_documents) ?? {};
   const receiptsSummary = toObject(receiptsDocuments.summary) ?? {};
@@ -490,6 +535,36 @@ function normalizeCustomerOperationalProfile(
         grand_total: toMoneyString(row.grand_total),
         received_total: toMoneyString(row.received_total),
         balance_total: toMoneyString(row.balance_total),
+      })),
+    },
+    contract_references: {
+      summary: {
+        total_count: toNumber(contractReferenceSummary.total_count),
+        advance_emi_count: toNumber(contractReferenceSummary.advance_emi_count),
+        rent_count: toNumber(contractReferenceSummary.rent_count),
+        lease_count: toNumber(contractReferenceSummary.lease_count),
+        direct_sale_count: toNumber(contractReferenceSummary.direct_sale_count),
+      },
+      rows: extractNestedArray(contractReferences, ["rows"]).map((row) => ({
+        source_type: normalizeContractReferenceSourceType(row.source_type),
+        source_id: toNullableNumber(row.source_id) ?? null,
+        reference_no: toStringValue(row.reference_no),
+        display_reference:
+          toStringValue(row.display_reference) || toStringValue(row.reference_no),
+        customer_id: toNullableNumber(row.customer_id) ?? null,
+        customer_name: toStringValue(row.customer_name),
+        phone_masked: toStringValue(row.phone_masked),
+        product_summary: toStringValue(row.product_summary),
+        due_amount: toMoneyString(row.due_amount),
+        overdue_amount: toMoneyString(row.overdue_amount),
+        next_due_date: toNullableString(row.next_due_date),
+        status: toStringValue(row.status),
+        allowed_actions: Array.isArray(row.allowed_actions)
+          ? row.allowed_actions.filter(
+              (item): item is string => typeof item === "string"
+            )
+          : [],
+        disabled_reason: toNullableString(row.disabled_reason),
       })),
     },
     ledger_summary: {
@@ -716,6 +791,137 @@ function StatusBadge({
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]}`}>
       {status}
     </span>
+  );
+}
+
+function contractReferenceLabel(sourceType: ContractReferenceSourceType): string {
+  if (sourceType === "ADVANCE_EMI") return "Advance EMI";
+  if (sourceType === "DIRECT_SALE") return "Direct Sale";
+  return sourceType.charAt(0) + sourceType.slice(1).toLowerCase();
+}
+
+function contractReferenceTone(
+  sourceType: ContractReferenceSourceType
+): "success" | "warning" | "danger" | "info" | "default" {
+  if (sourceType === "ADVANCE_EMI") return "success";
+  if (sourceType === "DIRECT_SALE") return "warning";
+  if (sourceType === "RENT") return "info";
+  return "default";
+}
+
+function ContractReferenceList({
+  rows,
+  emptyTitle,
+  emptyDescription,
+}: {
+  rows: ContractReferenceOperationalRow[];
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  if (rows.length === 0) {
+    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => {
+        const key = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+        const canCollectEmi =
+          row.source_type === "ADVANCE_EMI" &&
+          row.source_id !== null &&
+          row.allowed_actions.includes("COLLECT_EMI");
+        const canCollectDirectSale =
+          row.source_type === "DIRECT_SALE" &&
+          row.source_id !== null &&
+          row.allowed_actions.includes("COLLECT_DIRECT_SALE");
+
+        return (
+          <div
+            key={key}
+            className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge
+                    status={contractReferenceLabel(row.source_type)}
+                    tone={contractReferenceTone(row.source_type)}
+                  />
+                  <span className="break-all text-sm font-semibold text-foreground">
+                    {row.display_reference || row.reference_no}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {row.product_summary || "No product summary"} · Status {row.status || "—"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {row.customer_name || "Customer"} · {row.phone_masked || "Phone masked"}
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
+                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Due
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">
+                    {money(row.due_amount)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    Overdue
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-amber-900">
+                    {money(row.overdue_amount)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Next Due
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">
+                    {formatDate(row.next_due_date)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {canCollectEmi ? (
+                <Link
+                  href={`/admin/finance/collect?subscription=${row.source_id}`}
+                  className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
+                >
+                  Collect EMI
+                </Link>
+              ) : null}
+
+              {canCollectDirectSale ? (
+                <Link
+                  href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${row.source_id}`}
+                  className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                >
+                  Collect Direct Sale
+                </Link>
+              ) : null}
+
+              {!canCollectEmi && !canCollectDirectSale ? (
+                <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                  Collection disabled
+                </span>
+              ) : null}
+            </div>
+
+            {!canCollectEmi && !canCollectDirectSale && row.disabled_reason ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                {row.disabled_reason}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1269,6 +1475,29 @@ export default function AdminCustomerDetailPage() {
   const firstOutstandingDirectSale = useMemo(
     () => outstandingDirectSales[0] ?? null,
     [outstandingDirectSales]
+  );
+
+  const contractReferenceRows = useMemo(
+    () => operationalProfile?.contract_references.rows ?? [],
+    [operationalProfile]
+  );
+  const advanceEmiReferenceRows = useMemo(
+    () => contractReferenceRows.filter((row) => row.source_type === "ADVANCE_EMI"),
+    [contractReferenceRows]
+  );
+  const rentLeaseReferenceRows = useMemo(
+    () =>
+      contractReferenceRows.filter(
+        (row) => row.source_type === "RENT" || row.source_type === "LEASE"
+      ),
+    [contractReferenceRows]
+  );
+  const dueReferenceRows = useMemo(
+    () =>
+      contractReferenceRows.filter(
+        (row) => Number(row.due_amount || 0) > 0 || Number(row.overdue_amount || 0) > 0
+      ),
+    [contractReferenceRows]
   );
 
   const latestPayment = useMemo(() => payments[0] ?? null, [payments]);
@@ -1954,6 +2183,78 @@ export default function AdminCustomerDetailPage() {
                   )}
                 </SectionCard>
               </div>
+            ) : null}
+
+            {operationalProfile ? (
+              <>
+                <SectionCard
+                  title="Contracts"
+                  description="Search/display references across Advance EMI, rent, lease, and direct sale. These rows are index records only; financial truth remains in the source ledgers."
+                >
+                  <div className="mb-4 grid gap-3 sm:grid-cols-5">
+                    <DetailValue
+                      label="Total"
+                      value={String(operationalProfile.contract_references.summary.total_count)}
+                    />
+                    <DetailValue
+                      label="Advance EMI"
+                      value={String(operationalProfile.contract_references.summary.advance_emi_count)}
+                    />
+                    <DetailValue
+                      label="Rent"
+                      value={String(operationalProfile.contract_references.summary.rent_count)}
+                    />
+                    <DetailValue
+                      label="Lease"
+                      value={String(operationalProfile.contract_references.summary.lease_count)}
+                    />
+                    <DetailValue
+                      label="Direct Sale"
+                      value={String(operationalProfile.contract_references.summary.direct_sale_count)}
+                    />
+                  </div>
+                  <ContractReferenceList
+                    rows={contractReferenceRows}
+                    emptyTitle="No contract references"
+                    emptyDescription="No ContractReference rows were returned for this customer. Run the backfill command if historical contracts have not been indexed yet."
+                  />
+                </SectionCard>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <SectionCard
+                    title="Advance EMI / Lucky IDs"
+                    description="Advance EMI references include batch and Lucky ID snapshots for quick counter lookup."
+                  >
+                    <ContractReferenceList
+                      rows={advanceEmiReferenceRows}
+                      emptyTitle="No Advance EMI references"
+                      emptyDescription="No Advance EMI ContractReference rows were returned for this customer."
+                    />
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Rent / Lease"
+                    description="Rent and lease references are indexed for search. Collection remains disabled here until a production-safe posting service is available."
+                  >
+                    <ContractReferenceList
+                      rows={rentLeaseReferenceRows}
+                      emptyTitle="No rent or lease references"
+                      emptyDescription="No rent or lease ContractReference rows were returned for this customer."
+                    />
+                  </SectionCard>
+                </div>
+
+                <SectionCard
+                  title="Dues / Overdue"
+                  description="Due and overdue values are read from EMI, rent/lease demand, or direct-sale billing truth; ContractReference does not calculate balances."
+                >
+                  <ContractReferenceList
+                    rows={dueReferenceRows}
+                    emptyTitle="No current dues"
+                    emptyDescription="No indexed contract returned a positive due or overdue amount."
+                  />
+                </SectionCard>
+              </>
             ) : null}
 
             <SectionCard

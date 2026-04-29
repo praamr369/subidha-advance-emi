@@ -104,6 +104,15 @@ Disallowed content:
 - unapproved screenshots containing personal or financial data
 - arbitrary media directories
 
+## Phase 9A ContractReference Boundary
+
+Phase 9A ContractReference data is not an AI source.
+
+- The internal assistant remains docs/BI/read-only in this phase.
+- ContractReference may later support permission-filtered operational search, but that must be designed as a separate approved phase.
+- Do not ingest customer private data, contract references, phone snapshots, KYC snapshots, invoice records, payment records, ledger rows, or receivable search results into the AI knowledge base.
+- AI answers may reference approved documentation about the ContractReference system, but must not query or reveal live customer/contract data.
+
 Path rules:
 
 - allowlist source roots, for example `docs/`

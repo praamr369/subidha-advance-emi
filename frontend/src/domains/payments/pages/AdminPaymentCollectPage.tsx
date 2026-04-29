@@ -11,6 +11,7 @@ import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { normalizeApiError } from "@/services/api/errors";
 import AdminDirectSaleCollectForm from "@/features/direct-sale/components/AdminDirectSaleCollectForm";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   listBranches,
@@ -28,6 +29,10 @@ import {
   type PaymentCollectionResult,
   type PaymentMethod,
 } from "@/services/payments";
+import {
+  searchAdminReceivables,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 
 type AdminPaymentCollectVariant = "page" | "drawer";
 
@@ -231,6 +236,14 @@ export default function AdminPaymentCollectPage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [prefillMessages, setPrefillMessages] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
+  const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
 
   const selectedMethodLabel =
     PAYMENT_METHOD_OPTIONS.find(
@@ -355,6 +368,47 @@ export default function AdminPaymentCollectPage({
       setLoadingEmis(false);
     }
   }, [resetMessages, updateField]);
+
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError("Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference.");
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await searchAdminReceivables(trimmed);
+      setUnifiedSearchResults(payload.results);
+    } catch (error) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        normalizeApiError(error).message || "Unable to search receivables."
+      );
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  async function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    if (!row.source_id) {
+      setUnifiedSearchError("This receivable does not include a subscription id.");
+      return;
+    }
+    const actionKey = `${row.source_type}-${row.source_id}`;
+    setUnifiedActionLoadingKey(actionKey);
+    try {
+      await loadSubscription(row.source_id);
+      setSuccessMessage(null);
+      setErrorMessage(null);
+    } finally {
+      setUnifiedActionLoadingKey(null);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -755,6 +809,26 @@ export default function AdminPaymentCollectPage({
       presentation={variant === "drawer" ? "popup" : "page"}
       maxWidth={variant === "drawer" ? "100%" : undefined}
     >
+      <div className="space-y-6">
+        <UnifiedReceivableSearchPanel
+          title="Universal contract search"
+          description="Search across Advance EMI, rent, lease, and direct-sale references. Active actions route back into the existing posting workflows."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          actionLoadingKey={unifiedActionLoadingKey}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          directSaleHref={(row) =>
+            row.source_id
+              ? `/admin/finance/collect?workflow=direct-sale&direct_sale=${row.source_id}`
+              : "/admin/finance/collect?workflow=direct-sale"
+          }
+        />
+
       <div className={showAside ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
         <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-6">
@@ -1215,8 +1289,9 @@ export default function AdminPaymentCollectPage({
                 creation.
               </p>
             </div>
-          </aside>
-        ) : null}
+        </aside>
+      ) : null}
+      </div>
       </div>
     </PortalPage>
   );

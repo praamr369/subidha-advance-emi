@@ -7,7 +7,13 @@ from django.utils import timezone
 
 from billing.models import BillingInvoice, DirectSale, ReceiptDocument
 from subscriptions.models import Customer, PublicLead, PublicLeadStatus
-from subscriptions.models import FinancialLedger, Payment, SubscriptionDocument
+from subscriptions.models import (
+    ContractReference,
+    FinancialLedger,
+    Payment,
+    SubscriptionDocument,
+)
+from subscriptions.services.contract_reference_service import build_receivable_result
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
     get_subscription_detail_queryset,
@@ -353,6 +359,23 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
     quotation_estimate_rows = [
         row for row in recent_leads if row["intent"] in {"QUOTATION", "ESTIMATE"}
     ]
+    contract_reference_rows = list(
+        ContractReference.objects.select_related(
+            "subscription",
+            "subscription__customer",
+            "subscription__product",
+            "subscription__batch",
+            "subscription__lucky_id",
+            "direct_sale",
+            "invoice",
+        )
+        .filter(customer=customer)
+        .order_by("-source_created_at", "-id")[:25]
+    )
+    contract_reference_payload = [
+        build_receivable_result(reference, audience="admin")
+        for reference in contract_reference_rows
+    ]
 
     return {
         "customer": {
@@ -397,6 +420,28 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         "subscriptions": {
             "summary": build_customer_profile_summary(customer),
             "rows": recent_subscriptions,
+        },
+        "contract_references": {
+            "summary": {
+                "total_count": len(contract_reference_payload),
+                "advance_emi_count": sum(
+                    1
+                    for row in contract_reference_payload
+                    if row["source_type"] == "ADVANCE_EMI"
+                ),
+                "rent_count": sum(
+                    1 for row in contract_reference_payload if row["source_type"] == "RENT"
+                ),
+                "lease_count": sum(
+                    1 for row in contract_reference_payload if row["source_type"] == "LEASE"
+                ),
+                "direct_sale_count": sum(
+                    1
+                    for row in contract_reference_payload
+                    if row["source_type"] == "DIRECT_SALE"
+                ),
+            },
+            "rows": contract_reference_payload,
         },
         "payments": {
             "summary": {

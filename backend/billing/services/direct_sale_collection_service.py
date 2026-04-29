@@ -138,6 +138,53 @@ def _current_receivable_position(*, sale: DirectSale, invoice: BillingInvoice) -
     }
 
 
+def get_direct_sale_receivable_position(*, direct_sale_id: int) -> dict[str, object]:
+    sale = (
+        DirectSale.objects.select_related("customer", "branch", "finance_account")
+        .prefetch_related("receipts")
+        .get(pk=direct_sale_id)
+    )
+    invoice = (
+        BillingInvoice.objects.select_related("branch", "finance_account")
+        .filter(direct_sale=sale)
+        .order_by("-id")
+        .first()
+    )
+    if invoice is None:
+        return {
+            "direct_sale": sale,
+            "invoice": None,
+            "posted_receipt_total": Decimal("0.00"),
+            "collected_total": _money(sale.received_total),
+            "outstanding": _money(sale.balance_total),
+            "collection_supported": False,
+            "disabled_reason": "Linked billing invoice was not found for this direct sale.",
+        }
+
+    position = _current_receivable_position(sale=sale, invoice=invoice)
+    collection_supported = (
+        sale.status == "INVOICED"
+        and invoice.status == BillingDocumentStatus.POSTED
+        and position["outstanding"] > Decimal("0.00")
+    )
+    disabled_reason = None
+    if not collection_supported:
+        if position["outstanding"] <= Decimal("0.00"):
+            disabled_reason = "This direct sale has no outstanding balance."
+        elif sale.status != "INVOICED":
+            disabled_reason = "Only invoiced direct sales can accept later collections."
+        elif invoice.status != BillingDocumentStatus.POSTED:
+            disabled_reason = "Direct-sale collections require a posted retail invoice."
+
+    return {
+        "direct_sale": sale,
+        "invoice": invoice,
+        **position,
+        "collection_supported": collection_supported,
+        "disabled_reason": disabled_reason,
+    }
+
+
 @transaction.atomic
 def collect_direct_sale_payment(
     *,

@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -34,6 +34,12 @@ import {
   type PaymentRegisterSummary,
 } from "@/services/payments";
 import { listDirectSales, type DirectSale } from "@/services/billing";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
+import { normalizeApiError } from "@/services/api/errors";
+import {
+  searchAdminReceivables,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 
 // =====================================================
 // TYPES
@@ -741,6 +747,7 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
 // MAIN COMPONENT
 // =====================================================
 export default function AdminCollectionsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [dueTodayRows, setDueTodayRows] = useState<EmiRow[]>([]);
   const [overdueRows, setOverdueRows] = useState<EmiRow[]>([]);
@@ -749,6 +756,14 @@ export default function AdminCollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     const today = localDateISO();
@@ -803,6 +818,41 @@ export default function AdminCollectionsPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        "Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference."
+      );
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await searchAdminReceivables(trimmed);
+      setUnifiedSearchResults(payload.results);
+    } catch (err) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        normalizeApiError(err).message || "Unable to search receivables."
+      );
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    if (!row.source_id) {
+      setUnifiedSearchError("This receivable does not include a subscription id.");
+      return;
+    }
+    router.push(`${ROUTES.admin.financeCollect}?subscription=${row.source_id}`);
+  }
 
   const rawSubscriptionFilter = searchParams.get("subscription");
   const subscriptionFilter = parsePositiveInteger(rawSubscriptionFilter);
@@ -923,6 +973,24 @@ export default function AdminCollectionsPage() {
       }}
     >
       <div className="space-y-6">
+        <UnifiedReceivableSearchPanel
+          title="Universal contract search"
+          description="Search ContractReference index across Advance EMI, rent, lease, and direct sale. Collect actions open the finance collection desk and reuse existing posting flows."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          directSaleHref={(row) =>
+            row.source_id
+              ? `${ROUTES.admin.financeCollect}?workflow=direct-sale&direct_sale=${row.source_id}`
+              : `${ROUTES.admin.financeCollect}?workflow=direct-sale`
+          }
+        />
+
         {/* Top Bar with Actions */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex gap-2">

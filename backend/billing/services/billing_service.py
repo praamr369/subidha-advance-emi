@@ -328,6 +328,10 @@ def create_direct_sale(*, payload: dict, created_by):
     )
     _replace_direct_sale_lines(sale=sale, line_payloads=line_payloads)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_direct_sale,
+    )
+    ensure_contract_reference_for_direct_sale(sale)
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=sale,

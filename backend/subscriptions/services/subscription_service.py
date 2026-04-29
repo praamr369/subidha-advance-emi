@@ -90,6 +90,10 @@ def create_emi_subscription(
     # Assign immutable ADV-EMI contract number
     from subscriptions.services.contract_number_service import assign_subscription_number
     assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
 
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,

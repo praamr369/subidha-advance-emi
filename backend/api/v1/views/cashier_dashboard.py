@@ -124,6 +124,8 @@ def _filter_cashier_payment_queryset(queryset, query: str):
         | Q(customer__phone__icontains=query)
         | Q(customer__name__icontains=query)
         | Q(subscription__contract_reference__icontains=query)
+        | Q(subscription__contract_references__reference_no__icontains=query)
+        | Q(subscription__contract_references__display_reference__icontains=query)
     )
 
     if subscription_id is not None:
@@ -275,7 +277,12 @@ class CashierSearchEmiView(APIView):
         if mode == "phone":
             queryset = queryset.filter(subscription__customer__phone__icontains=query)
         elif mode == "subscription":
-            search_filter = Q(subscription__contract_reference__icontains=query)
+            search_filter = (
+                Q(subscription__contract_reference__icontains=query)
+                | Q(subscription__subscription_number__icontains=query)
+                | Q(subscription__contract_references__reference_no__icontains=query)
+                | Q(subscription__contract_references__display_reference__icontains=query)
+            )
             if subscription_id is not None:
                 search_filter |= Q(subscription_id=subscription_id)
             queryset = queryset.filter(search_filter)
@@ -297,6 +304,9 @@ class CashierSearchEmiView(APIView):
                 Q(subscription__customer__phone__icontains=query)
                 | Q(subscription__customer__name__icontains=query)
                 | Q(subscription__contract_reference__icontains=query)
+                | Q(subscription__subscription_number__icontains=query)
+                | Q(subscription__contract_references__reference_no__icontains=query)
+                | Q(subscription__contract_references__display_reference__icontains=query)
             )
 
             if subscription_id is not None:
@@ -311,7 +321,7 @@ class CashierSearchEmiView(APIView):
 
             queryset = queryset.filter(search_filter)
 
-        rows = list(queryset[:30])
+        rows = list(queryset.distinct()[:30])
 
         return Response(
             {

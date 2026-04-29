@@ -8,6 +8,10 @@ from api.v1.views.cashier import (
     CashierPendingDirectSales,
     CashierSearchDirectSaleView,
 )
+from api.v1.views.contract_references import (
+    CashierReceivablesSearchView,
+    UnifiedReceivableCollectView,
+)
 from api.v1.views.cashier_dashboard import (
     CashierDashboardView,
     CashierPaymentDetailView,
@@ -23,6 +27,8 @@ urlpatterns = [
     path("finance-accounts/", CashierFinanceAccountListView.as_view(), name="cashier-finance-accounts"),
     path("search-emis/", CashierSearchEmiView.as_view(), name="cashier-search-emis"),
     path("search-direct-sales/", CashierSearchDirectSaleView.as_view(), name="cashier-search-direct-sales"),
+    path("receivables/search/", CashierReceivablesSearchView.as_view(), name="cashier-receivables-search"),
+    path("receivables/collect/", UnifiedReceivableCollectView.as_view(), name="cashier-receivables-collect"),
     path("payments/", CashierPaymentHistoryView.as_view(), name="cashier-payment-history"),
     path("payments/<int:pk>/", CashierPaymentDetailView.as_view(), name="cashier-payment-detail"),
     path("collect-payment/", CashierCollectPayment.as_view(), name="cashier-collect-payment"),

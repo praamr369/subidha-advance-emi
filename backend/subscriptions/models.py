@@ -95,6 +95,13 @@ class PlanType(models.TextChoices):
     LEASE = "LEASE", "Lease"
 
 
+class ContractReferenceType(models.TextChoices):
+    ADVANCE_EMI = "ADVANCE_EMI", "Advance EMI"
+    RENT = "RENT", "Rent"
+    LEASE = "LEASE", "Lease"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+
+
 class PublicLeadStatus(models.TextChoices):
     NEW = "NEW", "New"
     IN_PROGRESS = "IN_PROGRESS", "In Progress"
@@ -1640,6 +1647,158 @@ class LeaseSubscriptionProfile(TimeStampedModel):
 
     def __str__(self):
         return f"LeaseProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+class ContractReferenceSequence(TimeStampedModel):
+    scope_key = models.CharField(max_length=120, unique=True, db_index=True)
+    next_number = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "contract_reference_sequences"
+        ordering = ["scope_key"]
+
+    def clean(self):
+        if not self.scope_key or not self.scope_key.strip():
+            raise ValidationError({"scope_key": "Sequence scope key is required."})
+
+    def save(self, *args, **kwargs):
+        self.scope_key = (self.scope_key or "").strip().upper()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.scope_key
+
+
+class ContractReference(TimeStampedModel):
+    reference_no = models.CharField(max_length=140, unique=True, db_index=True)
+    display_reference = models.CharField(max_length=180, db_index=True)
+    contract_type = models.CharField(
+        max_length=20,
+        choices=ContractReferenceType.choices,
+        db_index=True,
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    rent_contract = models.ForeignKey(
+        RentSubscriptionProfile,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    lease_contract = models.ForeignKey(
+        LeaseSubscriptionProfile,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    direct_sale = models.ForeignKey(
+        "billing.DirectSale",
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    invoice = models.ForeignKey(
+        "billing.BillingInvoice",
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    phone_snapshot = models.CharField(max_length=24, blank=True, default="", db_index=True)
+    customer_name_snapshot = models.CharField(
+        max_length=180,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    kyc_reference_snapshot = models.CharField(
+        max_length=120,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Masked-safe KYC/customer reference snapshot only; never store raw KYC document values here.",
+    )
+    product_summary_snapshot = models.CharField(max_length=255, blank=True, default="")
+    batch_snapshot = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    lucky_id_snapshot = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    partner_snapshot = models.CharField(max_length=180, blank=True, default="")
+    source_created_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "contract_references"
+        ordering = ["-source_created_at", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["contract_type"]),
+            models.Index(fields=["customer"]),
+            models.Index(fields=["phone_snapshot"]),
+            models.Index(fields=["customer_name_snapshot"]),
+            models.Index(fields=["kyc_reference_snapshot"]),
+            models.Index(fields=["batch_snapshot"]),
+            models.Index(fields=["lucky_id_snapshot"]),
+            models.Index(fields=["source_created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.reference_no or not self.reference_no.strip():
+            errors["reference_no"] = "Contract reference number is required."
+        if not self.display_reference or not self.display_reference.strip():
+            errors["display_reference"] = "Display reference is required."
+        if self.contract_type not in ContractReferenceType.values:
+            errors["contract_type"] = "Unsupported contract reference type."
+        if not any(
+            [
+                self.subscription_id,
+                self.rent_contract_id,
+                self.lease_contract_id,
+                self.direct_sale_id,
+                self.invoice_id,
+            ]
+        ):
+            errors["source"] = "ContractReference must point to at least one source record."
+        if self.pk:
+            existing = ContractReference.objects.only("reference_no").filter(pk=self.pk).first()
+            if existing and existing.reference_no != (self.reference_no or "").strip().upper():
+                errors["reference_no"] = "Contract reference number is immutable."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip().upper()
+        self.display_reference = (self.display_reference or "").strip().upper()
+        self.phone_snapshot = (self.phone_snapshot or "").strip()
+        self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
+        self.kyc_reference_snapshot = (
+            (self.kyc_reference_snapshot or "").strip() or None
+        )
+        self.product_summary_snapshot = (self.product_summary_snapshot or "").strip()
+        self.batch_snapshot = (self.batch_snapshot or "").strip().upper()
+        self.lucky_id_snapshot = (self.lucky_id_snapshot or "").strip().upper()
+        self.partner_snapshot = (self.partner_snapshot or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.reference_no
 
 
 class RentLeaseDemandType(models.TextChoices):
