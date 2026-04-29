@@ -47,6 +47,7 @@ export const ROUTES = {
     aiAssistant: "/admin/ai",
     aiSources: "/admin/ai/sources",
     aiQueryLog: "/admin/ai/query-log",
+    aiReadiness: "/admin/ai/readiness",
     partnerPaymentRequests: "/admin/partner-payment-requests",
     auditLogs: "/admin/audit-logs",
 

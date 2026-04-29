@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from ai_assistant.models import AIKnowledgeChunk, AIKnowledgeSource
 from ai_assistant.services.chunking_service import AIChunkingError, chunk_source_text
+from ai_assistant.services.embedding_service import embed_source, embeddings_enabled
 
 
 ALLOWED_SOURCE_TYPES = {
@@ -129,6 +130,8 @@ def ingest_source(*, source: AIKnowledgeSource) -> dict:
                 "checksum": checksum,
                 "ingestion_completed_at": completed_at.isoformat(),
                 "ingestion_error": "",
+                "embedding_status": "NOT_ENABLED",
+                "embedded_chunk_count": 0,
             }
         )
         source.checksum = checksum
@@ -155,13 +158,26 @@ def ingest_source(*, source: AIKnowledgeSource) -> dict:
                     for item in chunks
                 ]
             )
+            if embeddings_enabled():
+                metadata["embedding_status"] = "PENDING"
             source.save(update_fields=["checksum", "status", "metadata", "updated_at"])
+
+        if embeddings_enabled():
+            embedding_result = embed_source(source)
+            metadata = dict(source.metadata or {})
+            metadata["embedding_status"] = embedding_result.get("status") or "PENDING"
+            metadata["embedded_chunk_count"] = int(embedding_result.get("embedded_count") or 0)
+            metadata["embedding_skipped_chunk_count"] = int(embedding_result.get("skipped_count") or 0)
+            metadata["embedding_failed_chunk_count"] = int(embedding_result.get("failed_count") or 0)
+            source.metadata = metadata
+            source.save(update_fields=["metadata", "updated_at"])
 
         return {
             "source_id": source.id,
             "status": source.status,
             "chunk_count": len(chunks),
             "checksum": checksum,
+            "embedding_status": (source.metadata or {}).get("embedding_status", "NOT_ENABLED"),
         }
     except (AIIngestionError, AIChunkingError) as exc:
         completed_at = timezone.now()

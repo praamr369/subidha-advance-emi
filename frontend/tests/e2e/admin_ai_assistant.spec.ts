@@ -51,6 +51,9 @@ test.describe("admin AI assistant", () => {
           ],
           confidence: "HIGH",
           retrieval_mode: "KEYWORD",
+          requested_retrieval_mode: "HYBRID",
+          degraded: true,
+          degraded_reason: "VECTOR_SEARCH_DISABLED",
           query_log_id: 99,
           safety: {
             actionable_financial_instruction: false,
@@ -75,6 +78,8 @@ test.describe("admin AI assistant", () => {
     await page.getByRole("button", { name: "Ask" }).click();
 
     await expect(page.getByText("Based on approved internal documents")).toBeVisible();
+    await expect(page.getByText(/Degraded to KEYWORD/i)).toBeVisible();
+    await expect(page.getByText(/Keyword only retrieval is active/i)).toBeVisible();
     await expect(page.getByText("Backup Restore Runbook")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open Source" })).toHaveAttribute("href", "/admin/ai/sources/7");
     await page.getByRole("button", { name: "Helpful", exact: true }).click();
@@ -239,6 +244,53 @@ test.describe("admin AI assistant", () => {
     await page.goto("/admin/bi");
     await page.getByRole("button", { name: "Explain BI" }).click();
     await expect(page.getByRole("heading", { name: "AI assistant is disabled" })).toBeVisible();
+  });
+
+  test("AI readiness page renders", async ({ page }) => {
+    await page.route("**/api/v1/admin/ai/readiness/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          feature_flags: {
+            ai_assistant_enabled: true,
+            embeddings_enabled: false,
+            vector_search_enabled: false,
+          },
+          knowledge_base: {
+            sources_total: 2,
+            sources_active: 1,
+            chunks_total: 6,
+            embedded_chunks: 0,
+            failed_sources: 0,
+          },
+          retrieval: {
+            default_mode: "KEYWORD",
+            vector_available: false,
+            fallback_enabled: true,
+          },
+          safety: {
+            read_only: true,
+            financial_actions_enabled: false,
+            customer_private_ingestion_enabled: false,
+          },
+          last_activity: {
+            last_ingestion_status: "",
+            last_source_title: "Backup Restore Runbook",
+            query_logs_count: 12,
+            feedback_count: 3,
+            unsafe_blocked_ingestion_count: 0,
+          },
+          recommendations: ["Activate one more source."],
+        }),
+      });
+    });
+
+    await page.goto("/admin/ai/readiness");
+    await expect(page.getByRole("heading", { name: "AI Readiness" })).toBeVisible();
+    await expect(page.getByText("Default mode: KEYWORD")).toBeVisible();
+    await expect(page.getByText("Activate one more source.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
   });
 });
 

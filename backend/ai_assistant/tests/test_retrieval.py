@@ -79,6 +79,8 @@ class AIAssistantRetrievalTests(APITestCase):
         self.assertEqual(response.data["citations"], [])
         self.assertEqual(response.data["confidence"], "LOW")
         self.assertEqual(response.data["retrieval_mode"], "KEYWORD")
+        self.assertEqual(response.data["requested_retrieval_mode"], "AUTO")
+        self.assertFalse(response.data["degraded"])
         self.assertFalse(response.data["safety"]["source_grounded"])
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
@@ -100,6 +102,8 @@ class AIAssistantRetrievalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertIn("Based on approved internal documents", response.data["answer"])
         self.assertEqual(response.data["retrieval_mode"], "KEYWORD")
+        self.assertEqual(response.data["requested_retrieval_mode"], "AUTO")
+        self.assertFalse(response.data["degraded"])
         self.assertTrue(response.data["safety"]["permission_filtered"])
         self.assertTrue(response.data["safety"]["source_grounded"])
         self.assertGreaterEqual(len(response.data["citations"]), 1)
@@ -186,6 +190,8 @@ class AIAssistantRetrievalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         query_log = AIQueryLog.objects.get(id=response.data["query_log_id"])
         self.assertEqual(query_log.retrieval_mode, AIQueryLog.RetrievalMode.KEYWORD)
+        self.assertEqual(query_log.requested_retrieval_mode, "AUTO")
+        self.assertFalse(query_log.degraded)
         self.assertEqual(query_log.retrieved_chunk_ids, [chunk.id])
         self.assertIn("Based on approved internal documents", query_log.answer_preview)
         self.assertIsNone(query_log.denied_reason)
@@ -236,6 +242,7 @@ class AIAssistantRetrievalTests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["query"], "restore procedure")
         self.assertEqual(response.data[0]["retrieval_mode"], AIQueryLog.RetrievalMode.KEYWORD)
+        self.assertEqual(response.data[0]["requested_retrieval_mode"], "AUTO")
         self.assertEqual(response.data[0]["feedback_status"], AIFeedback.Rating.HELPFUL)
         self.assertNotIn("citations", response.data[0])
 
@@ -265,6 +272,22 @@ class AIAssistantRetrievalTests(APITestCase):
         self.assertTrue(response.data["safety"]["actionable_financial_instruction"])
         self.assertTrue(response.data["citations"])
         self.assertEqual(AIEmbedding.objects.count(), 0)
+
+    @override_settings(AI_ASSISTANT_ENABLED=True, AI_EMBEDDINGS_ENABLED=False, AI_VECTOR_SEARCH_ENABLED=False)
+    def test_hybrid_request_falls_back_to_keyword_with_degraded_fields(self):
+        self.client.force_authenticate(self.admin)
+        self._source()
+        response = self.client.post(
+            "/api/v1/admin/ai/query/",
+            {"query": "restore procedure", "scope": "INTERNAL_DOCS", "retrieval_mode": "HYBRID"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["requested_retrieval_mode"], "HYBRID")
+        self.assertEqual(response.data["retrieval_mode"], "KEYWORD")
+        self.assertTrue(response.data["degraded"])
+        self.assertEqual(response.data["degraded_reason"], "VECTOR_SEARCH_DISABLED")
+        self.assertTrue(response.data["citations"])
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
     def test_query_does_not_create_embeddings_or_external_calls(self):

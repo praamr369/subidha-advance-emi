@@ -31,7 +31,18 @@ export default function AiAnswerCard({ response }: AiAnswerCardProps) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={confidenceTone(response.confidence)} label={`Confidence ${response.confidence}`} />
           <StatusBadge status="ACTIVE" label={response.retrievalMode} />
+          <StatusBadge status="ACTIVE" label={`Citations ${response.citations.length}`} />
         </div>
+        {response.degraded ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+            Degraded to {response.retrievalMode}: {response.degradedReason || "Fallback applied"}
+          </div>
+        ) : null}
+        {response.retrievalMode === "KEYWORD" ? (
+          <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+            Keyword only retrieval is active.
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4">
           <p className="whitespace-pre-line text-sm leading-7 text-foreground">{response.answer}</p>
         </div>

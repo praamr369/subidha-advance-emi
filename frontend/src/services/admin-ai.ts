@@ -20,7 +20,10 @@ export type AiQueryResponse = {
   answer: string;
   citations: AiCitation[];
   confidence: AiConfidence;
-  retrievalMode: "KEYWORD";
+  retrievalMode: "KEYWORD" | "VECTOR" | "HYBRID";
+  requestedRetrievalMode: "AUTO" | "KEYWORD" | "VECTOR" | "HYBRID";
+  degraded: boolean;
+  degradedReason: string;
   queryLogId: number | null;
   safety: AiSafety;
 };
@@ -34,6 +37,7 @@ export type AiKnowledgeSource = {
   checksum: string;
   version: number;
   metadata: Record<string, unknown>;
+  embeddingStatus: "NOT_ENABLED" | "KEYWORD_ONLY" | "PENDING" | "EMBEDDED" | "FAILED";
   hasInlineContent: boolean;
   createdAt: string;
   updatedAt: string;
@@ -56,12 +60,48 @@ export type AiQueryLog = {
   role: string;
   query: string;
   retrievalMode: string;
+  requestedRetrievalMode: string;
+  degraded: boolean;
+  degradedReason: string;
   retrievedChunkIds: number[];
   answerPreview: string;
   latencyMs: number;
   deniedReason: string | null;
   feedbackStatus: string;
   createdAt: string;
+};
+
+export type AiReadinessResponse = {
+  featureFlags: {
+    aiAssistantEnabled: boolean;
+    embeddingsEnabled: boolean;
+    vectorSearchEnabled: boolean;
+  };
+  knowledgeBase: {
+    sourcesTotal: number;
+    sourcesActive: number;
+    chunksTotal: number;
+    embeddedChunks: number;
+    failedSources: number;
+  };
+  retrieval: {
+    defaultMode: "KEYWORD" | "VECTOR" | "HYBRID";
+    vectorAvailable: boolean;
+    fallbackEnabled: boolean;
+  };
+  safety: {
+    readOnly: boolean;
+    financialActionsEnabled: boolean;
+    customerPrivateIngestionEnabled: boolean;
+  };
+  lastActivity: {
+    lastIngestionStatus: string;
+    lastSourceTitle: string;
+    queryLogsCount: number;
+    feedbackCount: number;
+    unsafeBlockedIngestionCount: number;
+  };
+  recommendations: string[];
 };
 
 export type CreateAiSourceInput = {
@@ -133,7 +173,10 @@ type RawAiQueryResponse = {
   answer?: string;
   citations?: RawAiCitation[];
   confidence?: AiConfidence;
-  retrieval_mode?: "KEYWORD";
+  retrieval_mode?: "KEYWORD" | "VECTOR" | "HYBRID";
+  requested_retrieval_mode?: "AUTO" | "KEYWORD" | "VECTOR" | "HYBRID";
+  degraded?: boolean;
+  degraded_reason?: string;
   query_log_id?: number;
   safety?: {
     actionable_financial_instruction?: boolean;
@@ -173,12 +216,48 @@ type RawAiQueryLog = {
   role?: string;
   query?: string;
   retrieval_mode?: string;
+  requested_retrieval_mode?: string;
+  degraded?: boolean;
+  degraded_reason?: string;
   retrieved_chunk_ids?: number[];
   answer_preview?: string;
   latency_ms?: number;
   denied_reason?: string | null;
   feedback_status?: string;
   created_at?: string;
+};
+
+type RawAiReadinessResponse = {
+  feature_flags?: {
+    ai_assistant_enabled?: boolean;
+    embeddings_enabled?: boolean;
+    vector_search_enabled?: boolean;
+  };
+  knowledge_base?: {
+    sources_total?: number;
+    sources_active?: number;
+    chunks_total?: number;
+    embedded_chunks?: number;
+    failed_sources?: number;
+  };
+  retrieval?: {
+    default_mode?: "KEYWORD" | "VECTOR" | "HYBRID";
+    vector_available?: boolean;
+    fallback_enabled?: boolean;
+  };
+  safety?: {
+    read_only?: boolean;
+    financial_actions_enabled?: boolean;
+    customer_private_ingestion_enabled?: boolean;
+  };
+  last_activity?: {
+    last_ingestion_status?: string;
+    last_source_title?: string;
+    query_logs_count?: number;
+    feedback_count?: number;
+    unsafe_blocked_ingestion_count?: number;
+  };
+  recommendations?: string[];
 };
 
 type RawBiExplanationResponse = {
@@ -210,6 +289,9 @@ function normalizeQueryResponse(payload: RawAiQueryResponse): AiQueryResponse {
     citations: Array.isArray(payload.citations) ? payload.citations.map(normalizeCitation) : [],
     confidence: payload.confidence || "LOW",
     retrievalMode: payload.retrieval_mode || "KEYWORD",
+    requestedRetrievalMode: payload.requested_retrieval_mode || "AUTO",
+    degraded: Boolean(payload.degraded),
+    degradedReason: payload.degraded_reason || "",
     queryLogId: typeof payload.query_log_id === "number" ? payload.query_log_id : null,
     safety: {
       actionableFinancialInstruction: Boolean(payload.safety?.actionable_financial_instruction),
@@ -217,6 +299,16 @@ function normalizeQueryResponse(payload: RawAiQueryResponse): AiQueryResponse {
       sourceGrounded: Boolean(payload.safety?.source_grounded),
     },
   };
+}
+
+function computeEmbeddingStatus(row: RawAiSource): AiKnowledgeSource["embeddingStatus"] {
+  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  const raw = String((metadata as Record<string, unknown>).embedding_status || "");
+  if (raw === "EMBEDDED") return "EMBEDDED";
+  if (raw === "PENDING") return "PENDING";
+  if (raw === "FAILED") return "FAILED";
+  if (raw === "NOT_ENABLED") return "NOT_ENABLED";
+  return "KEYWORD_ONLY";
 }
 
 function normalizeSource(row: RawAiSource): AiKnowledgeSource {
@@ -229,6 +321,7 @@ function normalizeSource(row: RawAiSource): AiKnowledgeSource {
     checksum: row.checksum || "",
     version: Number(row.version ?? 1),
     metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+    embeddingStatus: computeEmbeddingStatus(row),
     hasInlineContent: Boolean(row.has_inline_content),
     createdAt: row.created_at || "",
     updatedAt: row.updated_at || "",
@@ -255,12 +348,50 @@ function normalizeQueryLog(row: RawAiQueryLog): AiQueryLog {
     role: row.role || "ADMIN",
     query: row.query || "",
     retrievalMode: row.retrieval_mode || "KEYWORD",
+    requestedRetrievalMode: row.requested_retrieval_mode || "AUTO",
+    degraded: Boolean(row.degraded),
+    degradedReason: row.degraded_reason || "",
     retrievedChunkIds: Array.isArray(row.retrieved_chunk_ids) ? row.retrieved_chunk_ids : [],
     answerPreview: row.answer_preview || "",
     latencyMs: Number(row.latency_ms ?? 0),
     deniedReason: row.denied_reason ?? null,
     feedbackStatus: row.feedback_status || "",
     createdAt: row.created_at || "",
+  };
+}
+
+function normalizeReadiness(payload: RawAiReadinessResponse): AiReadinessResponse {
+  return {
+    featureFlags: {
+      aiAssistantEnabled: Boolean(payload.feature_flags?.ai_assistant_enabled),
+      embeddingsEnabled: Boolean(payload.feature_flags?.embeddings_enabled),
+      vectorSearchEnabled: Boolean(payload.feature_flags?.vector_search_enabled),
+    },
+    knowledgeBase: {
+      sourcesTotal: Number(payload.knowledge_base?.sources_total ?? 0),
+      sourcesActive: Number(payload.knowledge_base?.sources_active ?? 0),
+      chunksTotal: Number(payload.knowledge_base?.chunks_total ?? 0),
+      embeddedChunks: Number(payload.knowledge_base?.embedded_chunks ?? 0),
+      failedSources: Number(payload.knowledge_base?.failed_sources ?? 0),
+    },
+    retrieval: {
+      defaultMode: payload.retrieval?.default_mode || "KEYWORD",
+      vectorAvailable: Boolean(payload.retrieval?.vector_available),
+      fallbackEnabled: Boolean(payload.retrieval?.fallback_enabled),
+    },
+    safety: {
+      readOnly: Boolean(payload.safety?.read_only),
+      financialActionsEnabled: Boolean(payload.safety?.financial_actions_enabled),
+      customerPrivateIngestionEnabled: Boolean(payload.safety?.customer_private_ingestion_enabled),
+    },
+    lastActivity: {
+      lastIngestionStatus: payload.last_activity?.last_ingestion_status || "",
+      lastSourceTitle: payload.last_activity?.last_source_title || "",
+      queryLogsCount: Number(payload.last_activity?.query_logs_count ?? 0),
+      feedbackCount: Number(payload.last_activity?.feedback_count ?? 0),
+      unsafeBlockedIngestionCount: Number(payload.last_activity?.unsafe_blocked_ingestion_count ?? 0),
+    },
+    recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : [],
   };
 }
 
@@ -300,13 +431,18 @@ export function isAiDisabledError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 503;
 }
 
-export async function queryAI(query: string, topK = 5): Promise<AiQueryResponse> {
+export async function queryAI(
+  query: string,
+  topK = 5,
+  retrievalMode: "AUTO" | "KEYWORD" | "VECTOR" | "HYBRID" = "AUTO"
+): Promise<AiQueryResponse> {
   const payload = await apiFetch<RawAiQueryResponse>("/admin/ai/query/", {
     method: "POST",
     body: {
       query,
       scope: "INTERNAL_DOCS",
       top_k: topK,
+      retrieval_mode: retrievalMode,
     },
   });
   return normalizeQueryResponse(payload);
@@ -373,4 +509,9 @@ export async function explainBI(scope: BiExplainScope, window: BiExplainWindow):
   const params = new URLSearchParams({ scope, window });
   const payload = await apiFetch<RawBiExplanationResponse>(`/admin/ai/bi-explain/?${params.toString()}`);
   return normalizeBiExplanation(payload);
+}
+
+export async function getAiReadiness(): Promise<AiReadinessResponse> {
+  const payload = await apiFetch<RawAiReadinessResponse>("/admin/ai/readiness/");
+  return normalizeReadiness(payload);
 }

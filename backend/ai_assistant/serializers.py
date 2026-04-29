@@ -136,6 +136,11 @@ class AIQueryRequestSerializer(serializers.Serializer):
     query = serializers.CharField(min_length=3, max_length=1000, trim_whitespace=True)
     scope = serializers.ChoiceField(choices=["INTERNAL_DOCS"], default="INTERNAL_DOCS")
     top_k = serializers.IntegerField(min_value=1, max_value=10, required=False)
+    retrieval_mode = serializers.ChoiceField(
+        choices=["AUTO", "KEYWORD", "VECTOR", "HYBRID"],
+        default="AUTO",
+        required=False,
+    )
 
 
 class AIBIExplainRequestSerializer(serializers.Serializer):
@@ -174,6 +179,9 @@ class AIQueryLogSerializer(serializers.ModelSerializer):
             "query",
             "normalized_query",
             "retrieval_mode",
+            "requested_retrieval_mode",
+            "degraded",
+            "degraded_reason",
             "filters",
             "retrieved_chunk_ids",
             "answer_preview",

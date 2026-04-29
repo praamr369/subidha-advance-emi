@@ -142,6 +142,7 @@ export default function AdminAiSourcesPage() {
       actions={[
         { href: ROUTES.admin.aiAssistant, label: "Assistant", variant: "secondary" },
         { href: ROUTES.admin.aiQueryLog, label: "Query Log", variant: "secondary" },
+        { href: ROUTES.admin.aiReadiness, label: "AI Readiness", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "warning" }}
       maxWidth="1180px"

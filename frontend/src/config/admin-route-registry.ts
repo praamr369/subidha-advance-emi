@@ -38,6 +38,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Command Center", "Reports & Analytics", ROUTES.admin.reports, "Business reports and analytics."),
   item("Command Center", "BI Control Center", ROUTES.admin.bi, "Read-only chart and trend control center."),
   item("Command Center", "AI Assistant", ROUTES.admin.aiAssistant, "Read-only internal knowledge assistant with source citations."),
+  item("Command Center", "AI Readiness", ROUTES.admin.aiReadiness, "AI feature flags, retrieval posture, and safety readiness checks."),
   item("Command Center", "Global Search", ROUTES.admin.globalSearch, "Search across customers, contracts, payments, and operations."),
 
   item("Staff & Business Setup", "Staff Workspace", ROUTES.admin.hr, "Daily HR command center for staff, attendance, leave, expenses, and payroll."),

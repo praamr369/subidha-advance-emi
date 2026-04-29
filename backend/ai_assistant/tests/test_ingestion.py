@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.test import override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
@@ -88,6 +90,7 @@ class AIAssistantIngestionApiTests(APITestCase):
         first = self.client.post(ingest_url, {}, format="json")
         self.assertEqual(first.status_code, status.HTTP_200_OK, first.data)
         self.assertEqual(first.data["status"], AIKnowledgeSource.Status.ACTIVE)
+        self.assertEqual(first.data["embedding_status"], "NOT_ENABLED")
         first_chunk_rows = list(
             AIKnowledgeChunk.objects.filter(source=source).order_by("chunk_index").values(
                 "chunk_index", "heading", "content", "token_count"
@@ -105,6 +108,96 @@ class AIAssistantIngestionApiTests(APITestCase):
         )
         self.assertEqual(first_chunk_rows, second_chunk_rows)
         self.assertEqual(first.data["chunk_count"], second.data["chunk_count"])
+
+    @override_settings(AI_ASSISTANT_ENABLED=True, AI_EMBEDDINGS_ENABLED=False)
+    def test_embeddings_disabled_ingestion_succeeds_without_external_call(self):
+        self.client.force_authenticate(self.admin)
+        source = AIKnowledgeSource.objects.create(
+            title="No Embeddings Source",
+            source_type=AIKnowledgeSource.SourceType.SYSTEM_HELP,
+            status=AIKnowledgeSource.Status.DRAFT,
+            visibility=AIKnowledgeSource.Visibility.ADMIN_ONLY,
+            content_text=SAFE_MARKDOWN,
+            created_by=self.admin,
+        )
+        with patch("urllib.request.urlopen") as urlopen:
+            response = self.client.post(f"/api/v1/admin/ai/sources/{source.id}/ingest/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["embedding_status"], "NOT_ENABLED")
+        self.assertEqual(AIEmbedding.objects.count(), 0)
+        urlopen.assert_not_called()
+
+    @override_settings(
+        AI_ASSISTANT_ENABLED=True,
+        AI_EMBEDDINGS_ENABLED=True,
+        AI_VECTOR_SEARCH_ENABLED=True,
+        AI_EMBEDDING_PROVIDER="MOCK",
+        AI_EMBEDDING_MODEL="mock-v1",
+        AI_EMBEDDING_DIMENSIONS=32,
+    )
+    def test_mock_embedding_provider_stores_json_embedding(self):
+        self.client.force_authenticate(self.admin)
+        source = AIKnowledgeSource.objects.create(
+            title="Embedding Source",
+            source_type=AIKnowledgeSource.SourceType.SYSTEM_HELP,
+            status=AIKnowledgeSource.Status.DRAFT,
+            visibility=AIKnowledgeSource.Visibility.ADMIN_ONLY,
+            content_text=SAFE_MARKDOWN,
+            created_by=self.admin,
+        )
+        response = self.client.post(f"/api/v1/admin/ai/sources/{source.id}/ingest/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["embedding_status"], "EMBEDDED")
+        self.assertGreater(AIEmbedding.objects.count(), 0)
+        row = AIEmbedding.objects.first()
+        self.assertIsInstance(row.embedding, list)
+        self.assertEqual(row.dimensions, 32)
+
+    @override_settings(
+        AI_ASSISTANT_ENABLED=True,
+        AI_EMBEDDINGS_ENABLED=True,
+        AI_VECTOR_SEARCH_ENABLED=True,
+        AI_EMBEDDING_PROVIDER="MOCK",
+        AI_EMBEDDING_MODEL="mock-v1",
+        AI_EMBEDDING_DIMENSIONS=32,
+    )
+    def test_unchanged_chunks_are_skipped_for_embedding(self):
+        self.client.force_authenticate(self.admin)
+        source = AIKnowledgeSource.objects.create(
+            title="Deterministic Embedding",
+            source_type=AIKnowledgeSource.SourceType.SYSTEM_HELP,
+            status=AIKnowledgeSource.Status.DRAFT,
+            visibility=AIKnowledgeSource.Visibility.ADMIN_ONLY,
+            content_text=SAFE_MARKDOWN,
+            created_by=self.admin,
+        )
+        first = self.client.post(f"/api/v1/admin/ai/sources/{source.id}/ingest/", {}, format="json")
+        self.assertEqual(first.status_code, status.HTTP_200_OK, first.data)
+        initial_embeddings = AIEmbedding.objects.count()
+        second = self.client.post(f"/api/v1/admin/ai/sources/{source.id}/ingest/", {}, format="json")
+        self.assertEqual(second.status_code, status.HTTP_200_OK, second.data)
+        self.assertEqual(AIEmbedding.objects.count(), initial_embeddings)
+
+    @override_settings(
+        AI_ASSISTANT_ENABLED=True,
+        AI_EMBEDDINGS_ENABLED=True,
+        AI_VECTOR_SEARCH_ENABLED=True,
+        AI_EMBEDDING_PROVIDER="MOCK",
+        AI_EMBEDDING_MODEL="mock-v1",
+    )
+    def test_unsafe_chunks_not_embedded(self):
+        self.client.force_authenticate(self.admin)
+        source = AIKnowledgeSource.objects.create(
+            title="Unsafe Embedding",
+            source_type=AIKnowledgeSource.SourceType.SYSTEM_HELP,
+            status=AIKnowledgeSource.Status.DRAFT,
+            visibility=AIKnowledgeSource.Visibility.ADMIN_ONLY,
+            content_text="Valid text\nSECRET_KEY=unsafe",
+            created_by=self.admin,
+        )
+        response = self.client.post(f"/api/v1/admin/ai/sources/{source.id}/ingest/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(AIEmbedding.objects.count(), 0)
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
     def test_secret_content_rejected_and_not_stored(self):

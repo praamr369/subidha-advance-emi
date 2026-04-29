@@ -5,6 +5,12 @@ from dataclasses import dataclass
 
 from django.db.models import Q
 
+from ai_assistant.services.embedding_service import (
+    embed_text,
+    embeddings_enabled,
+    vector_candidates_for_chunks,
+    vector_search_enabled,
+)
 from ai_assistant.services.ingestion_service import content_is_blocked_by_policy
 from ai_assistant.services.permission_filter_service import phase_8d_chunk_queryset
 
@@ -61,6 +67,15 @@ class RetrievedChunk:
         }
 
 
+@dataclass(frozen=True)
+class RetrievalExecution:
+    requested_mode: str
+    actual_mode: str
+    degraded: bool
+    degraded_reason: str
+    chunks: list[RetrievedChunk]
+
+
 def _tokens(text: str) -> list[str]:
     return [
         token.lower()
@@ -105,11 +120,32 @@ def _score_chunk(*, query: str, keywords: list[str], chunk) -> int:
 
 
 def retrieve_chunks(*, user, query: str, top_k: int = 5, scope: str | None = None) -> list[RetrievedChunk]:
+    result = execute_retrieval(user=user, query=query, top_k=top_k, scope=scope, requested_mode="AUTO")
+    return result.chunks
+
+
+def execute_retrieval(
+    *,
+    user,
+    query: str,
+    top_k: int = 5,
+    scope: str | None = None,
+    requested_mode: str = "AUTO",
+) -> RetrievalExecution:
     del scope
     normalized_query = " ".join((query or "").split())
     keywords = _tokens(normalized_query)
+    requested = (requested_mode or "AUTO").upper().strip()
+    if requested not in {"AUTO", "KEYWORD", "VECTOR", "HYBRID"}:
+        requested = "AUTO"
     if not normalized_query or not keywords:
-        return []
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=requested in {"VECTOR", "HYBRID"},
+            degraded_reason="EMPTY_QUERY_OR_KEYWORDS" if requested in {"VECTOR", "HYBRID"} else "",
+            chunks=[],
+        )
 
     queryset = phase_8d_chunk_queryset(user)
     text_filter = Q()
@@ -121,24 +157,124 @@ def retrieve_chunks(*, user, query: str, top_k: int = 5, scope: str | None = Non
     if text_filter:
         queryset = queryset.filter(text_filter)
 
-    scored: list[RetrievedChunk] = []
+    chunk_rows = []
     for chunk in queryset.order_by("source_id", "chunk_index", "id")[:500]:
         if content_is_blocked_by_policy(chunk.content):
             continue
-        score = _score_chunk(query=normalized_query, keywords=keywords, chunk=chunk)
-        if score <= 0:
+        chunk_rows.append(chunk)
+
+    keyword_scored: list[RetrievedChunk] = []
+    for chunk in chunk_rows:
+        keyword_score = _score_chunk(query=normalized_query, keywords=keywords, chunk=chunk)
+        if keyword_score <= 0:
             continue
-        scored.append(
+        keyword_scored.append(
             RetrievedChunk(
                 chunk_id=chunk.id,
                 source_id=chunk.source_id,
                 source_title=chunk.source.title,
                 heading=chunk.heading,
                 preview=_preview(chunk.content),
-                score=score,
+                score=keyword_score,
                 content=chunk.content,
             )
         )
 
-    scored.sort(key=lambda item: (-item.score, item.source_id, item.chunk_id))
-    return scored[: max(1, min(int(top_k or 5), 10))]
+    keyword_scored.sort(key=lambda item: (-item.score, item.source_id, item.chunk_id))
+    capped_top_k = max(1, min(int(top_k or 5), 10))
+
+    mode = requested
+    if mode == "AUTO":
+        mode = "HYBRID" if vector_search_enabled() else "KEYWORD"
+
+    if mode == "KEYWORD":
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=False,
+            degraded_reason="",
+            chunks=keyword_scored[:capped_top_k],
+        )
+
+    if mode in {"VECTOR", "HYBRID"} and not vector_search_enabled():
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=True,
+            degraded_reason="VECTOR_SEARCH_DISABLED",
+            chunks=keyword_scored[:capped_top_k],
+        )
+    if mode in {"VECTOR", "HYBRID"} and not embeddings_enabled():
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=True,
+            degraded_reason="EMBEDDINGS_DISABLED",
+            chunks=keyword_scored[:capped_top_k],
+        )
+
+    query_embedding_payload = embed_text(normalized_query)
+    if not query_embedding_payload.get("embedded"):
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=True,
+            degraded_reason=query_embedding_payload.get("reason") or "QUERY_EMBEDDING_UNAVAILABLE",
+            chunks=keyword_scored[:capped_top_k],
+        )
+
+    vector_scores = vector_candidates_for_chunks(
+        chunk_rows,
+        query_embedding=query_embedding_payload["embedding"],
+        top_k=max(capped_top_k * 4, 10),
+    )
+    if not vector_scores:
+        return RetrievalExecution(
+            requested_mode=requested,
+            actual_mode="KEYWORD",
+            degraded=True,
+            degraded_reason="NO_VECTOR_CANDIDATES",
+            chunks=keyword_scored[:capped_top_k],
+        )
+
+    vector_score_map = {row["chunk_id"]: float(row["score"]) for row in vector_scores}
+    by_id = {row.chunk_id: row for row in keyword_scored}
+    for chunk in chunk_rows:
+        if chunk.id not in by_id and chunk.id in vector_score_map:
+            by_id[chunk.id] = RetrievedChunk(
+                chunk_id=chunk.id,
+                source_id=chunk.source_id,
+                source_title=chunk.source.title,
+                heading=chunk.heading,
+                preview=_preview(chunk.content),
+                score=0,
+                content=chunk.content,
+            )
+
+    rescored: list[RetrievedChunk] = []
+    for chunk_id, row in by_id.items():
+        vector_score = vector_score_map.get(chunk_id, 0.0)
+        keyword_score = row.score
+        if mode == "VECTOR":
+            combined = int(vector_score * 1000)
+        else:
+            combined = int((vector_score * 700) + (keyword_score * 3))
+        rescored.append(
+            RetrievedChunk(
+                chunk_id=row.chunk_id,
+                source_id=row.source_id,
+                source_title=row.source_title,
+                heading=row.heading,
+                preview=row.preview,
+                score=combined,
+                content=row.content,
+            )
+        )
+    rescored.sort(key=lambda item: (-item.score, item.source_id, item.chunk_id))
+    return RetrievalExecution(
+        requested_mode=requested,
+        actual_mode=mode,
+        degraded=False,
+        degraded_reason="",
+        chunks=rescored[:capped_top_k],
+    )

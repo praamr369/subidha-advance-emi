@@ -2,6 +2,7 @@ from django.urls import path
 
 from ai_assistant.views import (
     AIBIExplainView,
+    AIAssistantReadinessView,
     AIAssistantHealthView,
     AIAssistantQueryView,
     AIFeedbackView,
@@ -23,6 +24,7 @@ urlpatterns = [
     path("sources/<int:source_id>/chunks/", AIKnowledgeSourceChunkListView.as_view(), name="source-chunks"),
     path("query/", AIAssistantQueryView.as_view(), name="query"),
     path("bi-explain/", AIBIExplainView.as_view(), name="bi-explain"),
+    path("readiness/", AIAssistantReadinessView.as_view(), name="readiness"),
     path("query-log/", AIQueryLogListView.as_view(), name="query-log"),
     path("feedback/", AIFeedbackView.as_view(), name="feedback"),
 ]

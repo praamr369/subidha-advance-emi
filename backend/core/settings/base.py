@@ -384,6 +384,17 @@ AI_ASSISTANT_ENABLED = _parse_bool(
     os.getenv("AI_ASSISTANT_ENABLED"),
     default=False,
 )
+AI_EMBEDDINGS_ENABLED = _parse_bool(
+    os.getenv("AI_EMBEDDINGS_ENABLED"),
+    default=False,
+)
+AI_EMBEDDING_PROVIDER = (os.getenv("AI_EMBEDDING_PROVIDER") or "").strip()
+AI_EMBEDDING_MODEL = (os.getenv("AI_EMBEDDING_MODEL") or "").strip()
+AI_EMBEDDING_DIMENSIONS = int(os.getenv("AI_EMBEDDING_DIMENSIONS") or "1536")
+AI_VECTOR_SEARCH_ENABLED = _parse_bool(
+    os.getenv("AI_VECTOR_SEARCH_ENABLED"),
+    default=False,
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

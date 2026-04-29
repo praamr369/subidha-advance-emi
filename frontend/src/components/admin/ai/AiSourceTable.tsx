@@ -29,6 +29,7 @@ export default function AiSourceTable({ sources, ingestingId = null, onIngest }:
           <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Title</th>
           <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Type</th>
           <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Status</th>
+          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Embedding</th>
           <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Updated</th>
           <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Actions</th>
         </tr>
@@ -45,6 +46,7 @@ export default function AiSourceTable({ sources, ingestingId = null, onIngest }:
               <td className="px-4 py-3">
                 <StatusBadge status={source.status} label={source.status.replaceAll("_", " ")} />
               </td>
+              <td className="px-4 py-3 text-sm text-muted-foreground">{source.embeddingStatus.replaceAll("_", " ")}</td>
               <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(source.updatedAt)}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap justify-end gap-2">

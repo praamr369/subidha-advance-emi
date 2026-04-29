@@ -196,6 +196,9 @@ class AIQueryLog(models.Model):
         default=RetrievalMode.HYBRID,
         db_index=True,
     )
+    requested_retrieval_mode = models.CharField(max_length=16, blank=True, default="")
+    degraded = models.BooleanField(default=False)
+    degraded_reason = models.CharField(max_length=128, blank=True, default="")
     filters = models.JSONField(default=dict, blank=True)
     retrieved_chunk_ids = models.JSONField(default=list, blank=True)
     answer_preview = models.TextField(blank=True, default="")
@@ -210,6 +213,7 @@ class AIQueryLog(models.Model):
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["role", "created_at"]),
             models.Index(fields=["retrieval_mode", "created_at"]),
+            models.Index(fields=["requested_retrieval_mode", "created_at"]),
             models.Index(fields=["created_at"]),
         ]
 

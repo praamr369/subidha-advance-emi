@@ -7,6 +7,7 @@ import AiSafetyBanner from "@/components/admin/ai/AiSafetyBanner";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ActionButton from "@/components/ui/ActionButton";
 import Card from "@/components/ui/card";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
@@ -14,6 +15,7 @@ import { ROUTES } from "@/lib/routes";
 import {
   getSource,
   getSourceChunks,
+  ingestSource,
   isAiDisabledError,
   type AiKnowledgeChunk,
   type AiKnowledgeSource,
@@ -32,6 +34,7 @@ export default function AdminAiSourceDetailPage() {
   const [source, setSource] = useState<AiKnowledgeSource | null>(null);
   const [chunks, setChunks] = useState<AiKnowledgeChunk[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ingesting, setIngesting] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +69,22 @@ export default function AdminAiSourceDetailPage() {
     };
   }, [sourceId]);
 
+  const runIngestion = async () => {
+    if (!sourceId || ingesting) return;
+    setIngesting(true);
+    setError(null);
+    try {
+      await ingestSource(sourceId);
+      const [nextSource, nextChunks] = await Promise.all([getSource(sourceId), getSourceChunks(sourceId)]);
+      setSource(nextSource);
+      setChunks(nextChunks);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Re-ingestion failed.");
+    } finally {
+      setIngesting(false);
+    }
+  };
+
   return (
     <PortalPage
       eyebrow="AI Assistant"
@@ -80,6 +99,7 @@ export default function AdminAiSourceDetailPage() {
       actions={[
         { href: ROUTES.admin.aiSources, label: "All Sources", variant: "secondary" },
         { href: ROUTES.admin.aiAssistant, label: "Assistant", variant: "secondary" },
+        { href: ROUTES.admin.aiReadiness, label: "AI Readiness", variant: "secondary" },
       ]}
       statusBadge={{ label: "Read Only", tone: "warning" }}
       maxWidth="1080px"
@@ -90,6 +110,11 @@ export default function AdminAiSourceDetailPage() {
         {error ? <ErrorState title="Source unavailable" description={error} /> : null}
         {!loading && source ? (
           <Card variant="bordered" title="Source metadata">
+            <div className="mb-3 flex justify-end">
+              <ActionButton variant="secondary" loading={ingesting} onClick={() => void runIngestion()}>
+                Re-ingest source
+              </ActionButton>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
                 <div className="text-xs text-muted-foreground">Type</div>
@@ -109,6 +134,24 @@ export default function AdminAiSourceDetailPage() {
                 <div className="text-xs text-muted-foreground">Updated</div>
                 <div className="mt-1 text-sm font-semibold">{formatDate(source.updatedAt)}</div>
               </div>
+              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+                <div className="text-xs text-muted-foreground">Chunk count</div>
+                <div className="mt-1 text-sm font-semibold">{chunks.length}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+                <div className="text-xs text-muted-foreground">Embedding status</div>
+                <div className="mt-1 text-sm font-semibold">{source.embeddingStatus.replaceAll("_", " ")}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+                <div className="text-xs text-muted-foreground">Checksum / Version</div>
+                <div className="mt-1 text-sm font-semibold">{source.checksum || "N/A"} / {source.version}</div>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3">
+              <div className="text-xs text-muted-foreground">Last ingestion metadata</div>
+              <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-foreground">
+                {JSON.stringify(source.metadata || {}, null, 2)}
+              </pre>
             </div>
           </Card>
         ) : null}

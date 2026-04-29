@@ -21,8 +21,9 @@ class AIAssistantPermissionTests(APITestCase):
             {"query": "How do I reset business data safely?", "scope": "INTERNAL_DOCS"},
             format="json",
         )
+        readiness_response = self.client.get("/api/v1/admin/ai/readiness/")
 
-        for response in [health_response, sources_response, query_response]:
+        for response in [health_response, sources_response, query_response, readiness_response]:
             self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
             self.assertEqual(response.data["detail"], "AI assistant is disabled")
 
@@ -31,6 +32,8 @@ class AIAssistantPermissionTests(APITestCase):
         self.client.force_authenticate(self.partner)
         response = self.client.get("/api/v1/admin/ai/health/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        readiness = self.client.get("/api/v1/admin/ai/readiness/")
+        self.assertEqual(readiness.status_code, status.HTTP_403_FORBIDDEN)
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
     def test_admin_gets_no_source_query_response_when_enabled(self):
