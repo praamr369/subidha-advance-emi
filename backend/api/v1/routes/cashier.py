@@ -20,6 +20,7 @@ from api.v1.views.cashier_dashboard import (
     CashierPendingEmis,
     CashierSearchEmiView,
 )
+from api.v1.views.views.audit_views import CashierBusinessEventLogListView
 
 urlpatterns = [
     path("dashboard/", CashierDashboardView.as_view(), name="cashier-dashboard"),
@@ -33,6 +34,7 @@ urlpatterns = [
     path("receivables/collect/", UnifiedReceivableCollectView.as_view(), name="cashier-receivables-collect"),
     path("payments/", CashierPaymentHistoryView.as_view(), name="cashier-payment-history"),
     path("payments/<int:pk>/", CashierPaymentDetailView.as_view(), name="cashier-payment-detail"),
+    path("audit/events/", CashierBusinessEventLogListView.as_view(), name="cashier-business-event-list"),
     path("collect-payment/", CashierCollectPayment.as_view(), name="cashier-collect-payment"),
     path("collect-advance/", CashierCollectAdvance.as_view(), name="cashier-collect-advance"),
     path("collect-direct-sale/", CashierCollectDirectSalePayment.as_view(), name="cashier-collect-direct-sale"),

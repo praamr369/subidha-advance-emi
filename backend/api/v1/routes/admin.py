@@ -46,6 +46,8 @@ from api.v1.views.admin_leads import (
     AdminLeadStatusUpdateView,
 )
 from api.v1.views.views.audit_views import (
+    AdminBusinessEventLogDetailView,
+    AdminBusinessEventLogListView,
     AuditLogListView,
     AuditLogDetailView,
     AuditObjectTimelineView,
@@ -413,6 +415,8 @@ urlpatterns = [
     path("audit-logs/<int:pk>/", AuditLogDetailView.as_view(), name="admin-audit-log-detail"),
     path("audit-logs/timeline/<str:model_name>/<str:object_id>/", AuditObjectTimelineView.as_view(), name="admin-audit-object-timeline"),
     path("audit-logs/financial-report/", financial_audit_report, name="admin-financial-audit-report"),
+    path("audit/events/", AdminBusinessEventLogListView.as_view(), name="admin-business-event-list"),
+    path("audit/events/<int:pk>/", AdminBusinessEventLogDetailView.as_view(), name="admin-business-event-detail"),
     path("collection-requests/", AdminPartnerCollectionRequestListView.as_view()),
     path("collection-requests/<int:pk>/approve/", AdminPartnerCollectionRequestApproveView.as_view()),
     path("collection-requests/<int:pk>/reject/", AdminPartnerCollectionRequestRejectView.as_view()),

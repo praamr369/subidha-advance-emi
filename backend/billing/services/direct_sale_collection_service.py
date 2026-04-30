@@ -23,6 +23,8 @@ from branch_control.services.branch_service import (
 )
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
+from subscriptions.models import BusinessEventType
+from subscriptions.services.business_event_service import append_business_event
 
 
 def _money(value) -> Decimal:
@@ -345,6 +347,24 @@ def collect_direct_sale_payment(
             "reference_no": normalized_reference or None,
             **audit_extra,
         },
+    )
+    append_business_event(
+        event_type=BusinessEventType.DIRECT_SALE_PAYMENT_RECEIVED,
+        source_module="billing.services.direct_sale_collection_service.collect_direct_sale_payment",
+        actor_user=collected_by,
+        customer=sale.customer,
+        payload={
+            "direct_sale_id": sale.id,
+            "billing_invoice_id": invoice.id,
+            "receipt_id": receipt.id,
+            "receipt_no": receipt.receipt_no,
+            "amount": str(amount),
+            "outstanding_before": str(outstanding_before),
+            "outstanding_after": str(outstanding_after),
+            "reference_no": normalized_reference or None,
+        },
+        ledger_reference=receipt.receipt_no or "",
+        idempotency_key=normalized_reference or None,
     )
 
     return {

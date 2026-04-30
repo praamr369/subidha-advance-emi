@@ -16,6 +16,7 @@ from branch_control.services.branch_service import (
 )
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     Emi,
     EmiStatus,
     FinancialLedger,
@@ -30,6 +31,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.commission_service import (
     create_commission_for_payment,
     reverse_commission_for_payment,
@@ -536,6 +538,37 @@ def record_emi_payment(
                 or unified_collection_source_id is not None
                 else {}
             ),
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.PAYMENT_RECEIVED,
+        source_module="subscriptions.services.payment_service.record_emi_payment",
+        actor_user=collected_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        payment=payment,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "amount": str(amount),
+            "method": method,
+            "reference_no": reference_no,
+        },
+        idempotency_key=reference_no,
+    )
+    append_business_event(
+        event_type=BusinessEventType.EMI_PAID,
+        source_module="subscriptions.services.payment_service.record_emi_payment",
+        actor_user=collected_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        payment=payment,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "emi_id": emi.id,
+            "month_no": emi.month_no,
+            "amount": str(amount),
         },
     )
 

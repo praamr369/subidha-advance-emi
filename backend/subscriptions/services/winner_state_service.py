@@ -6,6 +6,7 @@ from django.db.models import Q
 
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     LuckyId,
     EmiStatus,
     FinancialLedger,
@@ -19,6 +20,7 @@ from subscriptions.models import (
     SubscriptionStatus,
     q2,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
@@ -314,6 +316,23 @@ def apply_winner_state(
                 "winner_lucky_number": getattr(subscription.lucky_id, "lucky_number", None),
             },
         )
+    append_business_event(
+        event_type=BusinessEventType.WAIVER_APPLIED,
+        source_module="subscriptions.services.winner_state_service.apply_winner_state",
+        actor_user=performed_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "source": source,
+            "draw_id": getattr(draw, "id", None),
+            "winner_month": winner_month,
+            "waived_emi_count": len(future_pending_emis),
+            "waived_amount": str(q2(computed_waived_amount)),
+            "newly_waived_amount": str(q2(newly_waived_amount)),
+        },
+    )
 
     return {
         "subscription": subscription,

@@ -19,6 +19,7 @@ from accounting.services.operational_accounts_service import ensure_phase3_syste
 from subscriptions.models import (
     Batch,
     BatchStatus,
+    BusinessEventType,
     DrawCommit,
     DrawEligibilitySnapshot,
     LuckyDraw,
@@ -28,6 +29,7 @@ from subscriptions.models import (
     SubscriptionRequestStatus,
     SubscriptionStatus,
 )
+from subscriptions.services.business_event_service import append_business_event
 
 COORDINATION_ALGORITHM_VERSION = "pass7-v1"
 
@@ -213,6 +215,17 @@ def freeze_draw_eligibility_snapshot(batch: Batch, user=None) -> dict:
 
     DrawEligibilitySnapshot.objects.bulk_create(to_create)
     agg = compute_snapshot_aggregate_hash(batch, next_version)
+    append_business_event(
+        event_type=BusinessEventType.DRAW_SNAPSHOT_FROZEN,
+        source_module="subscriptions.services.batch_draw_coordination_service.freeze_draw_eligibility_snapshot",
+        actor_user=user,
+        batch=batch,
+        payload={
+            "snapshot_version": next_version,
+            "snapshot_hash": agg,
+            "eligible_count": len(to_create),
+        },
+    )
     return {
         "snapshot_version": next_version,
         "snapshot_hash": agg,
@@ -353,6 +366,18 @@ def commit_batch_draw(*, batch: Batch, user=None) -> dict:
     from subscriptions.services.batch_service import transition_batch_status
 
     transition_batch_status(batch, BatchStatus.DRAW_COMMITTED)
+    append_business_event(
+        event_type=BusinessEventType.DRAW_COMMITTED,
+        source_module="subscriptions.services.batch_draw_coordination_service.commit_batch_draw",
+        actor_user=user,
+        batch=batch,
+        payload={
+            "draw_commit_id": dc.id,
+            "snapshot_hash": snapshot_hash,
+            "public_commit_hash": public_commit_hash,
+            "lucky_draw_id": draw.id,
+        },
+    )
 
     return {
         "batch_id": batch.id,

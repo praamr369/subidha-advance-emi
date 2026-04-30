@@ -35,6 +35,8 @@ from subscriptions.services.customer_account_service import (
     build_customer_profile_summary,
     build_customer_operational_profile,
 )
+from subscriptions.services.business_event_service import append_business_event
+from subscriptions.models import BusinessEventType
 
 User = get_user_model()
 
@@ -237,6 +239,17 @@ def find_or_create_customer(
         object_id=customer.pk,
         performed_by=created_by,
         metadata={
+            "source": source,
+            "phone": norm_phone,
+            "has_email": bool(norm_email),
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.CUSTOMER_CREATED,
+        source_module="subscriptions.services.customer_service.find_or_create_customer",
+        actor_user=created_by,
+        customer=customer,
+        payload={
             "source": source,
             "phone": norm_phone,
             "has_email": bool(norm_email),

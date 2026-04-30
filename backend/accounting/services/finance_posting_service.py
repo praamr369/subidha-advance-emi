@@ -5,6 +5,8 @@ from decimal import Decimal
 from accounting.models import FinanceAccount
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from subscriptions.models import BusinessEventType
+from subscriptions.services.business_event_service import append_business_event
 
 
 def _money(value) -> Decimal:
@@ -43,7 +45,7 @@ class FinancePostingService:
         purpose: str = "PAYMENT_COLLECTION",
     ):
         accounts = ensure_phase3_system_accounts()
-        return post_bridge_entry(
+        entry = post_bridge_entry(
             source_instance=payment,
             purpose=purpose,
             entry_date=payment.payment_date,
@@ -74,6 +76,23 @@ class FinancePostingService:
             },
             posted_by=performed_by,
         )
+        append_business_event(
+            event_type=BusinessEventType.LEDGER_POSTED,
+            source_module="accounting.services.finance_posting_service.post_subscription_collection",
+            actor_user=performed_by,
+            customer=getattr(payment, "customer", None),
+            subscription=getattr(payment, "subscription", None),
+            payment=payment,
+            batch=getattr(getattr(payment, "subscription", None), "batch", None),
+            lucky_id=getattr(getattr(payment, "subscription", None), "lucky_id", None),
+            ledger_reference=str(getattr(entry, "id", "") or ""),
+            payload={
+                "purpose": purpose,
+                "payment_id": payment.id,
+                "entry_id": getattr(entry, "id", None),
+            },
+        )
+        return entry
 
     @classmethod
     def post_customer_advance_collection(

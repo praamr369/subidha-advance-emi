@@ -10,6 +10,7 @@ from subscriptions.models import (
     AuditLog,
     Batch,
     BatchStatus,
+    BusinessEventType,
     DrawEligibilitySnapshot,
     LuckyDraw,
     LuckyIdStatus,
@@ -17,6 +18,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.winner_state_service import (
     WAIVER_SCOPE_FUTURE_ONLY,
     apply_winner_state,
@@ -141,7 +143,17 @@ def create_lucky_draw_commit(batch: Batch):
             "committed_hash": committed_hash,
         },
     )
-
+    append_business_event(
+        event_type=BusinessEventType.DRAW_COMMITTED,
+        source_module="subscriptions.services.lucky_draw_service.create_lucky_draw_commit",
+        actor_user=None,
+        batch=batch,
+        payload={
+            "draw_id": draw.id,
+            "draw_month": draw.draw_month,
+            "committed_hash": committed_hash,
+        },
+    )
     return draw, secret_seed
 
 
@@ -262,6 +274,21 @@ def reveal_and_execute_draw(draw_id: int, revealed_seed: str, performed_by=None)
             "waived_emi_count": waived_count,
             "waived_amount": str(waived_amount),
             "waiver_scope": WAIVER_SCOPE_FUTURE_ONLY,
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.WINNER_SELECTED,
+        source_module="subscriptions.services.lucky_draw_service.reveal_and_execute_draw",
+        actor_user=performed_by,
+        customer=winner_subscription.customer,
+        subscription=winner_subscription,
+        batch=draw.batch,
+        lucky_id=winner_lucky_id,
+        payload={
+            "draw_id": draw.id,
+            "draw_month": draw.draw_month,
+            "waived_emi_count": waived_count,
+            "waived_amount": str(waived_amount),
         },
     )
 

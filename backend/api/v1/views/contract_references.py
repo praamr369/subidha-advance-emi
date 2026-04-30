@@ -13,6 +13,8 @@ from api.v1.serializers.contract_references import (
     UnifiedReceivablePreviewSerializer,
 )
 from subscriptions.models import ContractReference
+from subscriptions.models import BusinessEventType
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.contract_reference_service import (
     collect_unified_receivable,
     preview_unified_receivable_allocation,
@@ -143,6 +145,22 @@ class UnifiedReceivablePreviewView(APIView):
         except ValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        append_business_event(
+            event_type=BusinessEventType.PAYMENT_PREVIEWED,
+            source_module="api.v1.views.contract_references.UnifiedReceivablePreviewView.post",
+            actor_user=request.user,
+            customer=None,
+            payload={
+                "source_type": validated["source_type"],
+                "source_id": validated["source_id"],
+                "amount": str(validated["amount"]),
+                "overpayment_warning": bool(payload.get("overpayment_warning")),
+                "mutates_data": False,
+            },
+            idempotency_key=(request.headers.get("X-Idempotency-Key") or None),
+            request_id=(request.headers.get("X-Request-ID") or None),
+            user_agent=(request.headers.get("User-Agent") or None),
+        )
         return Response(payload, status=status.HTTP_200_OK)
 
 

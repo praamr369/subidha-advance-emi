@@ -3511,6 +3511,108 @@ class AuditLog(models.Model):
 
 
 # =====================================================
+# BUSINESS EVENT LOG (APPEND-ONLY)
+# =====================================================
+
+
+class BusinessEventType(models.TextChoices):
+    CUSTOMER_CREATED = "CUSTOMER_CREATED", "Customer Created"
+    CONTRACT_CREATED = "CONTRACT_CREATED", "Contract Created"
+    EMI_CREATED = "EMI_CREATED", "EMI Created"
+    PAYMENT_PREVIEWED = "PAYMENT_PREVIEWED", "Payment Previewed"
+    PAYMENT_RECEIVED = "PAYMENT_RECEIVED", "Payment Received"
+    EMI_PAID = "EMI_PAID", "EMI Paid"
+    RENT_PAYMENT_RECEIVED = "RENT_PAYMENT_RECEIVED", "Rent Payment Received"
+    DIRECT_SALE_PAYMENT_RECEIVED = "DIRECT_SALE_PAYMENT_RECEIVED", "Direct Sale Payment Received"
+    DRAW_SNAPSHOT_FROZEN = "DRAW_SNAPSHOT_FROZEN", "Draw Snapshot Frozen"
+    DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
+    WINNER_SELECTED = "WINNER_SELECTED", "Winner Selected"
+    WAIVER_APPLIED = "WAIVER_APPLIED", "Waiver Applied"
+    DELIVERY_CREATED = "DELIVERY_CREATED", "Delivery Created"
+    DELIVERY_COMPLETED = "DELIVERY_COMPLETED", "Delivery Completed"
+    LEDGER_POSTED = "LEDGER_POSTED", "Ledger Posted"
+    REVERSAL_CREATED = "REVERSAL_CREATED", "Reversal Created"
+
+
+class BusinessEventLog(models.Model):
+    event_type = models.CharField(max_length=64, choices=BusinessEventType.choices, db_index=True)
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    contract_reference = models.ForeignKey(
+        ContractReference,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    batch = models.ForeignKey(
+        Batch,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    lucky_id = models.ForeignKey(
+        LuckyId,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    ledger_reference = models.CharField(max_length=128, blank=True, default="")
+    source_module = models.CharField(max_length=160, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    request_id = models.CharField(max_length=128, null=True, blank=True, db_index=True)
+    idempotency_key = models.CharField(max_length=160, null=True, blank=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, null=True, blank=True)
+
+    class Meta:
+        db_table = "business_event_logs"
+        ordering = ["-occurred_at", "-id"]
+        indexes = [
+            models.Index(fields=["event_type", "occurred_at"]),
+            models.Index(fields=["customer", "occurred_at"]),
+            models.Index(fields=["subscription", "occurred_at"]),
+            models.Index(fields=["payment", "occurred_at"]),
+            models.Index(fields=["contract_reference", "occurred_at"]),
+            models.Index(fields=["batch", "occurred_at"]),
+            models.Index(fields=["lucky_id", "occurred_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("BusinessEventLog is append-only and cannot be updated.")
+        super().save(*args, **kwargs)
+
+# =====================================================
 # FINANCIAL LEDGER
 # =====================================================
 

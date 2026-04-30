@@ -58,6 +58,7 @@ export const ROUTES = {
     aiReadiness: "/admin/ai/readiness",
     partnerPaymentRequests: "/admin/partner-payment-requests",
     auditLogs: "/admin/audit-logs",
+    auditEvents: "/admin/audit/events",
 
     collections: "/admin/collections",
     leads: "/admin/leads",

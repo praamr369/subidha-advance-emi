@@ -5,7 +5,8 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
-from subscriptions.models import AuditLog
+from api.v1.permissions import IsCashierOrAdmin
+from subscriptions.models import AuditLog, BusinessEventLog
 
 
 class AuditLogSerializer(ModelSerializer):
@@ -110,6 +111,103 @@ class AuditObjectTimelineView(generics.ListAPIView):
         return queryset.filter(
             model_name__iexact=model_name,
             object_id=str(object_id).strip(),
+        )
+
+
+class BusinessEventLogSerializer(ModelSerializer):
+    actor_username = SerializerMethodField()
+
+    class Meta:
+        model = BusinessEventLog
+        fields = (
+            "id",
+            "event_type",
+            "actor_user",
+            "actor_username",
+            "customer",
+            "subscription",
+            "contract_reference",
+            "payment",
+            "batch",
+            "lucky_id",
+            "ledger_reference",
+            "source_module",
+            "payload",
+            "occurred_at",
+            "request_id",
+            "idempotency_key",
+            "ip_address",
+            "user_agent",
+        )
+
+    def get_actor_username(self, obj):
+        if not obj.actor_user_id:
+            return None
+        return obj.actor_user.username
+
+
+class CashierBusinessEventLogSerializer(BusinessEventLogSerializer):
+    class Meta(BusinessEventLogSerializer.Meta):
+        fields = (
+            "id",
+            "event_type",
+            "customer",
+            "subscription",
+            "payment",
+            "batch",
+            "lucky_id",
+            "ledger_reference",
+            "occurred_at",
+        )
+
+
+class AdminBusinessEventLogListView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = BusinessEventLogSerializer
+
+    def get_queryset(self):
+        queryset = BusinessEventLog.objects.select_related("actor_user").all().order_by("-occurred_at", "-id")
+        customer = self.request.query_params.get("customer")
+        subscription = self.request.query_params.get("subscription")
+        contract_reference = self.request.query_params.get("contract")
+        payment = self.request.query_params.get("payment")
+        event_type = self.request.query_params.get("event_type")
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
+        if customer:
+            queryset = queryset.filter(customer_id=customer)
+        if subscription:
+            queryset = queryset.filter(subscription_id=subscription)
+        if contract_reference:
+            queryset = queryset.filter(contract_reference_id=contract_reference)
+        if payment:
+            queryset = queryset.filter(payment_id=payment)
+        if event_type:
+            queryset = queryset.filter(event_type=event_type.strip().upper())
+        if date_from:
+            queryset = queryset.filter(occurred_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(occurred_at__date__lte=date_to)
+        return queryset
+
+
+class AdminBusinessEventLogDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = BusinessEventLogSerializer
+    queryset = BusinessEventLog.objects.select_related("actor_user").all()
+
+
+class CashierBusinessEventLogListView(generics.ListAPIView):
+    permission_classes = [IsCashierOrAdmin]
+    serializer_class = CashierBusinessEventLogSerializer
+
+    def get_queryset(self):
+        return (
+            BusinessEventLog.objects.filter(
+                Q(payment__collected_by=self.request.user) | Q(actor_user=self.request.user)
+            )
+            .order_by("-occurred_at", "-id")
+            .distinct()
         )
 
 
