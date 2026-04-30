@@ -244,6 +244,7 @@ export const ROUTES = {
   cashier: {
     root: "/cashier",
     dashboard: "/cashier",
+    billing: "/cashier/billing",
     collect: "/cashier/collect",
     payments: "/cashier/payments",
   },

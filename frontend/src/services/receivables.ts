@@ -40,6 +40,18 @@ export type UnifiedReceivableSearchResponse = {
   results: UnifiedReceivableResult[];
 };
 
+export type UnifiedReceivablePreviewResponse = {
+  source_type: ReceivableSourceType;
+  source_id: number;
+  requested_amount: string;
+  pending_dues: Array<Record<string, unknown>>;
+  allocation_preview: Array<Record<string, unknown>>;
+  unallocated_amount: string;
+  overpayment_warning: boolean;
+  disabled_reason?: string;
+  mutates_data: false;
+};
+
 function buildQuery(query: string): string {
   const search = new URLSearchParams();
   const trimmed = query.trim();
@@ -148,5 +160,29 @@ export function resolveAdminContractReference(
   return request<Record<string, unknown>>(
     `/admin/contract-references/${contractReferenceId}/resolve/`
   );
+}
+
+export function previewAdminReceivableAllocation(payload: {
+  source_type: ReceivableSourceType;
+  source_id: number;
+  amount: string;
+}): Promise<UnifiedReceivablePreviewResponse> {
+  return request<UnifiedReceivablePreviewResponse>("/admin/receivables/preview/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json" },
+  } as RequestInit);
+}
+
+export function previewCashierReceivableAllocation(payload: {
+  source_type: ReceivableSourceType;
+  source_id: number;
+  amount: string;
+}): Promise<UnifiedReceivablePreviewResponse> {
+  return request<UnifiedReceivablePreviewResponse>("/cashier/receivables/preview/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json" },
+  } as RequestInit);
 }
 

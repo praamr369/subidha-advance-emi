@@ -10,10 +10,12 @@ from api.v1.permissions import IsAdmin, IsCashierOrAdmin
 from api.v1.serializers.contract_references import (
     ContractReferenceSerializer,
     UnifiedReceivableCollectSerializer,
+    UnifiedReceivablePreviewSerializer,
 )
 from subscriptions.models import ContractReference
 from subscriptions.services.contract_reference_service import (
     collect_unified_receivable,
+    preview_unified_receivable_allocation,
     resolve_contract_reference_row,
     search_contract_references,
     search_receivables,
@@ -123,4 +125,27 @@ class UnifiedReceivableCollectView(APIView):
 class AdminUnifiedReceivableCollectView(UnifiedReceivableCollectView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     audience = "admin"
+
+
+class UnifiedReceivablePreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
+
+    def post(self, request, *args, **kwargs):
+        serializer = UnifiedReceivablePreviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        try:
+            payload = preview_unified_receivable_allocation(
+                source_type=validated["source_type"],
+                source_id=validated["source_id"],
+                amount=validated["amount"],
+            )
+        except ValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class AdminUnifiedReceivablePreviewView(UnifiedReceivablePreviewView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

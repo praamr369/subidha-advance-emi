@@ -37,8 +37,10 @@ import {
   type PaymentMethod,
 } from "@/services/payments";
 import {
+  previewAdminReceivableAllocation,
   searchAdminReceivables,
   type UnifiedReceivableResult,
+  type UnifiedReceivablePreviewResponse,
 } from "@/services/receivables";
 
 type AdminPaymentCollectVariant = "page" | "drawer";
@@ -244,6 +246,9 @@ export default function AdminPaymentCollectPage({
   const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
   const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
   const [unifiedLastPaymentSummary, setUnifiedLastPaymentSummary] = useState<string | null>(null);
+  const [allocationPreview, setAllocationPreview] =
+    useState<UnifiedReceivablePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const selectedMethodLabel =
     PAYMENT_METHOD_OPTIONS.find(
@@ -718,6 +723,24 @@ export default function AdminPaymentCollectPage({
     }
   }
 
+  async function handlePreviewAllocation() {
+    if (!form.subscription_id || !form.amount) return;
+    setPreviewLoading(true);
+    setAllocationPreview(null);
+    try {
+      const payload = await previewAdminReceivableAllocation({
+        source_type: "ADVANCE_EMI",
+        source_id: Number(form.subscription_id),
+        amount: form.amount,
+      });
+      setAllocationPreview(payload);
+    } catch {
+      setAllocationPreview(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   if (collectionWorkflow === "direct-sale") {
     return (
       <PortalPage
@@ -1182,6 +1205,16 @@ export default function AdminPaymentCollectPage({
                 type="button"
                 variant="outline"
                 size="lg"
+                onClick={handlePreviewAllocation}
+                disabled={isSubmitting || !form.subscription_id || !form.amount}
+              >
+                {previewLoading ? "Previewing..." : "Preview Allocation"}
+              </ActionButton>
+
+              <ActionButton
+                type="button"
+                variant="outline"
+                size="lg"
                 onClick={resetForm}
                 disabled={isSubmitting}
               >
@@ -1258,6 +1291,20 @@ export default function AdminPaymentCollectPage({
                 />
               </div>
             </DetailPanel>
+
+            {allocationPreview ? (
+              <DetailPanel title="Allocation preview">
+                <div className="text-sm text-muted-foreground">
+                  Requested {formatCurrency(allocationPreview.requested_amount)} · Unallocated{" "}
+                  {formatCurrency(allocationPreview.unallocated_amount)}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {allocationPreview.overpayment_warning
+                    ? "Warning: requested amount exceeds current collectible dues."
+                    : "Allocation is fully covered by current pending dues."}
+                </div>
+              </DetailPanel>
+            ) : null}
 
             {submitResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">

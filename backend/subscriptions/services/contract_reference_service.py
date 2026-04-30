@@ -878,3 +878,134 @@ def collect_unified_receivable(
     result, status_code = _dispatch()
     return result, status_code
 
+
+def preview_unified_receivable_allocation(
+    *,
+    source_type: str,
+    source_id: int,
+    amount,
+) -> dict[str, object]:
+    source_type = (source_type or "").strip().upper()
+    requested_amount = _money(amount)
+
+    if requested_amount <= MONEY_ZERO:
+        raise ValidationError({"amount": "Amount must be greater than zero."})
+
+    if source_type == ContractReferenceType.ADVANCE_EMI:
+        subscription = (
+            Subscription.objects.select_related("customer")
+            .prefetch_related("emis")
+            .filter(pk=source_id, plan_type=PlanType.EMI)
+            .first()
+        )
+        if not subscription:
+            raise ValidationError({"source_id": "Advance EMI subscription was not found."})
+
+        pending_emis = []
+        for emi in subscription.emis.order_by("due_date", "month_no", "id"):
+            status = str(emi.status or "").upper()
+            if status in {EmiStatus.PAID, EmiStatus.WAIVED}:
+                continue
+            outstanding = _money(emi.balance_amount())
+            if outstanding <= MONEY_ZERO:
+                continue
+            pending_emis.append(
+                {
+                    "emi_id": emi.id,
+                    "month_no": emi.month_no,
+                    "due_date": emi.due_date,
+                    "status": emi.status,
+                    "outstanding_amount": _money_string(outstanding),
+                }
+            )
+
+        remaining = requested_amount
+        allocations = []
+        for row in pending_emis:
+            outstanding = _money(row["outstanding_amount"])
+            if remaining <= MONEY_ZERO:
+                break
+            allocated = outstanding if outstanding <= remaining else remaining
+            allocations.append(
+                {
+                    "target_type": "EMI",
+                    "target_id": row["emi_id"],
+                    "month_no": row["month_no"],
+                    "due_date": row["due_date"],
+                    "allocated_amount": _money_string(allocated),
+                }
+            )
+            remaining -= allocated
+
+        return {
+            "source_type": source_type,
+            "source_id": source_id,
+            "requested_amount": _money_string(requested_amount),
+            "pending_dues": pending_emis,
+            "allocation_preview": allocations,
+            "unallocated_amount": _money_string(remaining),
+            "overpayment_warning": bool(remaining > MONEY_ZERO),
+            "mutates_data": False,
+        }
+
+    if source_type == ContractReferenceType.DIRECT_SALE:
+        from billing.models import DirectSale
+
+        sale = DirectSale.objects.filter(pk=source_id).first()
+        if not sale:
+            raise ValidationError({"source_id": "Direct sale was not found."})
+
+        position = direct_sale_receivable_position(sale)
+        outstanding = _money(position.get("due_amount"))
+        allocated = requested_amount if requested_amount <= outstanding else outstanding
+        remaining = requested_amount - allocated
+        return {
+            "source_type": source_type,
+            "source_id": source_id,
+            "requested_amount": _money_string(requested_amount),
+            "pending_dues": [
+                {
+                    "target_type": "DIRECT_SALE",
+                    "target_id": sale.id,
+                    "status": position.get("status"),
+                    "outstanding_amount": _money_string(outstanding),
+                }
+            ],
+            "allocation_preview": [
+                {
+                    "target_type": "DIRECT_SALE",
+                    "target_id": sale.id,
+                    "allocated_amount": _money_string(allocated),
+                }
+            ],
+            "unallocated_amount": _money_string(remaining),
+            "overpayment_warning": bool(remaining > MONEY_ZERO),
+            "mutates_data": False,
+        }
+
+    if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
+        subscription = Subscription.objects.filter(pk=source_id).first()
+        if not subscription:
+            raise ValidationError({"source_id": "Subscription was not found."})
+        position = rent_lease_receivable_position(subscription)
+        return {
+            "source_type": source_type,
+            "source_id": source_id,
+            "requested_amount": _money_string(requested_amount),
+            "pending_dues": [
+                {
+                    "target_type": "RENT_LEASE_DEMAND",
+                    "target_id": position.get("demand_id"),
+                    "demand_type": position.get("demand_type"),
+                    "outstanding_amount": _money_string(position.get("due_amount")),
+                }
+            ],
+            "allocation_preview": [],
+            "unallocated_amount": _money_string(requested_amount),
+            "overpayment_warning": True,
+            "disabled_reason": RENT_LEASE_DISABLED_REASON,
+            "mutates_data": False,
+        }
+
+    raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})
+

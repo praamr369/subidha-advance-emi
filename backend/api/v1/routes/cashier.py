@@ -10,6 +10,7 @@ from api.v1.views.cashier import (
 )
 from api.v1.views.contract_references import (
     CashierReceivablesSearchView,
+    UnifiedReceivablePreviewView,
     UnifiedReceivableCollectView,
 )
 from api.v1.views.cashier_dashboard import (
@@ -28,6 +29,7 @@ urlpatterns = [
     path("search-emis/", CashierSearchEmiView.as_view(), name="cashier-search-emis"),
     path("search-direct-sales/", CashierSearchDirectSaleView.as_view(), name="cashier-search-direct-sales"),
     path("receivables/search/", CashierReceivablesSearchView.as_view(), name="cashier-receivables-search"),
+    path("receivables/preview/", UnifiedReceivablePreviewView.as_view(), name="cashier-receivables-preview"),
     path("receivables/collect/", UnifiedReceivableCollectView.as_view(), name="cashier-receivables-collect"),
     path("payments/", CashierPaymentHistoryView.as_view(), name="cashier-payment-history"),
     path("payments/<int:pk>/", CashierPaymentDetailView.as_view(), name="cashier-payment-detail"),

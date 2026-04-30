@@ -81,3 +81,9 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
         crid = attrs.get("contract_reference_id")
         attrs["contract_reference_id"] = int(crid) if crid else None
         return attrs
+
+
+class UnifiedReceivablePreviewSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(choices=ContractReferenceType.choices)
+    source_id = serializers.IntegerField(min_value=1)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)

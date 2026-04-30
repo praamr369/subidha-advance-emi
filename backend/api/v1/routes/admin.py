@@ -19,6 +19,7 @@ from api.v1.views.admin_dashboard import AdminDashboardView
 from api.v1.views.contract_references import (
     AdminContractReferenceListView,
     AdminContractReferenceResolveView,
+    AdminUnifiedReceivablePreviewView,
     AdminReceivablesSearchView,
     AdminUnifiedReceivableCollectView,
 )
@@ -313,6 +314,7 @@ urlpatterns = [
     path("contract-references/", AdminContractReferenceListView.as_view()),
     path("contract-references/<int:pk>/resolve/", AdminContractReferenceResolveView.as_view()),
     path("receivables/search/", AdminReceivablesSearchView.as_view()),
+    path("receivables/preview/", AdminUnifiedReceivablePreviewView.as_view()),
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
