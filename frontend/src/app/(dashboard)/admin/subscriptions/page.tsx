@@ -10,6 +10,15 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -204,71 +213,6 @@ function normalizeSubscriptionListPayload(payload: unknown): SubscriptionListPay
   };
 }
 
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function WorkflowCard({
-  title,
-  description,
-  href,
-  action,
-  countLabel,
-  recentActivity,
-}: {
-  title: string;
-  description: string;
-  href: string;
-  action: string;
-  countLabel: string;
-  recentActivity: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-    >
-      <div className="flex min-h-full flex-col">
-        <div>
-          <div className="text-base font-semibold text-foreground">{title}</div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-        <div className="mt-4 grid gap-2 text-sm">
-          <div className="rounded-xl border border-border bg-background px-3 py-2">
-            <span className="font-semibold text-foreground">Primary action:</span>{" "}
-            <span className="text-muted-foreground">{action}</span>
-          </div>
-          <div className="rounded-xl border border-border bg-background px-3 py-2">
-            <span className="font-semibold text-foreground">Queue:</span>{" "}
-            <span className="text-muted-foreground">{countLabel}</span>
-          </div>
-          <div className="rounded-xl border border-border bg-background px-3 py-2">
-            <span className="font-semibold text-foreground">Recent activity:</span>{" "}
-            <span className="text-muted-foreground">{recentActivity}</span>
-          </div>
-        </div>
-        <div className="mt-4 text-sm font-semibold text-primary">Open workflow</div>
-      </div>
-    </Link>
-  );
-}
-
 function SubscriptionWorkflowLanding() {
   return (
     <PortalPage
@@ -310,60 +254,58 @@ function SubscriptionWorkflowLanding() {
           ]}
         />
         <div className="grid gap-4 lg:grid-cols-2">
-        <WorkflowCard
-          title="Advance EMI"
-          description="Lucky Plan EMI contracts, batches, lucky IDs, EMI register, payments, draws, winners, waivers, and delivery requests."
-          href={`${ROUTES.admin.subscriptions}?plan_type=EMI`}
-          action="Create Advance EMI contract"
-          countLabel="Pending requests and overdue EMI appear in the sidebar badges."
-          recentActivity="Use the register for current subscription rows and detail drill-down."
-        />
-        <WorkflowCard
-          title="Rent"
-          description="Rent contracts, monthly demands, rent payments, security deposits, possession, handover, and return inspections."
-          href={`${ROUTES.admin.subscriptions}?plan_type=RENT`}
-          action="Create rent contract"
-          countLabel="Rent queues are contract, demand, payment, deposit, and return oriented."
-          recentActivity="Rent does not expose Lucky ID or Lucky Draw workflows."
-        />
-        <WorkflowCard
-          title="Lease"
-          description="Lease contracts, monthly demands, lease payments, security deposits, possession, handover, and return inspections."
-          href={`${ROUTES.admin.subscriptions}?plan_type=LEASE`}
-          action="Create lease contract"
-          countLabel="Lease queues are contract, demand, payment, deposit, and return oriented."
-          recentActivity="Lease does not expose Lucky ID or Lucky Draw workflows."
-        />
-        <WorkflowCard
-          title="Partner Operations"
-          description="Partner register, partner customers, subscription requests, payment requests, collections, commissions, payouts, and performance."
-          href={ROUTES.admin.partnersWorkspace}
-          action="Review partner payment requests"
-          countLabel="Partner payment and collection badges stay under this workflow."
-          recentActivity="Partner operations remain tied to Advance EMI workflows."
-        />
+          <WorkflowCard
+            title="Advance EMI"
+            description="Lucky Plan EMI contracts, batches, lucky IDs, EMI register, payments, draws, winners, waivers, and delivery requests. Primary action: Create Advance EMI contract. Queue: Pending requests and overdue EMI appear in the sidebar badges. Recent activity: Use the register for current subscription rows and detail drill-down."
+            action={
+              <Link
+                href={`${ROUTES.admin.subscriptions}?plan_type=EMI`}
+                className="inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                Open subscription register →
+              </Link>
+            }
+          />
+          <WorkflowCard
+            title="Rent"
+            description="Rent contracts, monthly demands, rent payments, security deposits, possession, handover, and return inspections. Primary action: Create rent contract. Queue: Rent queues are contract, demand, payment, deposit, and return oriented. Recent activity: Rent does not expose Lucky ID or Lucky Draw workflows."
+            action={
+              <Link
+                href={`${ROUTES.admin.subscriptions}?plan_type=RENT`}
+                className="inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                Open subscription register →
+              </Link>
+            }
+          />
+          <WorkflowCard
+            title="Lease"
+            description="Lease contracts, monthly demands, lease payments, security deposits, possession, handover, and return inspections. Primary action: Create lease contract. Queue: Lease queues are contract, demand, payment, deposit, and return oriented. Recent activity: Lease does not expose Lucky ID or Lucky Draw workflows."
+            action={
+              <Link
+                href={`${ROUTES.admin.subscriptions}?plan_type=LEASE`}
+                className="inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                Open subscription register →
+              </Link>
+            }
+          />
+          <WorkflowCard
+            title="Partner Operations"
+            description="Partner register, partner customers, subscription requests, payment requests, collections, commissions, payouts, and performance. Primary action: Review partner payment requests. Queue: Partner payment and collection badges stay under this workflow. Recent activity: Partner operations remain tied to Advance EMI workflows."
+            action={
+              <Link
+                href={ROUTES.admin.partnersWorkspace}
+                className="inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                Open partner workspace →
+              </Link>
+            }
+          />
         </div>
       </div>
     </PortalPage>
   );
-}
-
-function statusBadgeClass(status: SubscriptionStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
 }
 
 export default function AdminSubscriptionsPage() {
@@ -622,7 +564,7 @@ export default function AdminSubscriptionsPage() {
       }}
     >
       <div className="space-y-6">
-        <SectionCard
+        <FormSection
           title="Filter register"
           description="Search by subscription, customer, phone, product, batch, lucky number, partner, or plan type."
         >
@@ -777,7 +719,7 @@ export default function AdminSubscriptionsPage() {
           <p className="mt-3 text-xs text-muted-foreground">
             This export includes only the rows visible on the current page. Use the matching count and page controls below to move through the filtered register, then export another page if needed.
           </p>
-        </SectionCard>
+        </FormSection>
 
         {loading ? <LoadingBlock label="Loading subscription register..." /> : null}
 
@@ -791,50 +733,30 @@ export default function AdminSubscriptionsPage() {
 
         {!loading && !error ? (
           <>
-            <SectionCard
+            <DetailPanel
               title="Operational note"
               description="Use this register for contract-level visibility. Open subscription detail for lifecycle, EMI schedule, payment history, and audit context."
             >
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Matching contracts
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(count)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Full filtered register size across all pages.
-                  </p>
-                </div>
+              <QuickActionGrid className="md:grid-cols-3">
+                <KpiCard
+                  label="Matching contracts"
+                  value={String(count)}
+                  helper="Full filtered register size across all pages."
+                />
+                <KpiCard
+                  label="Page active"
+                  value={String(pageActiveCount)}
+                  helper="Active contracts visible on the current page."
+                />
+                <KpiCard
+                  label="Page won"
+                  value={String(pageWonCount)}
+                  helper="Winner contracts visible on the current page."
+                />
+              </QuickActionGrid>
+            </DetailPanel>
 
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Page active
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(pageActiveCount)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Active contracts visible on the current page.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-muted/40 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Page won
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">
-                    {String(pageWonCount)}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Winner contracts visible on the current page.
-                  </p>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard
+            <DetailPanel
               title="Subscription rows"
               description="Review contract context and route into detail, customer, or payment operations."
             >
@@ -849,8 +771,9 @@ export default function AdminSubscriptionsPage() {
                   description="The current page has no results. Move to a previous page or change the filters."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
+                <DataTableShell>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -925,14 +848,7 @@ export default function AdminSubscriptionsPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                statusBadgeClass(row.status),
-                              ].join(" ")}
-                            >
-                              {row.status}
-                            </span>
+                            <StatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -989,8 +905,9 @@ export default function AdminSubscriptionsPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+                  </div>
+                </DataTableShell>
               )}
 
               {count > 0 ? (
@@ -1006,7 +923,7 @@ export default function AdminSubscriptionsPage() {
                   onNext={() => replacePage(page + 1)}
                 />
               ) : null}
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>

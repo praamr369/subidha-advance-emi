@@ -9,15 +9,8 @@ import {
   type ChangeEvent,
 } from "react";
 import {
-  
-  Package,
-  Tag,
-  Layers,
-
   Upload,
   X,
-  
-  TrendingUp,
 } from "lucide-react";
 
 
@@ -25,8 +18,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailPanel, FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
@@ -571,35 +564,26 @@ export default function AdminProductCreatePage() {
       }}
     >
       <div className="space-y-6">
-        {/* Advanced Stats Row */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Base Price"
-            value={money(basePrice || 0)}
-            icon={<TrendingUp className="h-4 w-4" />}
-            tone="success"
-          />
-          <StatCard
+        <QuickActionGrid>
+          <KpiCard label="Base Price" value={money(basePrice || 0)} helper="Total contract price for this product." />
+          <KpiCard
             label="EMI Mode"
             value={isEmiEnabled ? "Enabled" : "Disabled"}
-            icon={<Package className="h-4 w-4" />}
-            tone={isEmiEnabled ? "success" : "danger"}
+            helper="Locked on for current backend default plan behavior."
           />
-          <StatCard
+          <KpiCard
             label="Rent Mode"
             value={isRentEnabled ? "Enabled" : "Disabled"}
-            icon={<Layers className="h-4 w-4" />}
-            tone={isRentEnabled ? "warning" : "default"}
+            helper="Rent-capable flag for supported workflows."
           />
-          <StatCard
+          <KpiCard
             label="Lease Mode"
             value={isLeaseEnabled ? "Enabled" : "Disabled"}
-            icon={<Tag className="h-4 w-4" />}
-            tone={isLeaseEnabled ? "warning" : "default"}
+            helper="Lease-capable flag for supported workflows."
           />
-        </div>
+        </QuickActionGrid>
 
-        <SectionCard
+        <DetailPanel
           title="Product rule"
           description="Product base price is the total contract price. Default EMI is derived later from base price and tenure months."
         >
@@ -612,10 +596,10 @@ export default function AdminProductCreatePage() {
               value="EMI remains enabled at create time"
             />
           </div>
-        </SectionCard>
+        </DetailPanel>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <SectionCard
+          <FormSection
             title="Product fields"
             description="Create the product master fields used by admin and subscription workflows."
           >
@@ -838,9 +822,9 @@ export default function AdminProductCreatePage() {
                 <FieldError message={fieldErrors.description} />
               </div>
             </div>
-          </SectionCard>
+          </FormSection>
 
-          <SectionCard
+          <FormSection
             title="Image and product modes"
             description="Attach the single product image and choose the operational capability flags supported by current backend rules."
           >
@@ -945,7 +929,7 @@ export default function AdminProductCreatePage() {
                 </label>
               </div>
             </div>
-          </SectionCard>
+          </FormSection>
         </div>
 
         {loadingLabel ? <LoadingBlock label={loadingLabel} /> : null}
@@ -959,7 +943,7 @@ export default function AdminProductCreatePage() {
         ) : null}
 
         {created ? (
-          <SectionCard
+          <DetailPanel
             title="Product created"
             description="The product master was created successfully and is ready for register, detail, and subscription workflows."
           >
@@ -1017,10 +1001,10 @@ export default function AdminProductCreatePage() {
                 Create Another
               </button>
             </div>
-          </SectionCard>
+          </DetailPanel>
         ) : null}
 
-        <SectionCard
+        <FormSection
           title="Create product"
           description="Save only after confirming product code, pricing, catalog structure, and optional image."
         >
@@ -1043,7 +1027,7 @@ export default function AdminProductCreatePage() {
               </button>
             }
           />
-        </SectionCard>
+        </FormSection>
       </div>
     </PortalPage>
   );

@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DataTableShell, DetailPanel, FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import { apiFetch, toArray } from "@/lib/api";
 
 type LuckyIdStatus =
@@ -220,22 +222,6 @@ function parseErrorMessage(error: unknown): string {
   }
 }
 
-function luckyIdToneClass(status: LuckyIdStatus): string {
-  switch (status) {
-    case "AVAILABLE":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "ASSIGNED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "BLOCKED":
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
 function formatLuckyNumber(value: number | null): string {
   if (value == null) return "—";
   return `#${String(value).padStart(2, "0")}`;
@@ -267,46 +253,6 @@ function downloadCsv(filename: string, rows: Record<string, string | number | nu
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function SummaryTile({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-muted/40 p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 text-xl font-semibold text-foreground">{value}</div>
-      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
 }
 
 export default function AdminLuckyIdsPage() {
@@ -495,35 +441,35 @@ export default function AdminLuckyIdsPage() {
       }}
     >
       <div className="space-y-6">
-        <SectionCard
+        <DetailPanel
           title="Lucky ID integrity summary"
           description="Lucky IDs should always belong to one batch, and assigned states should resolve to a customer and subscription context."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryTile
+          <QuickActionGrid>
+            <KpiCard
               label="Available"
               value={String(availableCount)}
-              description="Lucky IDs ready for allocation to new subscriptions."
+              helper="Lucky IDs ready for allocation to new subscriptions."
             />
-            <SummaryTile
+            <KpiCard
               label="Assigned"
               value={String(assignedCount)}
-              description="Lucky IDs currently allocated to subscriptions and not yet won."
+              helper="Lucky IDs currently allocated to subscriptions and not yet won."
             />
-            <SummaryTile
+            <KpiCard
               label="Won / Drawn"
               value={String(wonCount)}
-              description="Lucky IDs that have already entered winner state or draw completion state."
+              helper="Lucky IDs that have already entered winner state or draw completion state."
             />
-            <SummaryTile
+            <KpiCard
               label="Integrity Alerts"
               value={String(orphanAssignedCount)}
-              description="Assigned-state Lucky IDs missing visible customer or subscription linkage."
+              helper="Assigned-state Lucky IDs missing visible customer or subscription linkage."
             />
-          </div>
-        </SectionCard>
+          </QuickActionGrid>
+        </DetailPanel>
 
-        <SectionCard
+        <FormSection
           title="Filter register"
           description="Narrow by batch, status, lucky number, customer, or subscription for daily administration and reconciliation."
         >
@@ -628,7 +574,7 @@ export default function AdminLuckyIdsPage() {
               Export Current View
             </button>
           </div>
-        </SectionCard>
+        </FormSection>
 
         {loading ? <LoadingBlock label="Loading Lucky ID register..." /> : null}
 
@@ -641,7 +587,7 @@ export default function AdminLuckyIdsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <SectionCard
+          <DetailPanel
             title="Lucky ID rows"
             description="Use this register to verify batch ownership, contract linkage, and assignment integrity."
           >
@@ -651,8 +597,9 @@ export default function AdminLuckyIdsPage() {
                 description="No Lucky IDs match the current filter set."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0">
+              <DataTableShell>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-left">
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -718,14 +665,7 @@ export default function AdminLuckyIdsPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                luckyIdToneClass(status),
-                              ].join(" ")}
-                            >
-                              {status}
-                            </span>
+                            <StatusBadge status={status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -761,9 +701,10 @@ export default function AdminLuckyIdsPage() {
                     })}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </DataTableShell>
             )}
-          </SectionCard>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

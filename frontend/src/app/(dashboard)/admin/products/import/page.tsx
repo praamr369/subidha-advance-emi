@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import PortalPage from "@/components/ui/PortalPage";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import { normalizeApiError } from "@/services/api/errors";
 import {
   postProductImport,
@@ -25,36 +26,6 @@ type ProductImportResponse = {
   message?: string;
   errors?: string[];
 };
-
-function StatCard({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "success" | "warning" | "danger" | "info";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : tone === "warning"
-      ? "border-amber-200 bg-amber-50 text-amber-700"
-      : tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700"
-      : tone === "info"
-      ? "border-blue-200 bg-blue-50 text-blue-700"
-      : "border-slate-200 bg-white text-slate-900";
-
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-80">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-bold tracking-tight">{value}</div>
-    </div>
-  );
-}
 
 export default function AdminProductImportPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -432,27 +403,29 @@ export default function AdminProductImportPage() {
                 Preview and result summary
               </h3>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <StatCard
-                  label="Preview Valid"
-                  value={preview?.valid_count ?? 0}
-                  tone={(preview?.valid_count ?? 0) > 0 ? "info" : "default"}
-                />
-                <StatCard
-                  label="Created"
-                  value={result?.created ?? 0}
-                  tone={(result?.created ?? 0) > 0 ? "success" : "default"}
-                />
-                <StatCard
-                  label="Updated"
-                  value={result?.updated ?? 0}
-                  tone={(result?.updated ?? 0) > 0 ? "info" : "default"}
-                />
-                <StatCard
-                  label="Preview Invalid"
-                  value={preview?.invalid_count ?? result?.skipped ?? 0}
-                  tone={(preview?.invalid_count ?? result?.skipped ?? 0) > 0 ? "warning" : "default"}
-                />
+              <div className="mt-4">
+                <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-2">
+                  <KpiCard
+                    label="Preview Valid"
+                    value={preview?.valid_count ?? 0}
+                    helper={(preview?.valid_count ?? 0) > 0 ? "Ready to import when no invalid rows remain." : "Run preview after selecting a CSV."}
+                  />
+                  <KpiCard
+                    label="Created"
+                    value={result?.created ?? 0}
+                    helper="Products created on last successful import."
+                  />
+                  <KpiCard
+                    label="Updated"
+                    value={result?.updated ?? 0}
+                    helper="Products updated on last successful import."
+                  />
+                  <KpiCard
+                    label="Preview Invalid"
+                    value={preview?.invalid_count ?? result?.skipped ?? 0}
+                    helper="Rows blocked until corrected or skipped per backend rules."
+                  />
+                </QuickActionGrid>
               </div>
 
               {preview ? (
@@ -499,56 +472,57 @@ export default function AdminProductImportPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Sample CSV format
-        </h2>
-
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-3">product_code</th>
-                <th className="px-4 py-3">name</th>
-                <th className="px-4 py-3">category</th>
-                <th className="px-4 py-3">sub_category</th>
-                <th className="px-4 py-3">sku</th>
-                <th className="px-4 py-3">unit_of_measure</th>
-                <th className="px-4 py-3">description</th>
-                <th className="px-4 py-3">base_price</th>
-                <th className="px-4 py-3">image</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t border-slate-200">
-                <td className="px-4 py-3">BED-001</td>
-                <td className="px-4 py-3">Wooden King Bed</td>
-                <td className="px-4 py-3">Bed</td>
-                <td className="px-4 py-3">Wooden Carving Bed</td>
-                <td className="px-4 py-3">BED-KING-001</td>
-                <td className="px-4 py-3">PCS</td>
-                <td className="px-4 py-3">
-                  Premium wooden carving king size bed
-                </td>
-                <td className="px-4 py-3">35000</td>
-                <td className="px-4 py-3">wooden-king-bed.jpg</td>
-              </tr>
-              <tr className="border-t border-slate-200">
-                <td className="px-4 py-3">ALM-002</td>
-                <td className="px-4 py-3">Steel Almirah</td>
-                <td className="px-4 py-3">Almirah</td>
-                <td className="px-4 py-3">Steel Almirah</td>
-                <td className="px-4 py-3">ALM-STEEL-002</td>
-                <td className="px-4 py-3">PCS</td>
-                <td className="px-4 py-3">
-                  Double door heavy gauge steel almirah
-                </td>
-                <td className="px-4 py-3">18500</td>
-                <td className="px-4 py-3">steel-almirah.jpg</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <DetailPanel
+        title="Sample CSV format"
+        description="Reference row shape for operator CSV authoring. Uses the same columns as the governed import path."
+      >
+        <DataTableShell>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-600">
+                <tr>
+                  <th className="px-4 py-3">product_code</th>
+                  <th className="px-4 py-3">name</th>
+                  <th className="px-4 py-3">category</th>
+                  <th className="px-4 py-3">sub_category</th>
+                  <th className="px-4 py-3">sku</th>
+                  <th className="px-4 py-3">unit_of_measure</th>
+                  <th className="px-4 py-3">description</th>
+                  <th className="px-4 py-3">base_price</th>
+                  <th className="px-4 py-3">image</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-slate-200">
+                  <td className="px-4 py-3">BED-001</td>
+                  <td className="px-4 py-3">Wooden King Bed</td>
+                  <td className="px-4 py-3">Bed</td>
+                  <td className="px-4 py-3">Wooden Carving Bed</td>
+                  <td className="px-4 py-3">BED-KING-001</td>
+                  <td className="px-4 py-3">PCS</td>
+                  <td className="px-4 py-3">
+                    Premium wooden carving king size bed
+                  </td>
+                  <td className="px-4 py-3">35000</td>
+                  <td className="px-4 py-3">wooden-king-bed.jpg</td>
+                </tr>
+                <tr className="border-t border-slate-200">
+                  <td className="px-4 py-3">ALM-002</td>
+                  <td className="px-4 py-3">Steel Almirah</td>
+                  <td className="px-4 py-3">Almirah</td>
+                  <td className="px-4 py-3">Steel Almirah</td>
+                  <td className="px-4 py-3">ALM-STEEL-002</td>
+                  <td className="px-4 py-3">PCS</td>
+                  <td className="px-4 py-3">
+                    Double door heavy gauge steel almirah
+                  </td>
+                  <td className="px-4 py-3">18500</td>
+                  <td className="px-4 py-3">steel-almirah.jpg</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </DataTableShell>
 
         <div className="mt-4 text-sm text-slate-600">
           After import, review the result in{" "}
@@ -560,7 +534,7 @@ export default function AdminProductImportPage() {
           </Link>
           .
         </div>
-      </section>
+      </DetailPanel>
     </PortalPage>
   );
 }
