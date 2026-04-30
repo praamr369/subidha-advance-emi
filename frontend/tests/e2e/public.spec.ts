@@ -73,12 +73,9 @@ test("public winner history page loads with live data", async ({ page }) => {
     name: "Winner history records",
   });
   await expect(winnerHistoryTable).toBeVisible();
-  await expect(
-    winnerHistoryTable.getByRole("cell", {
-      name: "PW-SMOKE-WINNER",
-      exact: true,
-    })
-  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Public commit hash");
+  await expect(page.locator("body")).toContainText("Verification");
+  await expect(page.locator("body")).not.toContainText("winner_customer_name");
 });
 
 test("public stats section renders explicit live-data contract copy", async ({
@@ -99,6 +96,6 @@ test("latest winner section shows a truthful live or empty state", async ({
   await page.goto("/");
   await expect(page.getByText("Latest winner").first()).toBeVisible();
   await expect(page.locator("body")).toContainText(
-    /No winner published yet|Latest published winner/i
+    /No winner published yet|Latest published draw result/i
   );
 });

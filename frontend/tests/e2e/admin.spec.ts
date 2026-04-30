@@ -1343,6 +1343,121 @@ test("admin batch edit only exposes canonical lifecycle targets", async ({
   expect(postedStatus).toBe("DRAW_IN_PROGRESS");
 });
 
+test("admin batch control center enforces backend reasons and action refetch", async ({
+  page,
+}) => {
+  let executed = false;
+
+  await page.route("**/api/v1/admin/batches/42/control-center/", async (route) => {
+    const payload = executed
+      ? {
+          batch_id: 42,
+          batch_code: "BATCH-42",
+          target_size: 100,
+          active_subscriptions: 100,
+          minimum_threshold: 100,
+          minimum_threshold_met: true,
+          recommended_threshold_status: "use_total_slots",
+          lock_status: "DRAW_COMPLETED",
+          batch_status: "DRAW_COMPLETED",
+          locked_at: "2026-04-01T08:00:00Z",
+          snapshot_status: "present",
+          snapshot_version: 1,
+          snapshot_row_count: 100,
+          snapshot_hash: "hash-snapshot-42",
+          commit_status: "present",
+          public_commit_hash: "public-hash-42",
+          draw_status: "revealed",
+          winner_lucky_number: 8,
+          product_demand_status: "not_configured",
+          delivery_status: "not_configured",
+          finance_waiver_posting_status: "ready",
+          finance_waiver_posting_reason: null,
+          disabled_reasons: {
+            lock_batch: ["batch_not_ready_for_lock"],
+            commit_draw: ["draw_already_revealed"],
+            execute_draw: ["draw_already_revealed"],
+          },
+        }
+      : {
+          batch_id: 42,
+          batch_code: "BATCH-42",
+          target_size: 100,
+          active_subscriptions: 100,
+          minimum_threshold: 100,
+          minimum_threshold_met: true,
+          recommended_threshold_status: "use_total_slots",
+          lock_status: "LOCKED",
+          batch_status: "DRAW_COMMITTED",
+          locked_at: "2026-04-01T08:00:00Z",
+          snapshot_status: "present",
+          snapshot_version: 1,
+          snapshot_row_count: 100,
+          snapshot_hash: "hash-snapshot-42",
+          commit_status: "present",
+          public_commit_hash: "public-hash-42",
+          draw_status: "committed_unrevealed",
+          winner_lucky_number: null,
+          product_demand_status: "not_configured",
+          delivery_status: "not_configured",
+          finance_waiver_posting_status: "ready",
+          finance_waiver_posting_reason: null,
+          disabled_reasons: {
+            lock_batch: ["batch_not_ready_for_lock"],
+            commit_draw: [],
+            execute_draw: [],
+          },
+        };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route("**/api/v1/admin/batches/42/commit-draw/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        batch_id: 42,
+        status: "DRAW_COMMITTED",
+        public_commit_hash: "public-hash-42",
+        admin_seed_store_securely: "seed-42",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/batches/42/execute-draw/", async (route) => {
+    executed = true;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 17,
+        batch_id: 42,
+        winner_lucky_number: 8,
+      }),
+    });
+  });
+
+  await page.goto("/admin/batches/42/control-center");
+  await expect(page.getByRole("button", { name: "Lock Batch" })).toBeDisabled();
+  await expect(page.locator("body")).toContainText("batch_not_ready_for_lock");
+
+  await page.getByRole("button", { name: "Commit Draw" }).click();
+  await expect(page.locator("body")).toContainText("seed-42");
+
+  await page
+    .getByPlaceholder("Paste the secure seed from commit response")
+    .fill("seed-42");
+  await page.getByRole("button", { name: "Execute Draw" }).click();
+  await expect(page.locator("body")).toContainText(
+    "Draw execution completed or already finalized"
+  );
+  await expect(page.locator("body")).toContainText("draw_already_revealed");
+});
+
 test("admin analytics shows an error state instead of fake zero fallback on dashboard failure", async ({
   page,
 }) => {

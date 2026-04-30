@@ -44,6 +44,9 @@ Use in staging before production manual testing. Requires admin API access.
 
 - [ ] `GET /api/v1/public/latest-winner/` (or winner history) shows `public_commit_hash`, `verification_status`, no full customer PII.  
 - [ ] Customer profile summary includes `lucky_plan_draw` only for own subscriptions.
+- [ ] `/winners` and `/winner-history` pages render batch/draw/lucky/verification/hash details from live public payload without customer phone/address/KYC/payment fields.
+- [ ] `/admin/batches/{id}/control-center` shows backend disabled reasons for lock/commit/execute and blocks unavailable actions.
+- [ ] After lock/commit/execute actions, control-center refetches and shows updated real status.
 
 ## 7) Partner
 

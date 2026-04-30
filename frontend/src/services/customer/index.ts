@@ -141,6 +141,18 @@ export type CustomerProfileResponse = {
     paid_emis: number;
     waived_emis: number;
     total_paid_amount: number | string;
+    lucky_plan_draw?: Array<{
+      subscription_id: number;
+      batch_code?: string | null;
+      winner_lucky_number?: number | null;
+      draw_month?: number | null;
+      draw_date?: string | null;
+      revealed_at?: string | null;
+      public_commit_hash?: string | null;
+      verification_status?: string | null;
+      waived_emi_count?: number;
+      waived_amount?: number | string;
+    }>;
   };
 };
 
@@ -737,6 +749,35 @@ function normalizeProfileResponse(payload: unknown): CustomerProfileResponse {
       paid_emis: toNumber(rawSummary.paid_emis, 0),
       waived_emis: toNumber(rawSummary.waived_emis, 0),
       total_paid_amount: toMoneyString(rawSummary.total_paid_amount, "0.00"),
+      lucky_plan_draw: Array.isArray(rawSummary.lucky_plan_draw)
+        ? rawSummary.lucky_plan_draw.map((item) => {
+            const row = (item ?? {}) as Record<string, unknown>;
+            return {
+              subscription_id: toNumber(row.subscription_id, 0),
+              batch_code: toStringOrUndefined(row.batch_code) ?? null,
+              winner_lucky_number:
+                row.winner_lucky_number === null || row.winner_lucky_number === undefined
+                  ? null
+                  : toNumber(row.winner_lucky_number),
+              draw_month:
+                row.draw_month === null || row.draw_month === undefined
+                  ? null
+                  : toNumber(row.draw_month),
+              draw_date: toStringOrUndefined(row.draw_date) ?? null,
+              revealed_at: toStringOrUndefined(row.revealed_at) ?? null,
+              public_commit_hash: toStringOrUndefined(row.public_commit_hash) ?? null,
+              verification_status: toStringOrUndefined(row.verification_status) ?? null,
+              waived_emi_count:
+                row.waived_emi_count === null || row.waived_emi_count === undefined
+                  ? 0
+                  : toNumber(row.waived_emi_count),
+              waived_amount:
+                row.waived_amount === null || row.waived_amount === undefined
+                  ? "0.00"
+                  : toMoneyString(row.waived_amount),
+            };
+          })
+        : [],
     },
   };
 }

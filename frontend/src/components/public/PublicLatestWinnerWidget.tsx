@@ -80,20 +80,21 @@ export default function PublicLatestWinnerWidget() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-            Latest Published Winner
+            Latest Published Draw Result
           </div>
           <h3 className="mt-2 text-2xl font-semibold text-foreground">
-            {winner.customer_name || "Winner published"}
+            Batch {winner.batch_name || winner.batch_code}
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Batch {winner.batch_code} · Month {winner.draw_month} · Lucky ID{" "}
-            {winner.lucky_id || "—"} · Published {formatDrawDate(winner.draw_date)}
+            Draw month {winner.draw_month} · Winner Lucky ID {winner.lucky_id || "—"} ·
+            Published {formatDrawDate(winner.draw_datetime || winner.draw_date)}
           </p>
-          {winner.product_name ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Product context: {winner.product_name}
-            </p>
-          ) : null}
+          <p className="mt-1 text-sm text-muted-foreground">
+            Public commit hash: {winner.public_commit_hash || winner.committed_hash || "—"}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verification status: {winner.verification_status || "unavailable"}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">

@@ -70,16 +70,18 @@ export default function WinnerSpotlight({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-            Latest published winner
+            Latest published draw result
           </div>
           <h3 className="mt-2 text-2xl font-semibold text-foreground">
-            {winner.customer_name || "Winner published"}
+            Batch {winner.batch_name || winner.batch_code}
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Batch {winner.batch_code} · Month {winner.draw_month} · Lucky ID {winner.lucky_id || "—"} · {formatDrawDate(winner.draw_date)}
+            Month {winner.draw_month} · Winner Lucky ID {winner.lucky_id || "—"} ·{" "}
+            {formatDrawDate(winner.draw_datetime || winner.draw_date)}
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Winner benefit: remaining future EMI is waived according to the plan rules. EMI already paid stays part of the completed payment history.
+            Public commit hash: {winner.public_commit_hash || winner.committed_hash || "—"} · Verification{" "}
+            {winner.verification_status || "unavailable"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

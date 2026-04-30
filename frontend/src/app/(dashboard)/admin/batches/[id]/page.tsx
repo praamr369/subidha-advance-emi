@@ -438,6 +438,11 @@ export default function AdminBatchDetailPage() {
           variant: "primary",
         },
         {
+          href: batchId ? `/admin/batches/${batchId}/control-center` : "/admin/batches",
+          label: "Control Center",
+          variant: "secondary",
+        },
+        {
           href: "/admin/subscriptions/advance-emi/create",
           label: "Create Subscription",
           variant: "secondary",
@@ -556,6 +561,12 @@ export default function AdminBatchDetailPage() {
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
                     Edit Batch
+                  </Link>
+                  <Link
+                    href={batchId ? `/admin/batches/${batchId}/control-center` : "/admin/batches"}
+                    className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    Control Center
                   </Link>
 
                   <Link

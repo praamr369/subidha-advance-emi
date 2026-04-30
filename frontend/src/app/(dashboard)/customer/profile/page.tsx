@@ -48,6 +48,13 @@ function money(value: string | number): string {
   return `₹${Number(value || 0).toFixed(2)}`;
 }
 
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     const raw = error.message.trim();
@@ -734,6 +741,74 @@ export default function CustomerProfilePage() {
                 description="Refer a customer and they will appear here once the referral is recorded."
               />
             ) : null}
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="Lucky draw verification (your records)"
+            description="Only your own winner/waiver records are shown here from authenticated profile data."
+          >
+            {(data.summary.lucky_plan_draw?.length ?? 0) > 0 ? (
+              <DataTableShell>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Subscription
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Draw
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Verification
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Waiver
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.summary.lucky_plan_draw || []).map((draw) => (
+                        <tr key={`${draw.subscription_id}-${draw.draw_month || 0}`}>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            SUB-{draw.subscription_id}
+                            <div className="text-xs text-muted-foreground">
+                              Batch {draw.batch_code || "—"} · Lucky #
+                              {draw.winner_lucky_number != null
+                                ? String(draw.winner_lucky_number).padStart(2, "0")
+                                : "—"}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            Month {draw.draw_month ?? "—"}
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(draw.revealed_at || draw.draw_date || null)}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <StatusBadge status={draw.verification_status || "UNKNOWN"} hideIcon />
+                            <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                              {draw.public_commit_hash || "—"}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {draw.waived_emi_count ?? 0} EMI
+                            <div className="text-xs text-muted-foreground">
+                              {money(draw.waived_amount || 0)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            ) : (
+              <EmptyState
+                title="No winner draw records yet"
+                description="When your own subscription receives winner waiver events, verification and waiver details appear here."
+              />
+            )}
           </WorkspaceSection>
 
           <WorkspaceSection

@@ -20,8 +20,13 @@ function WinnerCard({ winner }: { winner: PublicWinner }) {
   return (
     <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Batch {winner.batch_code} · Month {winner.draw_month}</div>
-      <div className="mt-3 text-xl font-semibold text-foreground">{winner.customer_name || "Winner published"}</div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">Lucky ID {winner.lucky_id || "—"}</p>
+      <div className="mt-3 text-xl font-semibold text-foreground">Lucky ID {winner.lucky_id || "—"}</div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Draw: {winner.draw_datetime || winner.draw_date || "—"} · Verification {winner.verification_status || "unavailable"}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground break-all">
+        Public commit hash: {winner.public_commit_hash || winner.committed_hash || "—"}
+      </p>
     </div>
   );
 }

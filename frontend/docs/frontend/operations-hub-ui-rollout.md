@@ -410,3 +410,57 @@
 ### Recommended next small follow-up pass
 
 - Admin **subscription-requests** queue detail or **products/masters** surfaces if they still use legacy section shells only.
+
+## Pass 8 — Batch Control Center + Public/Customer Draw Verification
+
+### Pages migrated / added
+
+- `src/app/(dashboard)/admin/batches/[id]/control-center/page.tsx` (new)
+- `src/app/(dashboard)/admin/batches/[id]/page.tsx` (control-center entrypoint actions)
+- `src/app/(dashboard)/admin/batches/page.tsx` (control-center action from register rows)
+- `src/app/(public)/winners/page.tsx` (verification-first winner cards)
+- `src/app/(public)/winner-history/WinnerHistoryTableClient.tsx` (verification columns, no winner PII rendering)
+- `src/components/public/PublicLatestWinnerWidget.tsx` (public commit hash + verification status)
+- `src/app/(dashboard)/customer/profile/page.tsx` (own winner/waiver verification table)
+
+### Shared primitives used
+
+- `PortalPage`
+- `KpiCard`
+- `DetailPanel`
+- `WorkflowCard`
+- `QuickActionGrid`
+- `Timeline`
+- `DataTableShell`
+- `StatusBadge`
+
+### Rollout notes
+
+- Added real-action admin control center flow using only backend endpoints:
+  - `POST /api/v1/admin/batches/{id}/lock/`
+  - `POST /api/v1/admin/batches/{id}/commit-draw/`
+  - `POST /api/v1/admin/batches/{id}/execute-draw/`
+  - `GET /api/v1/admin/batches/{id}/control-center/`
+- Disabled action states are backend-driven from `disabled_reasons`; UI shows those exact reasons.
+- Commit action surfaces one-time reveal seed from backend response and does not fabricate any hash/seed fallback.
+- Public winner pages now prioritize verification fields (`public_commit_hash`, `verification_status`, winner lucky id) and avoid rendering sensitive personal winner data.
+- Customer profile now renders only authenticated user's own draw/waiver verification list from profile summary payload (`lucky_plan_draw`).
+
+### Fake/dead UI removed
+
+- Removed public winner-name-centric rendering from winner cards/history rows in favor of verification fields that are safe for public exposure.
+- No optimistic draw completion or fabricated operational states were added.
+
+### Backend/API changes
+
+- none (frontend consumed existing Pass 7 endpoints and response fields)
+
+### Migrations
+
+- none
+
+### Test updates
+
+- `tests/e2e/admin.spec.ts` — control-center disabled reason + commit/execute refetch behavior
+- `tests/e2e/public.spec.ts` — winner history verification fields visibility and no sensitive field marker text
+- `tests/e2e/customer.spec.ts` — customer profile own lucky draw verification rendering
