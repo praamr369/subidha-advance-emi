@@ -14,7 +14,10 @@ from api.v1.views.inventory import (
 )
 from api.v1.views.inventory_phase2 import (
     DemandSummaryView,
+    ProductAvailabilityView,
+    ProductDemandPlanningView,
     ProductStockStatusView,
+    PurchaseNeedGenerateView,
     PurchaseSuggestionView,
 )
 
@@ -33,6 +36,9 @@ urlpatterns = [
     path("opening-stock/post/", OpeningStockImportPostView.as_view()),
     # Phase 2: stock status per product, demand summary, purchase suggestions
     path("products/<int:product_id>/stock-status/", ProductStockStatusView.as_view(), name="inventory-product-stock-status"),
+    path("products/<int:product_id>/availability/", ProductAvailabilityView.as_view(), name="inventory-product-availability"),
+    path("products/<int:product_id>/demand-planning/", ProductDemandPlanningView.as_view(), name="inventory-product-demand-planning"),
+    path("products/<int:product_id>/purchase-needs/generate/", PurchaseNeedGenerateView.as_view(), name="inventory-product-purchase-needs-generate"),
     path("demand-summary/", DemandSummaryView.as_view(), name="inventory-demand-summary"),
     path("purchase-suggestions/", PurchaseSuggestionView.as_view(), name="inventory-purchase-suggestions"),
     path("", include(router.urls)),

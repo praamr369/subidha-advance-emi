@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from inventory.services.demand_planning_service import stock_status_for_delivery
 from subscriptions.models import DeliveryStatus, PlanType, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import (
     build_subscription_delivery_summary,
@@ -27,6 +28,8 @@ class _BaseSubscriptionDeliveryReadSerializer(serializers.ModelSerializer):
     )
     is_terminal = serializers.SerializerMethodField()
     is_active_delivery = serializers.SerializerMethodField()
+    inventory_stock_status = serializers.SerializerMethodField()
+    inventory_available_qty = serializers.SerializerMethodField()
 
     def get_subscription_number(self, obj):
         return f"SUB-{obj.subscription_id}" if obj.subscription_id else None
@@ -36,6 +39,20 @@ class _BaseSubscriptionDeliveryReadSerializer(serializers.ModelSerializer):
 
     def get_is_active_delivery(self, obj):
         return obj.is_active_delivery
+
+    def get_inventory_stock_status(self, obj):
+        try:
+            payload = stock_status_for_delivery(product_id=obj.subscription.product_id)
+            return payload["status"]
+        except Exception:
+            return "not available"
+
+    def get_inventory_available_qty(self, obj):
+        try:
+            payload = stock_status_for_delivery(product_id=obj.subscription.product_id)
+            return payload["available"]
+        except Exception:
+            return "0.000"
 
 
 class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSerializer):
@@ -87,6 +104,8 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "fulfillment_status",
             "is_terminal",
             "is_active_delivery",
+            "inventory_stock_status",
+            "inventory_available_qty",
         )
         read_only_fields = fields
 
@@ -129,6 +148,8 @@ class CustomerSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSe
             "fulfillment_status",
             "is_terminal",
             "is_active_delivery",
+            "inventory_stock_status",
+            "inventory_available_qty",
         )
         read_only_fields = fields
 

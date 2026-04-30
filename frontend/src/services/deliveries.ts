@@ -59,6 +59,8 @@ export type DeliveryRecord = {
   is_terminal?: boolean;
   is_active_delivery?: boolean;
   history_count?: number;
+  inventory_stock_status?: "available" | "not available" | "reserved" | "purchase needed" | string;
+  inventory_available_qty?: string | null;
 };
 
 export type DeliveryReportSummary = {
@@ -216,6 +218,8 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     is_terminal: toBoolean(row.is_terminal),
     is_active_delivery: toBoolean(row.is_active_delivery),
     history_count: toNumber(row.history_count, 0) || undefined,
+    inventory_stock_status: toStringOrNull(row.inventory_stock_status) || undefined,
+    inventory_available_qty: toStringOrNull(row.inventory_available_qty),
   };
 }
 

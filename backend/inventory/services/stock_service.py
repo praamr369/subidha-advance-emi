@@ -587,6 +587,11 @@ def build_stock_summary(
     rows = []
     for item in queryset:
         on_hand = item.current_stock_quantity()
+        reserved_qty = item.reserved_qty()
+        available_qty = item.available_qty()
+        from inventory.services.demand_planning_service import calculate_product_demand
+
+        demand = calculate_product_demand(product_id=item.product_id)
         rows.append(
             {
                 "item_id": item.id,
@@ -601,6 +606,13 @@ def build_stock_summary(
                 "opening_stock_qty": f"{item.opening_stock_qty:.3f}",
                 "reorder_level_qty": f"{item.reorder_level_qty:.3f}",
                 "on_hand_qty": f"{on_hand:.3f}",
+                "reserved_qty": f"{reserved_qty:.3f}",
+                "available_qty": f"{available_qty:.3f}",
+                "incoming_qty": "0.000",
+                "required_for_winners": str(demand["winners_pending_delivery"]),
+                "required_for_confirmed_orders": str(
+                    int(demand["direct_sale_orders"]) + int(demand["rent_lease_commitments"])
+                ),
                 "is_below_reorder": on_hand <= item.reorder_level_qty,
                 "default_stock_location_id": item.default_stock_location_id,
                 "default_stock_location_code": getattr(item.default_stock_location, "code", None),

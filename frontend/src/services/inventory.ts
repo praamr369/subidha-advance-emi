@@ -77,11 +77,35 @@ export type StockSummaryRow = {
   // Phase 2: reserved and available-to-promise quantities
   reserved_qty?: string;
   available_qty?: string;
+  incoming_qty?: string;
+  required_for_winners?: string;
+  required_for_confirmed_orders?: string;
   is_below_reorder: boolean;
   default_stock_location_id?: number | null;
   default_stock_location_code?: string | null;
   default_stock_location_name?: string | null;
   branch_id?: number | null;
+};
+
+export type ProductDemandPlanning = {
+  product_id: number;
+  active_subscriptions: number;
+  locked_batch_demand: number;
+  winners_pending_delivery: number;
+  direct_sale_orders: number;
+  rent_lease_commitments: number;
+  total_required: string;
+};
+
+export type ProductAvailability = {
+  product_id: number;
+  on_hand: string;
+  reserved: string;
+  available: string;
+  incoming: string;
+  required_for_winners: string;
+  required_for_confirmed_orders: string;
+  demand: ProductDemandPlanning;
 };
 
 export type StockLocation = {
@@ -232,6 +256,29 @@ export function getStockSummary(params: Record<string, QueryValue> = {}) {
   return apiFetch<{ count: number; results: StockSummaryRow[] }>(
     `/inventory/stock-summary/${buildQuery(params)}`
   );
+}
+
+export function getProductDemandPlanning(productId: number | string) {
+  return apiFetch<ProductDemandPlanning>(`/inventory/products/${productId}/demand-planning/`);
+}
+
+export function getProductAvailability(productId: number | string) {
+  return apiFetch<ProductAvailability>(`/inventory/products/${productId}/availability/`);
+}
+
+export function generatePurchaseNeed(productId: number | string) {
+  return apiFetch<{
+    created: boolean;
+    detail?: string;
+    purchase_need_id?: number;
+    required_quantity?: string;
+    available_quantity?: string;
+    shortage_quantity?: string;
+    status?: string;
+  }>(`/inventory/products/${productId}/purchase-needs/generate/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export function getInventoryValuation(params: Record<string, QueryValue> = {}) {

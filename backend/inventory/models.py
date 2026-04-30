@@ -678,3 +678,216 @@ class InventoryValuation(InventoryTimeStampedModel):
             self.totals_json = {}
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class InternalStockMovementType(models.TextChoices):
+    IN = "IN", "In"
+    OUT = "OUT", "Out"
+    RESERVED = "RESERVED", "Reserved"
+    RELEASED = "RELEASED", "Released"
+    ADJUSTMENT = "ADJUSTMENT", "Adjustment"
+
+
+class StockReservationStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    RELEASED = "RELEASED", "Released"
+
+
+class PurchaseNeedStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    REVIEWED = "REVIEWED", "Reviewed"
+    CLOSED = "CLOSED", "Closed"
+
+
+class Warehouse(InventoryTimeStampedModel):
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    stock_location = models.OneToOneField(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="warehouse_profile",
+        null=True,
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_warehouses"
+        ordering = ["name", "id"]
+        indexes = [models.Index(fields=["is_active", "code"])]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StockLedgerEntry(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_stock_ledger_entries",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="stock_ledger_entries",
+    )
+    movement_type = models.CharField(
+        max_length=20,
+        choices=InternalStockMovementType.choices,
+        db_index=True,
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_stock_ledger_entries",
+    )
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_stock_ledger_entries"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["product", "warehouse", "movement_type"]),
+            models.Index(fields=["source_module", "source_object_id"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.source_module = (self.source_module or "").strip()
+        self.source_object_id = (self.source_object_id or "").strip()
+        self.note = (self.note or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StockReservation(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="stock_reservations",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="stock_reservations",
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=StockReservationStatus.choices,
+        default=StockReservationStatus.ACTIVE,
+        db_index=True,
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_stock_reservations",
+    )
+    released_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_stock_reservations"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["product", "warehouse", "status"]),
+            models.Index(fields=["source_module", "source_object_id"]),
+        ]
+
+
+class ReorderRule(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_reorder_rules",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="inventory_reorder_rules",
+    )
+    min_stock_level = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    reorder_qty = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "inventory_reorder_rules"
+        ordering = ["product_id", "warehouse_id", "id"]
+        unique_together = (("product", "warehouse"),)
+
+
+class PurchaseNeed(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="purchase_needs",
+    )
+    required_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    available_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    shortage_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    status = models.CharField(
+        max_length=12,
+        choices=PurchaseNeedStatus.choices,
+        default=PurchaseNeedStatus.OPEN,
+        db_index=True,
+    )
+    demand_snapshot = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_purchase_needs",
+    )
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_purchase_needs"
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["status", "created_at"])]
+
+
+class InventoryAdjustment(InventoryTimeStampedModel):
+    stock_adjustment = models.OneToOneField(
+        StockAdjustment,
+        on_delete=models.PROTECT,
+        related_name="inventory_adjustment_audit",
+    )
+    audit_reason = models.TextField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_adjustment_audits",
+    )
+
+    class Meta:
+        db_table = "inventory_adjustments"
+        ordering = ["-created_at", "-id"]

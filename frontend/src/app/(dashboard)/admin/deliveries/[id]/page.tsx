@@ -422,6 +422,12 @@ export default function AdminDeliveryDetailPage() {
                 <DetailValue label="Delivered" value={formatDateTime(delivery.delivered_at)} />
                 <DetailValue label="Failed" value={formatDateTime(delivery.failed_at)} />
                 <DetailValue label="Cancelled" value={formatDateTime(delivery.cancelled_at)} />
+                <DetailValue
+                  label="Inventory Stock Status"
+                  value={`${delivery.inventory_stock_status || "not available"}${
+                    delivery.inventory_available_qty ? ` (${delivery.inventory_available_qty} available)` : ""
+                  }`}
+                />
                 {/* Phase 2: show block reason when BLOCKED_STOCK_UNAVAILABLE */}
                 {delivery.status === "BLOCKED_STOCK_UNAVAILABLE" && delivery.stock_blocked_reason && (
                   <div className="col-span-full rounded-md border border-orange-200 bg-orange-50 p-3">

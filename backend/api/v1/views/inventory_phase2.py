@@ -21,6 +21,11 @@ from inventory.services.demand_service import (
     get_purchase_suggestions,
     get_shortage_for_product,
 )
+from inventory.services.demand_planning_service import (
+    calculate_product_demand,
+    get_product_stock_availability,
+    upsert_purchase_need_for_product,
+)
 
 
 class ProductStockStatusView(APIView):
@@ -117,5 +122,39 @@ class PurchaseSuggestionView(APIView):
             {
                 "count": len(suggestions),
                 "results": suggestions,
+            }
+        )
+
+
+class ProductDemandPlanningView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, product_id: int):
+        return Response(calculate_product_demand(product_id=product_id))
+
+
+class ProductAvailabilityView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, product_id: int):
+        return Response(get_product_stock_availability(product_id=product_id))
+
+
+class PurchaseNeedGenerateView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, product_id: int):
+        need = upsert_purchase_need_for_product(product_id=product_id, created_by=request.user)
+        if need is None:
+            return Response({"created": False, "detail": "No shortage for this product."})
+        return Response(
+            {
+                "created": True,
+                "purchase_need_id": need.id,
+                "product_id": need.product_id,
+                "required_quantity": f"{need.required_quantity:.3f}",
+                "available_quantity": f"{need.available_quantity:.3f}",
+                "shortage_quantity": f"{need.shortage_quantity:.3f}",
+                "status": need.status,
             }
         )
