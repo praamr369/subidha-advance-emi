@@ -197,6 +197,23 @@ def apply_winner_state(
     subscription = _lock_subscription_only(subscription.pk)
     lucky_id = _lock_lucky_id_if_present(subscription)
 
+    if (
+        draw
+        and draw.is_revealed
+        and draw.winner_subscription_id
+        and draw.winner_subscription_id == subscription.id
+    ):
+        emis = list(subscription.emis.order_by("month_no", "id"))
+        computed_waived_amount = q2(subscription.total_waived_emi_amount())
+        return {
+            "subscription": subscription,
+            "winner_month": subscription.winner_month or winner_month,
+            "waived_emi_count": draw.waived_emi_count or 0,
+            "waived_amount": computed_waived_amount,
+            "newly_waived_amount": MONEY_ZERO,
+            "lucky_id": lucky_id or subscription.lucky_id,
+        }
+
     if subscription.plan_type != PlanType.EMI:
         raise ValidationError("Winner state is only supported for EMI subscriptions.")
 

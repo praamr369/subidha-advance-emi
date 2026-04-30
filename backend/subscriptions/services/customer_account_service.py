@@ -9,8 +9,10 @@ from billing.models import BillingInvoice, DirectSale, ReceiptDocument
 from subscriptions.models import Customer, PublicLead, PublicLeadStatus
 from subscriptions.models import (
     ContractReference,
+    EmiStatus,
     FinancialLedger,
     Payment,
+    PlanType,
     SubscriptionDocument,
 )
 from subscriptions.services.contract_reference_service import build_receivable_result
@@ -18,6 +20,7 @@ from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
     get_subscription_detail_queryset,
 )
+from subscriptions.services.winner_state_service import get_subscription_winner_evidence
 
 
 def _money(value) -> str:
@@ -61,6 +64,33 @@ def build_customer_profile_summary(customer: Customer) -> dict[str, object]:
     )
     summary = build_customer_dashboard_summary(subscriptions)
 
+    lucky_plan_draw = []
+    for sub in subscriptions:
+        if sub.plan_type != PlanType.EMI or not sub.batch_id:
+            continue
+        evidence = get_subscription_winner_evidence(sub)
+        winning_draw = evidence.get("winning_draw")
+        if not winning_draw or not getattr(winning_draw, "is_revealed", False):
+            continue
+        dc = getattr(winning_draw, "draw_commit", None)
+        public_hash = (
+            dc.public_commit_hash if dc else winning_draw.committed_hash
+        )
+        lucky_plan_draw.append(
+            {
+                "subscription_id": sub.id,
+                "batch_code": sub.batch.batch_code if sub.batch_id else None,
+                "winner_lucky_number": getattr(sub.lucky_id, "lucky_number", None),
+                "draw_month": winning_draw.draw_month,
+                "draw_date": winning_draw.draw_date,
+                "revealed_at": winning_draw.revealed_at,
+                "public_commit_hash": public_hash,
+                "verification_status": "coordinated" if dc else "legacy",
+                "waived_emi_count": sub.emis.filter(status=EmiStatus.WAIVED).count(),
+                "waived_amount": _money(sub.waived_amount),
+            }
+        )
+
     return {
         "total_subscriptions": summary["subscription_count"],
         "active_subscriptions": summary["active_subscriptions"],
@@ -70,6 +100,7 @@ def build_customer_profile_summary(customer: Customer) -> dict[str, object]:
         "paid_emis": summary["paid_emis"],
         "waived_emis": summary["waived_emis"],
         "total_paid_amount": summary["total_paid_amount"],
+        "lucky_plan_draw": lucky_plan_draw,
     }
 
 

@@ -93,6 +93,12 @@ from subscriptions.services.payment_service import (
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
 from subscriptions.services.customer_account_service import build_customer_operational_profile
+from subscriptions.services.batch_draw_coordination_service import (
+    build_control_center,
+    commit_batch_draw,
+    execute_batch_draw,
+    lock_batch_for_draw,
+)
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
@@ -351,6 +357,20 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         next_status = serializer.validated_data.get("status", batch.status)
 
         if next_status != batch.status:
+            guarded = {
+                BatchStatus.LOCKED,
+                BatchStatus.DRAW_COMMITTED,
+                BatchStatus.DRAW_COMPLETED,
+            }
+            if next_status in guarded:
+                raise DRFValidationError(
+                    {
+                        "status": (
+                            "This status is managed only through coordination endpoints: "
+                            "lock/, commit-draw/, execute-draw/."
+                        )
+                    }
+                )
             self._validate_status_transition(batch, next_status)
 
         serializer.save()
@@ -363,6 +383,20 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         if not next_status:
             return Response(
                 {"status": ["Target status is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if next_status in {
+            BatchStatus.LOCKED,
+            BatchStatus.DRAW_COMMITTED,
+            BatchStatus.DRAW_COMPLETED,
+        }:
+            return Response(
+                {
+                    "status": [
+                        "Use POST …/lock/, commit-draw/, or execute-draw/ instead of transition-status."
+                    ]
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -442,6 +476,58 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["post"], url_path="lock")
+    def lock_batch(self, request, pk=None):
+        batch = self.get_object()
+        minimum_active = request.data.get("minimum_active")
+        try:
+            min_int = int(minimum_active) if minimum_active is not None else None
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "minimum_active must be an integer when provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = lock_batch_for_draw(
+                batch=batch,
+                user=request.user,
+                minimum_active=min_int,
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="commit-draw")
+    def commit_draw(self, request, pk=None):
+        batch = self.get_object()
+        try:
+            payload = commit_batch_draw(batch=batch, user=request.user)
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="execute-draw")
+    def execute_draw(self, request, pk=None):
+        batch = self.get_object()
+        revealed_seed = (request.data.get("revealed_seed") or "").strip()
+        try:
+            payload = execute_batch_draw(
+                batch=batch,
+                revealed_seed=revealed_seed or request.data.get("seed") or "",
+                performed_by=request.user,
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="control-center")
+    def control_center(self, request, pk=None):
+        batch = self.get_object()
+        return Response(build_control_center(batch))
 
 # =====================================================
 # CUSTOMER

@@ -720,6 +720,17 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             or f"SUB-{subscription.id}"
         )
 
+    def validate(self, attrs):
+        instance = self.instance
+        if instance and instance.batch_id and "status" in attrs:
+            if attrs["status"] != instance.status:
+                from subscriptions.services.batch_draw_coordination_service import (
+                    assert_subscription_eligibility_mutations_allowed,
+                )
+
+                assert_subscription_eligibility_mutations_allowed(instance.batch)
+        return attrs
+
 
 class PaymentAdminSerializer(serializers.ModelSerializer):
     customer_id = serializers.IntegerField(source="customer.id", read_only=True)
@@ -1474,6 +1485,31 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             field in attrs
             for field in ["product", "tenure_months", "batch", "lucky_id", "plan_type"]
         )
+
+        if (
+            instance
+            and instance.batch_id
+            and instance.plan_type == PlanType.EMI
+        ):
+            from subscriptions.services.batch_draw_coordination_service import (
+                assert_subscription_eligibility_mutations_allowed,
+            )
+
+            new_customer = attrs.get("customer", instance.customer)
+            if new_customer.pk != instance.customer_id:
+                assert_subscription_eligibility_mutations_allowed(instance.batch)
+
+            if "batch" in attrs:
+                nb = attrs.get("batch")
+                nb_id = nb.pk if nb else None
+                if nb_id != instance.batch_id:
+                    assert_subscription_eligibility_mutations_allowed(instance.batch)
+
+            if "lucky_id" in attrs:
+                nl = attrs["lucky_id"]
+                nl_id = nl.pk if nl else None
+                if nl_id != instance.lucky_id_id:
+                    assert_subscription_eligibility_mutations_allowed(instance.batch)
 
         if instance and financial_structure_changed:
             has_payments = instance.payments.exists()

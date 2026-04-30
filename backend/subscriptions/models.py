@@ -220,9 +220,15 @@ class BatchStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
     OPEN = "OPEN", "Open"
     FULL = "FULL", "Full"
+    # Pass-7 coordination: preparatory gate before cryptographic lock + snapshot freeze.
+    READY_TO_LOCK = "READY_TO_LOCK", "Ready To Lock"
+    LOCKED = "LOCKED", "Locked"
     DRAW_IN_PROGRESS = "DRAW_IN_PROGRESS", "Draw In Progress"
+    DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
+    DRAW_COMPLETED = "DRAW_COMPLETED", "Draw Completed"
     COMPLETED = "COMPLETED", "Completed"
     CLOSED = "CLOSED", "Closed"
+    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class LedgerEntryType(models.TextChoices):
@@ -1016,6 +1022,12 @@ class Batch(TimeStampedModel):
         choices=BatchStatus.choices,
         default=BatchStatus.DRAFT,
         db_index=True,
+    )
+    locked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Set when batch draw eligibility is frozen (LOCKED or beyond).",
     )
 
     class Meta:
@@ -3040,6 +3052,108 @@ class PartnerCollectionRequest(models.Model):
 
 
 
+# =====================================================
+# DRAW COORDINATION (Pass 7 — immutable eligibility + commit)
+# =====================================================
+
+
+class DrawEligibilitySnapshot(TimeStampedModel):
+    """
+    Immutable rows frozen at batch lock. Draw winner selection must use these rows,
+    not live subscription queries, when snapshots exist for the batch.
+    """
+
+    batch = models.ForeignKey(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    snapshot_version = models.PositiveIntegerField(db_index=True)
+    sort_order = models.PositiveIntegerField()
+    subscription = models.ForeignKey(
+        "Subscription",
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    lucky_id = models.ForeignKey(
+        LuckyId,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="draw_eligibility_snapshots",
+    )
+    contract_reference = models.CharField(max_length=64, blank=True, default="")
+    emi_schedule_summary = models.JSONField(default=dict)
+    row_hash = models.CharField(max_length=128)
+
+    class Meta:
+        db_table = "draw_eligibility_snapshots"
+        ordering = ["snapshot_version", "sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "snapshot_version", "subscription"],
+                name="uq_draw_eligibility_batch_version_subscription",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["batch", "snapshot_version"]),
+        ]
+
+    def __str__(self):
+        return f"DrawEligibilitySnapshot batch={self.batch_id} v={self.snapshot_version} sub={self.subscription_id}"
+
+
+class DrawCommit(TimeStampedModel):
+    """One published commit per batch for verifiable draw execution."""
+
+    class DrawCommitStatus(models.TextChoices):
+        COMMITTED = "COMMITTED", "Committed"
+
+    batch = models.OneToOneField(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="draw_commit",
+    )
+    snapshot_version = models.PositiveIntegerField()
+    snapshot_hash = models.CharField(max_length=64)
+    public_commit_hash = models.CharField(max_length=64)
+    seed_commitment = models.CharField(max_length=64)
+    committed_at = models.DateTimeField(db_index=True)
+    committed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="batch_draw_commits",
+    )
+    algorithm_version = models.CharField(max_length=32, default="pass7-v1")
+    status = models.CharField(
+        max_length=20,
+        choices=DrawCommitStatus.choices,
+        default=DrawCommitStatus.COMMITTED,
+    )
+
+    class Meta:
+        db_table = "draw_commits"
+
+    def __str__(self):
+        return f"DrawCommit batch={self.batch_id} hash={self.public_commit_hash[:12]}…"
+
 
 # =====================================================
 # LUCKY DRAW
@@ -3049,6 +3163,13 @@ class LuckyDraw(TimeStampedModel):
     batch = models.ForeignKey(
         Batch,
         on_delete=models.CASCADE,
+        related_name="lucky_draws",
+    )
+    draw_commit = models.ForeignKey(
+        DrawCommit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name="lucky_draws",
     )
     committed_hash = models.CharField(max_length=64)

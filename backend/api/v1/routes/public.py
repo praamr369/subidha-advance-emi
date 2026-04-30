@@ -64,20 +64,35 @@ def _serialize_public_winner(draw: LuckyDraw):
         product_name = getattr(product, "name", None)
 
     lucky_number = getattr(draw.winner_lucky_id, "lucky_number", None)
+    draw_commit = getattr(draw, "draw_commit", None)
+    public_commit_hash = (
+        draw_commit.public_commit_hash
+        if draw_commit
+        else draw.committed_hash
+    )
+    if draw_commit:
+        verification_status = "coordinated"
+    else:
+        verification_status = "legacy"
 
     return {
         "id": draw.id,
         "batch": draw.batch.batch_code,
         "batch_code": draw.batch.batch_code,
+        "batch_name": draw.batch.batch_code,
         "month": draw.draw_month,
         "draw_month": draw.draw_month,
         "draw_date": draw.draw_date,
+        "draw_datetime": draw.draw_date,
         "revealed_at": draw.revealed_at,
         "lucky_id": f"{lucky_number:02d}" if lucky_number is not None else None,
         "winner_lucky_id": draw.winner_lucky_id_id,
+        "winner_lucky_number": lucky_number,
         "customer_name": customer_name,
         "product_name": product_name,
         "committed_hash": draw.committed_hash,
+        "public_commit_hash": public_commit_hash,
+        "verification_status": verification_status,
         "waived_emi_count": draw.waived_emi_count or 0,
         "waived_amount": (
             str(draw.waived_amount) if draw.waived_amount is not None else None
@@ -181,6 +196,7 @@ class LatestWinnerView(APIView):
             LuckyDraw.objects.filter(is_revealed=True)
             .select_related(
                 "batch",
+                "draw_commit",
                 "winner_lucky_id",
                 "winner_subscription__customer",
                 "winner_subscription__product",
@@ -213,6 +229,7 @@ class PublicWinnerHistoryView(APIView):
             LuckyDraw.objects.filter(is_revealed=True, winner_lucky_id__isnull=False)
             .select_related(
                 "batch",
+                "draw_commit",
                 "winner_lucky_id",
                 "winner_subscription__customer",
                 "winner_subscription__product",
