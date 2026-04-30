@@ -254,7 +254,16 @@ from api.v1.views.admin_hr import (
     AdminHrStaffStatusView,
     AdminHrSummaryView,
 )
-from api.v1.views.admin_bi import AdminBiSummaryView
+from api.v1.views.admin_bi import (
+    AdminBiBatchPerformanceView,
+    AdminBiCashflowView,
+    AdminBiCustomerInsightsView,
+    AdminBiHrCostInsightsView,
+    AdminBiInsightsView,
+    AdminBiInventoryIntelligenceView,
+    AdminBiProfitabilityView,
+    AdminBiSummaryView,
+)
 from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
@@ -482,6 +491,14 @@ urlpatterns = [
     path("global-search/", AdminGlobalSearchView.as_view()),
     # Phase 7C: BI control center snapshot (admin-only, read-only)
     path("bi/summary/", AdminBiSummaryView.as_view()),
+    # Phase 10: BI + operational insights layer (admin-only, read-only)
+    path("bi/insights/", AdminBiInsightsView.as_view()),
+    path("bi/profitability/", AdminBiProfitabilityView.as_view()),
+    path("bi/customer-insights/", AdminBiCustomerInsightsView.as_view()),
+    path("bi/batch-performance/", AdminBiBatchPerformanceView.as_view()),
+    path("bi/cashflow/", AdminBiCashflowView.as_view()),
+    path("bi/inventory-intelligence/", AdminBiInventoryIntelligenceView.as_view()),
+    path("bi/hr-costs/", AdminBiHrCostInsightsView.as_view()),
     # Phase 7B: HR workspace (admin-only aggregation and actions)
     path("hr/summary/", AdminHrSummaryView.as_view()),
     path("hr/staff/", AdminHrStaffListCreateView.as_view()),

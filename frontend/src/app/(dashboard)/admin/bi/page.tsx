@@ -8,6 +8,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
 import { getAdminBiSummary, type BiSummary } from "@/services/admin-bi";
 import { BiChartCard } from "@/components/admin/bi/BiChartCard";
+import BiInsightsDashboard from "@/components/admin/bi/BiInsightsDashboard";
 import EmptyState from "@/components/feedback/EmptyState";
 
 export default function AdminBiControlCenterPage() {
@@ -70,6 +71,7 @@ export default function AdminBiControlCenterPage() {
       ) : (
         <div className="space-y-6">
           <AiBiExplanationPanel />
+          <BiInsightsDashboard />
 
           <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
             <h2 className="text-base font-semibold text-foreground">HR Snapshot</h2>

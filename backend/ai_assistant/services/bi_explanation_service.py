@@ -9,6 +9,7 @@ from accounting.services.hr_workspace_service import get_hr_summary
 from api.v1.services.admin_dashboard_service import build_admin_dashboard
 from inventory.services.stock_service import build_stock_summary
 from subscriptions.services.admin_operations_queue_service import build_admin_queue_summary
+from subscriptions.services.business_intelligence_service import build_business_intelligence_payload
 from subscriptions.services.phase5_control_center_service import build_accounting_deposit_liability
 from subscriptions.services.phase5_filter_service import AdminReportFilter
 
@@ -76,7 +77,184 @@ def _queue_count(queue_summary: dict, key: str) -> int:
     return 0
 
 
-def explain_bi_summary(user, scope: str = "ADMIN_BI", window: str = "THIS_MONTH") -> dict:
+def _phase10_explanation(*, scope: str, window: str, topic: str) -> dict:
+    flt = _filter_for_window(window)
+    payload = build_business_intelligence_payload(flt=flt)
+    profitability = payload["profitability"]["summary"]
+    cashflow = payload["cashflow"]["summary"]
+    customers = payload["customer_insights"]["summary"]
+    batches = payload["batch_performance"]["rows"]
+    high_risk_batches = sorted(
+        batches,
+        key=lambda row: (Decimal(str(row.get("default_rate") or "0")), int(row.get("overdue_emi_count") or 0)),
+        reverse=True,
+    )
+    riskiest_batch = high_risk_batches[0] if high_risk_batches else None
+    comparison = payload["comparisons"]["actual_inflow"]
+
+    highlights: list[dict] = []
+    risks: list[dict] = []
+    follow_up: list[dict] = []
+    source_metrics: list[dict] = [
+        {
+            "key": "current_actual_inflow",
+            "label": "Current Actual Inflow",
+            "value": comparison["current"],
+            "source": "/api/v1/admin/bi/insights/",
+        },
+        {
+            "key": "previous_actual_inflow",
+            "label": "Previous Actual Inflow",
+            "value": comparison["previous"],
+            "source": "/api/v1/admin/bi/insights/",
+        },
+        {
+            "key": "inflow_delta",
+            "label": "Inflow Delta",
+            "value": comparison["delta"],
+            "source": "/api/v1/admin/bi/insights/",
+        },
+        {
+            "key": "overdue_exposure",
+            "label": "Overdue Exposure",
+            "value": cashflow["overdue_exposure"],
+            "source": "/api/v1/admin/bi/cashflow/",
+        },
+    ]
+
+    if topic == "REVENUE_DROP":
+        delta = _to_decimal(comparison["delta"])
+        if delta < 0:
+            risks.append(
+                {
+                    "label": "Revenue drop",
+                    "message": "Actual inflow is below the previous comparable window.",
+                    "severity": "WARNING",
+                }
+            )
+        else:
+            highlights.append(
+                {
+                    "label": "Revenue position",
+                    "message": "Actual inflow is not below the previous comparable window.",
+                    "severity": "INFO",
+                }
+            )
+        source_metrics.extend(
+            [
+                {"key": "emi_revenue", "label": "EMI Revenue", "value": profitability["emi_revenue"], "source": "/api/v1/admin/bi/profitability/"},
+                {"key": "direct_sale_revenue", "label": "Direct Sale Revenue", "value": profitability["direct_sale_revenue"], "source": "/api/v1/admin/bi/profitability/"},
+                {"key": "rent_income", "label": "Rent Income", "value": profitability["rent_income"], "source": "/api/v1/admin/bi/profitability/"},
+                {"key": "lease_income", "label": "Lease Income", "value": profitability["lease_income"], "source": "/api/v1/admin/bi/profitability/"},
+            ]
+        )
+        summary = (
+            f"Revenue explanation for {window}. Current actual inflow is {comparison['current']} "
+            f"versus {comparison['previous']} in the previous comparable window, delta {comparison['delta']}. "
+            "The explanation is based on current EMI, direct-sale, rent, and lease income components only; no prediction is used."
+        )
+        follow_up.append({"label": "Open profitability BI", "href": "/admin/bi/profitability"})
+    elif topic == "OVERDUE_INCREASE":
+        overdue_amount = _to_decimal(cashflow["overdue_exposure"])
+        if overdue_amount > 0:
+            risks.append(
+                {
+                    "label": "Overdue exposure",
+                    "message": "Current overdue exposure is above zero and needs collection follow-up.",
+                    "severity": "WARNING",
+                }
+            )
+        else:
+            highlights.append({"label": "Overdue exposure", "message": "No overdue exposure is visible in the BI snapshot.", "severity": "INFO"})
+        source_metrics.extend(
+            [
+                {
+                    "key": "high_overdue_customers",
+                    "label": "High Overdue Customers",
+                    "value": customers["high_overdue_customers"],
+                    "source": "/api/v1/admin/bi/customer-insights/",
+                },
+                {
+                    "key": "churn_risk_customers",
+                    "label": "Churn Risk Customers",
+                    "value": customers["churn_risk_customers"],
+                    "source": "/api/v1/admin/bi/customer-insights/",
+                },
+            ]
+        )
+        summary = (
+            f"Overdue explanation for {window}. Overdue exposure is {cashflow['overdue_exposure']}; "
+            f"{customers['high_overdue_customers']} high-overdue customers and {customers['churn_risk_customers']} churn-risk customers are visible. "
+            "This is a current-state explanation, not a forecast."
+        )
+        follow_up.append({"label": "Open cashflow BI", "href": "/admin/bi/cashflow"})
+    elif topic == "RISKY_BATCH":
+        if riskiest_batch:
+            if riskiest_batch["risk_level"] == "HIGH":
+                risks.append(
+                    {
+                        "label": "Risky batch",
+                        "message": f"{riskiest_batch['batch_code']} has the highest current default rate.",
+                        "severity": "WARNING",
+                    }
+                )
+            else:
+                highlights.append(
+                    {
+                        "label": "Batch risk",
+                        "message": f"{riskiest_batch['batch_code']} is the highest-risk batch, but it is not currently HIGH risk.",
+                        "severity": "INFO",
+                    }
+                )
+            source_metrics.extend(
+                [
+                    {"key": "batch_code", "label": "Batch", "value": riskiest_batch["batch_code"], "source": "/api/v1/admin/bi/batch-performance/"},
+                    {"key": "default_rate", "label": "Default Rate", "value": riskiest_batch["default_rate"], "source": "/api/v1/admin/bi/batch-performance/"},
+                    {"key": "payment_discipline", "label": "Payment Discipline", "value": riskiest_batch["payment_discipline"], "source": "/api/v1/admin/bi/batch-performance/"},
+                ]
+            )
+            summary = (
+                f"Batch risk explanation for {window}. {riskiest_batch['batch_code']} is currently the highest-risk batch "
+                f"with default rate {riskiest_batch['default_rate']}% and payment discipline {riskiest_batch['payment_discipline']}%. "
+                "This is based only on current due EMI and draw completion data."
+            )
+        else:
+            highlights.append({"label": "Batch risk", "message": "No batch performance rows are available.", "severity": "INFO"})
+            summary = f"Batch risk explanation for {window}. No batch rows are available for the selected BI window."
+        follow_up.append({"label": "Open batch BI", "href": "/admin/bi/batches"})
+    else:
+        highlights.append({"label": "BI summary", "message": "Phase 10 BI snapshot is available for owner/admin review.", "severity": "INFO"})
+        summary = (
+            f"BI summary for {scope} in {window}. Gross income is {profitability['gross_income']}, "
+            f"window inflow is {cashflow['window_inflow']}, overdue exposure is {cashflow['overdue_exposure']}, "
+            f"and high-risk batches count is {payload['batch_performance']['summary']['high_risk_batches']}."
+        )
+        follow_up.append({"label": "Open BI Control Center", "href": "/admin/bi"})
+
+    if not highlights and not risks:
+        highlights.append({"label": "BI explanation", "message": "No exception was detected for the selected explanation topic.", "severity": "INFO"})
+
+    return {
+        "summary": summary,
+        "highlights": highlights,
+        "risks": risks,
+        "follow_up": follow_up,
+        "source_metrics": source_metrics,
+        "generated_at": timezone.now().isoformat(),
+        "safety": {
+            "read_only": True,
+            "actions_executed": False,
+            "financial_actions_enabled": False,
+            "automation_enabled": False,
+        },
+    }
+
+
+def explain_bi_summary(user, scope: str = "ADMIN_BI", window: str = "THIS_MONTH", topic: str = "SUMMARY") -> dict:
+    phase10_scopes = {"PROFITABILITY", "CUSTOMER_INSIGHTS", "BATCH_PERFORMANCE", "CASHFLOW", "INVENTORY_INTELLIGENCE", "HR_COSTS"}
+    if topic != "SUMMARY" or scope in phase10_scopes:
+        return _phase10_explanation(scope=scope, window=window, topic=topic)
+
     flt = _filter_for_window(window)
     now = timezone.now()
     dashboard = build_admin_dashboard(actor_user=user)
@@ -230,4 +408,3 @@ def explain_bi_summary(user, scope: str = "ADMIN_BI", window: str = "THIS_MONTH"
             "actions_executed": False,
         },
     }
-

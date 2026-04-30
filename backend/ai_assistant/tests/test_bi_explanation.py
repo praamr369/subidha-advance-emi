@@ -37,6 +37,8 @@ class AIBIExplanationApiTests(APITestCase):
         self.assertEqual(scope_response.status_code, status.HTTP_400_BAD_REQUEST)
         window_response = self.client.get("/api/v1/admin/ai/bi-explain/?scope=ADMIN_BI&window=FOREVER")
         self.assertEqual(window_response.status_code, status.HTTP_400_BAD_REQUEST)
+        topic_response = self.client.get("/api/v1/admin/ai/bi-explain/?scope=ADMIN_BI&window=THIS_MONTH&topic=AUTOMATE_COLLECTION")
+        self.assertEqual(topic_response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
     def test_admin_receives_explanation_with_safety_and_source_metrics(self):
@@ -62,6 +64,24 @@ class AIBIExplanationApiTests(APITestCase):
         self.assertEqual(Payment.objects.count(), payment_count_before)
         self.assertEqual(Subscription.objects.count(), subscription_count_before)
         self.assertEqual(InventoryItem.objects.count(), inventory_count_before)
+
+    @override_settings(AI_ASSISTANT_ENABLED=True)
+    def test_phase10_explanation_topics_are_read_only_and_grounded_in_bi_sources(self):
+        self.client.force_authenticate(self.admin)
+        payment_count_before = Payment.objects.count()
+        response = self.client.get(
+            "/api/v1/admin/ai/bi-explain/?scope=PROFITABILITY&window=THIS_MONTH&topic=REVENUE_DROP"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["safety"]["read_only"])
+        self.assertFalse(response.data["safety"]["actions_executed"])
+        self.assertFalse(response.data["safety"]["financial_actions_enabled"])
+        self.assertFalse(response.data["safety"]["automation_enabled"])
+        self.assertIn("Revenue explanation", response.data["summary"])
+        self.assertTrue(
+            any(metric["source"].startswith("/api/v1/admin/bi/") for metric in response.data["source_metrics"])
+        )
+        self.assertEqual(Payment.objects.count(), payment_count_before)
 
     @override_settings(AI_ASSISTANT_ENABLED=True)
     def test_overdue_low_stock_and_hr_messages_render_with_fixture_metrics(self):
@@ -109,4 +129,3 @@ class AIBIExplanationApiTests(APITestCase):
         self.assertIn("Leave requests need approval.", risk_messages)
         self.assertIn("Payroll items need review.", risk_messages)
         self.assertIn("Rent/lease deposits are held as refundable liabilities.", highlight_messages)
-

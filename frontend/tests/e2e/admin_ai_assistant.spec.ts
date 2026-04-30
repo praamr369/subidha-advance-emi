@@ -2,6 +2,94 @@ import { expect, test } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
 
+const emptyBiInsightsPayload = {
+  as_of: "2026-04-29T00:00:00Z",
+  window: {
+    date_from: "2026-04-01",
+    date_to: "2026-04-29",
+    previous_date_from: "2026-03-03",
+    previous_date_to: "2026-03-31",
+    ignored_filters: [],
+  },
+  safety: {
+    read_only: true,
+    financial_mutation_enabled: false,
+    ai_automation_enabled: false,
+  },
+  profitability: {
+    summary: {
+      emi_revenue: "0.00",
+      emi_waived_amount: "0.00",
+      direct_sale_revenue: "0.00",
+      rent_income: "0.00",
+      lease_income: "0.00",
+      deposit_liabilities: "0.00",
+      salary_cost: "0.00",
+      gross_income: "0.00",
+      operating_margin: "0.00",
+    },
+    monthly_profit_summary: [],
+    basis_note: "Read-only operational BI.",
+    sources: ["/api/v1/admin/payments/"],
+  },
+  customer_insights: {
+    summary: {
+      total_customers: 0,
+      active_customers: 0,
+      inactive_customers: 0,
+      high_overdue_customers: 0,
+      repeat_customers: 0,
+      churn_risk_customers: 0,
+    },
+    high_overdue_customers: [],
+    repeat_customers: [],
+    churn_risk: [],
+    sources: ["/api/v1/admin/customers/"],
+  },
+  batch_performance: {
+    summary: { batch_count: 0, average_fill_rate: "0.00", high_risk_batches: 0 },
+    rows: [],
+    sources: ["/api/v1/admin/batches/"],
+  },
+  cashflow: {
+    summary: {
+      daily_inflow: "0.00",
+      window_inflow: "0.00",
+      expected_inflow: "0.00",
+      overdue_exposure: "0.00",
+    },
+    daily_trend: [],
+    expected_breakdown: {
+      pending_emi: "0.00",
+      rent_lease_outstanding: "0.00",
+      direct_sale_balance: "0.00",
+    },
+    sources: ["/api/v1/admin/payments/"],
+  },
+  inventory_intelligence: {
+    summary: { fast_moving_count: 0, slow_moving_count: 0, stock_risk_count: 0 },
+    fast_moving_items: [],
+    slow_moving_items: [],
+    stock_risk: [],
+    sources: ["/api/v1/inventory/stock-summary/"],
+  },
+  hr_costs: {
+    summary: {
+      salary_cost: "0.00",
+      revenue: "0.00",
+      salary_vs_revenue_ratio: null,
+      active_staff: 0,
+    },
+    cost_per_department: [],
+    employment_type_split: { temporary_cost: "0.00", permanent_cost: "0.00" },
+    sources: ["/api/v1/admin/hr/payroll/"],
+  },
+  comparisons: {
+    actual_inflow: { current: "0.00", previous: "0.00", delta: "0.00" },
+    overdue_exposure: { current: "0.00" },
+  },
+};
+
 test.describe("admin AI assistant", () => {
   test.use({ storageState: authStatePath("admin") });
 
@@ -174,6 +262,13 @@ test.describe("admin AI assistant", () => {
         }),
       });
     });
+    await page.route("**/api/v1/admin/bi/insights/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(emptyBiInsightsPayload),
+      });
+    });
     await page.route("**/api/v1/admin/ai/bi-explain/**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -192,6 +287,7 @@ test.describe("admin AI assistant", () => {
 
     await page.goto("/admin/bi");
     await expect(page.getByRole("heading", { name: "Business Intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Profitability View" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "AI Explanation" })).toBeVisible();
     await page.getByRole("button", { name: "Explain BI" }).click();
     await expect(page.getByText("BI explanation for ADMIN_BI in THIS_MONTH.")).toBeVisible();
@@ -232,6 +328,13 @@ test.describe("admin AI assistant", () => {
             salary_payments_pending: 0,
           },
         }),
+      });
+    });
+    await page.route("**/api/v1/admin/bi/insights/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(emptyBiInsightsPayload),
       });
     });
     await page.route("**/api/v1/admin/ai/bi-explain/**", async (route) => {

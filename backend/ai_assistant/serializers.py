@@ -156,8 +156,19 @@ class AIBIExplainRequestSerializer(serializers.Serializer):
             "CRM",
             "PARTNER",
             "ADMIN_BI",
+            "PROFITABILITY",
+            "CUSTOMER_INSIGHTS",
+            "BATCH_PERFORMANCE",
+            "CASHFLOW",
+            "INVENTORY_INTELLIGENCE",
+            "HR_COSTS",
         ],
         default="ADMIN_BI",
+    )
+    topic = serializers.ChoiceField(
+        choices=["SUMMARY", "REVENUE_DROP", "OVERDUE_INCREASE", "RISKY_BATCH"],
+        default="SUMMARY",
+        required=False,
     )
     window = serializers.ChoiceField(
         choices=["TODAY", "THIS_WEEK", "THIS_MONTH", "LAST_MONTH"],

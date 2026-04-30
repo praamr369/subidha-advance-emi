@@ -174,12 +174,13 @@ class AIBIExplainView(AIAssistantBaseView):
         serializer.is_valid(raise_exception=True)
         scope = serializer.validated_data.get("scope", "ADMIN_BI")
         window = serializer.validated_data.get("window", "THIS_MONTH")
-        payload = explain_bi_summary(user=request.user, scope=scope, window=window)
+        topic = serializer.validated_data.get("topic", "SUMMARY")
+        payload = explain_bi_summary(user=request.user, scope=scope, window=window, topic=topic)
 
         log_ai_query(
             user=request.user,
-            query=f"BI_EXPLAIN:{scope}:{window}",
-            metadata={"scope": scope, "window": window, "mode": "BI_EXPLANATION"},
+            query=f"BI_EXPLAIN:{scope}:{window}:{topic}",
+            metadata={"scope": scope, "window": window, "topic": topic, "mode": "BI_EXPLANATION"},
             retrieved_chunk_ids=[],
             answer_preview=payload.get("summary", ""),
             latency_ms=0,

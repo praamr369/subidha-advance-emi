@@ -126,9 +126,16 @@ export type BiExplainScope =
   | "SUBSCRIPTIONS"
   | "CRM"
   | "PARTNER"
-  | "ADMIN_BI";
+  | "ADMIN_BI"
+  | "PROFITABILITY"
+  | "CUSTOMER_INSIGHTS"
+  | "BATCH_PERFORMANCE"
+  | "CASHFLOW"
+  | "INVENTORY_INTELLIGENCE"
+  | "HR_COSTS";
 
 export type BiExplainWindow = "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "LAST_MONTH";
+export type BiExplainTopic = "SUMMARY" | "REVENUE_DROP" | "OVERDUE_INCREASE" | "RISKY_BATCH";
 
 export type BiExplanationItem = {
   label: string;
@@ -158,6 +165,8 @@ export type BiExplanationResponse = {
   safety: {
     readOnly: boolean;
     actionsExecuted: boolean;
+    financialActionsEnabled: boolean;
+    automationEnabled: boolean;
   };
 };
 
@@ -270,6 +279,8 @@ type RawBiExplanationResponse = {
   safety?: {
     read_only?: boolean;
     actions_executed?: boolean;
+    financial_actions_enabled?: boolean;
+    automation_enabled?: boolean;
   };
 };
 
@@ -423,6 +434,8 @@ function normalizeBiExplanation(payload: RawBiExplanationResponse): BiExplanatio
     safety: {
       readOnly: Boolean(payload.safety?.read_only),
       actionsExecuted: Boolean(payload.safety?.actions_executed),
+      financialActionsEnabled: Boolean(payload.safety?.financial_actions_enabled),
+      automationEnabled: Boolean(payload.safety?.automation_enabled),
     },
   };
 }
@@ -505,8 +518,12 @@ export async function getQueryLogs(): Promise<AiQueryLog[]> {
   return toArray<RawAiQueryLog>(payload).map(normalizeQueryLog);
 }
 
-export async function explainBI(scope: BiExplainScope, window: BiExplainWindow): Promise<BiExplanationResponse> {
-  const params = new URLSearchParams({ scope, window });
+export async function explainBI(
+  scope: BiExplainScope,
+  window: BiExplainWindow,
+  topic: BiExplainTopic = "SUMMARY"
+): Promise<BiExplanationResponse> {
+  const params = new URLSearchParams({ scope, window, topic });
   const payload = await apiFetch<RawBiExplanationResponse>(`/admin/ai/bi-explain/?${params.toString()}`);
   return normalizeBiExplanation(payload);
 }

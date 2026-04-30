@@ -35,7 +35,15 @@ test("operations workspace is action-first and HR tasks visible", async ({ page 
 test("bi charts show read-only report links", async ({ page }) => {
   await page.goto("/admin/bi");
   await expect(page.getByRole("heading", { name: /Business Intelligence/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Profitability View" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cashflow" })).toHaveAttribute("href", "/admin/bi/cashflow");
   await expect(page.getByRole("link", { name: "Open report" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
+
+  await page.goto("/admin/bi/cashflow");
+  await expect(page.getByRole("heading", { name: "Cashflow Dashboard" })).toBeVisible();
+  await expect(page.getByText(/Financial mutation: disabled/i)).toBeVisible();
   await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
 });

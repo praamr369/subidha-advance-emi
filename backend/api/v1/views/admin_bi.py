@@ -18,6 +18,15 @@ from subscriptions.services.phase5_control_center_service import (
 from subscriptions.services.phase5_filter_service import parse_admin_report_filters
 from subscriptions.services.phase5_filter_service import SUPPORTED_FILTERS
 from accounting.services.hr_workspace_service import get_hr_summary
+from subscriptions.services.business_intelligence_service import (
+    build_batch_performance,
+    build_business_intelligence_payload,
+    build_cashflow_dashboard,
+    build_customer_insights,
+    build_hr_cost_insights,
+    build_inventory_intelligence,
+    build_profitability_view,
+)
 
 
 class _AdminBase(APIView):
@@ -110,3 +119,49 @@ class AdminBiSummaryView(_AdminBase):
             }
         )
 
+
+class AdminBiInsightsView(_AdminBase):
+    """
+    Phase 10 BI layer.
+    Read-only, admin-only, and sourced from persisted operational records.
+    """
+
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_business_intelligence_payload(flt=flt))
+
+
+class AdminBiProfitabilityView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_profitability_view(flt=flt))
+
+
+class AdminBiCustomerInsightsView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_customer_insights(flt=flt))
+
+
+class AdminBiBatchPerformanceView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_batch_performance(flt=flt))
+
+
+class AdminBiCashflowView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_cashflow_dashboard(flt=flt))
+
+
+class AdminBiInventoryIntelligenceView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_inventory_intelligence(flt=flt))
+
+
+class AdminBiHrCostInsightsView(_AdminBase):
+    def get(self, request):
+        flt = parse_admin_report_filters(request.query_params, applicable_filters=SUPPORTED_FILTERS)
+        return Response(build_hr_cost_insights(flt=flt))
