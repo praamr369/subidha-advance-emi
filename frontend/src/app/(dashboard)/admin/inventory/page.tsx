@@ -156,6 +156,8 @@ export default function AdminInventoryPage() {
         { href: ROUTES.admin.inventoryLedger, label: "Ledger", variant: "secondary" },
         { href: ROUTES.admin.inventoryDemandPlanning, label: "Demand Planning", variant: "secondary" },
         { href: ROUTES.admin.inventoryPurchaseNeeds, label: "Purchase Needs", variant: "secondary" },
+        { href: ROUTES.admin.vendors, label: "Vendors", variant: "secondary" },
+        { href: ROUTES.admin.purchases, label: "Purchases", variant: "secondary" },
         { href: ROUTES.admin.billingRegister, label: "Billing Register", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: ROUTES.admin.inventoryAdjustments, label: "Adjustments", variant: "secondary" },

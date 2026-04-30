@@ -5,8 +5,27 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from inventory.models import InventoryItem, PurchaseBill, StockAdjustment, StockLedger, StockLocation
+from accounting.models import Vendor
+from accounts.capabilities import require_capability
+from inventory.models import (
+    GoodsReceipt,
+    InventoryItem,
+    PurchaseBill,
+    PurchaseOrder,
+    StockAdjustment,
+    StockLedger,
+    StockLocation,
+    VendorBill,
+    VendorContact,
+    VendorPayment,
+)
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.procurement_service import (
+    cancel_purchase_order,
+    post_goods_receipt,
+    post_vendor_bill,
+    post_vendor_payment,
+)
 from inventory.services.opening_stock_import_service import (
     post_opening_stock_import,
     preview_opening_stock_import,
@@ -26,9 +45,15 @@ from api.v1.serializers.inventory import (
     OpeningStockImportPostSerializer,
     OpeningStockImportPreviewSerializer,
     PurchaseBillSerializer,
+    PurchaseOrderSerializer,
     StockLocationSerializer,
     StockAdjustmentSerializer,
     StockLedgerSerializer,
+    GoodsReceiptSerializer,
+    VendorBillSerializer,
+    VendorContactSerializer,
+    VendorLiteSerializer,
+    VendorPaymentSerializer,
 )
 
 
@@ -161,6 +186,7 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="approve")
+    @require_capability("inventory.adjust")
     def approve(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -175,6 +201,7 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
         return Response({"updated": updated, "stock_adjustment": payload.data})
 
     @action(detail=True, methods=["post"], url_path="post")
+    @require_capability("inventory.adjust")
     def post_adjustment(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -217,6 +244,174 @@ class PurchaseBillViewSet(AdminInventoryModelViewSet):
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
         return queryset
+
+
+class VendorContactViewSet(AdminInventoryModelViewSet):
+    queryset = VendorContact.objects.select_related("vendor").all()
+    serializer_class = VendorContactSerializer
+    search_fields = ["name", "vendor__name", "phone", "email"]
+    ordering_fields = ["vendor__name", "name", "created_at"]
+    ordering = ["vendor__name", "-is_primary", "name", "id"]
+
+    def perform_create(self, serializer):
+        contact = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.VENDOR_CONTACT_CREATED,
+            instance=contact,
+            performed_by=self.request.user,
+            event="VENDOR_CONTACT_CREATED",
+            metadata={"vendor_contact_id": contact.id, "vendor_id": contact.vendor_id},
+        )
+
+
+class VendorViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    queryset = Vendor.objects.all()
+    serializer_class = VendorLiteSerializer
+
+    def list(self, request, *args, **kwargs):
+        rows = list(
+            Vendor.objects.order_by("name", "id").values(
+                "id",
+                "name",
+                "phone",
+                "email",
+                "gstin",
+                "state_code",
+                "state_name",
+                "is_active",
+            )
+        )
+        return Response({"count": len(rows), "results": rows})
+
+
+class PurchaseOrderViewSet(AdminInventoryModelViewSet):
+    queryset = PurchaseOrder.objects.select_related("vendor", "stock_location").prefetch_related(
+        "lines", "lines__inventory_item", "lines__inventory_item__product"
+    )
+    serializer_class = PurchaseOrderSerializer
+    search_fields = ["po_no", "vendor__name"]
+    ordering_fields = ["po_date", "created_at", "po_no"]
+    ordering = ["-po_date", "-created_at", "-id"]
+
+    def perform_create(self, serializer):
+        po = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.PURCHASE_ORDER_CREATED,
+            instance=po,
+            performed_by=self.request.user,
+            event="PURCHASE_ORDER_CREATED",
+            metadata={"purchase_order_id": po.id, "po_no": po.po_no},
+        )
+
+    def perform_update(self, serializer):
+        po = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.PURCHASE_ORDER_UPDATED,
+            instance=po,
+            performed_by=self.request.user,
+            event="PURCHASE_ORDER_UPDATED",
+            metadata={"purchase_order_id": po.id, "po_no": po.po_no},
+        )
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        try:
+            purchase_order, updated = cancel_purchase_order(
+                purchase_order_id=int(pk),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = PurchaseOrderSerializer(purchase_order, context=self.get_serializer_context())
+        return Response({"updated": updated, "purchase_order": payload.data})
+
+
+class GoodsReceiptViewSet(AdminInventoryModelViewSet):
+    queryset = GoodsReceipt.objects.select_related("purchase_order", "purchase_order__vendor", "stock_location").prefetch_related(
+        "lines", "lines__inventory_item", "lines__inventory_item__product"
+    )
+    serializer_class = GoodsReceiptSerializer
+    search_fields = ["receipt_no", "purchase_order__po_no", "purchase_order__vendor__name"]
+    ordering_fields = ["receipt_date", "created_at", "receipt_no"]
+    ordering = ["-receipt_date", "-created_at", "-id"]
+
+    def perform_create(self, serializer):
+        receipt = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.GOODS_RECEIPT_CREATED,
+            instance=receipt,
+            performed_by=self.request.user,
+            event="GOODS_RECEIPT_CREATED",
+            metadata={"goods_receipt_id": receipt.id, "receipt_no": receipt.receipt_no},
+        )
+
+    @action(detail=True, methods=["post"], url_path="post")
+    def post_receipt(self, request, pk=None):
+        try:
+            receipt, updated = post_goods_receipt(goods_receipt_id=int(pk), posted_by=request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = GoodsReceiptSerializer(receipt, context=self.get_serializer_context())
+        return Response({"updated": updated, "goods_receipt": payload.data})
+
+
+class VendorBillViewSet(AdminInventoryModelViewSet):
+    queryset = VendorBill.objects.select_related(
+        "vendor", "purchase_order", "goods_receipt", "finance_account", "posted_journal_entry"
+    ).prefetch_related("lines", "lines__inventory_item", "lines__inventory_item__product")
+    serializer_class = VendorBillSerializer
+    search_fields = ["bill_no", "vendor__name"]
+    ordering_fields = ["bill_date", "created_at", "bill_no"]
+    ordering = ["-bill_date", "-created_at", "-id"]
+
+    def perform_create(self, serializer):
+        bill = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.VENDOR_BILL_CREATED,
+            instance=bill,
+            performed_by=self.request.user,
+            event="VENDOR_BILL_CREATED",
+            metadata={"vendor_bill_id": bill.id, "bill_no": bill.bill_no},
+        )
+
+    @action(detail=True, methods=["post"], url_path="post")
+    def post_bill(self, request, pk=None):
+        try:
+            bill, updated = post_vendor_bill(vendor_bill_id=int(pk), posted_by=request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = VendorBillSerializer(bill, context=self.get_serializer_context())
+        return Response({"updated": updated, "vendor_bill": payload.data})
+
+
+class VendorPaymentViewSet(AdminInventoryModelViewSet):
+    queryset = VendorPayment.objects.select_related(
+        "vendor", "vendor_bill", "finance_account", "posted_journal_entry"
+    ).all()
+    serializer_class = VendorPaymentSerializer
+    search_fields = ["payment_no", "vendor__name", "reference_no"]
+    ordering_fields = ["payment_date", "created_at", "payment_no"]
+    ordering = ["-payment_date", "-created_at", "-id"]
+
+    def perform_create(self, serializer):
+        payment = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.VENDOR_PAYMENT_CREATED,
+            instance=payment,
+            performed_by=self.request.user,
+            event="VENDOR_PAYMENT_CREATED",
+            metadata={"vendor_payment_id": payment.id, "payment_no": payment.payment_no},
+        )
+
+    @action(detail=True, methods=["post"], url_path="post")
+    def post_payment(self, request, pk=None):
+        try:
+            payment, updated = post_vendor_payment(vendor_payment_id=int(pk), posted_by=request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = VendorPaymentSerializer(payment, context=self.get_serializer_context())
+        return Response({"updated": updated, "vendor_payment": payload.data})
 
 
 class StockLocationViewSet(AdminInventoryModelViewSet):

@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from accounting.services.finance_transfer_service import FinanceTransferService
 from accounting.services.reconciliation_overview_service import ReconciliationOverviewService
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.finance_operations import (
     AdminAdvanceAllocationSerializer,
@@ -20,6 +21,7 @@ from subscriptions.services.payment_allocation_service import PaymentAllocationS
 class AdminAdvanceAllocationView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    @require_capability("billing.override_allocation")
     def post(self, request, *args, **kwargs):
         serializer = AdminAdvanceAllocationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

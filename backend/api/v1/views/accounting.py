@@ -22,6 +22,7 @@ from accounting.models import (
     Vendor,
     JournalEntryGroup,
 )
+from accounts.capabilities import require_capability
 from accounting.services.control_validation_service import (
     validate_financial_period_balance,
     validate_journal_group_balance,
@@ -241,6 +242,7 @@ class JournalEntryViewSet(AdminAccountingModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="void")
+    @require_capability("accounting.reverse_entry")
     def void_entry(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -799,6 +801,7 @@ class JournalGroupBalanceView(APIView):
 class JournalGroupReverseView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    @require_capability("accounting.reverse_entry")
     def post(self, request, pk):
         serializer = JournalGroupReverseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

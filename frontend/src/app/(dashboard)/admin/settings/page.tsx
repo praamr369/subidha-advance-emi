@@ -29,7 +29,7 @@ const controls = [
     title: "Role governance",
     description:
       "Role boundaries, least-privilege access, and admin policy controls.",
-    href: "/admin/settings/roles",
+    href: "/admin/settings/roles-permissions",
     icon: <ShieldCheck className="h-5 w-5" />,
   },
   {
@@ -50,7 +50,7 @@ const controls = [
     title: "Session policy",
     description:
       "Authentication expiry, route protection, and restricted admin surface exposure.",
-    href: "/admin/settings/roles",
+    href: "/admin/settings/roles-permissions",
     icon: <LockKeyhole className="h-5 w-5" />,
   },
 ];

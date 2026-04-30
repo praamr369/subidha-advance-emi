@@ -49,7 +49,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Staff & Business Setup", "Leave Requests", ROUTES.admin.hrLeave, "Approve or reject leave requests."),
   item("Staff & Business Setup", "Expense Claims", ROUTES.admin.hrExpenses, "Approve or reject employee expense claims."),
   item("Staff & Business Setup", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Manage staff KYC and agreement documents."),
-  item("Staff & Business Setup", "Roles & Permissions", ROUTES.admin.settingsRoles, "Role setup and access control."),
+  item("Staff & Business Setup", "Roles & Permissions", ROUTES.admin.settingsRolesPermissions, "Role setup and access control."),
   item("Staff & Business Setup", "Branches", ROUTES.admin.branches, "Branch configuration."),
   item("Staff & Business Setup", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
 

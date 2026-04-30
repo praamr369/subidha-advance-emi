@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounting.models import CreditNote, DebitNote, ExportPackJob, TaxInvoice
+from accounts.capabilities import require_capability
 from accounting.services.bridge_run_service import run_bridge_postings
 from accounting.services.export_pack_service import (
     create_gst_export_pack_job,
@@ -295,6 +296,7 @@ class ItrExportPackListCreateView(AdminAccountingReportView):
         serializer = ExportPackJobSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @require_capability("reports.export")
     def post(self, request):
         serializer = ItrExportPackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -315,6 +317,7 @@ class GstExportPackListCreateView(AdminAccountingReportView):
         serializer = ExportPackJobSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @require_capability("reports.export")
     def post(self, request):
         serializer = GstExportPackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -337,6 +340,7 @@ class ItrExportPackDetailView(AdminAccountingReportView):
 
 
 class ItrExportPackDownloadView(AdminAccountingReportView):
+    @require_capability("reports.export")
     def get(self, request, pk: int):
         job = ExportPackJob.objects.get(pk=pk)
         if not job.file_path or not os.path.exists(job.file_path):

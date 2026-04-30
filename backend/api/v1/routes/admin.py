@@ -62,6 +62,11 @@ from api.v1.views.admin_internal_users import (
     AdminInternalUserListView,
     AdminInternalUserPasswordResetView,
 )
+from api.v1.views.admin_role_capabilities import (
+    AdminRolePermissionMatrixView,
+    AdminRolePermissionUpdateView,
+    AdminUserCapabilityOverrideView,
+)
 from api.v1.views.admin_payout_batches import (
     AdminPayoutBatchCancelView,
     AdminPayoutBatchCreateView,
@@ -373,6 +378,10 @@ urlpatterns = [
     path("internal-users/<int:pk>/deactivate/", AdminInternalUserDeactivateView.as_view()),
     path("internal-users/<int:pk>/reset-password/", AdminInternalUserPasswordResetView.as_view()),
     path("internal-users/<int:pk>/audit/", AdminInternalUserAuditView.as_view()),
+    path("settings/roles-permissions/", AdminRolePermissionMatrixView.as_view()),
+    path("settings/roles-permissions/roles/<str:role>/", AdminRolePermissionUpdateView.as_view()),
+    path("settings/roles-permissions/users/", AdminUserCapabilityOverrideView.as_view()),
+    path("settings/roles-permissions/users/<int:user_id>/", AdminUserCapabilityOverrideView.as_view()),
     path("", include("api.v1.routes.admin_password_reset_requests")),
     path("commissions/<int:pk>/settle/", AdminCommissionSettleView.as_view()),
     path("commissions/", AdminCommissionListView.as_view()),

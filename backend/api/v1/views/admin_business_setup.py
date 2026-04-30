@@ -2,6 +2,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.business_setup import (
     BusinessProfileSerializer,
@@ -84,6 +85,7 @@ class BusinessSetupResetPreviewView(APIView):
 class BusinessSetupResetExecuteView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    @require_capability("business_setup.reset")
     def post(self, request):
         serializer = BusinessResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

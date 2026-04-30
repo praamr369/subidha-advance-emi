@@ -23,6 +23,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
 from accounts.models import User, UserRole
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.admin_resources import (
     AdminPaymentCollectSerializer,
@@ -456,6 +457,7 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="create-commit")
+    @require_capability("draw.commit")
     def create_commit(self, request, pk=None):
         batch = self.get_object()
 
@@ -478,6 +480,7 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="lock")
+    @require_capability("batch.lock")
     def lock_batch(self, request, pk=None):
         batch = self.get_object()
         minimum_active = request.data.get("minimum_active")
@@ -500,6 +503,7 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         return Response(payload, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="commit-draw")
+    @require_capability("draw.commit")
     def commit_draw(self, request, pk=None):
         batch = self.get_object()
         try:
@@ -510,6 +514,7 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         return Response(payload, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="execute-draw")
+    @require_capability("draw.complete")
     def execute_draw(self, request, pk=None):
         batch = self.get_object()
         revealed_seed = (request.data.get("revealed_seed") or "").strip()
@@ -1362,6 +1367,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=False, methods=["post"], url_path="collect")
+    @require_capability("billing.collect")
     def collect(self, request):
         serializer = AdminPaymentCollectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1613,6 +1619,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="reverse")
+    @require_capability("billing.override_allocation")
     def reverse(self, request, pk=None):
         payment_obj = self.get_object()
 

@@ -96,6 +96,149 @@ class PasswordResetStatus(models.TextChoices):
     LOCKED = "LOCKED", "Locked"
 
 
+DEFAULT_CAPABILITY_CODES = (
+    "billing.view",
+    "billing.collect",
+    "billing.override_allocation",
+    "accounting.view",
+    "accounting.reverse_entry",
+    "batch.lock",
+    "draw.commit",
+    "draw.complete",
+    "inventory.adjust",
+    "vendor.manage",
+    "crm.manage",
+    "reports.export",
+    "business_setup.reset",
+)
+
+
+class Capability(models.Model):
+    code = models.CharField(max_length=120, unique=True, db_index=True)
+    label = models.CharField(max_length=160)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "capabilities"
+        ordering = ["code", "id"]
+
+    def clean(self):
+        super().clean()
+        self.code = (self.code or "").strip().lower()
+        self.label = (self.label or "").strip()
+        self.description = (self.description or "").strip()
+        errors = {}
+        if not self.code:
+            errors["code"] = "Capability code is required."
+        if not self.label:
+            errors["label"] = "Capability label is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().lower()
+        self.label = (self.label or "").strip()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.code
+
+
+class RoleCapability(models.Model):
+    role = models.CharField(
+        max_length=20,
+        choices=UserRole.choices,
+        db_index=True,
+    )
+    capability = models.ForeignKey(
+        Capability,
+        on_delete=models.CASCADE,
+        related_name="role_assignments",
+    )
+    is_allowed = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "role_capabilities"
+        ordering = ["role", "capability__code", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "capability"],
+                name="unique_role_capability_assignment",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["role", "is_allowed"]),
+            models.Index(fields=["capability", "is_allowed"]),
+        ]
+
+    def __str__(self):
+        return f"{self.role}:{self.capability.code}={self.is_allowed}"
+
+
+class UserCapabilityOverride(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="capability_overrides",
+    )
+    capability = models.ForeignKey(
+        Capability,
+        on_delete=models.CASCADE,
+        related_name="user_overrides",
+    )
+    is_allowed = models.BooleanField(default=False)
+    note = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_capability_overrides",
+        null=True,
+        blank=True,
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="updated_capability_overrides",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_capability_overrides"
+        ordering = ["user_id", "capability__code", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "capability"],
+                name="unique_user_capability_override",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "is_allowed"]),
+            models.Index(fields=["capability", "is_allowed"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        self.note = (self.note or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"user={self.user_id}:{self.capability.code}={self.is_allowed}"
+
+
 class PasswordResetRequest(models.Model):
     user = models.ForeignKey(
         User,

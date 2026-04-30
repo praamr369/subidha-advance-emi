@@ -192,6 +192,49 @@ export type StockAdjustment = {
   posted_journal_entry?: number | null;
 };
 
+export type VendorLite = {
+  id: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  gstin?: string | null;
+  state_code?: string | null;
+  state_name?: string | null;
+  is_active: boolean;
+};
+
+export type PurchaseOrder = {
+  id: number;
+  po_no: string;
+  po_date: string;
+  vendor: number;
+  vendor_name?: string;
+  status: "DRAFT" | "SENT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "BILLED" | "CANCELLED";
+  notes?: string;
+};
+
+export type GoodsReceipt = {
+  id: number;
+  receipt_no: string;
+  receipt_date: string;
+  purchase_order: number;
+  purchase_order_no?: string;
+  vendor_name?: string;
+  status: "DRAFT" | "RECEIVED" | "CANCELLED";
+};
+
+export type VendorBill = {
+  id: number;
+  bill_no: string;
+  bill_date: string;
+  vendor: number;
+  vendor_name?: string;
+  status: "DRAFT" | "POSTED" | "CANCELLED";
+  subtotal: string;
+  tax_total: string;
+  grand_total: string;
+};
+
 export type StockLocationPayload = {
   code: string;
   name: string;
@@ -338,6 +381,22 @@ export function postStockAdjustment(id: number) {
       body: JSON.stringify({}),
     }
   );
+}
+
+export function listVendorsLite(params: Record<string, QueryValue> = {}) {
+  return apiFetch<{ count: number; results: VendorLite[] }>(`/inventory/vendors/${buildQuery(params)}`);
+}
+
+export function listPurchaseOrders(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<PurchaseOrder>>(`/inventory/purchase-orders/${buildQuery(params)}`);
+}
+
+export function listGoodsReceipts(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<GoodsReceipt>>(`/inventory/goods-receipts/${buildQuery(params)}`);
+}
+
+export function listVendorBills(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<VendorBill>>(`/inventory/vendor-bills/${buildQuery(params)}`);
 }
 
 export async function previewOpeningStockImport(file: File) {

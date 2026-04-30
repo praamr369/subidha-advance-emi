@@ -649,6 +649,193 @@ class PurchaseBillLine(InventoryTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class PurchaseOrderStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    SENT = "SENT", "Sent"
+    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED", "Partially Received"
+    RECEIVED = "RECEIVED", "Received"
+    BILLED = "BILLED", "Billed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class GoodsReceiptStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    RECEIVED = "RECEIVED", "Received"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorBillStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorPaymentStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorContact(InventoryTimeStampedModel):
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="inventory_contacts",
+    )
+    name = models.CharField(max_length=120)
+    designation = models.CharField(max_length=80, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    is_primary = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "inventory_vendor_contacts"
+        ordering = ["vendor_id", "-is_primary", "name", "id"]
+        indexes = [models.Index(fields=["vendor", "is_primary", "is_active"])]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.designation = (self.designation or "").strip()
+        self.phone = (self.phone or "").strip()
+        if self.is_primary:
+            self.__class__.objects.filter(vendor=self.vendor, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseOrder(InventoryTimeStampedModel):
+    po_no = models.CharField(max_length=60, unique=True, db_index=True)
+    po_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="purchase_orders")
+    status = models.CharField(max_length=20, choices=PurchaseOrderStatus.choices, default=PurchaseOrderStatus.DRAFT, db_index=True)
+    expected_date = models.DateField(null=True, blank=True)
+    branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_orders")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_orders")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_purchase_orders"
+        ordering = ["-po_date", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            existing = PurchaseOrder.objects.filter(pk=self.pk).only("status").first()
+            if existing and existing.status == PurchaseOrderStatus.CANCELLED and self.status != PurchaseOrderStatus.CANCELLED:
+                raise ValidationError({"status": "Cancelled purchase orders cannot be changed."})
+        self.po_no = (self.po_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.stock_location, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseOrderLine(InventoryTimeStampedModel):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="purchase_order_lines")
+    description = models.CharField(max_length=255, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "inventory_purchase_order_lines"
+        ordering = ["id"]
+
+    def save(self, *args, **kwargs):
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class GoodsReceipt(InventoryTimeStampedModel):
+    receipt_no = models.CharField(max_length=60, unique=True, db_index=True)
+    receipt_date = models.DateField(db_index=True)
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name="receipts")
+    status = models.CharField(max_length=12, choices=GoodsReceiptStatus.choices, default=GoodsReceiptStatus.DRAFT, db_index=True)
+    branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
+    notes = models.TextField(blank=True, default="")
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_goods_receipts")
+
+    class Meta:
+        db_table = "inventory_goods_receipts"
+        ordering = ["-receipt_date", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.receipt_no = (self.receipt_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.stock_location, "branch", None) or getattr(self.purchase_order, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class GoodsReceiptLine(InventoryTimeStampedModel):
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.CASCADE, related_name="lines")
+    purchase_order_line = models.ForeignKey(PurchaseOrderLine, on_delete=models.PROTECT, related_name="receipt_lines", null=True, blank=True)
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="goods_receipt_lines")
+    quantity_received = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_goods_receipt_lines"
+        ordering = ["id"]
+
+
+class VendorBill(InventoryTimeStampedModel):
+    bill_no = models.CharField(max_length=60, unique=True, db_index=True)
+    bill_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_bills")
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_bills")
+    status = models.CharField(max_length=12, choices=VendorBillStatus.choices, default=VendorBillStatus.DRAFT, db_index=True)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_bill")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_vendor_bills"
+        ordering = ["-bill_date", "-created_at", "-id"]
+
+
+class VendorBillLine(InventoryTimeStampedModel):
+    vendor_bill = models.ForeignKey(VendorBill, on_delete=models.CASCADE, related_name="lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="vendor_bill_lines")
+    description = models.CharField(max_length=255, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    taxable_value = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "inventory_vendor_bill_lines"
+        ordering = ["id"]
+
+
+class VendorPayment(InventoryTimeStampedModel):
+    payment_no = models.CharField(max_length=60, unique=True, db_index=True)
+    payment_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_payments")
+    vendor_bill = models.ForeignKey(VendorBill, on_delete=models.PROTECT, related_name="payments", null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, related_name="vendor_payments")
+    status = models.CharField(max_length=12, choices=VendorPaymentStatus.choices, default=VendorPaymentStatus.DRAFT, db_index=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_payment")
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_vendor_payments"
+        ordering = ["-payment_date", "-created_at", "-id"]
+
 class InventoryValuation(InventoryTimeStampedModel):
     as_of_date = models.DateField(db_index=True)
     method = models.CharField(

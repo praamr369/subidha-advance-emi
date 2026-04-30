@@ -1,4 +1,5 @@
 import PortalPage from "@/components/ui/PortalPage";
+import Link from "next/link";
 
 const rolePolicies = [
   {
@@ -35,6 +36,14 @@ export default function RoleSettingsPage() {
       ]}
     >
       <section className="grid gap-4">
+        <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="text-sm text-muted-foreground">
+            Live capability matrix is managed from{" "}
+            <Link href="/admin/settings/roles-permissions" className="font-medium text-foreground underline">
+              Roles & Capabilities
+            </Link>.
+          </div>
+        </article>
         {rolePolicies.map((policy) => (
           <article key={policy.role} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

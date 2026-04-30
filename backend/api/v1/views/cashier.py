@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounting.models import FinanceAccount
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.accounting import FinanceAccountSerializer
 from api.v1.serializers.finance_operations import (
@@ -143,6 +144,7 @@ class CashierCollectPayment(APIView):
 
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
+    @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
         serializer = CashierPaymentCollectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -374,6 +376,7 @@ class CashierSearchDirectSaleView(APIView):
 class CashierCollectDirectSalePayment(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
+    @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
         data = request.data or {}
         direct_sale_id = data.get("direct_sale_id")
