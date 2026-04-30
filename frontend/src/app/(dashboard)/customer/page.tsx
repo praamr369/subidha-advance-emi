@@ -3,15 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
-  BadgeCheck,
-  CalendarClock,
-  CreditCard,
-  Layers3,
   RefreshCw,
   Sparkles,
-  Wallet,
 } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
@@ -22,7 +16,10 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PageHeader from "@/components/ui/PageHeader";
-import StatCard from "@/components/ui/StatCard";
+import {
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
@@ -391,83 +388,64 @@ export default function CustomerDashboardPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    KYC status
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {legacy.customer.kyc_status || "PENDING"}
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Phone
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {legacy.customer.phone || "—"}
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Contracts
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.subscription_count ?? legacy.subscriptions.length} total
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Winner history
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.winner_subscriptions ?? 0} subscription
-                    {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
-                  </div>
-                </div>
+                <KpiCard
+                  label="KYC status"
+                  value={legacy.customer.kyc_status || "PENDING"}
+                  helper="From your live profile record"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Phone"
+                  value={legacy.customer.phone || "—"}
+                  helper="Contact on file"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Contracts"
+                  value={summary.subscription_count ?? legacy.subscriptions.length}
+                  helper="Total subscriptions in summary"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Winner history"
+                  value={`${summary.winner_subscriptions ?? 0} subscription${
+                    (summary.winner_subscriptions ?? 0) === 1 ? "" : "s"
+                  }`}
+                  helper="Winner-linked contracts in summary"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
               </div>
             </div>
           </section>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
+          <QuickActionGrid>
+            <KpiCard
               label="Paid"
               value={money(summary.total_paid_amount)}
-              subtext={`${summary.paid_emis} EMI settled through recorded payments`}
-              tone="success"
-              icon={<Wallet className="h-5 w-5" />}
+              helper={`${summary.paid_emis} EMI settled through recorded payments`}
             />
-            <StatCard
+            <KpiCard
               label="Remaining"
               value={money(summary.remaining_amount ?? summary.outstanding_amount)}
-              subtext={`${money(summary.total_pending_amount)} still open across current contracts`}
-              tone={
-                Number(summary.remaining_amount ?? summary.outstanding_amount ?? 0) > 0
-                  ? "info"
-                  : "success"
-              }
-              icon={<CreditCard className="h-5 w-5" />}
+              helper={`${money(summary.total_pending_amount)} still open across current contracts`}
             />
-            <StatCard
+            <KpiCard
               label="Overdue EMI"
               value={String(summary.overdue_emis ?? 0)}
-              subtext={`${money(summary.overdue_amount)} currently past due`}
-              tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
-              icon={<AlertTriangle className="h-5 w-5" />}
+              helper={`${money(summary.overdue_amount)} currently past due`}
             />
-            <StatCard
+            <KpiCard
               label="Upcoming EMI"
               value={String(summary.upcoming_emis ?? 0)}
-              subtext={
+              helper={
                 summary.next_due_date && summary.next_due_amount
                   ? `${money(summary.next_due_amount)} next on ${formatDate(
                       summary.next_due_date
                     )}`
                   : "No upcoming EMI currently visible"
               }
-              tone="default"
-              icon={<CalendarClock className="h-5 w-5" />}
             />
-          </div>
+          </QuickActionGrid>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <section
@@ -545,24 +523,20 @@ export default function CustomerDashboardPage() {
                 />
               }
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <StatCard
+              <QuickActionGrid className="sm:grid-cols-2">
+                <KpiCard
                   label="Waived by benefit"
                   value={money(
                     winnerSurface?.total_waived_amount ?? summary.total_waived_amount
                   )}
-                  subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
-                  tone="info"
-                  icon={<BadgeCheck className="h-5 w-5" />}
+                  helper={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
                 />
-                <StatCard
+                <KpiCard
                   label="Contracts in view"
                   value={String(summary.subscription_count ?? legacy.subscriptions.length)}
-                  subtext={`${summary.winner_subscriptions ?? 0} with winner history`}
-                  tone="default"
-                  icon={<Layers3 className="h-5 w-5" />}
+                  helper={`${summary.winner_subscriptions ?? 0} with winner history`}
                 />
-              </div>
+              </QuickActionGrid>
               {winnerRows.length > 0 ? (
                 <div className="mt-4 grid gap-2">
                   {winnerRows.map((row) => (

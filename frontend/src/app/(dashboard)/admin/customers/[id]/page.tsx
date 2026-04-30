@@ -10,23 +10,16 @@ import {
   useState,
 } from "react";
 import {
-  ArrowUpRight,
-  ArrowDownRight,
-  CheckCircle2,
-  Clock,
+  Check,
   Search,
   X,
   RefreshCw,
-  Info,
-  CreditCard,
-  Wallet,
-  Building2,
-  Check,
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
@@ -719,75 +712,6 @@ function extractNestedArray(
 // =====================================================
 // UI COMPONENTS
 // =====================================================
-
-function StatCard({
-  title,
-  value,
-  icon,
-  trend,
-  trendValue,
-  tone = "default",
-  tooltip,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
-  tone?: "default" | "success" | "warning" | "danger";
-  tooltip?: string;
-}) {
-  const toneColors = {
-    default: "border-border bg-card",
-    success: "border-emerald-200 bg-emerald-50/50",
-    warning: "border-amber-200 bg-amber-50/50",
-    danger: "border-red-200 bg-red-50/50",
-  };
-
-  return (
-    <div className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${toneColors[tone]}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          {tooltip && (
-            <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 hidden w-48 rounded-lg bg-popover px-2 py-1 text-xs text-popover-foreground shadow-lg group-hover:block">
-                {tooltip}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="rounded-xl bg-background/50 p-2 text-muted-foreground">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-2">
-        <p className="text-2xl font-semibold text-foreground">{value}</p>
-      </div>
-      {trend && trendValue && (
-        <div className="mt-3 flex items-center gap-1 text-xs">
-          {trend === "up" ? (
-            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
-          ) : trend === "down" ? (
-            <ArrowDownRight className="h-3 w-3 text-red-600" />
-          ) : null}
-          <span
-            className={
-              trend === "up"
-                ? "text-emerald-600"
-                : trend === "down"
-                  ? "text-red-600"
-                  : "text-muted-foreground"
-            }
-          >
-            {trendValue}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function StatusBadge({
   status,
@@ -1702,17 +1626,22 @@ export default function AdminCustomerDetailPage() {
       }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+        <DetailPanel
+          title="Workspace controls"
+          description="Refresh customer truth from the server without leaving this profile."
+        >
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading customer detail..." /> : null}
 
@@ -1752,62 +1681,46 @@ export default function AdminCustomerDetailPage() {
             )}
 
             {/* Advanced Stats Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-              <StatCard
-                title="Active Subscriptions"
+            <QuickActionGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiCard
+                label="Active subscriptions"
                 value={String(activeSubscriptionCount)}
-                icon={<Building2 className="h-4 w-4" />}
-                tone={activeSubscriptionCount > 0 ? "success" : "default"}
-                tooltip="Subscriptions with status 'ACTIVE'"
+                helper="Subscriptions with status ACTIVE"
               />
-              <StatCard
-                title="Total Contract Value"
+              <KpiCard
+                label="Total contract value"
                 value={money(totalContractValue)}
-                icon={<Wallet className="h-4 w-4" />}
-                tone="success"
-                tooltip="Sum of total amounts for all subscriptions"
+                helper="Sum of total amounts for all subscriptions"
               />
-              <StatCard
-                title="Active Payments"
+              <KpiCard
+                label="Active payments"
                 value={String(activePayments.length)}
-                icon={<CreditCard className="h-4 w-4" />}
-                tone="default"
-                tooltip="Non-reversed payments"
+                helper="Non-reversed payments in preview"
               />
-              <StatCard
-                title="KYC Status"
+              <KpiCard
+                label="KYC status"
                 value={customer.kyc_status}
-                icon={
-                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED" ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : customer.kyc_status === "REJECTED" ? (
-                    <X className="h-4 w-4" />
-                  ) : (
-                    <Clock className="h-4 w-4" />
-                  )
+                helper={
+                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED"
+                    ? "Verified or approved"
+                    : customer.kyc_status === "REJECTED"
+                      ? "Rejected — review required"
+                      : "Compliance posture"
                 }
-                tone={kycTone}
               />
-              <StatCard
-                title="Direct-Sale Outstanding"
+              <KpiCard
+                label="Direct-sale outstanding"
                 value={money(
                   operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
                 )}
-                icon={<Wallet className="h-4 w-4" />}
-                tone={
-                  operationalProfile?.direct_sales.summary.outstanding_count
-                    ? "warning"
-                    : "default"
-                }
+                helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0}`}
               />
-              <StatCard
-                title="Receipts / Invoices"
+              <KpiCard
+                label="Receipts / invoices"
                 value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.invoice_count ?? 0}`}
-                icon={<CreditCard className="h-4 w-4" />}
-                tone="default"
-                tooltip="Receipts and invoices linked to this customer profile."
+                helper="Retail receipts and invoices linked to this profile"
               />
-            </div>
+            </QuickActionGrid>
 
             <div className="grid gap-6 xl:grid-cols-2">
               <SectionCard

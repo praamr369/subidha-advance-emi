@@ -10,10 +10,10 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import { DataTableShell, DetailPanel } from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   listCustomerPayments,
@@ -272,10 +272,11 @@ export default function CustomerPaymentsPage() {
       statusBadge={{ label: "Customer payment truth", tone: "info" }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <DetailPanel
           title="Payment filters"
           description="Narrow customer-visible payment history by subscription or collection method."
-          action={
+        >
+          <div className="mb-4 flex justify-end">
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -284,8 +285,7 @@ export default function CustomerPaymentsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
+          </div>
           <TableToolbar
             footer={
               subscriptionFilter || methodFilter ? (
@@ -348,7 +348,7 @@ export default function CustomerPaymentsPage() {
               </div>
             </div>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading payment history..." /> : null}
 
@@ -361,7 +361,7 @@ export default function CustomerPaymentsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Recorded customer payments"
             description="Open a row to view the receipt and navigate to the related subscription or support route."
           >
@@ -375,16 +375,18 @@ export default function CustomerPaymentsPage() {
                 }
               />
             ) : (
-              <DataTable<CustomerPayment>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) => router.push(`/customer/payments/${row.id}`)}
-                rowActions={(row) => (
-                  <ActionButton href={`/customer/payments/${row.id}`} variant="outline">
-                    View receipt
-                  </ActionButton>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<CustomerPayment>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) => router.push(`/customer/payments/${row.id}`)}
+                  rowActions={(row) => (
+                    <ActionButton href={`/customer/payments/${row.id}`} variant="outline">
+                      View receipt
+                    </ActionButton>
+                  )}
+                />
+              </DataTableShell>
             )}
 
             <div className="mt-5">
@@ -392,7 +394,7 @@ export default function CustomerPaymentsPage() {
                 Payment rows on this page come directly from the customer payments API. Subscription outstanding or waiver figures stay on the related subscription detail page so receipt history is not overloaded with contract-state assumptions.
               </WorkspaceNotice>
             </div>
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

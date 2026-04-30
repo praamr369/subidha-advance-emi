@@ -18,6 +18,12 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
+import {
+  DataTableShell,
+  DetailPanel,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import StatusBadge from "@/components/ui/status-badge";
@@ -366,10 +372,28 @@ export default function CustomerProfilePage() {
             lanes={selfServiceLanes}
           />
 
-          <WorkspaceSection
+          {headerStats.length > 0 ? (
+            <DetailPanel
+              title="At a glance"
+              description="Figures below come from your live profile summary; they mirror the header stats from the same API response."
+            >
+              <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
+                {headerStats.map((stat) => (
+                  <KpiCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                  />
+                ))}
+              </QuickActionGrid>
+            </DetailPanel>
+          ) : null}
+
+          <DetailPanel
             title="Account identity"
             description="Core customer identity and KYC posture from your live profile record."
-            action={
+          >
+            <div className="mb-4 flex justify-end">
               <ActionButton
                 variant="outline"
                 onClick={() => void loadPage()}
@@ -377,8 +401,7 @@ export default function CustomerProfilePage() {
               >
                 Refresh
               </ActionButton>
-            }
-          >
+            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <DetailItem label="Username" value={data.username} />
               <DetailItem
@@ -390,7 +413,7 @@ export default function CustomerProfilePage() {
               <DetailItem label="City" value={data.city || "—"} />
               <DetailItem label="Address" value={data.address || "No address recorded"} />
             </div>
-          </WorkspaceSection>
+          </DetailPanel>
 
           <WorkspaceSection
             title="Profile maintenance"
@@ -729,16 +752,18 @@ export default function CustomerProfilePage() {
             ) : null}
 
             {productRows.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-2">
-                {productRows.map((subscription) => (
-                  <CustomerProductSummaryCard
-                    key={subscription.id}
-                    subscription={subscription}
-                    href={`/customer/subscriptions/${subscription.id}`}
-                    compact
-                  />
-                ))}
-              </div>
+              <DataTableShell>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {productRows.map((subscription) => (
+                    <CustomerProductSummaryCard
+                      key={subscription.id}
+                      subscription={subscription}
+                      href={`/customer/subscriptions/${subscription.id}`}
+                      compact
+                    />
+                  ))}
+                </div>
+              </DataTableShell>
             ) : !productError ? (
               <EmptyState
                 title="No linked subscriptions yet"

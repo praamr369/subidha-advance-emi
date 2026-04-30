@@ -7,6 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
+import { DataTableShell } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
@@ -775,9 +776,9 @@ export default function CustomerSubscriptionDetailPage() {
                 description="No advance EMI rows were returned for this subscription."
               />
             ) : (
-              <div className="rounded-2xl border border-border bg-background p-2">
+              <DataTableShell>
                 <DataTable<EmiRow> rows={emiRows} columns={columns} />
-              </div>
+              </DataTableShell>
             )}
           </DetailSectionShell>
         </div>

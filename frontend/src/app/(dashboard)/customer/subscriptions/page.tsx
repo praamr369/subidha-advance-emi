@@ -13,9 +13,9 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
+import { DataTableShell, DetailPanel } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   listCustomerSubscriptionsRegister,
   type CustomerSubscriptionRegisterResponse,
@@ -359,10 +359,11 @@ export default function CustomerSubscriptionsPage() {
       statusBadge={{ label: "Customer subscription truth", tone: "info" }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <DetailPanel
           title="Subscription filters"
           description="Narrow the register by current contract status and refresh the latest subscription truth."
-          action={
+        >
+          <div className="mb-4 flex justify-end">
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -371,8 +372,7 @@ export default function CustomerSubscriptionsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
+          </div>
           <TableToolbar
             footer={
               statusFilter ? (
@@ -413,7 +413,7 @@ export default function CustomerSubscriptionsPage() {
               </div>
             </div>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading subscriptions..." /> : null}
 
@@ -426,7 +426,7 @@ export default function CustomerSubscriptionsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Customer subscription register"
             description="Dedicated customer subscription rows with safe navigation into detail and payment history."
           >
@@ -445,27 +445,29 @@ export default function CustomerSubscriptionsPage() {
                 description="The current page has no results. Move to a previous page or change the filters."
               />
             ) : (
-              <DataTable<CustomerSubscription>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) => router.push(`/customer/subscriptions/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <ActionButton
-                      href={`/customer/subscriptions/${row.id}`}
-                      variant="outline"
-                    >
-                      View
-                    </ActionButton>
-                    <ActionButton
-                      href={`/customer/payments?subscription=${row.id}`}
-                      variant="outline"
-                    >
-                      Payments
-                    </ActionButton>
-                  </div>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<CustomerSubscription>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) => router.push(`/customer/subscriptions/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <ActionButton
+                        href={`/customer/subscriptions/${row.id}`}
+                        variant="outline"
+                      >
+                        View
+                      </ActionButton>
+                      <ActionButton
+                        href={`/customer/payments?subscription=${row.id}`}
+                        variant="outline"
+                      >
+                        Payments
+                      </ActionButton>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
             )}
 
             {count > 0 ? (
@@ -489,7 +491,7 @@ export default function CustomerSubscriptionsPage() {
                 Winner and waiver posture on this page comes from customer-scoped subscription truth. EMI-row detail and exact settlement context remain on the subscription detail page.
               </WorkspaceNotice>
             </div>
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

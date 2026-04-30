@@ -143,7 +143,7 @@
 - `cd frontend && npm run lint` — passed
 - `cd frontend && npm run typecheck` — passed
 - `cd frontend && npm run build` — passed
-- `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
+- `cd frontend && npm run test:e2e:smoke` — passed
 - `cd .. && bash scripts/run-release-candidate.sh` — passed
 
 ## Pass 3 — Payment Detail and History Rollout
@@ -249,3 +249,62 @@
 - `cd frontend && npm run build` — passed
 - `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
 - `cd .. && bash scripts/run-release-candidate.sh` — passed
+
+## Pass 5 — Customer Profile and Self-Service Rollout
+
+### Pages migrated
+
+- `src/app/(dashboard)/admin/customers/page.tsx`
+- `src/app/(dashboard)/admin/customers/[id]/page.tsx`
+- `src/app/(dashboard)/admin/customers/[id]/edit/page.tsx`
+- `src/app/(dashboard)/customer/page.tsx`
+- `src/app/(dashboard)/customer/profile/page.tsx`
+- `src/app/(dashboard)/customer/subscriptions/page.tsx`
+- `src/app/(dashboard)/customer/subscriptions/[id]/page.tsx`
+- `src/app/(dashboard)/customer/payments/page.tsx`
+
+### Shared primitives used
+
+- `DataTableShell`
+- `DetailPanel`
+- `FormSection` (operations — admin customer edit; customer self-service profile form groups remain on `components/ui/FormSection` for column/grid behavior)
+- `KpiCard`
+- `QuickActionGrid`
+- `Timeline` (admin customer edit — entries only from existing audit timeline API)
+
+### Rollout notes
+
+- Admin customer register: KPI row and CSV import preview use `KpiCard`/`QuickActionGrid`; workflow/filter blocks use `DetailPanel`; main register table uses `DataTableShell`. Search, filters, export, and import calls unchanged.
+- Admin customer detail: removed local duplicate `StatCard`; KPI strip uses `KpiCard` with the same sources; refresh control in `DetailPanel`. Dense operational sections keep `WorkspaceSection` where needed.
+- Admin customer edit: operations `FormSection` groupings; `DetailPanel` for account controls; `Timeline` for audit rows only. Request payloads unchanged.
+- Customer dashboard: hero and financial KPI rows use `KpiCard`/`QuickActionGrid`; preserved smoke-visible headings and settlement copy.
+- Customer profile: `At a glance` from existing summary stats; `DetailPanel` for account identity; product summary grid in `DataTableShell`.
+- Customer subscriptions and payments: `DetailPanel` for filter tooling; `DataTableShell` around history tables.
+- Customer subscription detail: EMI schedule table in `DataTableShell`.
+
+### Fake/dead UI removed
+
+- Removed bespoke admin customer detail `StatCard` implementation (tooltips moved to `KpiCard` helper copy).
+- Cleaned unused icon imports where primitives replaced prior stat widgets.
+
+### Remaining blockers
+
+- Admin customer detail file size/complexity; incremental `DetailPanel` migration for remaining sections possible later.
+- Profile page shows KPIs in both `PortalPage` stats and `At a glance` (same data); optional consolidation in a future UX pass.
+- `src/components/admin/customer/CustomerProfileInfo.tsx` not wired into these routes; unchanged legacy helper.
+
+### Backend/API changes
+
+- none
+
+### Migrations
+
+- none
+
+### Test results
+
+- `cd frontend && npm run lint` — passed
+- `cd frontend && npm run typecheck` — passed
+- `cd frontend && npm run build` — passed
+- `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
+- `cd .. && bash scripts/run-release-candidate.sh` — passed (`RELEASE CANDIDATE VALIDATION PASSED`)
