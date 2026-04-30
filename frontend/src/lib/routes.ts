@@ -84,6 +84,8 @@ export const ROUTES = {
 
     crm: "/admin/crm",
     crmLeads: "/admin/crm/leads",
+    crmPipeline: "/admin/crm/pipeline",
+    crmFollowUps: "/admin/crm/follow-ups",
     crmKyc: "/admin/crm/kyc",
     crmCustomerDetail: "/admin/crm/customers",
     crmParties: "/admin/crm/parties",

@@ -89,6 +89,7 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   await page.goto("/admin/crm/parties");
   await expect(page.getByRole("heading", { name: "Party Directory" }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Directory filters");
+  await expect(page.locator("body")).toContainText("customers, partners, vendors, and staff");
 
   await page.goto("/admin/support-requests");
   await expect(page.getByRole("heading", { name: "Support Requests" }).first()).toBeVisible();

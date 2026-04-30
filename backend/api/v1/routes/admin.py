@@ -240,6 +240,14 @@ from api.v1.views.admin_erp import (
     AdminProductOperationsWorkspaceView,
     AdminSalesWorkspaceView,
 )
+from api.v1.views.admin_crm_module import (
+    AdminCrmFollowUpCallNoteView,
+    AdminCrmFollowUpListView,
+    AdminCrmLeadConvertView,
+    AdminCrmLeadListCreateView,
+    AdminCrmLeadStageUpdateView,
+    AdminCustomerCrmProfileView,
+)
 from api.v1.views.admin_hr import (
     AdminHrAttendanceListCreateView,
     AdminHrExpenseClaimPatchView,
@@ -488,6 +496,12 @@ urlpatterns = [
     path("erp/summary/", AdminErpSummaryView.as_view()),
     path("erp/today-work/", AdminErpTodayWorkView.as_view()),
     path("crm/workspace/", AdminCrmWorkspaceView.as_view()),
+    path("crm/internal/leads/", AdminCrmLeadListCreateView.as_view()),
+    path("crm/internal/leads/<int:pk>/stage/", AdminCrmLeadStageUpdateView.as_view()),
+    path("crm/internal/leads/<int:pk>/convert/", AdminCrmLeadConvertView.as_view()),
+    path("crm/internal/follow-ups/", AdminCrmFollowUpListView.as_view()),
+    path("crm/internal/follow-ups/<int:pk>/call-note/", AdminCrmFollowUpCallNoteView.as_view()),
+    path("crm/internal/customers/<int:pk>/profile/", AdminCustomerCrmProfileView.as_view()),
     path("sales/workspace/", AdminSalesWorkspaceView.as_view()),
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),

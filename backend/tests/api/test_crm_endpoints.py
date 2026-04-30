@@ -8,7 +8,7 @@ from subscriptions.services.public_lead_service import (
     complete_public_lead_conversion,
     create_public_lead,
 )
-from tests.helpers import create_admin_user, create_customer_profile
+from tests.helpers import create_admin_user, create_customer_profile, create_partner_user
 
 
 class CrmApiTests(APITestCase):
@@ -80,3 +80,35 @@ class CrmApiTests(APITestCase):
         self.assertGreaterEqual(detail.data["summary"]["lead_count"], 1)
         self.assertGreaterEqual(detail.data["summary"]["interaction_count"], 1)
         self.assertEqual(detail.data["related"]["interactions"][0]["interaction_type"], "FOLLOW_UP")
+
+    def test_party_directory_merges_multiple_people_roles_on_shared_phone(self):
+        shared_phone = "7388000999"
+        create_customer_profile(
+            name="Unified Person",
+            phone=shared_phone,
+        )
+        create_partner_user(
+            username="crm_partner_shared",
+            phone=shared_phone,
+        )
+
+        parties = self.client.get(f"/api/v1/crm/parties/?q={shared_phone}")
+        self.assertEqual(parties.status_code, status.HTTP_200_OK, parties.data)
+        self.assertGreaterEqual(parties.data["count"], 1)
+
+        party_id = parties.data["results"][0]["id"]
+        detail = self.client.get(f"/api/v1/crm/parties/{party_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertIn("CUSTOMER", detail.data["party"]["role_types"])
+        self.assertIn("PARTNER", detail.data["party"]["role_types"])
+
+        patch_response = self.client.patch(
+            f"/api/v1/crm/parties/{party_id}/",
+            {"notes_summary": "Shared profile across customer and partner contexts."},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK, patch_response.data)
+        self.assertEqual(
+            patch_response.data["party"]["notes_summary"],
+            "Shared profile across customer and partner contexts.",
+        )

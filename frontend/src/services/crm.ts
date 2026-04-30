@@ -37,6 +37,7 @@ export type PartyListRow = {
   primary_email?: string;
   city?: string;
   is_active: boolean;
+  notes_summary?: string;
   role_types: PartyRoleType[];
   next_follow_up_at?: string | null;
   follow_up_state: PartyFollowUpState;
@@ -180,6 +181,24 @@ export function listCrmParties(params: Record<string, QueryValue> = {}) {
 
 export function getCrmParty(id: number | string) {
   return apiFetch<PartyDetailResponse>(`/crm/parties/${id}/`);
+}
+
+export function updateCrmParty(
+  id: number | string,
+  payload: {
+    display_name?: string;
+    party_kind?: string;
+    primary_phone?: string;
+    primary_email?: string;
+    city?: string;
+    notes_summary?: string;
+    is_active?: boolean;
+  }
+) {
+  return apiFetch<PartyDetailResponse>(`/crm/parties/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function createPartyInteraction(

@@ -34,7 +34,7 @@ export default function AdminCrmOverviewPage() {
   return (
     <WorkspaceShell
       title="CRM Workspace"
-      subtitle="Lead management, follow-up continuity, customer 360 visibility, and support posture from canonical records."
+      subtitle="Lead management, follow-up continuity, party 360 visibility, and support posture from canonical records."
     >
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
       {payload ? (

@@ -105,13 +105,16 @@ export default function AdminCrmPartyDirectoryPage() {
   const activePartyCount = rows.filter((row) => row.is_active).length;
   const dueFollowUpCount = rows.filter((row) => row.follow_up_state === "DUE").length;
   const customerLinkedCount = rows.filter((row) => row.role_types.includes("CUSTOMER")).length;
+  const partnerLinkedCount = rows.filter((row) => row.role_types.includes("PARTNER")).length;
+  const vendorLinkedCount = rows.filter((row) => row.role_types.includes("VENDOR")).length;
+  const staffLinkedCount = rows.filter((row) => row.role_types.includes("STAFF")).length;
 
   return (
     <PortalPage
       eyebrow="CRM Directory"
       title="Party Directory"
-      subtitle="A shared additive identity layer above leads, customers, vendors, partners, and staff. It links records together; it does not replace the underlying source models."
-      helperNote="Use the party directory for identity, role, and follow-up context. Customer edits, billing, and support actions remain in their source modules."
+      subtitle="A shared additive identity layer above leads, customers, partners, vendors, and staff. All party types are visible here in one directory without replacing underlying source models."
+      helperNote="All party roles are visible in this directory. Use it for identity, role, and follow-up continuity; financial and operational edits remain in source modules."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
@@ -131,6 +134,9 @@ export default function AdminCrmPartyDirectoryPage() {
           tone: dueFollowUpCount > 0 ? "warning" : "success",
         },
         { label: "Customer Linked", value: String(customerLinkedCount) },
+        { label: "Partner Linked", value: String(partnerLinkedCount) },
+        { label: "Vendor Linked", value: String(vendorLinkedCount) },
+        { label: "Staff Linked", value: String(staffLinkedCount) },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
@@ -181,7 +187,7 @@ export default function AdminCrmPartyDirectoryPage() {
               description="Focus the party register by role and follow-up posture before drilling into the full cross-module timeline."
               footer={
                 <div className="text-sm text-muted-foreground">
-                  Showing {roleType || "all roles"} with {followUpState || "all follow-up states"}.
+                  Showing {roleType || "all roles"} with {followUpState || "all follow-up states"} across customers, partners, vendors, and staff.
                 </div>
               }
             >
@@ -228,6 +234,9 @@ export default function AdminCrmPartyDirectoryPage() {
                 tone={dueFollowUpCount > 0 ? "warning" : "success"}
               />
               <StatCard label="Customer Linked" value={String(customerLinkedCount)} />
+              <StatCard label="Partner Linked" value={String(partnerLinkedCount)} />
+              <StatCard label="Vendor Linked" value={String(vendorLinkedCount)} />
+              <StatCard label="Staff Linked" value={String(staffLinkedCount)} />
             </div>
             <div className="mt-5">
             <EnterpriseDataTable

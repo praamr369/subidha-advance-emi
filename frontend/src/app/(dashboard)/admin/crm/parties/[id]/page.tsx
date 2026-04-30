@@ -19,6 +19,7 @@ import { ROUTES } from "@/lib/routes";
 import {
   createPartyInteraction,
   getCrmParty,
+  updateCrmParty,
   updatePartyInteractionStatus,
   type PartyDetailResponse,
 } from "@/services/crm";
@@ -79,6 +80,15 @@ export default function AdminCrmPartyDetailPage() {
     next_follow_up_at: "",
     create_follow_up_reminder: true,
   });
+  const [partyForm, setPartyForm] = useState({
+    display_name: "",
+    party_kind: "PERSON",
+    primary_phone: "",
+    primary_email: "",
+    city: "",
+    notes_summary: "",
+    is_active: true,
+  });
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -87,6 +97,15 @@ export default function AdminCrmPartyDetailPage() {
         else setRefreshing(true);
         const next = await getCrmParty(partyId);
         setPayload(next);
+        setPartyForm({
+          display_name: next.party.display_name || "",
+          party_kind: next.party.party_kind || "PERSON",
+          primary_phone: next.party.primary_phone || "",
+          primary_email: next.party.primary_email || "",
+          city: next.party.city || "",
+          notes_summary: next.party.notes_summary || "",
+          is_active: Boolean(next.party.is_active),
+        });
         setError(null);
       } catch (err) {
         setPayload(null);
@@ -180,10 +199,33 @@ export default function AdminCrmPartyDetailPage() {
     }
   }
 
+  async function handleUpdateParty() {
+    if (!payload) return;
+    try {
+      setSaving(true);
+      setNotice(null);
+      const next = await updateCrmParty(payload.party.id, {
+        display_name: partyForm.display_name,
+        party_kind: partyForm.party_kind,
+        primary_phone: partyForm.primary_phone,
+        primary_email: partyForm.primary_email,
+        city: partyForm.city,
+        notes_summary: partyForm.notes_summary,
+        is_active: partyForm.is_active,
+      });
+      setPayload(next);
+      setNotice("Party 360 profile updated.");
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <PortalPage
-      title={payload ? payload.party.display_name : "Party Timeline"}
-      subtitle="Cross-module timeline for one CRM party. This view surfaces related subscriptions, direct sales, billing, delivery, support, and follow-up history without taking ownership of those underlying records."
+      title={payload ? `${payload.party.display_name} · Party 360` : "Party 360 Profile"}
+      subtitle="Cross-module Party 360 profile for customers, partners, vendors, and staff. This view supports additive party-profile edits and interaction follow-ups while preserving source-system ownership."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM", href: ROUTES.admin.crm },
@@ -255,6 +297,7 @@ export default function AdminCrmPartyDetailPage() {
                   <DetailItem label="Primary Phone" value={payload.party.primary_phone || "—"} />
                   <DetailItem label="Primary Email" value={payload.party.primary_email || "—"} />
                   <DetailItem label="City" value={payload.party.city || "—"} />
+                  <DetailItem label="Notes Summary" value={payload.party.notes_summary || "—"} />
                   <DetailItem
                     label="Follow-Up State"
                     value={`${payload.party.follow_up_state} · ${payload.summary.open_follow_up_count} open`}
@@ -293,6 +336,98 @@ export default function AdminCrmPartyDetailPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+              <WorkspaceSection
+                title="Edit Party Profile"
+                description="Update additive party master fields here. Linked source records (customer, partner, vendor, staff, subscriptions, billing) remain authoritative in their own modules."
+              >
+                <div className="grid gap-3">
+                  <label className="grid gap-2 text-sm">
+                    <span>Display name</span>
+                    <input
+                      value={partyForm.display_name}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, display_name: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>Party kind</span>
+                    <select
+                      value={partyForm.party_kind}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, party_kind: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    >
+                      <option value="PERSON">Person</option>
+                      <option value="ORGANIZATION">Organization</option>
+                      <option value="HOUSEHOLD">Household</option>
+                      <option value="UNKNOWN">Unknown</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>Primary phone</span>
+                    <input
+                      value={partyForm.primary_phone}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, primary_phone: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>Primary email</span>
+                    <input
+                      value={partyForm.primary_email}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, primary_email: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>City</span>
+                    <input
+                      value={partyForm.city}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, city: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span>Notes summary</span>
+                    <textarea
+                      rows={3}
+                      value={partyForm.notes_summary}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, notes_summary: event.target.value }))
+                      }
+                      className="rounded-xl border border-border bg-background px-3 py-2"
+                    />
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={partyForm.is_active}
+                      onChange={(event) =>
+                        setPartyForm((current) => ({ ...current, is_active: event.target.checked }))
+                      }
+                    />
+                    Party active
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleUpdateParty()}
+                    disabled={saving || !partyForm.display_name.trim()}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {saving ? "Saving..." : "Save Party Profile"}
+                  </button>
+                </div>
+              </WorkspaceSection>
+
               <WorkspaceSection
                 title="Add Interaction"
                 description="Record follow-up notes explicitly. Reminder creation stays optional and separate from financial reminder truth."

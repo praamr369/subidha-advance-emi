@@ -6,6 +6,7 @@ from crm.models import (
     PartyInteraction,
     PartyInteractionStatus,
     PartyInteractionType,
+    PartyKind,
     PartyMaster,
 )
 from reminders.models import ReminderChannel
@@ -38,6 +39,7 @@ class PartyMasterListSerializer(serializers.ModelSerializer):
             "primary_email",
             "city",
             "is_active",
+            "notes_summary",
             "role_types",
             "next_follow_up_at",
             "follow_up_state",
@@ -143,3 +145,13 @@ class PartyInteractionCreateSerializer(serializers.Serializer):
 
 class PartyInteractionStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=PartyInteractionStatus.choices)
+
+
+class PartyMasterUpdateSerializer(serializers.Serializer):
+    display_name = serializers.CharField(required=False, allow_blank=False, trim_whitespace=True)
+    party_kind = serializers.ChoiceField(choices=PartyKind.choices, required=False)
+    primary_phone = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    primary_email = serializers.EmailField(required=False, allow_blank=True)
+    city = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    notes_summary = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    is_active = serializers.BooleanField(required=False)

@@ -54,7 +54,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Staff & Business Setup", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
 
   item("CRM", "CRM Workspace", ROUTES.admin.crmWorkspace, "Lead, customer, and support operating board."),
-  item("CRM", "Customer 360", ROUTES.admin.crmParties, "Party and customer 360 records."),
+  item("CRM", "Party 360", ROUTES.admin.crmParties, "Party-centric 360 records across customers, partners, vendors, and staff."),
   item("CRM", "Customers", ROUTES.admin.customers, "Customer register."),
   item("CRM", "Leads / Enquiries", ROUTES.admin.leads, "Lead and enquiry pipeline."),
   item("CRM", "Follow-ups", ROUTES.admin.remindersPaymentReminders, "Follow-up and payment reminder tasks."),
