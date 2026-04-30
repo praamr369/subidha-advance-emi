@@ -346,8 +346,45 @@
 
 ### Remaining blockers
 
-- Admin product/batch/subscription/Lucky ID detail, edit, lifecycle, and masters routes still use `WorkspaceSection` shells; incremental migration can follow the same primitive map.
-- `Timeline` not added on these registers (no new fabricated events; only existing timestamps remain in tables as before).
+- Drill-down/edit/lifecycle for products, batches, Lucky IDs, and advance-EMI subscriptions is covered in **Pass 6b** below.
+- Deeper admin masters (`admin/products/masters`, etc.) and non-EMI-only workflows can still adopt primitives incrementally.
+
+### Recommended next small follow-up pass
+
+- Subscription request / queue detail polish, or remaining `WorkspaceSection`-only admin surfaces outside this master set.
+
+## Pass 6b — Admin Master Drill-Down and Lifecycle Rollout
+
+### Pages migrated
+
+- `src/app/(dashboard)/admin/products/[id]/page.tsx`
+- `src/app/(dashboard)/admin/products/[id]/edit/page.tsx`
+- `src/app/(dashboard)/admin/batches/[id]/page.tsx`
+- `src/app/(dashboard)/admin/batches/[id]/edit/page.tsx`
+- `src/app/(dashboard)/admin/lucky-ids/[id]/page.tsx`
+- `src/app/(dashboard)/admin/lucky-ids/[id]/edit/page.tsx`
+- `src/app/(dashboard)/admin/subscriptions/[id]/page.tsx`
+- `src/app/(dashboard)/admin/subscriptions/[id]/lifecycle/page.tsx`
+
+### Shared primitives used
+
+- `DetailPanel` — product/batch/Lucky ID/subscription summary, rules, success blocks, rent/lease contract profile, delivery, finance, reconciliation, waived EMI lists, lifecycle overview.
+- `FormSection` — batch operational field update and guarded status transition; Lucky ID status correction; rent/lease lifecycle actions, amendments, possession, return inspection forms.
+- `DataTableShell` — subscription delivery history table, Advance EMI schedule table (existing columns and data only).
+- `Timeline` — subscription audit rows from existing timeline payload only (no fabricated events).
+- `KpiCard` / `QuickActionGrid` — already used on batch detail from Pass 6 continuity (unchanged semantics).
+- `StatusBadge` — shared component on Lucky ID and batch/subscription contexts; lifecycle page now uses shared `StatusBadge` instead of a local span helper.
+
+### Rollout notes
+
+- All routes, API calls, PATCH/transition payloads, and normalization helpers are unchanged.
+- Batch lifecycle actions and Lucky ID correction options remain exactly as wired; only layout and visual grouping changed.
+- Subscription detail preserves `enterprise-section-title` headings inside `DetailPanel` (smoke-visible section titles such as “Contract overview”, “Advance EMI schedule”, “Audit timeline” unchanged).
+
+### Fake/dead UI removed
+
+- Removed local `SectionCard` wrappers and ad-hoc status tone class helpers on Lucky ID detail/edit (replaced by `DetailPanel` / `FormSection` + shared `StatusBadge`).
+- Removed duplicate local `StatusBadge` + `statusTone` on subscription rent/lease lifecycle page in favor of shared `StatusBadge`.
 
 ### Backend/API changes
 
@@ -365,6 +402,11 @@
 - `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
 - `cd .. && bash scripts/run-release-candidate.sh` — passed (`RELEASE CANDIDATE VALIDATION PASSED`)
 
+### Remaining blockers
+
+- Subscription detail page remains large; optional future pass could split sections or adopt `DataTableShell` for payment card lists if a tabular API becomes available.
+- Lucky ID / batch status tokens depend on existing backend enums; `StatusBadge` presentation follows `resolveStatusPresentation` (cosmetic).
+
 ### Recommended next small follow-up pass
 
-- Migrate `admin/products/[id]`, `admin/products/[id]/edit`, `admin/batches/[id]`, `admin/batches/[id]/edit`, `admin/subscriptions/[id]`, `admin/subscriptions/[id]/lifecycle`, and `admin/lucky-ids/[id]`(+ edit) from `WorkspaceSection`-only shells to `DetailPanel`/`FormSection`/`DataTableShell` for full operational parity on drill-down routes.
+- Admin **subscription-requests** queue detail or **products/masters** surfaces if they still use legacy section shells only.
