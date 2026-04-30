@@ -8,9 +8,15 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { downloadCsv } from "@/lib/export/csv";
 import { getOverdueSummary } from "@/services/reports";
 import type { EmiRecord } from "@/services/emis";
@@ -319,7 +325,7 @@ export default function OverdueEmiPage() {
 
         {!loading && !error ? (
           <>
-            <WorkspaceSection
+            <DetailPanel
               title="Collections note"
               description="Use this queue to review overdue exposure, then hand off to collection, subscription review, or payment audit."
             >
@@ -328,7 +334,7 @@ export default function OverdueEmiPage() {
                 admin follow-up queue, then open the subscription or the collection
                 workspace for the next operational action.
               </p>
-            </WorkspaceSection>
+            </DetailPanel>
 
             {rows.length === 0 ? (
               <EmptyState
@@ -336,10 +342,30 @@ export default function OverdueEmiPage() {
                 description="No overdue pending EMI rows are currently available for follow-up."
               />
             ) : (
-              <WorkspaceSection
-                title="Overdue EMI Queue"
-                description="Search by customer, phone, subscription, or batch and route each overdue row to the next safe action."
-                action={
+              <>
+                <QuickActionGrid>
+                  <KpiCard
+                    label="Overdue EMI Count"
+                    value={String(summary?.overdueCount ?? summary?.overdue_count ?? 0)}
+                    helper="Pending overdue installments"
+                  />
+                  <KpiCard label="Overdue Exposure" value={money(totalExposure)} helper="Current outstanding exposure" />
+                  <KpiCard
+                    label="Oldest Overdue"
+                    value={`${oldestOverdueDays} days`}
+                    helper={oldestOverdueDays > 30 ? "Critical aging follow-up" : "Aging in control band"}
+                  />
+                  <KpiCard
+                    label="Pending EMI Count"
+                    value={String(summary?.pendingCount ?? summary?.pending_count ?? 0)}
+                    helper="Total pending EMI rows"
+                  />
+                </QuickActionGrid>
+                <FormSection
+                  title="Overdue EMI Queue"
+                  description="Search by customer, phone, subscription, or batch and route each overdue row to the next safe action."
+                >
+                <div className="mb-4 flex justify-end">
                   <button
                     type="button"
                     disabled={exportRows.length === 0}
@@ -368,8 +394,7 @@ export default function OverdueEmiPage() {
                   >
                     Export Current View
                   </button>
-                }
-              >
+                </div>
                 <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
                   <label className="relative block">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -428,6 +453,7 @@ export default function OverdueEmiPage() {
                   </div>
                 </div>
 
+                <DataTableShell>
                 <DataTable<EmiRecord>
                   rows={filteredRows}
                   columns={columns}
@@ -465,7 +491,9 @@ export default function OverdueEmiPage() {
                     </div>
                   )}
                 />
-              </WorkspaceSection>
+                </DataTableShell>
+              </FormSection>
+              </>
             )}
           </>
         ) : null}

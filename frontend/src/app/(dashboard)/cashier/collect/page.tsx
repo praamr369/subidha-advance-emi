@@ -9,8 +9,13 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
+import {
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
 import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
 import {
@@ -743,7 +748,37 @@ export default function CashierCollectPage() {
           lastPaymentSummary={unifiedLastPaymentSummary}
         />
 
-        <SectionCard
+        <QuickActionGrid>
+          <KpiCard
+            label="Workflow"
+            value={collectionWorkflow === "direct-sale" ? "Direct Sale" : "Subscription EMI"}
+            helper="Current cashier collection mode"
+          />
+          <KpiCard
+            label={collectionWorkflow === "direct-sale" ? "Queue Context" : "Pending EMI Count"}
+            value={
+              collectionWorkflow === "direct-sale"
+                ? (lookup?.customer_name || "Direct-sale receivables")
+                : String(lookup?.total_pending_emis ?? 0)
+            }
+            helper={collectionWorkflow === "direct-sale" ? "Current customer/queue" : "Pending collectible EMI rows"}
+          />
+          <KpiCard
+            label={collectionWorkflow === "direct-sale" ? "Reference Mode" : "Overdue EMI"}
+            value={
+              collectionWorkflow === "direct-sale"
+                ? "Receipt-safe retail flow"
+                : String(lookup?.overdue_emi_count ?? 0)
+            }
+            helper={collectionWorkflow === "direct-sale" ? "No EMI allocation mutation" : "Overdue rows requiring attention"}
+          />
+          <WorkflowCard
+            title="Counter sequence"
+            description="Search -> verify row -> post once -> open receipt/history."
+          />
+        </QuickActionGrid>
+
+        <FormSection
           title="Workflow selection"
           description="Keep retail direct-sale collections separate from subscription EMI collections so each path stays operationally clear and financially safe."
         >
@@ -791,13 +826,13 @@ export default function CashierCollectPage() {
               );
             })}
           </div>
-        </SectionCard>
+        </FormSection>
 
         {collectionWorkflow === "direct-sale" ? (
           <CashierDirectSaleCollectPanel prefillDirectSaleId={prefillDirectSaleId} />
         ) : (
           <>
-        <SectionCard
+        <FormSection
           title="Step 1 · Search collectible EMI rows"
           description="Phone loads the full customer queue directly. Subscription, lucky, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
         >
@@ -872,7 +907,7 @@ export default function CashierCollectPage() {
           <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
             {activeSearchConfig.help}
           </div>
-        </SectionCard>
+        </FormSection>
 
         {searchingMatches ? (
           <LoadingBlock label="Searching collectible EMI rows..." />
@@ -891,7 +926,7 @@ export default function CashierCollectPage() {
         !searchResultsError &&
         searchMode !== "phone" &&
         submittedSearch ? (
-          <SectionCard
+          <FormSection
             title="Search matches"
             description="Pick the right collectible EMI row to load the customer queue and continue safely."
           >
@@ -964,7 +999,7 @@ export default function CashierCollectPage() {
                 ))}
               </div>
             )}
-          </SectionCard>
+          </FormSection>
         ) : null}
 
         {lookupLoading ? <LoadingBlock label="Loading customer pending queue..." /> : null}
@@ -979,7 +1014,7 @@ export default function CashierCollectPage() {
 
         {!lookupLoading && !lookupError && hasLookupResult ? (
           <>
-            <SectionCard
+            <FormSection
               title="Customer summary"
               description="Quick customer context for the current collection candidate."
             >
@@ -1036,9 +1071,9 @@ export default function CashierCollectPage() {
                   </span>
                 </div>
               </div>
-            </SectionCard>
+            </FormSection>
 
-            <SectionCard
+            <FormSection
               title="Step 2 · Select pending EMI"
               description="Choose the exact EMI row you are collecting against."
             >
@@ -1121,9 +1156,9 @@ export default function CashierCollectPage() {
                   })}
                 </div>
               )}
-            </SectionCard>
+            </FormSection>
 
-            <SectionCard
+            <FormSection
               title="Step 3 · Post collection"
               description="Collect only against the selected EMI row. UPI and bank entries require a reference number."
             >
@@ -1385,9 +1420,9 @@ export default function CashierCollectPage() {
                   </div>
                 </form>
               )}
-            </SectionCard>
+            </FormSection>
 
-            <SectionCard
+            <FormSection
               title="Step 4 · Collect unapplied customer advance"
               description="Use this when the customer is paying now but the amount should remain unapplied until a later EMI or receivable allocation."
             >
@@ -1510,7 +1545,7 @@ export default function CashierCollectPage() {
                   </div>
                 </form>
               )}
-            </SectionCard>
+            </FormSection>
           </>
         ) : null}
           </>

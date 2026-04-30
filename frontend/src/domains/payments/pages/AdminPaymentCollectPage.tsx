@@ -6,6 +6,13 @@ import { useSearchParams } from "next/navigation";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
+import {
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -169,26 +176,6 @@ function getEmiLabel(emi: AdminEmiCollectionCandidate): string {
   )} • Outstanding ${formatCurrency(normalizeOutstandingAmount(emi))} • ${
     emi.status
   }`;
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.3)]">
-      <div className="enterprise-eyebrow">
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold text-foreground">{value}</div>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
 }
 
 export default function AdminPaymentCollectPage({
@@ -827,6 +814,27 @@ export default function AdminPaymentCollectPage({
       maxWidth={variant === "drawer" ? "100%" : undefined}
     >
       <div className="space-y-6">
+        <QuickActionGrid>
+          <KpiCard
+            label="Selected subscription"
+            value={selectedSubscription?.subscription_number || "—"}
+            helper={selectedSubscription?.status || "No subscription selected"}
+          />
+          <KpiCard
+            label="Selected EMI"
+            value={selectedEmi ? `#${selectedEmi.id}` : "—"}
+            helper={selectedEmi?.status || "No EMI selected"}
+          />
+          <KpiCard
+            label="Auto amount"
+            value={form.amount ? formatCurrency(form.amount) : "—"}
+            helper="Derived from outstanding amount"
+          />
+          <WorkflowCard
+            title="Safe posting path"
+            description="Search subscription -> select EMI -> verify amount/method -> confirm posting."
+          />
+        </QuickActionGrid>
         <UnifiedReceivableSearchPanel
           title="Universal contract search"
           description="Search across Advance EMI, rent, lease, and direct-sale references. Active actions route back into the existing posting workflows."
@@ -843,15 +851,13 @@ export default function AdminPaymentCollectPage({
         />
 
       <div className={showAside ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
-        <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <FormSection
+          title="Collection workflow"
+          description="Counter staff should first select the subscription, then choose the EMI. Amount auto-fills from outstanding value so payment entry remains controlled and operationally fast."
+        >
           <div className="mb-6">
-            <h2 className="enterprise-section-title text-lg">
-              Collection workflow
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Counter staff should first select the subscription, then choose the EMI.
-              Amount auto-fills from outstanding value so payment entry remains controlled
-              and operationally fast.
+            <p className="text-sm leading-6 text-muted-foreground">
+              Use existing payment services only. No direct ledger mutation or custom posting path is introduced here.
             </p>
           </div>
 
@@ -1191,75 +1197,67 @@ export default function AdminPaymentCollectPage({
               </ActionButton>
             </div>
           </form>
-        </section>
+        </FormSection>
 
         {showAside ? (
           <aside className="space-y-4">
-            <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h3 className="enterprise-eyebrow text-sm">
-                Selected subscription
-              </h3>
-
-              <div className="mt-4 grid gap-3">
-                <StatCard
+            <DetailPanel title="Selected subscription">
+              <div className="grid gap-3">
+                <KpiCard
                   label="Subscription"
                   value={selectedSubscription?.subscription_number || "—"}
-                  hint={selectedSubscription?.status || "No subscription selected"}
+                  helper={selectedSubscription?.status || "No subscription selected"}
                 />
-                <StatCard
+                <KpiCard
                   label="Customer"
                   value={selectedSubscription?.customer_name || "—"}
-                  hint={selectedSubscription?.customer_phone || "Customer not loaded"}
+                  helper={selectedSubscription?.customer_phone || "Customer not loaded"}
                 />
-                <StatCard
+                <KpiCard
                   label="Product"
                   value={selectedSubscription?.product_name || "—"}
-                  hint={
+                  helper={
                     selectedSubscription?.batch_code
                       ? `Batch ${selectedSubscription.batch_code}`
                       : "Batch not loaded"
                   }
                 />
-                <StatCard
+                <KpiCard
                   label="Monthly EMI"
                   value={formatCurrency(selectedSubscription?.monthly_amount)}
-                  hint={
+                  helper={
                     selectedSubscription?.tenure_months
                       ? `${selectedSubscription.tenure_months} months`
                       : "Tenure not loaded"
                   }
                 />
               </div>
-            </div>
+            </DetailPanel>
 
-            <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h3 className="enterprise-eyebrow text-sm">
-                Selected EMI
-              </h3>
-
-              <div className="mt-4 grid gap-3">
-                <StatCard
+            <DetailPanel title="Selected EMI">
+              <div className="grid gap-3">
+                <KpiCard
                   label="EMI ID"
                   value={selectedEmi ? `#${selectedEmi.id}` : "—"}
-                  hint={selectedEmi?.status || "No EMI selected"}
+                  helper={selectedEmi?.status || "No EMI selected"}
                 />
-                <StatCard
+                <KpiCard
                   label="Due date"
                   value={formatDateLabel(selectedEmi?.due_date)}
-                  hint="Scheduled due date"
+                  helper="Scheduled due date"
                 />
-                <StatCard
+                <KpiCard
                   label="EMI amount"
                   value={formatCurrency(selectedEmi?.amount)}
-                  hint="Nominal installment amount"
+                  helper="Nominal installment amount"
                 />
-                <StatCard
+                <KpiCard
                   label="Outstanding"
                   value={form.amount ? formatCurrency(form.amount) : "—"}
-                  hint="Auto-filled collection amount"
+                  helper="Auto-filled collection amount"
                 />
               </div>
-            </div>
+            </DetailPanel>
 
             {submitResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">

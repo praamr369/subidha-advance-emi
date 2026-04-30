@@ -93,3 +93,55 @@
 - No backend financial, ledger, reconciliation, draw, or payout logic touched.
 - No route URL changed.
 - All updates are additive and backward compatible.
+
+## Pass 2 — Collections, EMI, and Cashier Rollout
+
+### Pages migrated
+
+- `src/app/(dashboard)/admin/collections/page.tsx`
+- `src/app/(dashboard)/admin/emis/overdue/page.tsx`
+- `src/domains/payments/pages/AdminPaymentCollectPage.tsx`
+- `src/app/(dashboard)/cashier/collect/page.tsx`
+
+### Components used
+
+- `DataTableShell`
+- `FormSection`
+- `KpiCard`
+- `WorkflowCard`
+- `QuickActionGrid`
+- `DetailPanel`
+
+### Rollout notes
+
+- Kept all existing page routes, existing search/query behavior, and current service calls.
+- Preserved all payment/collection form IDs, key button labels, and existing smoke-critical headings.
+- Replaced duplicated local section/card visual wrappers with shared operations primitives.
+- Improved financial visibility (amount/paid/balance/outstanding) through consistent card/table shells and clearer hierarchy.
+
+### Fake/dead UI removed
+
+- No fake data or fake counters introduced.
+- Removed duplicated one-off presentation wrappers (`KpiCard`, `SectionCard`, `StatCard`) where shared primitives now cover the same real workflow surfaces.
+- Kept compatibility controls and route links intact.
+
+### Remaining blockers
+
+- `admin/finance/collect` continues to depend on dense domain form logic in one file; splitting into smaller form sub-sections/components would further improve maintainability.
+- Collections and overdue pages still use custom row renderers/tables in parts of the flow; could be further standardized with shared table helper variants.
+
+### Backend/API changes
+
+- none
+
+### Migrations
+
+- none
+
+### Test results
+
+- `cd frontend && npm run lint` — passed
+- `cd frontend && npm run typecheck` — passed
+- `cd frontend && npm run build` — passed
+- `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
+- `cd .. && bash scripts/run-release-candidate.sh` — passed
