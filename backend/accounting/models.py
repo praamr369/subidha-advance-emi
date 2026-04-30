@@ -36,6 +36,10 @@ def generate_entry_no() -> str:
     return _generate_reference("JE")
 
 
+def generate_journal_group_id() -> str:
+    return _generate_reference("JG")
+
+
 def generate_voucher_no() -> str:
     return _generate_reference("EXP")
 
@@ -729,6 +733,14 @@ class JournalEntry(AccountingTimeStampedModel):
     )
     posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     void_reason = models.TextField(blank=True, default="")
+    journal_group = models.ForeignKey(
+        "JournalEntryGroup",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="journal_entries",
+        db_index=True,
+    )
 
     class Meta:
         db_table = "accounting_journal_entries"
@@ -839,6 +851,81 @@ class JournalEntryLine(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"{self.journal_entry.entry_no} - {self.chart_account.code}"
+
+
+class JournalEntryGroup(AccountingTimeStampedModel):
+    journal_group_id = models.CharField(
+        max_length=48,
+        unique=True,
+        db_index=True,
+        default=generate_journal_group_id,
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    transaction_date = models.DateField(db_index=True)
+    narration = models.TextField(blank=True, default="")
+    total_debit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    total_credit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    is_balanced = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_journal_groups",
+    )
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_journal_groups",
+    )
+    reversal_of = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversal_groups",
+    )
+
+    class Meta:
+        db_table = "accounting_journal_entry_groups"
+        ordering = ["-transaction_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["source_module", "source_object_id"]),
+            models.Index(fields=["transaction_date", "is_balanced"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not (self.source_module or "").strip():
+            errors["source_module"] = "source_module is required."
+        if not (self.source_object_id or "").strip():
+            errors["source_object_id"] = "source_object_id is required."
+        if self.total_debit != self.total_credit and self.is_balanced:
+            errors["is_balanced"] = "is_balanced cannot be true when totals differ."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.journal_group_id = (self.journal_group_id or generate_journal_group_id()).strip().upper()
+        self.source_module = (self.source_module or "").strip()
+        self.source_object_id = (self.source_object_id or "").strip()
+        self.narration = (self.narration or "").strip()
+        self.is_balanced = self.total_debit == self.total_credit
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class Vendor(AccountingTimeStampedModel):

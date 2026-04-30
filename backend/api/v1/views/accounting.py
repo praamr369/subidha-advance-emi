@@ -20,6 +20,11 @@ from accounting.models import (
     SalaryPayment,
     SalarySheet,
     Vendor,
+    JournalEntryGroup,
+)
+from accounting.services.control_validation_service import (
+    validate_financial_period_balance,
+    validate_journal_group_balance,
 )
 from accounting.services.expense_posting_service import (
     approve_expense_voucher,
@@ -27,6 +32,7 @@ from accounting.services.expense_posting_service import (
 )
 from accounting.services.journal_posting_service import (
     post_journal_entry,
+    reverse_journal_group,
     void_journal_entry,
 )
 from accounting.services.money_movement_service import post_money_movement
@@ -48,6 +54,7 @@ from accounting.services.workforce_service import (
 )
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
+    AccountingValidationQuerySerializer,
     ChartOfAccountSerializer,
     ChartOfAccountDetailSerializer,
     ChartOfAccountUpdateSerializer,
@@ -62,6 +69,7 @@ from api.v1.serializers.accounting import (
     FinanceAccountDetailSerializer,
     FinanceAccountUpdateSerializer,
     JournalEntryPostSerializer,
+    JournalGroupReverseSerializer,
     JournalEntrySerializer,
     JournalEntryVoidSerializer,
     LeaveRequestActionSerializer,
@@ -765,3 +773,49 @@ class MoneyMovementViewSet(AdminAccountingModelViewSet):
 
         payload = MoneyMovementSerializer(movement, context=self.get_serializer_context())
         return Response({"updated": updated, "money_movement": payload.data}, status=status.HTTP_200_OK)
+
+
+class AccountingValidationView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        serializer = AccountingValidationQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        payload = validate_financial_period_balance(
+            date_from=serializer.validated_data.get("date_from"),
+            date_to=serializer.validated_data.get("date_to"),
+        )
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class JournalGroupBalanceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        group = JournalEntryGroup.objects.get(pk=pk)
+        return Response(validate_journal_group_balance(group), status=status.HTTP_200_OK)
+
+
+class JournalGroupReverseView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        serializer = JournalGroupReverseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reversal_group, created = reverse_journal_group(
+                journal_group_id=int(pk),
+                reason=serializer.validated_data["reason"],
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(
+            {
+                "created": created,
+                "journal_group_id": reversal_group.id,
+                "journal_group_code": reversal_group.journal_group_id,
+                "reversal_of": reversal_group.reversal_of_id,
+            },
+            status=status.HTTP_200_OK,
+        )

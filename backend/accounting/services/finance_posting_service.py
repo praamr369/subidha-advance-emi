@@ -5,7 +5,10 @@ from decimal import Decimal
 from accounting.models import FinanceAccount
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.models import JournalEntryGroup
+from accounting.models import JournalEntry
 from subscriptions.models import BusinessEventType
+from subscriptions.models import FinancialLedger
 from subscriptions.services.business_event_service import append_business_event
 
 
@@ -45,7 +48,7 @@ class FinancePostingService:
         purpose: str = "PAYMENT_COLLECTION",
     ):
         accounts = ensure_phase3_system_accounts()
-        entry = post_bridge_entry(
+        entry, _created = post_bridge_entry(
             source_instance=payment,
             purpose=purpose,
             entry_date=payment.payment_date,
@@ -91,6 +94,23 @@ class FinancePostingService:
                 "payment_id": payment.id,
                 "entry_id": getattr(entry, "id", None),
             },
+        )
+        total_amount = _money(payment.amount)
+        journal_group = JournalEntryGroup.objects.create(
+            source_module="accounting.services.finance_posting_service.post_subscription_collection",
+            source_object_id=str(payment.id),
+            transaction_date=payment.payment_date,
+            narration=f"Subscription collection {payment.reference_no or payment.id}",
+            total_debit=total_amount,
+            total_credit=total_amount,
+            created_by=performed_by if getattr(performed_by, "pk", None) else None,
+        )
+        posted_journal = entry
+        JournalEntry.objects.filter(pk=posted_journal.id).update(journal_group=journal_group)
+        FinancialLedger.objects.filter(payment_id=payment.id).update(
+            journal_group=journal_group,
+            posting_side="CREDIT",
+            posting_status="POSTED",
         )
         return entry
 

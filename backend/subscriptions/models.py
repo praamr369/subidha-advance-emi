@@ -3649,6 +3649,16 @@ class FinancialLedger(TimeStampedModel):
         db_index=True,
     )
     allocation_context = models.JSONField(default=dict, blank=True)
+    journal_group = models.ForeignKey(
+        "accounting.JournalEntryGroup",
+        on_delete=models.PROTECT,
+        related_name="financial_ledger_entries",
+        null=True,
+        blank=True,
+    )
+    posting_side = models.CharField(max_length=6, blank=True, default="")
+    posting_status = models.CharField(max_length=16, default="POSTED", db_index=True)
+    posted_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         db_table = "financial_ledger"
@@ -3680,6 +3690,13 @@ class FinancialLedger(TimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            existing = FinancialLedger.objects.filter(pk=self.pk).only("posted_at").first()
+            if existing and existing.posted_at != self.posted_at:
+                raise ValidationError({"posted_at": "posted_at is immutable once set."})
+        if not self.posting_side:
+            self.posting_side = (self.entry_direction or "").upper()
+        self.posting_status = (self.posting_status or "POSTED").strip().upper()
         if not self.plan_type_hint and self.emi_id:
             self.plan_type_hint = self.emi.subscription.plan_type
         self.full_clean()

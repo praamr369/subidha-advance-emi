@@ -77,6 +77,14 @@ class JournalEntryVoidSerializer(serializers.Serializer):
     reason = serializers.CharField()
 
 
+class JournalGroupReverseSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+
+
+class AccountingValidationQuerySerializer(serializers.Serializer):
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+
 class ChartOfAccountSerializer(serializers.ModelSerializer):
     parent_code = serializers.CharField(source="parent.code", read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)

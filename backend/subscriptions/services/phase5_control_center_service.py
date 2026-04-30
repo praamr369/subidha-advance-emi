@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from accounting.models import FinanceAccount, FinanceAccountCoaMapping
+from accounting.services.control_validation_service import validate_financial_period_balance
 
 from subscriptions.models import (
     Commission,
@@ -188,6 +190,15 @@ def build_admin_accounting_control_center(*, flt: Phase5Filter) -> dict:
             CommissionPayoutBatch.objects.filter(status=CommissionPayoutBatch.Status.DRAFT).aggregate(total=Sum("total_amount"))["total"]
         ),
     }
+    validation = validate_financial_period_balance(date_from=flt.date_from, date_to=flt.date_to)
+    kpis["unbalanced_journal_warnings"] = str(validation["unbalanced_group_count"])
+    kpis["unmapped_account_warnings"] = str(
+        max(
+            FinanceAccount.objects.filter(is_active=True).count()
+            - FinanceAccountCoaMapping.objects.filter(is_active=True).values("finance_account_id").distinct().count(),
+            0,
+        )
+    )
     kpi_cards = [
         _kpi_card(label="Today Collection", value=kpis["today_collection"], source="Payment", detail_url="/admin/reports/collections", flt=flt),
         _kpi_card(label="Overdue Receivables", value=kpis["overdue_receivables"], source="Emi", detail_url="/admin/reports/overdue", flt=flt, severity="HIGH"),
