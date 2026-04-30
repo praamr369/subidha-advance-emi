@@ -14,6 +14,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 
 type LuckyIdStatus =
@@ -311,59 +313,6 @@ function parseFieldErrors(error: unknown): FieldErrors {
   }
 }
 
-function luckyIdToneClass(status: LuckyIdStatus): string {
-  switch (status) {
-    case "AVAILABLE":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "ASSIGNED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "WON":
-    case "DRAWN":
-    case "WINNER":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "BLOCKED":
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function batchToneClass(status: BatchStatus): string {
-  switch (status) {
-    case "OPEN":
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "DRAFT":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "CLOSED":
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function subscriptionToneClass(status: SubscriptionStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
 function nextAllowedCorrectionStatuses(
   luckyId: LuckyIdDetailRecord | null
 ): LuckyIdStatus[] {
@@ -392,26 +341,6 @@ function nextAllowedCorrectionStatuses(
   }
 
   return Array.from(new Set(options.filter((value) => value !== "UNKNOWN")));
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 function DetailValue({
@@ -669,12 +598,12 @@ export default function AdminLuckyIdEditPage() {
 
         {!loading && luckyId ? (
           <>
-            <SectionCard
+            <DetailPanel
               title="Correction rule"
               description="Lucky ID linkage is derived from the subscription workflow, not edited directly here. This page should be used only for controlled administrative status correction."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="Current Status" value={luckyId.status} />
+                <DetailValue label="Current Status" value={<StatusBadge status={luckyId.status} />} />
                 <DetailValue
                   label="Allowed Corrections"
                   value={allowedStatuses.length > 0 ? allowedStatuses.join(", ") : "No direct correction allowed"}
@@ -688,32 +617,32 @@ export default function AdminLuckyIdEditPage() {
                   value={hasLinkage ? "Present" : "Missing"}
                 />
               </div>
-            </SectionCard>
+            </DetailPanel>
 
             {isAssignedState && hasLinkage ? (
-              <SectionCard
+              <DetailPanel
                 title="Status editing locked"
                 description="This Lucky ID is already linked to a visible contract context."
               >
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   Do not correct this Lucky ID directly. Fix assignment issues through the linked subscription workflow to preserve financial and audit integrity.
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             {isAssignedState && !hasLinkage ? (
-              <SectionCard
+              <DetailPanel
                 title="Integrity alert"
                 description="This Lucky ID is assigned-like but visible linkage is missing."
               >
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                   This row may need administrative correction. If no subscription truly exists, moving it back to AVAILABLE or blocking it may be appropriate after verification.
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Lucky ID overview"
                 description="Primary record snapshot for this Lucky ID."
               >
@@ -726,16 +655,7 @@ export default function AdminLuckyIdEditPage() {
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
                   <DetailValue
                     label="Status"
-                    value={
-                      <span
-                        className={[
-                          "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                          luckyIdToneClass(luckyId.status),
-                        ].join(" ")}
-                      >
-                        {luckyId.status}
-                      </span>
-                    }
+                    value={<StatusBadge status={luckyId.status} />}
                   />
                   <DetailValue
                     label="Customer"
@@ -760,9 +680,9 @@ export default function AdminLuckyIdEditPage() {
                     value={luckyId.batch_id != null ? `#${luckyId.batch_id}` : "—"}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <FormSection
                 title="Status correction"
                 description="Use only for controlled administrative correction. Batch ownership and Lucky number are immutable and not editable here."
               >
@@ -831,11 +751,11 @@ export default function AdminLuckyIdEditPage() {
                     description="This Lucky ID should be reviewed through its linked subscription or winner workflow rather than corrected directly here."
                   />
                 )}
-              </SectionCard>
+              </FormSection>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Batch context"
                 description="Batch ownership for this Lucky ID."
               >
@@ -844,16 +764,7 @@ export default function AdminLuckyIdEditPage() {
                     <DetailValue label="Batch Code" value={batchPreview.batch_code} />
                     <DetailValue
                       label="Status"
-                      value={
-                        <span
-                          className={[
-                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                            batchToneClass(batchPreview.status),
-                          ].join(" ")}
-                        >
-                          {batchPreview.status}
-                        </span>
-                      }
+                      value={<StatusBadge status={batchPreview.status} />}
                     />
                     <DetailValue
                       label="Total Slots"
@@ -882,9 +793,9 @@ export default function AdminLuckyIdEditPage() {
                     description="Batch preview could not be loaded for this Lucky ID."
                   />
                 )}
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Linked contract context"
                 description="Subscription preview when this Lucky ID is attached to a contract."
               >
@@ -912,16 +823,7 @@ export default function AdminLuckyIdEditPage() {
                     />
                     <DetailValue
                       label="Status"
-                      value={
-                        <span
-                          className={[
-                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                            subscriptionToneClass(subscriptionPreview.status),
-                          ].join(" ")}
-                        >
-                          {subscriptionPreview.status}
-                        </span>
-                      }
+                      value={<StatusBadge status={subscriptionPreview.status} />}
                     />
                     <DetailValue
                       label="Total Amount"
@@ -942,7 +844,7 @@ export default function AdminLuckyIdEditPage() {
                     description="This Lucky ID does not currently resolve to a visible subscription preview."
                   />
                 )}
-              </SectionCard>
+              </DetailPanel>
             </section>
 
             {error ? (
@@ -953,7 +855,7 @@ export default function AdminLuckyIdEditPage() {
             ) : null}
 
             {successMessage ? (
-              <SectionCard
+              <DetailPanel
                 title="Update successful"
                 description="Lucky ID status correction was saved successfully."
               >
@@ -976,10 +878,10 @@ export default function AdminLuckyIdEditPage() {
                     Back to Register
                   </Link>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
-            <SectionCard
+            <DetailPanel
               title="Administrative correction note"
               description="Use this page sparingly. For linked contract issues, correct the subscription workflow instead of forcing Lucky ID state changes directly."
             >
@@ -1007,7 +909,7 @@ export default function AdminLuckyIdEditPage() {
                   Reset Workspace
                 </button>
               </div>
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>

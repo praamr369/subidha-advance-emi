@@ -12,12 +12,14 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import {
   type BatchStatus,
   isLiveBatchStatus,
   normalizeBatchStatus,
 } from "@/domains/batches/status";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 
 type SubscriptionStatus =
@@ -348,58 +350,6 @@ function parseErrorMessage(error: unknown): string {
   }
 }
 
-function batchStatusToneClass(status: BatchStatus): string {
-  switch (status) {
-    case "OPEN":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "FULL":
-    case "DRAW_IN_PROGRESS":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "DRAFT":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "CLOSED":
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function subscriptionToneClass(status: SubscriptionStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function luckyIdToneClass(status: string): string {
-  if (status === "AVAILABLE") {
-    return "border-slate-200 bg-slate-100 text-slate-700";
-  }
-  if (status === "ASSIGNED") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-  if (status === "WON") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-  if (status === "CANCELLED" || status === "BLOCKED") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  return "border-border bg-muted text-foreground";
-}
-
 export default function AdminBatchDetailPage() {
   const params = useParams<{ id: string }>();
   const batchId = params?.id;
@@ -550,7 +500,7 @@ export default function AdminBatchDetailPage() {
         {!loading && !error && batch && summary ? (
           <>
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Batch overview"
                 description="Master batch data used for grouping Lucky IDs, subscriptions, and lifecycle transitions."
               >
@@ -572,62 +522,33 @@ export default function AdminBatchDetailPage() {
                   />
                   <DetailValue
                     label="Status"
-                    value={
-                      <span
-                        className={[
-                          "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                          batchStatusToneClass(batch.status),
-                        ].join(" ")}
-                      >
-                        {batch.status}
-                      </span>
-                    }
+                    value={<StatusBadge status={batch.status} />}
                   />
                   <DetailValue
                     label="Created At"
                     value={formatDateTime(batch.created_at)}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Live batch summary"
                 description="This section uses live summary data from backend, not static placeholders."
               >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailValue
-                    label="Subscriptions"
-                    value={String(summary.subscription_count)}
-                  />
-                  <DetailValue
-                    label="Active Subscriptions"
-                    value={String(summary.active_subscription_count)}
-                  />
-                  <DetailValue
-                    label="Won Subscriptions"
-                    value={String(summary.won_subscription_count)}
-                  />
-                  <DetailValue
+                <QuickActionGrid className="md:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard label="Subscriptions" value={String(summary.subscription_count)} />
+                  <KpiCard label="Active Subscriptions" value={String(summary.active_subscription_count)} />
+                  <KpiCard label="Won Subscriptions" value={String(summary.won_subscription_count)} />
+                  <KpiCard
                     label="Monthly Booked Value"
                     value={money(summary.monthly_booked_value)}
+                    helper="From batch summary API."
                   />
-                  <DetailValue
-                    label="Available Lucky IDs"
-                    value={String(summary.available_lucky_ids)}
-                  />
-                  <DetailValue
-                    label="Assigned Lucky IDs"
-                    value={String(summary.assigned_lucky_ids)}
-                  />
-                  <DetailValue
-                    label="Won Lucky IDs"
-                    value={String(summary.won_lucky_ids)}
-                  />
-                  <DetailValue
-                    label="Draw Records"
-                    value={String(summary.draw_count)}
-                  />
-                </div>
+                  <KpiCard label="Available Lucky IDs" value={String(summary.available_lucky_ids)} />
+                  <KpiCard label="Assigned Lucky IDs" value={String(summary.assigned_lucky_ids)} />
+                  <KpiCard label="Won Lucky IDs" value={String(summary.won_lucky_ids)} />
+                  <KpiCard label="Draw Records" value={String(summary.draw_count)} />
+                </QuickActionGrid>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
@@ -651,10 +572,10 @@ export default function AdminBatchDetailPage() {
                     Batch Register
                   </Link>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             </section>
 
-            <SectionCard
+            <DetailPanel
               title="Lucky ID register"
               description="All Lucky IDs for this batch, including assignment state and linked contract context."
             >
@@ -664,8 +585,9 @@ export default function AdminBatchDetailPage() {
                   description="No Lucky IDs were returned for this batch."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
+                <DataTableShell>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -717,25 +639,19 @@ export default function AdminBatchDetailPage() {
                             </td>
 
                             <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                              <span
-                                className={[
-                                  "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                  luckyIdToneClass(row.status),
-                                ].join(" ")}
-                              >
-                                {row.status}
-                              </span>
+                              <StatusBadge status={row.status} hideIcon />
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </DataTableShell>
               )}
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Linked subscriptions"
               description="All subscriptions filtered to this batch, with real product, customer, and contract value visibility."
             >
@@ -745,8 +661,9 @@ export default function AdminBatchDetailPage() {
                   description="No subscriptions were returned for this batch."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
+                <DataTableShell>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -799,14 +716,7 @@ export default function AdminBatchDetailPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                subscriptionToneClass(row.status),
-                              ].join(" ")}
-                            >
-                              {row.status}
-                            </span>
+                            <StatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -821,9 +731,10 @@ export default function AdminBatchDetailPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </DataTableShell>
               )}
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>

@@ -9,10 +9,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import {
-  DetailItem as DetailValue,
-  WorkspaceSection as SectionCard,
-} from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, Timeline } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
   buildSubscriptionDetailSemantics,
   formatLuckyNumberLabel,
@@ -1106,7 +1104,7 @@ export default function AdminSubscriptionDetailPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Contract overview"
                 description="Commercial, customer, product, batch, and assignment context."
                 className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1158,10 +1156,10 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Start Date" value={formatDate(subscription.start_date)} />
                   <DetailValue label="Created At" value={formatDateTime(subscription.created_at)} />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
               {isEmiSubscription ? (
-                <SectionCard
+                <DetailPanel
                   title="Winner / lucky context"
                   description="Winning draw linkage and waived EMI posture."
                   className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1212,9 +1210,9 @@ export default function AdminSubscriptionDetailPage() {
                       value={money(winnerSummary?.waived_amount ?? financialSummary.waived_amount)}
                     />
                   </div>
-                </SectionCard>
+                </DetailPanel>
               ) : (
-                <SectionCard
+                <DetailPanel
                   title="Rent/Lease profile"
                   description="Security deposit posture, return assessment status, and contract documents."
                   className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1342,11 +1340,11 @@ export default function AdminSubscriptionDetailPage() {
                       No rent/lease profile is attached to this subscription.
                     </div>
                   )}
-                </SectionCard>
+                </DetailPanel>
               )}
             </section>
 
-            <SectionCard
+            <DetailPanel
               title="Delivery tracking"
               description="Current fulfillment path, receiver details, and historical delivery records for this subscription."
               className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1402,7 +1400,8 @@ export default function AdminSubscriptionDetailPage() {
               )}
 
               {deliveryHistory.length > 0 ? (
-                <div className="mt-6 overflow-x-auto">
+                <DataTableShell className="mt-6">
+                  <div className="overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
@@ -1443,11 +1442,12 @@ export default function AdminSubscriptionDetailPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </DataTableShell>
               ) : null}
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Financial position"
               description="Canonical ledger-aware finance summary for this subscription."
               className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1469,9 +1469,9 @@ export default function AdminSubscriptionDetailPage() {
                 <DetailValue label="Active Payments" value={String(activePayments.length)} />
                 <DetailValue label="Reversed Payments" value={String(reversedPayments.length)} />
               </div>
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Reconciliation status"
               description="Backend flags for remaining balance alignment, reversals, waivers, and warning conditions."
               className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1511,10 +1511,10 @@ export default function AdminSubscriptionDetailPage() {
                   Pending, waived, reversed, and remaining amounts align with the canonical backend summary.
                 </div>
               )}
-            </SectionCard>
+            </DetailPanel>
 
             {isEmiSubscription ? (
-              <SectionCard
+              <DetailPanel
                 title="Advance EMI schedule"
                 description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
                 className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1525,7 +1525,8 @@ export default function AdminSubscriptionDetailPage() {
                   description="This subscription does not currently expose EMI rows."
                 />
               ) : (
-                <div className="overflow-x-auto">
+                <DataTableShell>
+                  <div className="overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
@@ -1606,14 +1607,15 @@ export default function AdminSubscriptionDetailPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </DataTableShell>
               )}
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
               {isEmiSubscription ? (
-                <SectionCard
+                <DetailPanel
                   title="Waived Advance EMI rows"
                   description="Future waived rows should be visible distinctly and never rewrite already paid installments."
                   className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1655,10 +1657,10 @@ export default function AdminSubscriptionDetailPage() {
                       ))}
                     </div>
                   )}
-                </SectionCard>
+                </DetailPanel>
               ) : null}
 
-              <SectionCard
+              <DetailPanel
                 title="Recent payments"
                 description="Operational payment visibility with reversed rows clearly marked."
                 className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1707,10 +1709,10 @@ export default function AdminSubscriptionDetailPage() {
                     ))}
                   </div>
                 )}
-              </SectionCard>
+              </DetailPanel>
             </section>
 
-            <SectionCard
+            <DetailPanel
               title="Audit timeline"
               description="Chronological audit visibility for subscription and EMI actions."
               className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
@@ -1721,7 +1723,7 @@ export default function AdminSubscriptionDetailPage() {
                   description="No audit trail entries are currently visible for this subscription."
                 />
               ) : (
-                <div className="space-y-3">
+                <Timeline>
                   {timeline.map((item) => (
                     <div
                       key={item.id}
@@ -1741,9 +1743,9 @@ export default function AdminSubscriptionDetailPage() {
                       </div>
                     </div>
                   ))}
-                </div>
+                </Timeline>
               )}
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>

@@ -15,7 +15,8 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailPanel, FormSection } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
   BATCH_LIFECYCLE_TRANSITION_NOTE,
   type BatchStatus,
@@ -456,12 +457,15 @@ export default function AdminBatchEditPage() {
 
         {!loading && batch && summary ? (
           <>
-            <SectionCard
+            <DetailPanel
               title="Transition rules"
               description="Status cannot be edited freely. Backend rules protect live Lucky Plan operations and prevent unsafe lifecycle jumps."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="Current Status" value={batch.status} />
+                <DetailValue
+                  label="Current Status"
+                  value={<StatusBadge status={String(batch.status)} />}
+                />
                 <DetailValue
                   label="Allowed Next Statuses"
                   value={
@@ -479,10 +483,10 @@ export default function AdminBatchEditPage() {
                   value="Use the enum-backed transition sequence only"
                 />
               </div>
-            </SectionCard>
+            </DetailPanel>
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Batch summary"
                 description="Read-only live metrics used to decide whether status change or field update is safe."
               >
@@ -542,9 +546,9 @@ export default function AdminBatchEditPage() {
                     value={formatDateTime(batch.created_at)}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <FormSection
                 title="Operational field update"
                 description="Only limited batch fields should be edited. This page locks core edits once the batch is no longer in a safe pre-live state."
               >
@@ -621,10 +625,10 @@ export default function AdminBatchEditPage() {
                     longer in a safe pre-live state. Use status transition only.
                   </div>
                 )}
-              </SectionCard>
+              </FormSection>
             </section>
 
-            <SectionCard
+            <FormSection
               title="Status transition"
               description="Use the guarded transition endpoint instead of direct free-form status patching."
             >
@@ -679,14 +683,14 @@ export default function AdminBatchEditPage() {
               <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                 {BATCH_LIFECYCLE_TRANSITION_NOTE}
               </div>
-            </SectionCard>
+            </FormSection>
 
             {error ? (
               <ErrorState title="Unable to update batch" description={error} />
             ) : null}
 
             {successMessage ? (
-              <SectionCard
+              <DetailPanel
                 title="Update successful"
                 description="Batch operations were updated successfully."
               >
@@ -709,10 +713,10 @@ export default function AdminBatchEditPage() {
                     Back to Register
                   </Link>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
-            <SectionCard
+            <DetailPanel
               title="Batch edit workflow"
               description="This page completes the batch operations module by adding safe mutation control on top of register, create, and detail pages."
             >
@@ -735,7 +739,7 @@ export default function AdminBatchEditPage() {
                   Reset Workspace
                 </button>
               </div>
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>

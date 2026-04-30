@@ -13,6 +13,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailPanel } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 
 type LuckyIdStatus =
@@ -285,79 +287,6 @@ function parseErrorMessage(error: unknown): string {
   }
 }
 
-function luckyIdToneClass(status: LuckyIdStatus): string {
-  switch (status) {
-    case "AVAILABLE":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "ASSIGNED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "WON":
-    case "DRAWN":
-    case "WINNER":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "BLOCKED":
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function batchToneClass(status: BatchStatus): string {
-  switch (status) {
-    case "OPEN":
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "DRAFT":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "CLOSED":
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function subscriptionToneClass(status: SubscriptionStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
 function DetailValue({
   label,
   value,
@@ -563,18 +492,18 @@ export default function AdminLuckyIdDetailPage() {
         {!loading && !error && luckyId ? (
           <>
             {isAssignedState && !hasVisibleLinkage ? (
-              <SectionCard
+              <DetailPanel
                 title="Integrity alert"
                 description="This Lucky ID is in an assigned-state status but visible customer or contract linkage is missing."
               >
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                   Investigate the subscription assignment flow for this Lucky ID. Assigned statuses should resolve to a linked customer and subscription.
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Lucky ID overview"
                 description="Primary Lucky ID record used in batch allocation and contract linkage."
               >
@@ -587,16 +516,7 @@ export default function AdminLuckyIdDetailPage() {
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
                   <DetailValue
                     label="Status"
-                    value={
-                      <span
-                        className={[
-                          "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                          luckyIdToneClass(luckyId.status),
-                        ].join(" ")}
-                      >
-                        {luckyId.status}
-                      </span>
-                    }
+                    value={<StatusBadge status={luckyId.status} />}
                   />
                   <DetailValue
                     label="Customer"
@@ -621,9 +541,9 @@ export default function AdminLuckyIdDetailPage() {
                     value={luckyId.batch_id != null ? `#${luckyId.batch_id}` : "—"}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Operational meaning"
                 description="Interpret the current Lucky ID state before making any downstream operational decision."
               >
@@ -645,11 +565,11 @@ export default function AdminLuckyIdDetailPage() {
                     value={isAssignedState && !hasVisibleLinkage ? "Yes" : "No"}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Batch context"
                 description="The batch that owns this Lucky ID."
               >
@@ -658,16 +578,7 @@ export default function AdminLuckyIdDetailPage() {
                     <DetailValue label="Batch Code" value={batchPreview.batch_code} />
                     <DetailValue
                       label="Status"
-                      value={
-                        <span
-                          className={[
-                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                            batchToneClass(batchPreview.status),
-                          ].join(" ")}
-                        >
-                          {batchPreview.status}
-                        </span>
-                      }
+                      value={<StatusBadge status={batchPreview.status} />}
                     />
                     <DetailValue
                       label="Total Slots"
@@ -696,9 +607,9 @@ export default function AdminLuckyIdDetailPage() {
                     description="Batch preview could not be loaded for this Lucky ID."
                   />
                 )}
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Linked contract context"
                 description="The subscription currently linked to this Lucky ID, when available."
               >
@@ -726,16 +637,7 @@ export default function AdminLuckyIdDetailPage() {
                     />
                     <DetailValue
                       label="Status"
-                      value={
-                        <span
-                          className={[
-                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                            subscriptionToneClass(subscriptionPreview.status),
-                          ].join(" ")}
-                        >
-                          {subscriptionPreview.status}
-                        </span>
-                      }
+                      value={<StatusBadge status={subscriptionPreview.status} />}
                     />
                     <DetailValue
                       label="Total Amount"
@@ -760,7 +662,7 @@ export default function AdminLuckyIdDetailPage() {
                     }
                   />
                 )}
-              </SectionCard>
+              </DetailPanel>
             </section>
           </>
         ) : null}

@@ -15,7 +15,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailPanel, FormSection } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
@@ -621,7 +622,7 @@ export default function AdminProductEditPage() {
       }}
     >
       <div className="space-y-6">
-        <SectionCard
+        <DetailPanel
           title="Editing rule"
           description="Product base price is the total contract price used by subscription creation. Update carefully to avoid future contract inconsistencies."
         >
@@ -631,7 +632,7 @@ export default function AdminProductEditPage() {
             <DetailValue label="Image Workflow" value="Attach, replace, or remove from this page" />
             <DetailValue label="Mutation Scope" value="Product master only" />
           </div>
-        </SectionCard>
+        </DetailPanel>
 
         <section className="flex justify-end">
           <button
@@ -664,7 +665,7 @@ export default function AdminProductEditPage() {
         {!loading && product ? (
           <>
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <FormSection
                 title="Product fields"
                 description="Update the catalog structure and contract pricing fields used by admin and subscription workflows."
               >
@@ -895,9 +896,9 @@ export default function AdminProductEditPage() {
                     <FieldError message={fieldErrors.description} />
                   </div>
                 </div>
-              </SectionCard>
+              </FormSection>
 
-              <SectionCard
+              <FormSection
                 title="Image attachment"
                 description="Attach a new image, replace the current one, or remove the existing image."
               >
@@ -1006,7 +1007,7 @@ export default function AdminProductEditPage() {
                     </div>
                   </div>
                 </div>
-              </SectionCard>
+              </FormSection>
             </section>
 
             {error ? (
@@ -1017,7 +1018,7 @@ export default function AdminProductEditPage() {
             ) : null}
 
             {saveSuccess ? (
-              <SectionCard
+              <DetailPanel
                 title="Update successful"
                 description="The product master has been updated successfully."
               >
@@ -1040,10 +1041,10 @@ export default function AdminProductEditPage() {
                     Back to Register
                   </Link>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
-            <SectionCard
+            <FormSection
               title="Save changes"
               description="Save only after confirming catalog fields, pricing, and image replacement."
             >
@@ -1069,7 +1070,7 @@ export default function AdminProductEditPage() {
                   </button>
                 }
               />
-            </SectionCard>
+            </FormSection>
           </>
         ) : null}
       </div>

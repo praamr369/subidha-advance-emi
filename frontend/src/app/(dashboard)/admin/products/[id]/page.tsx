@@ -8,7 +8,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import StatusBadge from "@/components/ui/status-badge";
+import { DataTableShell, DetailPanel } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
 import { prepareProductInventoryProfile } from "@/services/products";
@@ -218,24 +220,6 @@ function extractNestedArray(
     }
   }
   return [];
-}
-
-function subscriptionToneClass(status: SubscriptionStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "PENDING":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "WON":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "CANCELLED":
-    case "DEFAULTED":
-      return "border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border-border bg-muted text-foreground";
-  }
 }
 
 function capabilityTone(enabled: boolean): string {
@@ -489,7 +473,7 @@ export default function AdminProductDetailPage() {
         {!loading && !error && product ? (
           <>
             {warnings.length > 0 ? (
-              <SectionCard
+              <DetailPanel
                 title="Data source note"
                 description="The detail page loaded with fallback sources for some child data."
               >
@@ -503,11 +487,11 @@ export default function AdminProductDetailPage() {
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Product overview"
                 description="Primary product master fields used in contract pricing and subscription creation."
               >
@@ -559,9 +543,9 @@ export default function AdminProductDetailPage() {
                     }
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Inventory readiness"
                 description="Prepare a stock profile only when this product should participate in inventory workflows. This keeps product master truth shared while leaving delivery, EMI, and payment behavior unchanged."
               >
@@ -618,9 +602,9 @@ export default function AdminProductDetailPage() {
                     </Link>
                   </div>
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Image & operational state"
                 description="Single-image product master with capability visibility for EMI now and rent/lease expansion later."
               >
@@ -721,19 +705,19 @@ export default function AdminProductDetailPage() {
                     </span>
                   </div>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             </section>
 
-            <SectionCard
+            <DetailPanel
               title="Description"
               description="Full product description used for internal clarity and future catalog enrichment."
             >
               <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-foreground">
                 {product.description?.trim() || "No description available."}
               </div>
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Pricing rule"
               description="Base price is the total contract price. EMI is derived later from base price and tenure months."
             >
@@ -774,9 +758,9 @@ export default function AdminProductDetailPage() {
                   </div>
                 </div>
               </div>
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Subscription usage"
               description="Linked subscriptions show how this product is currently used in active and historical contracts."
             >
@@ -786,8 +770,9 @@ export default function AdminProductDetailPage() {
                   description="No subscription rows were returned for this product."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
+                <DataTableShell>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -843,14 +828,7 @@ export default function AdminProductDetailPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                subscriptionToneClass(row.status),
-                              ].join(" ")}
-                            >
-                              {row.status}
-                            </span>
+                            <StatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -874,9 +852,10 @@ export default function AdminProductDetailPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </DataTableShell>
               )}
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
       </div>
