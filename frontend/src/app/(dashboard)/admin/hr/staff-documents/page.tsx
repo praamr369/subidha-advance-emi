@@ -8,6 +8,13 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
+import {
+  DataTableShell,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
@@ -115,12 +122,29 @@ export default function AdminHrStaffDocumentsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <QuickActionGrid>
+        <KpiCard label="Documents loaded" value={rows.length} helper="Current filtered records" />
+        <KpiCard
+          label="Active documents"
+          value={rows.filter((row) => row.status === "ACTIVE").length}
+          helper="Operationally valid"
+        />
+        <KpiCard
+          label="Inactive documents"
+          value={rows.filter((row) => row.status === "INACTIVE").length}
+          helper="Kept for audit trail"
+        />
+        <WorkflowCard
+          title="Document workflow"
+          description="Upload from HR and toggle active/inactive without deleting historical records."
+        />
+      </QuickActionGrid>
+
+      <FormSection
+        title="Document filters"
+        description="Filters call the staff document API; verify/reject is disabled because only ACTIVE/INACTIVE status exists."
+      >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-foreground">Document filters</div>
-            <p className="mt-1 text-sm text-muted-foreground">Filters call the staff document API; verify/reject is disabled because only ACTIVE/INACTIVE status exists.</p>
-          </div>
           <ActionButton variant="primary" onClick={() => { setUpload((current) => ({ ...current, employee: filters.employee })); setDrawerOpen(true); }}>
             Upload Document
           </ActionButton>
@@ -144,15 +168,15 @@ export default function AdminHrStaffDocumentsPage() {
           <ActionButton variant="ghost" onClick={() => void clearFilters()}>Clear</ActionButton>
           {selectedStaff ? <Link href={`${ROUTES.admin.hrStaff}/${selectedStaff.id}`} className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-sm font-semibold">Back to {selectedStaff.name}</Link> : null}
         </div>
-      </section>
+      </FormSection>
 
       {drawerOpen ? (
-        <section className="rounded-2xl border border-primary/25 bg-card p-4 shadow-sm">
+        <FormSection
+          title="Upload staff document"
+          description="Uploads use POST /api/v1/admin/hr/staff-documents/."
+          className="border border-primary/25"
+        >
           <div className="flex flex-col gap-2 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-foreground">Upload staff document</div>
-              <p className="text-sm text-muted-foreground">Uploads use POST /api/v1/admin/hr/staff-documents/.</p>
-            </div>
             <button type="button" className="rounded-xl border border-border px-3 py-2 text-sm font-semibold" onClick={() => setDrawerOpen(false)}>Close</button>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -173,7 +197,7 @@ export default function AdminHrStaffDocumentsPage() {
               Upload Document
             </ActionButton>
           </div>
-        </section>
+        </FormSection>
       ) : null}
 
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
@@ -182,7 +206,7 @@ export default function AdminHrStaffDocumentsPage() {
       {!loading && !error && rows.length === 0 ? <EmptyState title="No staff documents" description="Upload KYC, appointment, and salary agreement documents from this page or the staff profile." /> : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <DataTableShell>
           <div className="text-sm font-semibold text-foreground">Documents ({rows.length})</div>
           <div className="mt-3 overflow-auto">
             <table className="min-w-full text-sm">
@@ -227,7 +251,7 @@ export default function AdminHrStaffDocumentsPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </DataTableShell>
       ) : null}
     </PortalPage>
   );

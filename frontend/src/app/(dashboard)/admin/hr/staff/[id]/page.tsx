@@ -8,6 +8,15 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  Timeline,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
@@ -105,18 +114,6 @@ function Detail({ label, value }: { label: string; value?: ReactNode }) {
   );
 }
 
-function Section({ title, children, description }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
 function TinyTable({
   empty,
   columns,
@@ -128,14 +125,16 @@ function TinyTable({
 }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
-    <div className="overflow-auto">
+    <DataTableShell className="p-3">
+      <div className="overflow-auto">
       <table className="min-w-full text-sm">
         <thead className="text-left text-xs uppercase text-muted-foreground">
           <tr>{columns.map((column) => <th key={column} className="py-2 pr-4">{column}</th>)}</tr>
         </thead>
         <tbody>{rows.map((row, index) => <tr key={index} className="border-t border-border/60">{row.map((cell, cellIndex) => <td key={cellIndex} className="py-2 pr-4 align-top">{cell || "Unavailable"}</td>)}</tr>)}</tbody>
       </table>
-    </div>
+      </div>
+    </DataTableShell>
   );
 }
 
@@ -199,7 +198,7 @@ function EditPanel({
   );
 
   return (
-    <Section title="Edit Profile" description="Tabbed edit form backed by PATCH /api/v1/admin/hr/staff/{id}/.">
+    <FormSection title="Edit Profile" description="Tabbed edit form backed by PATCH /api/v1/admin/hr/staff/{id}/.">
       <div className="flex flex-wrap gap-2">
         {["BASIC", "EMPLOYMENT", "PAYROLL", "KYC", "EMERGENCY", "ACCOUNTING"].map((item) => (
           <button key={item} type="button" onClick={() => setTab(item)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${tab === item ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
@@ -263,7 +262,7 @@ function EditPanel({
           <ActionButton variant="primary" disabled={!canSave} loading={saving} onClick={() => void save()}>Save Profile</ActionButton>
         </div>
       </div>
-    </Section>
+    </FormSection>
   );
 }
 
@@ -365,7 +364,7 @@ export default function AdminHrStaffProfilePage() {
       statusBadge={{ label: staff.is_active ? "Active" : "Inactive", tone: staff.is_active ? "success" : "warning" }}
       maxWidth="1180px"
     >
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <DetailPanel title="Staff profile summary" description="Operational identity and current status.">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -386,11 +385,21 @@ export default function AdminHrStaffProfilePage() {
             <ActionButton onClick={() => void downloadHrSalaryAgreementPdf(staff.id, `salary-agreement-${staff.employee_code || staff.id}.pdf`)}>Download Salary Agreement PDF</ActionButton>
           </div>
         </div>
-      </section>
+      </DetailPanel>
 
       {editing ? <EditPanel staff={staff} branches={branches} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} /> : null}
 
-      <Section title="Profile Overview">
+      <QuickActionGrid>
+        <KpiCard label="Present days" value={attendanceSummary.present} helper="Current loaded attendance rows" />
+        <KpiCard label="Leave requests" value={leave.length} helper="Recent leave records" />
+        <KpiCard label="Expense claims" value={expenses.length} helper="Recent claims" />
+        <WorkflowCard
+          title="Staff workflow"
+          description="Use profile edit, document upload, and status toggle for controlled HR operations."
+        />
+      </QuickActionGrid>
+
+      <DetailPanel title="Profile Overview">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Detail label="Phone" value={staff.phone} />
           <Detail label="Alternate phone" value="Not available on current staff API" />
@@ -403,9 +412,9 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="KYC status" value={<StatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
           <Detail label="KYC reference" value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
         </div>
-      </Section>
+      </DetailPanel>
 
-      <Section title="Employment & Payroll">
+      <DetailPanel title="Employment & Payroll">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Detail label="Employment type" value={staff.employment_type} />
           <Detail label="Salary type" value={staff.base_salary ? "Monthly base" : staff.daily_wage_rate ? "Daily wage" : staff.hourly_wage_rate ? "Hourly" : staff.piece_rate_amount ? "Piece rate" : "Not configured"} />
@@ -418,9 +427,9 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="Salary effective date" value={staff.salary_effective_from} />
           <Detail label="Contract end date" value={staff.temporary_contract_end_date} />
         </div>
-      </Section>
+      </DetailPanel>
 
-      <Section title="Documents" description="Document actions use staff document APIs. Verification is deferred because the backend only supports ACTIVE/INACTIVE document status.">
+      <DetailPanel title="Documents" description="Document actions use staff document APIs. Verification is deferred because the backend only supports ACTIVE/INACTIVE document status.">
         <div className="mb-3 flex justify-end"><ActionButton variant="primary" onClick={() => setUploadOpen(!uploadOpen)}>Upload Document</ActionButton></div>
         {uploadOpen ? (
           <div className="mb-4 rounded-xl border border-border bg-background p-3">
@@ -453,9 +462,9 @@ export default function AdminHrStaffProfilePage() {
             </div>,
           ])}
         />
-      </Section>
+      </DetailPanel>
 
-      <Section title="Attendance Summary">
+      <DetailPanel title="Attendance Summary">
         <div className="mb-4 grid gap-3 sm:grid-cols-4">
           <Detail label="Present" value={attendanceSummary.present} />
           <Detail label="Absent" value={attendanceSummary.absent} />
@@ -464,9 +473,9 @@ export default function AdminHrStaffProfilePage() {
         </div>
         <TinyTable empty="No recent attendance rows" columns={["Date", "Status", "Hours", "Notes"]} rows={attendance.slice(0, 10).map((row) => [row.attendance_date, row.status, row.worked_hours, row.notes])} />
         <Link href={ROUTES.admin.hrAttendance} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Attendance page</Link>
-      </Section>
+      </DetailPanel>
 
-      <Section title="Leave & Expense Summary">
+      <DetailPanel title="Leave & Expense Summary">
         <div className="grid gap-4 xl:grid-cols-2">
           <div>
             <TinyTable empty="No leave requests" columns={["Request", "Type", "Dates", "Status"]} rows={leave.slice(0, 8).map((row) => [row.request_no, row.leave_type_name, `${row.start_date} to ${row.end_date}`, row.status])} />
@@ -477,19 +486,19 @@ export default function AdminHrStaffProfilePage() {
             <Link href={ROUTES.admin.hrExpenses} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Expense Claims</Link>
           </div>
         </div>
-      </Section>
+      </DetailPanel>
 
-      <Section title="Payroll History">
+      <DetailPanel title="Payroll History">
         <div className="grid gap-4 xl:grid-cols-2">
           <TinyTable empty="No salary sheets" columns={["Period", "Gross", "Net", "Status"]} rows={salarySheets.slice(0, 8).map((row) => [`${row.year}-${String(row.month).padStart(2, "0")}`, row.gross_amount, row.net_amount, row.status])} />
           <TinyTable empty="No salary payments" columns={["Date", "Amount", "Account", "Reference"]} rows={salaryPayments.slice(0, 8).map((row) => [row.payment_date, row.amount, row.finance_account_name || "Unavailable", row.reference_no || "Unavailable"])} />
         </div>
         <Link href={ROUTES.admin.hrPayroll} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Payroll page</Link>
-      </Section>
+      </DetailPanel>
 
-      <Section title="Audit / Activity Timeline" description="Dedicated HR audit timeline endpoint is not available yet. This safe empty state avoids fabricating activity.">
+      <Timeline title="Audit / Activity Timeline">
         <EmptyState title="Timeline deferred" description="Profile updates, document status changes, deactivate/reactivate events, and salary setup changes should be shown here once a dedicated audit endpoint is exposed." />
-      </Section>
+      </Timeline>
     </PortalPage>
   );
 }

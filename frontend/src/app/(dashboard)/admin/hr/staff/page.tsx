@@ -6,6 +6,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  DataTableShell,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
@@ -254,6 +261,8 @@ export default function AdminHrStaffRegisterPage() {
   }, [rows]);
 
   const canSave = form.name.trim().length >= 2 && form.phone.trim().length >= 8;
+  const activeCount = rows.filter((row) => row.is_active).length;
+  const verifiedKycCount = rows.filter((row) => row.kyc_verified).length;
 
   async function load() {
     try {
@@ -348,12 +357,31 @@ export default function AdminHrStaffRegisterPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <QuickActionGrid>
+        <KpiCard label="Total staff" value={rows.length} helper="Current register scope" />
+        <KpiCard label="Active staff" value={activeCount} helper="Ready for scheduling/payroll" />
+        <KpiCard label="KYC verified" value={verifiedKycCount} helper="Compliant profiles" />
+        <WorkflowCard
+          title="Daily HR actions"
+          description="Use attendance, payroll, and documents to complete daily operator workflows."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Link href={ROUTES.admin.hrAttendance} className="text-xs font-semibold text-primary hover:underline">
+                Mark attendance
+              </Link>
+              <Link href={ROUTES.admin.hrPayroll} className="text-xs font-semibold text-primary hover:underline">
+                Run payroll
+              </Link>
+            </div>
+          }
+        />
+      </QuickActionGrid>
+
+      <FormSection
+        title="Staff search and filters"
+        description="All filters call the staff register API; no local fake records are used."
+      >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-foreground">Staff search and filters</div>
-            <p className="mt-1 text-sm text-muted-foreground">All filters call the staff register API; no local fake records are used.</p>
-          </div>
           <ActionButton variant="primary" onClick={openCreate}>Create Staff</ActionButton>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -385,19 +413,19 @@ export default function AdminHrStaffRegisterPage() {
           <ActionButton onClick={() => void applyFilters()}>Apply Filters</ActionButton>
           <ActionButton variant="ghost" onClick={() => { setFilters({ q: "", is_active: "", department: "", employment_type: "", branch: "", kyc_verified: "" }); void listHrStaff().then((payload) => setRows(payload.results)); }}>Clear</ActionButton>
         </div>
-      </section>
+      </FormSection>
 
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
       {loading ? <LoadingBlock label="Loading staff..." /> : null}
       {!loading && error ? <ErrorState title="Unable to load staff" description={error} onRetry={() => void load()} /> : null}
 
       {editorOpen ? (
-        <section className="rounded-2xl border border-primary/25 bg-card p-4 shadow-sm">
+        <FormSection
+          title={editStaff ? "Edit staff profile" : "Create staff profile"}
+          description="Profile, employment, payroll setup, KYC, emergency, and cost mapping fields."
+          className="border border-primary/25"
+        >
           <div className="flex flex-col gap-2 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">{editStaff ? "Edit staff profile" : "Create staff profile"}</h2>
-              <p className="text-sm text-muted-foreground">Profile, employment, payroll setup, KYC, emergency, and cost mapping fields.</p>
-            </div>
             <button type="button" className="rounded-xl border border-border px-3 py-2 text-sm font-semibold" onClick={() => { setCreateOpen(false); setEditStaff(null); }}>
               Close
             </button>
@@ -409,13 +437,13 @@ export default function AdminHrStaffRegisterPage() {
               Save Profile
             </ActionButton>
           </div>
-        </section>
+        </FormSection>
       ) : null}
 
       {!loading && !error && rows.length === 0 ? <EmptyState title="No staff found" description="Adjust filters or create a staff profile." /> : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <DataTableShell>
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-foreground">Staff ({rows.length})</div>
             <div className="text-xs text-muted-foreground">Profile pages are opened from staff names and View Profile actions.</div>
@@ -471,7 +499,7 @@ export default function AdminHrStaffRegisterPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </DataTableShell>
       ) : null}
     </PortalPage>
   );
