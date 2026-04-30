@@ -8,10 +8,16 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   getCashierPaymentHistory,
   type CashierTransaction,
@@ -232,10 +238,11 @@ export default function CashierPaymentsPage() {
       }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <FormSection
           title="Counter lookup"
           description="Search by payment ID, reference, customer phone, customer name, subscription number, EMI ID, or lucky number."
-          action={
+        >
+          <div className="mb-4 flex justify-end">
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh", query)}
@@ -244,8 +251,7 @@ export default function CashierPaymentsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
+          </div>
           <TableToolbar
             footer={
               query ? (
@@ -294,7 +300,26 @@ export default function CashierPaymentsPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </FormSection>
+
+        <QuickActionGrid>
+          <KpiCard label="Visible payments" value={String(rows.length)} helper="Current cashier search result set" />
+          <KpiCard label="Visible amount" value={money(visibleAmount)} helper="Total for listed rows" />
+          <KpiCard
+            label="Reversed"
+            value={String(reversedCount)}
+            helper="Rows marked reversed in cashier view"
+          />
+          <KpiCard
+            label="Latest visible"
+            value={
+              latestVisiblePayment
+                ? formatDateTime(latestVisiblePayment.created_at || latestVisiblePayment.payment_date)
+                : "—"
+            }
+            helper="Most recent record in this list"
+          />
+        </QuickActionGrid>
 
         {loading ? <LoadingBlock label="Loading cashier payment history..." /> : null}
 
@@ -307,7 +332,7 @@ export default function CashierPaymentsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Posted cashier-visible payments"
             description={
               query
@@ -326,17 +351,19 @@ export default function CashierPaymentsPage() {
                 }
               />
             ) : (
-              <DataTable<CashierTransaction>
-                rows={rows}
-                columns={columns}
-                rowActions={(row) => (
-                  <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
-                    Receipt
-                  </ActionButton>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<CashierTransaction>
+                  rows={rows}
+                  columns={columns}
+                  rowActions={(row) => (
+                    <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
+                      Receipt
+                    </ActionButton>
+                  )}
+                />
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

@@ -145,3 +145,56 @@
 - `cd frontend && npm run build` — passed
 - `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
 - `cd .. && bash scripts/run-release-candidate.sh` — passed
+
+## Pass 3 — Payment Detail and History Rollout
+
+### Pages migrated
+
+- `src/app/(dashboard)/admin/payments/page.tsx`
+- `src/app/(dashboard)/admin/payments/[id]/page.tsx`
+- `src/app/(dashboard)/cashier/payments/page.tsx`
+- `src/app/(dashboard)/cashier/payments/[id]/page.tsx`
+
+### Shared primitives used
+
+- `DataTableShell`
+- `FormSection`
+- `KpiCard`
+- `WorkflowCard`
+- `QuickActionGrid`
+- `DetailPanel`
+- `Timeline`
+
+### Rollout notes
+
+- Preserved all route URLs and existing service payload/query behavior for admin and cashier payment routes.
+- Kept real payment fields intact: payment id/reference, customer, subscription/lucky/EMI context, amount, method, status, collector/verifier, and timeline/audit metadata.
+- Improved readability and surface consistency by replacing ad-hoc section/card wrappers with shared operations primitives.
+- Kept real reversal action flow unchanged; only presentation was updated to better separate risk-bearing action context.
+
+### Fake/dead UI removed
+
+- Removed local duplicate visual wrappers in payment pages in favor of shared operations primitives.
+- Removed stale icon imports in admin payment register after primitive migration.
+- No fake stats, timeline events, or receipt controls were introduced.
+
+### Remaining blockers
+
+- Admin payment detail timeline still relies on generic metadata flattening for heterogeneous backend event payloads; typed timeline event rendering can be improved when backend event shape contracts are formalized.
+- Cashier payment detail still carries legacy `DetailSection` wrappers around migrated primitives for compatibility with receipt page structure.
+
+### Backend/API changes
+
+- none
+
+### Migrations
+
+- none
+
+### Test results
+
+- `cd frontend && npm run lint` — passed
+- `cd frontend && npm run typecheck` — passed
+- `cd frontend && npm run build` — passed
+- `cd frontend && npm run test:e2e:smoke` — passed
+- `cd .. && bash scripts/run-release-candidate.sh` — passed

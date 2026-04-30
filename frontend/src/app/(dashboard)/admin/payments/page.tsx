@@ -5,25 +5,27 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2,
   Download,
   RefreshCw,
   Search,
   X,
   Filter,
   Calendar,
-  CreditCard,
-  Wallet,
-  TrendingUp,
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { downloadCsv } from "@/lib/export/csv";
 import {
   buildAdminPaymentRoute,
@@ -158,6 +160,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
         )}
       </div>
 
+      <DataTableShell>
       <div className="overflow-x-auto">
         <table className="min-w-full border-separate border-spacing-0">
           <thead>
@@ -312,6 +315,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
           </tbody>
         </table>
       </div>
+      </DataTableShell>
     </div>
   );
 }
@@ -568,38 +572,30 @@ export default function AdminPaymentsPage() {
       }}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
+        <QuickActionGrid>
+          <KpiCard
             label="Visible Payments"
             value={String(summary.visible_payments)}
-            icon={<CreditCard className="h-4 w-4" />}
-            tone="default"
+            helper="Rows currently returned by filters"
           />
-          <StatCard
+          <KpiCard
             label="Net Collected"
             value={money(summary.net_collected_amount)}
-            icon={<Wallet className="h-4 w-4" />}
-            tone="success"
+            helper="Active collections minus reversed impact"
           />
-          <StatCard
+          <KpiCard
             label="Active Rate"
             value={`${activeRate}%`}
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            trend={Number(activeRate) > 80 ? "up" : "down"}
-            trendValue={Number(activeRate) > 80 ? "Healthy" : "Needs review"}
-            tone="default"
-            subtext={`${summary.active_payments} active of ${summary.visible_payments} visible`}
+            helper={`${summary.active_payments} active of ${summary.visible_payments} visible`}
           />
-          <StatCard
+          <KpiCard
             label="Reversed Amount"
             value={money(summary.reversed_amount)}
-            icon={<TrendingUp className="h-4 w-4" />}
-            tone="warning"
-            subtext={`${summary.reversed_payments} reversed payment row(s)`}
+            helper={`${summary.reversed_payments} reversed payment row(s)`}
           />
-        </div>
+        </QuickActionGrid>
 
-        <SectionCard
+        <FormSection
           title="Filter Register"
           description="Search by customer, phone, reference, payment id, subscription id, or batch context. Narrow by method, reversal state, and posting date."
         >
@@ -801,36 +797,22 @@ export default function AdminPaymentsPage() {
               ) : null}
             </div>
           ) : null}
-        </SectionCard>
+        </FormSection>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-border bg-background px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Gross Amount
-            </div>
-            <div className="mt-1 text-lg font-semibold text-foreground">
-              {money(summary.gross_amount)}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-              Reversed Amount
-            </div>
-            <div className="mt-1 text-lg font-semibold text-amber-800">
-              {money(summary.reversed_amount)}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              Net Collected
-            </div>
-            <div className="mt-1 text-lg font-semibold text-emerald-800">
-              {money(summary.net_collected_amount)}
-            </div>
-          </div>
-        </div>
+        <QuickActionGrid className="xl:grid-cols-3">
+          <WorkflowCard
+            title="Gross Amount"
+            description={money(summary.gross_amount)}
+          />
+          <WorkflowCard
+            title="Reversed Amount"
+            description={money(summary.reversed_amount)}
+          />
+          <WorkflowCard
+            title="Net Collected"
+            description={money(summary.net_collected_amount)}
+          />
+        </QuickActionGrid>
 
         {loading ? <LoadingBlock label="Loading payment register..." /> : null}
 
@@ -843,12 +825,12 @@ export default function AdminPaymentsPage() {
         ) : null}
 
         {!loading && !error && (
-          <SectionCard
+          <DetailPanel
             title="Payment Rows"
             description="Review payments, confirm reversal visibility, and hand off to payment detail, subscription detail, or payment-level reconciliation."
           >
             <PaymentsTable rows={rows} />
-          </SectionCard>
+          </DetailPanel>
         )}
       </div>
     </PortalPage>

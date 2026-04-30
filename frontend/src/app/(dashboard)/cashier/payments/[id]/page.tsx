@@ -9,6 +9,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
+import { DetailPanel, FormSection, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
@@ -164,7 +165,7 @@ export default function CashierPaymentReceiptPage() {
     >
       <div className="space-y-6">
         <section className="receipt-print-hide flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Use Print / Save PDF for a paper-safe counter copy without dashboard chrome.
           </p>
 
@@ -173,7 +174,7 @@ export default function CashierPaymentReceiptPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-70"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -182,7 +183,7 @@ export default function CashierPaymentReceiptPage() {
               type="button"
               onClick={handlePrint}
               disabled={loading || Boolean(error) || !payment}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-950 bg-slate-950 px-4 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.82)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-100 disabled:opacity-70"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background shadow-[0_18px_38px_-24px_rgba(15,23,42,0.82)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
             >
               Print / Save PDF
             </button>
@@ -274,67 +275,83 @@ export default function CashierPaymentReceiptPage() {
               title="Collection snapshot"
               description="Operational summary for this cashier-visible collection record."
             >
-              <DetailMetaGrid
-                items={[
-                  { label: "Receipt Reference", value: receiptReference },
-                  {
-                    label: "Collection Status",
-                    value: (
-                      <StatusChip
-                        label={statusLabel}
-                        tone={statusLabel === "REVERSED" ? "danger" : "success"}
-                      />
-                    ),
-                  },
-                  {
-                    label: "Recorded At",
-                    value: formatDateTime(payment.created_at || payment.payment_date),
-                  },
-                  { label: "Operator", value: payment.collected_by_username || "—" },
-                  { label: "Customer", value: payment.customer_name || "—" },
-                  { label: "Subscription", value: subscriptionLabel },
-                  { label: "Method", value: payment.method || "—" },
-                  { label: "Amount", value: money(payment.amount), tone: "success" },
-                ]}
-              />
+              <DetailPanel
+                title="Collection snapshot"
+                description="Operational summary for this cashier-visible collection record."
+              >
+                <DetailMetaGrid
+                  items={[
+                    { label: "Receipt Reference", value: receiptReference },
+                    {
+                      label: "Collection Status",
+                      value: (
+                        <StatusChip
+                          label={statusLabel}
+                          tone={statusLabel === "REVERSED" ? "danger" : "success"}
+                        />
+                      ),
+                    },
+                    {
+                      label: "Recorded At",
+                      value: formatDateTime(payment.created_at || payment.payment_date),
+                    },
+                    { label: "Operator", value: payment.collected_by_username || "—" },
+                    { label: "Customer", value: payment.customer_name || "—" },
+                    { label: "Subscription", value: subscriptionLabel },
+                    { label: "Method", value: payment.method || "—" },
+                    { label: "Amount", value: money(payment.amount), tone: "success" },
+                  ]}
+                />
+              </DetailPanel>
             </DetailSection>
 
-            <DetailSection
+            <FormSection
               className="receipt-print-hide"
               title="Next step"
               description="Use the next action that matches the customer conversation at the counter."
             >
-              <ActionStrip>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="inline-flex items-center rounded-md border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-                >
-                  Print / Save PDF
-                </button>
-
-                <Link
-                  href="/cashier/payments"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Payment History
-                </Link>
-
-                <Link
-                  href="/cashier/collect"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Collect Another Payment
-                </Link>
-
-                <Link
-                  href="/cashier"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Return to Dashboard
-                </Link>
-              </ActionStrip>
-            </DetailSection>
+              <QuickActionGrid className="xl:grid-cols-2">
+                <WorkflowCard
+                  title="Print Counter Copy"
+                  description="Generate paper or PDF proof for customer handover."
+                  action={
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="inline-flex items-center rounded-md border border-border bg-foreground px-3 py-2 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
+                    >
+                      Print / Save PDF
+                    </button>
+                  }
+                />
+                <WorkflowCard
+                  title="Continue Counter Workflow"
+                  description="Open history, collect another payment, or return to dashboard."
+                  action={
+                    <ActionStrip>
+                      <Link
+                        href="/cashier/payments"
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Open Payment History
+                      </Link>
+                      <Link
+                        href="/cashier/collect"
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Collect Another Payment
+                      </Link>
+                      <Link
+                        href="/cashier"
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Return to Dashboard
+                      </Link>
+                    </ActionStrip>
+                  }
+                />
+              </QuickActionGrid>
+            </FormSection>
           </>
         ) : null}
       </div>
