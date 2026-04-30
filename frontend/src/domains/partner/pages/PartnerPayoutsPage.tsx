@@ -10,11 +10,12 @@ import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import {
   listPartnerCommissions,
+  listPartnerSubscriptions,
   type PartnerCommission,
+  type PartnerSubscription,
 } from "@/services/partner";
 
 function money(value?: string | number | null): string {
@@ -57,6 +58,7 @@ export default function PartnerPayoutsPage({
   mode?: "payouts" | "commissions";
 }) {
   const [rows, setRows] = useState<PartnerCommission[]>([]);
+  const [subscriptionIndex, setSubscriptionIndex] = useState<Record<number, PartnerSubscription>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,11 +71,20 @@ export default function PartnerPayoutsPage({
     }
 
     try {
-      const payload = await listPartnerCommissions();
-      setRows(payload);
+      const [commissionPayload, subscriptionPayload] = await Promise.all([
+        listPartnerCommissions(),
+        listPartnerSubscriptions(),
+      ]);
+      setRows(commissionPayload);
+      const mapped: Record<number, PartnerSubscription> = {};
+      for (const sub of subscriptionPayload.results || []) {
+        mapped[sub.id] = sub;
+      }
+      setSubscriptionIndex(mapped);
       setError(null);
     } catch (err) {
       setRows([]);
+      setSubscriptionIndex({});
       setError(normalizeError(err));
     } finally {
       if (mode === "initial") {
@@ -110,35 +121,51 @@ export default function PartnerPayoutsPage({
     () => [
       {
         key: "id",
-        title: "Entry",
+        title: "Subscription / Customer",
         render: (row) => (
           <div className="space-y-1">
-            <div className="font-medium text-foreground">#{row.id}</div>
+            <div className="font-medium text-foreground">
+              {row.subscription ? `SUB-${row.subscription}` : `#${row.id}`}
+            </div>
             <div className="text-xs text-muted-foreground">
-              Subscription {row.subscription ? `SUB-${row.subscription}` : "—"}
+              {row.subscription
+                ? subscriptionIndex[row.subscription]?.customer_name || "Customer unavailable"
+                : "Subscription unavailable"}
             </div>
           </div>
         ),
       },
       {
-        key: "subscription",
-        title: "Subscription",
-        render: (row) => (row.subscription ? `SUB-${row.subscription}` : "—"),
-      },
-      {
         key: "emi",
-        title: "EMI",
-        render: (row) => (row.emi ? `#${row.emi}` : "—"),
+        title: "EMI Paid / Winner",
+        render: (row) => {
+          const sub = row.subscription ? subscriptionIndex[row.subscription] : undefined;
+          return (
+            <div className="space-y-1">
+              <div className="text-sm text-foreground">
+                EMI {row.emi ? `#${row.emi}` : "—"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Paid EMI {sub?.paid_emi_count ?? "—"}
+              </div>
+              {sub?.winner_status ? (
+                <StatusBadge status={sub.winner_status} hideIcon />
+              ) : (
+                <span className="text-xs text-muted-foreground">Winner status unavailable</span>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: "commission_amount",
-        title: "Amount",
+        title: "Commission Earned",
         align: "right",
         render: (row) => money(row.commission_amount),
       },
       {
         key: "status",
-        title: "Status",
+        title: "Payout Status",
         render: (row) => <StatusBadge status={row.status || "PENDING"} />,
       },
       {
@@ -152,7 +179,7 @@ export default function PartnerPayoutsPage({
         render: (row) => formatDateTime(row.paid_at || row.approved_at),
       },
     ],
-    []
+    [subscriptionIndex]
   );
 
   const title = mode === "commissions" ? "Commission Ledger" : "Payout Visibility";
@@ -204,10 +231,14 @@ export default function PartnerPayoutsPage({
       statusBadge={{ label: "Partner visibility", tone: "info" }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <DetailPanel
           title="Payout boundary"
-          description="Partner earnings visibility stays separate from payout authorization and finance posting."
-          action={
+          description="Commission is payment-based and visibility here does not authorize payout posting."
+        >
+          <WorkflowCard
+            title="Refresh payout visibility"
+            description="Reload current partner commission rows and linked subscription winner state."
+            action={
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -216,12 +247,24 @@ export default function PartnerPayoutsPage({
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
-          <WorkspaceNotice tone="info" title="What this page shows">
-            Commission entries indicate partner earnings posture. They do not grant payout control, reverse settled commissions, or expose admin-only payout-batch workflows.
-          </WorkspaceNotice>
-        </WorkspaceSection>
+            }
+          />
+        </DetailPanel>
+
+        <QuickActionGrid>
+          <KpiCard label="Commission Entries" value={rows.length} />
+          <KpiCard
+            label="Pending Payout"
+            value={money(pendingAmount)}
+            helper="Awaiting settlement approval"
+          />
+          <KpiCard
+            label="Settled Payout"
+            value={money(settledAmount)}
+            helper="Settled based on payment-backed commissions"
+          />
+          <KpiCard label="Latest Entry" value={formatDateTime(latestCreatedAt)} />
+        </QuickActionGrid>
 
         {loading ? <LoadingBlock label="Loading payout visibility..." /> : null}
 
@@ -234,9 +277,9 @@ export default function PartnerPayoutsPage({
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Commission and payout entries"
-            description="Live partner-visible earning rows sourced from the commission API."
+            description="Live partner-visible entries; winner status appears only when linked subscription data is available."
           >
             {rows.length === 0 ? (
               <EmptyState
@@ -244,22 +287,24 @@ export default function PartnerPayoutsPage({
                 description="No commission or payout visibility rows are currently available in this partner scope."
               />
             ) : (
-              <DataTable<PartnerCommission>
-                rows={rows}
-                columns={columns}
-                rowActions={(row) =>
-                  row.subscription ? (
-                    <ActionButton
-                      href={`/partner/subscriptions/${row.subscription}`}
-                      variant="outline"
-                    >
-                      Subscription
-                    </ActionButton>
-                  ) : null
-                }
-              />
+              <DataTableShell>
+                <DataTable<PartnerCommission>
+                  rows={rows}
+                  columns={columns}
+                  rowActions={(row) =>
+                    row.subscription ? (
+                      <ActionButton
+                        href={`/partner/subscriptions/${row.subscription}`}
+                        variant="outline"
+                      >
+                        Subscription
+                      </ActionButton>
+                    ) : null
+                  }
+                />
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

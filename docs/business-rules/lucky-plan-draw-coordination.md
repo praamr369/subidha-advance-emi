@@ -88,6 +88,12 @@ Admin control-center exposes `product_demand_status` / `delivery_status` as `not
 
 Draw execution does **not** create commissions. Partner commission remains **payment-driven**; tests assert commission row counts unchanged across the draw.
 
+### Partner UI visibility (Pass 9)
+
+- Partner dashboard/commission/payout views can display winner status for partner-linked subscriptions **only when already available** in partner-permitted APIs.
+- Winner status visibility does not alter commission computation, posting, approval, or payout batching.
+- Partner pages remain visibility and workflow-routing surfaces; admin-only payout/reconciliation controls are not exposed.
+
 ## Public verification
 
 Public winner payloads include `batch_name` (batch code), `draw_date` / `revealed_at`, `public_commit_hash`, `winner_lucky_number`, `verification_status` (`coordinated` vs `legacy`), and masked winner name only.

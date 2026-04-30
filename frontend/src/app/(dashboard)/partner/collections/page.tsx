@@ -10,8 +10,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import { getPartnerDashboard } from "@/services/partner";
 
 type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
@@ -342,10 +341,14 @@ export default function PartnerCollectionsPage() {
       statusBadge={{ label: "Partner collection scope", tone: "info" }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <DetailPanel
           title="Collection boundary"
           description="Use this workspace to understand where a partner-submitted collection is in the pipeline without crossing into admin finance or reconciliation controls."
-          action={
+        >
+          <WorkflowCard
+            title="Refresh collections"
+            description="Reload request and verified-payment surfaces."
+            action={
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -354,12 +357,16 @@ export default function PartnerCollectionsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
-          <WorkspaceNotice tone="info" title="Operational separation">
-            Submitted requests represent field collection activity. Verified payments below represent finalized partner-visible truth after approval. Neither surface exposes admin-only payout, reversal, or reconciliation controls.
-          </WorkspaceNotice>
-        </WorkspaceSection>
+            }
+          />
+        </DetailPanel>
+
+        <QuickActionGrid>
+          <KpiCard label="Submitted" value={submittedCount} />
+          <KpiCard label="Under Review" value={underReviewCount} />
+          <KpiCard label="Approved" value={approvedCount} />
+          <KpiCard label="Rejected" value={rejectedCount} />
+        </QuickActionGrid>
 
         {loading ? <LoadingBlock label="Loading partner collections..." /> : null}
 
@@ -374,7 +381,7 @@ export default function PartnerCollectionsPage() {
         {!loading && !error ? (
           <>
             {!hasAnyCollectionData ? (
-              <WorkspaceSection
+              <DetailPanel
                 title="Collection activity"
                 description="No submitted requests, verified payments, or follow-up items are currently available in this partner scope."
               >
@@ -387,10 +394,10 @@ export default function PartnerCollectionsPage() {
                     </ActionButton>
                   }
                 />
-              </WorkspaceSection>
+              </DetailPanel>
             ) : (
               <>
-                <WorkspaceSection
+                <DetailPanel
                   title="Submitted collection requests"
                   description="Partner-created requests waiting for review or final decision."
                 >
@@ -400,32 +407,34 @@ export default function PartnerCollectionsPage() {
                       description="No partner collection requests matched the current workspace."
                     />
                   ) : (
-                    <DataTable<CollectionRequestRow>
-                      rows={requests}
-                      columns={requestColumns}
-                      rowActions={(row) => (
-                        <div className="flex flex-wrap gap-2">
-                          <ActionButton
-                            href={`/partner/collections/${row.id}`}
-                            variant="outline"
-                          >
-                            Request detail
-                          </ActionButton>
-                          {typeof row.subscription_id === "number" ? (
+                    <DataTableShell>
+                      <DataTable<CollectionRequestRow>
+                        rows={requests}
+                        columns={requestColumns}
+                        rowActions={(row) => (
+                          <div className="flex flex-wrap gap-2">
                             <ActionButton
-                              href={`/partner/collections/create?subscription=${row.subscription_id}`}
+                              href={`/partner/collections/${row.id}`}
                               variant="outline"
                             >
-                              New request
+                              Request detail
                             </ActionButton>
-                          ) : null}
-                        </div>
-                      )}
-                    />
+                            {typeof row.subscription_id === "number" ? (
+                              <ActionButton
+                                href={`/partner/collections/create?subscription=${row.subscription_id}`}
+                                variant="outline"
+                              >
+                                New request
+                              </ActionButton>
+                            ) : null}
+                          </div>
+                        )}
+                      />
+                    </DataTableShell>
                   )}
-                </WorkspaceSection>
+                </DetailPanel>
 
-                <WorkspaceSection
+                <DetailPanel
                   title="Recently verified payments"
                   description="These rows represent finalized payment visibility after approval and verification."
                 >
@@ -435,26 +444,28 @@ export default function PartnerCollectionsPage() {
                       description="No verified partner-visible payment rows are currently available."
                     />
                   ) : (
-                    <DataTable<VerifiedPaymentRow>
-                      rows={verifiedPayments}
-                      columns={verifiedColumns}
-                      rowActions={(row) => (
-                        <ActionButton
-                          href={
-                            row.subscription_id
-                              ? `/partner/payments?subscription=${row.subscription_id}`
-                              : "/partner/payments"
-                          }
-                          variant="outline"
-                        >
-                          Open payments
-                        </ActionButton>
-                      )}
-                    />
+                    <DataTableShell>
+                      <DataTable<VerifiedPaymentRow>
+                        rows={verifiedPayments}
+                        columns={verifiedColumns}
+                        rowActions={(row) => (
+                          <ActionButton
+                            href={
+                              row.subscription_id
+                                ? `/partner/payments?subscription=${row.subscription_id}`
+                                : "/partner/payments"
+                            }
+                            variant="outline"
+                          >
+                            Open payments
+                          </ActionButton>
+                        )}
+                      />
+                    </DataTableShell>
                   )}
-                </WorkspaceSection>
+                </DetailPanel>
 
-                <WorkspaceSection
+                <DetailPanel
                   title="Follow-up queue"
                   description="Requests needing re-submission, trace clarification, or partner action."
                 >
@@ -464,44 +475,46 @@ export default function PartnerCollectionsPage() {
                       description="No partner follow-up items currently require action."
                     />
                   ) : (
-                    <DataTable<CollectionRequestRow>
-                      rows={followUpQueue}
-                      columns={[
-                        ...requestColumns.slice(0, 2),
-                        {
-                          key: "status",
-                          title: "Status",
-                          render: (row) => <StatusBadge status={row.status} />,
-                        },
-                        {
-                          key: "review_note",
-                          title: "Review Note",
-                          render: (row) => row.review_note || "—",
-                        },
-                      ]}
-                      rowActions={(row) => (
-                        <div className="flex flex-wrap gap-2">
-                          <ActionButton
-                            href={`/partner/collections/${row.id}`}
-                            variant="outline"
-                          >
-                            Request detail
-                          </ActionButton>
-                          <ActionButton
-                            href={
-                              row.subscription_id
-                                ? `/partner/collections/create?subscription=${row.subscription_id}`
-                                : "/partner/collections/create"
-                            }
-                            variant="outline"
-                          >
-                            Submit new request
-                          </ActionButton>
-                        </div>
-                      )}
-                    />
+                    <DataTableShell>
+                      <DataTable<CollectionRequestRow>
+                        rows={followUpQueue}
+                        columns={[
+                          ...requestColumns.slice(0, 2),
+                          {
+                            key: "status",
+                            title: "Status",
+                            render: (row) => <StatusBadge status={row.status} />,
+                          },
+                          {
+                            key: "review_note",
+                            title: "Review Note",
+                            render: (row) => row.review_note || "—",
+                          },
+                        ]}
+                        rowActions={(row) => (
+                          <div className="flex flex-wrap gap-2">
+                            <ActionButton
+                              href={`/partner/collections/${row.id}`}
+                              variant="outline"
+                            >
+                              Request detail
+                            </ActionButton>
+                            <ActionButton
+                              href={
+                                row.subscription_id
+                                  ? `/partner/collections/create?subscription=${row.subscription_id}`
+                                  : "/partner/collections/create"
+                              }
+                              variant="outline"
+                            >
+                              Submit new request
+                            </ActionButton>
+                          </div>
+                        )}
+                      />
+                    </DataTableShell>
                   )}
-                </WorkspaceSection>
+                </DetailPanel>
               </>
             )}
           </>

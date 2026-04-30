@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { RefreshCw, Search, ShieldCheck, Users } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -11,10 +11,9 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import {
   listPartnerCustomersRegister,
   type PartnerCustomerRegisterResponse,
@@ -221,27 +220,21 @@ export default function PartnerCustomersPage() {
       statusBadge={{ label: "Partner Customer Scope", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Matching Customers" value={count} icon={<Users className="h-4 w-4" />} />
-          <StatCard
-            label="Page Pending KYC"
-            value={pagePendingKyc}
-            icon={<ShieldCheck className="h-4 w-4" />}
-            tone={pagePendingKyc > 0 ? "warning" : "default"}
-          />
-          <StatCard
-            label="Page Verified KYC"
-            value={pageVerifiedKyc}
-            icon={<ShieldCheck className="h-4 w-4" />}
-            tone="success"
-          />
-          <StatCard label="Current Search" value={q || "All"} />
-        </div>
+        <QuickActionGrid>
+          <KpiCard label="Matching Customers" value={count} />
+          <KpiCard label="Page Pending KYC" value={pagePendingKyc} helper="Current page only" />
+          <KpiCard label="Page Verified KYC" value={pageVerifiedKyc} helper="Current page only" />
+          <KpiCard label="Current Search" value={q || "All"} />
+        </QuickActionGrid>
 
-        <WorkspaceSection
+        <DetailPanel
           title="Customer workflow"
           description="Search by customer name or phone, then narrow the visible list by KYC state without exposing admin-only customer controls."
-          action={
+        >
+          <WorkflowCard
+            title="Refresh partner customer scope"
+            description="Reload partner-visible customers using current filters."
+            action={
             <button
               type="button"
               onClick={() => void loadCustomers("refresh")}
@@ -251,8 +244,8 @@ export default function PartnerCustomersPage() {
               <RefreshCw className="h-4 w-4" />
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
-          }
-        >
+            }
+          />
           <TableToolbar
             footer={
               q || kycStatus ? (
@@ -313,7 +306,7 @@ export default function PartnerCustomersPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading customers..." /> : null}
 
@@ -326,7 +319,7 @@ export default function PartnerCustomersPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Customer rows"
             description="Open customer detail for partner-visible subscription and recent payment context."
           >
@@ -345,27 +338,29 @@ export default function PartnerCustomersPage() {
                 description="The current page has no results. Move to a previous page or change the filters."
               />
             ) : (
-              <DataTable<PartnerCustomer>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) => router.push(`/partner/customers/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/partner/customers/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      View Detail
-                    </Link>
-                    <Link
-                      href={`/partner/subscriptions?customer=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Subscriptions
-                    </Link>
-                  </div>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<PartnerCustomer>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) => router.push(`/partner/customers/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/partner/customers/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        View Detail
+                      </Link>
+                      <Link
+                        href={`/partner/subscriptions?customer=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Subscriptions
+                      </Link>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
             )}
 
             {count > 0 ? (
@@ -381,7 +376,7 @@ export default function PartnerCustomersPage() {
                 onNext={() => replacePage(page + 1)}
               />
             ) : null}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

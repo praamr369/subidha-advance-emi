@@ -14,11 +14,10 @@ test("partner dashboard loads and payouts is not shown in navigation", async ({
   await expect(page.locator('a[href="/partner/payouts"]')).toHaveCount(0);
 });
 
-test("partner payouts route redirects to commissions", async ({ page }) => {
+test("partner payouts route renders payout visibility list", async ({ page }) => {
   await page.goto("/partner/payouts");
-  await expect(page).toHaveURL(/\/partner\/commissions$/);
   await expect(
-    page.getByRole("heading", { name: "Commission Ledger" })
+    page.getByRole("heading", { name: "Payout Visibility" }).first()
   ).toBeVisible();
 });
 
@@ -76,6 +75,103 @@ test("partner collection request detail loads directly", async ({ page }) => {
       ),
     })
   ).toBeVisible();
+});
+
+test("partner commission list renders winner status only when available", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/partner/commissions/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 1,
+          subscription: 7001,
+          emi: 2,
+          commission_amount: "150.00",
+          status: "PENDING",
+          created_at: "2026-04-05T09:00:00Z",
+        },
+        {
+          id: 2,
+          subscription: 7002,
+          emi: 3,
+          commission_amount: "220.00",
+          status: "SETTLED",
+          created_at: "2026-04-06T09:00:00Z",
+          paid_at: "2026-04-08T10:00:00Z",
+        },
+      ]),
+    });
+  });
+  await page.route("**/api/v1/partner/subscriptions/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 2,
+        results: [
+          {
+            id: 7001,
+            subscription_number: "SUB-7001",
+            customer_name: "No Winner Yet",
+            paid_emi_count: 2,
+          },
+          {
+            id: 7002,
+            subscription_number: "SUB-7002",
+            customer_name: "Winner Customer",
+            paid_emi_count: 3,
+            winner_status: "WON",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/partner/commissions");
+  await expect(
+    page.getByRole("heading", { name: "Commission Ledger" })
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText(
+    /Winner status unavailable|WON/
+  );
+});
+
+test("partner winner status does not create commission entry by itself", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/partner/commissions/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    });
+  });
+  await page.route("**/api/v1/partner/subscriptions/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        results: [
+          {
+            id: 8801,
+            subscription_number: "SUB-8801",
+            customer_name: "Winner Without New Commission",
+            paid_emi_count: 1,
+            winner_status: "WON",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/partner/commissions");
+  await expect(page.locator("body")).toContainText(
+    "No commission entries found"
+  );
 });
 
 test("partner subscription detail keeps contract lifecycle and winner history separate", async ({

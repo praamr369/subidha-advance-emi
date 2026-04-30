@@ -464,3 +464,45 @@
 - `tests/e2e/admin.spec.ts` — control-center disabled reason + commit/execute refetch behavior
 - `tests/e2e/public.spec.ts` — winner history verification fields visibility and no sensitive field marker text
 - `tests/e2e/customer.spec.ts` — customer profile own lucky draw verification rendering
+
+## Pass 9 — Partner Dashboard, Commissions, Payouts, Winner Visibility
+
+### Pages migrated / updated
+
+- `src/domains/partner/pages/PartnerPayoutsPage.tsx`
+- `src/app/(dashboard)/partner/payouts/page.tsx`
+- `src/app/(dashboard)/partner/customers/page.tsx`
+- `src/app/(dashboard)/partner/collections/page.tsx`
+- `tests/e2e/partner.spec.ts`
+
+### Shared primitives used
+
+- `PortalPage`
+- `DetailPanel`
+- `DataTableShell`
+- `KpiCard`
+- `QuickActionGrid`
+- `WorkflowCard`
+- `StatusBadge`
+
+### Rollout notes
+
+- Partner payouts route now renders a partner visibility surface (instead of redirect-only behavior), while preserving partner-only scope and no payout control actions.
+- Commission/payout ledger now joins existing partner subscription data in UI to show:
+  - subscription and customer (partner scope)
+  - EMI reference
+  - commission earned
+  - payout status
+  - winner status only when linked subscription winner data exists
+- Partner customer and collection screens now use operations primitives (`DetailPanel`, `DataTableShell`, `KpiCard`) for clearer scanning and consistent loading/empty/error behavior.
+- No fake earnings, payout states, or winner states were introduced.
+
+### Business guardrails preserved
+
+- Commission visibility remains payment-based and read-only.
+- Winner state does not create commission entries.
+- No payout posting, approval, or batching controls were added to partner UI.
+
+### Backend/API changes
+
+- none
