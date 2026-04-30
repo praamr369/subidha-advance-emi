@@ -108,6 +108,14 @@ class FinalPreDeployHrStaffHardeningTests(TestCase):
         self.assertEqual(edited.data["phone"], "9811111010")
         self.assertTrue(edited.data["kyc_verified"])
 
+        detail = self.client.get(f"/api/v1/admin/hr/staff/{staff_id}/")
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertEqual(detail.data["id"], staff_id)
+
+        filtered = self.client.get("/api/v1/admin/hr/staff/?employment_type=SERVICE&kyc_verified=true&department=Service")
+        self.assertEqual(filtered.status_code, 200, filtered.data)
+        self.assertEqual(filtered.data["count"], 1)
+
     def test_duplicate_phone_blocked(self):
         EmployeeProfile.objects.create(name="Staff A", phone="9811111222", joining_date=date(2026, 1, 1))
         dup = self.client.post(
@@ -149,6 +157,19 @@ class FinalPreDeployHrStaffHardeningTests(TestCase):
         )
         self.assertEqual(upload.status_code, 200, upload.data)
         self.assertTrue(EmployeeDocument.objects.filter(employee=employee).exists())
+        document_id = upload.data["id"]
+
+        filtered = self.client.get(f"/api/v1/admin/hr/staff-documents/?employee={employee.id}&document_type=ID_PROOF&status=ACTIVE")
+        self.assertEqual(filtered.status_code, 200, filtered.data)
+        self.assertEqual(filtered.data["count"], 1)
+
+        inactive = self.client.patch(
+            f"/api/v1/admin/hr/staff-documents/{document_id}/",
+            {"status": "INACTIVE"},
+            format="json",
+        )
+        self.assertEqual(inactive.status_code, 200, inactive.data)
+        self.assertEqual(inactive.data["status"], "INACTIVE")
 
         profile_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/profile-pdf/")
         salary_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/salary-agreement-pdf/")
@@ -162,6 +183,8 @@ class FinalPreDeployHrStaffHardeningTests(TestCase):
         self.client.force_authenticate(self.cashier)
         blocked = self.client.get("/api/v1/admin/hr/staff/")
         self.assertEqual(blocked.status_code, 403)
+        blocked_detail = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/")
+        self.assertEqual(blocked_detail.status_code, 403)
         # Payroll setup updates must not create salary/accounting postings directly.
         self.client.force_authenticate(self.admin)
         pre_salary_sheet_count = employee.salary_sheets.count()

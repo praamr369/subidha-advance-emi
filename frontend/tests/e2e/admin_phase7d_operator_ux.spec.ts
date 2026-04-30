@@ -42,7 +42,7 @@ test("bi charts show read-only report links", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
 
   await page.goto("/admin/bi/cashflow");
-  await expect(page.getByRole("heading", { name: "Cashflow Dashboard" })).toBeVisible();
+  await expect(page.locator("h1", { hasText: "Cashflow Dashboard" })).toBeVisible();
   await expect(page.getByText(/Financial mutation: disabled/i)).toBeVisible();
   await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
@@ -61,9 +61,33 @@ test("sidebar includes phase 7D groups without duplicate dashboard href links", 
 test("staff register and payroll setup render hardening controls", async ({ page }) => {
   await page.goto("/admin/hr/staff");
   await expect(page.getByRole("heading", { name: /staff register/i })).toBeVisible();
-  await expect(page.getByText(/Quick create staff/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create staff" })).toBeVisible();
-  await expect(page.getByText(/Profile PDF|Salary PDF/i)).toHaveCount(0);
+  await expect(page.getByText(/Staff search and filters/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apply Filters" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create Staff" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create Staff" }).click();
+  await page.getByLabel("Full name").fill("Smoke HR Profile");
+  await page.getByLabel("Phone", { exact: true }).fill("9867001122");
+  await page.getByLabel("Department").fill("Operations");
+  await page.getByLabel("Role / title").fill("Supervisor");
+  await page.getByRole("button", { name: "Save Profile" }).click();
+  await expect(page.getByText("Staff profile created.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Smoke HR Profile" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View profile" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Profile PDF" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Salary PDF" }).first()).toBeVisible();
+
+  await page.getByRole("link", { name: "Smoke HR Profile" }).click();
+  await expect(page.locator("h1.enterprise-title", { hasText: "Smoke HR Profile" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Profile Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Employment & Payroll" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download Profile PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download Salary Agreement PDF" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit Profile" }).click();
+  await page.getByRole("button", { name: "KYC" }).click();
+  await page.getByLabel("KYC type").fill("NID");
+  await page.getByRole("button", { name: "Save Profile" }).click();
+  await expect(page.getByRole("heading", { name: "Profile Overview" })).toBeVisible();
 
   await page.goto("/admin/hr/payroll");
   await expect(page.getByRole("heading", { name: /salary \/ payroll/i })).toBeVisible();
@@ -74,5 +98,10 @@ test("staff register and payroll setup render hardening controls", async ({ page
 test("staff documents workspace renders real upload controls", async ({ page }) => {
   await page.goto("/admin/hr/staff-documents");
   await expect(page.getByRole("banner").getByRole("heading", { name: "Staff Documents" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /upload document/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apply Filters" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload Document" })).toBeVisible();
+  await page.getByRole("button", { name: "Upload Document" }).click();
+  await expect(page.getByText(/Uploads use POST \/api\/v1\/admin\/hr\/staff-documents\//i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload Document" }).last()).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Verify \/ Reject unavailable/i })).toHaveCount(0);
 });

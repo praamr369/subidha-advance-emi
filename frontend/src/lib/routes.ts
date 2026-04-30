@@ -44,6 +44,7 @@ export const ROUTES = {
     workspace: "/admin/workspace",
     hr: "/admin/hr",
     hrStaff: "/admin/hr/staff",
+    hrStaffProfile: "/admin/hr/staff",
     hrAttendance: "/admin/hr/attendance",
     hrPayroll: "/admin/hr/payroll",
     hrSalaryPayments: "/admin/hr/salary-payments",

@@ -94,11 +94,20 @@ class AdminHrStaffListCreateView(_AdminBase):
         qs = EmployeeProfile.objects.select_related("branch").all().order_by("name", "id")
         is_active = request.query_params.get("is_active")
         branch_id = request.query_params.get("branch")
+        department = (request.query_params.get("department") or "").strip()
+        employment_type = (request.query_params.get("employment_type") or "").strip().upper()
+        kyc_verified = request.query_params.get("kyc_verified")
         q = (request.query_params.get("q") or "").strip()
         if is_active in {"true", "false"}:
             qs = qs.filter(is_active=is_active == "true")
         if branch_id:
             qs = qs.filter(branch_id=branch_id)
+        if department:
+            qs = qs.filter(department__iexact=department)
+        if employment_type:
+            qs = qs.filter(employment_type=employment_type)
+        if kyc_verified in {"true", "false"}:
+            qs = qs.filter(kyc_verified=kyc_verified == "true")
         if q:
             qs = qs.filter(
                 Q(name__icontains=q)
@@ -166,6 +175,10 @@ class AdminHrStaffListCreateView(_AdminBase):
 
 
 class AdminHrStaffPatchView(_AdminBase):
+    def get(self, request, staff_id: int):
+        employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        return Response(EmployeeProfileSerializer(employee, context={"request": request}).data)
+
     def patch(self, request, staff_id: int):
         employee = get_object_or_404(EmployeeProfile, pk=staff_id)
         next_phone = (request.data.get("phone") or "").strip()
@@ -225,9 +238,15 @@ class AdminHrSalaryAgreementPdfView(_AdminBase):
 class AdminHrStaffDocumentsListCreateView(_AdminBase):
     def get(self, request):
         qs = EmployeeDocument.objects.select_related("employee", "uploaded_by").order_by("-created_at", "-id")
-        staff_id = request.query_params.get("staff")
+        staff_id = request.query_params.get("staff") or request.query_params.get("employee")
+        document_type = (request.query_params.get("document_type") or "").strip().upper()
+        status_value = (request.query_params.get("status") or "").strip().upper()
         if staff_id:
             qs = qs.filter(employee_id=staff_id)
+        if document_type:
+            qs = qs.filter(document_type=document_type)
+        if status_value:
+            qs = qs.filter(status=status_value)
         results = list(qs[:200])
         return Response(
             {
@@ -379,7 +398,11 @@ class AdminHrExpenseClaimPatchView(_AdminBase):
 class AdminHrPayrollView(_AdminBase):
     def get(self, request):
         period = PayrollPeriod.objects.order_by("-year", "-month", "-id").first()
-        sheets = SalarySheet.objects.select_related("employee", "payroll_period").order_by("-created_at", "-id")[:50]
+        sheets_qs = SalarySheet.objects.select_related("employee", "payroll_period").order_by("-created_at", "-id")
+        employee_id = request.query_params.get("employee")
+        if employee_id:
+            sheets_qs = sheets_qs.filter(employee_id=employee_id)
+        sheets = sheets_qs[:50]
         return Response(
             {
                 "current_period": None if period is None else {"id": period.id, "code": period.code, "status": period.status},
@@ -391,6 +414,9 @@ class AdminHrPayrollView(_AdminBase):
 class AdminHrSalaryPaymentsListCreateView(_AdminBase):
     def get(self, request):
         qs = SalaryPayment.objects.select_related("salary_sheet", "branch", "finance_account").order_by("-payment_date", "-id")
+        employee_id = request.query_params.get("employee")
+        if employee_id:
+            qs = qs.filter(salary_sheet__employee_id=employee_id)
         results = list(qs[:200])
         return Response({"count": qs.count(), "results": SalaryPaymentSerializer(results, many=True, context={"request": request}).data})
 
@@ -400,4 +426,3 @@ class AdminHrSalaryPaymentsListCreateView(_AdminBase):
         payment = serializer.save()
         record_salary_payment(performed_by=request.user, salary_payment=payment)
         return Response(SalaryPaymentSerializer(payment, context={"request": request}).data)
-
