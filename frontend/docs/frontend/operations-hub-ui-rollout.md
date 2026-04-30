@@ -308,3 +308,63 @@
 - `cd frontend && npm run build` — passed
 - `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
 - `cd .. && bash scripts/run-release-candidate.sh` — passed (`RELEASE CANDIDATE VALIDATION PASSED`)
+
+## Pass 6 — Admin Product, Batch, Lucky ID, and Subscription Rollout
+
+### Pages migrated
+
+- `src/app/(dashboard)/admin/products/page.tsx`
+- `src/app/(dashboard)/admin/products/import/page.tsx`
+- `src/app/(dashboard)/admin/products/create/page.tsx`
+- `src/app/(dashboard)/admin/batches/page.tsx`
+- `src/app/(dashboard)/admin/lucky-ids/page.tsx`
+- `src/app/(dashboard)/admin/subscriptions/page.tsx` (workflow landing + filtered subscription register)
+
+### Shared primitives used
+
+- `DataTableShell`
+- `DetailPanel`
+- `FormSection`
+- `KpiCard`
+- `QuickActionGrid`
+- `WorkflowCard`
+- `StatusBadge` (existing; Lucky ID and subscription register status columns)
+
+### Rollout notes
+
+- Product and batch registers: KPI strips and workflow/filter blocks use `KpiCard`, `QuickActionGrid`, and `DetailPanel`; main registers use `DataTableShell` around existing `DataTable` wiring (row actions, CSV export columns, API fetch paths unchanged).
+- Lucky ID register: integrity summary on `KpiCard`; filters in `FormSection`; row table in `DetailPanel` + `DataTableShell`; status column uses `StatusBadge` instead of ad-hoc tone classes.
+- Subscriptions: landing workflow tiles use shared `WorkflowCard` with explicit link actions; queue/recent copy merged into descriptions so smoke text such as “Rent does not expose Lucky ID or Lucky Draw workflows.” remains on-page. Register view uses `FormSection` for filters, `DetailPanel` + `QuickActionGrid` for operational KPIs, `DataTableShell` for the paged table, `StatusBadge` for subscription status.
+- Product import: preview/result metrics on `KpiCard`/`QuickActionGrid`; sample CSV reference table framed with `DetailPanel` + `DataTableShell`. Preview/import service calls and validation gates unchanged.
+- Product create: top pricing/mode row on `KpiCard`; rule summary on `DetailPanel`; field groups on `FormSection`; same submit payloads and EMI lock behavior as before.
+
+### Fake/dead UI removed
+
+- Removed local `StatCard` on product import in favor of shared `KpiCard`.
+- Removed duplicate `WorkflowCard`, `SectionCard`, `SummaryTile`, and `luckyIdToneClass` patterns on touched subscription and Lucky ID pages where primitives now cover the same surfaces.
+- Trimmed unused Lucide icons from product create after KPI migration.
+
+### Remaining blockers
+
+- Admin product/batch/subscription/Lucky ID detail, edit, lifecycle, and masters routes still use `WorkspaceSection` shells; incremental migration can follow the same primitive map.
+- `Timeline` not added on these registers (no new fabricated events; only existing timestamps remain in tables as before).
+
+### Backend/API changes
+
+- none
+
+### Migrations
+
+- none
+
+### Test results
+
+- `cd frontend && npm run lint` — passed
+- `cd frontend && npm run typecheck` — passed
+- `cd frontend && npm run build` — passed
+- `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
+- `cd .. && bash scripts/run-release-candidate.sh` — passed (`RELEASE CANDIDATE VALIDATION PASSED`)
+
+### Recommended next small follow-up pass
+
+- Migrate `admin/products/[id]`, `admin/products/[id]/edit`, `admin/batches/[id]`, `admin/batches/[id]/edit`, `admin/subscriptions/[id]`, `admin/subscriptions/[id]/lifecycle`, and `admin/lucky-ids/[id]`(+ edit) from `WorkspaceSection`-only shells to `DetailPanel`/`FormSection`/`DataTableShell` for full operational parity on drill-down routes.
