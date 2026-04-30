@@ -198,3 +198,54 @@
 - `cd frontend && npm run build` — passed
 - `cd frontend && npm run test:e2e:smoke` — passed
 - `cd .. && bash scripts/run-release-candidate.sh` — passed
+
+## Pass 4 — Reconciliation and Finance Review Rollout
+
+### Pages / components migrated
+
+- `src/app/(dashboard)/admin/reconciliation/page.tsx` (canonical `/admin/reconciliation` and `/admin/finance/reconciliation` re-export)
+- `src/app/(dashboard)/admin/finance/page.tsx` (finance control center KPI shells, quick lanes, settlement posture)
+- `src/components/admin/Phase5ReportSurface.tsx` (used by `admin/reports/reconciliation` and other Phase 5 report routes)
+- `src/app/(dashboard)/admin/reports/page.tsx` (reconciliation posture follow-up list in reports overview)
+
+### Shared primitives used
+
+- `DataTableShell`
+- `DetailPanel`
+- `FormSection`
+- `KpiCard`
+- `QuickActionGrid`
+- `StatusBadge` (existing component; payment queue state column and finance settlement rows)
+
+### Rollout notes
+
+- Reconciliation workspace: subscription and payment queue tables wrapped in `DataTableShell`; summary KPIs use `KpiCard`/`QuickActionGrid`; section shells use `DetailPanel` for scan-heavy blocks.
+- Finance control center: `MetricCard` now composes `KpiCard` (preserves all hrefs and API-derived values); section shells route through `FormSection`; reconciliation-adjacent KPI rows use `QuickActionGrid`.
+- Reports: flagged reconciliation drill-down links use `DataTableShell` for consistent table framing; Phase 5 BI report shell uses `FormSection` instead of ad-hoc workspace section styling.
+- Filters, data loaders, CSV export columns, and flag/reconcile behaviors are unchanged.
+
+### Fake/dead UI removed
+
+- Removed local `WorkspaceSection`/`StatCard`-only reconciliation summary grids where `DetailPanel`/`KpiCard` now cover the same real metrics.
+- Retired bespoke finance `MetricCard` chrome in favor of shared `KpiCard` styling (data and links unchanged).
+
+### Remaining blockers
+
+- Full `admin/finance/page.tsx` still contains long-form sections (commissions, payouts, etc.) that could be split into smaller `DetailPanel`/`FormSection` units in a later pass.
+- Reconciliation record `status` values must remain backend-driven; `StatusBadge` styling depends on existing badge mapping for arbitrary status strings.
+
+### Backend/API changes
+
+- none
+
+### Migrations
+
+- none
+
+### Test results
+
+- `cd frontend && npm run lint` — passed
+- `cd frontend && npm run typecheck` — passed
+- `cd frontend && npm run build` — passed
+- `cd frontend && npm run test:e2e:smoke` — passed (`121 passed`)
+- `cd .. && bash scripts/run-release-candidate.sh` — passed

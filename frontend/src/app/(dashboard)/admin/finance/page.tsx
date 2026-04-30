@@ -10,6 +10,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import { cn } from "@/lib/utils";
 import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -138,6 +141,13 @@ function MiniBar({
   );
 }
 
+function metricToneClass(tone: "default" | "warning" | "success" | "danger"): string | undefined {
+  if (tone === "danger") return "border-destructive/25 bg-destructive/5";
+  if (tone === "warning") return "border-[color-mix(in_oklab,var(--warning)_35%,var(--border)_65%)]";
+  if (tone === "success") return "border-[color-mix(in_oklab,var(--success)_35%,var(--border)_65%)]";
+  return undefined;
+}
+
 function MetricCard({
   label,
   value,
@@ -151,28 +161,20 @@ function MetricCard({
   href?: string;
   tone?: "default" | "warning" | "success" | "danger";
 }) {
-  const toneClass =
-    tone === "danger"
-      ? "border-red-200 bg-red-50/85"
-      : tone === "warning"
-        ? "border-amber-200 bg-amber-50/88"
-        : tone === "success"
-          ? "border-emerald-200 bg-emerald-50/88"
-          : "border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_84%,var(--surface-muted)_16%))]";
-
-  const content = (
-    <div className={`rounded-[1.45rem] border p-4 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.34)] ${toneClass}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
-      <div className="mt-1 text-sm text-slate-600">{note}</div>
-    </div>
+  const card = (
+    <KpiCard
+      className={cn(metricToneClass(tone))}
+      label={label}
+      value={value}
+      helper={note}
+    />
   );
 
-  if (!href) return content;
+  if (!href) return card;
 
   return (
     <Link href={href} className="block transition hover:-translate-y-0.5">
-      {content}
+      {card}
     </Link>
   );
 }
@@ -187,14 +189,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
+    <FormSection title={title} description={description}>
+      {children}
+    </FormSection>
   );
 }
 
@@ -537,40 +534,37 @@ export default function AdminFinancePage() {
           onEndDateChange={setEndDate}
         />
 
-        <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Finance quick lanes</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Fast access to reconciliation, receivables/payables, and controlled posting surfaces without mixing EMI collection into finance lanes.
-            </p>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <FormSection
+          title="Finance quick lanes"
+          description="Fast access to reconciliation, receivables/payables, and controlled posting surfaces without mixing EMI collection into finance lanes."
+        >
+          <div className="grid gap-3 md:grid-cols-3">
             <Link
               href={buildAdminReconciliationRoute({ flagged: true })}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
               Reconciliation queue
             </Link>
             <Link
               href={ROUTES.admin.accountingVendors}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
               Vendor payables
             </Link>
             <Link
               href={ROUTES.admin.payments}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
               Payment register
             </Link>
             <Link
               href="/admin/finance/deposits"
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted md:col-span-1"
             >
               Rent/Lease deposits
             </Link>
           </div>
-        </section>
+        </FormSection>
 
         {loading ? <LoadingBlock label="Loading finance control center..." /> : null}
 
@@ -639,7 +633,7 @@ export default function AdminFinancePage() {
                 },
               ]}
             />
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <QuickActionGrid className="xl:grid-cols-5">
               <MetricCard
                 label="Customer Receivables"
                 value={money(outstandingReceivables)}
@@ -675,14 +669,14 @@ export default function AdminFinancePage() {
                 href={buildAdminReconciliationRoute({ flagged: true })}
                 tone={reconciliationFlags > 0 ? "danger" : "success"}
               />
-            </section>
+            </QuickActionGrid>
 
             <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)]">
               <SectionCard
                 title="Operational settlement posture"
                 description="These cards use the new backend reconciliation overview and finance-account operational summary so pending clearing, unapplied customer money, and settlement-sensitive accounts stay visible without changing the underlying payment truth."
               >
-                <div className="grid gap-4 md:grid-cols-3">
+                <QuickActionGrid className="md:grid-cols-3">
                   <MetricCard
                     label="Pending Settlement"
                     value={money(pendingSettlementAmount)}
@@ -703,7 +697,7 @@ export default function AdminFinancePage() {
                     href={buildAdminReconciliationRoute({ view: "payments", flagged: true })}
                     tone={flaggedOperationalReconciliations > 0 ? "danger" : "success"}
                   />
-                </div>
+                </QuickActionGrid>
 
                 <div className="mt-5 space-y-3">
                   {operationalRows.length === 0 ? (
@@ -727,16 +721,10 @@ export default function AdminFinancePage() {
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={[
-                                "rounded-full px-3 py-1 text-xs font-semibold",
-                                row.reconciliation_status === "PENDING"
-                                  ? "border border-amber-200 bg-amber-50 text-amber-900"
-                                  : "border border-emerald-200 bg-emerald-50 text-emerald-800",
-                              ].join(" ")}
-                            >
-                              {row.reconciliation_status}
-                            </span>
+                            <StatusBadge
+                              status={row.reconciliation_status || "UNKNOWN"}
+                              label={row.reconciliation_status || "—"}
+                            />
                             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
                               Pending {money(row.pending_settlement_amount)}
                             </span>

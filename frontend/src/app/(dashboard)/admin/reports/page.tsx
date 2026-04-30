@@ -13,6 +13,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import { DataTableShell } from "@/components/ui/operations";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
@@ -654,23 +655,25 @@ export default function AdminReportsPage() {
                         description="No mismatch rows were returned for the selected scope."
                       />
                     ) : (
-                      <div className="space-y-2">
-                        {reconciliationRows.slice(0, 4).map((row) => (
-                          <Link
-                            key={row.subscription_id}
-                            href={buildAdminReconciliationRoute({
-                              subscription: row.subscription_id,
-                              flagged: true,
-                            })}
-                            className="block rounded-xl border border-border bg-card px-3 py-2 text-sm transition hover:bg-muted"
-                          >
-                            <div className="font-medium text-foreground">{row.subscription_number}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.customer_name || "Unknown customer"} · Delta {money(row.delta)}
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
+                      <DataTableShell>
+                        <div className="space-y-2">
+                          {reconciliationRows.slice(0, 4).map((row) => (
+                            <Link
+                              key={row.subscription_id}
+                              href={buildAdminReconciliationRoute({
+                                subscription: row.subscription_id,
+                                flagged: true,
+                              })}
+                              className="block rounded-xl border border-border bg-card px-3 py-2 text-sm transition hover:bg-muted"
+                            >
+                              <div className="font-medium text-foreground">{row.subscription_number}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.customer_name || "Unknown customer"} · Delta {money(row.delta)}
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </DataTableShell>
                     )}
                   </div>
                 </PurposeChartCard>
