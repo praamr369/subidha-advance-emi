@@ -26,6 +26,10 @@ from api.v1.views.notifications import (
     CashierNotificationMarkReadView,
     CashierUnreadNotificationCountView,
 )
+from api.v1.views.direct_sale_workspace import (
+    CashierBillingProductSearchView,
+    CashierDirectSalePreviewView,
+)
 
 urlpatterns = [
     path("dashboard/", CashierDashboardView.as_view(), name="cashier-dashboard"),
@@ -46,4 +50,6 @@ urlpatterns = [
     path("collect-payment/", CashierCollectPayment.as_view(), name="cashier-collect-payment"),
     path("collect-advance/", CashierCollectAdvance.as_view(), name="cashier-collect-advance"),
     path("collect-direct-sale/", CashierCollectDirectSalePayment.as_view(), name="cashier-collect-direct-sale"),
+    path("billing/products/search/", CashierBillingProductSearchView.as_view(), name="cashier-billing-product-search"),
+    path("direct-sales/preview/", CashierDirectSalePreviewView.as_view(), name="cashier-direct-sale-preview"),
 ]

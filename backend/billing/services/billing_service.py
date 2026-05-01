@@ -25,6 +25,10 @@ from billing.models import (
     ReceiptType,
 )
 from inventory.models import InventoryItem
+from inventory.services.purchase_need_service import (
+    StockNeedSignal,
+    upsert_direct_sale_purchase_need,
+)
 from inventory.services.stock_service import (
     post_credit_note_stock_movements,
     post_debit_note_stock_movements,
@@ -181,6 +185,36 @@ def _replace_direct_sale_lines(*, sale: DirectSale, line_payloads: list[dict]):
     )
 
 
+def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[dict], actor):
+    source_object_id = str(sale.id or "")
+    customer_id = sale.customer_id
+    for payload in line_payloads:
+        inventory_item = payload.get("inventory_item")
+        if inventory_item is None:
+            continue
+        required_qty = Decimal(str(payload.get("quantity") or "0"))
+        if required_qty <= Decimal("0"):
+            continue
+        available_qty = Decimal(str(inventory_item.available_qty()))
+        shortage_qty = required_qty - available_qty
+        if shortage_qty <= Decimal("0"):
+            continue
+        product = payload.get("product")
+        product_name = getattr(product, "name", "") if product is not None else ""
+        upsert_direct_sale_purchase_need(
+            signal=StockNeedSignal(
+                product_id=product.id,
+                required_quantity=required_qty,
+                available_quantity=available_qty,
+                shortage_quantity=shortage_qty,
+                source_object_id=source_object_id,
+                customer_id=customer_id,
+                note=f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}",
+            ),
+            created_by=actor,
+        )
+
+
 def _replace_invoice_lines_from_direct_sale(*, invoice: BillingInvoice, line_payloads: list[dict]):
     invoice.lines.all().delete()
     if not line_payloads:
@@ -327,6 +361,7 @@ def create_direct_sale(*, payload: dict, created_by):
         **payload,
     )
     _replace_direct_sale_lines(sale=sale, line_payloads=line_payloads)
+    _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=created_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
     from subscriptions.services.contract_reference_service import (
         ensure_contract_reference_for_direct_sale,
@@ -405,6 +440,7 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
 
     if lines is not None:
         _replace_direct_sale_lines(sale=sale, line_payloads=line_payloads)
+    _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=updated_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,

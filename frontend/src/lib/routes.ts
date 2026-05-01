@@ -93,6 +93,7 @@ export const ROUTES = {
 
     billing: "/admin/billing",
     billingDirectSales: "/admin/billing/direct-sales",
+    billingDirectSaleWorkspace: "/admin/billing/direct-sale",
     salesDirectSaleCreate: "/admin/sales/direct-sale/create",
     billingRegister: "/admin/billing/register",
     billingDailyBook: "/admin/billing/dailybook",
@@ -258,6 +259,7 @@ export const ROUTES = {
     root: "/cashier",
     dashboard: "/cashier",
     billing: "/cashier/billing",
+    billingDirectSaleWorkspace: "/cashier/billing/direct-sale",
     collect: "/cashier/collect",
     payments: "/cashier/payments",
     notifications: "/cashier/notifications",

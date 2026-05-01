@@ -96,6 +96,11 @@ from api.v1.views.admin_resources import (
 )
 from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
 from api.v1.views.admin_otp_delivery import AdminOtpDeliveryReadinessView
+from api.v1.views.direct_sale_workspace import (
+    AdminBillingProductSearchView,
+    AdminDirectSalePreviewView,
+    AdminInventoryRequirementListView,
+)
 from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
     PaymentReconciliationDetailView,
@@ -420,6 +425,9 @@ urlpatterns = [
     path("finance/account-mapping/", AdminFinanceAccountMappingView.as_view()),
     path("invoices/", AdminInvoiceRegisterView.as_view()),
     path("invoices/<int:pk>/pdf/", AdminInvoicePdfView.as_view()),
+    path("billing/products/search/", AdminBillingProductSearchView.as_view()),
+    path("direct-sales/preview/", AdminDirectSalePreviewView.as_view()),
+    path("inventory/requirements/", AdminInventoryRequirementListView.as_view()),
     path("receipts/", AdminReceiptRegisterView.as_view()),
     path("receipts/<int:pk>/pdf/", AdminReceiptPdfView.as_view()),
     path("documents/", AdminDocumentCenterView.as_view()),

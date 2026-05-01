@@ -883,6 +883,9 @@ class StockReservationStatus(models.TextChoices):
 class PurchaseNeedStatus(models.TextChoices):
     OPEN = "OPEN", "Open"
     REVIEWED = "REVIEWED", "Reviewed"
+    ORDERED = "ORDERED", "Ordered"
+    RECEIVED = "RECEIVED", "Received"
+    CANCELLED = "CANCELLED", "Cancelled"
     CLOSED = "CLOSED", "Closed"
 
 
@@ -1025,6 +1028,18 @@ class ReorderRule(InventoryTimeStampedModel):
 
 
 class PurchaseNeed(InventoryTimeStampedModel):
+    class SourceModule(models.TextChoices):
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+        WINNER_DELIVERY = "WINNER_DELIVERY", "Winner Delivery"
+        SUBSCRIPTION_DEMAND = "SUBSCRIPTION_DEMAND", "Subscription Demand"
+        GENERAL = "GENERAL", "General"
+
+    class Priority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+        URGENT = "URGENT", "Urgent"
+
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
@@ -1044,6 +1059,26 @@ class PurchaseNeed(InventoryTimeStampedModel):
         default=PurchaseNeedStatus.OPEN,
         db_index=True,
     )
+    source_module = models.CharField(
+        max_length=32,
+        choices=SourceModule.choices,
+        default=SourceModule.GENERAL,
+        db_index=True,
+    )
+    source_object_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+        null=True,
+        blank=True,
+    )
+    priority = models.CharField(
+        max_length=12,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+    )
     demand_snapshot = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -1057,7 +1092,10 @@ class PurchaseNeed(InventoryTimeStampedModel):
     class Meta:
         db_table = "inventory_purchase_needs"
         ordering = ["-created_at", "-id"]
-        indexes = [models.Index(fields=["status", "created_at"])]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["source_module", "status", "priority"]),
+        ]
 
 
 class InventoryAdjustment(InventoryTimeStampedModel):
