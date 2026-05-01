@@ -31,6 +31,7 @@ export const ROUTES = {
     erp: "/admin/erp",
     todayWork: "/admin/operations/today-work",
     globalSearch: "/admin/global-search",
+    notifications: "/admin/notifications",
     bi: "/admin/bi",
     biProfitability: "/admin/bi/profitability",
     biCustomers: "/admin/bi/customers",
@@ -258,5 +259,6 @@ export const ROUTES = {
     billing: "/cashier/billing",
     collect: "/cashier/collect",
     payments: "/cashier/payments",
+    notifications: "/cashier/notifications",
   },
 } as const;

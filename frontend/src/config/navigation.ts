@@ -268,6 +268,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.cashier.dashboard,
           icon: "dashboard",
         },
+        {
+          label: "Notifications",
+          href: ROUTES.cashier.notifications,
+          icon: "reminders",
+        },
       ],
     },
     {

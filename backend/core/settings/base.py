@@ -418,6 +418,7 @@ INSTALLED_APPS = [
     "manufacturing",
     "billing",
     "reminders",
+    "system_jobs",
     "subscriptions",
     "django_extensions",
 ]
@@ -674,3 +675,57 @@ CACHES = {
         "LOCATION": "subidha-core-cache",
     }
 }
+
+# ---------------------------------------------------------------------------
+# Celery (additive background jobs). Core finance DB transactions must not
+# depend on workers; tasks may notify, recompute summaries, or sync status.
+# ---------------------------------------------------------------------------
+CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL") or "").strip() or (
+    "redis://127.0.0.1:6379/0" if _is_local_dev_mode() else ""
+)
+CELERY_RESULT_BACKEND = (os.getenv("CELERY_RESULT_BACKEND") or "").strip() or CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT") or "3600")
+
+try:
+    from celery.schedules import crontab
+except Exception:  # pragma: no cover
+    crontab = None  # type: ignore[misc, assignment]
+
+if crontab is not None:
+    CELERY_BEAT_SCHEDULE = {
+        "daily-emi-due-reminders": {
+            "task": "system_jobs.tasks.daily_emi_due_reminders",
+            "schedule": crontab(hour=6, minute=5),
+        },
+        "daily-emi-overdue-reminders": {
+            "task": "system_jobs.tasks.daily_emi_overdue_reminders",
+            "schedule": crontab(hour=6, minute=20),
+        },
+        "daily-rent-due-reminders": {
+            "task": "system_jobs.tasks.daily_rent_due_reminders",
+            "schedule": crontab(hour=6, minute=35),
+        },
+        "daily-accounting-health-check": {
+            "task": "system_jobs.tasks.daily_accounting_health_check",
+            "schedule": crontab(hour=7, minute=0),
+        },
+        "daily-inventory-reorder-check": {
+            "task": "system_jobs.tasks.daily_inventory_reorder_check",
+            "schedule": crontab(hour=7, minute=30),
+        },
+        "daily-report-snapshot": {
+            "task": "system_jobs.tasks.daily_report_snapshot",
+            "schedule": crontab(hour=8, minute=0),
+        },
+        "nightly-failed-pdf-regeneration-scan": {
+            "task": "system_jobs.tasks.nightly_failed_pdf_regeneration_scan",
+            "schedule": crontab(hour=1, minute=15),
+        },
+    }
+else:
+    CELERY_BEAT_SCHEDULE = {}

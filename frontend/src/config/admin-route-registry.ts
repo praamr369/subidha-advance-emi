@@ -40,6 +40,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Command Center", "AI Assistant", ROUTES.admin.aiAssistant, "Read-only internal knowledge assistant with source citations."),
   item("Command Center", "AI Readiness", ROUTES.admin.aiReadiness, "AI feature flags, retrieval posture, and safety readiness checks."),
   item("Command Center", "Global Search", ROUTES.admin.globalSearch, "Search across customers, contracts, payments, and operations."),
+  item("Command Center", "Notifications", ROUTES.admin.notifications, "In-app system alerts, job outcomes, and operational signals."),
 
   item("Staff & Business Setup", "Staff Workspace", ROUTES.admin.hr, "Daily HR command center for staff, attendance, leave, expenses, and payroll."),
   item("Staff & Business Setup", "Staff Register", ROUTES.admin.hrStaff, "Create and manage staff profiles."),

@@ -67,6 +67,11 @@ from api.v1.views.admin_role_capabilities import (
     AdminRolePermissionUpdateView,
     AdminUserCapabilityOverrideView,
 )
+from api.v1.views.notifications import (
+    AdminNotificationListView,
+    AdminNotificationMarkReadView,
+    AdminUnreadNotificationCountView,
+)
 from api.v1.views.admin_payout_batches import (
     AdminPayoutBatchCancelView,
     AdminPayoutBatchCreateView,
@@ -544,5 +549,8 @@ urlpatterns = [
     path("hr/expense-claims/<int:expense_claim_id>/", AdminHrExpenseClaimPatchView.as_view()),
     path("hr/payroll/", AdminHrPayrollView.as_view()),
     path("hr/salary-payments/", AdminHrSalaryPaymentsListCreateView.as_view()),
+    path("notifications/", AdminNotificationListView.as_view()),
+    path("notifications/unread-count/", AdminUnreadNotificationCountView.as_view()),
+    path("notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view()),
     path("", include(router.urls)),
 ]

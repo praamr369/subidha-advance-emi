@@ -38,6 +38,7 @@ class ReminderType(models.TextChoices):
     RETAIL_DUE = "RETAIL_DUE", "Retail Due"
     EMI_DUE = "EMI_DUE", "EMI Due"
     EMI_OVERDUE = "EMI_OVERDUE", "EMI Overdue"
+    RENT_DUE = "RENT_DUE", "Rent / Lease Due"
     FOLLOWUP = "FOLLOWUP", "Follow Up"
 
 
