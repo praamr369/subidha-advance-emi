@@ -41,7 +41,7 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     description: "Create or continue a retail direct-sale bill without mixing it into the subscription sale workflow.",
     roles: ["ADMIN"],
     icon: "billing",
-    canonicalHref: ROUTES.admin.salesDirectSaleCreate,
+    canonicalHref: `${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`,
     surface: "route",
   },
   {

@@ -14,7 +14,7 @@ export default async function AdminSalesDirectSaleCreatePage({ searchParams }: P
   const resolved = (await searchParams) ?? {};
   const hasParams = Object.keys(resolved).length > 0;
   if (hasParams) {
-    await redirectToCanonicalPath(ROUTES.admin.billingDirectSales, searchParams);
+    await redirectToCanonicalPath(ROUTES.admin.billingDirectSaleWorkspace, searchParams);
   }
-  redirect(`${ROUTES.admin.billingDirectSales}?mode=create`);
+  redirect(`${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`);
 }

@@ -66,11 +66,10 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM", "Support / Service Cases", ROUTES.admin.supportRequests, "Customer support and service intake."),
 
   item("Sales", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
-  item("Sales", "Create Direct Sale", ROUTES.admin.salesDirectSaleCreate, "Create a direct retail sale."),
-  item("Sales", "Direct Sale Billing Workspace", ROUTES.admin.billingDirectSaleWorkspace, "Fast cashier/admin billing workspace with catalog search and stock warnings."),
-  item("Sales", "Direct Sales", ROUTES.admin.billingDirectSales, "Direct sale register."),
+  item("Sales", "Direct Sales", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
   item("Sales", "Invoices", ROUTES.admin.billingInvoices, "Invoice register."),
   item("Sales", "Receipts", ROUTES.admin.billingReceipts, "Receipt register."),
+  item("Sales", "Document Register", ROUTES.admin.billingRegister, "Billing document register."),
   item("Sales", "Payment Collection", ROUTES.admin.financeCollect, "Admin payment collection entry point."),
 
   item("Subscriptions", "Subscription Workflows", ROUTES.admin.subscriptions, "Advance EMI, rent, lease, and partner subscription workflow landing."),

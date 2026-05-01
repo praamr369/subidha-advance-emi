@@ -15,8 +15,9 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await page.goto("/admin/billing/direct-sales");
   await expect(page.getByRole("heading", { name: "Direct Sale Workspace" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Create Bill" }).click();
+  await page.goto("/admin/billing/direct-sales?mode=create");
   await expect(page.getByRole("heading", { name: "Create Direct Sale Bill" })).toBeVisible();
+  await expect(page.locator(".fixed.inset-0")).toBeVisible();
 
   await page.getByLabel("Walk-in / Snapshot Name").fill("Smoke Walk In");
   await page.getByLabel("Phone").fill("9812345678");
@@ -39,6 +40,14 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await page.getByLabel("Requirement Note").fill("Smoke direct-sale order requirement");
 
   const createButton = page.getByRole("button", { name: "Create Direct Sale" });
+  await expect(createButton).toBeEnabled();
   await createButton.dblclick();
   await expect(page.getByText(/Direct sale .* created/i)).toBeVisible();
+});
+
+test("admin sales sidebar avoids duplicate direct-sale entries", async ({ page }) => {
+  await page.goto("/admin");
+  const sidebar = page.locator("nav").first();
+  await expect(sidebar.getByRole("link", { name: "Direct Sales" })).toHaveCount(1);
+  await expect(sidebar.getByRole("link", { name: "Direct Sale Billing Workspace" })).toHaveCount(0);
 });

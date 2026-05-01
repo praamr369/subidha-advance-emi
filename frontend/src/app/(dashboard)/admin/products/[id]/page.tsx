@@ -723,6 +723,14 @@ export default function AdminProductDetailPage() {
                     >
                       Stock Tracking {product.inventory_stock_tracking_enabled ? "Enabled" : "Disabled"}
                     </span>
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                        capabilityTone(Boolean(product.inventory_delivery_stock_bridge_enabled)),
+                      ].join(" ")}
+                    >
+                      Delivery Bridge {product.inventory_delivery_stock_bridge_enabled ? "Enabled" : "Disabled"}
+                    </span>
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
                     Changes affect future onboarding and billing only. Existing contracts keep their saved pricing and plan snapshots.

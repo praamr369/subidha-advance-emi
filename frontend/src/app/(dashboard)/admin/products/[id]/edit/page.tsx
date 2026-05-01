@@ -19,6 +19,12 @@ import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
+import {
+  listStockLocations,
+  updateInventoryItem,
+  type InventoryItem,
+  type StockLocation,
+} from "@/services/inventory";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
 type ProductDetailRecord = {
@@ -266,10 +272,21 @@ export default function AdminProductEditPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inventorySaving, setInventorySaving] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [inventoryRecord, setInventoryRecord] = useState<InventoryItem | null>(null);
+  const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
+  const [inventoryForm, setInventoryForm] = useState({
+    is_active: true,
+    stock_tracking_enabled: true,
+    delivery_stock_bridge_enabled: true,
+    reorder_level_qty: "0.000",
+    standard_unit_cost: "0.00",
+    default_stock_location: "",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +311,26 @@ export default function AdminProductEditPage() {
 
     void loadCatalogOptions();
 
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStockLocations() {
+      try {
+        const payload = await listStockLocations();
+        if (!cancelled) {
+          setStockLocations(payload.results || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setStockLocations([]);
+        }
+      }
+    }
+    void loadStockLocations();
     return () => {
       cancelled = true;
     };
@@ -330,6 +367,32 @@ export default function AdminProductEditPage() {
         setSelectedImageFile(null);
         setSelectedImagePreview(null);
         setRemoveExistingImage(false);
+        const inventoryProfileId =
+          typeof payload.inventory_profile_id === "number"
+            ? payload.inventory_profile_id
+            : null;
+        if (inventoryProfileId) {
+          const inventoryPayload = await apiFetch<InventoryItem>(
+            `/inventory/items/${inventoryProfileId}/`
+          );
+          setInventoryRecord(inventoryPayload);
+          setInventoryForm({
+            is_active: Boolean(inventoryPayload.is_active),
+            stock_tracking_enabled: Boolean(
+              inventoryPayload.stock_tracking_enabled
+            ),
+            delivery_stock_bridge_enabled: Boolean(
+              inventoryPayload.delivery_stock_bridge_enabled
+            ),
+            reorder_level_qty: inventoryPayload.reorder_level_qty || "0.000",
+            standard_unit_cost: inventoryPayload.standard_unit_cost || "0.00",
+            default_stock_location: inventoryPayload.default_stock_location
+              ? String(inventoryPayload.default_stock_location)
+              : "",
+          });
+        } else {
+          setInventoryRecord(null);
+        }
 
         setError(null);
         setFieldErrors({});
@@ -635,6 +698,31 @@ export default function AdminProductEditPage() {
       setError(toErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveInventory() {
+    if (!inventoryRecord?.id) return;
+    setInventorySaving(true);
+    setError(null);
+    setSaveSuccess(null);
+    try {
+      const updated = await updateInventoryItem(inventoryRecord.id, {
+        is_active: inventoryForm.is_active,
+        stock_tracking_enabled: inventoryForm.stock_tracking_enabled,
+        delivery_stock_bridge_enabled: inventoryForm.delivery_stock_bridge_enabled,
+        reorder_level_qty: inventoryForm.reorder_level_qty,
+        standard_unit_cost: inventoryForm.standard_unit_cost || null,
+        default_stock_location: inventoryForm.default_stock_location
+          ? Number(inventoryForm.default_stock_location)
+          : null,
+      });
+      setInventoryRecord(updated);
+      setSaveSuccess("Inventory profile settings updated.");
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      setInventorySaving(false);
     }
   }
 
@@ -1164,6 +1252,121 @@ export default function AdminProductEditPage() {
                 </div>
               </FormSection>
             </section>
+
+            <FormSection
+              title="Inventory item controls"
+              description="Control stock tracking, bridge behavior, reorder threshold, costing, and default location for future inventory operations."
+            >
+              {!inventoryRecord ? (
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Inventory profile is not ready yet. Prepare inventory profile from product detail page before editing inventory controls.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.is_active}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          is_active: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Inventory item active
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.stock_tracking_enabled}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          stock_tracking_enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Stock tracking enabled
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.delivery_stock_bridge_enabled}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          delivery_stock_bridge_enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Delivery stock bridge enabled
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Reorder level</span>
+                    <input
+                      value={inventoryForm.reorder_level_qty}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          reorder_level_qty: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Standard unit cost</span>
+                    <input
+                      value={inventoryForm.standard_unit_cost}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          standard_unit_cost: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Default stock location</span>
+                    <select
+                      value={inventoryForm.default_stock_location}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          default_stock_location: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    >
+                      <option value="">No default location</option>
+                      {stockLocations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.code} · {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveInventory()}
+                      disabled={inventorySaving}
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {inventorySaving ? "Saving inventory..." : "Save Inventory Settings"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </FormSection>
 
             {error ? (
               <ErrorState

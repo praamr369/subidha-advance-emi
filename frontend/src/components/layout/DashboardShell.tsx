@@ -1103,7 +1103,7 @@ function Topbar({
               {[
                 { label: "Customer", href: `${ROUTES.admin.customers}/create` },
                 { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
-                { label: "Direct Sale", href: ROUTES.admin.salesDirectSaleCreate },
+                { label: "Direct Sale", href: `${ROUTES.admin.billingDirectSaleWorkspace}?mode=create` },
                 { label: "Payment", href: ROUTES.admin.financeCollect },
                 { label: "Delivery", href: ROUTES.admin.deliveryCreate },
               ].map((action) => (

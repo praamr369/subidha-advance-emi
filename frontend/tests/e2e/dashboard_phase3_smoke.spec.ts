@@ -84,10 +84,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("Ctrl K");
 
-    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale");
-    await expect(dialog.getByRole("link", { name: "Create Direct Sale Enter" })).toBeVisible();
-    await expect(dialog).toContainText(
-      "/admin/sales/direct-sale/create"
-    );
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Direct Sales");
+    await expect(dialog.getByRole("link", { name: /Direct Sales/i })).toBeVisible();
   });
 });

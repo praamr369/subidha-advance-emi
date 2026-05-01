@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Plus, ReceiptText, Search, Trash2, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -16,7 +17,9 @@ import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting"
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
+  listAdminInventoryRequirements,
   searchBillingProducts,
+  type InventoryRequirementRow,
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
 import {
@@ -166,7 +169,9 @@ function makeIdempotencyKey(): string {
 }
 
 export default function DirectSaleWorkspace() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<DirectSale[]>([]);
+  const [requirements, setRequirements] = useState<InventoryRequirementRow[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -198,16 +203,19 @@ export default function DirectSaleWorkspace() {
   const loadPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [salesPayload, accountsPayload] = await Promise.all([
+      const [salesPayload, accountsPayload, requirementsPayload] = await Promise.all([
         listDirectSales(),
         listFinanceAccounts(),
+        listAdminInventoryRequirements({ status: "OPEN", source_module: "DIRECT_SALE" }),
       ]);
       setRows(salesPayload.results);
       setFinanceAccounts(accountsPayload.results);
+      setRequirements(requirementsPayload.results);
       setError(null);
     } catch (err) {
       setRows([]);
       setFinanceAccounts([]);
+      setRequirements([]);
       setError(accountingErrorMessage(err, "Failed to load direct-sale workspace."));
     } finally {
       setLoading(false);
@@ -218,13 +226,22 @@ export default function DirectSaleWorkspace() {
     void loadPage();
   }, [loadPage]);
 
+  useEffect(() => {
+    const mode = (searchParams.get("mode") || "").trim().toLowerCase();
+    if (mode === "create") {
+      resetCreateForm();
+      setDrawerOpen(true);
+    }
+  }, [searchParams]);
+
   const stats = useMemo(() => {
     const today = todayIso();
     const draftSales = rows.filter((row) => row.status === "DRAFT").length;
     const todaySales = rows.filter((row) => row.sale_date === today).length;
     const deliveryHold = rows.filter((row) => row.delivery_required && !row.delivered_at).length;
-    return { draftSales, todaySales, deliveryHold };
-  }, [rows]);
+    const pendingRequirements = requirements.filter((row) => row.status === "OPEN").length;
+    return { draftSales, todaySales, deliveryHold, pendingRequirements };
+  }, [requirements, rows]);
 
   const computedLines = useMemo(
     () =>
@@ -327,6 +344,11 @@ export default function DirectSaleWorkspace() {
     setLines([makeLine()]);
     setValidationErrors([]);
     createAttemptKey.current = null;
+  }
+
+  function openCreateDrawer() {
+    resetCreateForm();
+    setDrawerOpen(true);
   }
 
   function updateLine(lineId: string, patch: Partial<DraftLine>) {
@@ -528,7 +550,7 @@ export default function DirectSaleWorkspace() {
         { label: "Draft Sales", value: stats.draftSales, tone: "info" },
         { label: "Today Sales", value: stats.todaySales, tone: "success" },
         { label: "Delivery Hold", value: stats.deliveryHold, tone: stats.deliveryHold ? "warning" : "default" },
-        { label: "Recent Sales", value: rows.length, tone: "info" },
+        { label: "Pending Stock Requirements", value: stats.pendingRequirements, tone: stats.pendingRequirements ? "warning" : "success" },
       ]}
       statusBadge={{ label: "Retail Billing", tone: "info" }}
     >
@@ -547,10 +569,7 @@ export default function DirectSaleWorkspace() {
         </div>
         <button
           type="button"
-          onClick={() => {
-            resetCreateForm();
-            setDrawerOpen(true);
-          }}
+          onClick={openCreateDrawer}
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -573,7 +592,11 @@ export default function DirectSaleWorkspace() {
         <StatCard label="Draft Sales" value={String(stats.draftSales)} tone="info" />
         <StatCard label="Today Sales" value={String(stats.todaySales)} tone="success" />
         <StatCard label="Delivery Hold" value={String(stats.deliveryHold)} tone={stats.deliveryHold ? "warning" : "default"} />
-        <StatCard label="Pending Stock Requirements" value="See Inventory Requirements" tone="warning" />
+        <StatCard
+          label="Pending Stock Requirements"
+          value={String(stats.pendingRequirements)}
+          tone={stats.pendingRequirements ? "warning" : "success"}
+        />
       </section>
 
       <WorkspaceSection
@@ -590,10 +613,31 @@ export default function DirectSaleWorkspace() {
         />
       </WorkspaceSection>
 
+      <WorkspaceSection
+        title="Pending Stock Requirements"
+        description="Open direct-sale inventory requirement alerts created from out-of-stock bill lines."
+      >
+        <EnterpriseDataTable
+          data={requirements}
+          columns={[
+            { key: "product_name", header: "Product" },
+            { key: "required_quantity", header: "Required" },
+            { key: "available_quantity", header: "Available" },
+            { key: "shortage_quantity", header: "Shortage" },
+            { key: "priority", header: "Priority" },
+            { key: "status", header: "Status" },
+            { key: "created_at", header: "Created", render: (row) => accountingDate(row.created_at) },
+          ]}
+          loading={loading}
+          emptyTitle="No pending inventory requirements"
+          emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
+        />
+      </WorkspaceSection>
+
       {drawerOpen ? (
-        <div className="fixed inset-0 z-50 bg-black/30">
-          <div className="absolute inset-y-0 right-0 flex w-full max-w-6xl flex-col border-l border-border bg-background shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm">
+          <div className="absolute inset-y-0 right-0 flex w-full max-w-6xl flex-col border-l border-border bg-[var(--surface-card-elevated)] shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-[var(--surface-card-elevated)] px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Create Direct Sale Bill</h2>
                 <p className="text-sm text-muted-foreground">
@@ -611,11 +655,14 @@ export default function DirectSaleWorkspace() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible px-5 py-5">
               <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
                 <div className="space-y-5">
                   <section className="rounded-lg border border-border bg-card p-4">
                     <h3 className="text-sm font-semibold text-foreground">Customer</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Registered customer links this bill to profile history. Walk-in customer stores only bill snapshot.
+                    </p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       <div className="relative">
                         <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="direct-sale-customer-search">
@@ -633,7 +680,7 @@ export default function DirectSaleWorkspace() {
                           />
                         </div>
                         {customerQuery.trim().length >= 2 ? (
-                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+                          <div className="absolute z-[85] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-[var(--surface-card-elevated)] p-1 shadow-2xl">
                             {customerLoading ? (
                               <div className="px-3 py-2 text-sm text-muted-foreground">Searching customers...</div>
                             ) : customerResults.length ? (
@@ -649,7 +696,7 @@ export default function DirectSaleWorkspace() {
                                 </button>
                               ))
                             ) : (
-                              <div className="px-3 py-2 text-sm text-muted-foreground">No matching customer.</div>
+                              <div className="px-3 py-2 text-sm text-muted-foreground">No registered customer found.</div>
                             )}
                           </div>
                         ) : null}
@@ -752,6 +799,9 @@ export default function DirectSaleWorkspace() {
                         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     </label>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Discount applies per bill line only. Product base price remains canonical in product master.
+                    </p>
                   </section>
 
                   <section className="rounded-lg border border-border bg-card p-4">
@@ -805,7 +855,7 @@ export default function DirectSaleWorkspace() {
                                 />
                               </div>
                               {line.product_search.trim().length >= 2 && !line.selected_product ? (
-                                <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+                                <div className="absolute z-[85] mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-[var(--surface-card-elevated)] p-1 shadow-2xl">
                                   {line.product_loading ? (
                                     <div className="px-3 py-2 text-sm text-muted-foreground">Searching products...</div>
                                   ) : line.product_error ? (
@@ -827,13 +877,13 @@ export default function DirectSaleWorkspace() {
                                       </button>
                                     ))
                                   ) : (
-                                    <div className="px-3 py-2 text-sm text-muted-foreground">No matching product.</div>
+                                    <div className="px-3 py-2 text-sm text-muted-foreground">No products found. Try product name, code, or SKU.</div>
                                   )}
                                 </div>
                               ) : null}
                               {line.selected_product ? (
                                 <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                                  {line.selected_product.product_code || line.selected_product.sku || `P-${line.selected_product.id}`} | Base {accountingMoney(line.selected_product.base_price)} | Stock {line.selected_product.current_stock_qty || line.selected_product.inventory_status.available} | Inventory {line.selected_product.inventory_ready ? "ready" : "not ready"}
+                                  {line.selected_product.product_code || line.selected_product.sku || `P-${line.selected_product.id}`} | Base {accountingMoney(line.selected_product.base_price)} | Stock {line.selected_product.current_stock_qty || line.selected_product.inventory_status.available} | Inventory {line.selected_product.inventory_ready ? "ready" : "not ready"} {!line.selected_product.inventory_status.is_in_stock ? " | OUT OF STOCK" : ""}
                                 </div>
                               ) : null}
                             </div>
@@ -941,6 +991,9 @@ export default function DirectSaleWorkspace() {
                                 </label>
                               </div>
                             ) : null}
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Requirement does not create stock movement. It only alerts purchasing/inventory.
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -994,7 +1047,7 @@ export default function DirectSaleWorkspace() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-border bg-background px-5 py-4">
+            <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-border bg-[var(--surface-card-elevated)] px-5 py-4">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
