@@ -1,66 +1,200 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
-import { Customer360Panel } from "@/components/admin/erp/Customer360Panel";
-import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
-import { PipelineBoard } from "@/components/admin/erp/PipelineBoard";
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
 import { ROUTES } from "@/lib/routes";
-import type { CrmWorkspacePayload } from "@/services/admin-erp";
-import { getAdminCrmWorkspace } from "@/services/admin-erp";
+import { getAdminCrmWorkspace, type CrmWorkspacePayload } from "@/services/admin-erp";
+import { listCustomers } from "@/services/customers";
+import { getCrmOverview, type CrmOverviewResponse } from "@/services/crm";
+
+type SectionCard = {
+  key: string;
+  label: string;
+  purpose: string;
+  href: string;
+  count: number | null;
+  status: "loading" | "ready" | "error";
+  statusMessage: string;
+};
+
+function findPipelineCount(payload: CrmWorkspacePayload | null, key: string): number {
+  const row = payload?.crm_pipeline?.find((entry) => entry.key === key);
+  return Number(row?.count || 0);
+}
 
 export default function AdminCrmOverviewPage() {
-  const [payload, setPayload] = useState<CrmWorkspacePayload | null>(null);
+  const [workspace, setWorkspace] = useState<CrmWorkspacePayload | null>(null);
+  const [overview, setOverview] = useState<CrmOverviewResponse | null>(null);
+  const [customerCount, setCustomerCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void getAdminCrmWorkspace()
-      .then((data) => {
-        if (!active) return;
-        setPayload(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Unable to load CRM workspace.");
-      });
+    async function load() {
+      const [workspaceResult, overviewResult, customerResult] = await Promise.allSettled([
+        getAdminCrmWorkspace(),
+        getCrmOverview(),
+        listCustomers({ page: 1 }),
+      ]);
+
+      if (!active) return;
+
+      if (workspaceResult.status === "fulfilled") {
+        setWorkspace(workspaceResult.value);
+      } else {
+        setWorkspace(null);
+        setError("CRM workspace status is unavailable.");
+      }
+
+      if (overviewResult.status === "fulfilled") {
+        setOverview(overviewResult.value);
+      } else {
+        setOverview(null);
+      }
+
+      if (customerResult.status === "fulfilled") {
+        setCustomerCount(Number(customerResult.value.count || 0));
+      } else {
+        setCustomerCount(null);
+      }
+    }
+
+    void load();
     return () => {
       active = false;
     };
   }, []);
 
+  const cards = useMemo<SectionCard[]>(() => {
+    const customersLoaded = customerCount !== null;
+    const partyCount = overview?.summary.party_count;
+    const leadsCount = overview?.summary.lead_count;
+    const followupsCount = overview?.summary.due_follow_up_count;
+    const supportCount = findPipelineCount(workspace, "support_open");
+    const kycCount = findPipelineCount(workspace, "pending_kyc");
+
+    return [
+      {
+        key: "registered-customers",
+        label: "Registered Customers",
+        purpose: "Canonical customer profiles used by direct-sale existing-customer selection.",
+        href: ROUTES.admin.customers,
+        count: customersLoaded ? customerCount : null,
+        status: customersLoaded ? "ready" : "loading",
+        statusMessage: customersLoaded ? `${customerCount} customer profiles.` : "Loading customer register status...",
+      },
+      {
+        key: "crm-parties",
+        label: "CRM Parties",
+        purpose: "Party 360 entries linked across customer, lead, partner, vendor, and staff roles.",
+        href: ROUTES.admin.crmParties,
+        count: typeof partyCount === "number" ? partyCount : null,
+        status: typeof partyCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof partyCount === "number"
+            ? `${partyCount} party records.`
+            : "Loading party directory status...",
+      },
+      {
+        key: "leads",
+        label: "Leads / Enquiries",
+        purpose: "Lead pipeline and enquiry conversion workflow.",
+        href: ROUTES.admin.crmLeads,
+        count: typeof leadsCount === "number" ? leadsCount : null,
+        status: typeof leadsCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof leadsCount === "number"
+            ? `${leadsCount} lead/enquiry records.`
+            : "Loading leads status...",
+      },
+      {
+        key: "followups",
+        label: "Follow-ups",
+        purpose: "Open interaction follow-up queue and due-call reminders.",
+        href: ROUTES.admin.crmFollowUps,
+        count: typeof followupsCount === "number" ? followupsCount : null,
+        status: typeof followupsCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof followupsCount === "number"
+            ? `${followupsCount} due follow-ups.`
+            : "Loading follow-up queue status...",
+      },
+      {
+        key: "kyc",
+        label: "KYC",
+        purpose: "Pending customer KYC verification queue for operational controls.",
+        href: ROUTES.admin.crmKyc,
+        count: workspace ? kycCount : null,
+        status: workspace ? "ready" : "loading",
+        statusMessage: workspace
+          ? `${kycCount} KYC records pending review.`
+          : "Loading KYC queue status...",
+      },
+      {
+        key: "support",
+        label: "Support / Service Cases",
+        purpose: "Customer service and support escalation queue.",
+        href: ROUTES.admin.supportRequests,
+        count: workspace ? supportCount : null,
+        status: workspace ? "ready" : "loading",
+        statusMessage: workspace
+          ? `${supportCount} open support/service cases.`
+          : "Loading support queue status...",
+      },
+    ];
+  }, [customerCount, overview, workspace]);
+
   return (
     <WorkspaceShell
       title="CRM Workspace"
-      subtitle="Lead management, follow-up continuity, party 360 visibility, and support posture from canonical records."
+      subtitle="Operational CRM hub with explicit separation between registered customers and CRM party records."
     >
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {payload ? (
-        <>
-          <Phase7Guidance
-            items={[
-              {
-                label: "Verify KYC",
-                href: ROUTES.admin.crmKyc,
-                note: "Review pending customer KYC before high-consequence operations.",
-                warning: "Incomplete KYC should remain visible before contract or delivery handoff.",
-              },
-              {
-                label: "+ Customer",
-                href: `${ROUTES.admin.customers}/create`,
-                note: "Create the customer profile once, then continue into contract, sale, or support workflows.",
-              },
-            ]}
-          />
-          <PipelineBoard title="CRM Pipeline" cards={payload.crm_pipeline} />
-          <PipelineBoard title="Today Work (CRM related)" cards={payload.today_work} />
-          <Customer360Panel customers={payload.customer_360} />
-        </>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">Loading CRM workspace...</div>
-      )}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : null}
+
+      <section className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <p>
+          Direct-sale existing-customer search uses the registered customer source (`/api/v1/admin/customers/search/`).
+          CRM parties remain a separate model and are not submitted as `customer` IDs in direct-sale payloads.
+        </p>
+        <p className="mt-2">
+          CRM Pipeline visibility is handled through the Leads / Enquiries and Follow-ups sections in this workspace.
+        </p>
+        <p className="mt-2">
+          Create-customer-from-party action path: unavailable (backend endpoint not present). Use{" "}
+          <Link href={`${ROUTES.admin.customers}/create`} className="font-medium text-primary underline-offset-4 hover:underline">
+            customer create
+          </Link>{" "}
+          for now.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {cards.map((card) => (
+          <article key={card.key} className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-foreground">{card.label}</h2>
+              <span className="text-xs font-medium text-muted-foreground">
+                {card.status === "loading" ? "Loading" : card.status === "error" ? "Error" : "Ready"}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">{card.purpose}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{card.statusMessage}</p>
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <span className="text-lg font-semibold text-foreground">{card.count ?? "—"}</span>
+              <Link
+                href={card.href}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
+              >
+                Open
+              </Link>
+            </div>
+          </article>
+        ))}
+      </section>
     </WorkspaceShell>
   );
 }

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { normalizeApiError } from "@/services/api/errors";
 import type { ApiRequestOptions } from "@/services/api/types";
 
@@ -29,6 +29,7 @@ function withTimeoutSignal(signal: AbortSignal | null | undefined, timeoutMs: nu
 }
 
 function isRetryableError(error: unknown): boolean {
+  if (error instanceof ApiError) return false;
   if (!(error instanceof Error)) return false;
   return /timeout|network|failed to fetch/i.test(error.message);
 }

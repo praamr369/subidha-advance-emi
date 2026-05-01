@@ -116,6 +116,43 @@ export default function BusinessSetupChecklistPage() {
 
       {data ? (
         <>
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Document Numbering</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Invoice, receipt, and direct-sale invoice numbering readiness.
+                </div>
+              </div>
+              <Link href="/admin/settings/business-setup/document-numbering" className="text-sm font-medium text-primary hover:underline">
+                Open setup
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  label: "Invoice numbering readiness",
+                  ready: Boolean(data.counts?.invoice_numbering_configured),
+                },
+                {
+                  label: "Receipt numbering readiness",
+                  ready: Boolean(data.counts?.receipt_numbering_configured),
+                },
+                {
+                  label: "Direct-sale invoice numbering readiness",
+                  ready: Boolean(data.counts?.direct_sale_invoice_numbering_configured),
+                },
+              ].map((row) => (
+                <div key={row.label} className="rounded-xl border border-border bg-background px-4 py-3">
+                  <div className="text-xs text-muted-foreground">{row.label}</div>
+                  <div className={`mt-2 text-sm font-semibold ${row.ready ? "text-emerald-600" : "text-amber-600"}`}>
+                    {row.ready ? "Ready" : "Needs setup"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section className="grid gap-5 md:grid-cols-3">
             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm font-medium text-muted-foreground">Completion</div>

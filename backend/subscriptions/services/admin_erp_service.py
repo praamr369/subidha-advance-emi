@@ -253,10 +253,15 @@ def build_admin_erp_summary() -> dict:
             _queue_card(
                 key="direct_sale_revenue",
                 label="Direct sale revenue",
-                count=direct_sales.filter(status="COMPLETED").count(),
-                value=str(_sum_decimal(direct_sales.filter(status="COMPLETED"), "grand_total")),
+                count=direct_sales.filter(status__in=["CONFIRMED", "DELIVERED", "INVOICED"]).count(),
+                value=str(
+                    _sum_decimal(
+                        direct_sales.filter(status__in=["CONFIRMED", "DELIVERED", "INVOICED"]),
+                        "grand_total",
+                    )
+                ),
                 source="billing.DirectSale",
-                deep_link="/admin/billing/direct-sales",
+                deep_link="/admin/billing/direct-sale",
             ),
             _queue_card(
                 key="rent_lease_deposit_held",
@@ -338,7 +343,7 @@ def build_admin_erp_summary() -> dict:
                 label="Direct sale orders",
                 count=direct_sales.exclude(status="CANCELLED").count(),
                 source="billing.DirectSale",
-                deep_link="/admin/billing/direct-sales",
+                deep_link="/admin/billing/direct-sale",
             ),
             _queue_card(
                 key="subscription_requests",
@@ -423,11 +428,11 @@ def build_admin_erp_summary() -> dict:
         "quick_actions": [
             {"label": "Create Customer", "href": "/admin/customers/create"},
             {"label": "Create Contract", "href": "/admin/subscriptions/create"},
-            {"label": "Create Direct Sale", "href": "/admin/billing/direct-sales"},
-            {"label": "Collect Payment", "href": "/admin/payments"},
-            {"label": "Create Delivery", "href": "/admin/deliveries"},
+            {"label": "Create Direct Sale", "href": "/admin/billing/direct-sale?mode=create"},
+            {"label": "Collect Payment", "href": "/admin/finance/collect"},
+            {"label": "Create Delivery", "href": "/admin/delivery/create"},
             {"label": "Verify KYC", "href": "/admin/customers"},
-            {"label": "Reconcile Payment", "href": "/admin/reconciliation"},
+            {"label": "Reconcile Payment", "href": "/admin/finance/reconciliation"},
             {"label": "View Reports", "href": "/admin/reports"},
         ],
     }
@@ -458,7 +463,7 @@ def build_admin_erp_summary() -> dict:
                 "Direct sale demand",
                 direct_sales.count(),
                 "billing.DirectSale",
-                "/admin/billing/direct-sales",
+                "/admin/billing/direct-sale",
             ),
         ]
     }
@@ -619,7 +624,7 @@ def build_admin_global_search(*, query: str) -> dict:
                 "title": sale.sale_no,
                 "subtitle": sale.customer_name_snapshot or "Direct sale",
                 "status": sale.status,
-                "deep_link": "/admin/billing/direct-sales",
+                "deep_link": "/admin/billing/direct-sale",
             }
         )
     for item in InventoryItem.objects.select_related("product").filter(

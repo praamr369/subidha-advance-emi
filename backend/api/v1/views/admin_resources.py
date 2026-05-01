@@ -583,6 +583,8 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 | Q(user__email__icontains=search)
                 | Q(user__username__icontains=search)
                 | Q(customer_code__icontains=search)
+                | Q(direct_sales__customer_gstin__icontains=search.upper())
+                | Q(billing_invoices__customer_gstin__icontains=search.upper())
             )
             if search.isdigit():
                 search_filter = search_filter | Q(id=int(search))
@@ -594,6 +596,8 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                     | Q(user__email__icontains=token)
                     | Q(user__username__icontains=token)
                     | Q(customer_code__icontains=token)
+                    | Q(direct_sales__customer_gstin__icontains=token.upper())
+                    | Q(billing_invoices__customer_gstin__icontains=token.upper())
                 )
                 if token_digits:
                     per_token = per_token | Q(phone__icontains=token_digits)

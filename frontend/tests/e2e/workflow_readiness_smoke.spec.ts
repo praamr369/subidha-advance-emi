@@ -87,8 +87,27 @@ test.describe("admin readiness banner", () => {
   test("business setup checklist and profile flows load and profile save is wired", async ({
     page,
   }) => {
+    await page.route("**/api/v1/admin/business-setup/checklist/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...notReadyChecklist,
+          counts: {
+            ...notReadyChecklist.counts,
+            invoice_numbering_configured: 0,
+            receipt_numbering_configured: 0,
+            direct_sale_invoice_numbering_configured: 0,
+          },
+        }),
+      });
+    });
     await page.goto("/admin/settings/business-setup/checklist");
     await expect(page.getByRole("heading", { name: "Business setup checklist" })).toBeVisible();
+    await expect(page.getByText("Document Numbering")).toBeVisible();
+    await expect(page.getByText("Invoice numbering readiness")).toBeVisible();
+    await expect(page.getByText("Receipt numbering readiness")).toBeVisible();
+    await expect(page.getByText("Direct-sale invoice numbering readiness")).toBeVisible();
 
     await page.route("**/api/v1/admin/business-profile/", async (route) => {
       const method = route.request().method();

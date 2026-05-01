@@ -8,6 +8,10 @@ from branch_control.models import Branch, BranchStatus, CashCounter
 from inventory.models import InventoryItem, StockLocation
 from subscriptions.models import Batch, Product
 from subscriptions.models_business_setup import BusinessProfile
+from subscriptions.services.document_numbering_service import (
+    get_document_numbering_state,
+    required_numbering_keys_for_checklist,
+)
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,12 @@ def compute_setup_checklist():
     active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
     active_periods = AccountingPeriod.objects.all()
     active_sequences = DocumentSequence.objects.filter(is_active=True)
+    numbering_state = get_document_numbering_state()
+    checklist_numbering_keys = set(required_numbering_keys_for_checklist())
+    numbering_rows = [row for row in numbering_state["sequences"] if row["key"] in checklist_numbering_keys]
+    numbering_ready = all(row["configured"] for row in numbering_rows)
+    numbering_preview_ready = all((row.get("next_number_preview") or "").strip() for row in numbering_rows if row["configured"])
+    no_duplicate_numbers = bool(numbering_state["checks"]["no_duplicate_issued_numbers"])
 
     has_cash_finance = active_finance_accounts.filter(kind="CASH").exists()
     has_bank_finance = active_finance_accounts.filter(kind="BANK").exists()
@@ -122,13 +132,17 @@ def compute_setup_checklist():
             is_warning=not active_periods.exists(),
         ),
         _item(
-            key="document_sequences",
-            label="Invoice/receipt number series configured",
+            key="document_numbering",
+            label="Document numbering configured (invoice/receipt/direct-sale invoice)",
             level="recommended",
-            is_complete=active_sequences.exists(),
-            detail=f"{active_sequences.count()} active series configured." if active_sequences.exists() else "Configure at least one document series for invoice/receipt numbering.",
-            route="/admin/accounting/periods",
-            is_warning=not active_sequences.exists(),
+            is_complete=numbering_ready and no_duplicate_numbers and numbering_preview_ready,
+            detail=(
+                "Invoice, receipt, and direct-sale numbering are configured with duplicate-safe previews."
+                if numbering_ready and no_duplicate_numbers and numbering_preview_ready
+                else "Open Document Numbering and configure invoice, receipt, and direct-sale sequence settings."
+            ),
+            route="/admin/settings/business-setup/document-numbering",
+            is_warning=not (numbering_ready and no_duplicate_numbers and numbering_preview_ready),
         ),
         _item(
             key="products",
@@ -198,6 +212,13 @@ def compute_setup_checklist():
         "finance_accounts_upi": int(has_upi_finance),
         "accounting_periods": active_periods.count(),
         "document_sequences_active": active_sequences.count(),
+        "invoice_numbering_configured": int(numbering_state["checks"]["invoice_numbering_configured"]),
+        "receipt_numbering_configured": int(numbering_state["checks"]["receipt_numbering_configured"]),
+        "direct_sale_invoice_numbering_configured": int(
+            numbering_state["checks"]["direct_sale_invoice_numbering_configured"]
+        ),
+        "document_numbering_no_duplicates": int(numbering_state["checks"]["no_duplicate_issued_numbers"]),
+        "document_numbering_preview_available": int(numbering_state["checks"]["next_number_preview_available"]),
         "products": products.count(),
         "batches": batches.count(),
         "stock_locations_active": stock_locations.count(),

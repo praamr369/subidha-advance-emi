@@ -67,6 +67,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 
   item("Sales", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
   item("Sales", "Direct Sales", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
+  item(
+    "Sales",
+    "Create Direct Sale Invoice",
+    `${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`,
+    "Open full-page direct-sale invoice creation."
+  ),
   item("Sales", "Invoices", ROUTES.admin.billingInvoices, "Invoice register."),
   item("Sales", "Receipts", ROUTES.admin.billingReceipts, "Receipt register."),
   item("Sales", "Document Register", ROUTES.admin.billingRegister, "Billing document register."),
@@ -198,6 +204,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Setup", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
   item("Settings & Setup", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
   item("Settings & Setup", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
+  item(
+    "Settings & Setup",
+    "Document Numbering",
+    ROUTES.admin.settingsBusinessSetupDocumentNumbering,
+    "Invoice and receipt sequence readiness and configuration."
+  ),
   item("Settings & Setup", "Accounting Setup", ROUTES.admin.settingsBusinessSetup, "Accounting and business setup entry point."),
   item("Settings & Setup", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
   item("Settings & Setup", "Backup / Export / System Readiness", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),

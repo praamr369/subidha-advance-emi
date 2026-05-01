@@ -211,6 +211,7 @@ export const ROUTES = {
     settingsBusinessSetupStaff: "/admin/settings/business-setup/staff",
     settingsBusinessSetupChartAccounts: "/admin/settings/business-setup/chart-accounts",
     settingsBusinessSetupChecklist: "/admin/settings/business-setup/checklist",
+    settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
 
     luckyDraw: "/admin/lucky-draws",

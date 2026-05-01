@@ -154,6 +154,8 @@ def search_customers(
                     Q(name__icontains=token)
                     | Q(user__email__icontains=token)
                     | Q(customer_code__icontains=token)
+                    | Q(direct_sales__customer_gstin__icontains=token.upper())
+                    | Q(billing_invoices__customer_gstin__icontains=token.upper())
                 )
                 if token_digits:
                     per_token = (
@@ -171,6 +173,8 @@ def search_customers(
             | Q(phone__icontains=term)
             | Q(user__email__icontains=term)
             | Q(customer_code__icontains=term)
+            | Q(direct_sales__customer_gstin__icontains=term.upper())
+            | Q(billing_invoices__customer_gstin__icontains=term.upper())
         )
         if term.isdigit():
             full_term_filter = full_term_filter | Q(id=int(term))

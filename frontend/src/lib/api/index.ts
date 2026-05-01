@@ -11,12 +11,24 @@ import { refreshTokenRequest } from "@/services/auth.service";
 export class ApiError extends Error {
   status: number;
   body: unknown;
+  readableMessage: string;
+  fieldErrors: Record<string, string[]>;
+  rawBodyPreview: string;
 
-  constructor(message: string, status: number, body: unknown = null) {
+  constructor(
+    message: string,
+    status: number,
+    body: unknown = null,
+    fieldErrors: Record<string, string[]> = {},
+    rawBodyPreview = ""
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.body = body;
+    this.readableMessage = message;
+    this.fieldErrors = fieldErrors;
+    this.rawBodyPreview = rawBodyPreview;
   }
 }
 
@@ -66,14 +78,84 @@ function buildApiUrl(path: string): string {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
-async function parseResponseBody(response: Response): Promise<unknown> {
-  const contentType = response.headers.get("content-type") || "";
+type ParsedResponseBody = {
+  body: unknown;
+  rawText: string;
+};
 
-  if (contentType.includes("application/json")) {
-    return response.json().catch(() => null);
+function trimBodyPreview(value: string): string {
+  return value.slice(0, 500);
+}
+
+function appendFieldError(
+  target: Record<string, string[]>,
+  key: string,
+  message: string
+): void {
+  const normalizedKey = key.trim() || "non_field_errors";
+  const normalizedMessage = message.trim();
+  if (!normalizedMessage) return;
+  if (!target[normalizedKey]) target[normalizedKey] = [];
+  if (!target[normalizedKey].includes(normalizedMessage)) {
+    target[normalizedKey].push(normalizedMessage);
+  }
+}
+
+function collectFieldErrors(
+  value: unknown,
+  target: Record<string, string[]>,
+  prefix = ""
+): void {
+  if (typeof value === "string") {
+    appendFieldError(target, prefix || "non_field_errors", value);
+    return;
   }
 
-  return response.text().catch(() => null);
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectFieldErrors(entry, target, prefix));
+    return;
+  }
+
+  if (!value || typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  Object.entries(record).forEach(([key, entry]) => {
+    if (key === "status") return;
+    const nextPrefix = key === "non_field_errors" ? (prefix || key) : prefix ? `${prefix}.${key}` : key;
+    collectFieldErrors(entry, target, nextPrefix);
+  });
+}
+
+function flattenFieldErrors(body: unknown): Record<string, string[]> {
+  const fieldErrors: Record<string, string[]> = {};
+  collectFieldErrors(body, fieldErrors);
+  return fieldErrors;
+}
+
+function firstFieldError(fieldErrors: Record<string, string[]>): string | null {
+  for (const [field, values] of Object.entries(fieldErrors)) {
+    const first = values.find((value) => value.trim().length > 0);
+    if (!first) continue;
+    if (field === "non_field_errors") return first;
+    return `${field}: ${first}`;
+  }
+  return null;
+}
+
+async function parseResponseBody(response: Response): Promise<ParsedResponseBody> {
+  const rawText = await response.text().catch(() => "");
+  if (!rawText.trim()) return { body: null, rawText: "" };
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json") || looksLikeJsonString(rawText)) {
+    try {
+      return { body: JSON.parse(rawText), rawText };
+    } catch {
+      return { body: rawText, rawText };
+    }
+  }
+
+  return { body: rawText, rawText };
 }
 
 function resolveErrorMessage(body: unknown, status: number): string {
@@ -292,13 +374,19 @@ async function apiFetchInternal<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(buildApiUrl(path), {
-    ...options,
-    body: requestBody,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      ...options,
+      body: requestBody,
+      headers,
+    });
+  } catch (error) {
+    throw error;
+  }
 
-  const body = await parseResponseBody(response);
+  const parsed = await parseResponseBody(response);
+  const body = parsed.body;
 
   if (!response.ok) {
     if (shouldAttemptRefresh(path, response.status, alreadyRetried)) {
@@ -317,10 +405,18 @@ async function apiFetchInternal<T>(
       }
     }
 
+    const fieldErrors = flattenFieldErrors(body);
+    const readableMessage =
+      resolveErrorMessage(body, response.status) ||
+      firstFieldError(fieldErrors) ||
+      `Request failed (${response.status})`;
+
     throw new ApiError(
-      resolveErrorMessage(body, response.status),
+      readableMessage,
       response.status,
-      body
+      body,
+      fieldErrors,
+      trimBodyPreview(parsed.rawText)
     );
   }
 

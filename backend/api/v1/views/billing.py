@@ -2,6 +2,7 @@ import hashlib
 import json
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -37,6 +38,7 @@ from billing.services.billing_sync_service import (
     sync_payment_into_billing,
     sync_subscription_billing_profile,
 )
+from subscriptions.services.document_numbering_service import get_document_numbering_state
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting_phase3 import AccountingBookQuerySerializer
 from api.v1.serializers.billing import (
@@ -96,6 +98,14 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
         return Response(payload.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
+        numbering = get_document_numbering_state()
+        if not numbering["checks"]["direct_sale_invoice_numbering_configured"]:
+            raise ValidationError(
+                {
+                    "detail": "Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.",
+                    "numbering_key": "DIRECT_SALE_INVOICE",
+                }
+            )
         idempotency_key = self._idempotency_key(request)
         payload_hash = self._request_payload_hash(request) if idempotency_key else ""
         if idempotency_key:
@@ -123,6 +133,12 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                 )
                 sale = serializer.save(**save_kwargs)
         except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        except DjangoValidationError as exc:
+            if getattr(exc, "message_dict", None):
+                raise ValidationError(exc.message_dict) from exc
+            if getattr(exc, "messages", None):
+                raise ValidationError({"detail": exc.messages}) from exc
             raise ValidationError({"detail": str(exc)}) from exc
         except IntegrityError:
             if idempotency_key:

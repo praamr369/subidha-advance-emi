@@ -5,6 +5,8 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
+from corsheaders.defaults import default_headers
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 LOCAL_DEV_SECRET_KEY = "local-development-only-secret-key"
@@ -604,6 +606,10 @@ DEFAULT_FROM_EMAIL = (
 CORS_ALLOW_CREDENTIALS = _parse_bool(
     os.getenv("CORS_ALLOW_CREDENTIALS"), default=bool(CORS_ALLOWED_ORIGINS)
 )
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "idempotency-key",
+    "x-idempotency-key",
+]
 if CORS_ALLOW_CREDENTIALS and not CORS_ALLOWED_ORIGINS and not _is_local_dev_mode():
     raise RuntimeError(
         "CORS_ALLOWED_ORIGINS must be configured outside local development when CORS_ALLOW_CREDENTIALS is enabled."

@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from api.v1.views.admin_business_setup import (
     AdminBusinessProfileView,
+    BusinessSetupDocumentNumberingView,
     BusinessSetupChecklistView,
     BusinessSetupResetPreviewView,
     BusinessSetupResetExecuteView,
@@ -349,6 +350,7 @@ urlpatterns = [
     path("business-profile/", AdminBusinessProfileView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
+    path("business-setup/document-numbering/", BusinessSetupDocumentNumberingView.as_view()),
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("business-setup/reset/", BusinessSetupResetExecuteView.as_view()),
     path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),

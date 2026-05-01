@@ -15,6 +15,7 @@ import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
+import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
   listAdminInventoryRequirements,
@@ -237,6 +238,7 @@ export default function DirectSaleWorkspace() {
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
+  const [customerPartyResults, setCustomerPartyResults] = useState<PartyListRow[]>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
@@ -368,9 +370,9 @@ export default function DirectSaleWorkspace() {
       balance: rollup.grand - received,
     };
   }, [computedLines, form.received_total]);
-  const submitBlockedByFinance = totals.received > 0 && !!financeAccountsError && !form.finance_account;
+  const submitBlockedByFinance = totals.received > 0 && !form.finance_account;
   const submitBlockedByExistingCustomer =
-    form.customer_mode === "EXISTING" && (!form.customer_id || !selectedCustomer);
+    form.customer_mode === "EXISTING" && (!form.customer_id || Number(form.customer_id) <= 0 || !selectedCustomer?.id);
   const submitBlocked = submitBlockedByFinance || submitBlockedByExistingCustomer;
 
   const columns: EnterpriseColumnDef<DirectSale>[] = [
@@ -430,6 +432,7 @@ export default function DirectSaleWorkspace() {
     setSelectedCustomer(null);
     setCustomerQuery("");
     setCustomerResults([]);
+    setCustomerPartyResults([]);
     setForm({
       sale_date: todayIso(),
       customer_mode: "EXISTING",
@@ -483,6 +486,7 @@ export default function DirectSaleWorkspace() {
     setCustomerSearchError(null);
     setValidationErrors([]);
     setCustomerModeError(null);
+    setCustomerPartyResults([]);
     if (selectedCustomer) {
       setSelectedCustomer(null);
       setForm((current) => ({ ...current, customer_id: "" }));
@@ -493,16 +497,24 @@ export default function DirectSaleWorkspace() {
     const trimmed = value.trim();
     if (trimmed.length < 2) {
       setCustomerResults([]);
+      setCustomerPartyResults([]);
       setCustomerLoading(false);
       return;
     }
     setCustomerLoading(true);
     customerSearchTimer.current = window.setTimeout(async () => {
       try {
-        const results = await searchCustomers(trimmed);
-        setCustomerResults(results);
+        const customerMatches = await searchCustomers(trimmed);
+        setCustomerResults(customerMatches);
+        if (!customerMatches.length) {
+          const partyPayload = await listCrmParties({ q: trimmed });
+          setCustomerPartyResults(partyPayload.results || []);
+        } else {
+          setCustomerPartyResults([]);
+        }
       } catch (err) {
         setCustomerResults([]);
+        setCustomerPartyResults([]);
         setCustomerSearchError(accountingErrorMessage(err, "Customer search failed."));
       } finally {
         setCustomerLoading(false);
@@ -526,6 +538,8 @@ export default function DirectSaleWorkspace() {
         targetMode === "NEW" ? current.new_customer_phone || snapshot.phone : current.new_customer_phone,
     }));
     setSelectedCustomer(null);
+    setCustomerResults([]);
+    setCustomerPartyResults([]);
     setCustomerModeError(null);
     setValidationErrors([]);
   }
@@ -534,6 +548,7 @@ export default function DirectSaleWorkspace() {
     setSelectedCustomer(customer);
     setCustomerQuery(`${customer.name} ${customer.phone}`.trim());
     setCustomerResults([]);
+    setCustomerPartyResults([]);
     setCustomerModeError(null);
     setForm((current) => ({
       ...current,
@@ -544,7 +559,7 @@ export default function DirectSaleWorkspace() {
       customer_snapshot_email: customer.email || current.customer_snapshot_email,
       customer_snapshot_billing_address_line1: customer.address || current.customer_snapshot_billing_address_line1,
       customer_snapshot_city: customer.city || current.customer_snapshot_city,
-      customer_gstin: current.customer_gstin,
+      customer_gstin: customer.gstin || current.customer_gstin,
       customer_snapshot_place_of_supply: current.customer_snapshot_place_of_supply,
     }));
   }
@@ -606,7 +621,7 @@ export default function DirectSaleWorkspace() {
     const next: string[] = [];
     let nextCustomerModeError: string | null = null;
     if (form.customer_mode === "EXISTING") {
-      if (!form.customer_id || !selectedCustomer) {
+      if (!form.customer_id || Number(form.customer_id) <= 0 || !selectedCustomer?.id) {
         nextCustomerModeError = "Select a registered customer from search results.";
         next.push("Existing customer mode requires selecting a registered customer.");
       }
@@ -614,10 +629,19 @@ export default function DirectSaleWorkspace() {
     if (form.customer_mode === "NEW") {
       if (!form.new_customer_name.trim()) next.push("New customer full name is required.");
       if (!normalizePhone(form.new_customer_phone)) next.push("New customer phone is required.");
+      if (!form.customer_snapshot_billing_address_line1.trim()) {
+        next.push("New customer billing address line 1 is required.");
+      }
+      if (!form.customer_snapshot_city.trim()) next.push("New customer city is required.");
+      if (!form.customer_snapshot_state.trim()) next.push("New customer state is required.");
+      if (!form.customer_snapshot_pincode.trim()) next.push("New customer pincode is required.");
     }
     if (form.customer_mode === "WALK_IN") {
       if (!form.customer_name_snapshot.trim()) next.push("Walk-in snapshot name is required.");
       if (!normalizePhone(form.customer_phone_snapshot)) next.push("Walk-in snapshot phone is required.");
+      if (!form.customer_snapshot_billing_address_line1.trim()) {
+        next.push("Walk-in billing address line 1 is required.");
+      }
     }
     if (form.tax_mode === "GST" && !form.customer_snapshot_place_of_supply.trim()) {
       next.push("Place of supply is required for GST invoices.");
@@ -632,8 +656,8 @@ export default function DirectSaleWorkspace() {
     if (totals.received > totals.grand) {
       next.push("Received total cannot exceed grand total.");
     }
-    if (totals.received > 0 && financeAccountsError && !form.finance_account) {
-      next.push("Finance account is required for immediate receipt while finance-account list is unavailable.");
+    if (totals.received > 0 && !form.finance_account) {
+      next.push("Finance account is required when received total is greater than zero.");
     }
     if (!lines.length) {
       next.push("At least one product line is required.");
@@ -643,7 +667,7 @@ export default function DirectSaleWorkspace() {
       const calculated = calculateLine(line, form.tax_mode);
       if (!line.product_id) next.push(`Line ${lineNo}: product is required.`);
       if (toNumber(line.quantity) <= 0) next.push(`Line ${lineNo}: quantity must be greater than zero.`);
-      if (toNumber(line.unit_price) <= 0) next.push(`Line ${lineNo}: unit price must be greater than zero.`);
+      if (toNumber(line.unit_price) < 0) next.push(`Line ${lineNo}: unit price cannot be negative.`);
       if (toNumber(line.discount_amount) < 0) next.push(`Line ${lineNo}: discount cannot be negative.`);
       if (toNumber(line.discount_amount) > calculated.gross) {
         next.push(`Line ${lineNo}: discount cannot exceed line gross amount.`);
@@ -724,23 +748,21 @@ export default function DirectSaleWorkspace() {
       ...commonPayload,
       customer: null,
       walkin_create_customer_profile: form.walkin_create_customer_profile,
-      new_customer_name: form.walkin_create_customer_profile ? form.customer_name_snapshot.trim() : "",
-      new_customer_phone: form.walkin_create_customer_profile
-        ? normalizePhone(form.customer_phone_snapshot)
-        : "",
-      new_customer_email: form.walkin_create_customer_profile ? form.customer_snapshot_email.trim() : "",
-      new_customer_billing_address_line1: form.walkin_create_customer_profile
-        ? form.customer_snapshot_billing_address_line1.trim()
-        : "",
-      new_customer_billing_address_line2: form.walkin_create_customer_profile
-        ? form.customer_snapshot_billing_address_line2.trim()
-        : "",
-      new_customer_city: form.walkin_create_customer_profile ? form.customer_snapshot_city.trim() : "",
-      new_customer_district: form.walkin_create_customer_profile ? form.customer_snapshot_district.trim() : "",
-      new_customer_state: form.walkin_create_customer_profile ? form.customer_snapshot_state.trim() : "",
-      new_customer_pincode: form.walkin_create_customer_profile ? form.customer_snapshot_pincode.trim() : "",
-      new_customer_gstin: form.walkin_create_customer_profile ? form.customer_gstin.trim() : "",
-      new_customer_type: form.customer_gst_type,
+      ...(form.walkin_create_customer_profile
+        ? {
+            new_customer_name: form.customer_name_snapshot.trim(),
+            new_customer_phone: normalizePhone(form.customer_phone_snapshot),
+            new_customer_email: form.customer_snapshot_email.trim(),
+            new_customer_billing_address_line1: form.customer_snapshot_billing_address_line1.trim(),
+            new_customer_billing_address_line2: form.customer_snapshot_billing_address_line2.trim(),
+            new_customer_city: form.customer_snapshot_city.trim(),
+            new_customer_district: form.customer_snapshot_district.trim(),
+            new_customer_state: form.customer_snapshot_state.trim(),
+            new_customer_pincode: form.customer_snapshot_pincode.trim(),
+            new_customer_gstin: form.customer_gstin.trim(),
+            new_customer_type: form.customer_gst_type,
+          }
+        : {}),
     };
   }
 
@@ -765,7 +787,10 @@ export default function DirectSaleWorkspace() {
       router.push(pathname);
     } catch (err) {
       if (err instanceof ApiError) {
-        const parsed = flattenApiErrors(err.body);
+        const parsedFromFields = Object.entries(err.fieldErrors || {}).flatMap(([field, values]) =>
+          (values || []).map((value) => (field === "non_field_errors" ? value : `${field}: ${value}`))
+        );
+        const parsed = parsedFromFields.length ? parsedFromFields : flattenApiErrors(err.body);
         if (parsed.length) {
           setValidationErrors(parsed);
           const customerError = parsed.find((entry) =>
@@ -774,28 +799,24 @@ export default function DirectSaleWorkspace() {
           if (customerError) setCustomerModeError(customerError);
         }
         if (process.env.NODE_ENV !== "production") {
-          const bodyText =
-            typeof err.body === "string"
-              ? err.body
-              : (() => {
-                  try {
-                    return JSON.stringify(err.body);
-                  } catch {
-                    return String(err.body ?? "");
-                  }
-                })();
           console.error("[DirectSale:create] request failed", {
-            endpoint: "/billing/direct-sales/",
+            endpoint: "/api/v1/billing/direct-sales/",
             status: err.status,
-            responsePreview: bodyText.slice(0, 400),
+            responsePreview: err.rawBodyPreview || "",
+            fieldErrors: err.fieldErrors || {},
           });
         }
         if (err.status === 400) {
+          const numberingIssue = parsed.find((entry) => /numbering|document numbering|DIRECT_SALE_INVOICE/i.test(entry));
+          if (numberingIssue) {
+            setError("Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.");
+            return;
+          }
           setError("Direct sale could not be created. Please fix the highlighted fields.");
           return;
         }
         if (err.status === 401 || err.status === 403) {
-          setError("You do not have permission to create direct sales. Please sign in again.");
+          setError("Your session or role does not allow this action.");
           return;
         }
         if (err.status === 404) {
@@ -808,7 +829,7 @@ export default function DirectSaleWorkspace() {
         }
       }
       if (err instanceof Error && /failed to fetch|network|timeout|abort/i.test(err.message)) {
-        setError("Network request failed while creating the direct sale. Check connection and retry.");
+        setError("Network request failed. Backend server or connection is unavailable.");
       } else {
         setError(accountingErrorMessage(err, "Failed to create direct sale."));
       }
@@ -908,10 +929,10 @@ export default function DirectSaleWorkspace() {
                             onChange={(event) => handleCustomerSearch(event.target.value)}
                             disabled={submitting}
                             className={`${FIELD_CLASS} pl-9`}
-                            placeholder="Name or phone"
+                            placeholder="Name, phone, customer code, GSTIN"
                           />
                         </div>
-                        {customerQuery.trim().length >= 2 ? (
+                        {customerQuery.trim().length >= 2 && !selectedCustomer ? (
                           <div className="absolute z-[85] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-[var(--surface-card-elevated)] p-1 shadow-2xl">
                             {customerLoading ? (
                               <div className="px-3 py-2 text-sm text-muted-foreground">Searching customers...</div>
@@ -924,9 +945,50 @@ export default function DirectSaleWorkspace() {
                                   className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
                                 >
                                   <span className="block font-medium">{customer.name}</span>
-                                  <span className="block text-xs text-muted-foreground">{customer.phone}</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {customer.phone}
+                                    {customer.customer_code ? ` · ${customer.customer_code}` : ` · #${customer.id}`}
+                                  </span>
                                 </button>
                               ))
+                            ) : customerPartyResults.length ? (
+                              <div className="space-y-2 px-3 py-2 text-sm">
+                                <p className="text-muted-foreground">
+                                  No registered customer matched. CRM party records were found.
+                                </p>
+                                {customerPartyResults.slice(0, 6).map((party) => (
+                                  <div key={party.id} className="rounded-md border border-border bg-background p-2">
+                                    <p className="text-sm font-medium text-foreground">{party.display_name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {party.primary_phone || "No phone"} · {party.party_no}
+                                    </p>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground"
+                                  title="Backend endpoint for customer creation from CRM party is not available."
+                                >
+                                  Create customer profile from party
+                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => applySearchPrefill("NEW")}
+                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                                  >
+                                    Create New Customer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySearchPrefill("WALK_IN")}
+                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                                  >
+                                    Use Walk-in Snapshot
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <div className="space-y-2 px-3 py-2 text-sm">
                                 <p className="text-muted-foreground">No registered customer found.</p>
@@ -1079,10 +1141,16 @@ export default function DirectSaleWorkspace() {
                     {selectedCustomer ? (
                       <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
                         <p className="font-semibold text-foreground">{selectedCustomer.name}</p>
+                        <p>Customer ID: #{selectedCustomer.id}</p>
                         <p>Phone: {selectedCustomer.phone || "—"}</p>
-                        <p>Customer Code: {selectedCustomer.customer_code || `#${selectedCustomer.id}`}</p>
-                        <p>Address: {selectedCustomer.address || "No address on customer profile."}</p>
-                        <p>GSTIN: {form.customer_gstin || "—"}</p>
+                        <p>Customer Code: {selectedCustomer.customer_code || "—"}</p>
+                        <p>
+                          Address:{" "}
+                          {selectedCustomer.address || selectedCustomer.city
+                            ? `${selectedCustomer.address || ""}${selectedCustomer.city ? `, ${selectedCustomer.city}` : ""}`
+                            : "No address on customer profile."}
+                        </p>
+                        <p>GSTIN: {selectedCustomer.gstin || form.customer_gstin || "—"}</p>
                         <div className="mt-2">
                           <button
                             type="button"
@@ -1091,6 +1159,7 @@ export default function DirectSaleWorkspace() {
                               setForm((current) => ({ ...current, customer_id: "" }));
                               setCustomerQuery("");
                               setCustomerResults([]);
+                              setCustomerPartyResults([]);
                             }}
                             className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
                           >
@@ -1364,7 +1433,7 @@ export default function DirectSaleWorkspace() {
                               <span className="font-medium text-foreground">Unit Price</span>
                               <input
                                 type="number"
-                                min="0.01"
+                                min="0"
                                 step="0.01"
                                 value={line.unit_price}
                                 onChange={(event) => updateLine(line.id, { unit_price: event.target.value })}

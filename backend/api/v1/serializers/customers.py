@@ -32,6 +32,7 @@ class CustomerSearchSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     customer_source = serializers.CharField(read_only=True)
     customer_code = serializers.CharField(read_only=True)
+    gstin = serializers.SerializerMethodField()
 
     class Meta:
         model = Customer
@@ -46,6 +47,7 @@ class CustomerSearchSerializer(serializers.ModelSerializer):
             "status",
             "customer_source",
             "customer_code",
+            "gstin",
             "created_at",
         )
         read_only_fields = fields
@@ -55,6 +57,25 @@ class CustomerSearchSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         return "ACTIVE" if getattr(obj.user, "is_active", False) else "INACTIVE"
+
+    def get_gstin(self, obj):
+        latest_direct_sale_gstin = (
+            obj.direct_sales.exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values_list("customer_gstin", flat=True)
+            .first()
+        )
+        if latest_direct_sale_gstin:
+            return latest_direct_sale_gstin
+        latest_invoice_gstin = (
+            obj.billing_invoices.exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values_list("customer_gstin", flat=True)
+            .first()
+        )
+        return latest_invoice_gstin or ""
 
 
 # ---------------------------------------------------------------------------

@@ -4,8 +4,9 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
 from inventory.models import InventoryItem
+from accounting.services.gst_document_posting_service import financial_year_for
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
 
@@ -43,6 +44,15 @@ class DirectSaleApiTests(APITestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
+        )
+        fy = financial_year_for(date.today())
+        DocumentSequence.objects.create(
+            series_code="DIRECT_SALE_INVOICE",
+            financial_year=fy,
+            prefix=f"DSI-{fy}",
+            next_number=1,
+            padding=5,
+            is_active=True,
         )
 
     def test_admin_can_create_confirm_and_filter_direct_sale_documents(self):
@@ -183,3 +193,21 @@ class DirectSaleApiTests(APITestCase):
         outstanding_list = self.client.get("/api/v1/billing/direct-sales/?outstanding_only=true")
         self.assertEqual(outstanding_list.status_code, status.HTTP_200_OK, outstanding_list.data)
         self.assertEqual(outstanding_list.data["count"], 0)
+
+    def test_direct_sale_create_returns_clear_400_when_numbering_missing(self):
+        DocumentSequence.objects.filter(series_code="DIRECT_SALE_INVOICE").delete()
+        response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 16),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Direct sale invoice numbering is not configured", str(response.data))

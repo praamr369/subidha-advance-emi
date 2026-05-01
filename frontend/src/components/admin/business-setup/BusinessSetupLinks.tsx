@@ -9,6 +9,7 @@ const links = [
   { href: "/admin/settings/business-setup/cash-desks", label: "Counters" },
   { href: "/admin/settings/business-setup/staff", label: "Staff & Roles" },
   { href: "/admin/settings/business-setup/chart-accounts", label: "Chart Accounts" },
+  { href: "/admin/settings/business-setup/document-numbering", label: "Document Numbering" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
 ];
 

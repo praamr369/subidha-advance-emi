@@ -187,6 +187,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     customer_source = serializers.CharField(read_only=True)
     customer_code = serializers.CharField(read_only=True)
     profile_photo_url = serializers.SerializerMethodField()
+    gstin = serializers.SerializerMethodField()
 
     class Meta:
         model = Customer
@@ -213,6 +214,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "customer_source",
             "customer_code",
             "profile_photo_url",
+            "gstin",
         )
         read_only_fields = (
             "id",
@@ -226,6 +228,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "customer_source",
             "customer_code",
             "profile_photo_url",
+            "gstin",
         )
         extra_kwargs = {"user": {"required": False}}
 
@@ -242,6 +245,25 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         return "ACTIVE" if obj.user.is_active else "INACTIVE"
+
+    def get_gstin(self, obj):
+        latest_direct_sale_gstin = (
+            obj.direct_sales.exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values_list("customer_gstin", flat=True)
+            .first()
+        )
+        if latest_direct_sale_gstin:
+            return latest_direct_sale_gstin
+        latest_invoice_gstin = (
+            obj.billing_invoices.exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values_list("customer_gstin", flat=True)
+            .first()
+        )
+        return latest_invoice_gstin or ""
 
     def to_representation(self, instance):
         payload = super().to_representation(instance)

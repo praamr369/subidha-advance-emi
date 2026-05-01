@@ -86,5 +86,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
 
     await page.getByPlaceholder("Search operations, registers, workflows…").fill("Direct Sales");
     await expect(dialog.getByRole("link", { name: /Direct Sales/i })).toBeVisible();
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale Invoice");
+    await expect(dialog.getByRole("button", { name: /Create Direct Sale Invoice/i })).toBeVisible();
   });
 });

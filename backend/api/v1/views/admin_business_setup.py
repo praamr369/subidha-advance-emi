@@ -8,6 +8,8 @@ from api.v1.serializers.business_setup import (
     BusinessProfileSerializer,
     BusinessResetRequestSerializer,
     BusinessResetResponseSerializer,
+    DocumentNumberingStateSerializer,
+    DocumentNumberingUpdateSerializer,
     SetupChecklistSerializer,
 )
 from subscriptions.services.business_setup_service import (
@@ -20,6 +22,11 @@ from subscriptions.services.business_reset_service import (
     RESET_CONFIRMATION,
     build_business_reset_plan,
     execute_business_reset,
+)
+from subscriptions.services.document_numbering_service import (
+    NUMBERING_BY_KEY,
+    get_document_numbering_state,
+    upsert_document_numbering,
 )
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
 
@@ -54,6 +61,37 @@ class BusinessSetupChecklistView(APIView):
         payload = compute_setup_checklist()
         serializer = SetupChecklistSerializer(payload)
         return Response(serializer.data)
+
+
+class BusinessSetupDocumentNumberingView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        payload = get_document_numbering_state()
+        serializer = DocumentNumberingStateSerializer(payload)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        serializer = DocumentNumberingUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = serializer.validated_data["key"]
+        current = get_document_numbering_state()
+        sequence_row = next((row for row in current["sequences"] if row["key"] == key), None)
+        if sequence_row is None:
+            return Response({"key": ["Unsupported numbering key."]}, status=status.HTTP_400_BAD_REQUEST)
+        spec = NUMBERING_BY_KEY[key]
+        try:
+            upsert_document_numbering(
+                key=key,
+                prefix=serializer.validated_data.get("prefix", sequence_row["prefix"]),
+                next_number=serializer.validated_data.get("next_number", sequence_row["next_number"]),
+                padding=serializer.validated_data.get("padding", sequence_row["padding"]),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc), "key": key, "series_code": spec.series_code}, status=status.HTTP_400_BAD_REQUEST)
+        payload = get_document_numbering_state()
+        return Response(DocumentNumberingStateSerializer(payload).data, status=status.HTTP_200_OK)
 
 
 class BusinessSetupResetPreviewView(APIView):

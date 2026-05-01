@@ -1,9 +1,12 @@
 from datetime import date
 from decimal import Decimal
 
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounting.models import DocumentSequence
+from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, StockLocation, Warehouse
 from tests.helpers import (
@@ -45,6 +48,15 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
             default_stock_location=self.location,
             opening_stock_qty=Decimal("0.000"),
             reorder_level_qty=Decimal("1.000"),
+        )
+        fy = financial_year_for(date.today())
+        DocumentSequence.objects.create(
+            series_code="DIRECT_SALE_INVOICE",
+            financial_year=fy,
+            prefix=f"DSI-{fy}",
+            next_number=1,
+            padding=5,
+            is_active=True,
         )
 
     def _payload(self, **line_overrides):
@@ -241,6 +253,15 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("customer", response.data)
 
+    def test_existing_customer_mode_create_succeeds_with_selected_customer_id(self):
+        payload = self._payload()
+        payload["customer_mode"] = "EXISTING"
+        payload["customer"] = self.customer.id
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = DirectSale.objects.get(pk=response.data["id"])
+        self.assertEqual(sale.customer_id, self.customer.id)
+
     def test_new_customer_mode_requires_name_and_phone(self):
         payload = self._payload()
         payload["customer"] = None
@@ -295,8 +316,39 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertIn(self.customer.id, {row["id"] for row in response.data["results"]})
 
+    def test_admin_customer_search_finds_by_gstin_when_available(self):
+        payload = self._payload()
+        payload["tax_mode"] = "GST"
+        payload["customer_gst_type"] = "REGISTERED_BUSINESS"
+        payload["customer_gstin"] = "19ABCDE1234F1Z5"
+        payload["customer_snapshot_place_of_supply"] = "WB"
+        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+
+        response = self.client.get("/api/v1/admin/customers/search/", {"q": "19ABCDE1234F1Z5"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn(self.customer.id, {row["id"] for row in response.data["results"]})
+
     def test_malformed_direct_sale_payload_returns_400_not_500(self):
         payload = self._payload()
         payload["lines"][0]["quantity"] = "invalid"
         response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+
+    def test_received_total_exceeding_grand_total_returns_400_not_500(self):
+        payload = self._payload()
+        payload["received_total"] = "999999.00"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://erp.example.com"])
+    def test_direct_sale_cors_preflight_allows_idempotency_headers(self):
+        response = self.client.options(
+            "/api/v1/billing/direct-sales/",
+            HTTP_ORIGIN="https://erp.example.com",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization,content-type,idempotency-key",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        allow_headers = (response.get("Access-Control-Allow-Headers") or "").lower()
+        self.assertIn("idempotency-key", allow_headers)
