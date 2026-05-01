@@ -338,7 +338,30 @@ def _sync_direct_sale_invoice(*, sale: DirectSale, line_payloads: list[dict]) ->
     return draft_invoice
 
 
-def _build_direct_sale_snapshots(*, customer, customer_name_snapshot, customer_phone_snapshot):
+def _build_direct_sale_snapshots(
+    *,
+    customer,
+    customer_name_snapshot,
+    customer_phone_snapshot,
+    customer_snapshot_email="",
+    customer_snapshot_billing_address_line1="",
+    customer_snapshot_billing_address_line2="",
+    customer_snapshot_city="",
+    customer_snapshot_district="",
+    customer_snapshot_state="",
+    customer_snapshot_pincode="",
+    customer_gstin=None,
+    customer_snapshot_place_of_supply="",
+    delivery_snapshot_address_line1="",
+    delivery_snapshot_address_line2="",
+    delivery_snapshot_city="",
+    delivery_snapshot_district="",
+    delivery_snapshot_state="",
+    delivery_snapshot_pincode="",
+):
+    customer_address = (getattr(customer, "address", "") or "").strip() if customer is not None else ""
+    customer_city = (getattr(customer, "city", "") or "").strip() if customer is not None else ""
+    customer_email = (getattr(getattr(customer, "user", None), "email", "") or "").strip()
     return {
         "customer_name_snapshot": (
             (customer_name_snapshot or "").strip()
@@ -348,6 +371,27 @@ def _build_direct_sale_snapshots(*, customer, customer_name_snapshot, customer_p
             (customer_phone_snapshot or "").strip()
             or getattr(customer, "phone", "")
         ),
+        "customer_snapshot_email": (customer_snapshot_email or "").strip() or customer_email,
+        "customer_snapshot_billing_address_line1": (
+            (customer_snapshot_billing_address_line1 or "").strip() or customer_address
+        ),
+        "customer_snapshot_billing_address_line2": (customer_snapshot_billing_address_line2 or "").strip(),
+        "customer_snapshot_city": (customer_snapshot_city or "").strip() or customer_city,
+        "customer_snapshot_district": (customer_snapshot_district or "").strip(),
+        "customer_snapshot_state": (customer_snapshot_state or "").strip(),
+        "customer_snapshot_pincode": (customer_snapshot_pincode or "").strip(),
+        "customer_gstin": (
+            (customer_gstin or "").strip().upper()
+            or (getattr(getattr(customer, "user", None), "gstin", "") or "").strip().upper()
+            or None
+        ),
+        "customer_snapshot_place_of_supply": (customer_snapshot_place_of_supply or "").strip(),
+        "delivery_snapshot_address_line1": (delivery_snapshot_address_line1 or "").strip(),
+        "delivery_snapshot_address_line2": (delivery_snapshot_address_line2 or "").strip(),
+        "delivery_snapshot_city": (delivery_snapshot_city or "").strip(),
+        "delivery_snapshot_district": (delivery_snapshot_district or "").strip(),
+        "delivery_snapshot_state": (delivery_snapshot_state or "").strip(),
+        "delivery_snapshot_pincode": (delivery_snapshot_pincode or "").strip(),
     }
 
 
@@ -390,6 +434,21 @@ def create_direct_sale(*, payload: dict, created_by):
             customer=customer,
             customer_name_snapshot=payload.get("customer_name_snapshot"),
             customer_phone_snapshot=payload.get("customer_phone_snapshot"),
+            customer_snapshot_email=payload.get("customer_snapshot_email"),
+            customer_snapshot_billing_address_line1=payload.get("customer_snapshot_billing_address_line1"),
+            customer_snapshot_billing_address_line2=payload.get("customer_snapshot_billing_address_line2"),
+            customer_snapshot_city=payload.get("customer_snapshot_city"),
+            customer_snapshot_district=payload.get("customer_snapshot_district"),
+            customer_snapshot_state=payload.get("customer_snapshot_state"),
+            customer_snapshot_pincode=payload.get("customer_snapshot_pincode"),
+            customer_gstin=payload.get("customer_gstin"),
+            customer_snapshot_place_of_supply=payload.get("customer_snapshot_place_of_supply"),
+            delivery_snapshot_address_line1=payload.get("delivery_snapshot_address_line1"),
+            delivery_snapshot_address_line2=payload.get("delivery_snapshot_address_line2"),
+            delivery_snapshot_city=payload.get("delivery_snapshot_city"),
+            delivery_snapshot_district=payload.get("delivery_snapshot_district"),
+            delivery_snapshot_state=payload.get("delivery_snapshot_state"),
+            delivery_snapshot_pincode=payload.get("delivery_snapshot_pincode"),
         )
     )
     sale_date = payload["sale_date"]
@@ -472,6 +531,21 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
                 customer=customer,
                 customer_name_snapshot=payload.get("customer_name_snapshot", sale.customer_name_snapshot),
                 customer_phone_snapshot=payload.get("customer_phone_snapshot", sale.customer_phone_snapshot),
+                customer_snapshot_email=payload.get("customer_snapshot_email", sale.customer_snapshot_email),
+                customer_snapshot_billing_address_line1=payload.get("customer_snapshot_billing_address_line1", sale.customer_snapshot_billing_address_line1),
+                customer_snapshot_billing_address_line2=payload.get("customer_snapshot_billing_address_line2", sale.customer_snapshot_billing_address_line2),
+                customer_snapshot_city=payload.get("customer_snapshot_city", sale.customer_snapshot_city),
+                customer_snapshot_district=payload.get("customer_snapshot_district", sale.customer_snapshot_district),
+                customer_snapshot_state=payload.get("customer_snapshot_state", sale.customer_snapshot_state),
+                customer_snapshot_pincode=payload.get("customer_snapshot_pincode", sale.customer_snapshot_pincode),
+                customer_gstin=payload.get("customer_gstin", sale.customer_gstin),
+                customer_snapshot_place_of_supply=payload.get("customer_snapshot_place_of_supply", sale.customer_snapshot_place_of_supply),
+                delivery_snapshot_address_line1=payload.get("delivery_snapshot_address_line1", sale.delivery_snapshot_address_line1),
+                delivery_snapshot_address_line2=payload.get("delivery_snapshot_address_line2", sale.delivery_snapshot_address_line2),
+                delivery_snapshot_city=payload.get("delivery_snapshot_city", sale.delivery_snapshot_city),
+                delivery_snapshot_district=payload.get("delivery_snapshot_district", sale.delivery_snapshot_district),
+                delivery_snapshot_state=payload.get("delivery_snapshot_state", sale.delivery_snapshot_state),
+                delivery_snapshot_pincode=payload.get("delivery_snapshot_pincode", sale.delivery_snapshot_pincode),
             )
         )
     payload.update(totals)

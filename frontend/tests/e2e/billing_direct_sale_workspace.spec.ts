@@ -19,8 +19,16 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await expect(page.getByRole("heading", { name: "Create Direct Sale Bill" })).toBeVisible();
   await expect(page.locator(".fixed.inset-0")).toBeVisible();
 
-  await page.getByLabel("Walk-in / Snapshot Name").fill("Smoke Walk In");
+  await expect(page.getByRole("button", { name: "Existing Customer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New Customer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Walk-in Snapshot" })).toBeVisible();
+  await page.getByRole("button", { name: "Walk-in Snapshot" }).click();
+  await page.getByLabel("Snapshot Name").fill("Smoke Walk In");
   await page.getByLabel("Phone").fill("9812345678");
+  await page.getByLabel("Tax Mode").selectOption("GST");
+  await page.getByLabel("Place of Supply / State").fill("WB");
+  await page.getByLabel("Customer GST Type").selectOption("REGISTERED_BUSINESS");
+  await page.getByLabel("GSTIN").fill("19ABCDE1234F1Z5");
   await page.getByLabel("Search Product").fill(productName);
   await expect(page.getByRole("button", { name: new RegExp(productName) }).first()).toBeVisible();
   await page.getByRole("button", { name: new RegExp(productName) }).first().click();
@@ -31,9 +39,9 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await expect(page.locator("body")).toContainText("Grand Total");
 
   await page.getByRole("button", { name: "Add Line" }).click();
-  await expect(page.getByText("Line 2")).toBeVisible();
+  await expect(page.getByText("Line 2", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Remove line 2" }).click();
-  await expect(page.getByText("Line 2")).toHaveCount(0);
+  await expect(page.getByText("Line 2", { exact: true })).toHaveCount(0);
 
   await page.getByLabel("Create purchase/stock requirement").check();
   await page.getByLabel("Required Qty").fill("1.000");

@@ -116,6 +116,15 @@ class DirectSaleStatus(models.TextChoices):
 
 
 class DirectSale(BillingTimeStampedModel):
+    class CustomerGstType(models.TextChoices):
+        UNREGISTERED_CONSUMER = "UNREGISTERED_CONSUMER", "Unregistered Consumer"
+        REGISTERED_BUSINESS = "REGISTERED_BUSINESS", "Registered Business"
+
+    class TaxCalculationMode(models.TextChoices):
+        NON_GST = "NON_GST", "Non-GST"
+        GST_INCLUSIVE = "GST_INCLUSIVE", "GST Inclusive"
+        GST_EXCLUSIVE = "GST_EXCLUSIVE", "GST Exclusive"
+
     sale_no = models.CharField(max_length=40, unique=True, null=True, blank=True, db_index=True)
     sale_date = models.DateField(db_index=True)
     financial_year = models.CharField(max_length=9, db_index=True)
@@ -157,6 +166,18 @@ class DirectSale(BillingTimeStampedModel):
         default=BillingTaxMode.NON_GST,
         db_index=True,
     )
+    tax_calculation_mode = models.CharField(
+        max_length=20,
+        choices=TaxCalculationMode.choices,
+        default=TaxCalculationMode.NON_GST,
+        db_index=True,
+    )
+    customer_gst_type = models.CharField(
+        max_length=32,
+        choices=CustomerGstType.choices,
+        default=CustomerGstType.UNREGISTERED_CONSUMER,
+        db_index=True,
+    )
     finance_account = models.ForeignKey(
         FinanceAccount,
         on_delete=models.PROTECT,
@@ -185,7 +206,21 @@ class DirectSale(BillingTimeStampedModel):
     balance_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     customer_name_snapshot = models.CharField(max_length=160, blank=True, default="")
     customer_phone_snapshot = models.CharField(max_length=20, blank=True, default="")
+    customer_snapshot_email = models.EmailField(blank=True, default="")
+    customer_snapshot_billing_address_line1 = models.CharField(max_length=255, blank=True, default="")
+    customer_snapshot_billing_address_line2 = models.CharField(max_length=255, blank=True, default="")
+    customer_snapshot_city = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_district = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_state = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
     customer_gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    customer_snapshot_place_of_supply = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_address_line1 = models.CharField(max_length=255, blank=True, default="")
+    delivery_snapshot_address_line2 = models.CharField(max_length=255, blank=True, default="")
+    delivery_snapshot_city = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_district = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_state = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
     idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     notes = models.TextField(blank=True, default="")
@@ -238,7 +273,21 @@ class DirectSale(BillingTimeStampedModel):
         self.delivery_reference = (self.delivery_reference or "").strip().upper()
         self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
         self.customer_phone_snapshot = (self.customer_phone_snapshot or "").strip()
+        self.customer_snapshot_email = (self.customer_snapshot_email or "").strip()
+        self.customer_snapshot_billing_address_line1 = (self.customer_snapshot_billing_address_line1 or "").strip()
+        self.customer_snapshot_billing_address_line2 = (self.customer_snapshot_billing_address_line2 or "").strip()
+        self.customer_snapshot_city = (self.customer_snapshot_city or "").strip()
+        self.customer_snapshot_district = (self.customer_snapshot_district or "").strip()
+        self.customer_snapshot_state = (self.customer_snapshot_state or "").strip()
+        self.customer_snapshot_pincode = (self.customer_snapshot_pincode or "").strip()
         self.customer_gstin = (self.customer_gstin or "").strip().upper() or None
+        self.customer_snapshot_place_of_supply = (self.customer_snapshot_place_of_supply or "").strip()
+        self.delivery_snapshot_address_line1 = (self.delivery_snapshot_address_line1 or "").strip()
+        self.delivery_snapshot_address_line2 = (self.delivery_snapshot_address_line2 or "").strip()
+        self.delivery_snapshot_city = (self.delivery_snapshot_city or "").strip()
+        self.delivery_snapshot_district = (self.delivery_snapshot_district or "").strip()
+        self.delivery_snapshot_state = (self.delivery_snapshot_state or "").strip()
+        self.delivery_snapshot_pincode = (self.delivery_snapshot_pincode or "").strip()
         self.idempotency_key = (self.idempotency_key or "").strip() or None
         self.idempotency_payload_hash = (self.idempotency_payload_hash or "").strip()
         self.notes = (self.notes or "").strip()

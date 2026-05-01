@@ -52,15 +52,37 @@ type DraftLine = {
 
 type FormState = {
   sale_date: string;
+  customer_mode: "EXISTING" | "NEW" | "WALK_IN";
+  walkin_create_customer_profile: boolean;
   customer_id: string;
   customer_name_snapshot: string;
   customer_phone_snapshot: string;
+  customer_snapshot_email: string;
+  customer_snapshot_billing_address_line1: string;
+  customer_snapshot_billing_address_line2: string;
+  customer_snapshot_city: string;
+  customer_snapshot_district: string;
+  customer_snapshot_state: string;
+  customer_snapshot_pincode: string;
   customer_gstin: string;
+  customer_gst_type: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
+  customer_snapshot_place_of_supply: string;
   tax_mode: "GST" | "NON_GST";
+  tax_calculation_mode: "NON_GST" | "GST_INCLUSIVE" | "GST_EXCLUSIVE";
   finance_account: string;
   delivery_required: boolean;
+  delivery_snapshot_address_line1: string;
+  delivery_snapshot_address_line2: string;
+  delivery_snapshot_city: string;
+  delivery_snapshot_district: string;
+  delivery_snapshot_state: string;
+  delivery_snapshot_pincode: string;
   received_total: string;
   notes: string;
+  terms: string;
+  new_customer_name: string;
+  new_customer_phone: string;
+  new_customer_email: string;
 };
 
 type LineTotals = {
@@ -185,15 +207,37 @@ export default function DirectSaleWorkspace() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
   const [form, setForm] = useState<FormState>({
     sale_date: todayIso(),
+    customer_mode: "EXISTING",
+    walkin_create_customer_profile: false,
     customer_id: "",
     customer_name_snapshot: "",
     customer_phone_snapshot: "",
+    customer_snapshot_email: "",
+    customer_snapshot_billing_address_line1: "",
+    customer_snapshot_billing_address_line2: "",
+    customer_snapshot_city: "",
+    customer_snapshot_district: "",
+    customer_snapshot_state: "",
+    customer_snapshot_pincode: "",
     customer_gstin: "",
+    customer_gst_type: "UNREGISTERED_CONSUMER",
+    customer_snapshot_place_of_supply: "",
     tax_mode: "NON_GST",
+    tax_calculation_mode: "NON_GST",
     finance_account: "",
     delivery_required: false,
+    delivery_snapshot_address_line1: "",
+    delivery_snapshot_address_line2: "",
+    delivery_snapshot_city: "",
+    delivery_snapshot_district: "",
+    delivery_snapshot_state: "",
+    delivery_snapshot_pincode: "",
     received_total: "0.00",
     notes: "",
+    terms: "",
+    new_customer_name: "",
+    new_customer_phone: "",
+    new_customer_email: "",
   });
   const [lines, setLines] = useState<DraftLine[]>([makeLine()]);
   const lineSearchTimers = useRef<Record<string, number>>({});
@@ -331,15 +375,37 @@ export default function DirectSaleWorkspace() {
     setCustomerResults([]);
     setForm({
       sale_date: todayIso(),
+      customer_mode: "EXISTING",
+      walkin_create_customer_profile: false,
       customer_id: "",
       customer_name_snapshot: "",
       customer_phone_snapshot: "",
+      customer_snapshot_email: "",
+      customer_snapshot_billing_address_line1: "",
+      customer_snapshot_billing_address_line2: "",
+      customer_snapshot_city: "",
+      customer_snapshot_district: "",
+      customer_snapshot_state: "",
+      customer_snapshot_pincode: "",
       customer_gstin: "",
+      customer_gst_type: "UNREGISTERED_CONSUMER",
+      customer_snapshot_place_of_supply: "",
       tax_mode: "NON_GST",
+      tax_calculation_mode: "NON_GST",
       finance_account: "",
       delivery_required: false,
+      delivery_snapshot_address_line1: "",
+      delivery_snapshot_address_line2: "",
+      delivery_snapshot_city: "",
+      delivery_snapshot_district: "",
+      delivery_snapshot_state: "",
+      delivery_snapshot_pincode: "",
       received_total: "0.00",
       notes: "",
+      terms: "",
+      new_customer_name: "",
+      new_customer_phone: "",
+      new_customer_email: "",
     });
     setLines([makeLine()]);
     setValidationErrors([]);
@@ -388,9 +454,13 @@ export default function DirectSaleWorkspace() {
     setCustomerResults([]);
     setForm((current) => ({
       ...current,
+      customer_mode: "EXISTING",
       customer_id: String(customer.id),
       customer_name_snapshot: customer.name || current.customer_name_snapshot,
       customer_phone_snapshot: customer.phone || current.customer_phone_snapshot,
+      customer_snapshot_email: customer.email || current.customer_snapshot_email,
+      customer_snapshot_billing_address_line1: customer.address || current.customer_snapshot_billing_address_line1,
+      customer_snapshot_city: customer.city || current.customer_snapshot_city,
     }));
   }
 
@@ -452,6 +522,20 @@ export default function DirectSaleWorkspace() {
     if (!form.customer_id && !form.customer_name_snapshot.trim()) {
       next.push("Walk-in customer name or registered customer is required.");
     }
+    if (form.customer_mode === "NEW") {
+      if (!form.new_customer_name.trim()) next.push("New customer full name is required.");
+      if (!normalizePhone(form.new_customer_phone)) next.push("New customer phone is required.");
+    }
+    if (form.tax_mode === "GST" && !form.customer_snapshot_place_of_supply.trim()) {
+      next.push("Place of supply is required for GST invoices.");
+    }
+    if (
+      form.tax_mode === "GST" &&
+      form.customer_gst_type === "REGISTERED_BUSINESS" &&
+      !form.customer_gstin.trim()
+    ) {
+      next.push("GSTIN is required for registered business GST invoices.");
+    }
     if (!form.customer_id && !normalizePhone(form.customer_phone_snapshot)) {
       next.push("Walk-in customer phone is required.");
     }
@@ -492,12 +576,41 @@ export default function DirectSaleWorkspace() {
       const payload = {
         sale_date: form.sale_date,
         customer: form.customer_id ? Number(form.customer_id) : null,
+        customer_mode: form.customer_mode,
+        walkin_create_customer_profile: form.walkin_create_customer_profile,
+        new_customer_name: form.new_customer_name.trim(),
+        new_customer_phone: normalizePhone(form.new_customer_phone),
+        new_customer_email: form.new_customer_email.trim(),
+        new_customer_billing_address_line1: form.customer_snapshot_billing_address_line1.trim(),
+        new_customer_billing_address_line2: form.customer_snapshot_billing_address_line2.trim(),
+        new_customer_city: form.customer_snapshot_city.trim(),
+        new_customer_district: form.customer_snapshot_district.trim(),
+        new_customer_state: form.customer_snapshot_state.trim(),
+        new_customer_pincode: form.customer_snapshot_pincode.trim(),
+        new_customer_gstin: form.customer_gstin.trim(),
+        new_customer_type: form.customer_gst_type,
         tax_mode: form.tax_mode,
+        tax_calculation_mode: form.tax_calculation_mode,
+        customer_gst_type: form.customer_gst_type,
         finance_account: form.finance_account ? Number(form.finance_account) : null,
         delivery_required: form.delivery_required,
         customer_name_snapshot: form.customer_name_snapshot.trim(),
         customer_phone_snapshot: normalizePhone(form.customer_phone_snapshot),
+        customer_snapshot_email: form.customer_snapshot_email.trim(),
+        customer_snapshot_billing_address_line1: form.customer_snapshot_billing_address_line1.trim(),
+        customer_snapshot_billing_address_line2: form.customer_snapshot_billing_address_line2.trim(),
+        customer_snapshot_city: form.customer_snapshot_city.trim(),
+        customer_snapshot_district: form.customer_snapshot_district.trim(),
+        customer_snapshot_state: form.customer_snapshot_state.trim(),
+        customer_snapshot_pincode: form.customer_snapshot_pincode.trim(),
         customer_gstin: form.customer_gstin.trim() || null,
+        customer_snapshot_place_of_supply: form.customer_snapshot_place_of_supply.trim(),
+        delivery_snapshot_address_line1: form.delivery_snapshot_address_line1.trim(),
+        delivery_snapshot_address_line2: form.delivery_snapshot_address_line2.trim(),
+        delivery_snapshot_city: form.delivery_snapshot_city.trim(),
+        delivery_snapshot_district: form.delivery_snapshot_district.trim(),
+        delivery_snapshot_state: form.delivery_snapshot_state.trim(),
+        delivery_snapshot_pincode: form.delivery_snapshot_pincode.trim(),
         subtotal: money(totals.subtotal),
         discount_total: money(totals.discount),
         taxable_total: money(totals.taxable),
@@ -506,6 +619,7 @@ export default function DirectSaleWorkspace() {
         received_total: money(totals.received),
         balance_total: money(totals.balance),
         notes: form.notes.trim(),
+        terms: form.terms.trim(),
         lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
       };
       const created = await createDirectSale(payload, {
@@ -663,8 +777,35 @@ export default function DirectSaleWorkspace() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       Registered customer links this bill to profile history. Walk-in customer stores only bill snapshot.
                     </p>
+                    <div className="mt-3 inline-flex rounded-lg border border-border bg-background p-1">
+                      {[
+                        ["EXISTING", "Existing Customer"],
+                        ["NEW", "New Customer"],
+                        ["WALK_IN", "Walk-in Snapshot"],
+                      ].map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              customer_mode: value as FormState["customer_mode"],
+                              customer_id: value === "EXISTING" ? current.customer_id : "",
+                            }))
+                          }
+                          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                            form.customer_mode === value
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                      <div className="relative">
+                      {form.customer_mode === "EXISTING" ? (
+                      <div className="relative lg:col-span-2">
                         <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="direct-sale-customer-search">
                           Search Existing Customer
                         </label>
@@ -701,9 +842,39 @@ export default function DirectSaleWorkspace() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      ) : null}
+                      <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+                        {form.customer_mode === "NEW" ? (
+                          <>
+                            <label className="grid gap-2 text-sm">
+                              <span className="font-medium text-foreground">New Customer Full Name</span>
+                              <input
+                                value={form.new_customer_name}
+                                onChange={(event) =>
+                                  setForm((current) => ({ ...current, new_customer_name: event.target.value }))
+                                }
+                                disabled={submitting}
+                                className={FIELD_CLASS}
+                              />
+                            </label>
+                            <label className="grid gap-2 text-sm">
+                              <span className="font-medium text-foreground">New Customer Phone</span>
+                              <input
+                                value={form.new_customer_phone}
+                                onChange={(event) =>
+                                  setForm((current) => ({
+                                    ...current,
+                                    new_customer_phone: normalizePhone(event.target.value),
+                                  }))
+                                }
+                                disabled={submitting}
+                                className={FIELD_CLASS}
+                              />
+                            </label>
+                          </>
+                        ) : null}
                         <label className="grid gap-2 text-sm">
-                          <span className="font-medium text-foreground">Walk-in / Snapshot Name</span>
+                          <span className="font-medium text-foreground">Snapshot Name</span>
                           <input
                             value={form.customer_name_snapshot}
                             onChange={(event) =>
@@ -727,6 +898,70 @@ export default function DirectSaleWorkspace() {
                             className={FIELD_CLASS}
                           />
                         </label>
+                        <label className="grid gap-2 text-sm sm:col-span-2">
+                          <span className="font-medium text-foreground">Email</span>
+                          <input
+                            value={form.customer_snapshot_email}
+                            onChange={(event) =>
+                              setForm((current) => ({ ...current, customer_snapshot_email: event.target.value }))
+                            }
+                            disabled={submitting}
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-2 text-sm sm:col-span-2">
+                          <span className="font-medium text-foreground">Billing Address Line 1</span>
+                          <input
+                            value={form.customer_snapshot_billing_address_line1}
+                            onChange={(event) =>
+                              setForm((current) => ({ ...current, customer_snapshot_billing_address_line1: event.target.value }))
+                            }
+                            disabled={submitting}
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-2 text-sm sm:col-span-2">
+                          <span className="font-medium text-foreground">Billing Address Line 2</span>
+                          <input
+                            value={form.customer_snapshot_billing_address_line2}
+                            onChange={(event) =>
+                              setForm((current) => ({ ...current, customer_snapshot_billing_address_line2: event.target.value }))
+                            }
+                            disabled={submitting}
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-foreground">City</span>
+                          <input value={form.customer_snapshot_city} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_city: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-foreground">District</span>
+                          <input value={form.customer_snapshot_district} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_district: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-foreground">State</span>
+                          <input value={form.customer_snapshot_state} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_state: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-foreground">Pincode</span>
+                          <input value={form.customer_snapshot_pincode} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_pincode: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
+                        </label>
+                        {form.customer_mode === "WALK_IN" ? (
+                          <label className="sm:col-span-2 flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={form.walkin_create_customer_profile}
+                              onChange={(event) =>
+                                setForm((current) => ({
+                                  ...current,
+                                  walkin_create_customer_profile: event.target.checked,
+                                }))
+                              }
+                            />
+                            Create customer profile from walk-in snapshot
+                          </label>
+                        ) : null}
                       </div>
                     </div>
                     {selectedCustomer ? (
@@ -764,6 +999,41 @@ export default function DirectSaleWorkspace() {
                         </select>
                       </label>
                       <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Tax Calculation</span>
+                        <select
+                          value={form.tax_calculation_mode}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              tax_calculation_mode: event.target.value as FormState["tax_calculation_mode"],
+                            }))
+                          }
+                          disabled={submitting}
+                          className={FIELD_CLASS}
+                        >
+                          <option value="NON_GST">Non-GST</option>
+                          <option value="GST_INCLUSIVE">GST Inclusive</option>
+                          <option value="GST_EXCLUSIVE">GST Exclusive</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Customer GST Type</span>
+                        <select
+                          value={form.customer_gst_type}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              customer_gst_type: event.target.value as FormState["customer_gst_type"],
+                            }))
+                          }
+                          disabled={submitting}
+                          className={FIELD_CLASS}
+                        >
+                          <option value="UNREGISTERED_CONSUMER">Unregistered Consumer</option>
+                          <option value="REGISTERED_BUSINESS">Registered Business</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-sm">
                         <span className="font-medium text-foreground">Finance Account</span>
                         <select
                           value={form.finance_account}
@@ -789,6 +1059,37 @@ export default function DirectSaleWorkspace() {
                         Delivery required
                       </label>
                     </div>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">GSTIN</span>
+                        <input
+                          value={form.customer_gstin}
+                          onChange={(event) => setForm((current) => ({ ...current, customer_gstin: event.target.value.toUpperCase() }))}
+                          disabled={submitting || form.tax_mode !== "GST"}
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Place of Supply / State</span>
+                        <input
+                          value={form.customer_snapshot_place_of_supply}
+                          onChange={(event) =>
+                            setForm((current) => ({ ...current, customer_snapshot_place_of_supply: event.target.value }))
+                          }
+                          disabled={submitting || form.tax_mode !== "GST"}
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Terms & Conditions</span>
+                        <input
+                          value={form.terms}
+                          onChange={(event) => setForm((current) => ({ ...current, terms: event.target.value }))}
+                          disabled={submitting}
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                    </div>
                     <label className="mt-4 grid gap-2 text-sm">
                       <span className="font-medium text-foreground">Notes</span>
                       <textarea
@@ -802,6 +1103,11 @@ export default function DirectSaleWorkspace() {
                     <p className="mt-2 text-xs text-muted-foreground">
                       Discount applies per bill line only. Product base price remains canonical in product master.
                     </p>
+                    {form.tax_calculation_mode !== "NON_GST" ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        GST inclusive/exclusive display is enabled; backend currently preserves existing GST amount fields and validations.
+                      </p>
+                    ) : null}
                   </section>
 
                   <section className="rounded-lg border border-border bg-card p-4">

@@ -191,3 +191,51 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(subscription.total_amount, Decimal("12000.00"))
         self.assertEqual(subscription.monthly_amount, Decimal("800.00"))
         self.assertEqual(subscription.product_id, self.product.id)
+
+    def test_walkin_snapshot_can_create_without_customer_link(self):
+        payload = self._payload()
+        payload["customer"] = None
+        payload["customer_mode"] = "WALK_IN"
+        payload["customer_name_snapshot"] = "Walk In Snapshot User"
+        payload["customer_phone_snapshot"] = "9000000001"
+        payload["customer_snapshot_billing_address_line1"] = "Market Road"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = DirectSale.objects.get(pk=response.data["id"])
+        self.assertIsNone(sale.customer_id)
+        self.assertEqual(sale.customer_name_snapshot, "Walk In Snapshot User")
+        self.assertEqual(sale.customer_snapshot_billing_address_line1, "Market Road")
+
+    def test_new_customer_mode_creates_profile_and_links_sale(self):
+        payload = self._payload()
+        payload["customer"] = None
+        payload["customer_mode"] = "NEW"
+        payload["new_customer_name"] = "Billing New Customer"
+        payload["new_customer_phone"] = "9000000011"
+        payload["new_customer_email"] = "billing.new@example.com"
+        payload["new_customer_billing_address_line1"] = "New Street 10"
+        payload["new_customer_city"] = "Asansol"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = DirectSale.objects.select_related("customer", "customer__user").get(pk=response.data["id"])
+        self.assertIsNotNone(sale.customer_id)
+        self.assertEqual(sale.customer.name, "Billing New Customer")
+        self.assertFalse(sale.customer.user.has_usable_password())
+
+    def test_gst_registered_business_requires_gstin(self):
+        payload = self._payload()
+        payload["tax_mode"] = "GST"
+        payload["customer_gst_type"] = "REGISTERED_BUSINESS"
+        payload["customer_gstin"] = ""
+        payload["customer_snapshot_place_of_supply"] = "WB"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("customer_gstin", response.data)
+
+    def test_non_gst_allows_without_gstin(self):
+        payload = self._payload()
+        payload["tax_mode"] = "NON_GST"
+        payload["customer_gst_type"] = "UNREGISTERED_CONSUMER"
+        payload["customer_gstin"] = ""
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

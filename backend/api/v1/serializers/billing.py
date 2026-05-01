@@ -29,6 +29,11 @@ from billing.services.billing_service import (
     create_direct_sale,
     update_direct_sale,
 )
+from accounts.services.password_reset_service import (
+    PasswordResetServiceError,
+    create_password_reset_request,
+)
+from subscriptions.services.customer_service import find_or_create_customer
 
 
 def _money(value) -> Decimal:
@@ -249,6 +254,29 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     billing_invoice_id = serializers.SerializerMethodField()
     billing_invoice_no = serializers.SerializerMethodField()
     billing_invoice_status = serializers.SerializerMethodField()
+    customer_mode = serializers.ChoiceField(
+        choices=[("EXISTING", "Existing Customer"), ("NEW", "New Customer"), ("WALK_IN", "Walk-in Snapshot")],
+        required=False,
+        write_only=True,
+        default="EXISTING",
+    )
+    walkin_create_customer_profile = serializers.BooleanField(required=False, write_only=True, default=False)
+    new_customer_name = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_phone = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+    new_customer_billing_address_line1 = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_billing_address_line2 = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_city = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_district = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_state = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_pincode = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_gstin = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    new_customer_type = serializers.ChoiceField(
+        choices=[("UNREGISTERED_CONSUMER", "Unregistered Consumer"), ("REGISTERED_BUSINESS", "Registered Business")],
+        required=False,
+        write_only=True,
+    )
+    terms = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     class Meta:
         model = DirectSale
@@ -269,6 +297,8 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "cash_counter_name",
             "status",
             "tax_mode",
+            "tax_calculation_mode",
+            "customer_gst_type",
             "finance_account",
             "finance_account_name",
             "delivery_required",
@@ -287,11 +317,39 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "balance_total",
             "customer_name_snapshot",
             "customer_phone_snapshot",
+            "customer_snapshot_email",
+            "customer_snapshot_billing_address_line1",
+            "customer_snapshot_billing_address_line2",
+            "customer_snapshot_city",
+            "customer_snapshot_district",
+            "customer_snapshot_state",
+            "customer_snapshot_pincode",
             "customer_gstin",
+            "customer_snapshot_place_of_supply",
+            "delivery_snapshot_address_line1",
+            "delivery_snapshot_address_line2",
+            "delivery_snapshot_city",
+            "delivery_snapshot_district",
+            "delivery_snapshot_state",
+            "delivery_snapshot_pincode",
             "notes",
             "billing_invoice_id",
             "billing_invoice_no",
             "billing_invoice_status",
+            "customer_mode",
+            "walkin_create_customer_profile",
+            "new_customer_name",
+            "new_customer_phone",
+            "new_customer_email",
+            "new_customer_billing_address_line1",
+            "new_customer_billing_address_line2",
+            "new_customer_city",
+            "new_customer_district",
+            "new_customer_state",
+            "new_customer_pincode",
+            "new_customer_gstin",
+            "new_customer_type",
+            "terms",
             "lines",
             "created_at",
             "updated_at",
@@ -323,20 +381,93 @@ class DirectSaleSerializer(serializers.ModelSerializer):
                 "Only draft, confirmed, or delivered direct sales can be edited."
             )
         _validate_invoice_lines(attrs.get("lines") or [], attrs)
+        tax_mode = attrs.get("tax_mode") or getattr(instance, "tax_mode", "NON_GST")
+        customer_gst_type = attrs.get("customer_gst_type") or getattr(
+            instance, "customer_gst_type", "UNREGISTERED_CONSUMER"
+        )
+        gstin = (attrs.get("customer_gstin") or "").strip()
+        place_of_supply = (attrs.get("customer_snapshot_place_of_supply") or "").strip()
+        if tax_mode == "GST" and customer_gst_type == "REGISTERED_BUSINESS" and not gstin:
+            raise serializers.ValidationError(
+                {"customer_gstin": "GSTIN is required for registered business GST invoices."}
+            )
+        if tax_mode == "GST" and not place_of_supply:
+            raise serializers.ValidationError(
+                {"customer_snapshot_place_of_supply": "Place of supply is required for GST invoices."}
+            )
         return attrs
 
     def create(self, validated_data):
+        self._resolve_customer_mode(validated_data)
         return create_direct_sale(
             payload=validated_data,
             created_by=self.context["request"].user,
         )
 
     def update(self, instance, validated_data):
+        self._resolve_customer_mode(validated_data)
         return update_direct_sale(
             direct_sale_id=instance.id,
             payload=validated_data,
             updated_by=self.context["request"].user,
         )
+
+    def _resolve_customer_mode(self, validated_data: dict) -> None:
+        request = self.context["request"]
+        customer_mode = validated_data.pop("customer_mode", "EXISTING")
+        walkin_create_customer_profile = bool(validated_data.pop("walkin_create_customer_profile", False))
+        new_customer_name = (validated_data.pop("new_customer_name", "") or "").strip()
+        new_customer_phone = (validated_data.pop("new_customer_phone", "") or "").strip()
+        new_customer_email = (validated_data.pop("new_customer_email", "") or "").strip()
+        new_customer_address1 = (validated_data.pop("new_customer_billing_address_line1", "") or "").strip()
+        validated_data.pop("new_customer_billing_address_line2", "")
+        new_customer_city = (validated_data.pop("new_customer_city", "") or "").strip()
+        validated_data.pop("new_customer_district", "")
+        validated_data.pop("new_customer_state", "")
+        validated_data.pop("new_customer_pincode", "")
+        new_customer_gstin = (validated_data.pop("new_customer_gstin", "") or "").strip()
+        validated_data.pop("terms", "")
+        new_customer_type = (
+            validated_data.pop("new_customer_type", "")
+            or validated_data.get("customer_gst_type")
+            or "UNREGISTERED_CONSUMER"
+        )
+        if new_customer_type:
+            validated_data["customer_gst_type"] = new_customer_type
+
+        if customer_mode == "NEW" or (customer_mode == "WALK_IN" and walkin_create_customer_profile):
+            if not new_customer_name or not new_customer_phone:
+                raise serializers.ValidationError(
+                    {"detail": "New customer mode requires at least full name and phone."}
+                )
+            customer, created = find_or_create_customer(
+                name=new_customer_name,
+                phone=new_customer_phone,
+                email=new_customer_email,
+                address=new_customer_address1,
+                city=new_customer_city,
+                created_by=request.user,
+            )
+            validated_data["customer"] = customer
+            validated_data["customer_name_snapshot"] = customer.name
+            validated_data["customer_phone_snapshot"] = customer.phone
+            validated_data["customer_snapshot_email"] = new_customer_email or (customer.user.email or "")
+            validated_data["customer_snapshot_billing_address_line1"] = new_customer_address1 or customer.address
+            validated_data["customer_snapshot_city"] = new_customer_city or customer.city
+            if new_customer_gstin:
+                validated_data["customer_gstin"] = new_customer_gstin.upper()
+
+            if created:
+                customer.user.set_unusable_password()
+                customer.user.save(update_fields=["password"])
+                identifier = (customer.user.email or customer.phone or customer.user.username or "").strip()
+                if identifier:
+                    try:
+                        create_password_reset_request(identifier=identifier)
+                    except (PasswordResetServiceError, ValueError):
+                        pass
+        elif customer_mode == "WALK_IN":
+            validated_data["customer"] = None
 
     def _latest_invoice(self, obj):
         if hasattr(obj, "_latest_invoice_cache"):
