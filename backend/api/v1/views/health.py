@@ -1,14 +1,19 @@
 import logging
 import time
+from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.executor import MigrationExecutor
 from django.db.utils import OperationalError, ProgrammingError
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from system_jobs.models import SystemJobLog
 
 logger = logging.getLogger("api.health")
 
@@ -102,6 +107,69 @@ def _migration_check(alias: str) -> tuple[bool, dict]:
     }
 
 
+def _cache_check() -> tuple[bool, dict]:
+    probe_key = "health:cache:probe"
+    probe_value = str(time.time())
+    try:
+        cache.set(probe_key, probe_value, timeout=30)
+        echoed = cache.get(probe_key)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Readiness cache check failed", exc_info=True)
+        return False, {"status": "error", "error": _serialize_exception(exc)}
+    if echoed != probe_value:
+        return False, {"status": "error", "error": "cache_echo_mismatch"}
+    return True, {"status": "ok"}
+
+
+def _worker_heartbeat_check() -> tuple[bool, dict]:
+    broker = (getattr(settings, "CELERY_BROKER_URL", "") or "").strip()
+    jobs_enabled = bool(broker)
+    if not jobs_enabled:
+        return True, {"status": "skipped", "reason": "background_jobs_disabled"}
+
+    latest = (
+        SystemJobLog.objects.exclude(started_at__isnull=True)
+        .order_by("-started_at")
+        .values("id", "job_type", "status", "started_at")
+        .first()
+    )
+    if not latest:
+        return False, {"status": "error", "error": "no_worker_heartbeat"}
+
+    max_age = int(getattr(settings, "HEALTHCHECK_WORKER_HEARTBEAT_SECONDS", 900))
+    age_seconds = int((timezone.now() - latest["started_at"]).total_seconds())
+    if age_seconds > max_age:
+        return False, {
+            "status": "stale",
+            "max_age_seconds": max_age,
+            "age_seconds": age_seconds,
+            "last_job_type": latest["job_type"],
+            "last_status": latest["status"],
+        }
+    return True, {
+        "status": "ok",
+        "max_age_seconds": max_age,
+        "age_seconds": age_seconds,
+        "last_job_type": latest["job_type"],
+        "last_status": latest["status"],
+    }
+
+
+def _storage_writable_check() -> tuple[bool, dict]:
+    root = Path(getattr(settings, "MEDIA_ROOT", ""))
+    if not root:
+        return False, {"status": "error", "error": "media_root_not_configured"}
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        probe = root / ".health-write-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Readiness storage check failed", exc_info=True)
+        return False, {"status": "error", "path": str(root), "error": _serialize_exception(exc)}
+    return True, {"status": "ok", "path": str(root)}
+
+
 class PublicLivenessView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -147,4 +215,50 @@ class PublicReadinessView(APIView):
                 },
             },
             status=response_status,
+        )
+
+
+class PublicApiHealthView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(
+            {
+                "status": "ok",
+                "service": "subidha-advance-emi-backend",
+                "api": "v1",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PublicApiDeepHealthView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        alias = _db_alias()
+        checks: dict[str, dict] = {}
+
+        db_ok, checks["database"] = _database_check(alias)
+        if db_ok:
+            migrations_ok, checks["migrations"] = _migration_check(alias)
+        else:
+            migrations_ok, checks["migrations"] = False, {
+                "status": "skipped",
+                "reason": "database_check_failed",
+            }
+        cache_ok, checks["cache"] = _cache_check()
+        worker_ok, checks["worker_heartbeat"] = _worker_heartbeat_check()
+        storage_ok, checks["storage_writable"] = _storage_writable_check()
+
+        healthy = db_ok and migrations_ok and cache_ok and worker_ok and storage_ok
+        return Response(
+            {
+                "status": "healthy" if healthy else "degraded",
+                "service": "subidha-advance-emi-backend",
+                "checks": checks,
+            },
+            status=status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
         )

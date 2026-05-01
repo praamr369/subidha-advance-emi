@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import logging
 
 from accounting.models import FinanceAccount
 from accounting.services.bridge_posting_service import post_bridge_entry
@@ -11,6 +12,7 @@ from subscriptions.models import BusinessEventType
 from subscriptions.models import FinancialLedger
 from subscriptions.services.business_event_service import append_business_event
 
+finance_logger = logging.getLogger("finance.events")
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
@@ -111,6 +113,16 @@ class FinancePostingService:
             journal_group=journal_group,
             posting_side="CREDIT",
             posting_status="POSTED",
+        )
+        finance_logger.info(
+            "finance.ledger_posted",
+            extra={
+                "entry_id": getattr(entry, "id", None),
+                "journal_group_id": journal_group.id,
+                "payment_id": payment.id,
+                "subscription_id": payment.subscription_id,
+                "performed_by_user_id": getattr(performed_by, "id", None),
+            },
         )
         return entry
 

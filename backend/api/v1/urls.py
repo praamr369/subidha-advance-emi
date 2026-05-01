@@ -1,6 +1,10 @@
 from django.urls import path, include
 
+from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
+
 urlpatterns = [
+    path("health/", PublicApiHealthView.as_view()),
+    path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/", include("api.v1.routes.admin")),
     path("branch-control/", include("api.v1.routes.branch_control")),

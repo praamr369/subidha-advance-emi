@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -40,6 +41,8 @@ from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
 from services.payments.allocate_payment import allocate_payment
+
+finance_logger = logging.getLogger("finance.events")
 
 
 def _to_decimal(value) -> Decimal:
@@ -583,6 +586,18 @@ def record_emi_payment(
         finance_account=finance_account,
         performed_by=collected_by,
     )
+    finance_logger.info(
+        "finance.payment_posted",
+        extra={
+            "payment_id": payment.id,
+            "subscription_id": subscription.id,
+            "emi_id": emi.id,
+            "amount": str(amount),
+            "method": method,
+            "finance_account_id": finance_account.id,
+            "collected_by_user_id": getattr(collected_by, "id", None),
+        },
+    )
     reconciliation = _upsert_payment_reconciliation(
         payment=payment,
         expected_amount=outstanding_before,
@@ -793,6 +808,17 @@ def reverse_payment_for_admin(
         source_model="Payment",
         source_id=payment.id,
         event_type="PAYMENT_REVERSED",
+    )
+    finance_logger.info(
+        "finance.payment_reversed",
+        extra={
+            "payment_id": payment.id,
+            "subscription_id": subscription.id,
+            "emi_id": emi.id,
+            "amount": str(payment.amount),
+            "reason": reason or "",
+            "reversed_by_user_id": getattr(reversed_by, "id", None),
+        },
     )
 
     return {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from rest_framework import permissions, serializers, status
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
@@ -14,6 +15,8 @@ from subscriptions.services.reports_center_export_service import (
     build_reports_center_pdf_summary_response,
 )
 from subscriptions.services.reports_center_service import REPORT_KEYS, get_reports_center_catalog, run_report
+
+security_logger = logging.getLogger("security.events")
 
 
 class _ReportsExportCsvFormatRenderer(BaseRenderer):
@@ -76,6 +79,15 @@ class AdminReportsCenterExportView(APIView):
 
     def get(self, request, report_key: str):
         if not user_has_capability(request.user, "reports.export"):
+            security_logger.warning(
+                "security.permission_denied",
+                extra={
+                    "capability_code": "reports.export",
+                    "user_id": getattr(request.user, "id", None),
+                    "path": getattr(request, "path", ""),
+                    "method": getattr(request, "method", ""),
+                },
+            )
             raise PermissionDenied(detail="Capability 'reports.export' is required for this action.")
         normalized = (report_key or "").strip().lower()
         if normalized not in REPORT_KEYS:

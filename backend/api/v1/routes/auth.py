@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from accounts.serializers import CustomTokenSerializer
+from api.v1.throttles.auth_password_reset import AuthLoginThrottle
 from api.v1.views.auth_password_reset import (
     confirm_password_reset_view,
     request_password_reset,
@@ -13,6 +14,7 @@ from api.v1.views.user import MeView
 
 class CustomTokenView(TokenObtainPairView):
     serializer_class = CustomTokenSerializer
+    throttle_classes = [AuthLoginThrottle]
 
 
 urlpatterns = [

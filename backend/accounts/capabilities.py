@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import wraps
 
 from rest_framework.exceptions import PermissionDenied
@@ -38,6 +39,7 @@ ROLE_CAPABILITY_FALLBACKS: dict[str, set[str]] = {
     },
     UserRole.CUSTOMER: set(),
 }
+security_logger = logging.getLogger("security.events")
 
 
 def user_has_capability(user, capability_code: str) -> bool:
@@ -91,6 +93,15 @@ def require_capability(capability_code: str):
         @wraps(func)
         def wrapper(view_self, request, *args, **kwargs):
             if not user_has_capability(request.user, normalized_code):
+                security_logger.warning(
+                    "security.permission_denied",
+                    extra={
+                        "capability_code": normalized_code,
+                        "user_id": getattr(request.user, "id", None),
+                        "path": getattr(request, "path", ""),
+                        "method": getattr(request, "method", ""),
+                    },
+                )
                 raise PermissionDenied(
                     detail=f"Capability '{normalized_code}' is required for this action."
                 )
@@ -108,6 +119,15 @@ class CapabilityRequiredMixin:
         super().initial(request, *args, **kwargs)
         capability_code = (self.required_capability_code or "").strip().lower()
         if capability_code and not user_has_capability(request.user, capability_code):
+            security_logger.warning(
+                "security.permission_denied",
+                extra={
+                    "capability_code": capability_code,
+                    "user_id": getattr(request.user, "id", None),
+                    "path": getattr(request, "path", ""),
+                    "method": getattr(request, "method", ""),
+                },
+            )
             raise PermissionDenied(
                 detail=f"Capability '{capability_code}' is required for this action."
             )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -25,6 +26,8 @@ from subscriptions.services.audit_service import log_audit
 from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
+
+finance_logger = logging.getLogger("finance.events")
 
 
 WAIVER_SCOPE_FUTURE_ONLY = "FUTURE_EMI_ONLY"
@@ -331,6 +334,17 @@ def apply_winner_state(
             "waived_emi_count": len(future_pending_emis),
             "waived_amount": str(q2(computed_waived_amount)),
             "newly_waived_amount": str(q2(newly_waived_amount)),
+        },
+    )
+    finance_logger.info(
+        "finance.waiver_applied",
+        extra={
+            "subscription_id": subscription.id,
+            "winner_month": winner_month,
+            "draw_id": getattr(draw, "id", None),
+            "waived_emi_count": len(future_pending_emis),
+            "waived_amount": str(q2(computed_waived_amount)),
+            "performed_by_user_id": getattr(performed_by, "id", None),
         },
     )
 

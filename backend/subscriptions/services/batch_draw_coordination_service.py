@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -30,6 +31,8 @@ from subscriptions.models import (
     SubscriptionStatus,
 )
 from subscriptions.services.business_event_service import append_business_event
+
+finance_logger = logging.getLogger("finance.events")
 
 COORDINATION_ALGORITHM_VERSION = "pass7-v1"
 
@@ -376,6 +379,16 @@ def commit_batch_draw(*, batch: Batch, user=None) -> dict:
             "snapshot_hash": snapshot_hash,
             "public_commit_hash": public_commit_hash,
             "lucky_draw_id": draw.id,
+        },
+    )
+    finance_logger.info(
+        "finance.draw_committed",
+        extra={
+            "batch_id": batch.id,
+            "draw_commit_id": dc.id,
+            "lucky_draw_id": draw.id,
+            "snapshot_hash": snapshot_hash,
+            "committed_by_user_id": getattr(user, "id", None),
         },
     )
 

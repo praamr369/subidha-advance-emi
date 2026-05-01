@@ -17,7 +17,7 @@ from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, throttle_classes
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
@@ -25,6 +25,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from accounts.models import User, UserRole
 from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
+from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
     AdminPaymentCollectSerializer,
     AdminPaymentReverseSerializer,
@@ -1368,6 +1369,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="collect")
     @require_capability("billing.collect")
+    @throttle_classes([PaymentMutationThrottle])
     def collect(self, request):
         serializer = AdminPaymentCollectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1620,6 +1622,7 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reverse")
     @require_capability("billing.override_allocation")
+    @throttle_classes([PaymentMutationThrottle])
     def reverse(self, request, pk=None):
         payment_obj = self.get_object()
 

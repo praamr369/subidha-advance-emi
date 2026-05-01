@@ -1,4 +1,5 @@
 import random
+import logging
 from datetime import timedelta
 
 from django.conf import settings
@@ -26,6 +27,7 @@ from subscriptions.models import AuditLog
 
 
 User = get_user_model()
+security_logger = logging.getLogger("security.events")
 
 ALLOWED_PUBLIC_RESET_ROLES = {
     UserRole.CUSTOMER,
@@ -144,6 +146,10 @@ def create_password_reset_request(
     requested_by_ip: str = "",
     requested_user_agent: str = "",
 ):
+    security_logger.info(
+        "security.password_reset_attempt",
+        extra={"identifier": (identifier or "").strip(), "action": "request"},
+    )
     user = resolve_user_by_identifier(identifier)
 
     generic_response = {
@@ -212,6 +218,10 @@ def resend_password_reset_otp(
     requested_by_ip: str = "",
     requested_user_agent: str = "",
 ):
+    security_logger.info(
+        "security.password_reset_attempt",
+        extra={"identifier": (identifier or "").strip(), "action": "resend"},
+    )
     user = resolve_user_by_identifier(identifier)
 
     generic_response = {
@@ -453,6 +463,10 @@ def confirm_password_reset(
     otp: str,
     new_password: str,
 ):
+    security_logger.info(
+        "security.password_reset_attempt",
+        extra={"identifier": (identifier or "").strip(), "action": "confirm"},
+    )
     user = resolve_user_by_identifier(identifier)
 
     if not user or not user.is_active or user.role not in ALLOWED_PUBLIC_RESET_ROLES:

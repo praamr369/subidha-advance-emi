@@ -1,4 +1,5 @@
 import hashlib
+import logging
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -23,6 +24,8 @@ from subscriptions.services.winner_state_service import (
     WAIVER_SCOPE_FUTURE_ONLY,
     apply_winner_state,
 )
+
+finance_logger = logging.getLogger("finance.events")
 
 
 def _subscription_ref(subscription: Subscription) -> str:
@@ -149,6 +152,15 @@ def create_lucky_draw_commit(batch: Batch):
         actor_user=None,
         batch=batch,
         payload={
+            "draw_id": draw.id,
+            "draw_month": draw.draw_month,
+            "committed_hash": committed_hash,
+        },
+    )
+    finance_logger.info(
+        "finance.draw_committed",
+        extra={
+            "batch_id": batch.id,
             "draw_id": draw.id,
             "draw_month": draw.draw_month,
             "committed_hash": committed_hash,

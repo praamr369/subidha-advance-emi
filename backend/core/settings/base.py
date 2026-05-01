@@ -380,6 +380,12 @@ HEALTHCHECK_INCLUDE_DETAILS = _parse_bool(
     os.getenv("HEALTHCHECK_INCLUDE_DETAILS"),
     default=_is_local_dev_mode(),
 )
+HEALTHCHECK_WORKER_HEARTBEAT_SECONDS = _parse_int(
+    os.getenv("HEALTHCHECK_WORKER_HEARTBEAT_SECONDS"),
+    900,
+    minimum=30,
+    name="HEALTHCHECK_WORKER_HEARTBEAT_SECONDS",
+)
 AI_ASSISTANT_ENABLED = _parse_bool(
     os.getenv("AI_ASSISTANT_ENABLED"),
     default=False,
@@ -473,6 +479,7 @@ STATIC_URL = _get_url_setting("STATIC_URL", "/static/")
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT") or (BASE_DIR / "staticfiles"))
 MEDIA_URL = _get_url_setting("MEDIA_URL", "/media/")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or (BASE_DIR / "media"))
+BACKUP_ROOT = (os.getenv("BACKUP_ROOT") or (str(BASE_DIR / "backups") if _is_local_dev_mode() else "")).strip()
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STORAGES = {
@@ -503,9 +510,11 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_THROTTLE_RATES": {
+        "auth_login": "20/minute",
         "forgot_password": "10/hour",
         "resend_password_reset_otp": "10/hour",
         "reset_password": "20/hour",
+        "payment_mutation": "60/minute",
     },
 }
 
@@ -662,6 +671,16 @@ LOGGING = {
             "propagate": False,
         },
         "api.health": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "security.events": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "finance.events": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
