@@ -435,11 +435,25 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         if new_customer_type:
             validated_data["customer_gst_type"] = new_customer_type
 
-        if customer_mode == "NEW" or (customer_mode == "WALK_IN" and walkin_create_customer_profile):
-            if not new_customer_name or not new_customer_phone:
+        if customer_mode == "EXISTING":
+            if not validated_data.get("customer"):
                 raise serializers.ValidationError(
-                    {"detail": "New customer mode requires at least full name and phone."}
+                    {"customer": "Existing customer mode requires selecting a registered customer."}
                 )
+            return
+
+        if customer_mode == "NEW" or (customer_mode == "WALK_IN" and walkin_create_customer_profile):
+            if customer_mode == "WALK_IN" and not new_customer_name:
+                new_customer_name = (validated_data.get("customer_name_snapshot") or "").strip()
+            if customer_mode == "WALK_IN" and not new_customer_phone:
+                new_customer_phone = (validated_data.get("customer_phone_snapshot") or "").strip()
+            field_errors = {}
+            if not new_customer_name:
+                field_errors["new_customer_name"] = "New customer full name is required."
+            if not new_customer_phone:
+                field_errors["new_customer_phone"] = "New customer phone is required."
+            if field_errors:
+                raise serializers.ValidationError(field_errors)
             customer, created = find_or_create_customer(
                 name=new_customer_name,
                 phone=new_customer_phone,
@@ -468,6 +482,13 @@ class DirectSaleSerializer(serializers.ModelSerializer):
                         pass
         elif customer_mode == "WALK_IN":
             validated_data["customer"] = None
+            field_errors = {}
+            if not (validated_data.get("customer_name_snapshot") or "").strip():
+                field_errors["customer_name_snapshot"] = "Walk-in snapshot name is required."
+            if not (validated_data.get("customer_phone_snapshot") or "").strip():
+                field_errors["customer_phone_snapshot"] = "Walk-in snapshot phone is required."
+            if field_errors:
+                raise serializers.ValidationError(field_errors)
 
     def _latest_invoice(self, obj):
         if hasattr(obj, "_latest_invoice_cache"):

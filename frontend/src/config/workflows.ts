@@ -37,11 +37,11 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
   },
   {
     id: "admin.createDirectSale",
-    label: "Create direct sale",
+    label: "Create Direct Sale Invoice",
     description: "Create or continue a retail direct-sale bill without mixing it into the subscription sale workflow.",
     roles: ["ADMIN"],
     icon: "billing",
-    canonicalHref: `${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`,
+    canonicalHref: ROUTES.admin.billingDirectSaleCreate,
     surface: "route",
   },
   {

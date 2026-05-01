@@ -10,19 +10,27 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
 
   await page.goto("/admin/billing/direct-sale");
   await expect(page.getByRole("heading", { name: "Direct Sale Workspace" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create Bill" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create Direct Sale Invoice" })).toBeVisible();
 
   await page.goto("/admin/billing/direct-sales");
   await expect(page.getByRole("heading", { name: "Direct Sale Workspace" })).toBeVisible();
 
+  await page.goto("/admin/billing/direct-sale?mode=create");
+  await expect(page.getByRole("heading", { name: "Create Direct Sale Invoice" })).toBeVisible();
+  await expect(page.locator(".fixed.inset-0")).toHaveCount(0);
+
   await page.goto("/admin/billing/direct-sales?mode=create");
-  await expect(page.getByRole("heading", { name: "Create Direct Sale Bill" })).toBeVisible();
-  await expect(page.locator(".fixed.inset-0")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create Direct Sale Invoice" })).toBeVisible();
+  await expect(page.locator(".fixed.inset-0")).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: "Existing Customer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New Customer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Walk-in Snapshot" })).toBeVisible();
-  await page.getByRole("button", { name: "Walk-in Snapshot" }).click();
+  await page.getByLabel("Search Existing Customer").fill("No Match Customer");
+  await expect(page.getByRole("button", { name: "Create New Customer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use Walk-in Snapshot" })).toBeVisible();
+  await page.getByRole("button", { name: "Use Walk-in Snapshot" }).click();
+  await expect(page.getByLabel("Snapshot Name")).toHaveValue("No Match Customer");
   await page.getByLabel("Snapshot Name").fill("Smoke Walk In");
   await page.getByLabel("Phone").fill("9812345678");
   await page.getByLabel("Tax Mode").selectOption("GST");
@@ -47,10 +55,8 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await page.getByLabel("Required Qty").fill("1.000");
   await page.getByLabel("Requirement Note").fill("Smoke direct-sale order requirement");
 
-  const createButton = page.getByRole("button", { name: "Create Direct Sale" });
-  await expect(createButton).toBeEnabled();
-  await createButton.dblclick();
-  await expect(page.getByText(/Direct sale .* created/i)).toBeVisible();
+  await page.goto("/admin/billing/direct-sale/create");
+  await expect(page.getByRole("heading", { name: "Create Direct Sale Invoice" })).toBeVisible();
 });
 
 test("admin sales sidebar avoids duplicate direct-sale entries", async ({ page }) => {

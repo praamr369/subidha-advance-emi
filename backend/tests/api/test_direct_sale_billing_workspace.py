@@ -206,6 +206,17 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(sale.customer_name_snapshot, "Walk In Snapshot User")
         self.assertEqual(sale.customer_snapshot_billing_address_line1, "Market Road")
 
+    def test_walkin_snapshot_requires_name_and_phone(self):
+        payload = self._payload()
+        payload["customer"] = None
+        payload["customer_mode"] = "WALK_IN"
+        payload["customer_name_snapshot"] = ""
+        payload["customer_phone_snapshot"] = ""
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("customer_name_snapshot", response.data)
+        self.assertIn("customer_phone_snapshot", response.data)
+
     def test_new_customer_mode_creates_profile_and_links_sale(self):
         payload = self._payload()
         payload["customer"] = None
@@ -221,6 +232,25 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertIsNotNone(sale.customer_id)
         self.assertEqual(sale.customer.name, "Billing New Customer")
         self.assertFalse(sale.customer.user.has_usable_password())
+
+    def test_existing_customer_mode_requires_selected_customer_id(self):
+        payload = self._payload()
+        payload["customer_mode"] = "EXISTING"
+        payload["customer"] = None
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("customer", response.data)
+
+    def test_new_customer_mode_requires_name_and_phone(self):
+        payload = self._payload()
+        payload["customer"] = None
+        payload["customer_mode"] = "NEW"
+        payload["new_customer_name"] = ""
+        payload["new_customer_phone"] = ""
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("new_customer_name", response.data)
+        self.assertIn("new_customer_phone", response.data)
 
     def test_gst_registered_business_requires_gstin(self):
         payload = self._payload()

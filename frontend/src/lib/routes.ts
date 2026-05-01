@@ -94,6 +94,7 @@ export const ROUTES = {
     billing: "/admin/billing",
     billingDirectSales: "/admin/billing/direct-sales",
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
+    billingDirectSaleCreate: "/admin/billing/direct-sale/create",
     salesDirectSaleCreate: "/admin/sales/direct-sale/create",
     billingRegister: "/admin/billing/register",
     billingDailyBook: "/admin/billing/dailybook",

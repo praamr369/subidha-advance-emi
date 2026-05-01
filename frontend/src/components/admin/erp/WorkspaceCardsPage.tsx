@@ -47,7 +47,7 @@ export function WorkspaceCardsPage({
           items={[
             {
               label: "Create Direct Sale",
-              href: `${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`,
+              href: ROUTES.admin.billingDirectSaleCreate,
               note: "Start the retail sale and invoice draft in one controlled workflow.",
               warning: "Delivery and invoice posting stay separate from payment collection.",
             },

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, ReceiptText, Search, Trash2, X } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { Plus, ReceiptText, Search, Trash2 } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -27,6 +27,7 @@ import {
   buildAdminBillingInvoicesRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { ApiError } from "@/lib/api";
 
 const FIELD_CLASS =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
@@ -139,6 +140,32 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function prefillFromSearchQuery(raw: string): { name: string; phone: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { name: "", phone: "" };
+  const phone = normalizePhone(trimmed);
+  const name = trimmed.replace(/\d+/g, " ").replace(/\s+/g, " ").trim();
+  return { name, phone };
+}
+
+function flattenApiErrors(value: unknown, prefix = ""): string[] {
+  if (typeof value === "string") {
+    const cleaned = value.trim();
+    return cleaned ? [prefix ? `${prefix}: ${cleaned}` : cleaned] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => flattenApiErrors(entry, prefix));
+  }
+  if (!value || typeof value !== "object") return [];
+
+  const record = value as Record<string, unknown>;
+  return Object.entries(record).flatMap(([key, entry]) => {
+    if (key === "status") return [];
+    const nextPrefix = key === "non_field_errors" ? prefix : key;
+    return flattenApiErrors(entry, nextPrefix);
+  });
+}
+
 function calculateLine(line: DraftLine, taxMode: "GST" | "NON_GST"): LineTotals {
   const qty = Math.max(toNumber(line.quantity), 0);
   const price = Math.max(toNumber(line.unit_price), 0);
@@ -191,20 +218,26 @@ function makeIdempotencyKey(): string {
 }
 
 export default function DirectSaleWorkspace() {
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<DirectSale[]>([]);
   const [requirements, setRequirements] = useState<InventoryRequirementRow[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const createMode = (searchParams.get("mode") || "").trim().toLowerCase() === "create";
+
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerSearchError, setCustomerSearchError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
+  const [financeAccountsError, setFinanceAccountsError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
     sale_date: todayIso(),
     customer_mode: "EXISTING",
@@ -246,16 +279,36 @@ export default function DirectSaleWorkspace() {
 
   const loadPage = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [salesPayload, accountsPayload, requirementsPayload] = await Promise.all([
+      const [salesPayload, accountsPayload, requirementsPayload] = await Promise.allSettled([
         listDirectSales(),
         listFinanceAccounts(),
         listAdminInventoryRequirements({ status: "OPEN", source_module: "DIRECT_SALE" }),
       ]);
-      setRows(salesPayload.results);
-      setFinanceAccounts(accountsPayload.results);
-      setRequirements(requirementsPayload.results);
-      setError(null);
+      if (salesPayload.status === "fulfilled") {
+        setRows(salesPayload.value.results);
+      } else {
+        setRows([]);
+        setError(accountingErrorMessage(salesPayload.reason, "Failed to load direct-sale register list."));
+      }
+
+      if (accountsPayload.status === "fulfilled") {
+        setFinanceAccounts(accountsPayload.value.results);
+        setFinanceAccountsError(null);
+      } else {
+        setFinanceAccounts([]);
+        setFinanceAccountsError(
+          accountingErrorMessage(accountsPayload.reason, "Failed to load finance accounts for payment receipts.")
+        );
+      }
+
+      if (requirementsPayload.status === "fulfilled") {
+        setRequirements(requirementsPayload.value.results);
+      } else {
+        setRequirements([]);
+        setError(accountingErrorMessage(requirementsPayload.reason, "Failed to load inventory requirements."));
+      }
     } catch (err) {
       setRows([]);
       setFinanceAccounts([]);
@@ -271,12 +324,9 @@ export default function DirectSaleWorkspace() {
   }, [loadPage]);
 
   useEffect(() => {
-    const mode = (searchParams.get("mode") || "").trim().toLowerCase();
-    if (mode === "create") {
-      resetCreateForm();
-      setDrawerOpen(true);
-    }
-  }, [searchParams]);
+    if (!createMode) return;
+    resetCreateForm();
+  }, [createMode]);
 
   const stats = useMemo(() => {
     const today = todayIso();
@@ -315,6 +365,7 @@ export default function DirectSaleWorkspace() {
       balance: rollup.grand - received,
     };
   }, [computedLines, form.received_total]);
+  const submitBlockedByFinance = totals.received > 0 && !!financeAccountsError && !form.finance_account;
 
   const columns: EnterpriseColumnDef<DirectSale>[] = [
     {
@@ -409,12 +460,9 @@ export default function DirectSaleWorkspace() {
     });
     setLines([makeLine()]);
     setValidationErrors([]);
+    setCustomerModeError(null);
+    setCustomerSearchError(null);
     createAttemptKey.current = null;
-  }
-
-  function openCreateDrawer() {
-    resetCreateForm();
-    setDrawerOpen(true);
   }
 
   function updateLine(lineId: string, patch: Partial<DraftLine>) {
@@ -426,6 +474,7 @@ export default function DirectSaleWorkspace() {
 
   function handleCustomerSearch(value: string) {
     setCustomerQuery(value);
+    setCustomerSearchError(null);
     if (customerSearchTimer.current) {
       window.clearTimeout(customerSearchTimer.current);
     }
@@ -440,18 +489,40 @@ export default function DirectSaleWorkspace() {
       try {
         const results = await searchCustomers(trimmed);
         setCustomerResults(results);
-      } catch {
+      } catch (err) {
         setCustomerResults([]);
+        setCustomerSearchError(accountingErrorMessage(err, "Customer search failed."));
       } finally {
         setCustomerLoading(false);
       }
     }, 250);
   }
 
+  function applySearchPrefill(targetMode: FormState["customer_mode"]) {
+    const snapshot = prefillFromSearchQuery(customerQuery);
+    setForm((current) => ({
+      ...current,
+      customer_mode: targetMode,
+      customer_id: "",
+      walkin_create_customer_profile:
+        targetMode === "WALK_IN" ? current.walkin_create_customer_profile : false,
+      customer_name_snapshot: current.customer_name_snapshot || snapshot.name,
+      customer_phone_snapshot: current.customer_phone_snapshot || snapshot.phone,
+      new_customer_name:
+        targetMode === "NEW" ? current.new_customer_name || snapshot.name : current.new_customer_name,
+      new_customer_phone:
+        targetMode === "NEW" ? current.new_customer_phone || snapshot.phone : current.new_customer_phone,
+    }));
+    setSelectedCustomer(null);
+    setCustomerModeError(null);
+    setValidationErrors([]);
+  }
+
   function selectCustomer(customer: CustomerRecord) {
     setSelectedCustomer(customer);
     setCustomerQuery(`${customer.name} ${customer.phone}`.trim());
     setCustomerResults([]);
+    setCustomerModeError(null);
     setForm((current) => ({
       ...current,
       customer_mode: "EXISTING",
@@ -517,14 +588,22 @@ export default function DirectSaleWorkspace() {
     });
   }
 
-  function validateForm(): string[] {
+  function validateForm(): { errors: string[]; customerMode: string | null } {
     const next: string[] = [];
-    if (!form.customer_id && !form.customer_name_snapshot.trim()) {
-      next.push("Walk-in customer name or registered customer is required.");
+    let nextCustomerModeError: string | null = null;
+    if (form.customer_mode === "EXISTING") {
+      if (!form.customer_id || !selectedCustomer) {
+        nextCustomerModeError = "Select a registered customer from search results.";
+        next.push("Existing customer mode requires selecting a registered customer.");
+      }
     }
     if (form.customer_mode === "NEW") {
       if (!form.new_customer_name.trim()) next.push("New customer full name is required.");
       if (!normalizePhone(form.new_customer_phone)) next.push("New customer phone is required.");
+    }
+    if (form.customer_mode === "WALK_IN") {
+      if (!form.customer_name_snapshot.trim()) next.push("Walk-in snapshot name is required.");
+      if (!normalizePhone(form.customer_phone_snapshot)) next.push("Walk-in snapshot phone is required.");
     }
     if (form.tax_mode === "GST" && !form.customer_snapshot_place_of_supply.trim()) {
       next.push("Place of supply is required for GST invoices.");
@@ -536,11 +615,11 @@ export default function DirectSaleWorkspace() {
     ) {
       next.push("GSTIN is required for registered business GST invoices.");
     }
-    if (!form.customer_id && !normalizePhone(form.customer_phone_snapshot)) {
-      next.push("Walk-in customer phone is required.");
-    }
     if (totals.received > totals.grand) {
       next.push("Received total cannot exceed grand total.");
+    }
+    if (totals.received > 0 && financeAccountsError && !form.finance_account) {
+      next.push("Finance account is required for immediate receipt while finance-account list is unavailable.");
     }
     if (!lines.length) {
       next.push("At least one product line is required.");
@@ -559,25 +638,60 @@ export default function DirectSaleWorkspace() {
         next.push(`Line ${lineNo}: requirement quantity must be greater than zero.`);
       }
     });
-    return next;
+    return { errors: next, customerMode: nextCustomerModeError };
   }
 
-  async function submitCreate() {
-    if (submitting) return;
-    const nextErrors = validateForm();
-    setValidationErrors(nextErrors);
-    setError(null);
-    setNotice(null);
-    if (nextErrors.length > 0) return;
+  function buildSubmitPayload() {
+    const mode = form.customer_mode;
+    const commonPayload = {
+      sale_date: form.sale_date,
+      customer_mode: mode,
+      tax_mode: form.tax_mode,
+      tax_calculation_mode: form.tax_calculation_mode,
+      customer_gst_type: form.customer_gst_type,
+      finance_account: form.finance_account ? Number(form.finance_account) : null,
+      delivery_required: form.delivery_required,
+      customer_name_snapshot: form.customer_name_snapshot.trim(),
+      customer_phone_snapshot: normalizePhone(form.customer_phone_snapshot),
+      customer_snapshot_email: form.customer_snapshot_email.trim(),
+      customer_snapshot_billing_address_line1: form.customer_snapshot_billing_address_line1.trim(),
+      customer_snapshot_billing_address_line2: form.customer_snapshot_billing_address_line2.trim(),
+      customer_snapshot_city: form.customer_snapshot_city.trim(),
+      customer_snapshot_district: form.customer_snapshot_district.trim(),
+      customer_snapshot_state: form.customer_snapshot_state.trim(),
+      customer_snapshot_pincode: form.customer_snapshot_pincode.trim(),
+      customer_gstin: form.customer_gstin.trim() || null,
+      customer_snapshot_place_of_supply: form.customer_snapshot_place_of_supply.trim(),
+      delivery_snapshot_address_line1: form.delivery_snapshot_address_line1.trim(),
+      delivery_snapshot_address_line2: form.delivery_snapshot_address_line2.trim(),
+      delivery_snapshot_city: form.delivery_snapshot_city.trim(),
+      delivery_snapshot_district: form.delivery_snapshot_district.trim(),
+      delivery_snapshot_state: form.delivery_snapshot_state.trim(),
+      delivery_snapshot_pincode: form.delivery_snapshot_pincode.trim(),
+      subtotal: money(totals.subtotal),
+      discount_total: money(totals.discount),
+      taxable_total: money(totals.taxable),
+      tax_total: money(totals.tax),
+      grand_total: money(totals.grand),
+      received_total: money(totals.received),
+      balance_total: money(totals.balance),
+      notes: form.notes.trim(),
+      terms: form.terms.trim(),
+      lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
+    };
 
-    setSubmitting(true);
-    createAttemptKey.current = createAttemptKey.current || makeIdempotencyKey();
-    try {
-      const payload = {
-        sale_date: form.sale_date,
-        customer: form.customer_id ? Number(form.customer_id) : null,
-        customer_mode: form.customer_mode,
-        walkin_create_customer_profile: form.walkin_create_customer_profile,
+    if (mode === "EXISTING") {
+      return {
+        ...commonPayload,
+        customer: Number(form.customer_id),
+      };
+    }
+
+    if (mode === "NEW") {
+      return {
+        ...commonPayload,
+        customer: null,
+        walkin_create_customer_profile: false,
         new_customer_name: form.new_customer_name.trim(),
         new_customer_phone: normalizePhone(form.new_customer_phone),
         new_customer_email: form.new_customer_email.trim(),
@@ -589,189 +703,124 @@ export default function DirectSaleWorkspace() {
         new_customer_pincode: form.customer_snapshot_pincode.trim(),
         new_customer_gstin: form.customer_gstin.trim(),
         new_customer_type: form.customer_gst_type,
-        tax_mode: form.tax_mode,
-        tax_calculation_mode: form.tax_calculation_mode,
-        customer_gst_type: form.customer_gst_type,
-        finance_account: form.finance_account ? Number(form.finance_account) : null,
-        delivery_required: form.delivery_required,
-        customer_name_snapshot: form.customer_name_snapshot.trim(),
-        customer_phone_snapshot: normalizePhone(form.customer_phone_snapshot),
-        customer_snapshot_email: form.customer_snapshot_email.trim(),
-        customer_snapshot_billing_address_line1: form.customer_snapshot_billing_address_line1.trim(),
-        customer_snapshot_billing_address_line2: form.customer_snapshot_billing_address_line2.trim(),
-        customer_snapshot_city: form.customer_snapshot_city.trim(),
-        customer_snapshot_district: form.customer_snapshot_district.trim(),
-        customer_snapshot_state: form.customer_snapshot_state.trim(),
-        customer_snapshot_pincode: form.customer_snapshot_pincode.trim(),
-        customer_gstin: form.customer_gstin.trim() || null,
-        customer_snapshot_place_of_supply: form.customer_snapshot_place_of_supply.trim(),
-        delivery_snapshot_address_line1: form.delivery_snapshot_address_line1.trim(),
-        delivery_snapshot_address_line2: form.delivery_snapshot_address_line2.trim(),
-        delivery_snapshot_city: form.delivery_snapshot_city.trim(),
-        delivery_snapshot_district: form.delivery_snapshot_district.trim(),
-        delivery_snapshot_state: form.delivery_snapshot_state.trim(),
-        delivery_snapshot_pincode: form.delivery_snapshot_pincode.trim(),
-        subtotal: money(totals.subtotal),
-        discount_total: money(totals.discount),
-        taxable_total: money(totals.taxable),
-        tax_total: money(totals.tax),
-        grand_total: money(totals.grand),
-        received_total: money(totals.received),
-        balance_total: money(totals.balance),
-        notes: form.notes.trim(),
-        terms: form.terms.trim(),
-        lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
       };
+    }
+
+    return {
+      ...commonPayload,
+      customer: null,
+      walkin_create_customer_profile: form.walkin_create_customer_profile,
+      new_customer_name: form.walkin_create_customer_profile ? form.customer_name_snapshot.trim() : "",
+      new_customer_phone: form.walkin_create_customer_profile
+        ? normalizePhone(form.customer_phone_snapshot)
+        : "",
+      new_customer_email: form.walkin_create_customer_profile ? form.customer_snapshot_email.trim() : "",
+      new_customer_billing_address_line1: form.walkin_create_customer_profile
+        ? form.customer_snapshot_billing_address_line1.trim()
+        : "",
+      new_customer_billing_address_line2: form.walkin_create_customer_profile
+        ? form.customer_snapshot_billing_address_line2.trim()
+        : "",
+      new_customer_city: form.walkin_create_customer_profile ? form.customer_snapshot_city.trim() : "",
+      new_customer_district: form.walkin_create_customer_profile ? form.customer_snapshot_district.trim() : "",
+      new_customer_state: form.walkin_create_customer_profile ? form.customer_snapshot_state.trim() : "",
+      new_customer_pincode: form.walkin_create_customer_profile ? form.customer_snapshot_pincode.trim() : "",
+      new_customer_gstin: form.walkin_create_customer_profile ? form.customer_gstin.trim() : "",
+      new_customer_type: form.customer_gst_type,
+    };
+  }
+
+  async function submitCreate() {
+    if (submitting) return;
+    const { errors: nextErrors, customerMode } = validateForm();
+    setValidationErrors(nextErrors);
+    setCustomerModeError(customerMode);
+    setError(null);
+    setNotice(null);
+    if (nextErrors.length > 0) return;
+
+    setSubmitting(true);
+    createAttemptKey.current = createAttemptKey.current || makeIdempotencyKey();
+    try {
+      const payload = buildSubmitPayload();
       const created = await createDirectSale(payload, {
         idempotencyKey: createAttemptKey.current,
       });
       setNotice(`Direct sale ${created.sale_no || `#${created.id}`} created.`);
-      setDrawerOpen(false);
       resetCreateForm();
-      await loadPage();
+      router.push(pathname);
     } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to create direct sale."));
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+        const parsed = flattenApiErrors(err.body);
+        if (parsed.length) {
+          setValidationErrors(parsed);
+          const customerError = parsed.find((entry) =>
+            /(customer|new_customer|customer_name_snapshot|customer_phone_snapshot)/i.test(entry)
+          );
+          if (customerError) setCustomerModeError(customerError);
+          setError("Direct sale validation failed. Fix the highlighted issues and try again.");
+          return;
+        }
+      }
+      if (err instanceof Error && /failed to fetch|network/i.test(err.message)) {
+        setError("Network request failed while creating the direct sale. Check connection and retry.");
+      } else {
+        setError(accountingErrorMessage(err, "Failed to create direct sale."));
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
-  return (
-    <PortalPage
-      eyebrow="Admin Billing"
-      title="Direct Sale Workspace"
-      subtitle="Create retail bills from the full product catalog while keeping product base price, EMI contracts, billing discounts, and inventory requirements separate."
-      helperNote="Product base price stays unchanged. Discount applies only to this direct-sale bill."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Billing", href: ROUTES.admin.billing },
-        { label: "Direct Sale" },
-      ]}
-      actions={[
-        {
-          label: "Retail Invoices",
-          href: buildAdminBillingInvoicesRoute({ source_type: "DIRECT_SALE" }),
-          variant: "secondary",
-        },
-        {
-          label: "Document Register",
-          href: ROUTES.admin.billingRegister,
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Draft Sales", value: stats.draftSales, tone: "info" },
-        { label: "Today Sales", value: stats.todaySales, tone: "success" },
-        { label: "Delivery Hold", value: stats.deliveryHold, tone: stats.deliveryHold ? "warning" : "default" },
-        { label: "Pending Stock Requirements", value: stats.pendingRequirements, tone: stats.pendingRequirements ? "warning" : "success" },
-      ]}
-      statusBadge={{ label: "Retail Billing", tone: "info" }}
-    >
-      <WorkspaceDirectory
-        title="Billing route map"
-        description="Move between retail sales, invoices, receipts, documents, and billing books without mixing direct-sale and EMI collection workflows."
-        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Direct Sale Billing Desk</h2>
-          <p className="text-sm text-muted-foreground">
-            Build cash/upfront bills with line discounts and purchase requirements from real backend endpoints.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreateDrawer}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Create Bill
-        </button>
-      </div>
-
-      {notice ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {notice}
-        </div>
-      ) : null}
-      {error && !drawerOpen ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Draft Sales" value={String(stats.draftSales)} tone="info" />
-        <StatCard label="Today Sales" value={String(stats.todaySales)} tone="success" />
-        <StatCard label="Delivery Hold" value={String(stats.deliveryHold)} tone={stats.deliveryHold ? "warning" : "default"} />
-        <StatCard
-          label="Pending Stock Requirements"
-          value={String(stats.pendingRequirements)}
-          tone={stats.pendingRequirements ? "warning" : "success"}
-        />
-      </section>
-
-      <WorkspaceSection
-        title="Recent Direct Sales"
-        description="Recent direct-sale bills, linked billing invoices, delivery hold state, customer snapshot, and amount."
+  if (createMode) {
+    return (
+      <PortalPage
+        eyebrow="Admin Billing"
+        title="Create Direct Sale Invoice"
+        subtitle="Full-page direct-sale invoice workspace with customer snapshot controls, GST/non-GST handling, product search, requirement flags, and safe payment summary."
+        helperNote="Customer snapshot is saved on the invoice so future profile edits do not rewrite old billing documents."
+        helperTone="info"
+        breadcrumbs={[
+          { label: "Admin", href: ROUTES.admin.dashboard },
+          { label: "Billing", href: ROUTES.admin.billing },
+          { label: "Direct Sale", href: pathname },
+          { label: "Create Invoice" },
+        ]}
+        actions={[
+          { label: "Back to Direct Sale Workspace", href: pathname, variant: "secondary" },
+          { label: "Retail Invoices", href: buildAdminBillingInvoicesRoute({ source_type: "DIRECT_SALE" }), variant: "secondary" },
+        ]}
+        statusBadge={{ label: "Retail Billing", tone: "info" }}
       >
-        <EnterpriseDataTable
-          data={rows}
-          columns={columns}
-          loading={loading}
-          error={error}
-          emptyTitle="No direct-sale bills found"
-          emptyDescription="Create a bill to start the retail direct-sale register."
-        />
-      </WorkspaceSection>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={pathname}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            Back to Direct Sale Workspace
+          </Link>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void submitCreate()}
+              disabled={submitting || submitBlockedByFinance}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting ? "Saving..." : "Save Draft"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitCreate()}
+              disabled={submitting || submitBlockedByFinance}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting ? "Creating..." : "Create Direct Sale"}
+            </button>
+          </div>
+        </div>
 
-      <WorkspaceSection
-        title="Pending Stock Requirements"
-        description="Open direct-sale inventory requirement alerts created from out-of-stock bill lines."
-      >
-        <EnterpriseDataTable
-          data={requirements}
-          columns={[
-            { key: "product_name", header: "Product" },
-            { key: "required_quantity", header: "Required" },
-            { key: "available_quantity", header: "Available" },
-            { key: "shortage_quantity", header: "Shortage" },
-            { key: "priority", header: "Priority" },
-            { key: "status", header: "Status" },
-            { key: "created_at", header: "Created", render: (row) => accountingDate(row.created_at) },
-          ]}
-          loading={loading}
-          emptyTitle="No pending inventory requirements"
-          emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
-        />
-      </WorkspaceSection>
-
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm">
-          <div className="absolute inset-y-0 right-0 flex w-full max-w-6xl flex-col border-l border-border bg-[var(--surface-card-elevated)] shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-[var(--surface-card-elevated)] px-5 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Create Direct Sale Bill</h2>
-                <p className="text-sm text-muted-foreground">
-                  Product base price stays unchanged. Discount applies only to this direct-sale bill.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                disabled={submitting}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Close create bill drawer"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible px-5 py-5">
-              <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-                <div className="space-y-5">
+        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+          <div className="space-y-5">
                   <section className="rounded-lg border border-border bg-card p-4">
                     <h3 className="text-sm font-semibold text-foreground">Customer</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -786,13 +835,7 @@ export default function DirectSaleWorkspace() {
                         <button
                           key={value}
                           type="button"
-                          onClick={() =>
-                            setForm((current) => ({
-                              ...current,
-                              customer_mode: value as FormState["customer_mode"],
-                              customer_id: value === "EXISTING" ? current.customer_id : "",
-                            }))
-                          }
+                          onClick={() => applySearchPrefill(value as FormState["customer_mode"])}
                           className={`rounded-md px-3 py-1.5 text-xs font-medium ${
                             form.customer_mode === value
                               ? "bg-primary text-primary-foreground"
@@ -803,6 +846,9 @@ export default function DirectSaleWorkspace() {
                         </button>
                       ))}
                     </div>
+                    {customerModeError ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">{customerModeError}</p>
+                    ) : null}
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       {form.customer_mode === "EXISTING" ? (
                       <div className="relative lg:col-span-2">
@@ -837,9 +883,30 @@ export default function DirectSaleWorkspace() {
                                 </button>
                               ))
                             ) : (
-                              <div className="px-3 py-2 text-sm text-muted-foreground">No registered customer found.</div>
+                              <div className="space-y-2 px-3 py-2 text-sm">
+                                <p className="text-muted-foreground">No registered customer found.</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => applySearchPrefill("NEW")}
+                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                                  >
+                                    Create New Customer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySearchPrefill("WALK_IN")}
+                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                                  >
+                                    Use Walk-in Snapshot
+                                  </button>
+                                </div>
+                              </div>
                             )}
                           </div>
+                        ) : null}
+                        {customerSearchError ? (
+                          <p className="mt-2 text-xs text-destructive">{customerSearchError}</p>
                         ) : null}
                       </div>
                       ) : null}
@@ -1048,6 +1115,18 @@ export default function DirectSaleWorkspace() {
                             </option>
                           ))}
                         </select>
+                        {financeAccountsError ? (
+                          <div className="flex items-center gap-2 text-xs text-destructive">
+                            <span>{financeAccountsError}</span>
+                            <button
+                              type="button"
+                              onClick={() => void loadPage()}
+                              className="rounded border border-border bg-background px-2 py-0.5 font-medium text-foreground hover:bg-muted"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : null}
                       </label>
                       <label className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm">
                         <input
@@ -1305,68 +1384,62 @@ export default function DirectSaleWorkspace() {
                       ))}
                     </div>
                   </section>
-                </div>
+          </div>
 
-                <aside className="space-y-4">
-                  <section className="sticky top-4 rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-center gap-2">
-                      <ReceiptText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      <h3 className="text-sm font-semibold text-foreground">Totals</h3>
-                    </div>
-                    <div className="mt-4 space-y-2 text-sm">
-                      <div className="flex justify-between"><span>Subtotal</span><strong>{accountingMoney(totals.subtotal)}</strong></div>
-                      <div className="flex justify-between"><span>Discount</span><strong>{accountingMoney(totals.discount)}</strong></div>
-                      <div className="flex justify-between"><span>Taxable</span><strong>{accountingMoney(totals.taxable)}</strong></div>
-                      <div className="flex justify-between"><span>Tax</span><strong>{accountingMoney(totals.tax)}</strong></div>
-                      <div className="flex justify-between border-t border-border pt-2 text-base"><span>Grand Total</span><strong>{accountingMoney(totals.grand)}</strong></div>
-                    </div>
-                    <label className="mt-4 grid gap-2 text-sm">
-                      <span className="font-medium text-foreground">Received Total</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.received_total}
-                        onChange={(event) => setForm((current) => ({ ...current, received_total: event.target.value }))}
-                        disabled={submitting}
-                        className={FIELD_CLASS}
-                      />
-                    </label>
-                    <div className="mt-3 flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
-                      <span>Balance</span>
-                      <strong>{accountingMoney(totals.balance)}</strong>
-                    </div>
-                    {validationErrors.length ? (
-                      <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                        {validationErrors.map((entry) => (
-                          <p key={entry}>{entry}</p>
-                        ))}
-                      </div>
-                    ) : null}
-                    {error && drawerOpen ? (
-                      <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                        {error}
-                      </div>
-                    ) : null}
-                  </section>
-                </aside>
+          <aside className="space-y-4">
+            <section className="sticky top-4 rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center gap-2">
+                <ReceiptText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-foreground">Totals / Payment</h3>
               </div>
-            </div>
-
-            <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-border bg-[var(--surface-card-elevated)] px-5 py-4">
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span>Subtotal</span><strong>{accountingMoney(totals.subtotal)}</strong></div>
+                <div className="flex justify-between"><span>Discount</span><strong>{accountingMoney(totals.discount)}</strong></div>
+                <div className="flex justify-between"><span>Taxable</span><strong>{accountingMoney(totals.taxable)}</strong></div>
+                <div className="flex justify-between"><span>Tax</span><strong>{accountingMoney(totals.tax)}</strong></div>
+                <div className="flex justify-between border-t border-border pt-2 text-base"><span>Grand Total</span><strong>{accountingMoney(totals.grand)}</strong></div>
+              </div>
+              <label className="mt-4 grid gap-2 text-sm">
+                <span className="font-medium text-foreground">Received Total</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.received_total}
+                  onChange={(event) => setForm((current) => ({ ...current, received_total: event.target.value }))}
+                  disabled={submitting}
+                  className={FIELD_CLASS}
+                />
+              </label>
               <button
                 type="button"
-                onClick={() => setDrawerOpen(false)}
+                onClick={() => setForm((current) => ({ ...current, received_total: money(totals.grand) }))}
                 disabled={submitting}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Cancel
+                Mark as fully paid
               </button>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="mt-3 flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
+                <span>Balance</span>
+                <strong>{accountingMoney(totals.balance)}</strong>
+              </div>
+              {validationErrors.length ? (
+                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {validationErrors.map((entry) => (
+                    <p key={entry}>{entry}</p>
+                  ))}
+                </div>
+              ) : null}
+              {error ? (
+                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : null}
+              <div className="mt-4 grid gap-2">
                 <button
                   type="button"
                   onClick={() => void submitCreate()}
-                  disabled={submitting}
+                disabled={submitting || submitBlockedByFinance}
                   className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Saving..." : "Save Draft"}
@@ -1374,16 +1447,129 @@ export default function DirectSaleWorkspace() {
                 <button
                   type="button"
                   onClick={() => void submitCreate()}
-                  disabled={submitting}
+                disabled={submitting || submitBlockedByFinance}
                   className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Creating..." : "Create Direct Sale"}
                 </button>
               </div>
-            </div>
-          </div>
+            </section>
+          </aside>
+        </div>
+      </PortalPage>
+    );
+  }
+
+  return (
+    <PortalPage
+      eyebrow="Admin Billing"
+      title="Direct Sale Workspace"
+      subtitle="Create retail bills from the full product catalog while keeping product base price, EMI contracts, billing discounts, and inventory requirements separate."
+      helperNote="Product base price stays unchanged. Discount applies only to this direct-sale bill."
+      helperTone="info"
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Billing", href: ROUTES.admin.billing },
+        { label: "Direct Sale" },
+      ]}
+      actions={[
+        {
+          label: "Retail Invoices",
+          href: buildAdminBillingInvoicesRoute({ source_type: "DIRECT_SALE" }),
+          variant: "secondary",
+        },
+        {
+          label: "Document Register",
+          href: ROUTES.admin.billingRegister,
+          variant: "secondary",
+        },
+      ]}
+      stats={[
+        { label: "Draft Sales", value: stats.draftSales, tone: "info" },
+        { label: "Today Sales", value: stats.todaySales, tone: "success" },
+        { label: "Delivery Hold", value: stats.deliveryHold, tone: stats.deliveryHold ? "warning" : "default" },
+        { label: "Pending Stock Requirements", value: stats.pendingRequirements, tone: stats.pendingRequirements ? "warning" : "success" },
+      ]}
+      statusBadge={{ label: "Retail Billing", tone: "info" }}
+    >
+      <WorkspaceDirectory
+        title="Billing route map"
+        description="Move between retail sales, invoices, receipts, documents, and billing books without mixing direct-sale and EMI collection workflows."
+        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Direct Sale Billing Desk</h2>
+          <p className="text-sm text-muted-foreground">
+            Build cash/upfront bills with line discounts and purchase requirements from real backend endpoints.
+          </p>
+        </div>
+        <Link
+          href={ROUTES.admin.billingDirectSaleCreate}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Create Direct Sale Invoice
+        </Link>
+      </div>
+
+      {notice ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {notice}
         </div>
       ) : null}
+      {error ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Draft Sales" value={String(stats.draftSales)} tone="info" />
+        <StatCard label="Today Sales" value={String(stats.todaySales)} tone="success" />
+        <StatCard label="Delivery Hold" value={String(stats.deliveryHold)} tone={stats.deliveryHold ? "warning" : "default"} />
+        <StatCard
+          label="Pending Stock Requirements"
+          value={String(stats.pendingRequirements)}
+          tone={stats.pendingRequirements ? "warning" : "success"}
+        />
+      </section>
+
+      <WorkspaceSection
+        title="Recent Direct Sales"
+        description="Recent direct-sale bills, linked billing invoices, delivery hold state, customer snapshot, and amount."
+      >
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No direct-sale bills found"
+          emptyDescription="Create a bill to start the retail direct-sale register."
+        />
+      </WorkspaceSection>
+
+      <WorkspaceSection
+        title="Pending Stock Requirements"
+        description="Open direct-sale inventory requirement alerts created from out-of-stock bill lines."
+      >
+        <EnterpriseDataTable
+          data={requirements}
+          columns={[
+            { key: "product_name", header: "Product" },
+            { key: "required_quantity", header: "Required" },
+            { key: "available_quantity", header: "Available" },
+            { key: "shortage_quantity", header: "Shortage" },
+            { key: "priority", header: "Priority" },
+            { key: "status", header: "Status" },
+            { key: "created_at", header: "Created", render: (row) => accountingDate(row.created_at) },
+          ]}
+          loading={loading}
+          emptyTitle="No pending inventory requirements"
+          emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
+        />
+      </WorkspaceSection>
     </PortalPage>
   );
 }

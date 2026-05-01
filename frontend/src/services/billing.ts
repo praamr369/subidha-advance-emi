@@ -169,6 +169,7 @@ export type DirectSalePayload = {
   new_customer_gstin?: string;
   new_customer_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
   notes?: string;
+  terms?: string;
   lines: DirectSaleLine[];
 };
 
