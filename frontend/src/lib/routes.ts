@@ -183,6 +183,7 @@ export const ROUTES = {
     luckyDraws: "/admin/lucky-draws",
     luckyDrawsCreate: "/admin/lucky-draws/create",
 
+    reportsCenter: "/admin/reports-center",
     reports: "/admin/reports",
     reportsRevenue: "/admin/reports/revenue",
     reportsCollections: "/admin/reports/collections",

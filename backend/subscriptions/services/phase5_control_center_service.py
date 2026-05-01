@@ -104,6 +104,8 @@ def _apply_common_payment_filters(qs, flt: AdminReportFilter):
         qs = qs.filter(subscription__product_id=flt.product_id)
     if flt.branch_id:
         qs = qs.filter(branch_id=flt.branch_id)
+    if flt.collected_by_id:
+        qs = qs.filter(collected_by_id=flt.collected_by_id)
     return qs
 
 

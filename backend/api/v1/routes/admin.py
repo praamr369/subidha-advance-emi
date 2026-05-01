@@ -217,6 +217,11 @@ from api.v1.views.admin_phase5_control import (
     AdminReportsWaiverLossAnalysisView,
     AdminReportExportView,
 )
+from api.v1.views.reports_center import (
+    AdminReportsCenterCatalogView,
+    AdminReportsCenterExportView,
+    AdminReportsCenterReportView,
+)
 from api.v1.views.admin_accounting_setup import (
     AccountingMappingSuggestionsView,
     AccountingSetupBootstrapView,
@@ -501,6 +506,9 @@ urlpatterns = [
     path("reports/collection-trend/", AdminReportsCollectionTrendView.as_view()),
     path("reports/product-demand-analysis/", AdminReportsProductDemandAnalysisView.as_view()),
     path("reports/source-map/", AdminReportsSourceMapView.as_view()),
+    path("reports-center/catalog/", AdminReportsCenterCatalogView.as_view()),
+    path("reports-center/reports/<str:report_key>/export/", AdminReportsCenterExportView.as_view()),
+    path("reports-center/reports/<str:report_key>/", AdminReportsCenterReportView.as_view()),
     path("reports/export/", AdminReportExportView.as_view()),
     path("accounting/setup/status/", AccountingSetupStatusView.as_view()),
     path("accounting/setup/bootstrap/", AccountingSetupBootstrapView.as_view()),

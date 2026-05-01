@@ -64,6 +64,7 @@ def _filter_for_window(window: str) -> AdminReportFilter:
         category_id=None,
         customer_id=None,
         branch_id=None,
+        collected_by_id=None,
         overdue_only=False,
         unreconciled_only=False,
         ignored_filters=[],
