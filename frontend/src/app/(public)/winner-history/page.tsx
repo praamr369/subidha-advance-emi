@@ -46,6 +46,8 @@ export default async function WinnerHistoryPage() {
         description="This section helps customers validate past winner publication patterns over time."
         items={[
           { title: "Chronological records", description: "Entries are listed from real backend responses." },
+          { title: "Masked winner names", description: "Public history masks customer names while retaining draw transparency." },
+          { title: "Draw proof/hash", description: "Commitment hash is shown where available for public verification." },
           { title: "Honest system status", description: "Errors and empty states are shown directly." },
           { title: "Business rule continuity", description: "Winner benefit remains future-EMI-only." },
         ]}

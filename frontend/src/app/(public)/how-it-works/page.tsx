@@ -45,6 +45,17 @@ export default async function HowItWorksPage() {
         ]}
       />
 
+      <PublicMarketingBanner
+        eyebrow="After enrollment"
+        title="Payment and delivery process"
+        description="Customers can track scheduled EMI, receipts, contract documents, and delivery status from their own portal scope."
+        items={[
+          { title: "Payment safety", description: "Payments are receipted and appear in customer payment/receipt pages." },
+          { title: "Delivery tracking", description: "Dispatch and handover states are shown in delivery pages." },
+          { title: "Support continuity", description: "Warranty/return follow-ups move through support requests with audit history." },
+        ]}
+      />
+
       <CtaBanner
         title="See live winner records"
         description="Visit Winners and Winner History pages for published entries from revealed records only."

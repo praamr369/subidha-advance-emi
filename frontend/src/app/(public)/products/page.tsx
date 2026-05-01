@@ -58,6 +58,17 @@ export default async function ProductsPage() {
         ]}
       />
 
+      <PublicMarketingBanner
+        eyebrow="Purchase confidence"
+        title="Warranty, return policy, and payment safety"
+        description="Final terms depend on product and contract type, but policy support and document visibility are available for every customer."
+        items={[
+          { title: "Warranty visibility", description: "Warranty/coverage terms are confirmed at contract and document stage." },
+          { title: "Return support flow", description: "Return/issue handling is routed through customer support with status tracking." },
+          { title: "Receipt traceability", description: "Receipts and contract documents are available in customer self-service." },
+        ]}
+      />
+
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
         <p className="mb-4 text-sm leading-6 text-muted-foreground">
           Browse the live catalogue sourced from production product records.

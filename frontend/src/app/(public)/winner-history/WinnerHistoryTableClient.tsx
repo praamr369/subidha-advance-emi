@@ -107,6 +107,7 @@ export default function WinnerHistoryTableClient({
                 "Batch",
                 "Draw month",
                 "Lucky ID",
+                "Winner (masked)",
                 "Verification",
                 "Public commit hash",
                 "Product",
@@ -134,6 +135,9 @@ export default function WinnerHistoryTableClient({
                 </td>
                 <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-foreground">
                   {winner.lucky_id || "—"}
+                </td>
+                <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-muted-foreground">
+                  {winner.winner_name_masked || "Masked for privacy"}
                 </td>
                 <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-foreground">
                   {winner.verification_status || "unavailable"}
@@ -180,6 +184,9 @@ export default function WinnerHistoryTableClient({
               {winner.verification_status || "unavailable"}
             </p>
             <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+              <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                Winner: {winner.winner_name_masked || "Masked for privacy"}
+              </div>
               <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
                 Product: {winner.product_name || "—"}
               </div>

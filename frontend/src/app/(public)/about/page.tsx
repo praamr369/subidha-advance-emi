@@ -51,6 +51,17 @@ export default async function AboutPage() {
 
       <PublicTrustBadgeGrid items={PUBLIC_PURPOSE_BADGES} />
 
+      <PublicMarketingBanner
+        eyebrow="Customer trust model"
+        title="Transparent plan rules and operational proof"
+        description="We publish process explanations for plan rules, winner transparency, payment safety, and delivery workflow."
+        items={[
+          { title: "Plan rules", description: "Customers can review eligibility, tenure, and monthly commitment rules before applying." },
+          { title: "Winner transparency", description: "Public winner pages use revealed draw records with masked names." },
+          { title: "Delivery + support", description: "Delivery tracking and warranty/return support remain available post-sale." },
+        ]}
+      />
+
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6">
         <SectionHeader
           eyebrow="Brand story"

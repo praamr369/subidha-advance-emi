@@ -54,6 +54,28 @@ export default async function LuckyPlanPage() {
         cards={ADVANCE_EMI_POLICY.cards}
       />
 
+      <PublicMarketingBanner
+        eyebrow="Winner transparency"
+        title="Public winner proof with privacy protection"
+        description="Published winner records include batch, draw month/date, lucky ID, and commitment proof hash where available. Winner names are masked."
+        items={[
+          { title: "Batch + draw context", description: "Each published winner row is tied to the exact batch and draw month." },
+          { title: "Proof hash visibility", description: "Commit/reveal proof references are shown when available." },
+          { title: "Masked identity", description: "Winner names are masked on public pages for privacy." },
+        ]}
+      />
+
+      <PublicMarketingBanner
+        eyebrow="Operations clarity"
+        title="Payment safety and delivery flow"
+        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior."
+        items={[
+          { title: "Receipt-first payments", description: "Collected payments are receipted and visible in customer payment/receipt pages." },
+          { title: "Delivery as separate workflow", description: "Delivery status is tracked separately from EMI and contract state." },
+          { title: "Warranty and return guidance", description: "Applicable return/warranty support is handled through documented policy and support flow." },
+        ]}
+      />
+
       <FaqBlock items={LUCKY_PLAN_FAQ} />
 
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />

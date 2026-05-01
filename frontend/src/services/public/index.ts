@@ -19,8 +19,8 @@ export type PublicWinner = {
   draw_datetime?: string;
   revealed_at?: string | null;
   lucky_id: string | null;
-  winner_lucky_id: number | null;
   winner_lucky_number?: number | null;
+  winner_name_masked?: string | null;
   product_name?: string | null;
   committed_hash?: string | null;
   public_commit_hash?: string | null;

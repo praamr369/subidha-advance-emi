@@ -37,11 +37,19 @@ def _mask_public_name(raw):
 
     parts = normalized.split(" ")
     if len(parts) == 1:
-        return parts[0]
+        token = parts[0]
+        if len(token) <= 2:
+            return f"{token[0]}*" if token else None
+        return f"{token[:2]}***"
 
     first = parts[0]
     last_initial = parts[-1][:1].upper()
-    return f"{first} {last_initial}."
+    first_masked = (
+        f"{first[:2]}***"
+        if len(first) > 2
+        else f"{first[:1]}*"
+    )
+    return f"{first_masked} {last_initial}."
 
 
 def _serialize_public_winner(draw: LuckyDraw):
@@ -86,9 +94,8 @@ def _serialize_public_winner(draw: LuckyDraw):
         "draw_datetime": draw.draw_date,
         "revealed_at": draw.revealed_at,
         "lucky_id": f"{lucky_number:02d}" if lucky_number is not None else None,
-        "winner_lucky_id": draw.winner_lucky_id_id,
         "winner_lucky_number": lucky_number,
-        "customer_name": customer_name,
+        "winner_name_masked": customer_name,
         "product_name": product_name,
         "committed_hash": draw.committed_hash,
         "public_commit_hash": public_commit_hash,

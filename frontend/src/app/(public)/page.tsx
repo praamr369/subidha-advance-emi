@@ -114,6 +114,17 @@ export default async function PublicHome() {
         ]}
       />
 
+      <PublicMarketingBanner
+        eyebrow="Customer trust"
+        title="Plan rules, payment safety, and delivery transparency"
+        description="Before joining, every customer can review plan rules, payment safeguards, and the delivery process in plain language."
+        items={[
+          { title: "Plan rules", description: "Clear tenure, monthly amount, and winner benefit scope before enrollment." },
+          { title: "Payment safety", description: "Every payment is receipted and visible in the customer portal." },
+          { title: "Delivery process", description: "Delivery scheduling and status are tracked separately from payment records." },
+        ]}
+      />
+
       <PlanCategoryShowcase />
 
       <section className="public-surface space-y-4 p-6">
