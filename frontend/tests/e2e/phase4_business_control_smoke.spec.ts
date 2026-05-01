@@ -76,7 +76,7 @@ test("phase-4 billing, inventory, and reconciliation surfaces share the business
   page,
 }) => {
   await page.goto("/admin/billing/direct-sales");
-  await expect(page.getByRole("heading", { name: "Direct Sales Register" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Direct Sale Workspace" }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Billing route map");
 
   await page.goto("/admin/billing/register");

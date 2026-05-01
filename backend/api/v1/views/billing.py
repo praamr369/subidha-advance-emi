@@ -1,5 +1,8 @@
+import hashlib
+import json
 from decimal import Decimal
 
+from django.db import IntegrityError, transaction
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -75,6 +78,63 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
     search_fields = ["sale_no", "customer_name_snapshot", "customer_phone_snapshot", "delivery_reference"]
     ordering_fields = ["sale_date", "created_at", "sale_no"]
     ordering = ["-sale_date", "-created_at", "-id"]
+
+    def _idempotency_key(self, request):
+        key = (
+            request.headers.get("Idempotency-Key")
+            or request.headers.get("X-Idempotency-Key")
+            or ""
+        ).strip()
+        return key
+
+    def _request_payload_hash(self, request):
+        payload = json.dumps(request.data, sort_keys=True, default=str, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _idempotent_response(self, sale):
+        payload = DirectSaleSerializer(sale, context=self.get_serializer_context())
+        return Response(payload.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        idempotency_key = self._idempotency_key(request)
+        payload_hash = self._request_payload_hash(request) if idempotency_key else ""
+        if idempotency_key:
+            sale = DirectSale.objects.filter(idempotency_key=idempotency_key).first()
+            if sale:
+                if sale.idempotency_payload_hash != payload_hash:
+                    return Response(
+                        {"detail": "Idempotency-Key was already used with a different direct-sale payload."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                return self._idempotent_response(sale)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                save_kwargs = (
+                    {
+                        "idempotency_key": idempotency_key,
+                        "idempotency_payload_hash": payload_hash,
+                    }
+                    if idempotency_key
+                    else {}
+                )
+                sale = serializer.save(**save_kwargs)
+        except IntegrityError:
+            if idempotency_key:
+                sale = DirectSale.objects.filter(idempotency_key=idempotency_key).first()
+                if sale and sale.idempotency_payload_hash == payload_hash:
+                    return self._idempotent_response(sale)
+            raise
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            DirectSaleSerializer(sale, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()

@@ -20,6 +20,13 @@ def _as_decimal(value, fallback: str = "0") -> Decimal:
         return Decimal(fallback)
 
 
+def _as_int(value, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def _product_search_queryset(query: str):
     queryset = Product.objects.select_related("inventory_profile").order_by("name", "id")
     if not query:
@@ -114,12 +121,20 @@ class AdminBillingProductSearchView(APIView):
         q = (request.query_params.get("q") or "").strip()
         stock_filter = (request.query_params.get("stock") or "all").strip().lower()
         include_inactive = request.query_params.get("include_inactive") in {"1", "true", "yes"}
+        include_inventory = request.query_params.get("include_inventory") in {"1", "true", "yes"}
+        is_direct_sale_enabled = request.query_params.get("direct_sale_enabled")
+        page = max(_as_int(request.query_params.get("page"), 1), 1)
+        page_size = min(max(_as_int(request.query_params.get("page_size"), 25), 1), 100)
         queryset = _product_search_queryset(q)
         if not include_inactive:
             queryset = queryset.filter(is_active=True)
+        if is_direct_sale_enabled in {"1", "true", "yes"}:
+            queryset = queryset.filter(is_direct_sale_enabled=True)
 
         rows = []
-        for product in queryset[:100]:
+        start = (page - 1) * page_size
+        end = start + page_size
+        for product in queryset[start:end]:
             row = _serialize_product_row(product, include_extended=True)
             in_stock = bool(row["inventory_status"]["is_in_stock"])
             available = _as_decimal(row["inventory_status"]["available"], "0")
@@ -129,8 +144,18 @@ class AdminBillingProductSearchView(APIView):
                 continue
             if stock_filter == "out_of_stock" and in_stock:
                 continue
+            if include_inventory:
+                inventory_item = getattr(product, "inventory_profile", None)
+                row["inventory_item_id"] = getattr(inventory_item, "id", None)
+                row["current_stock_qty"] = row["inventory_status"]["available"]
+                row["stock_tracking_enabled"] = bool(getattr(inventory_item, "stock_tracking_enabled", False))
+                row["delivery_stock_bridge_enabled"] = bool(getattr(inventory_item, "delivery_stock_bridge_enabled", False))
+                row["inventory_ready"] = bool(inventory_item is not None)
+                row["is_emi_enabled"] = bool(getattr(product, "is_emi_enabled", False))
+                row["is_rent_enabled"] = bool(getattr(product, "is_rent_enabled", False))
+                row["is_lease_enabled"] = bool(getattr(product, "is_lease_enabled", False))
             rows.append(row)
-        return Response({"count": len(rows), "results": rows})
+        return Response({"count": queryset.count(), "page": page, "page_size": page_size, "results": rows})
 
 
 class CashierBillingProductSearchView(APIView):

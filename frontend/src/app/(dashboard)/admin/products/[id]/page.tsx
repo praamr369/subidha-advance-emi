@@ -29,6 +29,8 @@ type ProductDetailRecord = {
   created_at?: string | null;
   inventory_profile_id?: number | null;
   inventory_ready?: boolean;
+  inventory_stock_tracking_enabled?: boolean;
+  inventory_delivery_stock_bridge_enabled?: boolean;
   is_active?: boolean;
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
@@ -160,6 +162,8 @@ function normalizeProductDetail(
           ? null
           : undefined,
     inventory_ready: toBoolean(raw.inventory_ready, false),
+    inventory_stock_tracking_enabled: toBoolean(raw.inventory_stock_tracking_enabled, false),
+    inventory_delivery_stock_bridge_enabled: toBoolean(raw.inventory_delivery_stock_bridge_enabled, false),
     is_active: toBoolean(raw.is_active, true),
     is_emi_enabled: toBoolean(raw.is_emi_enabled, true),
     is_rent_enabled: toBoolean(raw.is_rent_enabled, false),
@@ -703,7 +707,26 @@ export default function AdminProductDetailPage() {
                     >
                       Lease Ready {product.is_lease_ready ? "Yes" : "No"}
                     </span>
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                        capabilityTone(Boolean(product.inventory_ready)),
+                      ].join(" ")}
+                    >
+                      Inventory Profile {product.inventory_ready ? "Ready" : "Not Ready"}
+                    </span>
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
+                        capabilityTone(Boolean(product.inventory_stock_tracking_enabled)),
+                      ].join(" ")}
+                    >
+                      Stock Tracking {product.inventory_stock_tracking_enabled ? "Enabled" : "Disabled"}
+                    </span>
                   </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Changes affect future onboarding and billing only. Existing contracts keep their saved pricing and plan snapshots.
+                  </p>
                 </div>
               </DetailPanel>
             </section>

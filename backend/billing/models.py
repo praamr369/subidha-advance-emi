@@ -186,6 +186,8 @@ class DirectSale(BillingTimeStampedModel):
     customer_name_snapshot = models.CharField(max_length=160, blank=True, default="")
     customer_phone_snapshot = models.CharField(max_length=20, blank=True, default="")
     customer_gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -237,6 +239,8 @@ class DirectSale(BillingTimeStampedModel):
         self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
         self.customer_phone_snapshot = (self.customer_phone_snapshot or "").strip()
         self.customer_gstin = (self.customer_gstin or "").strip().upper() or None
+        self.idempotency_key = (self.idempotency_key or "").strip() or None
+        self.idempotency_payload_hash = (self.idempotency_payload_hash or "").strip()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = (

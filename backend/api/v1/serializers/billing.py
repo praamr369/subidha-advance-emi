@@ -79,6 +79,15 @@ class DirectSaleCollectionSerializer(serializers.Serializer):
 class DirectSaleLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    create_purchase_requirement = serializers.BooleanField(write_only=True, required=False, default=False)
+    requirement_quantity = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    requirement_note = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = DirectSaleLine
@@ -102,6 +111,9 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
             "sku_snapshot",
             "unit_of_measure_snapshot",
             "hsn_sac_code",
+            "create_purchase_requirement",
+            "requirement_quantity",
+            "requirement_note",
             "created_at",
             "updated_at",
         ]
@@ -113,6 +125,56 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        extra_kwargs = {
+            "unit_price": {"required": False},
+            "discount_amount": {"required": False},
+            "taxable_value": {"required": False},
+            "cgst_amount": {"required": False},
+            "sgst_amount": {"required": False},
+            "igst_amount": {"required": False},
+            "line_total": {"required": False},
+        }
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        product = attrs.get("product") or getattr(getattr(self, "instance", None), "product", None)
+        if product is None:
+            raise serializers.ValidationError({"product": "Product is required."})
+
+        quantity = Decimal(str(attrs.get("quantity") or "0"))
+        if quantity <= Decimal("0.000"):
+            raise serializers.ValidationError({"quantity": "Quantity must be greater than zero."})
+
+        unit_price = _money(attrs.get("unit_price") if attrs.get("unit_price") is not None else product.base_price)
+        discount_amount = _money(attrs.get("discount_amount"))
+        if discount_amount < Decimal("0.00"):
+            raise serializers.ValidationError({"discount_amount": "Discount amount cannot be negative."})
+
+        gross = (quantity * unit_price).quantize(Decimal("0.01"))
+        if discount_amount > gross:
+            raise serializers.ValidationError({"discount_amount": "Discount amount cannot exceed line gross amount."})
+
+        taxable_value = (gross - discount_amount).quantize(Decimal("0.01"))
+        gst_rate = Decimal(str(attrs.get("gst_rate") or "0.00"))
+        tax_amount = (taxable_value * gst_rate / Decimal("100")).quantize(Decimal("0.01"))
+        cgst_amount = _money(attrs.get("cgst_amount")) if "cgst_amount" in attrs else (tax_amount / Decimal("2")).quantize(Decimal("0.01"))
+        sgst_amount = _money(attrs.get("sgst_amount")) if "sgst_amount" in attrs else (tax_amount - cgst_amount).quantize(Decimal("0.01"))
+        igst_amount = _money(attrs.get("igst_amount")) if "igst_amount" in attrs else Decimal("0.00")
+        line_total = (taxable_value + cgst_amount + sgst_amount + igst_amount).quantize(Decimal("0.01"))
+
+        attrs["unit_price"] = unit_price
+        attrs["discount_amount"] = discount_amount
+        attrs["taxable_value"] = taxable_value
+        attrs["cgst_amount"] = cgst_amount
+        attrs["sgst_amount"] = sgst_amount
+        attrs["igst_amount"] = igst_amount
+        attrs["line_total"] = line_total
+
+        requirement_quantity = attrs.get("requirement_quantity")
+        if requirement_quantity is not None and Decimal(str(requirement_quantity)) <= Decimal("0.000"):
+            raise serializers.ValidationError({"requirement_quantity": "Requirement quantity must be greater than zero."})
+        attrs["requirement_note"] = (attrs.get("requirement_note") or "").strip()
+        return attrs
 
 
 class BillingInvoiceLineSerializer(serializers.ModelSerializer):

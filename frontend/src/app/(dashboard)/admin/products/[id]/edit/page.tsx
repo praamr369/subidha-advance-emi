@@ -33,6 +33,12 @@ type ProductDetailRecord = {
   base_price: string;
   image?: string | null;
   created_at?: string | null;
+  is_active?: boolean;
+  plan_type_default?: "EMI" | "RENT" | "LEASE";
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
+  is_direct_sale_enabled?: boolean;
 };
 
 type UpdateProductResponse = {
@@ -46,6 +52,12 @@ type UpdateProductResponse = {
   description?: string | null;
   base_price?: string;
   image?: string | null;
+  is_active?: boolean;
+  plan_type_default?: "EMI" | "RENT" | "LEASE";
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
+  is_direct_sale_enabled?: boolean;
 };
 
 type FieldErrors = Partial<
@@ -58,7 +70,10 @@ type FieldErrors = Partial<
     | "subcategory"
     | "description"
     | "base_price"
-    | "image",
+    | "image"
+    | "is_active"
+    | "plan_type_default"
+    | "is_emi_enabled",
     string
   >
 >;
@@ -87,6 +102,14 @@ function toNullableString(value: unknown): string | null | undefined {
   return undefined;
 }
 
+function toBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizePlanType(value: unknown): "EMI" | "RENT" | "LEASE" {
+  return value === "RENT" || value === "LEASE" ? value : "EMI";
+}
+
 function normalizeProductDetail(
   raw: Record<string, unknown>
 ): ProductDetailRecord {
@@ -106,6 +129,12 @@ function normalizeProductDetail(
         toNullableString(raw.image) ?? toNullableString(raw.image_url)
       ) ?? null,
     created_at: toNullableString(raw.created_at),
+    is_active: toBoolean(raw.is_active, true),
+    plan_type_default: normalizePlanType(raw.plan_type_default),
+    is_emi_enabled: toBoolean(raw.is_emi_enabled, true),
+    is_rent_enabled: toBoolean(raw.is_rent_enabled, false),
+    is_lease_enabled: toBoolean(raw.is_lease_enabled, false),
+    is_direct_sale_enabled: toBoolean(raw.is_direct_sale_enabled, true),
   };
 }
 
@@ -145,6 +174,8 @@ function parseFieldErrors(error: unknown): FieldErrors {
     pick("description");
     pick("base_price", ["base_price", "price"]);
     pick("image");
+    pick("is_emi_enabled");
+    pick("plan_type_default");
 
     return next;
   } catch {
@@ -220,6 +251,12 @@ export default function AdminProductEditPage() {
     unit_of_measure_options: ["PCS"],
   });
   const [basePrice, setBasePrice] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [planTypeDefault, setPlanTypeDefault] = useState<"EMI" | "RENT" | "LEASE">("EMI");
+  const [isEmiEnabled, setIsEmiEnabled] = useState(true);
+  const [isRentEnabled, setIsRentEnabled] = useState(false);
+  const [isLeaseEnabled, setIsLeaseEnabled] = useState(false);
+  const [isDirectSaleEnabled, setIsDirectSaleEnabled] = useState(true);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
     null
@@ -284,6 +321,12 @@ export default function AdminProductEditPage() {
         setSubcategory(normalized.subcategory || "");
         setDescription(normalized.description || "");
         setBasePrice(normalized.base_price || "");
+        setIsActive(normalized.is_active !== false);
+        setPlanTypeDefault(normalized.plan_type_default || "EMI");
+        setIsEmiEnabled(normalized.is_emi_enabled !== false);
+        setIsRentEnabled(Boolean(normalized.is_rent_enabled));
+        setIsLeaseEnabled(Boolean(normalized.is_lease_enabled));
+        setIsDirectSaleEnabled(normalized.is_direct_sale_enabled !== false);
         setSelectedImageFile(null);
         setSelectedImagePreview(null);
         setRemoveExistingImage(false);
@@ -385,6 +428,12 @@ export default function AdminProductEditPage() {
     setSubcategory(product.subcategory || "");
     setDescription(product.description || "");
     setBasePrice(product.base_price || "");
+    setIsActive(product.is_active !== false);
+    setPlanTypeDefault(product.plan_type_default || "EMI");
+    setIsEmiEnabled(product.is_emi_enabled !== false);
+    setIsRentEnabled(Boolean(product.is_rent_enabled));
+    setIsLeaseEnabled(Boolean(product.is_lease_enabled));
+    setIsDirectSaleEnabled(product.is_direct_sale_enabled !== false);
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
     setRemoveExistingImage(false);
@@ -418,6 +467,22 @@ export default function AdminProductEditPage() {
       next.base_price = "Base price is required.";
     } else if (!Number.isFinite(price) || price <= 0) {
       next.base_price = "Enter a valid base price greater than zero.";
+    }
+
+    if (!isEmiEnabled && !isRentEnabled && !isLeaseEnabled && !isDirectSaleEnabled) {
+      next.is_emi_enabled = "At least one product mode must remain enabled.";
+    }
+
+    if (planTypeDefault === "EMI" && !isEmiEnabled) {
+      next.plan_type_default = "Default plan type EMI requires EMI to be enabled.";
+    }
+
+    if (planTypeDefault === "RENT" && !isRentEnabled) {
+      next.plan_type_default = "Default plan type RENT requires rent to be enabled.";
+    }
+
+    if (planTypeDefault === "LEASE" && !isLeaseEnabled) {
+      next.plan_type_default = "Default plan type LEASE requires lease to be enabled.";
     }
 
     if (selectedImageFile) {
@@ -473,6 +538,12 @@ export default function AdminProductEditPage() {
       formData.append("subcategory", trimmedSubcategory);
       formData.append("description", trimmedDescription);
       formData.append("base_price", trimmedBasePrice);
+      formData.append("is_active", String(isActive));
+      formData.append("plan_type_default", planTypeDefault);
+      formData.append("is_emi_enabled", String(isEmiEnabled));
+      formData.append("is_rent_enabled", String(isRentEnabled));
+      formData.append("is_lease_enabled", String(isLeaseEnabled));
+      formData.append("is_direct_sale_enabled", String(isDirectSaleEnabled));
 
       if (removeExistingImage) {
         formData.append("clear_image", "true");
@@ -505,6 +576,12 @@ export default function AdminProductEditPage() {
             base_price: trimmedBasePrice,
             image: null,
             created_at: null,
+            is_active: isActive,
+            plan_type_default: planTypeDefault,
+            is_emi_enabled: isEmiEnabled,
+            is_rent_enabled: isRentEnabled,
+            is_lease_enabled: isLeaseEnabled,
+            is_direct_sale_enabled: isDirectSaleEnabled,
           } as ProductDetailRecord);
 
         return {
@@ -539,6 +616,12 @@ export default function AdminProductEditPage() {
               : removeExistingImage
                 ? null
                 : base.image,
+          is_active: updated.is_active ?? isActive,
+          plan_type_default: updated.plan_type_default ?? planTypeDefault,
+          is_emi_enabled: updated.is_emi_enabled ?? isEmiEnabled,
+          is_rent_enabled: updated.is_rent_enabled ?? isRentEnabled,
+          is_lease_enabled: updated.is_lease_enabled ?? isLeaseEnabled,
+          is_direct_sale_enabled: updated.is_direct_sale_enabled ?? isDirectSaleEnabled,
         };
       });
 
@@ -871,6 +954,78 @@ export default function AdminProductEditPage() {
                       className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     <FieldError message={fieldErrors.base_price} />
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Product Capabilities</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Changes affect future onboarding and billing only. Existing contracts keep their saved pricing and plan snapshots.
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={isActive}
+                          onChange={(event) => {
+                            setIsActive(event.target.checked);
+                            setError(null);
+                            setSaveSuccess(null);
+                          }}
+                          disabled={saving}
+                        />
+                        Active
+                      </label>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Default Plan Type</span>
+                        <select
+                          value={planTypeDefault}
+                          onChange={(event) => {
+                            setPlanTypeDefault(event.target.value as "EMI" | "RENT" | "LEASE");
+                            setError(null);
+                            setSaveSuccess(null);
+                          }}
+                          disabled={saving}
+                          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="EMI">EMI</option>
+                          <option value="RENT">Rent</option>
+                          <option value="LEASE">Lease</option>
+                        </select>
+                        <FieldError message={fieldErrors.plan_type_default} />
+                      </label>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[
+                          ["EMI", isEmiEnabled, setIsEmiEnabled],
+                          ["Rent", isRentEnabled, setIsRentEnabled],
+                          ["Lease", isLeaseEnabled, setIsLeaseEnabled],
+                          ["Direct Sale", isDirectSaleEnabled, setIsDirectSaleEnabled],
+                        ].map(([label, checked, setter]) => (
+                          <label
+                            key={String(label)}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(checked)}
+                              onChange={(event) => {
+                                (setter as (value: boolean) => void)(event.target.checked);
+                                setError(null);
+                                setSaveSuccess(null);
+                              }}
+                              disabled={saving}
+                            />
+                            {String(label)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <FieldError message={fieldErrors.is_emi_enabled} />
                   </div>
 
                   <div>

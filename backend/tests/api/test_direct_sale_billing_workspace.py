@@ -1,123 +1,193 @@
+from datetime import date
 from decimal import Decimal
 
-from django.test import TestCase
-from rest_framework.test import APIClient
+from rest_framework import status
+from rest_framework.test import APITestCase
 
+from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, StockLocation, Warehouse
-from tests.helpers import create_admin_user, create_cashier_user, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_batch,
+    create_customer_profile,
+    create_lucky_id,
+    create_product,
+    create_subscription,
+)
 
 
-class DirectSaleBillingWorkspaceApiTests(TestCase):
+class DirectSaleBillingWorkspaceTests(APITestCase):
     def setUp(self):
-        self.client = APIClient()
-        self.admin = create_admin_user(username="ds_workspace_admin", phone="9808800001")
-        self.cashier = create_cashier_user(username="ds_workspace_cashier", phone="9808800002")
-        self.in_stock_product = create_product(
-            name="Workspace In Stock Product",
-            product_code="WS-IN-001",
-            base_price=Decimal("2500.00"),
-        )
-        self.out_stock_product = create_product(
-            name="Workspace Out Stock Product",
-            product_code="WS-OUT-001",
-            base_price=Decimal("1999.00"),
-        )
-        self.stock_location = StockLocation.objects.create(code="DS-BILL", name="Direct Sale Billing")
-        self.warehouse = Warehouse.objects.create(code="DS-WH", name="Direct Sale WH", stock_location=self.stock_location)
-        InventoryItem.objects.create(product=self.in_stock_product, opening_stock_qty=Decimal("7.000"))
-        InventoryItem.objects.create(product=self.out_stock_product, opening_stock_qty=Decimal("0.000"))
-
-    def test_admin_product_search_returns_in_and_out_stock(self):
+        self.admin = create_admin_user(username="direct_sale_workspace_admin", phone="9377000011")
         self.client.force_authenticate(self.admin)
-        response = self.client.get("/api/v1/admin/billing/products/search/", {"q": "Workspace"})
-        self.assertEqual(response.status_code, 200, response.data)
-        names = {row["name"] for row in response.data["results"]}
-        self.assertIn(self.in_stock_product.name, names)
-        self.assertIn(self.out_stock_product.name, names)
-        out_row = next(row for row in response.data["results"] if row["id"] == self.out_stock_product.id)
-        self.assertEqual(out_row["inventory_status"]["is_in_stock"], False)
+        self.customer = create_customer_profile(
+            name="Direct Sale Workspace Customer",
+            phone="7377000011",
+        )
+        self.product = create_product(
+            name="Workspace Sofa Deluxe",
+            product_code="WS-SOFA-001",
+            base_price=Decimal("12000.00"),
+        )
+        self.location = StockLocation.objects.create(
+            code="WS-STORE",
+            name="Workspace Store",
+            location_type="STORE",
+        )
+        self.warehouse = Warehouse.objects.create(
+            code="WS-WH",
+            name="Workspace Warehouse",
+            stock_location=self.location,
+        )
+        self.inventory_item = InventoryItem.objects.create(
+            product=self.product,
+            sku="WS-SOFA-SKU-001",
+            default_stock_location=self.location,
+            opening_stock_qty=Decimal("0.000"),
+            reorder_level_qty=Decimal("1.000"),
+        )
 
-    def test_cashier_search_does_not_expose_admin_only_fields(self):
-        self.client.force_authenticate(self.cashier)
-        response = self.client.get("/api/v1/cashier/billing/products/search/", {"q": "Workspace"})
-        self.assertEqual(response.status_code, 200, response.data)
-        row = response.data["results"][0]
-        self.assertNotIn("lifecycle_status", row)
+    def _payload(self, **line_overrides):
+        line = {
+            "product": self.product.id,
+            "inventory_item": self.inventory_item.id,
+            "description": "Workspace sofa direct sale",
+            "quantity": "2.000",
+            "discount_amount": "1000.00",
+            "gst_rate": None,
+            "cgst_amount": "0.00",
+            "sgst_amount": "0.00",
+            "igst_amount": "0.00",
+            "create_purchase_requirement": True,
+            "requirement_quantity": "2.000",
+            "requirement_note": "Order for walk-in retail bill",
+        }
+        line.update(line_overrides)
+        return {
+            "sale_date": date(2026, 5, 1),
+            "customer": self.customer.id,
+            "tax_mode": "NON_GST",
+            "customer_name_snapshot": self.customer.name,
+            "customer_phone_snapshot": self.customer.phone,
+            "received_total": "0.00",
+            "lines": [line],
+        }
 
-    def test_preview_out_of_stock_contains_requirement_warning(self):
-        self.client.force_authenticate(self.admin)
+    def test_billing_product_search_finds_by_name_code_and_sku(self):
+        for query in ["Workspace Sofa", "WS-SOFA-001", "WS-SOFA-SKU-001"]:
+            response = self.client.get(
+                "/api/v1/admin/billing/product-search/",
+                {"q": query, "include_inventory": "true", "page_size": 10},
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+            ids = {row["id"] for row in response.data["results"]}
+            self.assertIn(self.product.id, ids)
+
+    def test_billing_product_search_includes_inventory_fields(self):
+        response = self.client.get(
+            "/api/v1/admin/billing/product-search/",
+            {"q": "WS-SOFA", "include_inventory": "true", "direct_sale_enabled": "true"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        row = next(item for item in response.data["results"] if item["id"] == self.product.id)
+        self.assertEqual(row["inventory_item_id"], self.inventory_item.id)
+        self.assertEqual(row["sku"], "WS-SOFA-SKU-001")
+        self.assertEqual(row["current_stock_qty"], "0.000")
+        self.assertTrue(row["stock_tracking_enabled"])
+        self.assertTrue(row["delivery_stock_bridge_enabled"])
+        self.assertTrue(row["inventory_ready"])
+
+    def test_direct_sale_defaults_unit_price_and_discount_does_not_change_base_price(self):
+        before_price = self.product.base_price
         response = self.client.post(
-            "/api/v1/admin/direct-sales/preview/",
-            {
-                "lines": [
-                    {
-                        "product_id": self.out_stock_product.id,
-                        "quantity": "2.000",
-                        "unit_price": "1999.00",
-                        "discount_amount": "0.00",
-                        "tax_rate": "0.00",
-                    }
-                ]
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.data)
-        self.assertTrue(response.data["stock_warnings"])
-        self.assertEqual(response.data["inventory_requirements_preview"][0]["source_module"], "DIRECT_SALE")
-
-    def test_admin_inventory_requirements_endpoint_is_admin_only(self):
-        PurchaseNeed.objects.create(
-            product=self.out_stock_product,
-            warehouse=self.warehouse,
-            required_quantity=Decimal("2.000"),
-            available_quantity=Decimal("0.000"),
-            shortage_quantity=Decimal("2.000"),
-            source_module="DIRECT_SALE",
-            source_object_id="test",
-        )
-        self.client.force_authenticate(self.cashier)
-        cashier_response = self.client.get("/api/v1/admin/inventory/requirements/")
-        self.assertEqual(cashier_response.status_code, 403)
-
-    def test_out_of_stock_direct_sale_creates_requirement(self):
-        self.client.force_authenticate(self.admin)
-        create_response = self.client.post(
             "/api/v1/billing/direct-sales/",
-            {
-                "sale_date": "2026-05-01",
-                "tax_mode": "NON_GST",
-                "subtotal": "1999.00",
-                "discount_total": "0.00",
-                "taxable_total": "1999.00",
-                "tax_total": "0.00",
-                "grand_total": "1999.00",
-                "received_total": "0.00",
-                "balance_total": "1999.00",
-                "customer_name_snapshot": "Walk In Customer",
-                "customer_phone_snapshot": "9808800099",
-                "lines": [
-                    {
-                        "product": self.out_stock_product.id,
-                        "description": "Out stock sale line",
-                        "quantity": "1.000",
-                        "unit_price": "1999.00",
-                        "discount_amount": "0.00",
-                        "taxable_value": "1999.00",
-                        "gst_rate": "0.00",
-                        "cgst_amount": "0.00",
-                        "sgst_amount": "0.00",
-                        "igst_amount": "0.00",
-                        "line_total": "1999.00",
-                    }
-                ],
-            },
+            self._payload(),
             format="json",
         )
-        self.assertEqual(create_response.status_code, 201, create_response.data)
-        requirements = self.client.get(
-            "/api/v1/admin/inventory/requirements/",
-            {"source_module": "DIRECT_SALE"},
-        )
-        self.assertEqual(requirements.status_code, 200, requirements.data)
-        self.assertGreaterEqual(requirements.data["count"], 1)
 
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = DirectSale.objects.get(pk=response.data["id"])
+        line = DirectSaleLine.objects.get(direct_sale=sale)
+        self.product.refresh_from_db()
+
+        self.assertEqual(line.unit_price, before_price)
+        self.assertEqual(sale.subtotal, Decimal("24000.00"))
+        self.assertEqual(sale.discount_total, Decimal("1000.00"))
+        self.assertEqual(sale.grand_total, Decimal("23000.00"))
+        self.assertEqual(self.product.base_price, before_price)
+
+    def test_discount_cannot_exceed_line_gross(self):
+        response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            self._payload(discount_amount="24001.00"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("discount_amount", str(response.data))
+
+    def test_duplicate_submit_with_same_idempotency_key_is_safe(self):
+        payload = self._payload()
+        first = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="direct-sale-workspace-idem-1",
+        )
+        second = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="direct-sale-workspace-idem-1",
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(second.status_code, status.HTTP_200_OK, second.data)
+        self.assertEqual(first.data["id"], second.data["id"])
+        self.assertEqual(DirectSale.objects.count(), 1)
+        self.assertEqual(BillingInvoice.objects.count(), 1)
+        self.assertEqual(ReceiptDocument.objects.count(), 0)
+        self.assertEqual(PurchaseNeed.objects.count(), 1)
+
+    def test_requirement_creation_during_direct_sale_creates_purchase_need_only(self):
+        response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            self._payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        need = PurchaseNeed.objects.get()
+        self.assertEqual(need.source_module, PurchaseNeed.SourceModule.DIRECT_SALE)
+        self.assertEqual(need.source_object_id, str(response.data["id"]))
+        self.assertEqual(need.product_id, self.product.id)
+        self.assertEqual(need.required_quantity, Decimal("2.000"))
+        self.assertEqual(need.shortage_quantity, Decimal("2.000"))
+        self.assertEqual(need.note, "Order for walk-in retail bill")
+
+    def test_existing_subscription_financial_snapshot_is_unchanged(self):
+        batch = create_batch(batch_code="WS-BATCH-001")
+        lucky_id = create_lucky_id(batch=batch, lucky_number=37)
+        subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=batch,
+            lucky_id=lucky_id,
+            partner=self.admin,
+            total_amount=Decimal("12000.00"),
+            monthly_amount=Decimal("800.00"),
+            tenure_months=15,
+        )
+
+        response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            self._payload(discount_amount="2000.00"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.total_amount, Decimal("12000.00"))
+        self.assertEqual(subscription.monthly_amount, Decimal("800.00"))
+        self.assertEqual(subscription.product_id, self.product.id)

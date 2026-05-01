@@ -112,6 +112,26 @@ def _resolve_line_inventory_item(*, product, inventory_item):
     return InventoryItem.objects.filter(product=product).first()
 
 
+DIRECT_SALE_LINE_MODEL_FIELDS = {
+    "product",
+    "inventory_item",
+    "description",
+    "quantity",
+    "unit_price",
+    "discount_amount",
+    "taxable_value",
+    "gst_rate",
+    "cgst_amount",
+    "sgst_amount",
+    "igst_amount",
+    "line_total",
+    "product_code_snapshot",
+    "sku_snapshot",
+    "unit_of_measure_snapshot",
+    "hsn_sac_code",
+}
+
+
 def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
     payloads: list[dict] = []
     for line in lines:
@@ -127,24 +147,38 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
             or getattr(product, "unit_of_measure", None)
             or "PCS"
         )
+        quantity = Decimal(str(line.get("quantity") or "0.000"))
+        unit_price = _money(line.get("unit_price") if line.get("unit_price") is not None else product.base_price)
+        discount_amount = _money(line.get("discount_amount"))
+        taxable_value = _money(
+            line.get("taxable_value")
+            if line.get("taxable_value") is not None
+            else ((quantity * unit_price).quantize(Decimal("0.01")) - discount_amount)
+        )
+        cgst_amount = _money(line.get("cgst_amount"))
+        sgst_amount = _money(line.get("sgst_amount"))
+        igst_amount = _money(line.get("igst_amount"))
         payloads.append(
             {
                 "product": product,
                 "inventory_item": inventory_item,
                 "description": (line.get("description") or "").strip(),
-                "quantity": line.get("quantity"),
-                "unit_price": line.get("unit_price"),
-                "discount_amount": line.get("discount_amount") or Decimal("0.00"),
-                "taxable_value": line.get("taxable_value") or Decimal("0.00"),
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "discount_amount": discount_amount,
+                "taxable_value": taxable_value,
                 "gst_rate": line.get("gst_rate"),
-                "cgst_amount": line.get("cgst_amount") or Decimal("0.00"),
-                "sgst_amount": line.get("sgst_amount") or Decimal("0.00"),
-                "igst_amount": line.get("igst_amount") or Decimal("0.00"),
-                "line_total": line.get("line_total") or Decimal("0.00"),
+                "cgst_amount": cgst_amount,
+                "sgst_amount": sgst_amount,
+                "igst_amount": igst_amount,
+                "line_total": line.get("line_total") or taxable_value + cgst_amount + sgst_amount + igst_amount,
                 "product_code_snapshot": product_code,
                 "sku_snapshot": inventory_sku,
                 "unit_of_measure_snapshot": str(unit_of_measure).strip().upper(),
                 "hsn_sac_code": (line.get("hsn_sac_code") or "").strip().upper(),
+                "_create_purchase_requirement": bool(line.get("create_purchase_requirement")),
+                "_requirement_quantity": line.get("requirement_quantity"),
+                "_requirement_note": (line.get("requirement_note") or "").strip(),
             }
         )
     return payloads
@@ -181,7 +215,13 @@ def _replace_direct_sale_lines(*, sale: DirectSale, line_payloads: list[dict]):
     if not line_payloads:
         return
     DirectSaleLine.objects.bulk_create(
-        [DirectSaleLine(direct_sale=sale, **payload) for payload in line_payloads]
+        [
+            DirectSaleLine(
+                direct_sale=sale,
+                **{key: payload[key] for key in DIRECT_SALE_LINE_MODEL_FIELDS if key in payload},
+            )
+            for payload in line_payloads
+        ]
     )
 
 
@@ -190,17 +230,21 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
     customer_id = sale.customer_id
     for payload in line_payloads:
         inventory_item = payload.get("inventory_item")
-        if inventory_item is None:
-            continue
         required_qty = Decimal(str(payload.get("quantity") or "0"))
+        explicit_requirement = bool(payload.get("_create_purchase_requirement"))
+        explicit_requirement_qty = payload.get("_requirement_quantity")
+        if explicit_requirement and explicit_requirement_qty:
+            required_qty = Decimal(str(explicit_requirement_qty))
         if required_qty <= Decimal("0"):
             continue
-        available_qty = Decimal(str(inventory_item.available_qty()))
+        available_qty = Decimal(str(inventory_item.available_qty())) if inventory_item is not None else Decimal("0.000")
         shortage_qty = required_qty - available_qty
-        if shortage_qty <= Decimal("0"):
+        if shortage_qty <= Decimal("0") and not explicit_requirement:
             continue
+        shortage_qty = max(Decimal("0.000"), shortage_qty)
         product = payload.get("product")
         product_name = getattr(product, "name", "") if product is not None else ""
+        note = payload.get("_requirement_note") or f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}"
         upsert_direct_sale_purchase_need(
             signal=StockNeedSignal(
                 product_id=product.id,
@@ -209,7 +253,7 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
                 shortage_quantity=shortage_qty,
                 source_object_id=source_object_id,
                 customer_id=customer_id,
-                note=f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}",
+                note=note,
             ),
             created_by=actor,
         )

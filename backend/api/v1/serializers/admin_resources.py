@@ -1044,6 +1044,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     unit_of_measure_master_name = serializers.CharField(source="unit_of_measure_master.name", read_only=True)
     inventory_profile_id = serializers.SerializerMethodField()
     inventory_ready = serializers.SerializerMethodField()
+    inventory_stock_tracking_enabled = serializers.SerializerMethodField()
+    inventory_delivery_stock_bridge_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -1066,6 +1068,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "image",
             "clear_image",
             "is_active",
+            "plan_type_default",
             "is_emi_enabled",
             "is_rent_enabled",
             "is_lease_enabled",
@@ -1076,6 +1079,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "lifecycle_status",
             "inventory_profile_id",
             "inventory_ready",
+            "inventory_stock_tracking_enabled",
+            "inventory_delivery_stock_bridge_enabled",
             "created_at",
         ]
         read_only_fields = [
@@ -1085,6 +1090,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "is_lease_ready",
             "inventory_profile_id",
             "inventory_ready",
+            "inventory_stock_tracking_enabled",
+            "inventory_delivery_stock_bridge_enabled",
         ]
 
     def validate(self, data):
@@ -1160,6 +1167,10 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "is_lease_enabled",
             instance.is_lease_enabled if instance else False,
         )
+        is_direct_sale_enabled = data.get(
+            "is_direct_sale_enabled",
+            instance.is_direct_sale_enabled if instance else True,
+        )
         plan_type_default = data.get(
             "plan_type_default",
             instance.plan_type_default if instance else PlanType.EMI,
@@ -1183,6 +1194,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             is_emi_enabled=is_emi_enabled,
             is_rent_enabled=is_rent_enabled,
             is_lease_enabled=is_lease_enabled,
+            is_direct_sale_enabled=is_direct_sale_enabled,
         )
 
         if instance:
@@ -1206,6 +1218,14 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 
     def get_inventory_ready(self, obj):
         return self.get_inventory_profile_id(obj) is not None
+
+    def get_inventory_stock_tracking_enabled(self, obj):
+        profile = getattr(obj, "inventory_profile", None)
+        return bool(getattr(profile, "stock_tracking_enabled", False)) if profile is not None else False
+
+    def get_inventory_delivery_stock_bridge_enabled(self, obj):
+        profile = getattr(obj, "inventory_profile", None)
+        return bool(getattr(profile, "delivery_stock_bridge_enabled", False)) if profile is not None else False
 
     def create(self, validated_data):
         validated_data.pop("clear_image", None)

@@ -11,8 +11,16 @@ export type BillingProductSearchRow = {
   sale_price: string;
   image?: string | null;
   is_active: boolean;
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
   is_direct_sale_enabled?: boolean;
   lifecycle_status?: string | null;
+  inventory_item_id?: number | null;
+  current_stock_qty?: string | null;
+  stock_tracking_enabled?: boolean;
+  delivery_stock_bridge_enabled?: boolean;
+  inventory_ready?: boolean;
   inventory_status: {
     on_hand: string;
     reserved: string;
@@ -26,6 +34,8 @@ export type BillingProductSearchRow = {
 
 export type BillingProductSearchResponse = {
   count: number;
+  page?: number;
+  page_size?: number;
   results: BillingProductSearchRow[];
 };
 
@@ -92,15 +102,25 @@ export async function searchAdminBillingProducts(params: {
   q?: string;
   stock?: "all" | "in_stock" | "low_stock" | "out_of_stock";
   include_inactive?: boolean;
+  include_inventory?: boolean;
+  direct_sale_enabled?: boolean;
+  page?: number;
+  page_size?: number;
 }): Promise<BillingProductSearchResponse> {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   if (params.stock) qs.set("stock", params.stock);
   if (params.include_inactive) qs.set("include_inactive", "1");
+  if (params.include_inventory) qs.set("include_inventory", "true");
+  if (params.direct_sale_enabled) qs.set("direct_sale_enabled", "true");
+  if (params.page) qs.set("page", String(params.page));
+  if (params.page_size) qs.set("page_size", String(params.page_size));
   return apiFetch<BillingProductSearchResponse>(
-    `/admin/billing/products/search/${qs.toString() ? `?${qs}` : ""}`
+    `/admin/billing/product-search/${qs.toString() ? `?${qs}` : ""}`
   );
 }
+
+export const searchBillingProducts = searchAdminBillingProducts;
 
 export async function searchCashierBillingProducts(params: {
   q?: string;

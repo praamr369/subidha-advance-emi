@@ -58,6 +58,9 @@ export type DirectSaleLine = {
   sku_snapshot?: string;
   unit_of_measure_snapshot?: string;
   hsn_sac_code?: string;
+  create_purchase_requirement?: boolean;
+  requirement_quantity?: string | null;
+  requirement_note?: string;
 };
 
 export type DirectSale = {
@@ -364,9 +367,12 @@ export function getDirectSale(id: number | string) {
   return apiFetch<DirectSale>(`/billing/direct-sales/${id}/`);
 }
 
-export function createDirectSale(payload: DirectSalePayload) {
+export function createDirectSale(payload: DirectSalePayload, options: { idempotencyKey?: string } = {}) {
   return apiFetch<DirectSale>("/billing/direct-sales/", {
     method: "POST",
+    headers: options.idempotencyKey
+      ? { "Idempotency-Key": options.idempotencyKey }
+      : undefined,
     body: JSON.stringify(payload),
   });
 }

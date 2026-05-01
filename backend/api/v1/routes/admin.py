@@ -426,6 +426,7 @@ urlpatterns = [
     path("invoices/", AdminInvoiceRegisterView.as_view()),
     path("invoices/<int:pk>/pdf/", AdminInvoicePdfView.as_view()),
     path("billing/products/search/", AdminBillingProductSearchView.as_view()),
+    path("billing/product-search/", AdminBillingProductSearchView.as_view()),
     path("direct-sales/preview/", AdminDirectSalePreviewView.as_view()),
     path("inventory/requirements/", AdminInventoryRequirementListView.as_view()),
     path("receipts/", AdminReceiptRegisterView.as_view()),

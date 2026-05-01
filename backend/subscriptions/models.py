@@ -572,7 +572,14 @@ class Product(TimeStampedModel):
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
-        if not any([self.is_emi_enabled, self.is_rent_enabled, self.is_lease_enabled]):
+        if not any(
+            [
+                self.is_emi_enabled,
+                self.is_rent_enabled,
+                self.is_lease_enabled,
+                self.is_direct_sale_enabled,
+            ]
+        ):
             errors["is_emi_enabled"] = "At least one product mode must be enabled."
         if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
             errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
