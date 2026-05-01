@@ -145,15 +145,37 @@ def search_customers(
     # Generic search term
     if q:
         term = q.strip()
-        flt = (
+        tokenized_filter = None
+        tokens = [token.strip() for token in term.split() if token.strip()]
+        if tokens:
+            for token in tokens:
+                token_digits = re.sub(r"\D", "", token)
+                per_token = (
+                    Q(name__icontains=token)
+                    | Q(user__email__icontains=token)
+                    | Q(customer_code__icontains=token)
+                )
+                if token_digits:
+                    per_token = (
+                        per_token
+                        | Q(phone__icontains=token_digits)
+                        | Q(phone__icontains=token)
+                    )
+                    if token_digits.isdigit():
+                        per_token = per_token | Q(id=int(token_digits))
+                elif token.isdigit():
+                    per_token = per_token | Q(id=int(token))
+                tokenized_filter = per_token if tokenized_filter is None else (tokenized_filter & per_token)
+        full_term_filter = (
             Q(name__icontains=term)
             | Q(phone__icontains=term)
             | Q(user__email__icontains=term)
             | Q(customer_code__icontains=term)
         )
         if term.isdigit():
-            flt = flt | Q(id=int(term))
-        qs = qs.filter(flt).distinct()
+            full_term_filter = full_term_filter | Q(id=int(term))
+        combined_filter = full_term_filter | tokenized_filter if tokenized_filter is not None else full_term_filter
+        qs = qs.filter(combined_filter).distinct()
         return qs[:limit]
 
     if name:

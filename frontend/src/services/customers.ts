@@ -85,6 +85,8 @@ function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
         : row.user === null
           ? null
           : undefined,
+    customer_code:
+      typeof row.customer_code === "string" ? row.customer_code : undefined,
   };
 }
 

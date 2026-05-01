@@ -380,7 +380,10 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Only draft, confirmed, or delivered direct sales can be edited."
             )
-        _validate_invoice_lines(attrs.get("lines") or [], attrs)
+        lines = attrs.get("lines")
+        if instance is None and not lines:
+            raise serializers.ValidationError({"lines": "At least one product line is required."})
+        _validate_invoice_lines(lines or [], attrs)
         tax_mode = attrs.get("tax_mode") or getattr(instance, "tax_mode", "NON_GST")
         customer_gst_type = attrs.get("customer_gst_type") or getattr(
             instance, "customer_gst_type", "UNREGISTERED_CONSUMER"

@@ -143,8 +143,11 @@ function todayIso(): string {
 function prefillFromSearchQuery(raw: string): { name: string; phone: string } {
   const trimmed = raw.trim();
   if (!trimmed) return { name: "", phone: "" };
-  const phone = normalizePhone(trimmed);
-  const name = trimmed.replace(/\d+/g, " ").replace(/\s+/g, " ").trim();
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const numericTokens = tokens.filter((token) => /\d/.test(token));
+  const textTokens = tokens.filter((token) => !/\d/.test(token));
+  const phone = normalizePhone(numericTokens.join(" "));
+  const name = textTokens.join(" ").trim() || trimmed.replace(/\d+/g, " ").replace(/\s+/g, " ").trim();
   return { name, phone };
 }
 
@@ -366,6 +369,9 @@ export default function DirectSaleWorkspace() {
     };
   }, [computedLines, form.received_total]);
   const submitBlockedByFinance = totals.received > 0 && !!financeAccountsError && !form.finance_account;
+  const submitBlockedByExistingCustomer =
+    form.customer_mode === "EXISTING" && (!form.customer_id || !selectedCustomer);
+  const submitBlocked = submitBlockedByFinance || submitBlockedByExistingCustomer;
 
   const columns: EnterpriseColumnDef<DirectSale>[] = [
     {
@@ -475,6 +481,12 @@ export default function DirectSaleWorkspace() {
   function handleCustomerSearch(value: string) {
     setCustomerQuery(value);
     setCustomerSearchError(null);
+    setValidationErrors([]);
+    setCustomerModeError(null);
+    if (selectedCustomer) {
+      setSelectedCustomer(null);
+      setForm((current) => ({ ...current, customer_id: "" }));
+    }
     if (customerSearchTimer.current) {
       window.clearTimeout(customerSearchTimer.current);
     }
@@ -532,6 +544,8 @@ export default function DirectSaleWorkspace() {
       customer_snapshot_email: customer.email || current.customer_snapshot_email,
       customer_snapshot_billing_address_line1: customer.address || current.customer_snapshot_billing_address_line1,
       customer_snapshot_city: customer.city || current.customer_snapshot_city,
+      customer_gstin: current.customer_gstin,
+      customer_snapshot_place_of_supply: current.customer_snapshot_place_of_supply,
     }));
   }
 
@@ -750,7 +764,7 @@ export default function DirectSaleWorkspace() {
       resetCreateForm();
       router.push(pathname);
     } catch (err) {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+      if (err instanceof ApiError) {
         const parsed = flattenApiErrors(err.body);
         if (parsed.length) {
           setValidationErrors(parsed);
@@ -758,11 +772,42 @@ export default function DirectSaleWorkspace() {
             /(customer|new_customer|customer_name_snapshot|customer_phone_snapshot)/i.test(entry)
           );
           if (customerError) setCustomerModeError(customerError);
-          setError("Direct sale validation failed. Fix the highlighted issues and try again.");
+        }
+        if (process.env.NODE_ENV !== "production") {
+          const bodyText =
+            typeof err.body === "string"
+              ? err.body
+              : (() => {
+                  try {
+                    return JSON.stringify(err.body);
+                  } catch {
+                    return String(err.body ?? "");
+                  }
+                })();
+          console.error("[DirectSale:create] request failed", {
+            endpoint: "/billing/direct-sales/",
+            status: err.status,
+            responsePreview: bodyText.slice(0, 400),
+          });
+        }
+        if (err.status === 400) {
+          setError("Direct sale could not be created. Please fix the highlighted fields.");
+          return;
+        }
+        if (err.status === 401 || err.status === 403) {
+          setError("You do not have permission to create direct sales. Please sign in again.");
+          return;
+        }
+        if (err.status === 404) {
+          setError("Direct sale API endpoint was not found. Check frontend API path.");
+          return;
+        }
+        if (err.status >= 500) {
+          setError("Server error while creating direct sale. Check backend logs.");
           return;
         }
       }
-      if (err instanceof Error && /failed to fetch|network/i.test(err.message)) {
+      if (err instanceof Error && /failed to fetch|network|timeout|abort/i.test(err.message)) {
         setError("Network request failed while creating the direct sale. Check connection and retry.");
       } else {
         setError(accountingErrorMessage(err, "Failed to create direct sale."));
@@ -803,7 +848,7 @@ export default function DirectSaleWorkspace() {
             <button
               type="button"
               onClick={() => void submitCreate()}
-              disabled={submitting || submitBlockedByFinance}
+              disabled={submitting || submitBlocked}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving..." : "Save Draft"}
@@ -811,7 +856,7 @@ export default function DirectSaleWorkspace() {
             <button
               type="button"
               onClick={() => void submitCreate()}
-              disabled={submitting || submitBlockedByFinance}
+              disabled={submitting || submitBlocked}
               className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Creating..." : "Create Direct Sale"}
@@ -1032,9 +1077,27 @@ export default function DirectSaleWorkspace() {
                       </div>
                     </div>
                     {selectedCustomer ? (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Registered customer selected: {selectedCustomer.name} ({selectedCustomer.phone})
-                      </p>
+                      <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                        <p className="font-semibold text-foreground">{selectedCustomer.name}</p>
+                        <p>Phone: {selectedCustomer.phone || "—"}</p>
+                        <p>Customer Code: {selectedCustomer.customer_code || `#${selectedCustomer.id}`}</p>
+                        <p>Address: {selectedCustomer.address || "No address on customer profile."}</p>
+                        <p>GSTIN: {form.customer_gstin || "—"}</p>
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCustomer(null);
+                              setForm((current) => ({ ...current, customer_id: "" }));
+                              setCustomerQuery("");
+                              setCustomerResults([]);
+                            }}
+                            className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                          >
+                            Change customer
+                          </button>
+                        </div>
+                      </div>
                     ) : null}
                   </section>
 
@@ -1439,7 +1502,7 @@ export default function DirectSaleWorkspace() {
                 <button
                   type="button"
                   onClick={() => void submitCreate()}
-                disabled={submitting || submitBlockedByFinance}
+                disabled={submitting || submitBlocked}
                   className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Saving..." : "Save Draft"}
@@ -1447,7 +1510,7 @@ export default function DirectSaleWorkspace() {
                 <button
                   type="button"
                   onClick={() => void submitCreate()}
-                disabled={submitting || submitBlockedByFinance}
+                disabled={submitting || submitBlocked}
                   className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Creating..." : "Create Direct Sale"}

@@ -3,6 +3,7 @@
 import csv
 import io
 import os
+import re
 from decimal import Decimal, InvalidOperation
 from urllib import request
 
@@ -581,9 +582,29 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 | Q(phone__icontains=search)
                 | Q(user__email__icontains=search)
                 | Q(user__username__icontains=search)
+                | Q(customer_code__icontains=search)
             )
             if search.isdigit():
                 search_filter = search_filter | Q(id=int(search))
+            token_filter = None
+            for token in [item.strip() for item in search.split() if item.strip()]:
+                token_digits = re.sub(r"\D", "", token)
+                per_token = (
+                    Q(name__icontains=token)
+                    | Q(user__email__icontains=token)
+                    | Q(user__username__icontains=token)
+                    | Q(customer_code__icontains=token)
+                )
+                if token_digits:
+                    per_token = per_token | Q(phone__icontains=token_digits)
+                    if token_digits.isdigit():
+                        per_token = per_token | Q(id=int(token_digits))
+                elif token.isdigit():
+                    per_token = per_token | Q(id=int(token))
+                token_filter = per_token if token_filter is None else (token_filter & per_token)
+
+            if token_filter is not None:
+                search_filter = search_filter | token_filter
             queryset = queryset.filter(search_filter).distinct()
 
         return queryset

@@ -122,6 +122,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                     else {}
                 )
                 sale = serializer.save(**save_kwargs)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         except IntegrityError:
             if idempotency_key:
                 sale = DirectSale.objects.filter(idempotency_key=idempotency_key).first()

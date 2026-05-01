@@ -269,3 +269,34 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         payload["customer_gstin"] = ""
         response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_admin_customer_search_finds_by_name_phone_and_mixed_tokens(self):
+        self.customer.name = "Debjit Roy"
+        self.customer.phone = "7797280952"
+        self.customer.save(update_fields=["name", "phone"])
+
+        by_name = self.client.get("/api/v1/admin/customers/search/", {"q": "Debjit Roy"})
+        self.assertEqual(by_name.status_code, status.HTTP_200_OK, by_name.data)
+        self.assertIn(self.customer.id, {row["id"] for row in by_name.data["results"]})
+
+        by_phone = self.client.get("/api/v1/admin/customers/search/", {"q": "7797280952"})
+        self.assertEqual(by_phone.status_code, status.HTTP_200_OK, by_phone.data)
+        self.assertIn(self.customer.id, {row["id"] for row in by_phone.data["results"]})
+
+        by_mixed = self.client.get("/api/v1/admin/customers/search/", {"q": "Debjit Roy 7797280952"})
+        self.assertEqual(by_mixed.status_code, status.HTTP_200_OK, by_mixed.data)
+        self.assertIn(self.customer.id, {row["id"] for row in by_mixed.data["results"]})
+
+    def test_admin_customer_search_normalizes_spaces_and_case(self):
+        self.customer.name = "Debjit Roy"
+        self.customer.phone = "7797280952"
+        self.customer.save(update_fields=["name", "phone"])
+        response = self.client.get("/api/v1/admin/customers/search/", {"q": "   debJIT    roy   7797280952   "})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn(self.customer.id, {row["id"] for row in response.data["results"]})
+
+    def test_malformed_direct_sale_payload_returns_400_not_500(self):
+        payload = self._payload()
+        payload["lines"][0]["quantity"] = "invalid"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
