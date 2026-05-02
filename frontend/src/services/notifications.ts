@@ -46,34 +46,34 @@ export async function listAdminNotifications(params?: {
   module?: string;
   limit?: number;
 }): Promise<NotificationListResponse> {
-  return apiFetch(`/api/v1/admin/notifications/${buildQuery(params ?? {})}`);
+  return apiFetch(`/admin/notifications/${buildQuery(params ?? {})}`);
 }
 
 export async function getAdminNotificationUnreadCount(params?: {
   module?: string;
 }): Promise<UnreadCountResponse> {
-  return apiFetch(`/api/v1/admin/notifications/unread-count/${buildQuery(params ?? {})}`);
+  return apiFetch(`/admin/notifications/unread-count/${buildQuery(params ?? {})}`);
 }
 
 export async function markAdminNotificationRead(id: number): Promise<SystemNotification> {
-  return apiFetch(`/api/v1/admin/notifications/${id}/read/`, { method: "POST" });
+  return apiFetch(`/admin/notifications/${id}/read/`, { method: "POST" });
 }
 
 export async function listCashierNotifications(params?: {
   module?: string;
   limit?: number;
 }): Promise<NotificationListResponse> {
-  return apiFetch(`/api/v1/cashier/notifications/${buildQuery(params ?? {})}`);
+  return apiFetch(`/cashier/notifications/${buildQuery(params ?? {})}`);
 }
 
 export async function getCashierNotificationUnreadCount(params?: {
   module?: string;
 }): Promise<UnreadCountResponse> {
-  return apiFetch(`/api/v1/cashier/notifications/unread-count/${buildQuery(params ?? {})}`);
+  return apiFetch(`/cashier/notifications/unread-count/${buildQuery(params ?? {})}`);
 }
 
 export async function markCashierNotificationRead(id: number): Promise<SystemNotification> {
-  return apiFetch(`/api/v1/cashier/notifications/${id}/read/`, { method: "POST" });
+  return apiFetch(`/cashier/notifications/${id}/read/`, { method: "POST" });
 }
 
 export async function listNotifications(params?: {
@@ -83,17 +83,17 @@ export async function listNotifications(params?: {
   unread?: boolean;
   limit?: number;
 }): Promise<NotificationListResponse> {
-  return apiFetch(`/api/v1/notifications/${buildQuery(params ?? {})}`);
+  return apiFetch(`/notifications/${buildQuery(params ?? {})}`);
 }
 
 export async function markNotificationRead(id: number): Promise<SystemNotification> {
-  return apiFetch(`/api/v1/notifications/${id}/read/`, { method: "POST" });
+  return apiFetch(`/notifications/${id}/read/`, { method: "POST" });
 }
 
 export async function markAllNotificationsRead(): Promise<{ updated_count: number }> {
-  return apiFetch("/api/v1/notifications/mark-all-read/", { method: "POST" });
+  return apiFetch("/notifications/mark-all-read/", { method: "POST" });
 }
 
 export async function getNotificationSummary(): Promise<NotificationSummaryResponse> {
-  return apiFetch("/api/v1/notifications/summary/");
+  return apiFetch("/notifications/summary/");
 }

@@ -1147,7 +1147,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenQuickActions}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
             aria-label="Open quick actions"
             title="Quick actions"
           >

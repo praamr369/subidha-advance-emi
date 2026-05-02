@@ -26,17 +26,17 @@ export type ReportCenterCatalog = {
 
 export function reportCenterPath(reportKey: string): string {
   const k = encodeURIComponent(reportKey);
-  return `/api/v1/admin/reports-center/reports/${k}/`;
+  return `/admin/reports-center/reports/${k}/`;
 }
 
 export function reportCenterExportPath(reportKey: string, format: "csv" | "pdf", query: Record<string, string>): string {
   const params = new URLSearchParams({ ...query, format });
   const k = encodeURIComponent(reportKey);
-  return `/api/v1/admin/reports-center/reports/${k}/export/?${params.toString()}`;
+  return `/admin/reports-center/reports/${k}/export/?${params.toString()}`;
 }
 
 export async function fetchReportsCenterCatalog(): Promise<ReportCenterCatalog> {
-  return apiFetch("/api/v1/admin/reports-center/catalog/");
+  return apiFetch("/admin/reports-center/catalog/");
 }
 
 export async function fetchReportCenterReport(

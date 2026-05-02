@@ -118,11 +118,11 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   const badge = unread === null ? null : unread > 99 ? "99+" : String(unread);
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative shrink-0" ref={rootRef}>
       <button
         type="button"
         onClick={() => void onToggle()}
-        className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)]"
+        className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)]"
         aria-label="Notifications"
         title="Notifications"
         data-testid="header-notification-bell"

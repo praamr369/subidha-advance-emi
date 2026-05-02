@@ -1470,6 +1470,7 @@ test("admin analytics shows an error state instead of fake zero fallback on dash
   });
 
   await page.goto("/admin/analytics");
+  await expect(page).toHaveURL(/\/admin\/reports\?live=1/);
   await expect(
     page.getByText("Unable to load analytics")
   ).toBeVisible();

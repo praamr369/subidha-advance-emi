@@ -103,13 +103,13 @@ export default function AdminReportCenterDetailPage() {
       subtitle="Read-only dataset. Exports require the reports.export capability."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Reports center", href: ROUTES.admin.reportsCenter },
+        { label: "Reports & analysis", href: `${ROUTES.admin.reports}?catalog=1` },
         { label: payload?.title || reportKey },
       ]}
       actions={[
         {
-          href: ROUTES.admin.reportsCenter,
-          label: "Back to catalog",
+          href: `${ROUTES.admin.reports}?catalog=1`,
+          label: "Back to reports hub",
           variant: "secondary",
         },
       ]}

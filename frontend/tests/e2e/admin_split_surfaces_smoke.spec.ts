@@ -18,8 +18,8 @@ test("admin split surfaces load with expected role-safe posture", async ({ page 
   await expect(page.locator("body")).toContainText("Read-only trends");
 
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("Backend-prepared operational analytics");
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("windowed analytics summary");
 
   await page.goto("/admin/finance");
   await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
@@ -28,7 +28,7 @@ test("admin split surfaces load with expected role-safe posture", async ({ page 
 
 test("reports and finance launch cards point to real routes", async ({ page }) => {
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
   const reportLinks: Array<{ label: string; hrefPrefix: string }> = [
     { label: "Revenue Report", hrefPrefix: "/admin/reports/revenue" },
     { label: "Overdue EMI Report", hrefPrefix: "/admin/reports/overdue" },

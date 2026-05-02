@@ -63,11 +63,12 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   await expect(page.locator("body")).toContainText("Branch operating lenses");
 
   await page.goto("/admin/analytics");
-  await expect(page.getByRole("heading", { name: "Analytics" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Analysis route map");
+  await expect(page).toHaveURL(/\/admin\/reports\?live=1/);
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Live dashboard posture");
 
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Report directory");
 
   await page.goto("/admin/customers");

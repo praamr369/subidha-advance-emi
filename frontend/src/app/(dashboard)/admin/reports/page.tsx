@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw, TrendingUp } from "lucide-react";
+
+import type { AdminDashboardApiResponse } from "@/features/admin-workflow/types";
+import { apiFetch } from "@/lib/api";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
@@ -22,6 +26,10 @@ import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
 } from "@/services/reports";
+import {
+  fetchReportsCenterCatalog,
+  type ReportCenterCatalog,
+} from "@/services/reports-center";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
 function money(value: string | number | undefined): string {
@@ -103,6 +111,10 @@ function PurposeChartCard({
 }
 
 export default function AdminReportsPage() {
+  const searchParams = useSearchParams();
+  const liveAnchorRef = useRef<HTMLDivElement>(null);
+  const catalogAnchorRef = useRef<HTMLDivElement>(null);
+
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummaryResponse | null>(null);
   const [windowPreset, setWindowPreset] = useState<DashboardWindowPreset>("THIS_MONTH");
   const [startDate, setStartDate] = useState("");
@@ -110,6 +122,10 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<ReportCenterCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [liveDashboard, setLiveDashboard] = useState<AdminDashboardApiResponse | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
 
   const analyticsQuery = useMemo(
     () =>
@@ -130,17 +146,38 @@ export default function AdminReportsPage() {
       if (mode === "initial") setLoading(true);
       else setRefreshing(true);
 
-      try {
-        const payload = await getAdminAnalyticsSummary(analyticsQuery);
-        setAnalytics(payload);
+      const [summaryResult, catalogResult, dashboardResult] = await Promise.allSettled([
+        getAdminAnalyticsSummary(analyticsQuery),
+        fetchReportsCenterCatalog(),
+        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
+      ]);
+
+      if (summaryResult.status === "fulfilled") {
+        setAnalytics(summaryResult.value);
         setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
+      } else {
+        setError(toErrorMessage(summaryResult.reason));
         setAnalytics(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      if (catalogResult.status === "fulfilled") {
+        setCatalog(catalogResult.value);
+        setCatalogError(null);
+      } else {
+        setCatalog(null);
+        setCatalogError(toErrorMessage(catalogResult.reason));
+      }
+
+      if (dashboardResult.status === "fulfilled") {
+        setLiveDashboard(dashboardResult.value);
+        setLiveError(null);
+      } else {
+        setLiveDashboard(null);
+        setLiveError(toErrorMessage(dashboardResult.reason));
+      }
+
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
     },
     [analyticsQuery]
   );
@@ -148,6 +185,18 @@ export default function AdminReportsPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  useEffect(() => {
+    if (loading) return;
+    const handle = window.setTimeout(() => {
+      if (searchParams.get("live") === "1" && liveAnchorRef.current) {
+        liveAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (searchParams.get("catalog") === "1" && catalogAnchorRef.current) {
+        catalogAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [loading, searchParams]);
 
   const cards = useMemo(() => {
     const overview = analytics?.overview;
@@ -300,16 +349,26 @@ export default function AdminReportsPage() {
 
   const financePosture = analytics?.finance_posture;
 
+  const liveKpis = liveDashboard?.kpis;
+  const liveActive =
+    liveKpis?.active_subscriptions ?? liveDashboard?.subscriptions?.active ?? 0;
+  const liveOverdue = liveKpis?.overdue_count ?? liveDashboard?.emi?.overdue ?? 0;
+  const liveTodayCollection = liveDashboard?.financial?.today_collection ?? "0";
+  const liveRecon =
+    liveKpis?.reconciliation_exceptions ??
+    liveDashboard?.reconciliation_warnings?.length ??
+    0;
+
   return (
     <PortalPage
       eyebrow="Report Control"
-      title="Reports Overview"
-      subtitle="Backend-prepared operational analytics for collections, receivables pressure, reconciliation posture, delivery readiness, and finance routing."
-      helperNote="Charts and comparison slices are backend-prepared from live operational records. Reports stay separate from collections, finance posting, and cashier execution."
+      title="Reports & analysis"
+      subtitle="Single hub: windowed analytics summary, live admin dashboard posture, SME read-only report catalog (CSV/PDF), and shortcuts into canonical report routes."
+      helperNote="Legacy /admin/analytics and /admin/reports-center forward here (?live=1 and ?catalog=1). Charts stay backend-prepared; reporting remains separate from collections posting and cashier execution."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Reports" },
+        { label: "Reports & analysis" },
       ]}
       actions={[
         {
@@ -349,7 +408,7 @@ export default function AdminReportsPage() {
       <div className="space-y-6">
         <WorkspaceSection
           title="Reporting workflow"
-          description="Reports overview now consumes one admin analytics summary endpoint to keep chart calculations backend-driven and audit-aligned."
+          description="Windowed analytics use the admin analytics summary endpoint; SME catalog uses reports-center read APIs; live strip uses the admin dashboard snapshot."
           action={
             <ActionButton
               type="button"
@@ -394,6 +453,57 @@ export default function AdminReportsPage() {
           </div>
         </WorkspaceSection>
 
+        {!loading ? (
+          <div ref={liveAnchorRef} id="live-posture" className="scroll-mt-28">
+            <WorkspaceSection
+              title="Live dashboard posture"
+              description="Admin dashboard snapshot (same payload class as operations home). Open with ?live=1 when bookmarking the old analytics entry."
+              actionHref={`${ROUTES.admin.reports}?live=1`}
+              actionLabel="Deep link"
+              note="Full widget layout remains on Admin home and Operations."
+              noteTone="info"
+            >
+              {liveError ? (
+                <ErrorState
+                  title="Unable to load analytics"
+                  description={liveError}
+                  onRetry={() => void loadPage("refresh")}
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <StatCard
+                    label="Active subscriptions"
+                    value={String(liveActive)}
+                    subtext="Dashboard KPI / subscription posture"
+                    href={ROUTES.admin.subscriptions}
+                  />
+                  <StatCard
+                    label="Overdue EMIs (live)"
+                    value={String(liveOverdue)}
+                    subtext="Dashboard EMI lane"
+                    tone={liveOverdue > 0 ? "warning" : undefined}
+                    href={ROUTES.admin.emisOverdue}
+                  />
+                  <StatCard
+                    label="Today collection"
+                    value={money(liveTodayCollection)}
+                    subtext="Financial.today_collection"
+                    tone="success"
+                    href={ROUTES.admin.collections}
+                  />
+                  <StatCard
+                    label="Reconciliation signals"
+                    value={String(liveRecon)}
+                    subtext="Warnings surfaced on dashboard"
+                    tone={liveRecon > 0 ? "warning" : undefined}
+                    href={buildAdminReconciliationRoute({ flagged: true })}
+                  />
+                </div>
+              )}
+            </WorkspaceSection>
+          </div>
+        ) : null}
+
         {loading ? <LoadingBlock label="Loading reports overview..." /> : null}
 
         {!loading && error ? (
@@ -411,9 +521,9 @@ export default function AdminReportsPage() {
               description="Move from aggregate analytics into explicit operational workspaces. Reporting remains separate from finance posting, collections, and reconciliation execution."
               lanes={[
                 {
-                  title: "Analytics overview",
-                  description: "Live dashboard-backed aggregate posture for admin leadership review.",
-                  href: ROUTES.admin.analytics,
+                  title: "Live dashboard posture",
+                  description: "Scroll to the embedded dashboard snapshot on this page (same as legacy analytics).",
+                  href: `${ROUTES.admin.reports}?live=1`,
                   icon: <TrendingUp className="h-4 w-4" />,
                   badge: "View",
                 },
@@ -435,6 +545,12 @@ export default function AdminReportsPage() {
                   description: "Receivables, payables, and account posture stay in a separate finance lane.",
                   href: ROUTES.admin.finance,
                   badge: "Finance",
+                },
+                {
+                  title: "SME report catalog",
+                  description: "Curated read-only ERP-style reports with filters and CSV/PDF export.",
+                  href: `${ROUTES.admin.reports}?catalog=1`,
+                  badge: "ERP",
                 },
               ]}
             />
@@ -755,6 +871,59 @@ export default function AdminReportsPage() {
               </div>
             </WorkspaceSection>
           </>
+        ) : null}
+
+        {!loading ? (
+          <div ref={catalogAnchorRef} id="sme-catalog" className="scroll-mt-28">
+            <WorkspaceSection
+              title="SME report catalog (ERP)"
+              description="Read-only report center listings with export-capable detail routes. Legacy /admin/reports-center opens here with ?catalog=1."
+              actionHref={`${ROUTES.admin.reports}?catalog=1`}
+              actionLabel="Deep link"
+              note="Each report opens its own detail workspace for filters and CSV/PDF download."
+              noteTone="info"
+            >
+              {catalogError ? (
+                <ErrorState
+                  title="Unable to load SME catalog"
+                  description={catalogError}
+                  onRetry={() => void loadPage("refresh")}
+                />
+              ) : !catalog?.sections?.length ? (
+                <EmptyState
+                  title="No catalog sections"
+                  description="The reports center catalog returned no sections. Confirm admin reports-center APIs are deployed."
+                />
+              ) : (
+                <div className="space-y-6">
+                  {catalog.sections.map((section) => (
+                    <div key={section.id} className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        {section.label}
+                      </h3>
+                      <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {section.reports.map((report) => (
+                          <li key={report.key}>
+                            <Link
+                              href={`${ROUTES.admin.reportsCenter}/${encodeURIComponent(report.key)}`}
+                              className="block rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
+                            >
+                              <span className="block">{report.title}</span>
+                              {report.description ? (
+                                <span className="mt-1 block text-xs font-normal leading-5 text-muted-foreground">
+                                  {report.description}
+                                </span>
+                              ) : null}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+          </div>
         ) : null}
       </div>
     </PortalPage>

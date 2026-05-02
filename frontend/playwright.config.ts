@@ -108,7 +108,9 @@ export default defineConfig({
     {
       command: "npm run start:smoke",
       url: `${frontendBaseUrl}/login`,
-      reuseExistingServer: !process.env.CI,
+      // Always start a fresh Next server for smoke: a reused process can keep an
+      // outdated in-memory bundle after `npm run build:smoke` rewrote `.next/`.
+      reuseExistingServer: false,
       timeout: 240_000,
       cwd: ".",
       env: {

@@ -70,8 +70,8 @@ const MODULES: ModuleCard[] = [
   {
     key: "reports",
     label: "Reports",
-    purpose: "Read-only business reports and export-ready operational insights.",
-    href: ROUTES.admin.reportsCenter,
+    purpose: "Read-only business reports, SME catalog, and export-ready operational insights.",
+    href: ROUTES.admin.reports,
   },
   {
     key: "setup",

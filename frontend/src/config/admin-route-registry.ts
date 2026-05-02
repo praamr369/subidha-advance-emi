@@ -35,8 +35,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Command Center", "ERP Home", ROUTES.admin.erp, "Unified CRM and ERP command center."),
   item("Command Center", "Today's Work", ROUTES.admin.todayWork, "Daily exception and action queue."),
   item("Command Center", "Operations Command Center", ROUTES.admin.operationsCommandCenter, "Cross-module operational controls."),
-  item("Command Center", "Reports & Analytics", ROUTES.admin.reports, "Business reports and analytics."),
-  item("Command Center", "Reports center (ERP)", ROUTES.admin.reportsCenter, "Curated read-only reports with CSV/PDF export and filters."),
+  item(
+    "Command Center",
+    "Reports & analysis",
+    ROUTES.admin.reports,
+    "Unified window: windowed analytics, live dashboard posture, SME read-only report catalog (exports), and classic report shortcuts."
+  ),
   item("Command Center", "BI Control Center", ROUTES.admin.bi, "Read-only chart and trend control center."),
   item("Command Center", "AI Assistant", ROUTES.admin.aiAssistant, "Read-only internal knowledge assistant with source citations."),
   item("Command Center", "AI Readiness", ROUTES.admin.aiReadiness, "AI feature flags, retrieval posture, and safety readiness checks."),
