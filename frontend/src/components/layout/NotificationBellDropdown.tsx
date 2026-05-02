@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getAccessToken } from "@/lib/auth/tokens";
 import { ROUTES } from "@/lib/routes";
 import type { NavigationRole } from "@/config/navigation";
+import { NotificationListSkeleton } from "@/components/feedback/Skeleton";
 import {
   getAdminNotificationUnreadCount,
   getCashierNotificationUnreadCount,
@@ -142,7 +143,11 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-lg">
+        <div
+          className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"
+          role="dialog"
+          aria-label="Notifications menu"
+        >
           <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
             <span className="text-sm font-semibold text-foreground">Notifications</span>
             <Link
@@ -155,7 +160,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
           </div>
           <div className="max-h-80 overflow-y-auto py-2">
             {loading ? (
-              <p className="px-1 py-3 text-xs text-muted-foreground">Loading…</p>
+              <NotificationListSkeleton rows={4} />
             ) : items.length === 0 ? (
               <p className="px-1 py-3 text-xs text-muted-foreground">You are caught up.</p>
             ) : (
@@ -177,7 +182,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                       {!n.is_read ? (
                         <button
                           type="button"
-                          className="text-xs font-medium text-primary hover:underline"
+                          className="motion-safe:transition-opacity text-xs font-medium text-primary duration-150 hover:underline hover:opacity-90"
                           onClick={() => void onMarkRead(n.id)}
                         >
                           Mark read

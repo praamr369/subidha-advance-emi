@@ -1,0 +1,32 @@
+import { expect, test } from "@playwright/test";
+
+import { authStatePath } from "./helpers/smoke-data";
+
+test.describe("UX polish smoke", () => {
+  test.describe("admin surfaces", () => {
+    test.use({ storageState: authStatePath("admin") });
+
+    test("direct sale workspace settles loading skeletons without persistent busy regions", async ({ page }) => {
+      await page.goto("/admin/billing/direct-sale");
+      await expect(page.getByRole("heading", { name: /Direct Sale Workspace/i })).toBeVisible();
+      await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 45_000 });
+    });
+
+    test("notification bell opens an accessible dropdown shell", async ({ page }) => {
+      await page.goto("/admin");
+      await page.getByTestId("header-notification-bell").click();
+      await expect(page.getByRole("dialog", { name: "Notifications menu" })).toBeVisible();
+    });
+  });
+
+  test.describe("customer dashboard", () => {
+    test.use({ storageState: authStatePath("customer") });
+
+    test("customer home renders workspace heading after navigation", async ({ page }) => {
+      await page.goto("/customer");
+      await expect(page.getByRole("heading", { name: "Customer Workspace" })).toBeVisible({
+        timeout: 45_000,
+      });
+    });
+  });
+});

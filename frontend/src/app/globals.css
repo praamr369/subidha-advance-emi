@@ -441,6 +441,22 @@ a, button, input, select, textarea {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton-pulse {
+    animation: none;
+    opacity: 0.88;
+  }
+
+  .animate-in,
+  .fade-in-0,
+  .slide-in-from-right,
+  .zoom-in-95 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 button {
   cursor: pointer;
 }

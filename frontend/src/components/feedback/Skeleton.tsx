@@ -5,7 +5,15 @@ type BaseProps = {
 };
 
 function SkeletonBlock({ className }: BaseProps) {
-  return <div className={cn("animate-skeleton-pulse rounded-lg bg-[var(--surface-muted)]", className)} />;
+  return (
+    <div
+      className={cn(
+        "motion-safe:animate-skeleton-pulse rounded-lg bg-[var(--surface-muted)]",
+        className
+      )}
+      aria-hidden="true"
+    />
+  );
 }
 
 export function CardSkeleton({ className }: BaseProps) {
@@ -41,7 +49,11 @@ export function TableSkeleton({ rows = 6, columns = 4, className }: BaseProps & 
 
 export function FormSkeleton({ fields = 5, className }: BaseProps & { fields?: number }) {
   return (
-    <div className={cn("surface-glass space-y-4 rounded-2xl p-5", className)}>
+    <div
+      className={cn("surface-glass space-y-4 rounded-2xl p-5", className)}
+      aria-busy="true"
+      aria-label="Loading form"
+    >
       {Array.from({ length: fields }).map((_, index) => (
         <div key={`field-${index}`} className="space-y-2">
           <SkeletonBlock className="h-3 w-28" />
@@ -49,5 +61,69 @@ export function FormSkeleton({ fields = 5, className }: BaseProps & { fields?: n
         </div>
       ))}
     </div>
+  );
+}
+
+/** Matches StatCard shell height for dashboard metric rows */
+export function StatCardSkeleton({ className }: BaseProps) {
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-[1.6rem] border border-border bg-[var(--surface-card-elevated)] p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.42)]",
+        className
+      )}
+      aria-hidden="true"
+    >
+      <SkeletonBlock className="h-3 w-28" />
+      <SkeletonBlock className="mt-4 h-9 w-20" />
+      <SkeletonBlock className="mt-3 h-3 w-full max-w-[12rem]" />
+    </div>
+  );
+}
+
+export function DashboardGridSkeleton({
+  cards = 4,
+  className,
+}: BaseProps & { cards?: number }) {
+  return (
+    <div
+      className={cn("grid gap-4 md:grid-cols-2 xl:grid-cols-4", className)}
+      aria-busy="true"
+      aria-label="Loading dashboard metrics"
+    >
+      {Array.from({ length: cards }).map((_, i) => (
+        <StatCardSkeleton key={`dash-metric-${i}`} />
+      ))}
+    </div>
+  );
+}
+
+export function ChartSkeleton({ className }: BaseProps) {
+  return (
+    <div
+      className={cn("surface-glass rounded-2xl border border-border p-4", className)}
+      aria-busy="true"
+      aria-label="Loading chart"
+    >
+      <SkeletonBlock className="h-4 w-36" />
+      <SkeletonBlock className="mt-6 h-40 w-full rounded-xl" />
+    </div>
+  );
+}
+
+export function NotificationListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <ul className="space-y-2 px-1 py-2" aria-busy="true" aria-label="Loading notifications">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li
+          key={`n-sk-${i}`}
+          className="space-y-2 rounded-xl border border-border bg-background px-3 py-3"
+        >
+          <SkeletonBlock className="h-3 w-3/4" />
+          <SkeletonBlock className="h-3 w-full" />
+          <SkeletonBlock className="h-3 w-1/2" />
+        </li>
+      ))}
+    </ul>
   );
 }

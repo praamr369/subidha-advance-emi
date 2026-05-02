@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateAfterSubscriptionPaymentMutation } from "@/lib/operational-query-invalidation";
 import {
   reversePayment,
   type PaymentReversePayload,
@@ -23,22 +24,8 @@ export function useReversePayment() {
       const subscriptionId = result?.subscription?.id;
       const emiId = result?.emi?.id;
 
+      await invalidateAfterSubscriptionPaymentMutation(queryClient);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["payments"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard-today-queue"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["dashboard-priority-alerts"],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["reconciliation"] }),
-        queryClient.invalidateQueries({ queryKey: ["reconciliation-snapshot"] }),
-        queryClient.invalidateQueries({ queryKey: ["collections-due-today"] }),
-        queryClient.invalidateQueries({ queryKey: ["collections-overdue"] }),
-        queryClient.invalidateQueries({ queryKey: ["collections-recent"] }),
-        queryClient.invalidateQueries({ queryKey: ["emis"] }),
-        queryClient.invalidateQueries({ queryKey: ["overdue-emis"] }),
-        queryClient.invalidateQueries({ queryKey: ["pending-emis"] }),
-        queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["payment", paymentId] }),
         queryClient.invalidateQueries({
           queryKey: ["payment-timeline", paymentId],

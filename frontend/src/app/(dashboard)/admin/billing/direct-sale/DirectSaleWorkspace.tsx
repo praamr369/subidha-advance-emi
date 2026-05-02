@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { Plus, ReceiptText, Search, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import { DashboardGridSkeleton } from "@/components/feedback/Skeleton";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
@@ -29,6 +30,7 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { ApiError } from "@/lib/api";
+import { invalidateAfterDirectSaleMutation } from "@/lib/operational-query-invalidation";
 
 const FIELD_CLASS =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
@@ -225,14 +227,18 @@ export default function DirectSaleWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<DirectSale[]>([]);
   const [requirements, setRequirements] = useState<InventoryRequirementRow[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [requirementsLoading, setRequirementsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const createMode = (searchParams.get("mode") || "").trim().toLowerCase() === "create";
 
-  const [error, setError] = useState<string | null>(null);
+  const [salesError, setSalesError] = useState<string | null>(null);
+  const [requirementsError, setRequirementsError] = useState<string | null>(null);
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
@@ -283,19 +289,22 @@ export default function DirectSaleWorkspace() {
   const createAttemptKey = useRef<string | null>(null);
 
   const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setSalesLoading(true);
+    setRequirementsLoading(true);
+    setSalesError(null);
+    setRequirementsError(null);
     try {
       const [salesPayload, accountsPayload, requirementsPayload] = await Promise.allSettled([
         listDirectSales(),
-        listFinanceAccounts(),
+        listFinanceAccounts({ is_active: "true", for_payment_collection: "true" }),
         listAdminInventoryRequirements({ status: "OPEN", source_module: "DIRECT_SALE" }),
       ]);
       if (salesPayload.status === "fulfilled") {
         setRows(salesPayload.value.results);
+        setSalesError(null);
       } else {
         setRows([]);
-        setError(accountingErrorMessage(salesPayload.reason, "Failed to load direct-sale register list."));
+        setSalesError(accountingErrorMessage(salesPayload.reason, "Failed to load direct-sale register list."));
       }
 
       if (accountsPayload.status === "fulfilled") {
@@ -310,17 +319,23 @@ export default function DirectSaleWorkspace() {
 
       if (requirementsPayload.status === "fulfilled") {
         setRequirements(requirementsPayload.value.results);
+        setRequirementsError(null);
       } else {
         setRequirements([]);
-        setError(accountingErrorMessage(requirementsPayload.reason, "Failed to load inventory requirements."));
+        setRequirementsError(
+          accountingErrorMessage(requirementsPayload.reason, "Failed to load inventory requirements.")
+        );
       }
     } catch (err) {
       setRows([]);
       setFinanceAccounts([]);
       setRequirements([]);
-      setError(accountingErrorMessage(err, "Failed to load direct-sale workspace."));
+      const msg = accountingErrorMessage(err, "Failed to load direct-sale workspace.");
+      setSalesError(msg);
+      setRequirementsError(msg);
     } finally {
-      setLoading(false);
+      setSalesLoading(false);
+      setRequirementsLoading(false);
     }
   }, []);
 
@@ -772,7 +787,7 @@ export default function DirectSaleWorkspace() {
     const { errors: nextErrors, customerMode } = validateForm();
     setValidationErrors(nextErrors);
     setCustomerModeError(customerMode);
-    setError(null);
+    setCreateFormError(null);
     setNotice(null);
     if (nextErrors.length > 0) return;
 
@@ -793,6 +808,7 @@ export default function DirectSaleWorkspace() {
         deliveryLabel || null,
       ].filter(Boolean);
       setNotice(parts.join(". ") + ".");
+      await invalidateAfterDirectSaleMutation(queryClient);
       resetCreateForm();
       await loadPage();
       router.push(pathname);
@@ -820,29 +836,31 @@ export default function DirectSaleWorkspace() {
         if (err.status === 400) {
           const numberingIssue = parsed.find((entry) => /numbering|document numbering|DIRECT_SALE_INVOICE/i.test(entry));
           if (numberingIssue) {
-            setError("Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.");
+            setCreateFormError(
+              "Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering."
+            );
             return;
           }
-          setError("Direct sale could not be created. Please fix the highlighted fields.");
+          setCreateFormError("Direct sale could not be created. Please fix the highlighted fields.");
           return;
         }
         if (err.status === 401 || err.status === 403) {
-          setError("Your session or role does not allow this action.");
+          setCreateFormError("Your session or role does not allow this action.");
           return;
         }
         if (err.status === 404) {
-          setError("Direct sale API endpoint was not found. Check frontend API path.");
+          setCreateFormError("Direct sale API endpoint was not found. Check frontend API path.");
           return;
         }
         if (err.status >= 500) {
-          setError("Server error while creating direct sale. Check backend logs.");
+          setCreateFormError("Server error while creating direct sale. Check backend logs.");
           return;
         }
       }
       if (err instanceof Error && /failed to fetch|network|timeout|abort/i.test(err.message)) {
-        setError("Network request failed. Backend server or connection is unavailable.");
+        setCreateFormError("Network request failed. Backend server or connection is unavailable.");
       } else {
-        setError(accountingErrorMessage(err, "Failed to create direct sale."));
+        setCreateFormError(accountingErrorMessage(err, "Failed to create direct sale."));
       }
     } finally {
       setSubmitting(false);
@@ -881,7 +899,7 @@ export default function DirectSaleWorkspace() {
               type="button"
               onClick={() => void submitCreate()}
               disabled={submitting || submitBlocked}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              className="motion-safe:transition-colors inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground duration-150 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving..." : "Save Draft"}
             </button>
@@ -889,7 +907,7 @@ export default function DirectSaleWorkspace() {
               type="button"
               onClick={() => void submitCreate()}
               disabled={submitting || submitBlocked}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="motion-safe:transition-opacity inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Creating..." : "Create Direct Sale"}
             </button>
@@ -1583,9 +1601,9 @@ export default function DirectSaleWorkspace() {
                   ))}
                 </div>
               ) : null}
-              {error ? (
+              {createFormError ? (
                 <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
+                  {createFormError}
                 </div>
               ) : null}
               <div className="mt-4 grid gap-2">
@@ -1593,7 +1611,7 @@ export default function DirectSaleWorkspace() {
                   type="button"
                   onClick={() => void submitCreate()}
                 disabled={submitting || submitBlocked}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  className="motion-safe:transition-colors inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground duration-150 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Saving..." : "Save Draft"}
                 </button>
@@ -1601,7 +1619,7 @@ export default function DirectSaleWorkspace() {
                   type="button"
                   onClick={() => void submitCreate()}
                 disabled={submitting || submitBlocked}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="motion-safe:transition-opacity inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Creating..." : "Create Direct Sale"}
                 </button>
@@ -1637,12 +1655,24 @@ export default function DirectSaleWorkspace() {
           variant: "secondary",
         },
       ]}
-      stats={[
-        { label: "Draft Sales", value: stats.draftSales, tone: "info" },
-        { label: "Today Sales", value: stats.todaySales, tone: "success" },
-        { label: "Delivery Hold", value: stats.deliveryHold, tone: stats.deliveryHold ? "warning" : "default" },
-        { label: "Pending Stock Requirements", value: stats.pendingRequirements, tone: stats.pendingRequirements ? "warning" : "success" },
-      ]}
+      stats={
+        salesLoading
+          ? []
+          : [
+              { label: "Draft Sales", value: stats.draftSales, tone: "info" },
+              { label: "Today Sales", value: stats.todaySales, tone: "success" },
+              {
+                label: "Delivery Hold",
+                value: stats.deliveryHold,
+                tone: stats.deliveryHold ? "warning" : "default",
+              },
+              {
+                label: "Pending Stock Requirements",
+                value: stats.pendingRequirements,
+                tone: stats.pendingRequirements ? "warning" : "success",
+              },
+            ]
+      }
       statusBadge={{ label: "Retail Billing", tone: "info" }}
     >
       <WorkspaceDirectory
@@ -1668,26 +1698,18 @@ export default function DirectSaleWorkspace() {
       </div>
 
       {notice ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div
+          role="status"
+          aria-live="polite"
+          className="motion-safe:transition-opacity rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 duration-150"
+        >
           {notice}
         </div>
       ) : null}
-      {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Draft Sales" value={String(stats.draftSales)} tone="info" />
-        <StatCard label="Today Sales" value={String(stats.todaySales)} tone="success" />
-        <StatCard label="Delivery Hold" value={String(stats.deliveryHold)} tone={stats.deliveryHold ? "warning" : "default"} />
-        <StatCard
-          label="Pending Stock Requirements"
-          value={String(stats.pendingRequirements)}
-          tone={stats.pendingRequirements ? "warning" : "success"}
-        />
-      </section>
+      {salesLoading ? (
+        <DashboardGridSkeleton cards={4} className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200" />
+      ) : null}
 
       <WorkspaceSection
         title="Recent Direct Sales"
@@ -1696,8 +1718,9 @@ export default function DirectSaleWorkspace() {
         <EnterpriseDataTable
           data={rows}
           columns={columns}
-          loading={loading}
-          error={error}
+          loading={salesLoading}
+          error={salesError}
+          onRetry={() => void loadPage()}
           emptyTitle="No direct-sale bills found"
           emptyDescription="Create a bill to start the retail direct-sale register."
         />
@@ -1718,7 +1741,9 @@ export default function DirectSaleWorkspace() {
             { key: "status", header: "Status" },
             { key: "created_at", header: "Created", render: (row) => accountingDate(row.created_at) },
           ]}
-          loading={loading}
+          loading={requirementsLoading}
+          error={requirementsError}
+          onRetry={() => void loadPage()}
           emptyTitle="No pending inventory requirements"
           emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
         />
