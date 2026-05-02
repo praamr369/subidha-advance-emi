@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { TableSkeleton } from "@/components/feedback/Skeleton";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
@@ -266,7 +266,11 @@ export default function PartnerPayoutsPage({
           <KpiCard label="Latest Entry" value={formatDateTime(latestCreatedAt)} />
         </QuickActionGrid>
 
-        {loading ? <LoadingBlock label="Loading payout visibility..." /> : null}
+        {loading ? (
+          <section aria-busy="true" aria-label="Loading commission entries">
+            <TableSkeleton rows={8} columns={6} />
+          </section>
+        ) : null}
 
         {!loading && error ? (
           <ErrorState
@@ -284,7 +288,11 @@ export default function PartnerPayoutsPage({
             {rows.length === 0 ? (
               <EmptyState
                 title="No commission entries found"
-                description="No commission or payout visibility rows are currently available in this partner scope."
+                description={
+                  mode === "commissions"
+                    ? "When customers pay EMIs tied to your partner scope, earned commissions appear here with pending or settled payout status."
+                    : "No commission or payout visibility rows are currently available in this partner scope."
+                }
               />
             ) : (
               <DataTableShell>

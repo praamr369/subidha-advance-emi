@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getAccessToken } from "@/lib/auth/tokens";
-import { ROUTES } from "@/lib/routes";
 import type { NavigationRole } from "@/config/navigation";
+import ErrorState from "@/components/feedback/ErrorState";
 import { NotificationListSkeleton } from "@/components/feedback/Skeleton";
+import { ROUTES } from "@/lib/routes";
+import { notificationKeys } from "@/lib/query-keys";
+import { useAuth } from "@/providers/AuthProvider";
 import {
   getAdminNotificationUnreadCount,
   getCashierNotificationUnreadCount,
@@ -16,10 +19,16 @@ import {
   listCashierNotifications,
   listNotifications,
   markAdminNotificationRead,
+  markAllNotificationsRead,
   markCashierNotificationRead,
   markNotificationRead,
   type SystemNotification,
 } from "@/services/notifications";
+
+export type NotificationBellSnapshot = {
+  unread: number;
+  items: SystemNotification[];
+};
 
 function centerHref(role: NavigationRole): string {
   switch (role) {
@@ -35,51 +44,50 @@ function centerHref(role: NavigationRole): string {
   }
 }
 
-async function fetchUnreadCount(role: NavigationRole): Promise<number> {
+async function fetchBellSnapshot(role: NavigationRole): Promise<NotificationBellSnapshot> {
   if (role === "ADMIN") {
-    const r = await getAdminNotificationUnreadCount();
-    return r.unread_count ?? 0;
+    const [listRes, countRes] = await Promise.all([
+      listAdminNotifications({ limit: 6 }),
+      getAdminNotificationUnreadCount(),
+    ]);
+    return {
+      items: listRes.results ?? [],
+      unread: countRes.unread_count ?? listRes.unread_count ?? 0,
+    };
   }
   if (role === "CASHIER") {
-    const r = await getCashierNotificationUnreadCount();
-    return r.unread_count ?? 0;
+    const [listRes, countRes] = await Promise.all([
+      listCashierNotifications({ limit: 6 }),
+      getCashierNotificationUnreadCount(),
+    ]);
+    return {
+      items: listRes.results ?? [],
+      unread: countRes.unread_count ?? listRes.unread_count ?? 0,
+    };
   }
-  const s = await getNotificationSummary();
-  return s.unread_count ?? 0;
+  const [listRes, summary] = await Promise.all([
+    listNotifications({ limit: 6 }),
+    getNotificationSummary(),
+  ]);
+  return {
+    items: listRes.results ?? [],
+    unread: summary.unread_count ?? listRes.unread_count ?? 0,
+  };
 }
 
 export default function NotificationBellDropdown({ role }: { role: NavigationRole }) {
+  const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const queryKey = notificationKeys.bell(role);
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState<number | null>(null);
-  const [items, setItems] = useState<SystemNotification[]>([]);
-  const [loading, setLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!getAccessToken()) {
-      setUnread(0);
-      setItems([]);
-      return;
-    }
-    try {
-      const listPromise =
-        role === "ADMIN"
-          ? listAdminNotifications({ limit: 6 })
-          : role === "CASHIER"
-            ? listCashierNotifications({ limit: 6 })
-            : listNotifications({ limit: 6 });
-      const [countRes, listRes] = await Promise.all([fetchUnreadCount(role), listPromise]);
-      setUnread(countRes);
-      setItems(listRes.results ?? []);
-    } catch {
-      setUnread(0);
-      setItems([]);
-    }
-  }, [role]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const bellQuery = useQuery({
+    queryKey,
+    queryFn: () => fetchBellSnapshot(role),
+    enabled: isAuthenticated,
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     function onDocMouseDown(ev: MouseEvent) {
@@ -96,17 +104,25 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   async function onToggle() {
     const next = !open;
     setOpen(next);
-    if (next) {
-      setLoading(true);
-      try {
-        await refresh();
-      } finally {
-        setLoading(false);
-      }
+    if (next && isAuthenticated) {
+      void bellQuery.refetch();
     }
   }
 
+  const unreadCount = !isAuthenticated ? 0 : (bellQuery.data?.unread ?? null);
+  const items = bellQuery.data?.items ?? [];
+  const dropdownBusy = open && bellQuery.isFetching;
+
   async function onMarkRead(id: number) {
+    const previous = queryClient.getQueryData<NotificationBellSnapshot>(queryKey);
+    if (previous) {
+      const target = previous.items.find((n) => n.id === id);
+      const decrement = target && !target.is_read ? 1 : 0;
+      queryClient.setQueryData<NotificationBellSnapshot>(queryKey, {
+        unread: Math.max(0, previous.unread - decrement),
+        items: previous.items.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+      });
+    }
     try {
       if (role === "ADMIN") {
         await markAdminNotificationRead(id);
@@ -115,14 +131,35 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
       } else {
         await markNotificationRead(id);
       }
-      await refresh();
     } catch {
-      // ignore
+      if (previous) {
+        queryClient.setQueryData(queryKey, previous);
+      }
+    }
+  }
+
+  async function onMarkAllRead() {
+    if (role !== "CUSTOMER" && role !== "PARTNER") return;
+    const previous = queryClient.getQueryData<NotificationBellSnapshot>(queryKey);
+    queryClient.setQueryData<NotificationBellSnapshot>(queryKey, {
+      unread: 0,
+      items: (previous?.items ?? []).map((n) => ({ ...n, is_read: true })),
+    });
+    try {
+      await markAllNotificationsRead();
+      await queryClient.invalidateQueries({ queryKey });
+    } catch {
+      if (previous) {
+        queryClient.setQueryData(queryKey, previous);
+      }
     }
   }
 
   const href = centerHref(role);
-  const badge = unread === null ? null : unread > 99 ? "99+" : String(unread);
+  const badge =
+    unreadCount === null ? null : unreadCount > 99 ? "99+" : String(Math.max(0, unreadCount));
+
+  const showMarkAll = (role === "CUSTOMER" || role === "PARTNER") && items.some((n) => !n.is_read);
 
   return (
     <div className="relative shrink-0" ref={rootRef}>
@@ -134,8 +171,8 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
         title="Notifications"
         data-testid="header-notification-bell"
       >
-        <Bell className="h-4 w-4" />
-        {badge && unread !== null && unread > 0 ? (
+        <Bell className="h-4 w-4" aria-hidden="true" />
+        {badge !== null && unreadCount !== null && unreadCount > 0 ? (
           <span className="absolute -right-1 -top-1 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">
             {badge}
           </span>
@@ -150,16 +187,36 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
         >
           <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
             <span className="text-sm font-semibold text-foreground">Notifications</span>
-            <Link
-              href={href}
-              className="text-xs font-medium text-primary hover:underline"
-              onClick={() => setOpen(false)}
-            >
-              Open center
-            </Link>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {showMarkAll ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => void onMarkAllRead()}
+                >
+                  Mark all read
+                </button>
+              ) : null}
+              <Link
+                href={href}
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => setOpen(false)}
+              >
+                Open center
+              </Link>
+            </div>
           </div>
-          <div className="max-h-80 overflow-y-auto py-2">
-            {loading ? (
+          <div
+            className="max-h-80 overflow-y-auto py-2"
+            aria-busy={dropdownBusy || bellQuery.isPending}
+          >
+            {bellQuery.isError ? (
+              <ErrorState
+                title="Notifications unavailable"
+                message={bellQuery.error instanceof Error ? bellQuery.error.message : "Try again."}
+                onRetry={() => void bellQuery.refetch()}
+              />
+            ) : dropdownBusy || (bellQuery.isPending && !bellQuery.data) ? (
               <NotificationListSkeleton rows={4} />
             ) : items.length === 0 ? (
               <p className="px-1 py-3 text-xs text-muted-foreground">You are caught up.</p>
@@ -168,7 +225,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                 {items.map((n) => (
                   <li
                     key={n.id}
-                    className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                    className="motion-safe:transition-colors rounded-xl border border-border bg-background px-3 py-2 text-sm duration-150"
                   >
                     <div className="font-medium text-foreground">{n.title}</div>
                     {n.body ? (
@@ -183,6 +240,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                         <button
                           type="button"
                           className="motion-safe:transition-opacity text-xs font-medium text-primary duration-150 hover:underline hover:opacity-90"
+                          aria-label={`Mark notification ${n.title} as read`}
                           onClick={() => void onMarkRead(n.id)}
                         >
                           Mark read

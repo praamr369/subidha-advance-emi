@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { ROUTES } from "@/lib/routes";
@@ -10,6 +11,7 @@ import { logoutRequest } from "@/services/auth.service";
 
 export function useLogout() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -26,6 +28,7 @@ export function useLogout() {
         // Local cleanup must still happen.
       }
     } finally {
+      queryClient.clear();
       logout();
 
       if (typeof window !== "undefined") {
@@ -37,7 +40,7 @@ export function useLogout() {
       router.refresh();
       setIsLoggingOut(false);
     }
-  }, [logout, router]);
+  }, [logout, queryClient, router]);
 
   return {
     logout: handleLogout,

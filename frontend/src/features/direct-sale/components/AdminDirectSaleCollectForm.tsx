@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
@@ -27,6 +28,7 @@ import {
   listFinanceAccounts,
   type FinanceAccount,
 } from "@/services/accounting";
+import { invalidateAfterDirectSaleCollect } from "@/lib/operational-query-invalidation";
 
 const FIELD_CLASS_NAME =
   "w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2.5 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35";
@@ -83,6 +85,7 @@ export default function AdminDirectSaleCollectForm({
   canonicalSelfHref: string;
   prefillDirectSaleId?: number | null;
 }) {
+  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [searchResults, setSearchResults] = useState<DirectSale[]>([]);
   const [searching, setSearching] = useState(false);
@@ -258,6 +261,7 @@ export default function AdminDirectSaleCollectForm({
   }
 
   async function submitCollection() {
+    if (submitting) return;
     setErrorMessage(null);
     setSuccess(null);
 
@@ -281,6 +285,7 @@ export default function AdminDirectSaleCollectForm({
         notes: form.notes.trim() || undefined,
       });
       setSuccess(response);
+      await invalidateAfterDirectSaleCollect(queryClient);
       setSelectedSale(response.direct_sale);
       setForm((current) => ({
         ...current,
@@ -317,7 +322,8 @@ export default function AdminDirectSaleCollectForm({
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               className={FIELD_CLASS_NAME}
-              placeholder="Search by sale no, customer name, or phone"
+              placeholder="Sale number, customer name, phone, or invoice reference"
+              aria-describedby="admin-direct-sale-search-hint"
             />
           </div>
 
@@ -338,8 +344,11 @@ export default function AdminDirectSaleCollectForm({
           </ActionButton>
         </div>
 
-        <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
-          Use direct-sale collection only for invoiced retail bills with outstanding balance. Subscription EMI, rent, and lease collections stay in the subscription workflow.
+        <div
+          id="admin-direct-sale-search-hint"
+          className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground"
+        >
+          Search accepts sale number, customer name, phone, or invoice reference. Use direct-sale collection only for invoiced retail bills with outstanding balance. Subscription EMI, rent, and lease collections stay in the subscription workflow.
         </div>
 
         {searching ? <div className="mt-4 text-sm text-muted-foreground">Searching outstanding direct sales...</div> : null}

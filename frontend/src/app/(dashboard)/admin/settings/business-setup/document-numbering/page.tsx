@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { invalidateAfterDocumentNumberingMutation } from "@/lib/operational-query-invalidation";
 import {
   getDocumentNumberingState,
   updateDocumentNumbering,
@@ -18,6 +20,7 @@ function toErrorMessage(error: unknown): string {
 type DraftState = Record<string, { prefix: string; next_number: string; padding: string }>;
 
 export default function BusinessSetupDocumentNumberingPage() {
+  const queryClient = useQueryClient();
   const [data, setData] = useState<DocumentNumberingState | null>(null);
   const [drafts, setDrafts] = useState<DraftState>({});
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +68,7 @@ export default function BusinessSetupDocumentNumberingPage() {
       });
       setData(response);
       setNotice(`${sequence.name} numbering updated.`);
+      await invalidateAfterDocumentNumberingMutation(queryClient);
     } catch (saveError) {
       setError(toErrorMessage(saveError));
     } finally {

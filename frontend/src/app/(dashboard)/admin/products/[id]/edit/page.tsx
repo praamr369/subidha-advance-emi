@@ -9,6 +9,7 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -18,6 +19,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { invalidateAfterProductInventoryMutation } from "@/lib/operational-query-invalidation";
 import { resolveApiMediaUrl } from "@/lib/media";
 import {
   listStockLocations,
@@ -234,10 +236,15 @@ function toErrorMessage(error: unknown): string {
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return (
+    <p tabIndex={-1} data-field-error="" className="mt-1 text-xs text-destructive">
+      {message}
+    </p>
+  );
 }
 
 export default function AdminProductEditPage() {
+  const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
   const productId = params?.id;
 
@@ -571,6 +578,7 @@ export default function AdminProductEditPage() {
 
   async function handleSave() {
     if (!productId) return;
+    if (saving) return;
 
     setError(null);
     setSaveSuccess(null);
@@ -578,7 +586,15 @@ export default function AdminProductEditPage() {
     const nextFieldErrors = validate();
     setFieldErrors(nextFieldErrors);
 
-    if (Object.keys(nextFieldErrors).length > 0) return;
+    if (Object.keys(nextFieldErrors).length > 0) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>("[data-field-error]")?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+      });
+      return;
+    }
 
     setSaving(true);
 
@@ -693,6 +709,7 @@ export default function AdminProductEditPage() {
       setRemoveExistingImage(false);
       setFieldErrors({});
       setSaveSuccess("Product updated successfully.");
+      await invalidateAfterProductInventoryMutation(queryClient, { productId });
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
       setError(toErrorMessage(err));
@@ -703,6 +720,7 @@ export default function AdminProductEditPage() {
 
   async function handleSaveInventory() {
     if (!inventoryRecord?.id) return;
+    if (inventorySaving) return;
     setInventorySaving(true);
     setError(null);
     setSaveSuccess(null);
@@ -719,6 +737,10 @@ export default function AdminProductEditPage() {
       });
       setInventoryRecord(updated);
       setSaveSuccess("Inventory profile settings updated.");
+      await invalidateAfterProductInventoryMutation(queryClient, {
+        productId: productId ?? undefined,
+        inventoryItemId: inventoryRecord.id,
+      });
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -734,6 +756,7 @@ export default function AdminProductEditPage() {
           : `Edit Product #${productId ?? "—"}`
       }
       subtitle="Update product master data safely. Base price remains the total contract price, and image replacement or removal is handled from this edit workflow."
+      helperNote="Changes affect future onboarding and billing only. Existing contracts keep saved pricing and plan snapshots."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Products", href: "/admin/products" },
@@ -1255,7 +1278,7 @@ export default function AdminProductEditPage() {
 
             <FormSection
               title="Inventory item controls"
-              description="Control stock tracking, bridge behavior, reorder threshold, costing, and default location for future inventory operations."
+              description="Control stock tracking, bridge behavior, reorder threshold, costing, and default location for future inventory operations. Stock tracking affects operational stock visibility. It does not rewrite historical invoices or receipts."
             >
               {!inventoryRecord ? (
                 <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">

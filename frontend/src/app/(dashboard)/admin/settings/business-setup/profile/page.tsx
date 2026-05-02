@@ -2,9 +2,11 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { invalidateAfterBusinessSetupMutation } from "@/lib/operational-query-invalidation";
 import {
   getBusinessProfile,
   saveBusinessProfile,
@@ -43,6 +45,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function BusinessProfilePage() {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<BusinessProfile>(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,6 +95,7 @@ export default function BusinessProfilePage() {
       setForm({ ...initialForm, ...saved });
       setMessage("Business profile saved.");
       setUnauthorized(false);
+      await invalidateAfterBusinessSetupMutation(queryClient);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setUnauthorized(true);

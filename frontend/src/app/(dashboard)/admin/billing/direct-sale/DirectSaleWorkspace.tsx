@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Plus, ReceiptText, Search, Trash2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -14,14 +14,13 @@ import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceD
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
+import { listFinanceAccounts } from "@/services/accounting";
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
 import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
   listAdminInventoryRequirements,
   searchBillingProducts,
-  type InventoryRequirementRow,
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
 import {
@@ -30,7 +29,14 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { ApiError } from "@/lib/api";
-import { invalidateAfterDirectSaleMutation } from "@/lib/operational-query-invalidation";
+import {
+  invalidateAfterDirectSaleCreate,
+} from "@/lib/operational-query-invalidation";
+import {
+  directSalesKeys,
+  financeAccountKeys,
+  inventoryRequirementKeys,
+} from "@/lib/query-keys";
 
 const FIELD_CLASS =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
@@ -227,17 +233,63 @@ export default function DirectSaleWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
-  const [rows, setRows] = useState<DirectSale[]>([]);
-  const [requirements, setRequirements] = useState<InventoryRequirementRow[]>([]);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
-  const [salesLoading, setSalesLoading] = useState(true);
-  const [requirementsLoading, setRequirementsLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const createMode = (searchParams.get("mode") || "").trim().toLowerCase() === "create";
+  const workspaceQueriesEnabled = !createMode;
+  const queryClient = useQueryClient();
 
-  const [salesError, setSalesError] = useState<string | null>(null);
-  const [requirementsError, setRequirementsError] = useState<string | null>(null);
+  const financeAccountsQuery = useQuery({
+    queryKey: financeAccountKeys.collectionList(),
+    queryFn: async () => {
+      const payload = await listFinanceAccounts({
+        is_active: "true",
+        for_payment_collection: "true",
+      });
+      return payload.results;
+    },
+  });
+
+  const salesQuery = useQuery({
+    queryKey: directSalesKeys.adminRegister(),
+    queryFn: async () => {
+      const payload = await listDirectSales();
+      return payload.results;
+    },
+    enabled: workspaceQueriesEnabled,
+  });
+
+  const requirementsQuery = useQuery({
+    queryKey: inventoryRequirementKeys.adminList({ status: "OPEN", source_module: "DIRECT_SALE" }),
+    queryFn: async () => {
+      const payload = await listAdminInventoryRequirements({
+        status: "OPEN",
+        source_module: "DIRECT_SALE",
+      });
+      return payload.results;
+    },
+    enabled: workspaceQueriesEnabled,
+  });
+
+  const rows = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
+  const requirements = useMemo(() => requirementsQuery.data ?? [], [requirementsQuery.data]);
+  const financeAccounts = financeAccountsQuery.data ?? [];
+
+  const salesLoading = workspaceQueriesEnabled && salesQuery.isPending;
+  const requirementsLoading = workspaceQueriesEnabled && requirementsQuery.isPending;
+
+  const salesError = salesQuery.error
+    ? accountingErrorMessage(salesQuery.error, "Failed to load direct-sale register list.")
+    : null;
+  const requirementsError = requirementsQuery.error
+    ? accountingErrorMessage(requirementsQuery.error, "Failed to load inventory requirements.")
+    : null;
+  const financeAccountsError = financeAccountsQuery.error
+    ? accountingErrorMessage(
+        financeAccountsQuery.error,
+        "Failed to load finance accounts for payment receipts.",
+      )
+    : null;
+
+  const [submitting, setSubmitting] = useState(false);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -248,7 +300,6 @@ export default function DirectSaleWorkspace() {
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
-  const [financeAccountsError, setFinanceAccountsError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
     sale_date: todayIso(),
     customer_mode: "EXISTING",
@@ -287,61 +338,6 @@ export default function DirectSaleWorkspace() {
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
   const createAttemptKey = useRef<string | null>(null);
-
-  const loadPage = useCallback(async () => {
-    setSalesLoading(true);
-    setRequirementsLoading(true);
-    setSalesError(null);
-    setRequirementsError(null);
-    try {
-      const [salesPayload, accountsPayload, requirementsPayload] = await Promise.allSettled([
-        listDirectSales(),
-        listFinanceAccounts({ is_active: "true", for_payment_collection: "true" }),
-        listAdminInventoryRequirements({ status: "OPEN", source_module: "DIRECT_SALE" }),
-      ]);
-      if (salesPayload.status === "fulfilled") {
-        setRows(salesPayload.value.results);
-        setSalesError(null);
-      } else {
-        setRows([]);
-        setSalesError(accountingErrorMessage(salesPayload.reason, "Failed to load direct-sale register list."));
-      }
-
-      if (accountsPayload.status === "fulfilled") {
-        setFinanceAccounts(accountsPayload.value.results);
-        setFinanceAccountsError(null);
-      } else {
-        setFinanceAccounts([]);
-        setFinanceAccountsError(
-          accountingErrorMessage(accountsPayload.reason, "Failed to load finance accounts for payment receipts.")
-        );
-      }
-
-      if (requirementsPayload.status === "fulfilled") {
-        setRequirements(requirementsPayload.value.results);
-        setRequirementsError(null);
-      } else {
-        setRequirements([]);
-        setRequirementsError(
-          accountingErrorMessage(requirementsPayload.reason, "Failed to load inventory requirements.")
-        );
-      }
-    } catch (err) {
-      setRows([]);
-      setFinanceAccounts([]);
-      setRequirements([]);
-      const msg = accountingErrorMessage(err, "Failed to load direct-sale workspace.");
-      setSalesError(msg);
-      setRequirementsError(msg);
-    } finally {
-      setSalesLoading(false);
-      setRequirementsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
 
   useEffect(() => {
     if (!createMode) return;
@@ -808,9 +804,8 @@ export default function DirectSaleWorkspace() {
         deliveryLabel || null,
       ].filter(Boolean);
       setNotice(parts.join(". ") + ".");
-      await invalidateAfterDirectSaleMutation(queryClient);
+      await invalidateAfterDirectSaleCreate(queryClient);
       resetCreateForm();
-      await loadPage();
       router.push(pathname);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1266,8 +1261,9 @@ export default function DirectSaleWorkspace() {
                         <select
                           value={form.finance_account}
                           onChange={(event) => setForm((current) => ({ ...current, finance_account: event.target.value }))}
-                          disabled={submitting}
+                          disabled={submitting || financeAccountsQuery.isPending}
                           className={FIELD_CLASS}
+                          aria-busy={financeAccountsQuery.isPending}
                         >
                           <option value="">No immediate receipt</option>
                           {financeAccounts.map((account) => (
@@ -1281,7 +1277,7 @@ export default function DirectSaleWorkspace() {
                             <span>{financeAccountsError}</span>
                             <button
                               type="button"
-                              onClick={() => void loadPage()}
+                              onClick={() => void financeAccountsQuery.refetch()}
                               className="rounded border border-border bg-background px-2 py-0.5 font-medium text-foreground hover:bg-muted"
                             >
                               Retry
@@ -1720,7 +1716,7 @@ export default function DirectSaleWorkspace() {
           columns={columns}
           loading={salesLoading}
           error={salesError}
-          onRetry={() => void loadPage()}
+          onRetry={() => void salesQuery.refetch()}
           emptyTitle="No direct-sale bills found"
           emptyDescription="Create a bill to start the retail direct-sale register."
         />
@@ -1743,7 +1739,7 @@ export default function DirectSaleWorkspace() {
           ]}
           loading={requirementsLoading}
           error={requirementsError}
-          onRetry={() => void loadPage()}
+          onRetry={() => void requirementsQuery.refetch()}
           emptyTitle="No pending inventory requirements"
           emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
         />

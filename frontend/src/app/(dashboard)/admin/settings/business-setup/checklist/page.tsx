@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
 import { clearSession } from "@/lib/auth/session";
+import { businessSetupKeys } from "@/lib/query-keys";
 import {
   executeBusinessReset,
   getResetPreview,
   getSetupChecklist,
   type BusinessResetExecuteRequest,
-  type SetupChecklist,
 } from "@/services/business-setup";
 
 const RESET_CONFIRM_PHRASE = "RESET_SUBIDHA_CORE";
@@ -21,53 +22,38 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function BusinessSetupChecklistPage() {
-  const [data, setData] = useState<SetupChecklist | null>(null);
+  const checklistQuery = useQuery({
+    queryKey: businessSetupKeys.checklist(),
+    queryFn: getSetupChecklist,
+  });
+
+  const data = checklistQuery.data ?? null;
   const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [resetUsername, setResetUsername] = useState("subidhafurniture");
   const [confirm, setConfirm] = useState("");
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
   const [resetResult, setResetResult] = useState<Record<string, unknown> | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    Promise.all([getSetupChecklist(), getResetPreview("subidhafurniture")])
-      .then(([checklist, resetPreview]) => {
-        if (!isMounted) {
-          return;
-        }
-        setData(checklist);
-        setPreview(resetPreview);
-        setResetResult(null);
-        setError(null);
-      })
-      .catch((loadError) => {
-        if (!isMounted) {
-          return;
-        }
-        setError(toErrorMessage(loadError));
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  async function refreshPreview(username: string) {
+  const refreshPreview = useCallback(async (username: string) => {
     try {
       const next = await getResetPreview(username);
       setPreview(next);
+      setPreviewError(null);
     } catch (err) {
-      setError(toErrorMessage(err));
+      setPreviewError(toErrorMessage(err));
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void refreshPreview("subidhafurniture");
+  }, [refreshPreview]);
 
   async function runReset() {
     const isPhraseConfirmed = confirm.trim() === RESET_CONFIRM_PHRASE;
     if (!isPhraseConfirmed) {
-      setError(`Type ${RESET_CONFIRM_PHRASE} exactly before running reset.`);
+      setPreviewError(`Type ${RESET_CONFIRM_PHRASE} exactly before running reset.`);
       return;
     }
 
@@ -81,16 +67,18 @@ export default function BusinessSetupChecklistPage() {
 
     try {
       setRunning(true);
-      setError(null);
+      setPreviewError(null);
       const response = await executeBusinessReset(payload);
       setResetResult(response);
       await refreshPreview(resetUsername);
       if (!dryRun) {
         clearSession();
         window.location.href = "/login";
+      } else {
+        void checklistQuery.refetch();
       }
     } catch (err) {
-      setError(toErrorMessage(err));
+      setPreviewError(toErrorMessage(err));
     } finally {
       setRunning(false);
     }
@@ -108,10 +96,45 @@ export default function BusinessSetupChecklistPage() {
       />
       <BusinessSetupLinks />
 
-      {error ? (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+      {checklistQuery.error ? (
+        <div
+          className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+          role="alert"
+        >
+          <div className="font-medium">Checklist could not be loaded.</div>
+          <p className="mt-1">{toErrorMessage(checklistQuery.error)}</p>
+          <button
+            type="button"
+            className="mt-3 text-sm font-semibold text-primary underline"
+            onClick={() => void checklistQuery.refetch()}
+          >
+            Retry checklist
+          </button>
         </div>
+      ) : null}
+
+      {previewError ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          <div className="font-medium">Reset preview failed.</div>
+          <p className="mt-1">{previewError}</p>
+          <button
+            type="button"
+            className="mt-3 text-sm font-semibold text-amber-900 underline"
+            onClick={() => void refreshPreview(resetUsername)}
+          >
+            Retry preview
+          </button>
+        </div>
+      ) : null}
+
+      {checklistQuery.isPending && !data ? (
+        <section
+          className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm"
+          aria-busy="true"
+          aria-label="Loading business setup checklist"
+        >
+          Loading checklist…
+        </section>
       ) : null}
 
       {data ? (

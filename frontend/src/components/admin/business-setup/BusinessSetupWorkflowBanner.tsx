@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { NavigationRole } from "@/config/navigation";
+import { businessSetupKeys } from "@/lib/query-keys";
 import { ROUTES } from "@/lib/routes";
 import {
   getSetupChecklist,
-  type SetupChecklist,
   type SetupChecklistItem,
 } from "@/services/business-setup";
 
@@ -81,41 +82,15 @@ export default function BusinessSetupWorkflowBanner({
   const showCashierBanner = role === "CASHIER" && isCashierSensitivePath(pathname);
   const shouldFetchChecklist = Boolean(adminScope);
 
-  const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
-  const [loading, setLoading] = useState(shouldFetchChecklist);
-  const [error, setError] = useState<string | null>(null);
+  const checklistQuery = useQuery({
+    queryKey: businessSetupKeys.checklist(),
+    queryFn: getSetupChecklist,
+    enabled: shouldFetchChecklist,
+  });
 
-  useEffect(() => {
-    if (!shouldFetchChecklist) {
-      setChecklist(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let active = true;
-
-    async function loadChecklist() {
-      setLoading(true);
-      try {
-        const payload = await getSetupChecklist();
-        if (!active) return;
-        setChecklist(payload);
-        setError(null);
-      } catch (loadError) {
-        if (!active) return;
-        setChecklist(null);
-        setError(toErrorMessage(loadError));
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void loadChecklist();
-    return () => {
-      active = false;
-    };
-  }, [shouldFetchChecklist, pathname]);
+  const checklist = checklistQuery.data ?? null;
+  const loading = shouldFetchChecklist && checklistQuery.isPending;
+  const error = checklistQuery.error ? toErrorMessage(checklistQuery.error) : null;
 
   const missingRequiredItems = useMemo(() => {
     if (!checklist) return [];
@@ -143,7 +118,11 @@ export default function BusinessSetupWorkflowBanner({
 
   if (loading) {
     return (
-      <section className="mb-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+      <section
+        className="mb-4 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
+        aria-busy="true"
+        aria-label="Checking business setup readiness"
+      >
         Checking setup readiness for this workflow...
       </section>
     );
@@ -157,7 +136,14 @@ export default function BusinessSetupWorkflowBanner({
       >
         <div className="text-sm font-semibold">Setup readiness could not be verified</div>
         <p className="mt-1 text-sm leading-6">{error}</p>
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="text-sm font-medium underline"
+            onClick={() => void checklistQuery.refetch()}
+          >
+            Retry check
+          </button>
           <Link className="text-sm font-medium underline" href={ROUTES.admin.settingsBusinessSetupChecklist}>
             Open checklist
           </Link>
