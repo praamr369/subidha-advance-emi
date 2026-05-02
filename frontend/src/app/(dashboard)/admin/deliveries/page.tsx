@@ -9,6 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import {
+  buildAdminBillingDocumentRoute,
   buildAdminBillingRegisterRoute,
   buildAdminReconciliationRoute,
 } from "@/lib/route-builders";
@@ -441,7 +442,7 @@ export default function AdminDeliveriesPage() {
             <input
               value={qInput}
               onChange={(event) => setQInput(event.target.value)}
-              placeholder="Search reference, customer, phone, note"
+              placeholder="Search reference, customer, phone, sale no., invoice no."
               className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
             <select
@@ -789,7 +790,7 @@ export default function AdminDeliveriesPage() {
         {!loading && !error && rows.length === 0 ? (
           <EmptyState
             title="No deliveries found"
-            description="No delivery records match the current filter set."
+            description="No subscription deliveries or active direct-sale delivery cases match the current filters. Direct-sale rows appear when delivery is required and a Service Desk delivery case is open."
           />
         ) : null}
 
@@ -814,21 +815,43 @@ export default function AdminDeliveriesPage() {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="align-top">
+                    <tr
+                      key={`${row.record_kind ?? "SUBSCRIPTION_DELIVERY"}-${row.id}`}
+                      className="align-top"
+                    >
                       <td className="border-b border-border px-4 py-3 text-sm">
                         <div className="font-medium text-foreground">{row.delivery_reference}</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           Created {formatDateTime(row.created_at)}
                         </div>
+                        {row.record_kind === "DIRECT_SALE_CASE" ? (
+                          <div className="mt-2 inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-800">
+                            Direct Sale
+                          </div>
+                        ) : null}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
-                        <div className="font-medium text-foreground">
-                          {row.subscription_number || `SUB-${row.subscription_id ?? "—"}`}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {row.product_name || "Unknown product"}
-                          {row.batch_code ? ` · ${row.batch_code}` : ""}
-                        </div>
+                        {row.record_kind === "DIRECT_SALE_CASE" ? (
+                          <>
+                            <div className="font-medium text-foreground">
+                              {row.sale_no || `Sale #${row.direct_sale_id ?? row.id}`}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.invoice_document_no ? `Invoice ${row.invoice_document_no}` : "Invoice pending"}
+                              {row.product_name ? ` · ${row.product_name}` : ""}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-medium text-foreground">
+                              {row.subscription_number || `SUB-${row.subscription_id ?? "—"}`}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.product_name || "Unknown product"}
+                              {row.batch_code ? ` · ${row.batch_code}` : ""}
+                            </div>
+                          </>
+                        )}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
                         <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
@@ -845,8 +868,15 @@ export default function AdminDeliveriesPage() {
                           {row.status}
                         </span>
                         <div className="mt-2 text-xs text-muted-foreground">
-                          Fulfillment {row.fulfillment_status || "PENDING"}
+                          {row.record_kind === "DIRECT_SALE_CASE"
+                            ? row.delivery_phase_label || row.payment_state || "—"
+                            : `Fulfillment ${row.fulfillment_status || "PENDING"}`}
                         </div>
+                        {row.record_kind === "DIRECT_SALE_CASE" && row.service_desk_status ? (
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            Desk {row.service_desk_status}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
                         {formatDate(row.scheduled_date)}
@@ -862,22 +892,53 @@ export default function AdminDeliveriesPage() {
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
                         <div className="flex flex-col gap-2">
-                          <Link
-                            href={`/admin/deliveries/${row.id}${queryString ? `?${queryString}` : ""}`}
-                            className="text-primary underline-offset-4 hover:underline"
-                          >
-                            View Detail
-                          </Link>
-                          {row.subscription_id ? (
-                            <Link
-                              href={buildAdminBillingRegisterRoute({
-                                subscription: row.subscription_id,
-                              })}
-                              className="text-primary underline-offset-4 hover:underline"
-                            >
-                              Billing Docs
-                            </Link>
-                          ) : null}
+                          {row.record_kind === "DIRECT_SALE_CASE" ? (
+                            <>
+                              {row.billing_invoice_id ? (
+                                <Link
+                                  href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}
+                                  className="text-primary underline-offset-4 hover:underline"
+                                >
+                                  Open invoice
+                                </Link>
+                              ) : null}
+                              <Link
+                                href={
+                                  row.direct_sale_id
+                                    ? `${ROUTES.admin.billingDirectSaleWorkspace}?highlight_sale=${row.direct_sale_id}`
+                                    : ROUTES.admin.billingDirectSaleWorkspace
+                                }
+                                className="text-primary underline-offset-4 hover:underline"
+                              >
+                                Direct Sale workspace
+                              </Link>
+                              <Link
+                                href={`${ROUTES.admin.serviceDeskCases}/${row.service_case_id ?? row.id}`}
+                                className="text-primary underline-offset-4 hover:underline"
+                              >
+                                Service desk case
+                              </Link>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                href={`/admin/deliveries/${row.id}${queryString ? `?${queryString}` : ""}`}
+                                className="text-primary underline-offset-4 hover:underline"
+                              >
+                                View Detail
+                              </Link>
+                              {row.subscription_id ? (
+                                <Link
+                                  href={buildAdminBillingRegisterRoute({
+                                    subscription: row.subscription_id,
+                                  })}
+                                  className="text-primary underline-offset-4 hover:underline"
+                                >
+                                  Billing Docs
+                                </Link>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

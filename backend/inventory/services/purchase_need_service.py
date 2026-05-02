@@ -9,6 +9,11 @@ from inventory.models import PurchaseNeed, PurchaseNeedStatus, Warehouse
 QUANTITY_ZERO = Decimal("0.000")
 
 
+def direct_sale_purchase_need_source_key(*, sale_id: int, product_id: int) -> str:
+    """Stable idempotency key: one open DIRECT_SALE need per sale + product."""
+    return f"ds:{int(sale_id)}:p:{int(product_id)}"
+
+
 @dataclass
 class StockNeedSignal:
     product_id: int

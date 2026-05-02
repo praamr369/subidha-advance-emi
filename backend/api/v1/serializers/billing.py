@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db.models import Q
 from rest_framework import serializers
 
 from accounting.models import DocumentSequence
@@ -190,6 +191,8 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
 class BillingInvoiceLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    display_sku = serializers.SerializerMethodField()
+    stock_tracking_label = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingInvoiceLine
@@ -199,6 +202,8 @@ class BillingInvoiceLineSerializer(serializers.ModelSerializer):
             "product_code",
             "inventory_item",
             "inventory_item_sku",
+            "display_sku",
+            "stock_tracking_label",
             "description",
             "quantity",
             "unit_price",
@@ -214,6 +219,21 @@ class BillingInvoiceLineSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_display_sku(self, obj):
+        item = getattr(obj, "inventory_item", None)
+        if item is not None and (item.sku or "").strip():
+            return (item.sku or "").strip()
+        product = getattr(obj, "product", None)
+        if product is not None and (getattr(product, "product_code", None) or "").strip():
+            return (product.product_code or "").strip()
+        return ""
+
+    def get_stock_tracking_label(self, obj):
+        item = getattr(obj, "inventory_item", None)
+        if item is None:
+            return "Not linked"
+        return "Tracked" if item.stock_tracking_enabled else "Untracked"
 
 
 def _replace_invoice_lines(invoice: BillingInvoice, lines: list[dict]):
@@ -540,11 +560,12 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     def get_requirement_count(self, obj):
         if obj.pk is None:
             return 0
+        legacy = Q(source_object_id=str(obj.pk))
+        keyed = Q(source_object_id__startswith=f"ds:{obj.pk}:p:")
         return PurchaseNeed.objects.filter(
             source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
-            source_object_id=str(obj.pk),
             status=PurchaseNeedStatus.OPEN,
-        ).count()
+        ).filter(legacy | keyed).count()
 
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):

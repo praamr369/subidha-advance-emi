@@ -102,9 +102,18 @@ export default function BillingDocumentDetailPage() {
   const lineColumns: EnterpriseColumnDef<BillingInvoiceLine>[] = [
     { key: "product_code", header: "Product" },
     {
-      key: "inventory_item_sku",
+      key: "display_sku",
       header: "SKU",
-      render: (row) => row.inventory_item_sku || "Untracked",
+      render: (row) =>
+        (row.display_sku && row.display_sku.trim()) ||
+        (row.inventory_item_sku && row.inventory_item_sku.trim()) ||
+        (row.product_code && row.product_code.trim()) ||
+        "—",
+    },
+    {
+      key: "stock_tracking_label",
+      header: "Stock tracking",
+      render: (row) => row.stock_tracking_label?.trim() || "—",
     },
     { key: "description", header: "Description" },
     { key: "quantity", header: "Qty" },

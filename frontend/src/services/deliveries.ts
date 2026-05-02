@@ -17,6 +17,7 @@ export type DeliveryBucket = "" | "PENDING" | "DELIVERED";
 
 export type DeliveryRecord = {
   id: number;
+  record_kind?: "SUBSCRIPTION_DELIVERY" | "DIRECT_SALE_CASE";
   subscription?: number | null;
   subscription_id?: number | null;
   subscription_number?: string | null;
@@ -61,6 +62,18 @@ export type DeliveryRecord = {
   history_count?: number;
   inventory_stock_status?: "available" | "not available" | "reserved" | "purchase needed" | string;
   inventory_available_qty?: string | null;
+  direct_sale_id?: number | null;
+  sale_no?: string | null;
+  invoice_document_no?: string | null;
+  billing_invoice_id?: number | null;
+  service_case_id?: number | null;
+  service_desk_status?: string | null;
+  delivery_phase_label?: string | null;
+  payment_state?: string | null;
+  detail_hint?: string | null;
+  grand_total?: string | null;
+  balance_total?: string | null;
+  received_total?: string | null;
 };
 
 export type DeliveryReportSummary = {
@@ -75,10 +88,13 @@ export type DeliveryReportSummary = {
   cancelled: number;
   return_requested: number;
   returned: number;
+  direct_sale_delivery_cases?: number;
 };
 
 export type DeliveryListResponse = {
   count: number;
+  subscription_delivery_count?: number;
+  direct_sale_delivery_count?: number;
   summary: DeliveryReportSummary;
   results: DeliveryRecord[];
 };
@@ -129,6 +145,7 @@ export type AdminDeliveryQuery = {
   bucket?: DeliveryBucket;
   date_from?: string;
   date_to?: string;
+  include_direct_sale_cases?: boolean;
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -159,6 +176,7 @@ function normalizeStatus(value: unknown): DeliveryStatus {
   if (
     normalized === "PENDING" ||
     normalized === "SCHEDULED" ||
+    normalized === "BLOCKED_STOCK_UNAVAILABLE" ||
     normalized === "DISPATCHED" ||
     normalized === "OUT_FOR_DELIVERY" ||
     normalized === "DELIVERED" ||
@@ -177,6 +195,10 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
 
   return {
     id: toNumber(row.id),
+    record_kind:
+      row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "SUBSCRIPTION_DELIVERY"
+        ? row.record_kind
+        : undefined,
     subscription: toNullableNumber(row.subscription),
     subscription_id:
       toNullableNumber(row.subscription_id) ?? toNullableNumber(row.subscription),
@@ -220,6 +242,19 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     history_count: toNumber(row.history_count, 0) || undefined,
     inventory_stock_status: toStringOrNull(row.inventory_stock_status) || undefined,
     inventory_available_qty: toStringOrNull(row.inventory_available_qty),
+    stock_blocked_reason: toStringOrNull(row.stock_blocked_reason),
+    direct_sale_id: toNullableNumber(row.direct_sale_id),
+    sale_no: toStringOrNull(row.sale_no),
+    invoice_document_no: toStringOrNull(row.invoice_document_no),
+    billing_invoice_id: toNullableNumber(row.billing_invoice_id),
+    service_case_id: toNullableNumber(row.service_case_id),
+    service_desk_status: toStringOrNull(row.service_desk_status),
+    delivery_phase_label: toStringOrNull(row.delivery_phase_label),
+    payment_state: toStringOrNull(row.payment_state),
+    detail_hint: toStringOrNull(row.detail_hint),
+    grand_total: toStringOrNull(row.grand_total),
+    balance_total: toStringOrNull(row.balance_total),
+    received_total: toStringOrNull(row.received_total),
   };
 }
 
@@ -237,6 +272,7 @@ export function normalizeDeliverySummary(payload: unknown): DeliveryReportSummar
     cancelled: toNumber(row.cancelled, 0),
     return_requested: toNumber(row.return_requested, 0),
     returned: toNumber(row.returned, 0),
+    direct_sale_delivery_cases: toNumber(row.direct_sale_delivery_cases, 0) || undefined,
   };
 }
 
@@ -246,6 +282,8 @@ export function normalizeDeliveryListResponse(payload: unknown): DeliveryListRes
 
   return {
     count: toNumber(root.count, 0),
+    subscription_delivery_count: toNumber(root.subscription_delivery_count, 0) || undefined,
+    direct_sale_delivery_count: toNumber(root.direct_sale_delivery_count, 0) || undefined,
     summary: normalizeDeliverySummary(root.summary),
     results: results.map(normalizeDeliveryRecord),
   };
@@ -323,6 +361,9 @@ function buildQuery(params: AdminDeliveryQuery = {}): string {
   if (params.bucket) search.set("bucket", params.bucket);
   if (params.date_from) search.set("date_from", params.date_from);
   if (params.date_to) search.set("date_to", params.date_to);
+  if (params.include_direct_sale_cases === false) {
+    search.set("include_direct_sale_cases", "false");
+  }
 
   const query = search.toString();
   return query ? `?${query}` : "";

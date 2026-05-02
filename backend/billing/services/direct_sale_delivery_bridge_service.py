@@ -15,6 +15,8 @@ TERMINAL_CASE_STATUSES = frozenset(
     {
         ServiceDeskCaseStatus.CLOSED,
         ServiceDeskCaseStatus.CANCELLED,
+        ServiceDeskCaseStatus.RESOLVED,
+        ServiceDeskCaseStatus.REJECTED,
     }
 )
 

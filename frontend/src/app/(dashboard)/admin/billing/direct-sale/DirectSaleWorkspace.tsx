@@ -344,6 +344,14 @@ export default function DirectSaleWorkspace() {
     resetCreateForm();
   }, [createMode]);
 
+  useEffect(() => {
+    if (!createMode) return;
+    const raw = (searchParams.get("delivery_required") || "").trim().toLowerCase();
+    if (raw === "true" || raw === "1" || raw === "yes") {
+      setForm((current) => ({ ...current, delivery_required: true }));
+    }
+  }, [createMode, searchParams]);
+
   const stats = useMemo(() => {
     const today = todayIso();
     const draftSales = rows.filter((row) => row.status === "DRAFT").length;
@@ -1546,6 +1554,12 @@ export default function DirectSaleWorkspace() {
                             <p className="mt-2 text-xs text-muted-foreground">
                               Requirement does not create stock movement. It only alerts purchasing/inventory.
                             </p>
+                            {line.selected_product && line.selected_product.stock_tracking_enabled === false ? (
+                              <p className="mt-2 text-xs text-amber-800">
+                                Stock tracking is off for this SKU. Enable tracking on the inventory item or check
+                                &quot;Create purchase/stock requirement&quot; above to flag purchasing manually.
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       ))}

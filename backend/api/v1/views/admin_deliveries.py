@@ -6,6 +6,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
+from billing.services.direct_sale_delivery_queue import (
+    apply_direct_sale_case_filters,
+    direct_sale_delivery_cases_queryset,
+    merge_delivery_summaries,
+    serialize_direct_sale_delivery_case,
+)
+from service_desk.models import ServiceDeskCaseStatus
 from api.v1.serializers.delivery import (
     AdminDeliverySourceSubscriptionsQuerySerializer,
     AdminDeliverySourceSubscriptionSerializer,
@@ -109,11 +116,91 @@ class AdminDeliveryListCreateView(APIView):
     def get(self, request):
         queryset = _apply_delivery_filters(get_delivery_queryset(), request)
         serializer = AdminSubscriptionDeliveryReadSerializer(queryset[:200], many=True)
+        sub_summary = build_delivery_report_summary(queryset)
+        sub_count = queryset.count()
+        subscription_rows = list(serializer.data)
+
+        include_direct_sale = (request.query_params.get("include_direct_sale_cases") or "true").strip().lower() not in {
+            "false",
+            "0",
+            "no",
+        }
+        ds_payloads: list[dict] = []
+        if include_direct_sale:
+            ds_qs = apply_direct_sale_case_filters(direct_sale_delivery_cases_queryset(), request)
+            ds_cases = list(ds_qs[:400])
+            ds_payloads = [serialize_direct_sale_delivery_case(c) for c in ds_cases]
+            pending_ds = sum(
+                1
+                for c in ds_cases
+                if c.status
+                in (
+                    ServiceDeskCaseStatus.OPEN,
+                    ServiceDeskCaseStatus.UNDER_REVIEW,
+                )
+            )
+            scheduled_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.AUTHORIZED)
+            ofd_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.IN_SERVICE)
+            sub_summary = merge_delivery_summaries(
+                subscription_summary=sub_summary,
+                direct_sale_cases_count=len(ds_cases),
+                pending_ds=pending_ds,
+                scheduled_ds=scheduled_ds,
+                ofd_ds=ofd_ds,
+            )
+
+        if not include_direct_sale:
+            return Response(
+                {
+                    "count": sub_count,
+                    "subscription_delivery_count": sub_count,
+                    "direct_sale_delivery_count": 0,
+                    "summary": sub_summary,
+                    "results": subscription_rows,
+                }
+            )
+
+        merged: list[dict] = []
+        i_sub = 0
+        i_ds = 0
+        while len(merged) < 200 and (i_sub < len(subscription_rows) or i_ds < len(ds_payloads)):
+            ts_sub = subscription_rows[i_sub].get("created_at") if i_sub < len(subscription_rows) else None
+            ts_ds = ds_payloads[i_ds].get("created_at") if i_ds < len(ds_payloads) else None
+            pick_sub = False
+            if ts_sub and ts_ds:
+                pick_sub = ts_sub >= ts_ds
+            elif ts_sub:
+                pick_sub = True
+            elif ts_ds:
+                pick_sub = False
+            else:
+                pick_sub = i_sub < len(subscription_rows)
+
+            if pick_sub and i_sub < len(subscription_rows):
+                row = dict(subscription_rows[i_sub])
+                row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                merged.append(row)
+                i_sub += 1
+            elif i_ds < len(ds_payloads):
+                merged.append(ds_payloads[i_ds])
+                i_ds += 1
+            elif i_sub < len(subscription_rows):
+                row = dict(subscription_rows[i_sub])
+                row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                merged.append(row)
+                i_sub += 1
+            else:
+                break
+
+        total_count = sub_count + len(ds_payloads)
+
         return Response(
             {
-                "count": queryset.count(),
-                "summary": build_delivery_report_summary(queryset),
-                "results": serializer.data,
+                "count": total_count,
+                "subscription_delivery_count": sub_count,
+                "direct_sale_delivery_count": len(ds_payloads),
+                "summary": sub_summary,
+                "results": merged,
             }
         )
 

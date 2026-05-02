@@ -9,6 +9,7 @@ from accounting.models import DocumentSequence
 from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, StockLocation, Warehouse
+from inventory.services.purchase_need_service import direct_sale_purchase_need_source_key
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from tests.helpers import (
     create_admin_user,
@@ -173,7 +174,10 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         need = PurchaseNeed.objects.get()
         self.assertEqual(need.source_module, PurchaseNeed.SourceModule.DIRECT_SALE)
-        self.assertEqual(need.source_object_id, str(response.data["id"]))
+        self.assertEqual(
+            need.source_object_id,
+            direct_sale_purchase_need_source_key(sale_id=response.data["id"], product_id=self.product.id),
+        )
         self.assertEqual(need.product_id, self.product.id)
         self.assertEqual(need.required_quantity, Decimal("2.000"))
         self.assertEqual(need.shortage_quantity, Decimal("2.000"))
@@ -378,7 +382,12 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.inventory_item.save(update_fields=["opening_stock_qty"])
         response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        need = PurchaseNeed.objects.get(source_object_id=str(response.data["id"]))
+        need = PurchaseNeed.objects.get(
+            source_object_id=direct_sale_purchase_need_source_key(
+                sale_id=response.data["id"],
+                product_id=self.product.id,
+            )
+        )
         self.assertEqual(need.shortage_quantity, Decimal("0.000"))
 
     def test_direct_sale_bootstraps_primary_warehouse_when_none_exist(self):
@@ -404,3 +413,18 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
         self.assertEqual(case.status, ServiceDeskCaseStatus.AUTHORIZED)
         self.assertEqual(response.data.get("delivery_status"), "READY_FOR_DELIVERY")
+
+    def test_admin_delivery_register_includes_direct_sale_case_rows(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        create_resp = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED, create_resp.data)
+        sale_id = create_resp.data["id"]
+
+        delivery_resp = self.client.get("/api/v1/admin/deliveries/")
+        self.assertEqual(delivery_resp.status_code, status.HTTP_200_OK, delivery_resp.data)
+        ds_rows = [
+            row for row in delivery_resp.data["results"] if row.get("record_kind") == "DIRECT_SALE_CASE"
+        ]
+        self.assertTrue(any(row.get("direct_sale_id") == sale_id for row in ds_rows))
+        self.assertGreaterEqual(delivery_resp.data.get("direct_sale_delivery_count", 0), 1)

@@ -30,6 +30,7 @@ from billing.models import (
 from inventory.models import InventoryItem
 from inventory.services.purchase_need_service import (
     StockNeedSignal,
+    direct_sale_purchase_need_source_key,
     upsert_direct_sale_purchase_need,
 )
 from inventory.services.stock_service import (
@@ -233,7 +234,6 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
         schedule_direct_sale_stock_requirement_notifications,
     )
 
-    source_object_id = str(sale.id or "")
     customer_id = sale.customer_id
     for payload in line_payloads:
         inventory_item = payload.get("inventory_item")
@@ -253,8 +253,11 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
             continue
         shortage_qty = max(Decimal("0.000"), shortage_qty)
         product = payload.get("product")
+        if product is None:
+            continue
         product_name = getattr(product, "name", "") if product is not None else ""
         note = payload.get("_requirement_note") or f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}"
+        source_object_id = direct_sale_purchase_need_source_key(sale_id=int(sale.id), product_id=int(product.id))
         need, created = upsert_direct_sale_purchase_need(
             signal=StockNeedSignal(
                 product_id=product.id,

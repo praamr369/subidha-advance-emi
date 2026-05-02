@@ -25,6 +25,10 @@ export type BillingInvoiceLine = {
   product_code?: string;
   inventory_item?: number | null;
   inventory_item_sku?: string;
+  /** Resolved SKU / product code for display (additive API field). */
+  display_sku?: string;
+  /** Inventory tracking state separate from SKU (additive API field). */
+  stock_tracking_label?: string;
   description: string;
   quantity: string;
   unit_price: string;
