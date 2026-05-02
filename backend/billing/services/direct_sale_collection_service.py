@@ -209,19 +209,22 @@ def collect_direct_sale_payment(
     if amount <= Decimal("0.00"):
         raise ValueError("Collection amount must be greater than zero.")
 
+    DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
     sale = (
-        DirectSale.objects.select_for_update()
-        .select_related("branch", "cash_counter", "finance_account", "customer")
+        DirectSale.objects.select_related("branch", "cash_counter", "finance_account", "customer")
         .prefetch_related("receipts")
         .get(pk=direct_sale_id)
     )
     invoice = (
-        BillingInvoice.objects.select_for_update()
-        .select_related("branch", "finance_account")
-        .filter(direct_sale=sale)
+        BillingInvoice.objects.select_for_update(of=("self",))
+        .filter(direct_sale_id=sale.id)
         .order_by("-id")
         .first()
     )
+    if invoice is not None:
+        invoice = (
+            BillingInvoice.objects.select_related("branch", "finance_account").get(pk=invoice.pk)
+        )
     if invoice is None:
         raise ValueError("Linked billing invoice was not found for this direct sale.")
     if sale.status != "INVOICED":

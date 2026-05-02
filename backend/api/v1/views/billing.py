@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.http import Http404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -215,6 +216,7 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="collect")
     def collect_payment(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -229,6 +231,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                 reference_no=serializer.validated_data.get("reference_no"),
                 notes=serializer.validated_data.get("notes"),
             )
+        except DirectSale.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
 
@@ -304,10 +308,13 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             invoice, updated = approve_billing_invoice(invoice_id=int(pk), approved_by=request.user)
+        except BillingInvoice.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())
@@ -315,10 +322,13 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="post")
     def post_invoice(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             invoice, updated = post_billing_invoice(invoice_id=int(pk), posted_by=request.user)
+        except BillingInvoice.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())

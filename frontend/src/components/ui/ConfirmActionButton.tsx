@@ -3,6 +3,7 @@
 import { AlertTriangle, X } from "lucide-react";
 import { useState } from "react";
 
+import { ApiError } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import ModalShell from "@/components/ui/ModalShell";
 
@@ -29,12 +30,30 @@ export default function ConfirmActionButton({
 }: ConfirmActionButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  function formatActionError(err: unknown): string {
+    if (err instanceof ApiError) {
+      if (err.status === 404) return "That record was not found.";
+      if (err.status === 400) return err.readableMessage || "Request could not be validated.";
+      if (err.status >= 500) return "A server error occurred. Please try again or contact support.";
+      return err.readableMessage || `Request failed (${err.status}).`;
+    }
+    if (err instanceof TypeError) {
+      return "Unable to reach the server. Check your network connection and try again.";
+    }
+    if (err instanceof Error && err.message.trim()) return err.message.trim();
+    return "Something went wrong.";
+  }
 
   async function handleConfirm() {
     setLoading(true);
+    setActionError(null);
     try {
       await onConfirm();
       setOpen(false);
+    } catch (err) {
+      setActionError(formatActionError(err));
     } finally {
       setLoading(false);
     }
@@ -45,7 +64,10 @@ export default function ConfirmActionButton({
       <ActionButton
         variant={variant}
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setActionError(null);
+          setOpen(true);
+        }}
         className={className}
       >
         {label}
@@ -55,6 +77,7 @@ export default function ConfirmActionButton({
         open={open}
         onClose={() => {
           if (loading) return;
+          setActionError(null);
           setOpen(false);
         }}
         title={title}
@@ -72,12 +95,23 @@ export default function ConfirmActionButton({
                 <div>
                   <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+                  {actionError ? (
+                    <p
+                      className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                      role="alert"
+                    >
+                      {actionError}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setActionError(null);
+                  setOpen(false);
+                }}
                 disabled={loading}
                 className="popup-control inline-flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Close confirmation dialog"
@@ -92,7 +126,10 @@ export default function ConfirmActionButton({
               <ActionButton
                 variant="outline"
                 disabled={loading}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setActionError(null);
+                  setOpen(false);
+                }}
               >
                 Cancel
               </ActionButton>

@@ -487,9 +487,9 @@ def create_direct_sale(*, payload: dict, created_by):
 
 @transaction.atomic
 def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
+    DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
     sale = (
-        DirectSale.objects.select_for_update()
-        .select_related("customer", "doc_series", "finance_account")
+        DirectSale.objects.select_related("customer", "doc_series", "finance_account")
         .prefetch_related("lines", "billing_invoices")
         .get(pk=direct_sale_id)
     )
@@ -632,9 +632,10 @@ def mark_direct_sale_delivered(*, direct_sale_id: int, delivered_by, delivery_re
 
 @transaction.atomic
 def approve_billing_invoice(*, invoice_id: int, approved_by):
+    BillingInvoice.objects.select_for_update(of=("self",)).get(pk=invoice_id)
     invoice = (
-        BillingInvoice.objects.select_for_update()
-        .select_related("doc_series", "subscription")
+        BillingInvoice.objects.select_related("doc_series", "subscription")
+        .prefetch_related("lines")
         .get(pk=invoice_id)
     )
     if invoice.status in {BillingDocumentStatus.APPROVED, BillingDocumentStatus.POSTED}:
@@ -665,16 +666,16 @@ def approve_billing_invoice(*, invoice_id: int, approved_by):
 
 @transaction.atomic
 def post_billing_invoice(*, invoice_id: int, posted_by):
+    BillingInvoice.objects.select_for_update(of=("self",)).get(pk=invoice_id)
     invoice = (
-        BillingInvoice.objects.select_for_update()
-        .select_related(
+        BillingInvoice.objects.select_related(
             "direct_sale",
             "finance_account",
             "finance_account__chart_account",
             "posted_journal_entry",
             "subscription",
         )
-        .prefetch_related("lines", "lines__inventory_item")
+        .prefetch_related("lines", "lines__inventory_item", "receipts")
         .get(pk=invoice_id)
     )
     if invoice.status == BillingDocumentStatus.POSTED and invoice.posted_journal_entry_id:
@@ -842,7 +843,8 @@ def create_manual_receipt(
     from accounting.models import FinanceAccount
 
     accounts = ensure_phase3_system_accounts()
-    finance_account = FinanceAccount.objects.select_for_update().select_related("chart_account").get(pk=finance_account_id)
+    FinanceAccount.objects.select_for_update(of=("self",)).get(pk=finance_account_id)
+    finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
     sequence = _ensure_receipt_sequence(receipt_date)
     billing_invoice = BillingInvoice.objects.select_related("customer").filter(pk=billing_invoice_id).first() if billing_invoice_id else None
     direct_sale = DirectSale.objects.select_related("customer").filter(pk=direct_sale_id).first() if direct_sale_id else None
@@ -934,10 +936,8 @@ def create_manual_receipt(
 
 @transaction.atomic
 def generate_emi_payment_receipt(*, payment_id: int, finance_account_id: int, performed_by):
-    payment = Payment.objects.select_for_update().select_related(
-        "customer",
-        "subscription",
-    ).get(pk=payment_id)
+    Payment.objects.select_for_update(of=("self",)).get(pk=payment_id)
+    payment = Payment.objects.select_related("customer", "subscription").get(pk=payment_id)
     if ReceiptDocument.objects.filter(payment_id=payment.id).exists():
         receipt = ReceiptDocument.objects.get(payment_id=payment.id)
         return receipt, False
@@ -958,10 +958,13 @@ def generate_emi_payment_receipt(*, payment_id: int, finance_account_id: int, pe
 
 @transaction.atomic
 def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
+    ReceiptDocument.objects.select_for_update(of=("self",)).get(pk=receipt_id)
     receipt = (
-        ReceiptDocument.objects.select_for_update()
-        .select_related("finance_account", "finance_account__chart_account", "posted_journal_entry")
-        .get(pk=receipt_id)
+        ReceiptDocument.objects.select_related(
+            "finance_account",
+            "finance_account__chart_account",
+            "posted_journal_entry",
+        ).get(pk=receipt_id)
     )
     if receipt.status == BillingDocumentStatus.VOID:
         return receipt, False
