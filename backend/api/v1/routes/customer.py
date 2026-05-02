@@ -19,6 +19,9 @@ from api.v1.views.customer import (
 )
 from api.v1.views.phase4_finance import (
     CustomerAccountStatementView,
+    CustomerDirectSaleDetailView,
+    CustomerDirectSaleListView,
+    CustomerDirectSaleSummaryView,
     CustomerDepositPdfView,
     CustomerDocumentListView,
     CustomerFinanceSummaryView,
@@ -58,6 +61,9 @@ urlpatterns = [
     path("deliveries/<int:pk>/pdf/", CustomerDeliveryPdfView.as_view()),
     path("payments/", CustomerPaymentListView.as_view()),
     path("payments/<int:pk>/", CustomerPaymentDetailView.as_view()),
+    path("direct-sales/", CustomerDirectSaleListView.as_view()),
+    path("direct-sales/summary/", CustomerDirectSaleSummaryView.as_view()),
+    path("direct-sales/<int:pk>/", CustomerDirectSaleDetailView.as_view()),
     # Phase 4: customer finance + documents
     path("finance/summary/", CustomerFinanceSummaryView.as_view()),
     path("invoices/", CustomerInvoiceListView.as_view()),

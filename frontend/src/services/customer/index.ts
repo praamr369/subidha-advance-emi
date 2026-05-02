@@ -881,6 +881,195 @@ export async function getCustomerPaymentDetail(
   return normalizeCustomerPayment(payload);
 }
 
+export type CustomerDirectSaleListItem = {
+  id: number;
+  document_number?: string;
+  invoice_number?: string | null;
+  sale_date?: string;
+  status?: string;
+  grand_total?: string;
+  paid_amount?: string;
+  outstanding_amount?: string;
+  delivery_required?: boolean;
+  delivery_status?: string;
+  item_count?: number;
+  item_names?: string[];
+  detail_url?: string;
+  invoice_pdf_url?: string | null;
+};
+
+export type CustomerDirectSaleReceipt = {
+  id: number;
+  invoice_id?: number | null;
+  invoice_number?: string | null;
+  receipt_number?: string | null;
+  receipt_date?: string;
+  receipt_type?: string;
+  amount?: string;
+  status?: string;
+  payment_method?: string | null;
+  reference_no?: string;
+  receipt_pdf_url?: string | null;
+};
+
+export type CustomerDirectSaleDetail = {
+  id: number;
+  document_number?: string;
+  invoice_number?: string | null;
+  invoice_date?: string | null;
+  sale_date?: string;
+  status?: string;
+  tax_mode?: string;
+  customer_gstin?: string | null;
+  customer_snapshot_place_of_supply?: string;
+  customer_snapshot?: Record<string, unknown> | null;
+  delivery_required?: boolean;
+  delivery_status?: string;
+  delivery_snapshot?: Record<string, unknown> | null;
+  line_items?: Array<Record<string, unknown>>;
+  subtotal?: string;
+  discount_total?: string;
+  taxable_total?: string;
+  tax_total?: string;
+  grand_total?: string;
+  paid_amount?: string;
+  outstanding_amount?: string;
+  receipts?: CustomerDirectSaleReceipt[];
+  invoice_pdf_url?: string | null;
+};
+
+export type CustomerDirectSaleSummary = {
+  total_direct_sale_invoices: number;
+  total_outstanding_direct_sale_dues: string;
+  total_paid_direct_sale_amount: string;
+  overdue_direct_sale_count: number;
+  latest_direct_sale_invoice?: Record<string, unknown> | null;
+};
+
+export type CustomerDirectSaleListResponse = {
+  count: number;
+  page: number;
+  page_size: number;
+  results: CustomerDirectSaleListItem[];
+};
+
+function normalizeCustomerDirectSaleListItem(item: unknown): CustomerDirectSaleListItem {
+  const row = (item ?? {}) as Record<string, unknown>;
+  return {
+    id: toNumber(row.id),
+    document_number: toStringOrUndefined(row.document_number),
+    invoice_number: toStringOrUndefined(row.invoice_number) ?? null,
+    sale_date: toStringOrUndefined(row.sale_date),
+    status: toStringOrUndefined(row.status),
+    grand_total: toMoneyString(row.grand_total),
+    paid_amount: toMoneyString(row.paid_amount),
+    outstanding_amount: toMoneyString(row.outstanding_amount),
+    delivery_required: toBoolean(row.delivery_required),
+    delivery_status: toStringOrUndefined(row.delivery_status),
+    item_count:
+      row.item_count === null || row.item_count === undefined
+        ? undefined
+        : toNumber(row.item_count),
+    item_names: Array.isArray(row.item_names)
+      ? row.item_names.filter((entry): entry is string => typeof entry === "string")
+      : [],
+    detail_url: toStringOrUndefined(row.detail_url),
+    invoice_pdf_url: toStringOrUndefined(row.invoice_pdf_url) ?? null,
+  };
+}
+
+function normalizeCustomerDirectSaleReceipt(item: unknown): CustomerDirectSaleReceipt {
+  const row = (item ?? {}) as Record<string, unknown>;
+  return {
+    id: toNumber(row.id),
+    invoice_id:
+      row.invoice_id === null || row.invoice_id === undefined
+        ? null
+        : toNumber(row.invoice_id),
+    invoice_number: toStringOrUndefined(row.invoice_number) ?? null,
+    receipt_number: toStringOrUndefined(row.receipt_number) ?? null,
+    receipt_date: toStringOrUndefined(row.receipt_date),
+    receipt_type: toStringOrUndefined(row.receipt_type),
+    amount: toMoneyString(row.amount),
+    status: toStringOrUndefined(row.status),
+    payment_method: toStringOrUndefined(row.payment_method) ?? null,
+    reference_no: toStringOrUndefined(row.reference_no),
+    receipt_pdf_url: toStringOrUndefined(row.receipt_pdf_url) ?? null,
+  };
+}
+
+function normalizeCustomerDirectSaleDetail(payload: unknown): CustomerDirectSaleDetail {
+  const row = (payload ?? {}) as Record<string, unknown>;
+  return {
+    id: toNumber(row.id),
+    document_number: toStringOrUndefined(row.document_number),
+    invoice_number: toStringOrUndefined(row.invoice_number) ?? null,
+    invoice_date: toStringOrUndefined(row.invoice_date) ?? null,
+    sale_date: toStringOrUndefined(row.sale_date),
+    status: toStringOrUndefined(row.status),
+    tax_mode: toStringOrUndefined(row.tax_mode),
+    customer_gstin: toStringOrUndefined(row.customer_gstin) ?? null,
+    customer_snapshot_place_of_supply: toStringOrUndefined(row.customer_snapshot_place_of_supply),
+    customer_snapshot: toRecordOrNull(row.customer_snapshot),
+    delivery_required: toBoolean(row.delivery_required),
+    delivery_status: toStringOrUndefined(row.delivery_status),
+    delivery_snapshot: toRecordOrNull(row.delivery_snapshot),
+    line_items: Array.isArray(row.line_items)
+      ? row.line_items.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+      : [],
+    subtotal: toMoneyString(row.subtotal),
+    discount_total: toMoneyString(row.discount_total),
+    taxable_total: toMoneyString(row.taxable_total),
+    tax_total: toMoneyString(row.tax_total),
+    grand_total: toMoneyString(row.grand_total),
+    paid_amount: toMoneyString(row.paid_amount),
+    outstanding_amount: toMoneyString(row.outstanding_amount),
+    receipts: Array.isArray(row.receipts)
+      ? row.receipts.map(normalizeCustomerDirectSaleReceipt)
+      : [],
+    invoice_pdf_url: toStringOrUndefined(row.invoice_pdf_url) ?? null,
+  };
+}
+
+export async function listCustomerDirectSales(params?: { page?: number; pageSize?: number }) {
+  const search = new URLSearchParams();
+  if (params?.page) {
+    search.set("page", String(params.page));
+  }
+  if (params?.pageSize) {
+    search.set("page_size", String(params.pageSize));
+  }
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(`/customer/direct-sales/${query ? `?${query}` : ""}`);
+  const root = (payload ?? {}) as Record<string, unknown>;
+  return {
+    count: toNumber(root.count, 0),
+    page: toNumber(root.page, 1),
+    page_size: toNumber(root.page_size, 20),
+    results: toArray(root.results).map(normalizeCustomerDirectSaleListItem),
+  } as CustomerDirectSaleListResponse;
+}
+
+export async function getCustomerDirectSale(id: number | string): Promise<CustomerDirectSaleDetail> {
+  const payload = await apiFetch<unknown>(`/customer/direct-sales/${id}/`);
+  return normalizeCustomerDirectSaleDetail(payload);
+}
+
+export async function getCustomerDirectSaleSummary(): Promise<CustomerDirectSaleSummary> {
+  const payload = await apiFetch<unknown>("/customer/direct-sales/summary/");
+  const root = (payload ?? {}) as Record<string, unknown>;
+  return {
+    total_direct_sale_invoices: toNumber(root.total_direct_sale_invoices, 0),
+    total_outstanding_direct_sale_dues: toMoneyString(root.total_outstanding_direct_sale_dues),
+    total_paid_direct_sale_amount: toMoneyString(root.total_paid_direct_sale_amount),
+    overdue_direct_sale_count: toNumber(root.overdue_direct_sale_count, 0),
+    latest_direct_sale_invoice:
+      root.latest_direct_sale_invoice && typeof root.latest_direct_sale_invoice === "object"
+        ? (root.latest_direct_sale_invoice as Record<string, unknown>)
+        : null,
+  };
+}
+
 export async function listCustomerSupportRequests(params?: {
   status?: string;
   category?: string;

@@ -4,14 +4,16 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("partner") });
 
-test("partner dashboard loads and payouts is not shown in navigation", async ({
+test("partner dashboard loads and payouts is shown in navigation", async ({
   page,
 }) => {
   await page.goto("/partner");
   await expect(
     page.getByRole("heading", { name: "Partner Dashboard" })
   ).toBeVisible();
-  await expect(page.locator('a[href="/partner/payouts"]')).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("link", { name: "Payouts" }).first()
+  ).toBeVisible();
 });
 
 test("partner payouts route renders payout visibility list", async ({ page }) => {
@@ -132,11 +134,45 @@ test("partner commission list renders winner status only when available", async 
 
   await page.goto("/partner/commissions");
   await expect(
-    page.getByRole("heading", { name: "Commission Ledger" })
+    page.getByRole("heading", { name: "Commission Ledger" }).first()
   ).toBeVisible();
   await expect(page.locator("body")).toContainText(
     /Winner status unavailable|WON/
   );
+});
+
+test("partner notifications page loads", async ({ page }) => {
+  await page.route("**/api/v1/notifications/?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        unread_count: 1,
+        results: [
+          {
+            id: 5001,
+            module: "partner",
+            category: "COMMISSION_APPROVED",
+            severity: "INFO",
+            title: "Commission approved",
+            body: "Commission for SUB-7001 approved.",
+            payload: {},
+            is_read: false,
+            read_at: null,
+            created_at: "2026-04-10T10:00:00Z",
+            source_job_id: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/partner/notifications");
+  await expect(
+    page.getByRole("heading", { name: "Partner Notifications" }).last()
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Commission approved");
 });
 
 test("partner winner status does not create commission entry by itself", async ({

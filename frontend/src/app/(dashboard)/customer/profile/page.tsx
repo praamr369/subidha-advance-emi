@@ -31,6 +31,7 @@ import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
   getCustomerProfile,
+  getCustomerDirectSaleSummary,
   updateCustomerProfile,
   type CustomerProfileResponse,
 } from "@/services/customer";
@@ -130,6 +131,8 @@ export default function CustomerProfilePage() {
   const [referrals, setReferrals] = useState<CustomerReferralRecord[]>([]);
   const [referralCount, setReferralCount] = useState(0);
   const [referralError, setReferralError] = useState<string | null>(null);
+  const [directSaleSummary, setDirectSaleSummary] =
+    useState<Awaited<ReturnType<typeof getCustomerDirectSaleSummary>> | null>(null);
 
   function hydrate(payload: CustomerProfileResponse) {
     setData(payload);
@@ -150,12 +153,13 @@ export default function CustomerProfilePage() {
   const loadPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [profileResult, subscriptionsResult, kycResult, referralResult] =
+      const [profileResult, subscriptionsResult, kycResult, referralResult, directSaleResult] =
         await Promise.allSettled([
           getCustomerProfile(),
           listCustomerSubscriptionsRegister({ page: 1, pageSize: 4 }),
           listCustomerKycDocuments(),
           listCustomerReferrals(),
+          getCustomerDirectSaleSummary(),
         ]);
 
       if (profileResult.status === "rejected") {
@@ -187,11 +191,13 @@ export default function CustomerProfilePage() {
         setReferrals([]);
         setReferralError("Referral data temporarily unavailable.");
       }
+      setDirectSaleSummary(directSaleResult.status === "fulfilled" ? directSaleResult.value : null);
     } catch (err) {
       setError(toErrorMessage(err));
       setData(null);
       setProductRows([]);
       setProductError(null);
+      setDirectSaleSummary(null);
     } finally {
       setLoading(false);
     }
@@ -421,6 +427,35 @@ export default function CustomerProfilePage() {
               <DetailItem label="Address" value={data.address || "No address recorded"} />
             </div>
           </DetailPanel>
+
+          <WorkspaceSection
+            title="Purchases & Direct Sales"
+            description="Unified customer snapshot across subscriptions and direct-sale purchases."
+            action={
+              <ActionButton href="/customer/direct-sales" variant="outline">
+                Open Direct Sales
+              </ActionButton>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Active EMI subscriptions</div>
+                <div className="mt-1 font-semibold">{data.summary.active_subscriptions ?? 0}</div>
+              </div>
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Rent/Lease contracts</div>
+                <div className="mt-1 font-semibold">{productRows.filter((row) => ["RENT", "LEASE"].includes((row.plan_type || "").toUpperCase())).length}</div>
+              </div>
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Direct-sale invoices</div>
+                <div className="mt-1 font-semibold">{directSaleSummary?.total_direct_sale_invoices ?? 0}</div>
+              </div>
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Direct-sale dues</div>
+                <div className="mt-1 font-semibold">{money(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}</div>
+              </div>
+            </div>
+          </WorkspaceSection>
 
           <WorkspaceSection
             title="Profile maintenance"

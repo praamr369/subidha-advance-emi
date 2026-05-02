@@ -104,10 +104,18 @@ test.describe("admin readiness banner", () => {
     });
     await page.goto("/admin/settings/business-setup/checklist");
     await expect(page.getByRole("heading", { name: "Business setup checklist" })).toBeVisible();
-    await expect(page.getByText("Document Numbering")).toBeVisible();
-    await expect(page.getByText("Invoice numbering readiness")).toBeVisible();
-    await expect(page.getByText("Receipt numbering readiness")).toBeVisible();
-    await expect(page.getByText("Direct-sale invoice numbering readiness")).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Document Numbering").first()
+    ).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Invoice numbering readiness", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Receipt numbering readiness", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Direct-sale invoice numbering readiness", { exact: true })
+    ).toBeVisible();
 
     await page.route("**/api/v1/admin/business-profile/", async (route) => {
       const method = route.request().method();

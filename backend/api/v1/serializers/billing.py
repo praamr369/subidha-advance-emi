@@ -1012,3 +1012,256 @@ class BillingProfileSerializer(serializers.ModelSerializer):
         )
         instance.refresh_from_db()
         return instance
+
+
+class CustomerDirectSaleReceiptSerializer(serializers.ModelSerializer):
+    invoice_id = serializers.IntegerField(source="billing_invoice_id", read_only=True)
+    invoice_number = serializers.CharField(source="billing_invoice.document_no", read_only=True)
+    receipt_number = serializers.CharField(source="receipt_no", read_only=True)
+    receipt_date = serializers.DateField(read_only=True)
+    receipt_type = serializers.CharField(read_only=True)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    status = serializers.CharField(read_only=True)
+    payment_method = serializers.CharField(source="payment.method", read_only=True)
+    reference_no = serializers.CharField(source="source_reference", read_only=True)
+    receipt_pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReceiptDocument
+        fields = [
+            "id",
+            "invoice_id",
+            "invoice_number",
+            "receipt_number",
+            "receipt_date",
+            "receipt_type",
+            "amount",
+            "status",
+            "payment_method",
+            "reference_no",
+            "receipt_pdf_url",
+        ]
+        read_only_fields = fields
+
+    def get_receipt_pdf_url(self, obj):
+        request = self.context.get("request")
+        if request is None:
+            return None
+        return request.build_absolute_uri(f"/api/v1/customer/receipts/{obj.id}/pdf/")
+
+
+class CustomerDirectSaleLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DirectSaleLine
+        fields = [
+            "description",
+            "quantity",
+            "unit_price",
+            "discount_amount",
+            "taxable_value",
+            "gst_rate",
+            "cgst_amount",
+            "sgst_amount",
+            "igst_amount",
+            "line_total",
+            "unit_of_measure_snapshot",
+            "hsn_sac_code",
+        ]
+        read_only_fields = fields
+
+
+class CustomerDirectSaleListSerializer(serializers.ModelSerializer):
+    document_number = serializers.CharField(source="sale_no", read_only=True)
+    invoice_number = serializers.SerializerMethodField()
+    paid_amount = serializers.DecimalField(source="received_total", max_digits=12, decimal_places=2, read_only=True)
+    outstanding_amount = serializers.SerializerMethodField()
+    delivery_status = serializers.SerializerMethodField()
+    item_count = serializers.SerializerMethodField()
+    item_names = serializers.SerializerMethodField()
+    detail_url = serializers.SerializerMethodField()
+    invoice_pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DirectSale
+        fields = [
+            "id",
+            "document_number",
+            "invoice_number",
+            "sale_date",
+            "status",
+            "grand_total",
+            "paid_amount",
+            "outstanding_amount",
+            "delivery_required",
+            "delivery_status",
+            "item_count",
+            "item_names",
+            "detail_url",
+            "invoice_pdf_url",
+        ]
+        read_only_fields = fields
+
+    def get_invoice_number(self, obj):
+        invoice = getattr(obj, "_customer_invoice", None)
+        return getattr(invoice, "document_no", None) if invoice is not None else None
+
+    def get_outstanding_amount(self, obj):
+        outstanding = Decimal(str(obj.grand_total or "0.00")) - Decimal(str(obj.received_total or "0.00"))
+        if outstanding < Decimal("0.00"):
+            return Decimal("0.00")
+        return outstanding.quantize(Decimal("0.01"))
+
+    def get_delivery_status(self, obj):
+        if not obj.delivery_required:
+            return "NOT_REQUIRED"
+        status_value = (obj.status or "").upper()
+        if status_value == "DELIVERED":
+            return "DELIVERED"
+        return "PENDING"
+
+    def get_item_count(self, obj):
+        return len(getattr(obj, "_customer_lines", []))
+
+    def get_item_names(self, obj):
+        lines = getattr(obj, "_customer_lines", [])
+        names = []
+        for line in lines[:3]:
+            label = (line.description or "").strip()
+            if label:
+                names.append(label)
+        return names
+
+    def get_detail_url(self, obj):
+        request = self.context.get("request")
+        if request is None:
+            return f"/customer/direct-sales/{obj.id}"
+        return request.build_absolute_uri(f"/customer/direct-sales/{obj.id}")
+
+    def get_invoice_pdf_url(self, obj):
+        invoice = getattr(obj, "_customer_invoice", None)
+        if invoice is None:
+            return None
+        request = self.context.get("request")
+        if request is None:
+            return f"/api/v1/customer/invoices/{invoice.id}/pdf/"
+        return request.build_absolute_uri(f"/api/v1/customer/invoices/{invoice.id}/pdf/")
+
+
+class CustomerDirectSaleDetailSerializer(serializers.ModelSerializer):
+    document_number = serializers.CharField(source="sale_no", read_only=True)
+    invoice_number = serializers.SerializerMethodField()
+    invoice_date = serializers.SerializerMethodField()
+    tax_mode = serializers.CharField(read_only=True)
+    paid_amount = serializers.DecimalField(source="received_total", max_digits=12, decimal_places=2, read_only=True)
+    outstanding_amount = serializers.SerializerMethodField()
+    status = serializers.CharField(read_only=True)
+    delivery_status = serializers.SerializerMethodField()
+    customer_snapshot = serializers.SerializerMethodField()
+    delivery_snapshot = serializers.SerializerMethodField()
+    line_items = serializers.SerializerMethodField()
+    receipts = serializers.SerializerMethodField()
+    invoice_pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DirectSale
+        fields = [
+            "id",
+            "document_number",
+            "invoice_number",
+            "invoice_date",
+            "sale_date",
+            "status",
+            "tax_mode",
+            "customer_gstin",
+            "customer_snapshot_place_of_supply",
+            "customer_snapshot",
+            "delivery_required",
+            "delivery_status",
+            "delivery_snapshot",
+            "line_items",
+            "subtotal",
+            "discount_total",
+            "taxable_total",
+            "tax_total",
+            "grand_total",
+            "paid_amount",
+            "outstanding_amount",
+            "receipts",
+            "invoice_pdf_url",
+        ]
+        read_only_fields = fields
+
+    def get_invoice_number(self, obj):
+        invoice = getattr(obj, "_customer_invoice", None)
+        return getattr(invoice, "document_no", None) if invoice is not None else None
+
+    def get_invoice_date(self, obj):
+        invoice = getattr(obj, "_customer_invoice", None)
+        return getattr(invoice, "invoice_date", None) if invoice is not None else None
+
+    def get_outstanding_amount(self, obj):
+        outstanding = Decimal(str(obj.grand_total or "0.00")) - Decimal(str(obj.received_total or "0.00"))
+        if outstanding < Decimal("0.00"):
+            return Decimal("0.00")
+        return outstanding.quantize(Decimal("0.01"))
+
+    def get_delivery_status(self, obj):
+        if not obj.delivery_required:
+            return "NOT_REQUIRED"
+        status_value = (obj.status or "").upper()
+        if status_value == "DELIVERED":
+            return "DELIVERED"
+        return "PENDING"
+
+    def get_customer_snapshot(self, obj):
+        return {
+            "name": (obj.customer_name_snapshot or "").strip(),
+            "phone": (obj.customer_phone_snapshot or "").strip(),
+            "email": (obj.customer_snapshot_email or "").strip(),
+            "billing_address_line1": (obj.customer_snapshot_billing_address_line1 or "").strip(),
+            "billing_address_line2": (obj.customer_snapshot_billing_address_line2 or "").strip(),
+            "city": (obj.customer_snapshot_city or "").strip(),
+            "district": (obj.customer_snapshot_district or "").strip(),
+            "state": (obj.customer_snapshot_state or "").strip(),
+            "pincode": (obj.customer_snapshot_pincode or "").strip(),
+        }
+
+    def get_delivery_snapshot(self, obj):
+        if not obj.delivery_required:
+            return None
+        return {
+            "address_line1": (obj.delivery_snapshot_address_line1 or "").strip(),
+            "address_line2": (obj.delivery_snapshot_address_line2 or "").strip(),
+            "city": (obj.delivery_snapshot_city or "").strip(),
+            "district": (obj.delivery_snapshot_district or "").strip(),
+            "state": (obj.delivery_snapshot_state or "").strip(),
+            "pincode": (obj.delivery_snapshot_pincode or "").strip(),
+            "delivery_reference": (obj.delivery_reference or "").strip(),
+        }
+
+    def get_line_items(self, obj):
+        lines = getattr(obj, "_customer_lines", [])
+        serializer = CustomerDirectSaleLineSerializer(lines, many=True, context=self.context)
+        return serializer.data
+
+    def get_receipts(self, obj):
+        receipts = getattr(obj, "_customer_receipts", [])
+        serializer = CustomerDirectSaleReceiptSerializer(receipts, many=True, context=self.context)
+        return serializer.data
+
+    def get_invoice_pdf_url(self, obj):
+        invoice = getattr(obj, "_customer_invoice", None)
+        if invoice is None:
+            return None
+        request = self.context.get("request")
+        if request is None:
+            return f"/api/v1/customer/invoices/{invoice.id}/pdf/"
+        return request.build_absolute_uri(f"/api/v1/customer/invoices/{invoice.id}/pdf/")
+
+
+class CustomerDirectSaleSummarySerializer(serializers.Serializer):
+    total_direct_sale_invoices = serializers.IntegerField()
+    total_outstanding_direct_sale_dues = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_paid_direct_sale_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    overdue_direct_sale_count = serializers.IntegerField()
+    latest_direct_sale_invoice = serializers.DictField(allow_null=True)

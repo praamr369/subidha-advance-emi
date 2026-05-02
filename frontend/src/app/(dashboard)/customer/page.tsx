@@ -29,7 +29,7 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import { ROUTES } from "@/lib/routes";
-import { getCustomerDashboard } from "@/services/customer";
+import { getCustomerDashboard, getCustomerDirectSaleSummary } from "@/services/customer";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -49,6 +49,7 @@ type DashboardPaymentsPayload = Awaited<
   ReturnType<typeof listDashboardRecentPayments>
 >;
 type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
+type DirectSaleSummaryPayload = Awaited<ReturnType<typeof getCustomerDirectSaleSummary>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -106,6 +107,7 @@ export default function CustomerDashboardPage() {
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
+  const [directSaleSummary, setDirectSaleSummary] = useState<DirectSaleSummaryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export default function CustomerDashboardPage() {
           upcomingResult,
           recentPaymentsResult,
           winnersResult,
+          directSaleSummaryResult,
         ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
@@ -145,6 +148,7 @@ export default function CustomerDashboardPage() {
           listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+          getCustomerDirectSaleSummary(),
         ]);
 
         if (legacyResult.status !== "fulfilled") {
@@ -165,6 +169,9 @@ export default function CustomerDashboardPage() {
             : null
         );
         setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
+        setDirectSaleSummary(
+          directSaleSummaryResult.status === "fulfilled" ? directSaleSummaryResult.value : null
+        );
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -174,6 +181,7 @@ export default function CustomerDashboardPage() {
         setUpcoming(null);
         setRecentPayments(null);
         setWinnerItems(null);
+        setDirectSaleSummary(null);
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
@@ -241,6 +249,11 @@ export default function CustomerDashboardPage() {
       title: "My Payments",
       description: "Review recorded payment rows and the current settled total.",
       href: ROUTES.customer.payments,
+    },
+    {
+      title: "Direct Sales",
+      description: "View direct-sale invoices, dues, and receipt downloads linked to your profile.",
+      href: ROUTES.customer.directSales,
     },
     {
       title: "Finance Summary",
@@ -445,7 +458,46 @@ export default function CustomerDashboardPage() {
                   : "No upcoming EMI currently visible"
               }
             />
+            <KpiCard
+              label="Direct Sale Dues"
+              value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
+              helper={`${directSaleSummary?.total_direct_sale_invoices ?? 0} direct-sale invoice(s) linked`}
+            />
           </QuickActionGrid>
+
+          <WorkspaceSection
+            title="Direct sale dues"
+            description="Outstanding dues from direct-sale invoices linked to your customer profile."
+            action={
+              <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
+                View Direct Sales
+              </ActionButton>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <KpiCard
+                label="Outstanding"
+                value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
+                helper="Based on grand total minus received amount."
+              />
+              <KpiCard
+                label="Total paid"
+                value={money(directSaleSummary?.total_paid_direct_sale_amount ?? "0.00")}
+                helper="Recorded direct-sale collections."
+              />
+              <KpiCard
+                label="Latest invoice"
+                value={
+                  String(
+                    (directSaleSummary?.latest_direct_sale_invoice?.invoice_number as string | undefined) ||
+                      (directSaleSummary?.latest_direct_sale_invoice?.document_number as string | undefined) ||
+                      "—"
+                  )
+                }
+                helper="Most recent linked direct-sale invoice."
+              />
+            </div>
+          </WorkspaceSection>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <section

@@ -39,6 +39,13 @@ test("customer dashboard, subscription requests, subscriptions, and payments rou
     .click();
   await expect(page).toHaveURL(/\/customer\/payments$/);
   await expect(page.getByRole("heading", { name: "My Payments" })).toBeVisible();
+
+  await page
+    .getByRole("complementary")
+    .getByRole("link", { name: "Direct Sales", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/customer\/direct-sales$/);
+  await expect(page.getByRole("heading", { name: "Direct Sales" }).last()).toBeVisible();
 });
 
 test("customer payment receipt is self-scoped", async ({ page }) => {
@@ -60,6 +67,23 @@ test("customer payment receipt is self-scoped", async ({ page }) => {
 });
 
 test("customer dashboard renders canonical financial grouping", async ({ page }) => {
+  await page.route("**/api/v1/customer/direct-sales/summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total_direct_sale_invoices: 2,
+        total_outstanding_direct_sale_dues: "1500.00",
+        total_paid_direct_sale_amount: "500.00",
+        overdue_direct_sale_count: 1,
+        latest_direct_sale_invoice: {
+          id: 88,
+          invoice_number: "INV-2026-00088",
+          document_number: "DSI-2026-00088",
+        },
+      }),
+    });
+  });
   await page.route("**/api/v1/customer/dashboard/", async (route) => {
     await route.fulfill({
       status: 200,
@@ -195,14 +219,120 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
   await expect(page.locator("body")).toContainText("Overdue EMI");
   await expect(page.locator("body")).toContainText("Upcoming EMI");
   await expect(page.locator("body")).toContainText("Waived by benefit");
+  await expect(page.locator("body")).toContainText("Direct Sale Dues");
+  await expect(page.locator("body")).toContainText("View Direct Sales");
   await expect(page.locator("body")).toContainText("Settled totals already reflect any reversal history.");
   await expect(page.locator("body")).toContainText("Aurora Sofa");
   await expect(page.locator("body")).toContainText("Winner Sofa");
 });
 
+test("customer direct-sales list and detail routes load", async ({ page }) => {
+  await page.route("**/api/v1/customer/direct-sales/?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        page: 1,
+        page_size: 20,
+        results: [
+          {
+            id: 701,
+            document_number: "DSI-2026-00701",
+            invoice_number: "INV-2026-00701",
+            sale_date: "2026-04-20",
+            status: "INVOICED",
+            grand_total: "2000.00",
+            paid_amount: "500.00",
+            outstanding_amount: "1500.00",
+            delivery_required: false,
+            detail_url: "/customer/direct-sales/701",
+            invoice_pdf_url: "/api/v1/customer/invoices/91/pdf/",
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/customer/direct-sales/701/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 701,
+        document_number: "DSI-2026-00701",
+        invoice_number: "INV-2026-00701",
+        sale_date: "2026-04-20",
+        status: "INVOICED",
+        subtotal: "2000.00",
+        discount_total: "100.00",
+        taxable_total: "1900.00",
+        tax_total: "0.00",
+        grand_total: "2000.00",
+        paid_amount: "500.00",
+        outstanding_amount: "1500.00",
+        customer_snapshot: { name: "Customer One", phone: "01700000000" },
+        line_items: [{ description: "Sofa", quantity: "1.000", unit_price: "2000.00", discount_amount: "100.00", line_total: "2000.00" }],
+        receipts: [
+          {
+            id: 77,
+            receipt_number: "RCT-2026-00077",
+            receipt_date: "2026-04-21",
+            amount: "500.00",
+            payment_method: "CASH",
+            receipt_pdf_url: "/api/v1/customer/receipts/77/pdf/",
+          },
+        ],
+        invoice_pdf_url: "/api/v1/customer/invoices/91/pdf/",
+      }),
+    });
+  });
+  await page.goto("/customer/direct-sales");
+  await expect(page.getByRole("heading", { name: "Direct Sales" }).last()).toBeVisible();
+  await expect(page.locator("body")).toContainText("INV-2026-00701");
+  await expect(page.locator("body")).toContainText("₹1500.00");
+  await page.getByRole("link", { name: "View" }).click();
+  await expect(page).toHaveURL(/\/customer\/direct-sales\/701$/);
+  await expect(page.locator("body")).toContainText("Customer snapshot");
+  await expect(page.locator("body")).toContainText("RCT-2026-00077");
+});
+
 test("customer legacy emis route redirects to subscriptions", async ({ page }) => {
   await page.goto("/customer/emis");
   await expect(page).toHaveURL(/\/customer\/subscriptions$/);
+});
+
+test("customer notifications page loads", async ({ page }) => {
+  await page.route("**/api/v1/notifications/?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        unread_count: 1,
+        results: [
+          {
+            id: 8001,
+            module: "customer",
+            category: "DIRECT_SALE_DUE",
+            severity: "INFO",
+            title: "Direct sale due reminder",
+            body: "Invoice INV-2026-00701 has an outstanding amount.",
+            payload: {},
+            is_read: false,
+            read_at: null,
+            created_at: "2026-04-22T10:00:00Z",
+            source_job_id: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/customer/notifications");
+  await expect(
+    page.getByRole("heading", { name: "Notifications" }).last()
+  ).toBeVisible();
+  await expect(page.locator("body")).toContainText("Direct sale due reminder");
 });
 
 test("customer profile renders own lucky draw verification records", async ({

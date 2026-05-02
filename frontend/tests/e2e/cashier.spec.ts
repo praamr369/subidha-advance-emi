@@ -126,4 +126,38 @@ test.describe.serial("cashier smoke", () => {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/unauthorized$/);
   });
+
+  test("cashier notifications page loads", async ({ page }) => {
+    await page.route("**/api/v1/cashier/notifications/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          count: 1,
+          unread_count: 1,
+          results: [
+            {
+              id: 9001,
+              module: "billing",
+              category: "RECEIPT_CREATED",
+              severity: "INFO",
+              title: "Receipt created",
+              body: "Receipt generated for cashier collection.",
+              payload: {},
+              is_read: false,
+              read_at: null,
+              created_at: "2026-04-25T09:15:00Z",
+              source_job_id: null,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/cashier/notifications");
+    await expect(
+      page.getByRole("heading", { name: "Notifications" }).last()
+    ).toBeVisible();
+    await expect(page.locator("body")).toContainText("Receipt created");
+  });
 });

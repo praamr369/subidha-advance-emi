@@ -2,12 +2,13 @@ import { apiFetch } from "@/lib/api";
 
 export type SystemNotification = {
   id: number;
-  recipient: number | null;
-  audience: string;
   module: string;
+  category: string;
+  severity: string;
   title: string;
   body: string;
   payload: Record<string, unknown>;
+  is_read: boolean;
   read_at: string | null;
   created_at: string;
   source_job_id: number | null;
@@ -21,6 +22,12 @@ export type NotificationListResponse = {
 
 export type UnreadCountResponse = {
   unread_count: number;
+};
+
+export type NotificationSummaryResponse = {
+  unread_count: number;
+  high_priority_count: number;
+  latest: SystemNotification[];
 };
 
 type QueryValue = string | number | undefined | null;
@@ -67,4 +74,26 @@ export async function getCashierNotificationUnreadCount(params?: {
 
 export async function markCashierNotificationRead(id: number): Promise<SystemNotification> {
   return apiFetch(`/api/v1/cashier/notifications/${id}/read/`, { method: "POST" });
+}
+
+export async function listNotifications(params?: {
+  module?: string;
+  category?: string;
+  severity?: string;
+  unread?: boolean;
+  limit?: number;
+}): Promise<NotificationListResponse> {
+  return apiFetch(`/api/v1/notifications/${buildQuery(params ?? {})}`);
+}
+
+export async function markNotificationRead(id: number): Promise<SystemNotification> {
+  return apiFetch(`/api/v1/notifications/${id}/read/`, { method: "POST" });
+}
+
+export async function markAllNotificationsRead(): Promise<{ updated_count: number }> {
+  return apiFetch("/api/v1/notifications/mark-all-read/", { method: "POST" });
+}
+
+export async function getNotificationSummary(): Promise<NotificationSummaryResponse> {
+  return apiFetch("/api/v1/notifications/summary/");
 }

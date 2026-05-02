@@ -19,6 +19,7 @@ import {
   listCustomerPayments,
   type CustomerPayment,
 } from "@/services/customer";
+import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
 
 function money(value: string | number | null | undefined): string {
   const parsed = Number(value);
@@ -80,6 +81,7 @@ export default function CustomerPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [directSaleReceipts, setDirectSaleReceipts] = useState<FinanceReceiptRow[]>([]);
 
   useEffect(() => {
     setSubscriptionInput(subscriptionFilter);
@@ -95,14 +97,22 @@ export default function CustomerPaymentsPage() {
       }
 
       try {
-        const payload = await listCustomerPayments({
-          subscription: subscriptionFilter || undefined,
-          method: methodFilter || undefined,
-        });
+        const [payload, receiptPayload] = await Promise.all([
+          listCustomerPayments({
+            subscription: subscriptionFilter || undefined,
+            method: methodFilter || undefined,
+          }),
+          listCustomerReceipts(),
+        ]);
 
         setRows(payload.results);
         setCount(payload.count);
         setTotalPaidAmount(String(payload.total_paid_amount || "0.00"));
+        setDirectSaleReceipts(
+          (receiptPayload.results || []).filter(
+            (row) => row.direct_sale_id !== null && row.direct_sale_id !== undefined
+          )
+        );
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -110,6 +120,7 @@ export default function CustomerPaymentsPage() {
           setRows([]);
           setCount(0);
           setTotalPaidAmount("0.00");
+          setDirectSaleReceipts([]);
         }
       } finally {
         if (mode === "initial") {
@@ -361,9 +372,10 @@ export default function CustomerPaymentsPage() {
         ) : null}
 
         {!loading && !error ? (
+          <>
           <DetailPanel
-            title="Recorded customer payments"
-            description="Open a row to view the receipt and navigate to the related subscription or support route."
+            title="EMI payment records"
+            description="Subscription-linked customer payment rows."
           >
             {rows.length === 0 ? (
               <EmptyState
@@ -395,6 +407,54 @@ export default function CustomerPaymentsPage() {
               </WorkspaceNotice>
             </div>
           </DetailPanel>
+          <DetailPanel
+            title="Direct-sale receipts"
+            description="Direct-sale receipt documents, kept separate from EMI payment rows."
+          >
+            {directSaleReceipts.length === 0 ? (
+              <EmptyState
+                title="No direct-sale receipts"
+                description="No direct-sale receipt is currently linked to your profile."
+              />
+            ) : (
+              <DataTableShell>
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="px-3 py-2">Receipt</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Method</th>
+                        <th className="px-3 py-2 text-right">Amount</th>
+                        <th className="px-3 py-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {directSaleReceipts.map((receipt) => (
+                        <tr key={receipt.id} className="border-t border-border">
+                          <td className="px-3 py-2">{receipt.receipt_no || `RCT-${receipt.id}`}</td>
+                          <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
+                          <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
+                          <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                          <td className="px-3 py-2">
+                            <a
+                              href={`/api/v1/customer/receipts/${receipt.id}/pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
+                            >
+                              Download
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            )}
+          </DetailPanel>
+          </>
         ) : null}
       </div>
     </PortalPage>

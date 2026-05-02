@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.http import HttpResponse
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
+from api.v1.serializers.billing import (
+    CustomerDirectSaleDetailSerializer,
+    CustomerDirectSaleListSerializer,
+    CustomerDirectSaleSummarySerializer,
+)
 from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
-from billing.models import BillingInvoice, ReceiptDocument
+from billing.models import BillingInvoice, DirectSale, ReceiptDocument
 from subscriptions.models import (
     PlanType,
     RentLeaseBillingDemand,
@@ -56,6 +63,37 @@ from subscriptions.services.rent_lease_billing_service import (
     record_deposit_refund,
 )
 from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
+
+
+def _safe_customer_profile(request):
+    return getattr(request.user, "customer_profile", None)
+
+
+def _paginate_customer_queryset(request, queryset):
+    page_raw = (request.query_params.get("page") or "1").strip()
+    page_size_raw = (request.query_params.get("page_size") or "20").strip()
+    page = int(page_raw) if page_raw.isdigit() and int(page_raw) > 0 else 1
+    page_size = int(page_size_raw) if page_size_raw.isdigit() and int(page_size_raw) > 0 else 20
+    page_size = min(page_size, 100)
+    offset = (page - 1) * page_size
+    total_count = queryset.count()
+    return queryset[offset : offset + page_size], page, page_size, total_count
+
+
+def _direct_sale_outstanding_amount(sale: DirectSale) -> Decimal:
+    outstanding = Decimal(str(sale.grand_total or "0.00")) - Decimal(str(sale.received_total or "0.00"))
+    if outstanding < Decimal("0.00"):
+        return Decimal("0.00")
+    return outstanding.quantize(Decimal("0.01"))
+
+
+def _direct_sale_queryset_for_customer(customer):
+    return (
+        DirectSale.objects.select_related("customer")
+        .prefetch_related("lines", "billing_invoices", "receipts")
+        .filter(customer=customer)
+        .order_by("-sale_date", "-id")
+    )
 
 
 class AdminFinanceDashboardView(APIView):
@@ -656,6 +694,115 @@ class CustomerAccountStatementView(APIView):
             return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
         flt = FinanceFilter.from_query_params(request.query_params)
         return Response(customer_account_statement(customer=customer, flt=flt))
+
+
+class CustomerDirectSaleListView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request):
+        customer = _safe_customer_profile(request)
+        if customer is None:
+            return Response(
+                {"count": 0, "page": 1, "page_size": 20, "results": []},
+                status=status.HTTP_200_OK,
+            )
+
+        queryset = _direct_sale_queryset_for_customer(customer)
+        page_rows, page, page_size, total_count = _paginate_customer_queryset(request, queryset)
+        rows = list(page_rows)
+        for row in rows:
+            row._customer_invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
+            row._customer_lines = list(row.lines.all())
+        serializer = CustomerDirectSaleListSerializer(rows, many=True, context={"request": request})
+        return Response(
+            {
+                "count": total_count,
+                "page": page,
+                "page_size": page_size,
+                "results": serializer.data,
+            }
+        )
+
+
+class CustomerDirectSaleDetailView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = _safe_customer_profile(request)
+        if customer is None:
+            return Response({"detail": "Direct sale not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        sale = _direct_sale_queryset_for_customer(customer).filter(pk=pk).first()
+        if sale is None:
+            return Response({"detail": "Direct sale not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        sale._customer_invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
+        sale._customer_lines = list(sale.lines.all())
+        sale._customer_receipts = list(sale.receipts.order_by("-receipt_date", "-id"))
+        serializer = CustomerDirectSaleDetailSerializer(sale, context={"request": request})
+        return Response(serializer.data)
+
+
+class CustomerDirectSaleSummaryView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request):
+        customer = _safe_customer_profile(request)
+        if customer is None:
+            serializer = CustomerDirectSaleSummarySerializer(
+                {
+                    "total_direct_sale_invoices": 0,
+                    "total_outstanding_direct_sale_dues": Decimal("0.00"),
+                    "total_paid_direct_sale_amount": Decimal("0.00"),
+                    "overdue_direct_sale_count": 0,
+                    "latest_direct_sale_invoice": None,
+                }
+            )
+            return Response(serializer.data)
+
+        rows = list(_direct_sale_queryset_for_customer(customer))
+        total_invoices = len(rows)
+        total_paid = Decimal("0.00")
+        total_due = Decimal("0.00")
+        overdue_count = 0
+        latest_invoice = None
+
+        for index, row in enumerate(rows):
+            total_paid += Decimal(str(row.received_total or "0.00"))
+            outstanding = _direct_sale_outstanding_amount(row)
+            status_token = (row.status or "").upper()
+            is_payable_status = status_token not in {"DRAFT", "CANCELLED"}
+            if is_payable_status:
+                total_due += outstanding
+            if is_payable_status and outstanding > Decimal("0.00"):
+                overdue_count += 1
+            if index == 0:
+                invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
+                latest_invoice = {
+                    "id": row.id,
+                    "document_number": row.sale_no,
+                    "invoice_number": getattr(invoice, "document_no", None),
+                    "sale_date": row.sale_date,
+                    "status": row.status,
+                    "grand_total": row.grand_total,
+                    "paid_amount": row.received_total,
+                    "outstanding_amount": outstanding,
+                    "detail_url": request.build_absolute_uri(f"/customer/direct-sales/{row.id}"),
+                    "invoice_pdf_url": request.build_absolute_uri(f"/api/v1/customer/invoices/{invoice.id}/pdf/")
+                    if invoice is not None
+                    else None,
+                }
+
+        serializer = CustomerDirectSaleSummarySerializer(
+            {
+                "total_direct_sale_invoices": total_invoices,
+                "total_outstanding_direct_sale_dues": total_due.quantize(Decimal("0.01")),
+                "total_paid_direct_sale_amount": total_paid.quantize(Decimal("0.01")),
+                "overdue_direct_sale_count": overdue_count,
+                "latest_direct_sale_invoice": latest_invoice,
+            }
+        )
+        return Response(serializer.data)
 
 
 class PartnerFinanceSummaryView(APIView):

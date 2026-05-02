@@ -158,6 +158,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.partner.payments,
           icon: "payments",
         },
+        {
+          label: "Collection Requests",
+          href: ROUTES.partner.collectionRequests,
+          icon: "collections",
+        },
       ],
     },
     {
@@ -168,6 +173,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           label: "Commissions",
           href: ROUTES.partner.commissions,
           icon: "commissions",
+        },
+        {
+          label: "Payouts",
+          href: ROUTES.partner.payouts,
+          icon: "payoutBatches",
         },
       ],
     },
@@ -184,6 +194,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           label: "Reports",
           href: ROUTES.partner.reports,
           icon: "reports",
+        },
+        {
+          label: "Notifications",
+          href: ROUTES.partner.notifications,
+          icon: "reminders",
         },
       ],
     },
@@ -221,6 +236,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.customer.payments,
           icon: "payments",
         },
+        {
+          label: "Direct Sales",
+          href: ROUTES.customer.directSales,
+          icon: "billing",
+        },
       ],
     },
     {
@@ -250,9 +270,19 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       icon: "support",
       items: [
         {
+          label: "Deliveries",
+          href: ROUTES.customer.deliveries,
+          icon: "deliveries",
+        },
+        {
           label: "Support",
           href: ROUTES.customer.support,
           icon: "support",
+        },
+        {
+          label: "Notifications",
+          href: ROUTES.customer.notifications,
+          icon: "reminders",
         },
       ],
     },
