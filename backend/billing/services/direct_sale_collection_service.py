@@ -21,10 +21,12 @@ from branch_control.services.branch_service import (
     assert_user_branch_access,
     assert_user_counter_access,
 )
-from subscriptions.models import AuditLog
+from subscriptions.models import AuditLog, BusinessEventType, Customer
 from subscriptions.services.audit_service import log_audit
-from subscriptions.models import BusinessEventType
 from subscriptions.services.business_event_service import append_business_event
+from subscriptions.services.operational_notification_service import (
+    schedule_direct_sale_collection_notifications,
+)
 
 
 def _money(value) -> Decimal:
@@ -365,6 +367,21 @@ def collect_direct_sale_payment(
         },
         ledger_reference=receipt.receipt_no or "",
         idempotency_key=normalized_reference or None,
+    )
+
+    customer_user_id = None
+    if sale.customer_id:
+        customer_user_id = (
+            Customer.objects.filter(pk=sale.customer_id).values_list("user_id", flat=True).first()
+        )
+
+    schedule_direct_sale_collection_notifications(
+        receipt_id=receipt.id,
+        direct_sale_id=sale.id,
+        customer_user_id=customer_user_id,
+        amount_str=str(amount),
+        receipt_no=receipt.receipt_no,
+        cashier_user_id=getattr(collected_by, "id", None),
     )
 
     return {

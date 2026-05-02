@@ -82,12 +82,13 @@ export type FinanceReceiptRow = {
   receipt_no: string | null;
   receipt_date: string;
   status: string;
-  receipt_type: string;
+  receipt_type?: string;
   amount: Money;
   customer_id: number | null;
   customer_name: string;
   subscription_id: number | null;
   subscription_number: string | null;
+  plan_type?: string | null;
   invoice_id: number | null;
   invoice_no: string | null;
   direct_sale_id: number | null;

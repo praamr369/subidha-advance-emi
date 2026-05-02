@@ -53,6 +53,7 @@ import {
   X,
 } from "lucide-react";
 
+import NotificationBellDropdown from "@/components/layout/NotificationBellDropdown";
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import RoleSidebar from "@/components/layout/RoleSidebar";
@@ -1153,6 +1154,7 @@ function Topbar({
             <ReceiptText className="h-4 w-4" />
             Quick Actions
           </button>
+          <NotificationBellDropdown role={role} />
           <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
         </div>
       </div>

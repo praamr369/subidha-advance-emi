@@ -76,6 +76,7 @@ def compute_setup_checklist():
     # Staff/users (existing accounts model)
     cashier_users = User.objects.filter(is_active=True, role=UserRole.CASHIER)
     partner_users = User.objects.filter(is_active=True, role=UserRole.PARTNER)
+    customer_users = User.objects.filter(is_active=True, role=UserRole.CUSTOMER)
 
     items = [
         _item(
@@ -179,6 +180,16 @@ def compute_setup_checklist():
             route="/admin/partners",
         ),
         _item(
+            key="customer_portal_users",
+            label="Customer portal logins available",
+            level="optional",
+            is_complete=customer_users.exists(),
+            detail=f"{customer_users.count()} active customer user(s) available."
+            if customer_users.exists()
+            else "Create at least one CUSTOMER user so self-service portal (subscriptions, payments, direct sales) can be exercised.",
+            route="/admin/settings/users",
+        ),
+        _item(
             key="inventory_readiness",
             label="Inventory locations and items configured",
             level="optional",
@@ -225,6 +236,7 @@ def compute_setup_checklist():
         "inventory_items_active": inventory_items.count(),
         "cashier_users_active": cashier_users.count(),
         "partner_users_active": partner_users.count(),
+        "customer_users_active": customer_users.count(),
         "required_items_total": len(required_items),
         "required_items_complete": completed_required,
     }

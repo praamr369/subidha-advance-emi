@@ -116,6 +116,60 @@ export default function CustomerDirectSaleDetailPage() {
             </div>
           </WorkspaceSection>
 
+          <WorkspaceSection
+            title="GST / tax summary"
+            description="Document-level totals from the linked invoice (discounts remain line-level only)."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <div className="text-xs text-muted-foreground">Tax mode</div>
+                <div className="mt-1 text-sm font-medium">{stringify(row.tax_mode)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Customer GSTIN</div>
+                <div className="mt-1 text-sm font-medium">{stringify(row.customer_gstin)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Place of supply</div>
+                <div className="mt-1 text-sm font-medium">{stringify(row.customer_snapshot_place_of_supply)}</div>
+              </div>
+            </div>
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
+              <table className="min-w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-border">
+                    <td className="px-3 py-2 text-muted-foreground">Subtotal</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.subtotal)}</td>
+                  </tr>
+                  <tr className="border-b border-border">
+                    <td className="px-3 py-2 text-muted-foreground">Discount</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.discount_total)}</td>
+                  </tr>
+                  <tr className="border-b border-border">
+                    <td className="px-3 py-2 text-muted-foreground">Taxable amount</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.taxable_total)}</td>
+                  </tr>
+                  <tr className="border-b border-border">
+                    <td className="px-3 py-2 text-muted-foreground">Tax total</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.tax_total)}</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-semibold">Grand total</td>
+                    <td className="px-3 py-2 text-right font-semibold">{money(row.grand_total)}</td>
+                  </tr>
+                  <tr className="border-t border-border bg-muted/30">
+                    <td className="px-3 py-2 text-muted-foreground">Paid</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.paid_amount)}</td>
+                  </tr>
+                  <tr className="bg-muted/30">
+                    <td className="px-3 py-2 text-muted-foreground">Due</td>
+                    <td className="px-3 py-2 text-right font-medium">{money(row.outstanding_amount)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </WorkspaceSection>
+
           <WorkspaceSection title="Line items" description="Direct-sale line-level charges.">
             {row.line_items && row.line_items.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl border border-border">

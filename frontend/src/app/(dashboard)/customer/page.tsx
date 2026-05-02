@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { NotificationSummaryResponse } from "@/services/notifications";
+import { getNotificationSummary } from "@/services/notifications";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -29,7 +31,12 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import { ROUTES } from "@/lib/routes";
-import { getCustomerDashboard, getCustomerDirectSaleSummary } from "@/services/customer";
+import {
+  getCustomerDashboard,
+  getCustomerDirectSaleSummary,
+  listCustomerDirectSales,
+  type CustomerDirectSaleListItem,
+} from "@/services/customer";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -108,6 +115,9 @@ export default function CustomerDashboardPage() {
     null
   );
   const [directSaleSummary, setDirectSaleSummary] = useState<DirectSaleSummaryPayload | null>(null);
+  const [latestDirectSales, setLatestDirectSales] = useState<CustomerDirectSaleListItem[]>([]);
+  const [notificationSummary, setNotificationSummary] =
+    useState<NotificationSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +151,8 @@ export default function CustomerDashboardPage() {
           recentPaymentsResult,
           winnersResult,
           directSaleSummaryResult,
+          directSalesListResult,
+          notificationSummaryResult,
         ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
@@ -149,6 +161,8 @@ export default function CustomerDashboardPage() {
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
           getCustomerDirectSaleSummary(),
+          listCustomerDirectSales({ page: 1, pageSize: 5 }),
+          getNotificationSummary(),
         ]);
 
         if (legacyResult.status !== "fulfilled") {
@@ -172,6 +186,12 @@ export default function CustomerDashboardPage() {
         setDirectSaleSummary(
           directSaleSummaryResult.status === "fulfilled" ? directSaleSummaryResult.value : null
         );
+        setLatestDirectSales(
+          directSalesListResult.status === "fulfilled" ? directSalesListResult.value.results : []
+        );
+        setNotificationSummary(
+          notificationSummaryResult.status === "fulfilled" ? notificationSummaryResult.value : null
+        );
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -182,6 +202,8 @@ export default function CustomerDashboardPage() {
         setRecentPayments(null);
         setWinnerItems(null);
         setDirectSaleSummary(null);
+        setLatestDirectSales([]);
+        setNotificationSummary(null);
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
@@ -498,6 +520,87 @@ export default function CustomerDashboardPage() {
               />
             </div>
           </WorkspaceSection>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <WorkspaceSection
+              title="Latest direct-sale invoices"
+              description="Recent invoices linked to your customer profile (walk-in snapshot-only sales are excluded)."
+              action={
+                <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
+                  All direct sales
+                </ActionButton>
+              }
+            >
+              {latestDirectSales.length === 0 ? (
+                <EmptyState
+                  title="No direct-sale invoices"
+                  description="When a direct sale is linked to your account, it will appear here with balance context."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {latestDirectSales.map((inv) => (
+                    <Link
+                      key={inv.id}
+                      href={`${ROUTES.customer.directSales}/${inv.id}`}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm transition hover:bg-muted/40"
+                    >
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          {inv.invoice_number || inv.document_number || `Sale #${inv.id}`}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {inv.sale_date ? formatDate(inv.sale_date) : "—"} · Due {money(inv.outstanding_amount)}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <div>Total {money(inv.grand_total)}</div>
+                        <div>Paid {money(inv.paid_amount)}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Notifications"
+              description="Operational updates for your account (payments, documents, and subscription events)."
+              action={
+                <ActionButton href={ROUTES.customer.notifications} variant="secondary" className="h-9 px-3 text-xs">
+                  Notification center
+                </ActionButton>
+              }
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <KpiCard
+                  label="Unread"
+                  value={String(notificationSummary?.unread_count ?? 0)}
+                  helper="Items awaiting your attention"
+                />
+                <KpiCard
+                  label="High priority"
+                  value={String(notificationSummary?.high_priority_count ?? 0)}
+                  helper="Urgent or time-sensitive alerts"
+                />
+              </div>
+              {(notificationSummary?.latest?.length ?? 0) > 0 ? (
+                <ul className="mt-4 space-y-2 text-sm">
+                  {(notificationSummary?.latest ?? []).slice(0, 5).map((n) => (
+                    <li key={n.id} className="rounded-xl border border-border px-3 py-2">
+                      <div className="font-medium text-foreground">{n.title}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {formatDate(n.created_at)}
+                        {n.is_read ? "" : " · Unread"}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">No recent notifications.</p>
+              )}
+            </WorkspaceSection>
+          </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <section

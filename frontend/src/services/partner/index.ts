@@ -1095,3 +1095,30 @@ export async function getPartnerCollectionRequestDetail(
   const payload = await apiFetch<unknown>(`/partner/collection-requests/${id}/`);
   return normalizeCollectionRequestDetail(payload);
 }
+
+export type PartnerCollectionRequestListResponse = {
+  count: number;
+  results: PartnerCollectionRequest[];
+};
+
+export async function listPartnerCollectionRequests(params?: {
+  subscription?: number | string;
+  status?: string;
+}): Promise<PartnerCollectionRequestListResponse> {
+  const search = new URLSearchParams();
+  if (params?.subscription !== undefined && params.subscription !== "") {
+    search.set("subscription", String(params.subscription));
+  }
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/partner/collection-requests/${query ? `?${query}` : ""}`
+  );
+  const root = (payload ?? {}) as Record<string, unknown>;
+  return {
+    count: toNumber(root.count, 0),
+    results: toArray(root.results).map(normalizeCollectionRequest),
+  };
+}

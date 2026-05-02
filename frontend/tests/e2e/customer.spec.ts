@@ -48,6 +48,127 @@ test("customer dashboard, subscription requests, subscriptions, and payments rou
   await expect(page.getByRole("heading", { name: "Direct Sales" }).last()).toBeVisible();
 });
 
+test("customer payments page shows separated EMI, rent/lease, and direct-sale receipt sections", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => {
+      const path = url.pathname;
+      return path === "/api/v1/customer/payments" || path === "/api/v1/customer/payments/";
+    },
+    async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        total_paid_amount: "1000.00",
+        results: [
+          {
+            id: 501,
+            subscription: 901,
+            subscription_id: 901,
+            subscription_number: "SUB-901",
+            subscription_plan_type: "EMI",
+            amount: "1000.00",
+            method: "CASH",
+            payment_date: "2026-04-10",
+            created_at: "2026-04-10T10:00:00Z",
+            is_reversed: false,
+            reference_no: "REF-501",
+            emi_id: 1,
+            emi_month_no: 1,
+            emi_due_date: "2026-04-01",
+          },
+        ],
+      }),
+    });
+  }
+  );
+  await page.route("**/api/v1/customer/receipts/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 3,
+        results: [
+          {
+            id: 1,
+            receipt_no: "RCT-DS-1",
+            receipt_date: "2026-04-11",
+            status: "POSTED",
+            amount: "500.00",
+            customer_id: 31,
+            customer_name: "Customer One",
+            subscription_id: null,
+            subscription_number: null,
+            plan_type: null,
+            invoice_id: 10,
+            invoice_no: "INV-10",
+            direct_sale_id: 701,
+            direct_sale_no: "DSI-701",
+            payment_id: 80,
+            payment_method: "CASH",
+            reference_no: "DS-80",
+          },
+          {
+            id: 2,
+            receipt_no: "RCT-RL-1",
+            receipt_date: "2026-04-12",
+            status: "POSTED",
+            amount: "200.00",
+            customer_id: 31,
+            customer_name: "Customer One",
+            subscription_id: 902,
+            subscription_number: "SUB-RL",
+            plan_type: "RENT",
+            invoice_id: null,
+            invoice_no: null,
+            direct_sale_id: null,
+            direct_sale_no: null,
+            payment_id: 81,
+            payment_method: "UPI",
+            reference_no: "RL-81",
+          },
+          {
+            id: 3,
+            receipt_no: "RCT-EMI-1",
+            receipt_date: "2026-04-13",
+            status: "POSTED",
+            amount: "1000.00",
+            customer_id: 31,
+            customer_name: "Customer One",
+            subscription_id: 901,
+            subscription_number: "SUB-901",
+            plan_type: "EMI",
+            invoice_id: null,
+            invoice_no: null,
+            direct_sale_id: null,
+            direct_sale_no: null,
+            payment_id: 82,
+            payment_method: "CASH",
+            reference_no: "EMI-82",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/customer/payments");
+  await expect(page.getByRole("heading", { name: "My Payments" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("EMI payment records");
+  await expect(page.locator("body")).toContainText("Rent / lease receipts");
+  await expect(page.locator("body")).toContainText("RCT-RL-1");
+  await expect(page.locator("body")).toContainText("Direct-sale receipts");
+  await expect(page.locator("body")).toContainText("RCT-DS-1");
+  await expect(page.locator("body")).toContainText("EMI subscription receipts");
+  await expect(page.locator("body")).toContainText("RCT-EMI-1");
+});
+
 test("customer payment receipt is self-scoped", async ({ page }) => {
   const manifest = readSmokeManifest();
 
@@ -81,6 +202,55 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
           invoice_number: "INV-2026-00088",
           document_number: "DSI-2026-00088",
         },
+      }),
+    });
+  });
+  await page.route("**/api/v1/customer/direct-sales/?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        page: 1,
+        page_size: 5,
+        results: [
+          {
+            id: 701,
+            document_number: "DSI-2026-00701",
+            invoice_number: "INV-2026-00701",
+            sale_date: "2026-04-20",
+            status: "INVOICED",
+            grand_total: "2000.00",
+            paid_amount: "500.00",
+            outstanding_amount: "1500.00",
+            delivery_required: false,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/notifications/summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        unread_count: 2,
+        high_priority_count: 1,
+        latest: [
+          {
+            id: 9001,
+            module: "customer",
+            category: "PAYMENT_POSTED",
+            severity: "INFO",
+            title: "Payment recorded",
+            body: "A payment was posted to your subscription.",
+            payload: {},
+            is_read: false,
+            read_at: null,
+            created_at: "2026-04-20T10:00:00Z",
+            source_job_id: null,
+          },
+        ],
       }),
     });
   });
@@ -221,6 +391,10 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
   await expect(page.locator("body")).toContainText("Waived by benefit");
   await expect(page.locator("body")).toContainText("Direct Sale Dues");
   await expect(page.locator("body")).toContainText("View Direct Sales");
+  await expect(page.locator("body")).toContainText("Latest direct-sale invoices");
+  await expect(page.locator("body")).toContainText("INV-2026-00701");
+  await expect(page.locator("body")).toContainText("Notifications");
+  await expect(page.locator("body")).toContainText("Payment recorded");
   await expect(page.locator("body")).toContainText("Settled totals already reflect any reversal history.");
   await expect(page.locator("body")).toContainText("Aurora Sofa");
   await expect(page.locator("body")).toContainText("Winner Sofa");
@@ -263,6 +437,10 @@ test("customer direct-sales list and detail routes load", async ({ page }) => {
         invoice_number: "INV-2026-00701",
         sale_date: "2026-04-20",
         status: "INVOICED",
+        tax_mode: "GST",
+        customer_gstin: "29AABCU9603R1ZX",
+        customer_snapshot_place_of_supply: "Karnataka",
+        invoice_date: "2026-04-20",
         subtotal: "2000.00",
         discount_total: "100.00",
         taxable_total: "1900.00",
@@ -293,6 +471,8 @@ test("customer direct-sales list and detail routes load", async ({ page }) => {
   await page.getByRole("link", { name: "View" }).click();
   await expect(page).toHaveURL(/\/customer\/direct-sales\/701$/);
   await expect(page.locator("body")).toContainText("Customer snapshot");
+  await expect(page.locator("body")).toContainText("GST / tax summary");
+  await expect(page.locator("body")).toContainText("Taxable amount");
   await expect(page.locator("body")).toContainText("RCT-2026-00077");
 });
 

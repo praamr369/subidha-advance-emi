@@ -82,6 +82,8 @@ export default function CustomerPaymentsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [directSaleReceipts, setDirectSaleReceipts] = useState<FinanceReceiptRow[]>([]);
+  const [rentLeaseReceipts, setRentLeaseReceipts] = useState<FinanceReceiptRow[]>([]);
+  const [emiReceipts, setEmiReceipts] = useState<FinanceReceiptRow[]>([]);
 
   useEffect(() => {
     setSubscriptionInput(subscriptionFilter);
@@ -108,9 +110,23 @@ export default function CustomerPaymentsPage() {
         setRows(payload.results);
         setCount(payload.count);
         setTotalPaidAmount(String(payload.total_paid_amount || "0.00"));
+        const receiptRows = receiptPayload.results || [];
         setDirectSaleReceipts(
-          (receiptPayload.results || []).filter(
-            (row) => row.direct_sale_id !== null && row.direct_sale_id !== undefined
+          receiptRows.filter((row) => row.direct_sale_id !== null && row.direct_sale_id !== undefined)
+        );
+        setRentLeaseReceipts(
+          receiptRows.filter(
+            (row) =>
+              (row.direct_sale_id === null || row.direct_sale_id === undefined) &&
+              (row.plan_type === "RENT" || row.plan_type === "LEASE")
+          )
+        );
+        setEmiReceipts(
+          receiptRows.filter(
+            (row) =>
+              (row.direct_sale_id === null || row.direct_sale_id === undefined) &&
+              row.plan_type !== "RENT" &&
+              row.plan_type !== "LEASE"
           )
         );
         setError(null);
@@ -121,6 +137,8 @@ export default function CustomerPaymentsPage() {
           setCount(0);
           setTotalPaidAmount("0.00");
           setDirectSaleReceipts([]);
+          setRentLeaseReceipts([]);
+          setEmiReceipts([]);
         }
       } finally {
         if (mode === "initial") {
@@ -149,6 +167,21 @@ export default function CustomerPaymentsPage() {
 
   const columns = useMemo<Column<CustomerPayment>[]>(
     () => [
+      {
+        key: "plan_type",
+        title: "Type",
+        render: (row) => (
+          <StatusBadge
+            status={row.subscription_plan_type || "EMI"}
+            label={
+              row.subscription_plan_type
+                ? formatPlanTypeLabel(row.subscription_plan_type)
+                : "EMI"
+            }
+            hideIcon
+          />
+        ),
+      },
       {
         key: "id",
         title: "Payment",
@@ -375,7 +408,7 @@ export default function CustomerPaymentsPage() {
           <>
           <DetailPanel
             title="EMI payment records"
-            description="Subscription-linked customer payment rows."
+            description="Subscription-linked customer payment rows (Lucky Plan / EMI)."
           >
             {rows.length === 0 ? (
               <EmptyState
@@ -408,6 +441,70 @@ export default function CustomerPaymentsPage() {
             </div>
           </DetailPanel>
           <DetailPanel
+            title="Rent / lease receipts"
+            description="Receipts linked to rent or lease subscriptions (excludes direct-sale register rows)."
+          >
+            {rentLeaseReceipts.length === 0 ? (
+              <EmptyState
+                title="No rent or lease receipts"
+                description="No rent/lease receipt is currently linked to your profile."
+              />
+            ) : (
+              <DataTableShell>
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Receipt</th>
+                        <th className="px-3 py-2">Subscription</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Method</th>
+                        <th className="px-3 py-2 text-right">Amount</th>
+                        <th className="px-3 py-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rentLeaseReceipts.map((receipt) => (
+                        <tr key={receipt.id} className="border-t border-border">
+                          <td className="px-3 py-2">
+                            <StatusBadge
+                              status={receipt.plan_type || "RENT"}
+                              label={
+                                receipt.plan_type === "LEASE"
+                                  ? "Lease"
+                                  : receipt.plan_type === "RENT"
+                                    ? "Rent"
+                                    : formatPlanTypeLabel(receipt.plan_type)
+                              }
+                              hideIcon
+                            />
+                          </td>
+                          <td className="px-3 py-2">{receipt.receipt_no || `RCT-${receipt.id}`}</td>
+                          <td className="px-3 py-2">{receipt.subscription_number || "—"}</td>
+                          <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
+                          <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
+                          <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                          <td className="px-3 py-2">
+                            <a
+                              href={`/api/v1/customer/receipts/${receipt.id}/pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
+                            >
+                              Download
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            )}
+          </DetailPanel>
+
+          <DetailPanel
             title="Direct-sale receipts"
             description="Direct-sale receipt documents, kept separate from EMI payment rows."
           >
@@ -422,6 +519,7 @@ export default function CustomerPaymentsPage() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-muted/40 text-left">
                       <tr>
+                        <th className="px-3 py-2">Type</th>
                         <th className="px-3 py-2">Receipt</th>
                         <th className="px-3 py-2">Date</th>
                         <th className="px-3 py-2">Method</th>
@@ -432,6 +530,9 @@ export default function CustomerPaymentsPage() {
                     <tbody>
                       {directSaleReceipts.map((receipt) => (
                         <tr key={receipt.id} className="border-t border-border">
+                          <td className="px-3 py-2">
+                            <StatusBadge status="DIRECT_SALE" label="Direct sale" hideIcon />
+                          </td>
                           <td className="px-3 py-2">{receipt.receipt_no || `RCT-${receipt.id}`}</td>
                           <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
                           <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
@@ -454,6 +555,55 @@ export default function CustomerPaymentsPage() {
               </DataTableShell>
             )}
           </DetailPanel>
+
+          {emiReceipts.length > 0 ? (
+            <DetailPanel
+              title="EMI subscription receipts"
+              description="Official receipt documents linked to EMI (Lucky Plan) subscriptions. These complement the payment register above; both reflect posted collections."
+            >
+              <DataTableShell>
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Receipt</th>
+                        <th className="px-3 py-2">Subscription</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Method</th>
+                        <th className="px-3 py-2 text-right">Amount</th>
+                        <th className="px-3 py-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emiReceipts.map((receipt) => (
+                        <tr key={receipt.id} className="border-t border-border">
+                          <td className="px-3 py-2">
+                            <StatusBadge status="EMI" label="EMI" hideIcon />
+                          </td>
+                          <td className="px-3 py-2">{receipt.receipt_no || `RCT-${receipt.id}`}</td>
+                          <td className="px-3 py-2">{receipt.subscription_number || "—"}</td>
+                          <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
+                          <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
+                          <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                          <td className="px-3 py-2">
+                            <a
+                              href={`/api/v1/customer/receipts/${receipt.id}/pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
+                            >
+                              Download
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            </DetailPanel>
+          ) : null}
           </>
         ) : null}
       </div>

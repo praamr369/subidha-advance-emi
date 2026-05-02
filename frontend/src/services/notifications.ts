@@ -30,7 +30,7 @@ export type NotificationSummaryResponse = {
   latest: SystemNotification[];
 };
 
-type QueryValue = string | number | undefined | null;
+type QueryValue = string | number | boolean | undefined | null;
 
 function buildQuery(params: Record<string, QueryValue>): string {
   const search = new URLSearchParams();

@@ -37,6 +37,9 @@ from subscriptions.services.commission_service import (
     create_commission_for_payment,
     reverse_commission_for_payment,
 )
+from subscriptions.services.operational_notification_service import (
+    schedule_emi_payment_posted_notifications,
+)
 from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
@@ -610,6 +613,16 @@ def record_emi_payment(
         source_model="Payment",
         source_id=payment.id,
         event_type="PAYMENT_POSTED",
+    )
+
+    subscription_label = (getattr(subscription, "subscription_number", None) or "").strip() or f"SUB-{subscription.id}"
+    schedule_emi_payment_posted_notifications(
+        payment_id=payment.id,
+        customer_user_id=subscription.customer.user_id,
+        partner_user_id=getattr(subscription, "partner_id", None),
+        cashier_user_id=getattr(collected_by, "id", None),
+        subscription_label=subscription_label,
+        amount_str=str(amount),
     )
 
     return {

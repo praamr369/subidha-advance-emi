@@ -30,6 +30,7 @@ import {
   formatDate,
   money,
 } from "@/lib/dashboard-summary";
+import { ROUTES } from "@/lib/routes";
 import { getPartnerDashboard } from "@/services/partner";
 import {
   getDashboardSummaryV2,
@@ -271,10 +272,16 @@ export default function PartnerDashboardPage() {
                 group: "core",
                 fixed: true,
                 content: (
-                  <ActionButton href="/partner/collections/create" variant="outline" className="justify-between">
-                    Open collection form
-                    <ArrowRight className="h-4 w-4" />
-                  </ActionButton>
+                  <div className="flex flex-col gap-2">
+                    <ActionButton href="/partner/collections/create" variant="outline" className="justify-between">
+                      Open collection form
+                      <ArrowRight className="h-4 w-4" />
+                    </ActionButton>
+                    <ActionButton href={ROUTES.partner.collectionRequests} variant="outline" className="justify-between">
+                      Request register
+                      <ArrowRight className="h-4 w-4" />
+                    </ActionButton>
+                  </div>
                 ),
               },
               {
@@ -529,6 +536,57 @@ export default function PartnerDashboardPage() {
             </div>
 
             <WorkspaceSection
+              title="Required actions"
+              description="Subscriptions flagged for follow-up in your partner scope."
+              action={
+                <ActionButton href={ROUTES.partner.subscriptions} variant="secondary" className="h-9 px-3 text-xs">
+                  Browse subscriptions
+                </ActionButton>
+              }
+            >
+              {legacy.follow_up_queue && legacy.follow_up_queue.length > 0 ? (
+                <div className="grid gap-3">
+                  {legacy.follow_up_queue.slice(0, 8).map((item) => (
+                    <div
+                      key={String(item.id)}
+                      className="rounded-2xl border border-white/75 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
+                    >
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {item.customer_name || "Customer"}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {item.subscription_number || `SUB-${String(item.subscription_id ?? "")}`} ·{" "}
+                            {item.reason || "Follow-up required"}
+                          </div>
+                          {item.pending_amount ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Pending {money(item.pending_amount)}
+                              {item.overdue_days ? ` · ${item.overdue_days} day(s) overdue` : ""}
+                            </div>
+                          ) : null}
+                        </div>
+                        <Link
+                          href={`/partner/subscriptions/${String(item.subscription_id ?? "")}`}
+                          className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                        >
+                          Open subscription
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No required actions"
+                  description="No follow-up queue items are currently visible for your partner scope."
+                />
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
               title="Due collection queue"
               description="Partner-scoped next-due contracts ordered by urgency, sourced from the canonical surface endpoints."
               action={
@@ -601,8 +659,8 @@ export default function PartnerDashboardPage() {
               <WorkspaceSection
                 title="Recent collection requests"
                 description="Request workflow visibility stays operational only and does not redefine settlement truth."
-                actionHref="/partner/collections"
-                actionLabel="Open queue"
+                actionHref={ROUTES.partner.collectionRequests}
+                actionLabel="View register"
               >
                 {legacy.recent_collection_requests &&
                 legacy.recent_collection_requests.length > 0 ? (
