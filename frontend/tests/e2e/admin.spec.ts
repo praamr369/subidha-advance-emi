@@ -1471,10 +1471,11 @@ test("admin analytics shows an error state instead of fake zero fallback on dash
 
   await page.goto("/admin/analytics");
   await expect(page).toHaveURL(/\/admin\/reports\?live=1/);
-  await expect(
-    page.getByText("Unable to load analytics")
-  ).toBeVisible();
-  await expect(page.getByText("Active Subscriptions")).not.toBeVisible();
+  const livePosture = page.locator("#live-posture");
+  await expect(livePosture.getByText("Unable to load analytics")).toBeVisible();
+  // Scope to the live strip: the reports hub still loads windowed analytics elsewhere, which may
+  // mention subscriptions; those must not satisfy this regression.
+  await expect(livePosture.getByText(/^Active subscriptions$/i)).not.toBeVisible();
 });
 
 test("legacy overdue admin route redirects to canonical overdue workspace", async ({

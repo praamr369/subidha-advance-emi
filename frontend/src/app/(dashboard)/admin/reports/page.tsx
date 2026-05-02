@@ -141,16 +141,15 @@ export default function AdminReportsPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      const [summaryResult, catalogResult, dashboardResult] = await Promise.allSettled([
-        getAdminAnalyticsSummary(analyticsQuery),
-        fetchReportsCenterCatalog(),
-        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
-      ]);
+  const commitFetchResults = useCallback(
+    (
+      results: [
+        PromiseSettledResult<AdminAnalyticsSummaryResponse>,
+        PromiseSettledResult<ReportCenterCatalog>,
+        PromiseSettledResult<AdminDashboardApiResponse>,
+      ]
+    ) => {
+      const [summaryResult, catalogResult, dashboardResult] = results;
 
       if (summaryResult.status === "fulfilled") {
         setAnalytics(summaryResult.value);
@@ -175,16 +174,63 @@ export default function AdminReportsPage() {
         setLiveDashboard(null);
         setLiveError(toErrorMessage(dashboardResult.reason));
       }
+    },
+    []
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const bundle = await Promise.allSettled([
+        getAdminAnalyticsSummary(analyticsQuery),
+        fetchReportsCenterCatalog(),
+        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
+      ]);
+
+      if (cancelled) return;
+      commitFetchResults(bundle as Parameters<typeof commitFetchResults>[0]);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analyticsQuery, commitFetchResults]);
+
+  const handleWindowPresetChange = useCallback((preset: DashboardWindowPreset) => {
+    setLoading(true);
+    setWindowPreset(preset);
+  }, []);
+
+  const handleStartDateChange = useCallback((value: string) => {
+    setLoading(true);
+    setStartDate(value);
+  }, []);
+
+  const handleEndDateChange = useCallback((value: string) => {
+    setLoading(true);
+    setEndDate(value);
+  }, []);
+
+  const loadPage = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
+      const bundle = await Promise.allSettled([
+        getAdminAnalyticsSummary(analyticsQuery),
+        fetchReportsCenterCatalog(),
+        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
+      ]);
+
+      commitFetchResults(bundle as Parameters<typeof commitFetchResults>[0]);
 
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     },
-    [analyticsQuery]
+    [analyticsQuery, commitFetchResults]
   );
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
 
   useEffect(() => {
     if (loading) return;
@@ -428,9 +474,9 @@ export default function AdminReportsPage() {
             loading={refreshing || loading}
             title="Reports window"
             description="Window filters apply to backend analytics trend slices and exception posture only; payment and settlement posting semantics remain unchanged."
-            onWindowChange={setWindowPreset}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
+            onWindowChange={handleWindowPresetChange}
+            onStartDateChange={handleStartDateChange}
+            onEndDateChange={handleEndDateChange}
           />
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
