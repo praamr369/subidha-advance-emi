@@ -21,6 +21,10 @@ from billing.models import (
     ReceiptDocument,
 )
 from billing.services.billing_sync_service import sync_subscription_billing_profile
+from billing.services.direct_sale_delivery_bridge_service import (
+    direct_sale_delivery_phase,
+    get_direct_sale_delivery_case,
+)
 from billing.services.billing_service import (
     _ensure_credit_sequence,
     _ensure_debit_sequence,
@@ -29,6 +33,7 @@ from billing.services.billing_service import (
     create_direct_sale,
     update_direct_sale,
 )
+from inventory.models import PurchaseNeed, PurchaseNeedStatus
 from accounts.services.password_reset_service import (
     PasswordResetServiceError,
     create_password_reset_request,
@@ -254,6 +259,10 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     billing_invoice_id = serializers.SerializerMethodField()
     billing_invoice_no = serializers.SerializerMethodField()
     billing_invoice_status = serializers.SerializerMethodField()
+    delivery_status = serializers.SerializerMethodField()
+    delivery_display = serializers.SerializerMethodField()
+    delivery_request_id = serializers.SerializerMethodField()
+    requirement_count = serializers.SerializerMethodField()
     customer_mode = serializers.ChoiceField(
         choices=[("EXISTING", "Existing Customer"), ("NEW", "New Customer"), ("WALK_IN", "Walk-in Snapshot")],
         required=False,
@@ -336,6 +345,10 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "billing_invoice_id",
             "billing_invoice_no",
             "billing_invoice_status",
+            "delivery_status",
+            "delivery_display",
+            "delivery_request_id",
+            "requirement_count",
             "customer_mode",
             "walkin_create_customer_profile",
             "new_customer_name",
@@ -511,6 +524,27 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     def get_billing_invoice_status(self, obj):
         latest = self._latest_invoice(obj)
         return getattr(latest, "status", None)
+
+    def get_delivery_status(self, obj):
+        code, _label = direct_sale_delivery_phase(sale=obj)
+        return code
+
+    def get_delivery_display(self, obj):
+        _code, label = direct_sale_delivery_phase(sale=obj)
+        return label
+
+    def get_delivery_request_id(self, obj):
+        case = get_direct_sale_delivery_case(sale=obj)
+        return case.id if case else None
+
+    def get_requirement_count(self, obj):
+        if obj.pk is None:
+            return 0
+        return PurchaseNeed.objects.filter(
+            source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
+            source_object_id=str(obj.pk),
+            status=PurchaseNeedStatus.OPEN,
+        ).count()
 
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):

@@ -9,6 +9,7 @@ from accounting.models import DocumentSequence
 from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, StockLocation, Warehouse
+from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -352,3 +353,54 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         allow_headers = (response.get("Access-Control-Allow-Headers") or "").lower()
         self.assertIn("idempotency-key", allow_headers)
+
+    def test_delivery_required_false_skips_service_desk_tracking_case(self):
+        payload = self._payload()
+        payload["delivery_required"] = False
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertFalse(ServiceDeskCase.objects.filter(direct_sale_id=response.data["id"]).exists())
+        self.assertEqual(response.data.get("delivery_status"), "NONE")
+
+    def test_delivery_required_unpaid_creates_payment_hold_case_and_labels(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
+        self.assertEqual(case.case_type, ServiceDeskCaseType.DIRECT_SALE_DELIVERY)
+        self.assertEqual(case.status, ServiceDeskCaseStatus.OPEN)
+        self.assertEqual(response.data.get("delivery_status"), "PAYMENT_HOLD")
+        self.assertEqual(response.data.get("delivery_request_id"), case.id)
+
+    def test_explicit_requirement_when_stock_covers_sale_still_creates_need(self):
+        self.inventory_item.opening_stock_qty = Decimal("50.000")
+        self.inventory_item.save(update_fields=["opening_stock_qty"])
+        response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        need = PurchaseNeed.objects.get(source_object_id=str(response.data["id"]))
+        self.assertEqual(need.shortage_quantity, Decimal("0.000"))
+
+    def test_direct_sale_bootstraps_primary_warehouse_when_none_exist(self):
+        Warehouse.objects.all().delete()
+        self.assertFalse(Warehouse.objects.exists())
+        response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertTrue(Warehouse.objects.filter(code="PRIMARY").exists())
+        self.assertEqual(PurchaseNeed.objects.count(), 1)
+
+    def test_full_prepayment_delivery_ready_promotes_case_and_matches_labels(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        payload["received_total"] = "23000.00"
+        payload["balance_total"] = "0.00"
+        payload["subtotal"] = "24000.00"
+        payload["discount_total"] = "1000.00"
+        payload["taxable_total"] = "23000.00"
+        payload["tax_total"] = "0.00"
+        payload["grand_total"] = "23000.00"
+        response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
+        self.assertEqual(case.status, ServiceDeskCaseStatus.AUTHORIZED)
+        self.assertEqual(response.data.get("delivery_status"), "READY_FOR_DELIVERY")

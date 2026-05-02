@@ -123,16 +123,27 @@ def build_admin_erp_summary() -> dict:
     direct_sales = DirectSale.objects.all()
     active_contracts = Subscription.objects.filter(status__in=["ACTIVE", "APPROVED", "PENDING_APPROVAL"])
 
-    low_stock = [
-        item
-        for item in InventoryItem.objects.filter(is_active=True)[:300]
-        if item.available_to_commit_qty() <= item.low_stock_threshold()
-    ]
-    out_of_stock_requested = [
-        item
-        for item in InventoryItem.objects.filter(is_active=True)[:300]
-        if item.available_to_commit_qty() <= 0
-    ]
+    def _inventory_alert_candidates(query_slice):
+        """Safe ERP inventory counts using actual InventoryItem APIs (no guessed math)."""
+        low: list[InventoryItem] = []
+        out: list[InventoryItem] = []
+        for item in query_slice:
+            if not item.stock_tracking_enabled:
+                continue
+            try:
+                available = item.available_qty()
+            except Exception:
+                continue
+            if available <= Decimal("0"):
+                out.append(item)
+            threshold = item.reorder_level_qty
+            if threshold > Decimal("0") and available <= threshold:
+                low.append(item)
+        return low, out
+
+    low_stock, out_of_stock_requested = _inventory_alert_candidates(
+        InventoryItem.objects.filter(is_active=True).select_related("product")[:300]
+    )
 
     pending_invoices = BillingInvoice.objects.filter(status="DRAFT")
     unpaid_invoices = BillingInvoice.objects.filter(status="POSTED")

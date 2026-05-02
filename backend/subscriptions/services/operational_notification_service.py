@@ -17,14 +17,25 @@ logger = logging.getLogger(__name__)
 
 def _payload(*, category: str, severity: str = "INFO", **kwargs: Any) -> dict:
     data: dict[str, Any] = {"category": category, "severity": severity}
+    int_fields = {
+        "subscription_id",
+        "emi_id",
+        "payment_id",
+        "direct_sale_id",
+        "receipt_id",
+        "purchase_need_id",
+        "service_case_id",
+    }
     for key, value in kwargs.items():
         if value is None:
             continue
-        if key in {"subscription_id", "emi_id", "payment_id", "direct_sale_id", "receipt_id"}:
+        if key in int_fields:
             try:
                 data[key] = int(value)
             except (TypeError, ValueError):
                 continue
+        else:
+            data[key] = value
     return data
 
 
@@ -137,6 +148,82 @@ def schedule_direct_sale_collection_notifications(
             logger.exception(
                 "operational_notification.direct_sale_receipt_failed receipt_id=%s",
                 receipt_id,
+            )
+
+    transaction.on_commit(_run)
+
+
+def schedule_direct_sale_stock_requirement_notifications(
+    *,
+    purchase_need_id: int,
+    sale_no: str,
+    product_name: str,
+    shortage_quantity: str,
+) -> None:
+    """Notify admins/inventory when a direct-sale purchase need is created or refreshed."""
+
+    def _run() -> None:
+        try:
+            from decimal import Decimal
+
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            short = Decimal(str(shortage_quantity or "0"))
+            severity = "WARNING" if short > Decimal("0") else "INFO"
+            label = (sale_no or "").strip() or f"sale-{purchase_need_id}"
+            notify_all_active_admins(
+                module="inventory",
+                title="Stock requirement created",
+                body=f"{label}: {product_name or 'Product'} — review pending inventory requirements.",
+                dedupe_prefix=f"STOCK_REQUIREMENT_CREATED:{purchase_need_id}",
+                payload=_payload(
+                    category="STOCK_REQUIREMENT_CREATED",
+                    severity=severity,
+                    purchase_need_id=purchase_need_id,
+                    object_type="DIRECT_SALE_REQUIREMENT",
+                    action_url="/admin/inventory/workspace",
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "operational_notification.direct_sale_stock_requirement_failed purchase_need_id=%s",
+                purchase_need_id,
+            )
+
+    transaction.on_commit(_run)
+
+
+def schedule_direct_sale_delivery_ready_notifications(
+    *,
+    direct_sale_id: int,
+    sale_no: str,
+    service_case_id: int,
+) -> None:
+    """Notify admins/delivery desk once a paid direct sale becomes dispatch-ready."""
+
+    def _run() -> None:
+        try:
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            label = (sale_no or "").strip() or f"SALE-{direct_sale_id}"
+            notify_all_active_admins(
+                module="delivery",
+                title="Direct sale ready for delivery",
+                body=f"{label} is fully paid and ready for dispatch (when stock allows).",
+                dedupe_prefix=f"DIRECT_SALE_DELIVERY_READY:{direct_sale_id}",
+                payload=_payload(
+                    category="DIRECT_SALE_DELIVERY_READY",
+                    severity="INFO",
+                    direct_sale_id=direct_sale_id,
+                    service_case_id=service_case_id,
+                    object_type="DIRECT_SALE_DELIVERY",
+                    action_url="/admin/delivery/workspace",
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "operational_notification.direct_sale_delivery_ready_failed direct_sale_id=%s",
+                direct_sale_id,
             )
 
     transaction.on_commit(_run)

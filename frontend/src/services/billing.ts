@@ -117,6 +117,10 @@ export type DirectSale = {
   billing_invoice_id?: number | null;
   billing_invoice_no?: string | null;
   billing_invoice_status?: string | null;
+  delivery_status?: string;
+  delivery_display?: string;
+  delivery_request_id?: number | null;
+  requirement_count?: number;
   lines: DirectSaleLine[];
 };
 

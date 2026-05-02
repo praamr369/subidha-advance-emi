@@ -295,6 +295,10 @@ class InventoryItem(InventoryTimeStampedModel):
         """
         return max(QUANTITY_ZERO, self.current_stock_quantity() - self.reserved_qty())
 
+    def available_to_commit_qty(self) -> Decimal:
+        """Operational alias used by ERP/workspace summaries (same as available_qty)."""
+        return self.available_qty()
+
     @property
     def low_stock_threshold(self) -> Decimal:
         """Alias for reorder_level_qty — used in Phase 2 purchase suggestion logic."""

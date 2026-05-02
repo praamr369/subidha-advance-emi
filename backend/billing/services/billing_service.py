@@ -226,12 +226,19 @@ def _replace_direct_sale_lines(*, sale: DirectSale, line_payloads: list[dict]):
 
 
 def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[dict], actor):
+    from subscriptions.services.operational_notification_service import (
+        schedule_direct_sale_stock_requirement_notifications,
+    )
+
     source_object_id = str(sale.id or "")
     customer_id = sale.customer_id
     for payload in line_payloads:
         inventory_item = payload.get("inventory_item")
-        required_qty = Decimal(str(payload.get("quantity") or "0"))
         explicit_requirement = bool(payload.get("_create_purchase_requirement"))
+        if inventory_item is not None and not inventory_item.stock_tracking_enabled and not explicit_requirement:
+            continue
+
+        required_qty = Decimal(str(payload.get("quantity") or "0"))
         explicit_requirement_qty = payload.get("_requirement_quantity")
         if explicit_requirement and explicit_requirement_qty:
             required_qty = Decimal(str(explicit_requirement_qty))
@@ -245,7 +252,7 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
         product = payload.get("product")
         product_name = getattr(product, "name", "") if product is not None else ""
         note = payload.get("_requirement_note") or f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}"
-        upsert_direct_sale_purchase_need(
+        need, created = upsert_direct_sale_purchase_need(
             signal=StockNeedSignal(
                 product_id=product.id,
                 required_quantity=required_qty,
@@ -254,9 +261,17 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
                 source_object_id=source_object_id,
                 customer_id=customer_id,
                 note=note,
+                allow_zero_shortage=explicit_requirement,
             ),
             created_by=actor,
         )
+        if need is not None and created:
+            schedule_direct_sale_stock_requirement_notifications(
+                purchase_need_id=need.id,
+                sale_no=sale.sale_no or "",
+                product_name=product_name,
+                shortage_quantity=str(shortage_qty),
+            )
 
 
 def _replace_invoice_lines_from_direct_sale(*, invoice: BillingInvoice, line_payloads: list[dict]):
@@ -466,6 +481,9 @@ def create_direct_sale(*, payload: dict, created_by):
     _replace_direct_sale_lines(sale=sale, line_payloads=line_payloads)
     _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=created_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    sync_direct_sale_delivery_case(sale=sale, actor=created_by)
     from subscriptions.services.contract_reference_service import (
         ensure_contract_reference_for_direct_sale,
     )
@@ -560,6 +578,9 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
         _replace_direct_sale_lines(sale=sale, line_payloads=line_payloads)
     _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=updated_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    sync_direct_sale_delivery_case(sale=sale, actor=updated_by)
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=sale,
@@ -627,6 +648,9 @@ def mark_direct_sale_delivered(*, direct_sale_id: int, delivered_by, delivery_re
             "delivery_reference": sale.delivery_reference,
         },
     )
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    sync_direct_sale_delivery_case(sale=sale, actor=delivered_by)
     return sale, True
 
 
@@ -661,6 +685,10 @@ def approve_billing_invoice(*, invoice_id: int, approved_by):
         performed_by=approved_by,
         metadata={"invoice_id": invoice.id, "document_no": invoice.document_no},
     )
+    if invoice.direct_sale_id:
+        from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+        sync_direct_sale_delivery_case(sale=invoice.direct_sale, actor=approved_by)
     return invoice, True
 
 
@@ -764,6 +792,9 @@ def post_billing_invoice(*, invoice_id: int, posted_by):
         if not direct_sale.delivery_required and direct_sale.delivered_at is None:
             direct_sale.delivered_at = direct_sale.invoiced_at
         direct_sale.save(update_fields=["status", "invoiced_at", "delivered_at", "updated_at"])
+        from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+        sync_direct_sale_delivery_case(sale=direct_sale, actor=posted_by)
     _log_accounting_event(
         event="BILLING_INVOICE_POSTED",
         instance=invoice,

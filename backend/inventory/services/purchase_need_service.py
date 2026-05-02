@@ -19,20 +19,34 @@ class StockNeedSignal:
     customer_id: int | None = None
     note: str = ""
     priority: str = PurchaseNeed.Priority.MEDIUM
+    allow_zero_shortage: bool = False
 
 
-def _primary_warehouse() -> Warehouse | None:
-    return Warehouse.objects.filter(is_active=True).order_by("id").first()
+def ensure_primary_warehouse() -> Warehouse:
+    """
+    PurchaseNeed rows require a warehouse FK. Bootstrap a single primary warehouse when none exists
+    so operational flows (direct-sale requirements) do not silently drop records.
+    """
+    existing = Warehouse.objects.filter(is_active=True).order_by("id").first()
+    if existing is not None:
+        return existing
+    warehouse, _ = Warehouse.objects.get_or_create(
+        code="PRIMARY",
+        defaults={
+            "name": "Primary warehouse",
+            "is_active": True,
+            "notes": "Auto-created because no active warehouse existed.",
+        },
+    )
+    return warehouse
 
 
-def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None) -> PurchaseNeed | None:
-    if signal.shortage_quantity <= QUANTITY_ZERO:
-        return None
-    warehouse = _primary_warehouse()
-    if warehouse is None:
-        return None
+def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None) -> tuple[PurchaseNeed | None, bool]:
+    if signal.shortage_quantity <= QUANTITY_ZERO and not signal.allow_zero_shortage:
+        return None, False
+    warehouse = ensure_primary_warehouse()
 
-    need, _ = PurchaseNeed.objects.update_or_create(
+    need, created = PurchaseNeed.objects.update_or_create(
         product_id=signal.product_id,
         warehouse=warehouse,
         status=PurchaseNeedStatus.OPEN,
@@ -53,4 +67,4 @@ def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None
             },
         },
     )
-    return need
+    return need, created

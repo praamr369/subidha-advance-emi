@@ -405,11 +405,12 @@ export default function DirectSaleWorkspace() {
       key: "delivery_required",
       header: "Delivery",
       render: (row) =>
-        row.delivery_required
+        row.delivery_display ||
+        (row.delivery_required
           ? row.delivered_at
             ? "Delivered"
             : "Hold"
-          : "Counter sale",
+          : "Counter sale"),
     },
     {
       key: "billing_invoice_no",
@@ -782,8 +783,18 @@ export default function DirectSaleWorkspace() {
       const created = await createDirectSale(payload, {
         idempotencyKey: createAttemptKey.current,
       });
-      setNotice(`Direct sale ${created.sale_no || `#${created.id}`} created.`);
+      const invNo = created.billing_invoice_no?.trim();
+      const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
+      const deliveryLabel = created.delivery_display?.trim();
+      const parts = [
+        `Direct sale ${created.sale_no || `#${created.id}`} created`,
+        invNo ? `invoice ${invNo}` : null,
+        reqCount !== null ? `${reqCount} pending requirement(s)` : null,
+        deliveryLabel || null,
+      ].filter(Boolean);
+      setNotice(parts.join(". ") + ".");
       resetCreateForm();
+      await loadPage();
       router.push(pathname);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1478,7 +1489,17 @@ export default function DirectSaleWorkspace() {
                               <input
                                 type="checkbox"
                                 checked={line.create_requirement}
-                                onChange={(event) => updateLine(line.id, { create_requirement: event.target.checked })}
+                                onChange={(event) => {
+                                  const checked = event.target.checked;
+                                  updateLine(line.id, {
+                                    create_requirement: checked,
+                                    ...(checked &&
+                                    (!line.requirement_quantity.trim() ||
+                                      toNumber(line.requirement_quantity) <= 0)
+                                      ? { requirement_quantity: line.quantity }
+                                      : {}),
+                                  });
+                                }}
                                 disabled={submitting}
                               />
                               Create purchase/stock requirement

@@ -53,6 +53,7 @@ class ServiceDeskCaseType(models.TextChoices):
     DELIVERY_RETURN = "DELIVERY_RETURN", "Delivery Return"
     EXCHANGE = "EXCHANGE", "Exchange"
     SERVICE = "SERVICE", "Service"
+    DIRECT_SALE_DELIVERY = "DIRECT_SALE_DELIVERY", "Direct Sale Delivery"
 
 
 class ServiceDeskCaseStatus(models.TextChoices):

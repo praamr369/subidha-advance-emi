@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from inventory.models import InventoryItem
 from subscriptions.models import SubscriptionRequest
 from tests.helpers import (
     create_admin_user,
@@ -70,3 +73,25 @@ class AdminErpApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         search = self.client.get("/api/v1/admin/global-search/?q=test")
         self.assertEqual(search.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_erp_workspace_views_do_not_error_with_inventory_profiles(self):
+        self._seed_records()
+        product = create_product(name="ERP Inventory SKU", product_code="ERP-INV-SKU")
+        InventoryItem.objects.create(
+            product=product,
+            sku="ERP-INV-SKU-001",
+            opening_stock_qty=Decimal("2.000"),
+            reorder_level_qty=Decimal("5.000"),
+            stock_tracking_enabled=True,
+        )
+        workspace_urls = (
+            "/api/v1/admin/erp/today-work/",
+            "/api/v1/admin/sales/workspace/",
+            "/api/v1/admin/finance/workspace/",
+            "/api/v1/admin/crm/workspace/",
+            "/api/v1/admin/delivery/workspace/",
+            "/api/v1/admin/inventory/workspace/",
+        )
+        for path in workspace_urls:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, (path, getattr(response, "data", None)))

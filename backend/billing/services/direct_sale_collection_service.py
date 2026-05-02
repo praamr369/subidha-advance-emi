@@ -324,6 +324,11 @@ def collect_direct_sale_payment(
         ]
     )
 
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    sale.refresh_from_db()
+    sync_direct_sale_delivery_case(sale=sale, actor=collected_by)
+
     audit_extra = {}
     if contract_reference_id is not None:
         audit_extra["contract_reference_id"] = contract_reference_id
