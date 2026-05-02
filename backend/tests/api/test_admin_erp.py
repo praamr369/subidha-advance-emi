@@ -91,6 +91,8 @@ class AdminErpApiTests(APITestCase):
             "/api/v1/admin/crm/workspace/",
             "/api/v1/admin/delivery/workspace/",
             "/api/v1/admin/inventory/workspace/",
+            "/api/v1/admin/reports-center/catalog/",
+            "/api/v1/admin/business-setup/checklist/",
         )
         for path in workspace_urls:
             response = self.client.get(path)

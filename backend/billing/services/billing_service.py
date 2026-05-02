@@ -597,7 +597,8 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
 
 @transaction.atomic
 def confirm_direct_sale(*, direct_sale_id: int, confirmed_by):
-    sale = DirectSale.objects.select_for_update().prefetch_related("lines").get(pk=direct_sale_id)
+    DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
+    sale = DirectSale.objects.prefetch_related("lines").get(pk=direct_sale_id)
     if sale.status in {DirectSaleStatus.CONFIRMED, DirectSaleStatus.DELIVERED, DirectSaleStatus.INVOICED}:
         return sale, False
     if sale.status == DirectSaleStatus.CANCELLED:
@@ -624,7 +625,8 @@ def confirm_direct_sale(*, direct_sale_id: int, confirmed_by):
 
 @transaction.atomic
 def mark_direct_sale_delivered(*, direct_sale_id: int, delivered_by, delivery_reference: str = ""):
-    sale = DirectSale.objects.select_for_update().get(pk=direct_sale_id)
+    DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
+    sale = DirectSale.objects.get(pk=direct_sale_id)
     if sale.status == DirectSaleStatus.DELIVERED:
         return sale, False
     if sale.status == DirectSaleStatus.INVOICED:

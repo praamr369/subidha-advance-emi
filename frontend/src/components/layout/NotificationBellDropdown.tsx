@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getAccessToken } from "@/lib/auth/tokens";
 import { ROUTES } from "@/lib/routes";
 import type { NavigationRole } from "@/config/navigation";
 import {
@@ -54,6 +55,11 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!getAccessToken()) {
+      setUnread(0);
+      setItems([]);
+      return;
+    }
     try {
       const listPromise =
         role === "ADMIN"

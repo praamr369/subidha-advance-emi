@@ -73,8 +73,9 @@ export async function getPayoutBatchDetail(
   return request<PayoutBatchDetail>(`/admin/commission-payout-batches/${id}/`);
 }
 
+/** Path segment only; compose with API_BASE_URL / apiFetch (which already includes `/api/v1`). */
 export function getPayoutBatchExportUrl(id: number | string): string {
-  return `/api/v1/admin/commission-payout-batches/${id}/export/`;
+  return `/admin/commission-payout-batches/${id}/export/`;
 }
 
 export async function finalizePayoutBatch(

@@ -357,7 +357,8 @@ def create_service_desk_case(*, payload: dict, created_by=None) -> ServiceDeskCa
 
 @transaction.atomic
 def update_service_desk_case(*, case_id: int, payload: dict, updated_by=None) -> ServiceDeskCase:
-    case = ServiceDeskCase.objects.select_for_update().prefetch_related("lines").get(pk=case_id)
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
+    case = ServiceDeskCase.objects.prefetch_related("lines").get(pk=case_id)
     if case.status in {
         ServiceDeskCaseStatus.CLOSED,
         ServiceDeskCaseStatus.CANCELLED,
@@ -437,7 +438,8 @@ def transition_service_desk_case_status(
     performed_by=None,
     resolution_summary: str = "",
 ):
-    case = ServiceDeskCase.objects.select_for_update().get(pk=case_id)
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
+    case = ServiceDeskCase.objects.get(pk=case_id)
     next_status = (next_status or "").strip().upper()
     _validate_transition(case.status, next_status)
     if case.status == next_status:
@@ -488,7 +490,8 @@ def transition_service_desk_case_status(
 
 @transaction.atomic
 def request_service_case_delivery_return(*, case_id: int, performed_by=None, notes: str = ""):
-    case = ServiceDeskCase.objects.select_for_update().select_related("delivery").get(pk=case_id)
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
+    case = ServiceDeskCase.objects.select_related("delivery").get(pk=case_id)
     if case.delivery_id is None:
         raise ValueError("Service desk case does not link a delivery record.")
     if case.case_type not in {
@@ -528,7 +531,8 @@ def request_service_case_delivery_return(*, case_id: int, performed_by=None, not
 
 @transaction.atomic
 def complete_service_case_delivery_return(*, case_id: int, performed_by=None, notes: str = ""):
-    case = ServiceDeskCase.objects.select_for_update().select_related("delivery").get(pk=case_id)
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
+    case = ServiceDeskCase.objects.select_related("delivery").get(pk=case_id)
     if case.delivery_id is None:
         raise ValueError("Service desk case does not link a delivery record.")
     if case.delivery.status != DeliveryStatus.RETURNED:
@@ -619,9 +623,11 @@ def _create_debit_note_from_case(case: ServiceDeskCase) -> BillingDebitNote:
 
 @transaction.atomic
 def post_credit_note_for_service_case(*, case_id: int, performed_by=None):
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
     case = (
-        ServiceDeskCase.objects.select_for_update()
-        .select_related("billing_invoice", "credit_note", "direct_sale", "subscription", "delivery")
+        ServiceDeskCase.objects.select_related(
+            "billing_invoice", "credit_note", "direct_sale", "subscription", "delivery"
+        )
         .prefetch_related("lines")
         .get(pk=case_id)
     )
@@ -660,9 +666,11 @@ def post_credit_note_for_service_case(*, case_id: int, performed_by=None):
 
 @transaction.atomic
 def post_debit_note_for_service_case(*, case_id: int, performed_by=None):
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
     case = (
-        ServiceDeskCase.objects.select_for_update()
-        .select_related("billing_invoice", "debit_note", "direct_sale", "subscription", "delivery")
+        ServiceDeskCase.objects.select_related(
+            "billing_invoice", "debit_note", "direct_sale", "subscription", "delivery"
+        )
         .prefetch_related("lines")
         .get(pk=case_id)
     )
@@ -701,7 +709,8 @@ def post_debit_note_for_service_case(*, case_id: int, performed_by=None):
 
 @transaction.atomic
 def link_replacement_direct_sale(*, case_id: int, replacement_direct_sale_id: int, performed_by=None):
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(pk=case_id)
+    ServiceDeskCase.objects.select_for_update(of=("self",)).get(pk=case_id)
+    case = ServiceDeskCase.objects.select_related("direct_sale").get(pk=case_id)
     if case.case_type != ServiceDeskCaseType.EXCHANGE:
         raise ValueError("Replacement direct-sale linkage is only available for exchange cases.")
     if case.direct_sale_id and case.direct_sale_id == replacement_direct_sale_id:

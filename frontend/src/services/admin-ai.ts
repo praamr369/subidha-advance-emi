@@ -427,7 +427,7 @@ function normalizeBiExplanation(payload: RawBiExplanationResponse): BiExplanatio
           key: row.key || "metric",
           label: row.label || "Metric",
           value: row.value ?? 0,
-          source: row.source || "/api/v1/admin/bi/summary/",
+          source: row.source || "/admin/bi/summary/",
         }))
       : [],
     generatedAt: payload.generated_at || "",
