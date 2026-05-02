@@ -1,9 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
-from accounting.models import FinanceAccountKind
+from accounting.models import DocumentSequence, FinanceAccountKind
 from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
-from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from accounting.models import EmployeeAttendance, EmployeeDocument, EmployeeProfile
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -30,7 +30,10 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionStatus,
 )
-from subscriptions.services.contract_reference_service import ensure_contract_reference_for_subscription
+from subscriptions.services.contract_reference_service import (
+    ensure_contract_reference_for_direct_sale,
+    ensure_contract_reference_for_subscription,
+)
 from tests.helpers import ensure_default_payment_collection_accounts
 
 
@@ -354,6 +357,14 @@ class Phase9FOperationalReadinessTests(TestCase):
         )
         self.assertEqual(cashier_phone.status_code, 200, cashier_phone.data)
         self.assertGreaterEqual(cashier_phone.data["count"], 1)
+        emi_rows = [
+            row
+            for row in cashier_phone.data["results"]
+            if row.get("source_type") == ContractReferenceType.ADVANCE_EMI
+        ]
+        self.assertTrue(emi_rows)
+        self.assertEqual(emi_rows[0]["result_type"], "EMI")
+        self.assertEqual(emi_rows[0]["action_type"], emi_rows[0]["primary_action"])
 
         rent_subscription = Subscription.objects.create(
             customer=self.customer,
@@ -374,8 +385,10 @@ class Phase9FOperationalReadinessTests(TestCase):
         self.assertEqual(rent_search.status_code, 200, rent_search.data)
         rent_row = rent_search.data["results"][0]
         self.assertEqual(rent_row["source_type"], ContractReferenceType.RENT)
+        self.assertEqual(rent_row["result_type"], "RENT")
         self.assertEqual(rent_row["allowed_actions"], [])
         self.assertEqual(rent_row["primary_action"], "VIEW_ONLY")
+        self.assertEqual(rent_row["action_type"], "VIEW_ONLY")
         self.assertIn("production-safe", rent_row["disabled_reason"])
 
         blocked_collect = self.client.post(
@@ -392,6 +405,62 @@ class Phase9FOperationalReadinessTests(TestCase):
         )
         self.assertEqual(blocked_collect.status_code, 400)
         self.assertIn("source_type", str(blocked_collect.data))
+
+    def test_unified_receivable_search_returns_direct_sale_result_type_for_cashier(self):
+        fy = financial_year_for(date(2026, 5, 1))
+        ds_series = DocumentSequence.objects.create(
+            series_code="DIRECT_SALE_INVOICE_RC",
+            financial_year=fy,
+            prefix=f"DSI-RC-{fy}",
+            next_number=50,
+            padding=5,
+            is_active=True,
+        )
+        sale = DirectSale.objects.create(
+            sale_no=f"DSI-RC-{fy}-00050",
+            sale_date=date(2026, 5, 2),
+            financial_year=fy,
+            doc_series=ds_series,
+            customer=self.customer,
+            status="INVOICED",
+            tax_mode="NON_GST",
+            tax_calculation_mode="NON_GST",
+            customer_gst_type="UNREGISTERED_CONSUMER",
+            subtotal=Decimal("800.00"),
+            discount_total=Decimal("0.00"),
+            taxable_total=Decimal("800.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("800.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("800.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        DirectSaleLine.objects.create(
+            direct_sale=sale,
+            product=self.product,
+            description="RC direct sale line",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("800.00"),
+            discount_amount=Decimal("0.00"),
+            taxable_value=Decimal("800.00"),
+            gst_rate=Decimal("0.00"),
+            cgst_amount=Decimal("0.00"),
+            sgst_amount=Decimal("0.00"),
+            igst_amount=Decimal("0.00"),
+            line_total=Decimal("800.00"),
+        )
+        ds_reference = ensure_contract_reference_for_direct_sale(sale)
+
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(
+            f"/api/v1/cashier/receivables/search/?q={ds_reference.reference_no}"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertGreaterEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["result_type"], "DIRECT_SALE")
+        self.assertEqual(row["source_type"], ContractReferenceType.DIRECT_SALE)
 
 
 class PaymentFlowIntegrationTests(TestCase):

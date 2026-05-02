@@ -12,7 +12,22 @@ export type CollectionPrimaryAction =
   | "VIEW_ONLY"
   | "DISABLED";
 
+/** Canonical badge/category from unified search API (`result_type`). Optional extras only when API sends them. */
+export type UnifiedReceivableResultType =
+  | "EMI"
+  | "DIRECT_SALE"
+  | "RENT"
+  | "LEASE"
+  | "DEPOSIT"
+  | "RECEIPT"
+  | "CUSTOMER";
+
 export type UnifiedReceivableResult = {
+  /** Server-provided classification for cashier UX badges (additive). */
+  result_type: UnifiedReceivableResultType | "";
+  /** Mirrors primary_action for stable routing diagnostics. */
+  action_type: string;
+  secondary_badges?: UnifiedReceivableResultType[];
   source_type: ReceivableSourceType;
   source_id: number | null;
   contract_reference_id: number | null;
@@ -94,10 +109,48 @@ function normalizePrimaryAction(value: unknown): CollectionPrimaryAction {
   return "COLLECT_EMI";
 }
 
+function normalizeResultType(
+  raw: unknown,
+  sourceType: ReceivableSourceType,
+): UnifiedReceivableResultType | "" {
+  const token = String(raw || "").trim().toUpperCase();
+  const allowed: UnifiedReceivableResultType[] = [
+    "EMI",
+    "DIRECT_SALE",
+    "RENT",
+    "LEASE",
+    "DEPOSIT",
+    "RECEIPT",
+    "CUSTOMER",
+  ];
+  if (allowed.includes(token as UnifiedReceivableResultType)) {
+    return token as UnifiedReceivableResultType;
+  }
+  if (sourceType === "ADVANCE_EMI") return "EMI";
+  if (sourceType === "DIRECT_SALE") return "DIRECT_SALE";
+  if (sourceType === "RENT") return "RENT";
+  if (sourceType === "LEASE") return "LEASE";
+  return "";
+}
+
 function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableResult {
   const routeRaw = toStringValue(row.collection_route);
+  const source_type = normalizeSourceType(row.source_type);
+  const primary_action = normalizePrimaryAction(row.primary_action);
+  const action_type = toStringValue(row.action_type) || String(primary_action);
+  const secondaryRaw = row.secondary_badges ?? row.secondary_result_types;
+  const secondary_badges = Array.isArray(secondaryRaw)
+    ? secondaryRaw
+        .map((item) => String(item || "").trim().toUpperCase())
+        .filter((item): item is UnifiedReceivableResultType =>
+          ["DEPOSIT", "RECEIPT", "CUSTOMER", "EMI", "DIRECT_SALE", "RENT", "LEASE"].includes(item)
+        )
+    : undefined;
   return {
-    source_type: normalizeSourceType(row.source_type),
+    result_type: normalizeResultType(row.result_type, source_type),
+    action_type,
+    secondary_badges,
+    source_type,
     source_id: toNumberOrNull(row.source_id),
     contract_reference_id: toNumberOrNull(row.contract_reference_id),
     reference_no: toStringValue(row.reference_no),
@@ -116,7 +169,7 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
         : null,
     status: toStringValue(row.status),
     payment_state: toStringValue(row.payment_state),
-    primary_action: normalizePrimaryAction(row.primary_action),
+    primary_action,
     allowed_actions: Array.isArray(row.allowed_actions)
       ? row.allowed_actions.filter((item): item is string => typeof item === "string")
       : [],

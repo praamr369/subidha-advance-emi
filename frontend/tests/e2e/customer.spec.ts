@@ -597,6 +597,107 @@ test("customer profile renders own lucky draw verification records", async ({
   await expect(page.locator("body")).toContainText("SUB-901");
 });
 
+test("customer profile keeps identity visible when direct-sale summary fails", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/customer/profile/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 31,
+        name: "Customer One",
+        phone: "01700000000",
+        email: "customer@example.com",
+        address: "Dhaka",
+        city: "Dhaka",
+        kyc_status: "VERIFIED",
+        username: "customer_one",
+        summary: {
+          total_subscriptions: 1,
+          active_subscriptions: 1,
+          won_subscriptions: 0,
+          completed_subscriptions: 0,
+          pending_emis: 1,
+          paid_emis: 1,
+          waived_emis: 0,
+          total_paid_amount: "500.00",
+          lucky_plan_draw: [],
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/direct-sales/summary/", async (route) => {
+    await route.fulfill({ status: 500, body: "direct-sale unavailable" });
+  });
+
+  await page.route("**/api/v1/customer/payments/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 0,
+        total_paid_amount: "0.00",
+        recorded_amount_total: "0.00",
+        reversed_amount_total: "0.00",
+        results: [],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/subscriptions/register/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        results: [
+          {
+            id: 901,
+            subscription_number: "SUB-901",
+            plan_type: "EMI",
+            product_name: "Ledger Sofa",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/kyc/documents/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ count: 0, kyc_status: "VERIFIED", results: [] }),
+    });
+  });
+
+  await page.route("**/api/v1/customer/referrals/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 0,
+        commission_summary: {
+          total_referrals: 0,
+          approved_commissions: 0,
+          total_approved_commission_amount: "0.00",
+        },
+        results: [],
+      }),
+    });
+  });
+
+  await page.goto("/customer/profile");
+  await expect(page.getByRole("heading", { name: "Profile Workspace" })).toBeVisible();
+  await expect(page.getByLabel("Name")).toHaveValue("Customer One");
+  await expect(page.getByText("Direct-sale summary unavailable")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View all direct sales" })).toHaveAttribute(
+    "href",
+    "/customer/direct-sales",
+  );
+});
+
 test("customer completed winner detail separates contract and winner history", async ({
   page,
 }) => {

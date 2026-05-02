@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CardSkeleton } from "@/components/feedback/Skeleton";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
@@ -32,7 +32,9 @@ import CustomerProductSummaryCard from "@/domains/subscriptions/components/Custo
 import {
   getCustomerProfile,
   getCustomerDirectSaleSummary,
+  listCustomerPayments,
   updateCustomerProfile,
+  type CustomerPayment,
   type CustomerProfileResponse,
 } from "@/services/customer";
 import { listCustomerSubscriptionsRegister } from "@/services/customer/paginated-subscriptions";
@@ -133,6 +135,9 @@ export default function CustomerProfilePage() {
   const [referralError, setReferralError] = useState<string | null>(null);
   const [directSaleSummary, setDirectSaleSummary] =
     useState<Awaited<ReturnType<typeof getCustomerDirectSaleSummary>> | null>(null);
+  const [directSaleError, setDirectSaleError] = useState<string | null>(null);
+  const [paymentPreview, setPaymentPreview] = useState<CustomerPayment[]>([]);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   function hydrate(payload: CustomerProfileResponse) {
     setData(payload);
@@ -150,17 +155,48 @@ export default function CustomerProfilePage() {
     }
   }
 
+  const reloadDirectSaleSummary = useCallback(async () => {
+    try {
+      const summary = await getCustomerDirectSaleSummary();
+      setDirectSaleSummary(summary);
+      setDirectSaleError(null);
+    } catch (err) {
+      setDirectSaleSummary(null);
+      setDirectSaleError(toErrorMessage(err));
+    }
+  }, []);
+
+  const reloadPaymentsPreview = useCallback(async () => {
+    try {
+      const payload = await listCustomerPayments();
+      setPaymentPreview((payload.results ?? []).slice(0, 5));
+      setPaymentError(null);
+    } catch (err) {
+      setPaymentPreview([]);
+      setPaymentError(toErrorMessage(err));
+    }
+  }, []);
+
   const loadPage = useCallback(async () => {
     setLoading(true);
+    setPaymentError(null);
+    setDirectSaleError(null);
     try {
-      const [profileResult, subscriptionsResult, kycResult, referralResult, directSaleResult] =
-        await Promise.allSettled([
-          getCustomerProfile(),
-          listCustomerSubscriptionsRegister({ page: 1, pageSize: 4 }),
-          listCustomerKycDocuments(),
-          listCustomerReferrals(),
-          getCustomerDirectSaleSummary(),
-        ]);
+      const [
+        profileResult,
+        subscriptionsResult,
+        kycResult,
+        referralResult,
+        directSaleResult,
+        paymentsResult,
+      ] = await Promise.allSettled([
+        getCustomerProfile(),
+        listCustomerSubscriptionsRegister({ page: 1, pageSize: 4 }),
+        listCustomerKycDocuments(),
+        listCustomerReferrals(),
+        getCustomerDirectSaleSummary(),
+        listCustomerPayments(),
+      ]);
 
       if (profileResult.status === "rejected") {
         throw profileResult.reason;
@@ -191,13 +227,31 @@ export default function CustomerProfilePage() {
         setReferrals([]);
         setReferralError("Referral data temporarily unavailable.");
       }
-      setDirectSaleSummary(directSaleResult.status === "fulfilled" ? directSaleResult.value : null);
+
+      if (directSaleResult.status === "fulfilled") {
+        setDirectSaleSummary(directSaleResult.value);
+        setDirectSaleError(null);
+      } else {
+        setDirectSaleSummary(null);
+        setDirectSaleError(toErrorMessage(directSaleResult.reason));
+      }
+
+      if (paymentsResult.status === "fulfilled") {
+        setPaymentPreview((paymentsResult.value.results ?? []).slice(0, 5));
+        setPaymentError(null);
+      } else {
+        setPaymentPreview([]);
+        setPaymentError(toErrorMessage(paymentsResult.reason));
+      }
     } catch (err) {
       setError(toErrorMessage(err));
       setData(null);
       setProductRows([]);
       setProductError(null);
       setDirectSaleSummary(null);
+      setDirectSaleError(null);
+      setPaymentPreview([]);
+      setPaymentError(null);
     } finally {
       setLoading(false);
     }
@@ -367,7 +421,15 @@ export default function CustomerProfilePage() {
         tone: noticeToneForKyc(data?.kyc_status),
       }}
     >
-      {loading ? <LoadingBlock label="Loading profile workspace..." /> : null}
+      {loading ? (
+        <div aria-busy="true" aria-label="Loading profile workspace">
+          <div className="space-y-6" aria-hidden="true">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        </div>
+      ) : null}
 
       {!loading && error && !data ? (
         <ErrorState
@@ -378,7 +440,7 @@ export default function CustomerProfilePage() {
       ) : null}
 
       {!loading && !error && data ? (
-        <div className="space-y-6">
+        <div className="space-y-6" aria-busy="false">
           <ControlLaneGrid
             title="Self-service lanes"
             description="Use the current customer-safe workspace routes without crossing into internal branch or finance controls."
@@ -429,32 +491,116 @@ export default function CustomerProfilePage() {
           </DetailPanel>
 
           <WorkspaceSection
-            title="Purchases & Direct Sales"
-            description="Unified customer snapshot across subscriptions and direct-sale purchases."
+            title="EMI subscriptions & rent/lease contracts"
+            description="Lucky Plan EMI contracts stay distinct from retail invoices and receipts."
             action={
-              <ActionButton href="/customer/direct-sales" variant="outline">
-                Open Direct Sales
+              <ActionButton href="/customer/subscriptions" variant="outline">
+                View all subscriptions
               </ActionButton>
             }
           >
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-border p-3 text-sm">
                 <div className="text-xs text-muted-foreground">Active EMI subscriptions</div>
                 <div className="mt-1 font-semibold">{data.summary.active_subscriptions ?? 0}</div>
               </div>
               <div className="rounded-xl border border-border p-3 text-sm">
-                <div className="text-xs text-muted-foreground">Rent/Lease contracts</div>
-                <div className="mt-1 font-semibold">{productRows.filter((row) => ["RENT", "LEASE"].includes((row.plan_type || "").toUpperCase())).length}</div>
+                <div className="text-xs text-muted-foreground">Rent / lease contracts (recent)</div>
+                <div className="mt-1 font-semibold">
+                  {
+                    productRows.filter((row) =>
+                      ["RENT", "LEASE"].includes((row.plan_type || "").toUpperCase()),
+                    ).length
+                  }
+                </div>
               </div>
               <div className="rounded-xl border border-border p-3 text-sm">
-                <div className="text-xs text-muted-foreground">Direct-sale invoices</div>
-                <div className="mt-1 font-semibold">{directSaleSummary?.total_direct_sale_invoices ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-border p-3 text-sm">
-                <div className="text-xs text-muted-foreground">Direct-sale dues</div>
-                <div className="mt-1 font-semibold">{money(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}</div>
+                <div className="text-xs text-muted-foreground">Linked EMI highlights</div>
+                <div className="mt-1 font-semibold">{productRows.length} shown</div>
               </div>
             </div>
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="Direct-sale invoices"
+            description="Counts include only invoiced retail bills linked to your customer profile (walk-in snapshots matched by phone alone never appear here)."
+            action={
+              <ActionButton href="/customer/direct-sales" variant="outline">
+                View all direct sales
+              </ActionButton>
+            }
+          >
+            {directSaleError ? (
+              <div className="space-y-3">
+                <WorkspaceNotice tone="warning" title="Direct-sale summary unavailable">
+                  {directSaleError}
+                </WorkspaceNotice>
+                <ActionButton variant="outline" onClick={() => void reloadDirectSaleSummary()}>
+                  Retry direct-sale summary
+                </ActionButton>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-border p-3 text-sm">
+                  <div className="text-xs text-muted-foreground">Direct-sale invoices</div>
+                  <div className="mt-1 font-semibold">
+                    {directSaleSummary?.total_direct_sale_invoices ?? 0}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border p-3 text-sm">
+                  <div className="text-xs text-muted-foreground">Outstanding dues</div>
+                  <div className="mt-1 font-semibold">
+                    {money(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="Receipts & EMI payments"
+            description="Recorded Lucky Plan EMI payments and receipts linked to your authenticated profile."
+            action={
+              <ActionButton href="/customer/payments" variant="outline">
+                View all payments
+              </ActionButton>
+            }
+          >
+            {paymentError ? (
+              <div className="space-y-3">
+                <WorkspaceNotice tone="warning" title="Payment history unavailable">
+                  {paymentError}
+                </WorkspaceNotice>
+                <ActionButton variant="outline" onClick={() => void reloadPaymentsPreview()}>
+                  Retry payments
+                </ActionButton>
+              </div>
+            ) : paymentPreview.length === 0 ? (
+              <EmptyState
+                title="No payments shown yet"
+                description="Payments appear once EMI receipts post against your subscriptions."
+              />
+            ) : (
+              <div className="space-y-3">
+                {paymentPreview.map((pay) => (
+                  <div
+                    key={pay.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <div className="font-medium text-foreground">
+                        {pay.subscription_number || `SUB-${pay.subscription ?? ""}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {pay.payment_date || pay.paid_at || "—"} ·{" "}
+                        {pay.subscription_plan_type || "EMI"}
+                      </div>
+                    </div>
+                    <div className="font-semibold tabular-nums">{money(String(pay.amount))}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </WorkspaceSection>
 
           <WorkspaceSection

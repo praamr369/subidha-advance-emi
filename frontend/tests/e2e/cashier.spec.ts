@@ -127,6 +127,102 @@ test.describe.serial("cashier smoke", () => {
     await expect(page).toHaveURL(/\/unauthorized$/);
   });
 
+  test("cashier universal search shows EMI and Direct Sale badges", async ({ page }) => {
+    await page.route("**/api/v1/cashier/receivables/search/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          count: 2,
+          results: [
+            {
+              contract_reference_id: 101,
+              result_type: "EMI",
+              action_type: "COLLECT_EMI",
+              source_type: "ADVANCE_EMI",
+              source_id: 501,
+              reference_no: "REF-EMI-501",
+              display_reference: "REF-EMI-501",
+              customer_id: 9,
+              customer_name: "Badge Customer",
+              phone_masked: "98******01",
+              product_summary: "Sofa EMI",
+              due_amount: "100.00",
+              paid_amount: "0.00",
+              total_amount: "1200.00",
+              overdue_amount: "0.00",
+              next_due_date: null,
+              status: "ACTIVE",
+              payment_state: "",
+              primary_action: "COLLECT_EMI",
+              allowed_actions: ["COLLECT_EMI"],
+              disabled_reason: null,
+              collection_route: "",
+            },
+            {
+              contract_reference_id: 102,
+              result_type: "DIRECT_SALE",
+              action_type: "COLLECT_DIRECT_SALE",
+              source_type: "DIRECT_SALE",
+              source_id: 802,
+              reference_no: "DS-802",
+              display_reference: "DS-802",
+              customer_id: 9,
+              customer_name: "Badge Customer",
+              phone_masked: "98******01",
+              product_summary: "Retail SKU",
+              due_amount: "250.00",
+              paid_amount: "0.00",
+              total_amount: "250.00",
+              overdue_amount: "0.00",
+              next_due_date: null,
+              status: "INVOICED",
+              payment_state: "UNPAID",
+              primary_action: "COLLECT_DIRECT_SALE",
+              allowed_actions: ["COLLECT_DIRECT_SALE"],
+              disabled_reason: null,
+              collection_route: "/cashier/collect?workflow=direct-sale",
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/cashier/collect");
+    await page.locator("#unified-receivable-search").fill("badge-query");
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#unified-receivable-search") })
+      .getByRole("button", { name: "Search" })
+      .click();
+
+    await expect(page.getByTestId("unified-receivable-badge-EMI")).toBeVisible();
+    await expect(page.getByTestId("unified-receivable-badge-DIRECT_SALE")).toBeVisible();
+
+    await page.getByTestId("unified-receivable-open-direct-sale-link").click();
+    await expect(page).toHaveURL(/workflow=direct-sale/);
+  });
+
+  test("cashier universal search empty copy stays helpful", async ({ page }) => {
+    await page.route("**/api/v1/cashier/receivables/search/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ count: 0, results: [] }),
+      });
+    });
+
+    await page.goto("/cashier/collect");
+    await page.locator("#unified-receivable-search").fill("zz-no-rows");
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#unified-receivable-search") })
+      .getByRole("button", { name: "Search" })
+      .click();
+
+    await expect(page.getByText(/Try another phone number/i)).toBeVisible();
+  });
+
   test("cashier notifications page loads", async ({ page }) => {
     await page.route("**/api/v1/cashier/notifications/**", async (route) => {
       await route.fulfill({

@@ -35,7 +35,7 @@ import {
 import {
   directSalesKeys,
   financeAccountKeys,
-  inventoryRequirementKeys,
+  inventoryKeys,
 } from "@/lib/query-keys";
 
 const FIELD_CLASS =
@@ -258,7 +258,7 @@ export default function DirectSaleWorkspace() {
   });
 
   const requirementsQuery = useQuery({
-    queryKey: inventoryRequirementKeys.adminList({ status: "OPEN", source_module: "DIRECT_SALE" }),
+    queryKey: inventoryKeys.requirements({ status: "OPEN", source_module: "DIRECT_SALE" }),
     queryFn: async () => {
       const payload = await listAdminInventoryRequirements({
         status: "OPEN",

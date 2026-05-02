@@ -8,7 +8,6 @@ import {
   emiKeys,
   financeAccountKeys,
   inventoryKeys,
-  inventoryRequirementKeys,
   notificationKeys,
   paymentsKeys,
   productKeys,
@@ -49,7 +48,7 @@ export async function invalidateAfterSubscriptionPaymentMutation(queryClient: Qu
 export async function invalidateAfterDirectSaleCreate(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
-    queryClient.invalidateQueries({ queryKey: inventoryRequirementKeys.all }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
     queryClient.invalidateQueries({ queryKey: financeAccountKeys.collectionList() }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     queryClient.invalidateQueries({ queryKey: businessSetupKeys.all }),
@@ -61,7 +60,9 @@ export async function invalidateAfterDirectSaleCreate(queryClient: QueryClient):
 export async function invalidateAfterDirectSaleCollect(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
-    queryClient.invalidateQueries({ queryKey: inventoryRequirementKeys.all }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "workspace"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
     queryClient.invalidateQueries({ queryKey: paymentsKeys.root }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     invalidateDashboardCollectionsSubscriptions(queryClient),
@@ -71,7 +72,7 @@ export async function invalidateAfterDirectSaleCollect(queryClient: QueryClient)
 /** Stock requirement rows created/updated outside full direct-sale create (if applicable). */
 export async function invalidateAfterStockRequirementMutation(queryClient: QueryClient): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: inventoryRequirementKeys.all }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
     queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     invalidateDashboardCollectionsSubscriptions(queryClient),
@@ -107,14 +108,21 @@ export async function invalidateAfterProductInventoryMutation(
   context?: { productId?: string | number; inventoryItemId?: number },
 ): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: productKeys.all }),
-    queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
-    queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
-    queryClient.invalidateQueries({ queryKey: inventoryRequirementKeys.all }),
+    queryClient.invalidateQueries({ queryKey: [...productKeys.all, "list"] }),
     queryClient.invalidateQueries({ queryKey: productKeys.billingSearchPrefix }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
+    queryClient.invalidateQueries({ queryKey: inventoryKeys.workspace() }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-movements"] }),
+    queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
+    queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    invalidateDashboardCollectionsSubscriptions(queryClient),
   ]);
   if (context?.productId !== undefined) {
-    await queryClient.invalidateQueries({ queryKey: productKeys.detail(context.productId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(context.productId) }),
+      queryClient.invalidateQueries({ queryKey: productKeys.edit(context.productId) }),
+    ]);
   }
   if (context?.inventoryItemId !== undefined) {
     await queryClient.invalidateQueries({ queryKey: inventoryKeys.item(context.inventoryItemId) });

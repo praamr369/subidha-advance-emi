@@ -86,25 +86,33 @@ test("partner commission list renders winner status only when available", async 
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify([
-        {
-          id: 1,
-          subscription: 7001,
-          emi: 2,
-          commission_amount: "150.00",
-          status: "PENDING",
-          created_at: "2026-04-05T09:00:00Z",
+      body: JSON.stringify({
+        count: 2,
+        summary: {
+          total_commission: "370.00",
+          pending_commission: "150.00",
+          settled_commission: "220.00",
         },
-        {
-          id: 2,
-          subscription: 7002,
-          emi: 3,
-          commission_amount: "220.00",
-          status: "SETTLED",
-          created_at: "2026-04-06T09:00:00Z",
-          paid_at: "2026-04-08T10:00:00Z",
-        },
-      ]),
+        results: [
+          {
+            id: 1,
+            subscription: 7001,
+            emi: 2,
+            commission_amount: "150.00",
+            status: "PENDING",
+            created_at: "2026-04-05T09:00:00Z",
+          },
+          {
+            id: 2,
+            subscription: 7002,
+            emi: 3,
+            commission_amount: "220.00",
+            status: "SETTLED",
+            created_at: "2026-04-06T09:00:00Z",
+            settlement_date: "2026-04-08",
+          },
+        ],
+      }),
     });
   });
   await page.route("**/api/v1/partner/subscriptions/**", async (route) => {
@@ -139,6 +147,91 @@ test("partner commission list renders winner status only when available", async 
   await expect(page.locator("body")).toContainText(
     /Winner status unavailable|WON/
   );
+});
+
+test("partner commissions filters keep toolbar visible and narrow rows by status", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/partner/commissions/**", async (route) => {
+    const url = new URL(route.request().url());
+    const status = url.searchParams.get("status");
+    const base = [
+      {
+        id: 1,
+        subscription: 7001,
+        emi: 2,
+        commission_amount: "150.00",
+        status: "PENDING",
+        created_at: "2026-04-05T09:00:00Z",
+      },
+      {
+        id: 2,
+        subscription: 7002,
+        emi: 3,
+        commission_amount: "220.00",
+        status: "SETTLED",
+        created_at: "2026-04-06T09:00:00Z",
+        settlement_date: "2026-04-08",
+      },
+    ];
+    const results =
+      status === "PENDING" ? base.filter((row) => row.status === "PENDING") : base;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: results.length,
+        summary: {
+          total_commission: "370.00",
+          pending_commission: results
+            .filter((row) => row.status === "PENDING")
+            .reduce((sum, row) => sum + Number(row.commission_amount), 0)
+            .toFixed(2),
+          settled_commission: results
+            .filter((row) => row.status === "SETTLED")
+            .reduce((sum, row) => sum + Number(row.commission_amount), 0)
+            .toFixed(2),
+        },
+        results,
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/partner/subscriptions/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 2,
+        results: [
+          {
+            id: 7001,
+            subscription_number: "SUB-7001",
+            customer_name: "No Winner Yet",
+            paid_emi_count: 2,
+          },
+          {
+            id: 7002,
+            subscription_number: "SUB-7002",
+            customer_name: "Winner Customer",
+            paid_emi_count: 3,
+            winner_status: "WON",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/partner/commissions");
+  await expect(page.getByTestId("partner-commission-filters")).toBeVisible();
+  await expect(page.locator("body")).toContainText("Winner Customer");
+
+  await page.locator('[data-testid="partner-commission-filters"] select').selectOption("PENDING");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.locator("body")).not.toContainText("Winner Customer");
+
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.locator("body")).toContainText("Winner Customer");
 });
 
 test("partner notifications page loads", async ({ page }) => {
@@ -182,7 +275,15 @@ test("partner winner status does not create commission entry by itself", async (
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify([]),
+      body: JSON.stringify({
+        count: 0,
+        summary: {
+          total_commission: "0.00",
+          pending_commission: "0.00",
+          settled_commission: "0.00",
+        },
+        results: [],
+      }),
     });
   });
   await page.route("**/api/v1/partner/subscriptions/**", async (route) => {

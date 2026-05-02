@@ -451,7 +451,7 @@ export default function CashierCollectPage() {
     if (!trimmed) {
       setUnifiedSearchResults([]);
       setUnifiedSearchError(
-        "Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference."
+        "Enter a phone, customer ID, contract ID, subscription ID, invoice number, or receipt number."
       );
       return;
     }
@@ -746,6 +746,7 @@ export default function CashierCollectPage() {
           onSearch={handleUnifiedReceivableSearch}
           onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
           lastPaymentSummary={unifiedLastPaymentSummary}
+          onRetrySearch={() => void handleUnifiedReceivableSearch(unifiedSearchQuery)}
         />
 
         <QuickActionGrid>

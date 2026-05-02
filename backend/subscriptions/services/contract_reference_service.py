@@ -723,6 +723,17 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
     }
 
 
+def _receivable_result_type(contract_type: str) -> str:
+    """Stable badge/category for cashier/admin unified search (additive API field)."""
+    mapping = {
+        ContractReferenceType.ADVANCE_EMI: "EMI",
+        ContractReferenceType.DIRECT_SALE: "DIRECT_SALE",
+        ContractReferenceType.RENT: "RENT",
+        ContractReferenceType.LEASE: "LEASE",
+    }
+    return mapping.get(contract_type, str(contract_type or "").strip().upper() or "UNKNOWN")
+
+
 def build_receivable_result(
     reference: ContractReference,
     *,
@@ -742,6 +753,8 @@ def build_receivable_result(
 
     return {
         "contract_reference_id": reference.id,
+        "result_type": _receivable_result_type(source_type),
+        "action_type": str(state["primary_action"]),
         "source_type": source_type,
         "source_id": source_id,
         "reference_no": reference.reference_no,

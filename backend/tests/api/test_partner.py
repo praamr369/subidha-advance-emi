@@ -1,10 +1,9 @@
 from decimal import Decimal
-from datetime import date
-
-from rest_framework import status
-from rest_framework.test import APITestCase
+from datetime import date, datetime, timezone as datetime_timezone
 
 from django.db.models import Sum
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from subscriptions.models import Commission, CommissionStatus, MONEY_ZERO
 from subscriptions.services.lucky_draw_service import (
@@ -595,3 +594,72 @@ class PartnerCommissionApiTests(TestCase):
         response = self.client.get(self.url)
 
         self.assertIn(response.status_code, [403, 401])
+
+    def test_partner_commission_invalid_status_returns_400(self):
+        self._auth_partner(self.partner)
+        response = self.client.get(f"{self.url}?status=NOT_A_STATUS")
+        self.assertEqual(response.status_code, 400)
+
+    def test_partner_commission_invalid_date_range_returns_400(self):
+        self._auth_partner(self.partner)
+        response = self.client.get(f"{self.url}?date_from=2026-06-01&date_to=2026-05-01")
+        self.assertEqual(response.status_code, 400)
+
+    def test_partner_commission_filter_by_status(self):
+        record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
+            reference_no="API-COM-FILTER-STATUS",
+        )
+        self._auth_partner(self.partner)
+        pending = self.client.get(f"{self.url}?status=PENDING")
+        self.assertEqual(pending.status_code, 200)
+        self.assertEqual(len(pending.data["results"]), 1)
+
+        settled_resp = self.client.get(f"{self.url}?status=SETTLED")
+        self.assertEqual(settled_resp.status_code, 200)
+        self.assertEqual(len(settled_resp.data["results"]), 0)
+
+        Commission.objects.filter(partner=self.partner).update(status=CommissionStatus.SETTLED)
+
+        pending2 = self.client.get(f"{self.url}?status=PENDING")
+        self.assertEqual(len(pending2.data["results"]), 0)
+        settled2 = self.client.get(f"{self.url}?status=SETTLED")
+        self.assertEqual(len(settled2.data["results"]), 1)
+
+    def test_partner_commission_date_range_filter(self):
+        record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
+            reference_no="API-COM-FILTER-DATE",
+        )
+        comm = Commission.objects.get(partner=self.partner)
+        Commission.objects.filter(pk=comm.pk).update(
+            created_at=datetime(2026, 4, 10, 12, 0, 0, tzinfo=datetime_timezone.utc)
+        )
+
+        self._auth_partner(self.partner)
+        hit = self.client.get(f"{self.url}?date_from=2026-04-01&date_to=2026-04-30")
+        self.assertEqual(hit.status_code, 200)
+        self.assertEqual(len(hit.data["results"]), 1)
+
+        miss = self.client.get(f"{self.url}?date_from=2026-05-01&date_to=2026-05-31")
+        self.assertEqual(miss.status_code, 200)
+        self.assertEqual(len(miss.data["results"]), 0)
+
+    def test_partner_commission_q_does_not_surface_other_partner_records(self):
+        record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            finance_account_id=self.finance_account.id,
+            reference_no="API-COM-FILTER-Q-SCOPE",
+        )
+        self._auth_partner(self.other_partner)
+        response = self.client.get(f"{self.url}?q={self.subscription.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 0)

@@ -1,5 +1,19 @@
 import type { NavigationRole } from "@/config/navigation";
 
+/** Stable serialized params for Query identity / targeted invalidation. */
+export function stableQueryParams(
+  params: Record<string, string | number | boolean | undefined | null>,
+): string {
+  const sortedKeys = Object.keys(params).sort();
+  const normalized: Record<string, string | number | boolean> = {};
+  for (const key of sortedKeys) {
+    const val = params[key];
+    if (val === undefined || val === null || val === "") continue;
+    normalized[key] = val;
+  }
+  return JSON.stringify(normalized);
+}
+
 /** Stable TanStack Query roots for prefix invalidation (`invalidateQueries({ queryKey: x.all })`). */
 
 export const dashboardKeys = {
@@ -50,6 +64,11 @@ export const inventoryRequirementKeys = {
     [...inventoryRequirementKeys.all, "admin", filters] as const,
 };
 
+export type InventoryRequirementsParams = {
+  status?: string;
+  source_module?: string;
+};
+
 export const financeAccountKeys = {
   /** Accounts scoped for payment/direct-sale collection pickers */
   collectionList: () => ["finance-accounts", "collection"] as const,
@@ -71,15 +90,27 @@ const productsRoot = ["products"] as const;
 
 export const productKeys = {
   all: productsRoot,
+  list: (params?: Record<string, string | number | undefined>) =>
+    [...productsRoot, "list", stableQueryParams(params ?? {})] as const,
   detail: (productId: string | number) => [...productsRoot, "detail", String(productId)] as const,
-  /** Prefix for billing workspace product search (if wired to React Query later). */
+  billingSearch: (params?: Record<string, string | undefined>) =>
+    [...productsRoot, "billing-search", stableQueryParams(params ?? {})] as const,
+  /** Prefix match for all billing-search(*) queries */
   billingSearchPrefix: [...productsRoot, "billing-search"] as const,
+  edit: (productId: string | number) => [...productsRoot, "edit", String(productId)] as const,
 };
 
 export const inventoryKeys = {
   all: ["inventory"] as const,
-  item: (id: number) => [...inventoryKeys.all, "item", id] as const,
   workspace: () => [...inventoryKeys.all, "workspace"] as const,
+  items: (params?: Record<string, string | number | undefined>) =>
+    [...inventoryKeys.all, "items", stableQueryParams(params ?? {})] as const,
+  item: (id: number) => [...inventoryKeys.all, "item", id] as const,
+  requirements: (params: InventoryRequirementsParams) =>
+    [...inventoryKeys.all, "requirements", stableQueryParams(params)] as const,
+  requirement: (id: number) => [...inventoryKeys.all, "requirement", id] as const,
+  stockMovements: (params?: Record<string, string | undefined>) =>
+    [...inventoryKeys.all, "stock-movements", stableQueryParams(params ?? {})] as const,
 };
 
 export const customerKeys = {
@@ -92,6 +123,10 @@ export const cashierKeys = {
   all: ["cashier"] as const,
 };
 
+const partnerRoot = ["partner"] as const;
+
 export const partnerKeys = {
-  all: ["partner"] as const,
+  all: partnerRoot,
+  commissions: (params?: Record<string, string | undefined>) =>
+    [...partnerRoot, "commissions", stableQueryParams(params ?? {})] as const,
 };

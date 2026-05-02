@@ -5,9 +5,10 @@ import { Search } from "lucide-react";
 import { type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ErrorState from "@/components/feedback/ErrorState";
+import { TableSkeleton } from "@/components/feedback/Skeleton";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
-import type { UnifiedReceivableResult } from "@/services/receivables";
+import type { UnifiedReceivableResult, UnifiedReceivableResultType } from "@/services/receivables";
 
 function money(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -20,22 +21,48 @@ function formatDate(value: string | null | undefined): string {
   return new Date(parsed).toLocaleDateString();
 }
 
-function sourceLabel(sourceType: UnifiedReceivableResult["source_type"]): string {
-  if (sourceType === "ADVANCE_EMI") return "Advance EMI";
-  if (sourceType === "DIRECT_SALE") return "Direct Sale";
-  return sourceType.charAt(0) + sourceType.slice(1).toLowerCase();
+function badgeLabel(kind: UnifiedReceivableResultType | ""): string {
+  if (!kind) return "";
+  if (kind === "EMI") return "EMI";
+  if (kind === "DIRECT_SALE") return "Direct Sale";
+  if (kind === "RENT") return "Rent";
+  if (kind === "LEASE") return "Lease";
+  if (kind === "DEPOSIT") return "Deposit";
+  if (kind === "RECEIPT") return "Receipt";
+  if (kind === "CUSTOMER") return "Customer";
+  return kind;
 }
 
-function badgeClass(sourceType: UnifiedReceivableResult["source_type"]): string {
-  if (sourceType === "ADVANCE_EMI") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (sourceType === "DIRECT_SALE") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (sourceType === "RENT") return "border-blue-200 bg-blue-50 text-blue-800";
-  return "border-violet-200 bg-violet-50 text-violet-800";
+function badgeClass(kind: UnifiedReceivableResultType | ""): string {
+  if (kind === "EMI") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (kind === "DIRECT_SALE") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (kind === "RENT") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (kind === "LEASE") return "border-violet-200 bg-violet-50 text-violet-800";
+  if (kind === "DEPOSIT") return "border-slate-200 bg-slate-50 text-slate-800";
+  if (kind === "RECEIPT") return "border-cyan-200 bg-cyan-50 text-cyan-900";
+  if (kind === "CUSTOMER") return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900";
+  return "border-border bg-muted text-foreground";
+}
+
+function routeToAdminCopy(row: UnifiedReceivableResult): boolean {
+  const rt = row.result_type || "";
+  return (
+    row.primary_action === "VIEW_ONLY" &&
+    (rt === "RENT" || rt === "LEASE" || rt === "DEPOSIT")
+  );
+}
+
+function disabledActionLabel(row: UnifiedReceivableResult): string {
+  if (routeToAdminCopy(row)) return "Route to admin";
+  if (row.primary_action === "VIEW_ONLY") return "View only";
+  return "Collection disabled";
 }
 
 export default function UnifiedReceivableSearchPanel({
   title,
   description,
+  searchHelperText,
+  emptyStateDescription,
   query,
   results,
   loading,
@@ -46,9 +73,13 @@ export default function UnifiedReceivableSearchPanel({
   onQueryChange,
   onSearch,
   onAdvanceEmiSelect,
+  onRetrySearch,
 }: {
   title: string;
   description: string;
+  /** Visible helper under the search field (also linked via aria-describedby). */
+  searchHelperText?: string;
+  emptyStateDescription?: string;
   query: string;
   results: UnifiedReceivableResult[];
   loading: boolean;
@@ -59,7 +90,13 @@ export default function UnifiedReceivableSearchPanel({
   onQueryChange: (value: string) => void;
   onSearch: (query: string) => void;
   onAdvanceEmiSelect?: (row: UnifiedReceivableResult) => void;
+  onRetrySearch?: () => void;
 }) {
+  const helperId = "unified-receivable-search-helper";
+  const resolvedHelper =
+    searchHelperText ??
+    "Search by phone, customer ID, contract ID, subscription ID, invoice number, or receipt number.";
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSearch(query);
@@ -78,15 +115,19 @@ export default function UnifiedReceivableSearchPanel({
               id="unified-receivable-search"
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Search by phone, contract ID, Lucky ID, batch, KYC, customer name, direct sale ref..."
+              placeholder="Phone, IDs, invoice no., receipt no., contract ref…"
+              aria-describedby={helperId}
               className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
             />
           </div>
+          <p id={helperId} className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {resolvedHelper}
+          </p>
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-11 items-center justify-center self-start rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:self-auto"
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -99,22 +140,37 @@ export default function UnifiedReceivableSearchPanel({
       ) : null}
 
       {loading ? (
-        <div className="mt-4">
-          <LoadingBlock label="Searching receivables..." />
-        </div>
+        <section className="mt-4" aria-busy="true" aria-label="Searching receivables">
+          <div aria-hidden="true">
+            <TableSkeleton rows={4} columns={4} />
+          </div>
+        </section>
       ) : null}
 
       {error ? (
-        <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
+        <div className="mt-4">
+          <ErrorState
+            title="Search failed"
+            description={error}
+            onRetry={
+              onRetrySearch
+                ? () => {
+                    onRetrySearch();
+                  }
+                : undefined
+            }
+          />
         </div>
       ) : null}
 
       {!loading && !error && searched && results.length === 0 ? (
         <div className="mt-4">
           <EmptyState
-            title="No receivables found"
-            description="No contract reference matched this search within the current role scope."
+            title="No receivables matched"
+            description={
+              emptyStateDescription ??
+              "Try another phone number, subscription ID, invoice number, or receipt number. Results respect your cashier role scope."
+            }
           />
         </div>
       ) : null}
@@ -122,8 +178,11 @@ export default function UnifiedReceivableSearchPanel({
       {results.length > 0 ? (
         <div className="mt-5 space-y-3">
           {results.map((row) => {
-            const key = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+            const rowKey = `${row.source_type}-${row.source_id ?? row.reference_no}-${row.contract_reference_id ?? ""}`;
+            const loadingKey = `${row.source_type}-${row.source_id ?? row.reference_no}`;
             const route = row.collection_route?.trim() || "";
+            const primaryBadge = row.result_type || "";
+            const extras = row.secondary_badges ?? [];
             const canEmiInline =
               row.primary_action === "COLLECT_EMI" && Boolean(onAdvanceEmiSelect);
             const canEmiRoute =
@@ -135,17 +194,29 @@ export default function UnifiedReceivableSearchPanel({
 
             return (
               <div
-                key={key}
+                key={rowKey}
                 className="rounded-2xl border border-border bg-background p-4 shadow-sm"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(row.source_type)}`}
-                      >
-                        {sourceLabel(row.source_type)}
-                      </span>
+                      {primaryBadge ? (
+                        <span
+                          data-testid={`unified-receivable-badge-${primaryBadge}`}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(primaryBadge)}`}
+                        >
+                          {badgeLabel(primaryBadge)}
+                        </span>
+                      ) : null}
+                      {extras.map((kind) => (
+                        <span
+                          key={kind}
+                          data-testid={`unified-receivable-extra-${kind}`}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClass(kind)}`}
+                        >
+                          {badgeLabel(kind)}
+                        </span>
+                      ))}
                       <span className="break-all text-sm font-semibold text-foreground">
                         {row.display_reference || row.reference_no}
                       </span>
@@ -197,18 +268,20 @@ export default function UnifiedReceivableSearchPanel({
                   {canEmiInline ? (
                     <button
                       type="button"
+                      data-testid="unified-receivable-open-emi-flow"
                       onClick={() => onAdvanceEmiSelect?.(row)}
-                      disabled={actionLoadingKey === key}
+                      disabled={actionLoadingKey === loadingKey}
                       title="Opens the in-page EMI collection workflow using the canonical route from the server."
                       className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {actionLoadingKey === key ? "Loading EMI..." : "Use EMI Flow"}
+                      {actionLoadingKey === loadingKey ? "Loading EMI..." : "Use EMI Flow"}
                     </button>
                   ) : null}
 
                   {canEmiRoute ? (
                     <Link
                       href={route}
+                      data-testid="unified-receivable-open-emi-link"
                       className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800"
                     >
                       Open EMI collection
@@ -218,6 +291,7 @@ export default function UnifiedReceivableSearchPanel({
                   {canDirectRoute ? (
                     <Link
                       href={route}
+                      data-testid="unified-receivable-open-direct-sale-link"
                       className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
                     >
                       Open direct-sale collection
@@ -229,9 +303,10 @@ export default function UnifiedReceivableSearchPanel({
                       type="button"
                       disabled
                       title={disabledReason}
+                      data-testid="unified-receivable-disabled-action"
                       className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-xl border border-border bg-muted px-4 text-sm font-semibold text-muted-foreground"
                     >
-                      {row.primary_action === "VIEW_ONLY" ? "View only" : "Collection disabled"}
+                      {disabledActionLabel(row)}
                     </button>
                   ) : null}
                 </div>

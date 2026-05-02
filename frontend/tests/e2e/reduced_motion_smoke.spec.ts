@@ -45,5 +45,23 @@ test.describe("Reduced motion smoke", () => {
         timeout: 45_000,
       });
     });
+
+    test("universal receivable helper stays readable", async ({ page }) => {
+      await page.goto("/cashier/collect");
+      await expect(page.getByText(/invoice number, or receipt number/i)).toBeVisible({
+        timeout: 45_000,
+      });
+    });
+  });
+
+  test.describe("partner payouts filters", () => {
+    test.use({ storageState: authStatePath("partner") });
+
+    test("commission filters panel stays usable", async ({ page }) => {
+      await page.goto("/partner/payouts");
+      await expect(page.getByTestId("partner-commission-filters")).toBeVisible({
+        timeout: 45_000,
+      });
+    });
   });
 });
