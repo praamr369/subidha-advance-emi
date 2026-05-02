@@ -91,7 +91,11 @@ function CollectPaymentDrawerContent({
 
     async function loadFinanceAccountOptions() {
       try {
-        const payload = await listFinanceAccounts({ is_active: 1, page_size: 100 });
+        const payload = await listFinanceAccounts({
+          is_active: 1,
+          page_size: 100,
+          for_payment_collection: "true",
+        });
         if (!active) return;
         setFinanceAccounts(payload.results.filter((account) => account.is_active));
       } catch {

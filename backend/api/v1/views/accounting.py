@@ -148,6 +148,10 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
     ordering = ["name", "id"]
 
     def get_queryset(self):
+        from accounting.services.finance_account_collection_guard import (
+            filter_finance_accounts_for_payment_collection,
+        )
+
         queryset = super().get_queryset()
         is_active = self.request.query_params.get("is_active")
         kind = self.request.query_params.get("kind")
@@ -158,6 +162,14 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
             queryset = queryset.filter(kind=kind.strip().upper())
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
+        if self.request.query_params.get("for_payment_collection") in {
+            "1",
+            "true",
+            "TRUE",
+            "yes",
+            "YES",
+        }:
+            queryset = filter_finance_accounts_for_payment_collection(queryset)
         return queryset
 
     def get_serializer_class(self):

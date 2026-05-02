@@ -8,6 +8,9 @@ from django.utils import timezone
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
 from accounting.services.journal_posting_service import _log_accounting_event
+from accounting.services.finance_account_collection_guard import (
+    assert_finance_account_allowed_for_payment_collection,
+)
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
 from billing.models import (
     BillingChannel,
@@ -878,6 +881,8 @@ def create_manual_receipt(
     accounts = ensure_phase3_system_accounts()
     FinanceAccount.objects.select_for_update(of=("self",)).get(pk=finance_account_id)
     finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
+    if receipt_type in {ReceiptType.RETAIL_RECEIPT, ReceiptType.EMI_PAYMENT_RECEIPT}:
+        assert_finance_account_allowed_for_payment_collection(finance_account)
     sequence = _ensure_receipt_sequence(receipt_date)
     billing_invoice = BillingInvoice.objects.select_related("customer").filter(pk=billing_invoice_id).first() if billing_invoice_id else None
     direct_sale = DirectSale.objects.select_related("customer").filter(pk=direct_sale_id).first() if direct_sale_id else None

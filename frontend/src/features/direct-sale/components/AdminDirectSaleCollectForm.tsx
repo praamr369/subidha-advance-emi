@@ -106,7 +106,7 @@ export default function AdminDirectSaleCollectForm({
         const [branchPayload, counterPayload, financePayload] = await Promise.all([
           listBranches({ status: "ACTIVE" }),
           listCashCounters({ is_active: "true" }),
-          listFinanceAccounts({ is_active: "true" }),
+          listFinanceAccounts({ is_active: "true", for_payment_collection: "true" }),
         ]);
         if (!active) return;
         setBranches(branchPayload.results);

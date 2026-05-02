@@ -7,6 +7,9 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.models import FinanceAccount, FinanceAccountKind
+from accounting.services.finance_account_collection_guard import (
+    assert_finance_account_allowed_for_payment_collection,
+)
 from accounting.services.finance_posting_service import FinancePostingService
 from branch_control.models import Branch
 from branch_control.services.branch_service import (
@@ -477,6 +480,7 @@ def record_emi_payment(
         finance_account = FinancePostingService.resolve_operational_finance_account(
             finance_account_id=resolved_finance_account_id,
         )
+    assert_finance_account_allowed_for_payment_collection(finance_account)
     finance_branch_id = getattr(finance_account, "branch_id", None)
     if branch and finance_branch_id and branch.id != finance_branch_id:
         raise ValueError("Selected finance account does not belong to the payment branch.")

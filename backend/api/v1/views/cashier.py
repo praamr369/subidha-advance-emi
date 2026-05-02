@@ -92,7 +92,12 @@ class CashierFinanceAccountListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
     def get(self, request, *args, **kwargs):
+        from accounting.services.finance_account_collection_guard import (
+            filter_finance_accounts_for_payment_collection,
+        )
+
         queryset = FinanceAccount.objects.select_related("chart_account", "branch")
+        queryset = filter_finance_accounts_for_payment_collection(queryset)
         queryset = scope_queryset_to_user_branches(
             queryset,
             user=request.user,

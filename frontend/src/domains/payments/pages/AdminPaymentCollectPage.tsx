@@ -424,7 +424,7 @@ export default function AdminPaymentCollectPage({
         const [branchPayload, counterPayload, financeAccountPayload] = await Promise.all([
           listBranches({ status: "ACTIVE" }),
           listCashCounters({ is_active: "true" }),
-          listFinanceAccounts({ is_active: 1, page_size: 100 }),
+          listFinanceAccounts({ is_active: 1, page_size: 100, for_payment_collection: "true" }),
         ]);
         if (!active) return;
         setBranches(branchPayload.results);

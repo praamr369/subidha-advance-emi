@@ -7,6 +7,9 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.models import FinanceAccount
+from accounting.services.finance_account_collection_guard import (
+    assert_finance_account_allowed_for_payment_collection,
+)
 from billing.models import (
     BillingDocumentStatus,
     BillingInvoice,
@@ -119,6 +122,8 @@ def _resolve_branch_counter_and_finance_account(
         raise ValueError("Selected cash counter does not belong to the direct-sale branch.")
     if finance_account.branch_id and sale.branch_id and finance_account.branch_id != sale.branch_id:
         raise ValueError("Selected finance account does not belong to the direct-sale branch.")
+
+    assert_finance_account_allowed_for_payment_collection(finance_account)
 
     resolved_branch_id = resolved_branch_id or finance_account.branch_id or sale.branch_id
 
