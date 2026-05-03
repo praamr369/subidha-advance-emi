@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from decimal import Decimal
 
 from django.conf import settings
@@ -1039,9 +1040,11 @@ class StockReservationStatus(models.TextChoices):
 
 class PurchaseNeedStatus(models.TextChoices):
     OPEN = "OPEN", "Open"
-    REVIEWED = "REVIEWED", "Reviewed"
+    IN_REVIEW = "IN_REVIEW", "In Review"
     ORDERED = "ORDERED", "Ordered"
+    PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED", "Partially Fulfilled"
     RECEIVED = "RECEIVED", "Received"
+    FULFILLED = "FULFILLED", "Fulfilled"
     CANCELLED = "CANCELLED", "Cancelled"
     CLOSED = "CLOSED", "Closed"
 
@@ -1197,11 +1200,13 @@ class PurchaseNeed(InventoryTimeStampedModel):
         HIGH = "HIGH", "High"
         URGENT = "URGENT", "Urgent"
 
+    need_no = models.CharField(max_length=48, unique=True, editable=False, db_index=True)
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
         related_name="inventory_purchase_needs",
     )
+    product_name_snapshot = models.CharField(max_length=255, blank=True, default="")
     warehouse = models.ForeignKey(
         Warehouse,
         on_delete=models.PROTECT,
@@ -1223,6 +1228,13 @@ class PurchaseNeed(InventoryTimeStampedModel):
         db_index=True,
     )
     source_object_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+        null=True,
+        blank=True,
+    )
     customer = models.ForeignKey(
         "subscriptions.Customer",
         on_delete=models.PROTECT,
@@ -1245,6 +1257,15 @@ class PurchaseNeed(InventoryTimeStampedModel):
         related_name="inventory_purchase_needs",
     )
     note = models.TextField(blank=True, default="")
+    fulfilled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if self.product_id and not (self.product_name_snapshot or "").strip():
+            name = Product.objects.filter(pk=self.product_id).values_list("name", flat=True).first()
+            self.product_name_snapshot = (name or "")[:255]
+        if not self.need_no:
+            self.need_no = f"SN-{secrets.token_hex(5).upper()}"
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = "inventory_purchase_needs"

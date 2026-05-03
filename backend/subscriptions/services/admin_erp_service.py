@@ -8,10 +8,19 @@ from django.contrib.auth import get_user_model
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from billing.models import BillingInvoice, DirectSale, ReceiptDocument
+from billing.models import BillingInvoice, DirectSale, DirectSaleStatus, ReceiptDocument
+from billing.services.direct_sale_delivery_queue import (
+    ACTIVE_DIRECT_SALE_CASE_STATUSES,
+    DIRECT_SALE_SUCCESS_TERMINAL_STATUSES,
+)
 from crm.models import PartyInteraction, PartyInteractionStatus
 from inventory.models import InventoryItem, StockLedger, StockMovementType
-from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus
+from service_desk.models import (
+    ServiceDeskCase,
+    ServiceDeskCaseStatus,
+    ServiceDeskCaseType,
+    ServiceDeskStockStatus,
+)
 from subscriptions.models import (
     Batch,
     Customer,
@@ -43,8 +52,17 @@ def _severity_for_count(count: int) -> str:
     return "HIGH"
 
 
-def _queue_card(key: str, label: str, count: int, source: str, deep_link: str, value: str | None = None) -> dict:
-    return {
+def _queue_card(
+    key: str,
+    label: str,
+    count: int,
+    source: str,
+    deep_link: str,
+    value: str | None = None,
+    *,
+    source_breakdown: list[dict] | None = None,
+) -> dict:
+    card = {
         "key": key,
         "label": label,
         "count": count,
@@ -54,6 +72,9 @@ def _queue_card(key: str, label: str, count: int, source: str, deep_link: str, v
         "deep_link": deep_link,
         "empty_state": "No pending records." if count == 0 else None,
     }
+    if source_breakdown:
+        card["source_breakdown"] = source_breakdown
+    return card
 
 
 def _sum_decimal(queryset, field: str) -> Decimal:
@@ -510,18 +531,102 @@ def build_admin_erp_summary() -> dict:
             _queue_card("reconciliation", "Reconciliation", unreconciled.count(), "subscriptions.PaymentReconciliation", "/admin/reconciliation"),
         ]
     }
+    ds_active_cases = ServiceDeskCase.objects.filter(
+        case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        status__in=ACTIVE_DIRECT_SALE_CASE_STATUSES,
+        direct_sale__delivery_required=True,
+    )
+
+    delivery_pending_sub = SubscriptionDelivery.objects.filter(status=DeliveryStatus.PENDING).count()
+    delivery_pending_ds = ds_active_cases.filter(
+        status__in=[ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW]
+    ).count()
+
+    handover_pending_sub = SubscriptionDelivery.objects.filter(
+        status__in=[DeliveryStatus.DISPATCHED, DeliveryStatus.OUT_FOR_DELIVERY]
+    ).count()
+    handover_pending_ds = ds_active_cases.filter(status=ServiceDeskCaseStatus.IN_SERVICE).count()
+
+    blocked_delivery_sub = blocked_deliveries.count()
+    blocked_delivery_ds = ds_active_cases.filter(
+        Q(direct_sale__status=DirectSaleStatus.DRAFT)
+        | Q(direct_sale__balance_total__gt=0)
+        | Q(stock_status=ServiceDeskStockStatus.PENDING)
+    ).count()
+
+    ready_dispatch_sub = SubscriptionDelivery.objects.filter(status=DeliveryStatus.SCHEDULED).count()
+    ready_dispatch_ds = ds_active_cases.filter(status=ServiceDeskCaseStatus.AUTHORIZED).count()
+
+    delivered_completed_sub = SubscriptionDelivery.objects.filter(status=DeliveryStatus.DELIVERED).count()
+    delivered_completed_ds = ServiceDeskCase.objects.filter(
+        case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        status__in=DIRECT_SALE_SUCCESS_TERMINAL_STATUSES,
+    ).count()
+
     results["delivery_workspace"] = {
         "cards": [
-            _queue_card("delivery_pending", "Delivery pending", due_deliveries.count(), "subscriptions.Subscription", "/admin/deliveries"),
-            _queue_card("handover_pending", "Handover pending", due_deliveries.count(), "subscriptions.Subscription", "/admin/deliveries"),
-            _queue_card("delivery_blocked", "Delivery blocked", blocked_deliveries.count(), "subscriptions.Subscription", "/admin/deliveries"),
-            _queue_card("return_due", "Return due", return_due.count(), "subscriptions.RentLeaseReturnInspection", "/admin/service-desk/returns"),
-            _queue_card("return_inspection", "Return inspection", return_inspection_pending.count(), "subscriptions.RentLeaseReturnInspection", "/admin/service-desk/returns"),
+            _queue_card(
+                "delivery_pending",
+                "Delivery pending",
+                delivery_pending_sub + delivery_pending_ds,
+                "Subscriptions · Direct Sale",
+                "/admin/deliveries?bucket=PENDING",
+                source_breakdown=[
+                    {"label": "Subscription", "count": delivery_pending_sub},
+                    {"label": "Direct Sale", "count": delivery_pending_ds},
+                ],
+            ),
+            _queue_card(
+                "handover_pending",
+                "Handover pending",
+                handover_pending_sub + handover_pending_ds,
+                "Subscriptions · Direct Sale",
+                "/admin/deliveries?status=OUT_FOR_DELIVERY",
+                source_breakdown=[
+                    {"label": "Subscription", "count": handover_pending_sub},
+                    {"label": "Direct Sale", "count": handover_pending_ds},
+                ],
+            ),
+            _queue_card(
+                "delivery_blocked",
+                "Delivery blocked",
+                blocked_delivery_sub + blocked_delivery_ds,
+                "Stock · Payment · Invoice holds",
+                "/admin/deliveries?bucket=PENDING",
+                source_breakdown=[
+                    {"label": "Subscription", "count": blocked_delivery_sub},
+                    {"label": "Direct Sale", "count": blocked_delivery_ds},
+                ],
+            ),
+            _queue_card(
+                "ready_dispatch",
+                "Ready for dispatch",
+                ready_dispatch_sub + ready_dispatch_ds,
+                "Subscriptions · Direct Sale",
+                "/admin/deliveries?bucket=READY_DISPATCH",
+                source_breakdown=[
+                    {"label": "Subscription", "count": ready_dispatch_sub},
+                    {"label": "Direct Sale", "count": ready_dispatch_ds},
+                ],
+            ),
+            _queue_card(
+                "delivered_completed",
+                "Delivered / completed",
+                delivered_completed_sub + delivered_completed_ds,
+                "Subscriptions · Direct Sale",
+                "/admin/deliveries?bucket=DELIVERED",
+                source_breakdown=[
+                    {"label": "Subscription", "count": delivered_completed_sub},
+                    {"label": "Direct Sale", "count": delivered_completed_ds},
+                ],
+            ),
+            _queue_card("return_due", "Return due", return_due.count(), "Rent / Lease returns", "/admin/service-desk/returns"),
+            _queue_card("return_inspection", "Return inspection", return_inspection_pending.count(), "Rent / Lease returns", "/admin/service-desk/returns"),
             _queue_card(
                 "damaged_return",
                 "Damaged return",
                 RentLeaseReturnInspection.objects.filter(condition_recorded="DAMAGED").count(),
-                "subscriptions.RentLeaseReturnInspection",
+                "Rent / Lease returns",
                 "/admin/service-desk/returns",
             ),
         ]

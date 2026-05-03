@@ -1,20 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
 
-import {
-  type AsyncRouteSearchParams,
-  redirectToCanonicalPath,
-} from "@/lib/route-redirect";
-import { ROUTES } from "@/lib/routes";
+import DirectSaleWorkspace from "@/app/(dashboard)/admin/billing/direct-sale/DirectSaleWorkspace";
 
-type PageProps = {
-  searchParams?: AsyncRouteSearchParams;
-};
-
-export default async function AdminSalesDirectSaleCreatePage({ searchParams }: PageProps) {
-  const resolved = (await searchParams) ?? {};
-  const hasParams = Object.keys(resolved).length > 0;
-  if (hasParams) {
-    await redirectToCanonicalPath(ROUTES.admin.billingDirectSaleCreate, searchParams);
-  }
-  redirect(ROUTES.admin.billingDirectSaleCreate);
+export default function AdminSalesDirectSaleCreatePage() {
+  return <DirectSaleWorkspace orchestrationCreate />;
 }

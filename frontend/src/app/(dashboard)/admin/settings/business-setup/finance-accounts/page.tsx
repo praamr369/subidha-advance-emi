@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { getAccountingSetupStatus } from "@/services/accounting-setup";
 import { getSetupChecklist, type SetupChecklist } from "@/services/business-setup";
 
 function toNumber(value: unknown): number {
@@ -14,14 +15,16 @@ function toNumber(value: unknown): number {
 
 export default function AccountingSetupGuidePage() {
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
+  const [acctStatus, setAcctStatus] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    getSetupChecklist()
-      .then((payload) => {
+    Promise.all([getSetupChecklist(), getAccountingSetupStatus()])
+      .then(([payload, accounting]) => {
         if (!mounted) return;
         setChecklist(payload);
+        setAcctStatus(accounting as Record<string, unknown>);
         setError(null);
       })
       .catch((err) => {
@@ -52,6 +55,36 @@ export default function AccountingSetupGuidePage() {
           {error}
         </div>
       ) : null}
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="text-base font-semibold text-foreground">Live accounting readiness</div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Settlement desks must stay separate from ledger-only concepts (income, liabilities, inventory valuation). Detailed
+          mappings live under Accounting Setup.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3 text-sm">
+          <div>
+            <div className="text-muted-foreground">Setup engine status</div>
+            <div className="font-semibold">{acctStatus ? String(acctStatus.status ?? "—") : "—"}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Mappings complete</div>
+            <div className="font-semibold">{acctStatus?.mappings_complete ? "Yes" : "No"}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Warnings</div>
+            <div className="font-semibold">{acctStatus ? String(acctStatus.warnings_count ?? 0) : "—"}</div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" href="/admin/accounting/setup">
+            Open accounting setup
+          </a>
+          <a className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/settings/business-setup/chart-accounts">
+            Chart accounts checklist
+          </a>
+        </div>
+      </section>
 
       <section className="grid gap-5 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">

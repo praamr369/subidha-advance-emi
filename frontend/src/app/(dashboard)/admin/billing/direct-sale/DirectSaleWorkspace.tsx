@@ -15,6 +15,7 @@ import { accountingDate, accountingErrorMessage, accountingMoney } from "@/compo
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listFinanceAccounts } from "@/services/accounting";
+import { createAdminDirectSaleOrchestrated } from "@/services/admin-sales";
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
 import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
@@ -229,11 +230,18 @@ function makeIdempotencyKey(): string {
   return `direct-sale-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export default function DirectSaleWorkspace() {
+type DirectSaleWorkspaceProps = {
+  /** POST /admin/sales/direct-sales/ and surface stock/delivery/stock-need envelope (additive UX path). */
+  orchestrationCreate?: boolean;
+};
+
+export default function DirectSaleWorkspace({ orchestrationCreate = false }: DirectSaleWorkspaceProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const createMode = (searchParams.get("mode") || "").trim().toLowerCase() === "create";
+  const createMode =
+    orchestrationCreate ||
+    (searchParams.get("mode") || "").trim().toLowerCase() === "create";
   const workspaceQueriesEnabled = !createMode;
   const queryClient = useQueryClient();
 
@@ -799,19 +807,42 @@ export default function DirectSaleWorkspace() {
     createAttemptKey.current = createAttemptKey.current || makeIdempotencyKey();
     try {
       const payload = buildSubmitPayload();
-      const created = await createDirectSale(payload, {
-        idempotencyKey: createAttemptKey.current,
-      });
-      const invNo = created.billing_invoice_no?.trim();
-      const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
-      const deliveryLabel = created.delivery_display?.trim();
-      const parts = [
-        `Direct sale ${created.sale_no || `#${created.id}`} created`,
-        invNo ? `invoice ${invNo}` : null,
-        reqCount !== null ? `${reqCount} pending requirement(s)` : null,
-        deliveryLabel || null,
-      ].filter(Boolean);
-      setNotice(parts.join(". ") + ".");
+      if (orchestrationCreate) {
+        const envelope = await createAdminDirectSaleOrchestrated(payload, {
+          idempotencyKey: createAttemptKey.current,
+        });
+        const created = envelope.sale;
+        const invNo = created.billing_invoice_no?.trim();
+        const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
+        const deliveryLabel = created.delivery_display?.trim();
+        const desk = envelope.delivery_request;
+        const need = envelope.stock_need;
+        const parts = [
+          `Direct sale ${created.sale_no || `#${created.id}`} created`,
+          `Stock status ${envelope.stock_status}`,
+          invNo ? `invoice ${invNo}` : null,
+          reqCount !== null ? `${reqCount} pending requirement(s)` : null,
+          deliveryLabel || null,
+          desk ? `Delivery desk case #${String(desk.id)} (${String(desk.status)})` : "No delivery desk case",
+          need ? `Stock need ${String(need.need_no)} (${String(need.status)})` : "No open stock need",
+          ...(envelope.warnings || []),
+        ].filter(Boolean);
+        setNotice(parts.join(". ") + ".");
+      } else {
+        const created = await createDirectSale(payload, {
+          idempotencyKey: createAttemptKey.current,
+        });
+        const invNo = created.billing_invoice_no?.trim();
+        const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
+        const deliveryLabel = created.delivery_display?.trim();
+        const parts = [
+          `Direct sale ${created.sale_no || `#${created.id}`} created`,
+          invNo ? `invoice ${invNo}` : null,
+          reqCount !== null ? `${reqCount} pending requirement(s)` : null,
+          deliveryLabel || null,
+        ].filter(Boolean);
+        setNotice(parts.join(". ") + ".");
+      }
       await invalidateAfterDirectSaleCreate(queryClient);
       resetCreateForm();
       router.push(pathname);
@@ -830,7 +861,7 @@ export default function DirectSaleWorkspace() {
         }
         if (process.env.NODE_ENV !== "production") {
           console.error("[DirectSale:create] request failed", {
-            endpoint: "/api/v1/billing/direct-sales/",
+            endpoint: orchestrationCreate ? "/api/v1/admin/sales/direct-sales/" : "/api/v1/billing/direct-sales/",
             status: err.status,
             responsePreview: err.rawBodyPreview || "",
             fieldErrors: err.fieldErrors || {},

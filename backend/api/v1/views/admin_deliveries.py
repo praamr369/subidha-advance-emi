@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from billing.services.direct_sale_delivery_queue import (
+    DIRECT_SALE_SUCCESS_TERMINAL_STATUSES,
     apply_direct_sale_case_filters,
     direct_sale_delivery_cases_queryset,
     merge_delivery_summaries,
@@ -14,6 +15,8 @@ from billing.services.direct_sale_delivery_queue import (
 )
 from service_desk.models import ServiceDeskCaseStatus
 from api.v1.serializers.delivery import (
+    AdminDeliveryDirectSaleSourceSerializer,
+    AdminDeliveryDirectSaleSourcesQuerySerializer,
     AdminDeliverySourceSubscriptionsQuerySerializer,
     AdminDeliverySourceSubscriptionSerializer,
     AdminSubscriptionDeliveryCreateSerializer,
@@ -23,7 +26,9 @@ from api.v1.serializers.delivery import (
     AdminSubscriptionDeliveryTransitionSerializer,
     AdminSubscriptionDeliveryUpdateSerializer,
 )
-from subscriptions.models import DeliveryStatus, Subscription
+from billing.models import DirectSale, DirectSaleStatus
+from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
 from subscriptions.services.delivery_service import (
@@ -73,6 +78,8 @@ def _apply_delivery_filters(queryset, request):
 
     if bucket == "DELIVERED":
         queryset = queryset.filter(status=DeliveryStatus.DELIVERED)
+    elif bucket == "READY_DISPATCH":
+        queryset = queryset.filter(status=DeliveryStatus.SCHEDULED)
     elif bucket == "PENDING":
         queryset = queryset.filter(
             status__in=[
@@ -114,42 +121,70 @@ class AdminDeliveryListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        queryset = _apply_delivery_filters(get_delivery_queryset(), request)
-        serializer = AdminSubscriptionDeliveryReadSerializer(queryset[:200], many=True)
-        sub_summary = build_delivery_report_summary(queryset)
-        sub_count = queryset.count()
-        subscription_rows = list(serializer.data)
+        source_type = (request.query_params.get("source_type") or "ALL").strip().upper()
+        include_sub = source_type in ("ALL", "SUBSCRIPTION")
+        include_ds = source_type in ("ALL", "DIRECT_SALE")
 
-        include_direct_sale = (request.query_params.get("include_direct_sale_cases") or "true").strip().lower() not in {
+        bucket_upper = (request.query_params.get("bucket") or "").strip().upper()
+        ds_active_only = bucket_upper != "DELIVERED"
+
+        subscription_rows: list[dict] = []
+        sub_count = 0
+        sub_summary = build_delivery_report_summary(SubscriptionDelivery.objects.none())
+
+        if include_sub:
+            queryset = _apply_delivery_filters(get_delivery_queryset(), request)
+            serializer = AdminSubscriptionDeliveryReadSerializer(queryset[:200], many=True)
+            subscription_rows = list(serializer.data)
+            sub_summary = build_delivery_report_summary(queryset)
+            sub_count = queryset.count()
+
+        include_direct_sale_cases_flag = (
+            request.query_params.get("include_direct_sale_cases") or "true"
+        ).strip().lower() not in {
             "false",
             "0",
             "no",
         }
+        include_ds_merge = include_ds and include_direct_sale_cases_flag
+
         ds_payloads: list[dict] = []
-        if include_direct_sale:
-            ds_qs = apply_direct_sale_case_filters(direct_sale_delivery_cases_queryset(), request)
+        if include_ds_merge:
+            ds_qs = apply_direct_sale_case_filters(
+                direct_sale_delivery_cases_queryset(active_only=ds_active_only),
+                request,
+            )
             ds_cases = list(ds_qs[:400])
             ds_payloads = [serialize_direct_sale_delivery_case(c) for c in ds_cases]
             pending_ds = sum(
                 1
                 for c in ds_cases
-                if c.status
-                in (
-                    ServiceDeskCaseStatus.OPEN,
-                    ServiceDeskCaseStatus.UNDER_REVIEW,
-                )
+                if c.status in (ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW)
             )
             scheduled_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.AUTHORIZED)
             ofd_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.IN_SERVICE)
+            delivered_ds = sum(1 for c in ds_cases if c.status in DIRECT_SALE_SUCCESS_TERMINAL_STATUSES)
             sub_summary = merge_delivery_summaries(
                 subscription_summary=sub_summary,
                 direct_sale_cases_count=len(ds_cases),
                 pending_ds=pending_ds,
                 scheduled_ds=scheduled_ds,
                 ofd_ds=ofd_ds,
+                delivered_ds=delivered_ds,
             )
 
-        if not include_direct_sale:
+        if not include_sub and not include_ds_merge:
+            return Response(
+                {
+                    "count": 0,
+                    "subscription_delivery_count": 0,
+                    "direct_sale_delivery_count": 0,
+                    "summary": sub_summary,
+                    "results": [],
+                }
+            )
+
+        if include_sub and not include_ds_merge:
             return Response(
                 {
                     "count": sub_count,
@@ -157,6 +192,18 @@ class AdminDeliveryListCreateView(APIView):
                     "direct_sale_delivery_count": 0,
                     "summary": sub_summary,
                     "results": subscription_rows,
+                }
+            )
+
+        if include_ds_merge and not include_sub:
+            total_count = len(ds_payloads)
+            return Response(
+                {
+                    "count": total_count,
+                    "subscription_delivery_count": 0,
+                    "direct_sale_delivery_count": len(ds_payloads),
+                    "summary": sub_summary,
+                    "results": ds_payloads[:200],
                 }
             )
 
@@ -179,6 +226,7 @@ class AdminDeliveryListCreateView(APIView):
             if pick_sub and i_sub < len(subscription_rows):
                 row = dict(subscription_rows[i_sub])
                 row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                row.setdefault("source_type", "SUBSCRIPTION")
                 merged.append(row)
                 i_sub += 1
             elif i_ds < len(ds_payloads):
@@ -187,6 +235,7 @@ class AdminDeliveryListCreateView(APIView):
             elif i_sub < len(subscription_rows):
                 row = dict(subscription_rows[i_sub])
                 row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                row.setdefault("source_type", "SUBSCRIPTION")
                 merged.append(row)
                 i_sub += 1
             else:
@@ -207,21 +256,34 @@ class AdminDeliveryListCreateView(APIView):
     def post(self, request):
         serializer = AdminSubscriptionDeliveryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        direct_sale = validated.get("direct_sale")
+
+        if direct_sale is not None:
+            case = sync_direct_sale_delivery_case(sale=direct_sale, actor=request.user)
+            if case is None:
+                raise serializers.ValidationError(
+                    {"detail": "Unable to open delivery tracking for this sale (delivery may be disabled)."}
+                )
+            return Response(
+                serialize_direct_sale_delivery_case(case),
+                status=status.HTTP_201_CREATED,
+            )
 
         try:
             delivery = create_subscription_delivery(
-                subscription=serializer.validated_data["subscription"],
+                subscription=validated["subscription"],
                 performed_by=request.user,
-                status=serializer.validated_data.get("status", DeliveryStatus.PENDING),
-                delivery_reference=serializer.validated_data.get("delivery_reference"),
-                scheduled_date=serializer.validated_data.get("scheduled_date"),
-                receiver_name=serializer.validated_data.get("receiver_name", ""),
-                receiver_phone=serializer.validated_data.get("receiver_phone", ""),
-                delivery_address_snapshot=serializer.validated_data.get(
+                status=validated.get("status", DeliveryStatus.PENDING),
+                delivery_reference=validated.get("delivery_reference"),
+                scheduled_date=validated.get("scheduled_date"),
+                receiver_name=validated.get("receiver_name", ""),
+                receiver_phone=validated.get("receiver_phone", ""),
+                delivery_address_snapshot=validated.get(
                     "delivery_address_snapshot",
                     "",
                 ),
-                notes=serializer.validated_data.get("notes", ""),
+                notes=validated.get("notes", ""),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -494,3 +556,85 @@ class AdminDeliveryMarkReturnedView(APIView):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class AdminDeliverySourceDirectSalesView(APIView):
+    """Search direct-sale sources eligible for delivery desk tracking."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        query_serializer = AdminDeliveryDirectSaleSourcesQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+
+        q = (query_serializer.validated_data.get("q") or "").strip()
+        limit = query_serializer.validated_data.get("limit") or 20
+
+        queryset = (
+            DirectSale.objects.select_related("customer")
+            .prefetch_related("billing_invoices")
+            .filter(delivery_required=True)
+            .exclude(status=DirectSaleStatus.CANCELLED)
+            .order_by("-created_at", "-id")
+        )
+
+        if q:
+            filters = (
+                Q(sale_no__icontains=q)
+                | Q(customer_name_snapshot__icontains=q)
+                | Q(customer_phone_snapshot__icontains=q)
+                | Q(billing_invoices__document_no__icontains=q)
+            )
+            if q.isdigit():
+                filters = filters | Q(id=int(q)) | Q(billing_invoices__id=int(q))
+            queryset = queryset.filter(filters).distinct()
+
+        total = queryset.count()
+        serializer = AdminDeliveryDirectSaleSourceSerializer(queryset[:limit], many=True)
+        return Response({"count": total, "results": serializer.data})
+
+
+class AdminDeliverySourceDirectSalePrefillView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, direct_sale_id: int):
+        sale = get_object_or_404(
+            DirectSale.objects.select_related("customer").prefetch_related("billing_invoices"),
+            pk=direct_sale_id,
+        )
+        snapshot_lines = "\n".join(
+            [
+                line
+                for line in [
+                    (sale.delivery_snapshot_address_line1 or "").strip(),
+                    (sale.delivery_snapshot_address_line2 or "").strip(),
+                    " ".join(
+                        [
+                            (sale.delivery_snapshot_city or "").strip(),
+                            (sale.delivery_snapshot_state or "").strip(),
+                            (sale.delivery_snapshot_pincode or "").strip(),
+                        ]
+                    ).strip(),
+                ]
+                if line
+            ]
+        )
+        cust = sale.customer
+        receiver_name = (sale.customer_name_snapshot or "").strip() or (
+            getattr(cust, "name", "") if cust else ""
+        ).strip()
+        receiver_phone = (sale.customer_phone_snapshot or "").strip() or (
+            getattr(cust, "phone", "") if cust else ""
+        ).strip()
+        payload = AdminDeliveryDirectSaleSourceSerializer(sale).data
+        return Response(
+            {
+                "source": payload,
+                "defaults": {
+                    "receiver_name": receiver_name,
+                    "receiver_phone": receiver_phone,
+                    "delivery_address_snapshot": snapshot_lines,
+                    "notes": "",
+                },
+            }
+        )

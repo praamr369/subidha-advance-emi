@@ -626,6 +626,9 @@ def confirm_direct_sale(*, direct_sale_id: int, confirmed_by):
             "sale_no": sale.sale_no,
         },
     )
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    sync_direct_sale_delivery_case(sale=sale, actor=confirmed_by)
     return sale, True
 
 

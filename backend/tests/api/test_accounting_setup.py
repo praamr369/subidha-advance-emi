@@ -67,6 +67,8 @@ class AccountingSetupApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/accounting/setup/status/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("status", response.data)
+        self.assertIn("missing_required_accounts", response.data)
+        self.assertIn("missing_required_mappings", response.data)
 
     def test_admin_can_get_mapping_suggestions(self):
         self.client.force_authenticate(user=self.admin)

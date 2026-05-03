@@ -68,6 +68,15 @@ export default function AdminSalesWorkspacePage() {
         metric: "Full-page create workflow",
       },
       {
+        key: "create-direct-sale-orchestrated",
+        label: "Create Direct Sale (live stock/delivery signals)",
+        purpose:
+          "Runs through /api/v1/admin/sales/direct-sales/ so ATP, delivery desk linkage, and stock needs surface immediately after creation.",
+        href: ROUTES.admin.salesDirectSaleCreate,
+        available: true,
+        metric: "Composite operational response",
+      },
+      {
         key: "invoices",
         label: "Invoices",
         purpose: "Billing invoice register for direct-sale and other sales channels.",
@@ -101,9 +110,9 @@ export default function AdminSalesWorkspacePage() {
       },
       {
         key: "stock-needs",
-        label: "Pending Stock Requirements",
-        purpose: "Direct-sale and demand-driven inventory requirement queue.",
-        href: ROUTES.admin.inventoryPurchaseNeeds,
+        label: "Stock needs workspace",
+        purpose: "Unified purchase/stock need queue with REST-backed workflows.",
+        href: ROUTES.admin.inventoryStockNeeds,
         available: true,
         metric: `${subscriptionRequests} subscription-demand signals`,
       },

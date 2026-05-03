@@ -24,6 +24,10 @@ type SetupStatus = {
   finance_accounts_ready?: boolean;
   mappings_complete?: boolean;
   last_validated_at?: string;
+  missing_required_accounts?: string[];
+  missing_required_mappings?: string[];
+  ledger_anchor_present?: boolean;
+  real_settlement_accounts_present?: boolean;
 };
 
 type MappingRow = {
@@ -41,15 +45,21 @@ const PURPOSE_LABELS: Record<string, string> = {
   CASH_COLLECTION: "Cash Desk Collection",
   UPI_COLLECTION: "UPI Collection",
   BANK_COLLECTION: "Bank Collection",
+  PAYMENT_GATEWAY_COLLECTION: "Gateway Settlement Collection",
   CUSTOMER_RECEIVABLE: "Customer Receivable",
   SECURITY_DEPOSIT_LIABILITY: "Security Deposit Liability",
+  CUSTOMER_ADVANCE_UNEARNED_REVENUE: "Customer Advance / Unearned Revenue",
   EMI_INCOME: "Advance EMI Collection",
   RENT_INCOME: "Rent Income",
   LEASE_INCOME: "Lease Income",
   DIRECT_SALE_INCOME: "Direct Sale Income",
+  DELIVERY_CHARGES_INCOME: "Delivery Charges Income",
   WAIVER_LOSS: "Waiver / Loss",
   COMMISSION_PAYABLE: "Partner Commission Payable",
+  COMMISSION_EXPENSE: "Commission Expense",
   DAMAGE_RECOVERY: "Damage Recovery",
+  DELIVERY_EXPENSE: "Delivery Expense",
+  SALARY_EXPENSE: "Salary Expense",
   INVENTORY_ASSET: "Inventory Asset",
 };
 
@@ -168,6 +178,30 @@ export default function AdminAccountingSetupPage() {
           <StatCard label="COA ready" value={status?.coa_ready ? "Yes" : "No"} />
           <StatCard label="Finance accounts ready" value={status?.finance_accounts_ready ? "Yes" : "No"} />
           <StatCard label="Warnings" value={String(status?.warnings_count ?? 0)} tone={(status?.warnings_count ?? 0) > 0 ? "warning" : "success"} />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
+            <div className="text-sm font-semibold text-foreground">Ledger anchor</div>
+            <div className="mt-2">
+              Present: {status?.ledger_anchor_present ? "yes" : "no"} · Settlement desks flagged:{" "}
+              {status?.real_settlement_accounts_present ? "yes" : "no"}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
+            <div className="text-sm font-semibold text-foreground">Missing mapping purposes</div>
+            <div className="mt-2 max-h-32 overflow-y-auto">
+              {(status?.missing_required_mappings?.length ?? 0) === 0 ? (
+                <span>None detected.</span>
+              ) : (
+                <ul className="list-disc pl-4">
+                  {(status?.missing_required_mappings ?? []).map((code) => (
+                    <li key={code}>{code}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-4">

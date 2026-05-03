@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from inventory.models import PurchaseNeed, PurchaseNeedStatus, Warehouse
+from subscriptions.models import Product
 
 
 QUANTITY_ZERO = Decimal("0.000")
@@ -51,6 +52,12 @@ def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None
         return None, False
     warehouse = ensure_primary_warehouse()
 
+    pname = ""
+    try:
+        pname = (Product.objects.filter(pk=signal.product_id).values_list("name", flat=True).first() or "")[:255]
+    except Exception:
+        pname = ""
+
     need, created = PurchaseNeed.objects.update_or_create(
         product_id=signal.product_id,
         warehouse=warehouse,
@@ -65,6 +72,7 @@ def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None
             "priority": signal.priority,
             "created_by": created_by if getattr(created_by, "pk", None) else None,
             "note": signal.note,
+            "product_name_snapshot": pname,
             "demand_snapshot": {
                 "required_quantity": f"{signal.required_quantity:.3f}",
                 "available_quantity": f"{signal.available_quantity:.3f}",

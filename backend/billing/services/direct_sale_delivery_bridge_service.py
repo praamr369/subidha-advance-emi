@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from billing.models import DirectSale, DirectSaleStatus
+from billing.models import BillingDocumentStatus, DirectSale, DirectSaleStatus
+from inventory.services.demand_planning_service import stock_status_for_delivery
 from service_desk.models import (
     ServiceDeskCase,
     ServiceDeskCaseStatus,
@@ -25,6 +26,10 @@ def _balance_decimal(sale: DirectSale) -> Decimal:
     return Decimal(str(sale.balance_total or "0")).quantize(Decimal("0.01"))
 
 
+def _received_decimal(sale: DirectSale) -> Decimal:
+    return Decimal(str(sale.received_total or "0")).quantize(Decimal("0.01"))
+
+
 def _delivery_snapshot_lines(sale: DirectSale) -> str:
     parts = [
         (sale.delivery_snapshot_address_line1 or "").strip(),
@@ -41,6 +46,142 @@ def _delivery_snapshot_lines(sale: DirectSale) -> str:
     return "\n".join(line for line in parts if line)
 
 
+def _primary_invoice(sale: DirectSale):
+    return sale.billing_invoices.order_by("-id").first()
+
+
+def _invoice_financial_label(invoice) -> str:
+    if invoice is None:
+        return "NONE"
+    return (invoice.status or "").strip().upper() or "UNKNOWN"
+
+
+def _stock_blocked_for_sale(*, sale: DirectSale) -> bool:
+    """
+    Conservative operational gate: treat severe shortage signals as dispatch-blocking.
+    Does not mutate inventory or reservations.
+    """
+    try:
+        line = sale.lines.select_related("product").first()
+        product_id = getattr(line, "product_id", None)
+        if product_id is None:
+            return False
+        payload = stock_status_for_delivery(product_id=product_id)
+        token = (payload.get("status") or "").strip().lower()
+        return token in {"purchase needed", "not available"}
+    except Exception:
+        return False
+
+
+def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
+    """
+    Canonical delivery UX snapshot for direct-sale rows (additive fields for APIs/UI).
+
+    Ordering reflects operational precedence: cancelled/completed pipelines first,
+    then physical delivery states, draft holds, payment holds, stock gates, dispatch-ready.
+    """
+    balance = _balance_decimal(sale)
+    received = _received_decimal(sale)
+    invoice = _primary_invoice(sale)
+    invoice_state = _invoice_financial_label(invoice)
+
+    if not sale.delivery_required:
+        return {
+            "phase_code": "NONE",
+            "phase_label": "Counter sale",
+            "payment_state": "NOT_APPLICABLE",
+            "invoice_state": invoice_state,
+            "stock_blocked": False,
+        }
+
+    if sale.status == DirectSaleStatus.CANCELLED:
+        return {
+            "phase_code": "CANCELLED",
+            "phase_label": "Cancelled",
+            "payment_state": "PAID" if balance <= Decimal("0.00") else "OUTSTANDING",
+            "invoice_state": invoice_state,
+            "stock_blocked": False,
+        }
+
+    if sale.status == DirectSaleStatus.INVOICED:
+        return {
+            "phase_code": "COMPLETED",
+            "phase_label": "Completed",
+            "payment_state": "PAID" if balance <= Decimal("0.00") else "OUTSTANDING",
+            "invoice_state": invoice_state,
+            "stock_blocked": False,
+        }
+
+    delivered_pipeline = sale.delivered_at is not None or sale.status == DirectSaleStatus.DELIVERED
+    if delivered_pipeline:
+        inv_posted = invoice is not None and invoice.status == BillingDocumentStatus.POSTED
+        label = "Delivered · Invoice pending" if not inv_posted else "Delivered"
+        if received > Decimal("0.00") and balance > Decimal("0.00"):
+            pay_state = "PARTIAL"
+        elif balance > Decimal("0.00"):
+            pay_state = "OUTSTANDING"
+        else:
+            pay_state = "PAID"
+        return {
+            "phase_code": "DELIVERED_PIPELINE",
+            "phase_label": label,
+            "payment_state": pay_state,
+            "invoice_state": invoice_state,
+            "stock_blocked": False,
+        }
+
+    if balance > Decimal("0.00"):
+        pay_state = "PARTIAL" if received > Decimal("0.00") else "OUTSTANDING"
+        label = (
+            "Delivery hold · Draft sale · Payment due"
+            if sale.status == DirectSaleStatus.DRAFT
+            else "Delivery required · Payment hold"
+        )
+        return {
+            "phase_code": "PAYMENT_HOLD",
+            "phase_label": label,
+            "payment_state": pay_state,
+            "invoice_state": invoice_state,
+            "stock_blocked": _stock_blocked_for_sale(sale=sale),
+        }
+
+    if sale.status == DirectSaleStatus.DRAFT:
+        return {
+            "phase_code": "DRAFT_HOLD",
+            "phase_label": "Delivery hold · Draft sale",
+            "payment_state": "PAID",
+            "invoice_state": invoice_state,
+            "stock_blocked": _stock_blocked_for_sale(sale=sale),
+        }
+
+    stock_blocked = _stock_blocked_for_sale(sale=sale)
+    if stock_blocked:
+        return {
+            "phase_code": "STOCK_BLOCKED",
+            "phase_label": "Delivery blocked · Stock unavailable",
+            "payment_state": "PAID",
+            "invoice_state": invoice_state,
+            "stock_blocked": True,
+        }
+
+    if sale.status == DirectSaleStatus.CONFIRMED:
+        return {
+            "phase_code": "READY_FOR_DELIVERY",
+            "phase_label": "Ready for delivery",
+            "payment_state": "PAID",
+            "invoice_state": invoice_state,
+            "stock_blocked": False,
+        }
+
+    return {
+        "phase_code": "PAYMENT_HOLD",
+        "phase_label": "Delivery required · Payment hold",
+        "payment_state": "OUTSTANDING" if balance > Decimal("0.00") else "PAID",
+        "invoice_state": invoice_state,
+        "stock_blocked": stock_blocked,
+    }
+
+
 def get_direct_sale_delivery_case(*, sale: DirectSale) -> ServiceDeskCase | None:
     if sale.pk is None:
         return None
@@ -55,19 +196,9 @@ def get_direct_sale_delivery_case(*, sale: DirectSale) -> ServiceDeskCase | None
 
 
 def direct_sale_delivery_phase(*, sale: DirectSale) -> tuple[str, str]:
-    """
-    Returns (machine_code, human_label) for UI/API summaries.
-    """
-    if not sale.delivery_required:
-        return "NONE", "Counter sale"
-    if sale.status == DirectSaleStatus.INVOICED:
-        return "COMPLETED", "Completed"
-    if sale.delivered_at is not None or sale.status == DirectSaleStatus.DELIVERED:
-        return "IN_DELIVERY", "In delivery"
-    balance = _balance_decimal(sale)
-    if balance > Decimal("0.00"):
-        return "PAYMENT_HOLD", "Delivery required · Payment hold"
-    return "READY_FOR_DELIVERY", "Ready for delivery"
+    """Returns (machine_code, human_label) for UI/API summaries."""
+    snap = compute_direct_sale_delivery_snapshot(sale=sale)
+    return snap["phase_code"], snap["phase_label"]
 
 
 def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDeskCase | None:
@@ -86,24 +217,31 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
     ):
         return None
 
-    desired_status = ServiceDeskCaseStatus.OPEN
-    balance = _balance_decimal(sale)
-    if sale.status == DirectSaleStatus.INVOICED:
-        desired_status = ServiceDeskCaseStatus.CLOSED
-    elif sale.delivered_at is not None or sale.status == DirectSaleStatus.DELIVERED:
-        desired_status = ServiceDeskCaseStatus.IN_SERVICE
-    elif balance > Decimal("0.00"):
-        desired_status = ServiceDeskCaseStatus.OPEN
-    else:
-        desired_status = ServiceDeskCaseStatus.AUTHORIZED
-
+    snapshot = compute_direct_sale_delivery_snapshot(sale=sale)
     case = get_direct_sale_delivery_case(sale=sale)
     if case is not None and case.status in TERMINAL_CASE_STATUSES:
         return case
 
+    phase = snapshot["phase_code"]
+    desired_status = ServiceDeskCaseStatus.OPEN
+    if phase == "COMPLETED":
+        desired_status = ServiceDeskCaseStatus.CLOSED
+    elif phase == "DELIVERED_PIPELINE":
+        desired_status = ServiceDeskCaseStatus.IN_SERVICE
+    elif phase == "READY_FOR_DELIVERY":
+        desired_status = ServiceDeskCaseStatus.AUTHORIZED
+    else:
+        desired_status = ServiceDeskCaseStatus.OPEN
+
+    desired_stock = (
+        ServiceDeskStockStatus.PENDING
+        if snapshot.get("stock_blocked")
+        else ServiceDeskStockStatus.NOT_REQUIRED
+    )
+
     first_line = sale.lines.select_related("product").order_by("id").first()
     product = first_line.product if first_line else None
-    invoice = sale.billing_invoices.order_by("-id").first()
+    invoice = _primary_invoice(sale)
 
     summary = (sale.sale_no or f"SALE-{sale.id}")[:200]
     issue_summary = f"Retail delivery · {summary}".strip()
@@ -125,7 +263,7 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
             reporter_name_snapshot=sale.customer_name_snapshot or "",
             reporter_phone_snapshot=sale.customer_phone_snapshot or "",
             finance_status=ServiceDeskFinanceStatus.NOT_REQUIRED,
-            stock_status=ServiceDeskStockStatus.NOT_REQUIRED,
+            stock_status=desired_stock,
             resolution_summary=resolution_summary,
         )
     else:
@@ -146,11 +284,14 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
             if case.product_id != product_id:
                 case.product_id = product_id
                 updates.append("product")
+        if case.stock_status != desired_stock:
+            case.stock_status = desired_stock
+            updates.append("stock_status")
         if updates:
             case.save(update_fields=updates + ["updated_at"])
 
     if (
-        previous_status in {None, ServiceDeskCaseStatus.OPEN}
+        previous_status in {None, ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW}
         and desired_status == ServiceDeskCaseStatus.AUTHORIZED
         and case is not None
     ):

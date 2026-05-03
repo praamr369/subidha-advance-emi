@@ -408,11 +408,20 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         payload["taxable_total"] = "23000.00"
         payload["tax_total"] = "0.00"
         payload["grand_total"] = "23000.00"
+        self.inventory_item.opening_stock_qty = Decimal("50.000")
+        self.inventory_item.save(update_fields=["opening_stock_qty"])
         response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
+        sale_id = response.data["id"]
+        case = ServiceDeskCase.objects.get(direct_sale_id=sale_id)
+        self.assertEqual(case.status, ServiceDeskCaseStatus.OPEN)
+        self.assertEqual(response.data.get("delivery_status"), "DRAFT_HOLD")
+
+        confirm = self.client.post(f"/api/v1/billing/direct-sales/{sale_id}/confirm/", {}, format="json")
+        self.assertEqual(confirm.status_code, status.HTTP_200_OK, confirm.data)
+        case.refresh_from_db()
         self.assertEqual(case.status, ServiceDeskCaseStatus.AUTHORIZED)
-        self.assertEqual(response.data.get("delivery_status"), "READY_FOR_DELIVERY")
+        self.assertEqual(confirm.data["direct_sale"].get("delivery_status"), "READY_FOR_DELIVERY")
 
     def test_admin_delivery_register_includes_direct_sale_case_rows(self):
         payload = self._payload()

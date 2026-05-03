@@ -142,15 +142,21 @@ class FinanceAccountMappingPurpose(models.TextChoices):
     CASH_COLLECTION = "CASH_COLLECTION", "Cash Collection"
     UPI_COLLECTION = "UPI_COLLECTION", "UPI Collection"
     BANK_COLLECTION = "BANK_COLLECTION", "Bank Collection"
+    PAYMENT_GATEWAY_COLLECTION = "PAYMENT_GATEWAY_COLLECTION", "Payment Gateway Settlement Collection"
     CUSTOMER_RECEIVABLE = "CUSTOMER_RECEIVABLE", "Customer Receivable"
     SECURITY_DEPOSIT_LIABILITY = "SECURITY_DEPOSIT_LIABILITY", "Security Deposit Liability"
+    CUSTOMER_ADVANCE_UNEARNED_REVENUE = "CUSTOMER_ADVANCE_UNEARNED_REVENUE", "Customer Advance / Unearned Revenue"
     EMI_INCOME = "EMI_INCOME", "Advance EMI Income"
     RENT_INCOME = "RENT_INCOME", "Rent Income"
     LEASE_INCOME = "LEASE_INCOME", "Lease Income"
     DIRECT_SALE_INCOME = "DIRECT_SALE_INCOME", "Direct Sale Income"
+    DELIVERY_CHARGES_INCOME = "DELIVERY_CHARGES_INCOME", "Delivery Charges Income"
     WAIVER_LOSS = "WAIVER_LOSS", "Waiver/Loss"
     COMMISSION_PAYABLE = "COMMISSION_PAYABLE", "Commission Payable"
+    COMMISSION_EXPENSE = "COMMISSION_EXPENSE", "Commission Expense"
     DAMAGE_RECOVERY = "DAMAGE_RECOVERY", "Damage Recovery"
+    DELIVERY_EXPENSE = "DELIVERY_EXPENSE", "Delivery Expense"
+    SALARY_EXPENSE = "SALARY_EXPENSE", "Salary Expense"
     INVENTORY_ASSET = "INVENTORY_ASSET", "Inventory Asset"
 
 
@@ -493,6 +499,8 @@ class FinanceAccount(AccountingTimeStampedModel):
         default=MONEY_ZERO,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    # Settlement desks (cash/bank/UPI/gateway) use True; ledger-profile anchor rows use False.
+    is_real_settlement_account = models.BooleanField(default=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     bank_last4 = models.CharField(max_length=4, blank=True, default="")
     upi_handle = models.CharField(max_length=255, blank=True, default="")
@@ -590,6 +598,7 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
             FinanceAccountMappingPurpose.CASH_COLLECTION,
             FinanceAccountMappingPurpose.UPI_COLLECTION,
             FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
             FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,
             FinanceAccountMappingPurpose.INVENTORY_ASSET,
         } and account_type != ChartOfAccountType.ASSET:
@@ -597,6 +606,7 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
         if self.purpose in {
             FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,
             FinanceAccountMappingPurpose.COMMISSION_PAYABLE,
+            FinanceAccountMappingPurpose.CUSTOMER_ADVANCE_UNEARNED_REVENUE,
         } and account_type != ChartOfAccountType.LIABILITY:
             errors["chart_account"] = "This purpose must map to a LIABILITY chart account."
         if self.purpose in {
@@ -605,8 +615,15 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
             FinanceAccountMappingPurpose.LEASE_INCOME,
             FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,
             FinanceAccountMappingPurpose.DAMAGE_RECOVERY,
+            FinanceAccountMappingPurpose.DELIVERY_CHARGES_INCOME,
         } and account_type != ChartOfAccountType.INCOME:
             errors["chart_account"] = "This purpose must map to an INCOME chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.COMMISSION_EXPENSE,
+            FinanceAccountMappingPurpose.DELIVERY_EXPENSE,
+            FinanceAccountMappingPurpose.SALARY_EXPENSE,
+        } and account_type != ChartOfAccountType.EXPENSE:
+            errors["chart_account"] = "This purpose must map to an EXPENSE chart account."
         if self.purpose == FinanceAccountMappingPurpose.WAIVER_LOSS and account_type not in {
             ChartOfAccountType.EXPENSE,
             ChartOfAccountType.EQUITY,

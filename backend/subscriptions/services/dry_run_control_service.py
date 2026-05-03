@@ -19,8 +19,18 @@ from django.db.models import Q
 from django.utils import timezone
 
 from accounting.services.accounting_setup_service import AccountingSetupService
+from billing.services.direct_sale_workflow_service import classify_direct_sale_stock_status
+from billing.models import DirectSale
+from inventory.models import (
+    InventoryItem,
+    OpeningStockEntry,
+    OpeningStockEntryStatus,
+    PurchaseNeed,
+    PurchaseNeedStatus,
+    Warehouse,
+)
+from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
 from accounts.models import User, UserRole
-from inventory.models import InventoryItem, OpeningStockEntry, OpeningStockEntryStatus
 from subscriptions.models import (
     Batch,
     BatchStatus,
@@ -37,6 +47,7 @@ from subscriptions.models import (
 from subscriptions.services.business_reset_service import BusinessResetOptions, build_business_reset_plan
 from subscriptions.services.business_setup_service import get_reset_preview
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
+from subscriptions.services.document_numbering_service import get_document_numbering_state
 
 # Check category keys (API contract)
 CHECK_SETUP_READINESS = "SETUP_READINESS"
@@ -50,6 +61,12 @@ CHECK_LUCKY_PLAN_WORKFLOW = "LUCKY_PLAN_WORKFLOW"
 CHECK_PAYMENT_FINANCE_SAFETY = "PAYMENT_FINANCE_SAFETY"
 CHECK_INVENTORY_SALES_PURCHASE_READINESS = "INVENTORY_SALES_PURCHASE_READINESS"
 CHECK_HR_READINESS = "HR_READINESS"
+CHECK_FINANCE_SETUP_READINESS = "FINANCE_SETUP_READINESS"
+CHECK_COA_SETUP_READINESS = "COA_SETUP_READINESS"
+CHECK_INVENTORY_READINESS = "INVENTORY_READINESS"
+CHECK_DIRECT_SALE_WORKFLOW_READINESS = "DIRECT_SALE_WORKFLOW_READINESS"
+CHECK_DELIVERY_HANDOFF_READINESS = "DELIVERY_HANDOFF_READINESS"
+CHECK_STOCK_NEED_WORKFLOW_READINESS = "STOCK_NEED_WORKFLOW_READINESS"
 
 ALL_CHECK_KEYS: tuple[str, ...] = (
     CHECK_SETUP_READINESS,
@@ -63,6 +80,12 @@ ALL_CHECK_KEYS: tuple[str, ...] = (
     CHECK_PAYMENT_FINANCE_SAFETY,
     CHECK_INVENTORY_SALES_PURCHASE_READINESS,
     CHECK_HR_READINESS,
+    CHECK_FINANCE_SETUP_READINESS,
+    CHECK_COA_SETUP_READINESS,
+    CHECK_INVENTORY_READINESS,
+    CHECK_DIRECT_SALE_WORKFLOW_READINESS,
+    CHECK_DELIVERY_HANDOFF_READINESS,
+    CHECK_STOCK_NEED_WORKFLOW_READINESS,
 )
 
 
@@ -157,6 +180,54 @@ def dry_run_check_catalog() -> list[dict[str, Any]]:
             "supports_scopes": False,
             "requires_upload": False,
         },
+        {
+            "key": CHECK_FINANCE_SETUP_READINESS,
+            "label": "Finance settlement desks readiness",
+            "description": "Validates presence of settlement-flagged finance accounts, ledger-profile anchor coverage, and settlement-oriented warnings.",
+            "risk_level": "MEDIUM",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
+        {
+            "key": CHECK_COA_SETUP_READINESS,
+            "label": "Chart of accounts readiness",
+            "description": "Ensures seeded system_code coverage and mapping completeness signals from AccountingSetupService.",
+            "risk_level": "MEDIUM",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
+        {
+            "key": CHECK_INVENTORY_READINESS,
+            "label": "Inventory readiness",
+            "description": "Read-only ATP/opening-stock/stock-need snapshot without mutating inventory.",
+            "risk_level": "LOW",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
+        {
+            "key": CHECK_DIRECT_SALE_WORKFLOW_READINESS,
+            "label": "Direct sale workflow readiness",
+            "description": "Document numbering gates plus lightweight stock-status sampling on recent direct sales.",
+            "risk_level": "MEDIUM",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
+        {
+            "key": CHECK_DELIVERY_HANDOFF_READINESS,
+            "label": "Delivery desk handoff readiness",
+            "description": "Read-only counts on retail delivery desk cases (service desk).",
+            "risk_level": "LOW",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
+        {
+            "key": CHECK_STOCK_NEED_WORKFLOW_READINESS,
+            "label": "Stock need workflow readiness",
+            "description": "Confirms warehouses exist and summarizes open purchase/stock needs.",
+            "risk_level": "LOW",
+            "supports_scopes": False,
+            "requires_upload": False,
+        },
     ]
 
 
@@ -171,8 +242,9 @@ def _row(
     recommended_action: str,
     action_href: str,
     safe_to_execute: bool,
+    findings: list[str] | None = None,
 ) -> dict[str, Any]:
-    return {
+    row = {
         "check": check,
         "status": status,
         "risk_level": risk_level,
@@ -183,6 +255,9 @@ def _row(
         "action_href": action_href,
         "safe_to_execute": safe_to_execute,
     }
+    if findings:
+        row["findings"] = findings
+    return row
 
 
 def _repo_root() -> Path:
@@ -727,6 +802,220 @@ def _check_hr_readiness() -> list[dict[str, Any]]:
     return rows
 
 
+def _check_finance_setup_readiness() -> list[dict[str, Any]]:
+    validation = AccountingSetupService.validate_accounting_setup()
+    warn = validation.get("warnings") or []
+    settlement_codes = {
+        "MISSING_ACTIVE_SETTLEMENT_ACCOUNT",
+        "MISSING_LEDGER_PROFILE_ANCHOR",
+        "SETTLEMENT_ACCOUNT_WITHOUT_COLLECTION_MAPPING",
+        "FINANCE_ACCOUNT_LOOKS_CONCEPTUAL",
+        "SETTLEMENT_ACCOUNT_NON_COLLECTION_PURPOSE",
+    }
+    findings = [w.get("message", "") for w in warn if w.get("code") in settlement_codes]
+    status = "PASS"
+    if any(w.get("code") in settlement_codes for w in warn):
+        status = "WARNING" if validation.get("finance_accounts_ready") else "BLOCKED"
+    return [
+        _row(
+            check=CHECK_FINANCE_SETUP_READINESS,
+            status=status,
+            risk_level="MEDIUM",
+            module="Finance Setup",
+            title="Settlement finance desk configuration",
+            detail=f"finance_accounts_ready={validation.get('finance_accounts_ready')} ledger_anchor={validation.get('ledger_anchor_present')}.",
+            recommended_action="Review /admin/accounting/setup and bootstrap or correct settlement flags on finance accounts.",
+            action_href="/admin/settings/business-setup/finance-accounts",
+            safe_to_execute=status != "BLOCKED",
+            findings=findings or None,
+        )
+    ]
+
+
+def _check_coa_setup_readiness() -> list[dict[str, Any]]:
+    validation = AccountingSetupService.validate_accounting_setup()
+    missing_coa = validation.get("missing_required_accounts") or []
+    missing_map = validation.get("missing_required_mappings") or []
+    findings: list[str] = []
+    findings.extend([f"Missing COA system code: {c}" for c in missing_coa])
+    findings.extend([f"Missing mapping purpose: {p}" for p in missing_map])
+    code_hits = {w.get("code") for w in (validation.get("warnings") or [])}
+    blocked = bool(missing_coa or missing_map or {"DUPLICATE_DEFAULT_MAPPING", "MAPPING_ACCOUNT_TYPE_MISMATCH"} & code_hits)
+    status = "PASS"
+    if missing_coa or missing_map:
+        status = "BLOCKED"
+    elif code_hits & {"MISSING_REQUIRED_PURPOSE"}:
+        status = "WARNING"
+    return [
+        _row(
+            check=CHECK_COA_SETUP_READINESS,
+            status=status,
+            risk_level="HIGH" if blocked else "MEDIUM",
+            module="Chart of Accounts",
+            title="COA + mapping coverage",
+            detail=f"coa_ready={validation.get('coa_ready')} mappings_complete={validation.get('mappings_complete')}.",
+            recommended_action="Seed or repair chart accounts and finance-to-COA mappings.",
+            action_href="/admin/settings/business-setup/chart-accounts",
+            safe_to_execute=not blocked,
+            findings=findings or None,
+        )
+    ]
+
+
+def _check_inventory_readiness_dry() -> list[dict[str, Any]]:
+    snap = get_inventory_readiness_snapshot()
+    if snap.get("module_not_configured"):
+        return [
+            _row(
+                check=CHECK_INVENTORY_READINESS,
+                status="WARNING",
+                risk_level="LOW",
+                module="Inventory",
+                title="Inventory module not fully available",
+                detail="Unable to evaluate product/inventory linkage on this deployment.",
+                recommended_action="Verify database migrations and PRODUCT master availability.",
+                action_href="/admin/inventory/workspace",
+                safe_to_execute=True,
+                findings=snap.get("warnings") and [w.get("message", "") for w in snap["warnings"]],
+            )
+        ]
+    findings = [w.get("message", "") for w in snap.get("warnings") or []]
+    status = "PASS" if snap.get("inventory_ready") else "WARNING"
+    if snap.get("products_without_stock_count", 0) and not snap.get("inventory_ready"):
+        status = "WARNING"
+    return [
+        _row(
+            check=CHECK_INVENTORY_READINESS,
+            status=status,
+            risk_level="LOW",
+            module="Inventory",
+            title="Inventory readiness snapshot",
+            detail=f"Tracked items: {snap.get('active_tracked_stock_items', 0)}, opening ready: {snap.get('opening_stock_ready')}.",
+            recommended_action="; ".join(snap.get("recommended_actions") or ["Review /admin/inventory/readiness"]),
+            action_href="/admin/inventory/readiness",
+            safe_to_execute=True,
+            findings=findings or None,
+        )
+    ]
+
+
+def _check_direct_sale_workflow_readiness() -> list[dict[str, Any]]:
+    numbering = get_document_numbering_state()
+    numbering_ok = bool(numbering["checks"].get("direct_sale_invoice_numbering_configured"))
+    sale = DirectSale.objects.order_by("-id").first()
+    findings: list[str] = []
+    stock_token = None
+    if sale:
+        stock_token, _, w = classify_direct_sale_stock_status(sale=sale)
+        findings.extend(w)
+        findings.append(f"Latest direct sale #{sale.id} stock_status={stock_token}")
+    status = "PASS" if numbering_ok else "BLOCKED"
+    if numbering_ok and stock_token in {"UNAVAILABLE", "NOT_CONFIGURED"}:
+        status = "WARNING"
+    return [
+        _row(
+            check=CHECK_DIRECT_SALE_WORKFLOW_READINESS,
+            status=status,
+            risk_level="HIGH" if not numbering_ok else "MEDIUM",
+            module="Sales",
+            title="Direct sale operational readiness",
+            detail="Requires document numbering plus healthy stock telemetry for recent sales.",
+            recommended_action="Configure document numbering and validate inventory profiles for retail SKUs.",
+            action_href="/admin/sales/direct-sale/create",
+            safe_to_execute=numbering_ok,
+            findings=findings or None,
+        )
+    ]
+
+
+def _check_delivery_handoff_readiness() -> list[dict[str, Any]]:
+    try:
+        from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
+
+        qs = ServiceDeskCase.objects.filter(case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY)
+        open_like = qs.exclude(
+            status__in={
+                ServiceDeskCaseStatus.CLOSED,
+                ServiceDeskCaseStatus.CANCELLED,
+                ServiceDeskCaseStatus.RESOLVED,
+                ServiceDeskCaseStatus.REJECTED,
+            },
+        ).count()
+        total = qs.count()
+    except Exception as exc:
+        return [
+            _row(
+                check=CHECK_DELIVERY_HANDOFF_READINESS,
+                status="WARNING",
+                risk_level="LOW",
+                module="Delivery Desk",
+                title="Delivery desk metadata unavailable",
+                detail=str(exc),
+                recommended_action="Verify service_desk migrations and operational modules.",
+                action_href="/admin/deliveries",
+                safe_to_execute=True,
+            )
+        ]
+
+    findings = [f"Retail delivery cases: {total}, non-terminal: {open_like}."]
+    status = "PASS" if total or open_like == 0 else "WARNING"
+    return [
+        _row(
+            check=CHECK_DELIVERY_HANDOFF_READINESS,
+            status=status,
+            risk_level="LOW",
+            module="Delivery Desk",
+            title="Retail delivery desk volume",
+            detail=f"Tracked {total} direct-sale delivery desk case(s); {open_like} still active.",
+            recommended_action="Dispatch backlog cases via /admin/deliveries.",
+            action_href="/admin/deliveries",
+            safe_to_execute=True,
+            findings=findings,
+        )
+    ]
+
+
+def _check_stock_need_workflow_readiness() -> list[dict[str, Any]]:
+    if not Warehouse.objects.filter(is_active=True).exists():
+        return [
+            _row(
+                check=CHECK_STOCK_NEED_WORKFLOW_READINESS,
+                status="BLOCKED",
+                risk_level="HIGH",
+                module="Stock Needs",
+                title="No active warehouse configured",
+                detail="Purchase/stock needs require at least one warehouse.",
+                recommended_action="Create at least one warehouse/stock location.",
+                action_href="/admin/inventory/locations",
+                safe_to_execute=False,
+            )
+        ]
+    open_rows = PurchaseNeed.objects.filter(
+        status__in=[
+            PurchaseNeedStatus.OPEN,
+            PurchaseNeedStatus.IN_REVIEW,
+            PurchaseNeedStatus.ORDERED,
+            PurchaseNeedStatus.PARTIALLY_FULFILLED,
+        ]
+    ).count()
+    findings = [f"Open workflow stock needs: {open_rows}."]
+    status = "WARNING" if open_rows else "PASS"
+    return [
+        _row(
+            check=CHECK_STOCK_NEED_WORKFLOW_READINESS,
+            status=status,
+            risk_level="LOW",
+            module="Stock Needs",
+            title="Stock need workflow health",
+            detail=f"{open_rows} non-terminal purchase/stock needs.",
+            recommended_action="Clear purchase needs via procurement flows.",
+            action_href="/admin/inventory/stock-needs",
+            safe_to_execute=True,
+            findings=findings,
+        )
+    ]
+
+
 def _summarize(results: list[dict[str, Any]]) -> dict[str, int]:
     c = Counter((r.get("status") or "FAILED") for r in results)
     return {
@@ -783,6 +1072,18 @@ def run_dry_run_checks(
             results.extend(_check_inventory_sales_purchase_readiness())
         elif key == CHECK_HR_READINESS:
             results.extend(_check_hr_readiness())
+        elif key == CHECK_FINANCE_SETUP_READINESS:
+            results.extend(_check_finance_setup_readiness())
+        elif key == CHECK_COA_SETUP_READINESS:
+            results.extend(_check_coa_setup_readiness())
+        elif key == CHECK_INVENTORY_READINESS:
+            results.extend(_check_inventory_readiness_dry())
+        elif key == CHECK_DIRECT_SALE_WORKFLOW_READINESS:
+            results.extend(_check_direct_sale_workflow_readiness())
+        elif key == CHECK_DELIVERY_HANDOFF_READINESS:
+            results.extend(_check_delivery_handoff_readiness())
+        elif key == CHECK_STOCK_NEED_WORKFLOW_READINESS:
+            results.extend(_check_stock_need_workflow_readiness())
     summary = _summarize(results)
     with transaction.atomic():
         job = DryRunValidationJob.objects.create(

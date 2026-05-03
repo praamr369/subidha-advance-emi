@@ -38,6 +38,8 @@ from api.v1.views.admin_deliveries import (
     AdminDeliveryMarkReturnedView,
     AdminDeliveryPdfView,
     AdminDeliveryRequestReturnView,
+    AdminDeliverySourceDirectSalePrefillView,
+    AdminDeliverySourceDirectSalesView,
     AdminDeliverySourceSubscriptionPrefillView,
     AdminDeliverySourceSubscriptionsView,
     AdminDeliverySummaryView,
@@ -240,6 +242,15 @@ from api.v1.views.admin_accounting_setup import (
     FinanceAccountMappingListCreateView,
     FinanceAccountMappingPatchView,
 )
+from api.v1.views.admin_inventory_ops import (
+    AdminInventoryReadinessView,
+    AdminInventoryStockNeedListCreateView,
+    AdminInventoryStockNeedPatchView,
+)
+from api.v1.views.admin_sales_ops import (
+    AdminSalesDirectSaleDetailView,
+    AdminSalesDirectSaleListCreateView,
+)
 from api.v1.views.admin_operations_queues import (
     AdminOperationsQueueSummaryView,
     AdminOperationsRequestQueuesView,
@@ -382,6 +393,11 @@ urlpatterns = [
     path(
         "deliveries/sources/subscriptions/<int:subscription_id>/prefill/",
         AdminDeliverySourceSubscriptionPrefillView.as_view(),
+    ),
+    path("deliveries/sources/direct-sales/", AdminDeliverySourceDirectSalesView.as_view()),
+    path(
+        "deliveries/sources/direct-sales/<int:direct_sale_id>/prefill/",
+        AdminDeliverySourceDirectSalePrefillView.as_view(),
     ),
     path("deliveries/<int:pk>/", AdminDeliveryDetailView.as_view()),
     path("deliveries/<int:pk>/pdf/", AdminDeliveryPdfView.as_view()),
@@ -558,6 +574,11 @@ urlpatterns = [
     path("sales/workspace/", AdminSalesWorkspaceView.as_view()),
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
+    path("inventory/readiness/", AdminInventoryReadinessView.as_view()),
+    path("inventory/stock-needs/", AdminInventoryStockNeedListCreateView.as_view()),
+    path("inventory/stock-needs/<int:pk>/", AdminInventoryStockNeedPatchView.as_view()),
+    path("sales/direct-sales/", AdminSalesDirectSaleListCreateView.as_view()),
+    path("sales/direct-sales/<int:pk>/", AdminSalesDirectSaleDetailView.as_view()),
     path(
         "inventory/opening-stock/import/preview/",
         AdminOpeningStockBulkPreviewView.as_view(),
