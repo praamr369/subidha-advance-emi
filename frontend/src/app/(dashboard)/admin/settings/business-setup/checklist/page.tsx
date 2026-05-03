@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { ROUTES } from "@/lib/routes";
 import { clearSession } from "@/lib/auth/session";
 import { businessSetupKeys } from "@/lib/query-keys";
 import {
@@ -95,6 +96,14 @@ export default function BusinessSetupChecklistPage() {
         description="Review computed setup completion and go-live blockers."
       />
       <BusinessSetupLinks />
+
+      <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+        Validate routing, API contracts, and finance safety without changing data in the{" "}
+        <Link href={ROUTES.admin.settingsBusinessSetupDryRuns} className="font-semibold text-primary hover:underline">
+          Dry Run Control Center
+        </Link>
+        .
+      </div>
 
       {checklistQuery.error ? (
         <div

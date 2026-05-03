@@ -8,6 +8,11 @@ from api.v1.views.admin_business_setup import (
     BusinessSetupResetPreviewView,
     BusinessSetupResetExecuteView,
 )
+from api.v1.views.admin_dry_runs import (
+    AdminDryRunHistoryView,
+    AdminDryRunOptionsView,
+    AdminDryRunRunView,
+)
 from api.v1.views.admin_commissions import (
     AdminCommissionBulkSettleView,
     AdminCommissionListView,
@@ -365,6 +370,9 @@ urlpatterns = [
     path("business-setup/document-numbering/", BusinessSetupDocumentNumberingView.as_view()),
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),
     path("business-setup/reset/", BusinessSetupResetExecuteView.as_view()),
+    path("business-setup/dry-runs/options/", AdminDryRunOptionsView.as_view()),
+    path("business-setup/dry-runs/run/", AdminDryRunRunView.as_view()),
+    path("business-setup/dry-runs/history/", AdminDryRunHistoryView.as_view()),
     path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
     path("ai/", include("ai_assistant.urls")),
     path("dashboard/", AdminDashboardView.as_view()),

@@ -213,6 +213,7 @@ export const ROUTES = {
     settingsBusinessSetupChecklist: "/admin/settings/business-setup/checklist",
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
+    settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
 
     luckyDraw: "/admin/lucky-draws",
     reconciliation: "/admin/reconciliation",

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ROUTES } from "@/lib/routes";
+
 const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
@@ -11,6 +13,7 @@ const links = [
   { href: "/admin/settings/business-setup/chart-accounts", label: "Chart Accounts" },
   { href: "/admin/settings/business-setup/document-numbering", label: "Document Numbering" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
+  { href: ROUTES.admin.settingsBusinessSetupDryRuns, label: "Dry runs" },
 ];
 
 export default function BusinessSetupLinks() {
