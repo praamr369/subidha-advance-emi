@@ -9,6 +9,7 @@ export type ErpCard = {
   source: string;
   deep_link: string;
   empty_state?: string | null;
+  source_breakdown?: Array<{ label: string; count: number }>;
 };
 
 export type ErpSummary = {

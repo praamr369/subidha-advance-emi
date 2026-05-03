@@ -13,11 +13,13 @@ export type DeliveryStatus =
   | "RETURN_REQUESTED"
   | "RETURNED";
 
-export type DeliveryBucket = "" | "PENDING" | "DELIVERED";
+export type DeliveryBucket = "" | "PENDING" | "DELIVERED" | "READY_DISPATCH";
 
 export type DeliveryRecord = {
   id: number;
   record_kind?: "SUBSCRIPTION_DELIVERY" | "DIRECT_SALE_CASE";
+  source_type?: "SUBSCRIPTION" | "DIRECT_SALE";
+  source_label?: string | null;
   subscription?: number | null;
   subscription_id?: number | null;
   subscription_number?: string | null;
@@ -67,8 +69,13 @@ export type DeliveryRecord = {
   invoice_document_no?: string | null;
   billing_invoice_id?: number | null;
   service_case_id?: number | null;
+  case_no?: string | null;
   service_desk_status?: string | null;
   delivery_phase_label?: string | null;
+  delivery_phase_code?: string | null;
+  delivery_display?: string | null;
+  delivery_status?: string | null;
+  invoice_state?: string | null;
   payment_state?: string | null;
   detail_hint?: string | null;
   grand_total?: string | null;
@@ -146,6 +153,49 @@ export type AdminDeliveryQuery = {
   date_from?: string;
   date_to?: string;
   include_direct_sale_cases?: boolean;
+  source_type?: "ALL" | "SUBSCRIPTION" | "DIRECT_SALE";
+  sale?: string;
+  invoice?: string;
+};
+
+export type DeliverySourceDirectSale = {
+  id: number;
+  sale_no?: string | null;
+  status?: string | null;
+  delivery_required?: boolean;
+  customer_id?: number | null;
+  customer_name_snapshot?: string | null;
+  customer_phone_snapshot?: string | null;
+  grand_total?: string | null;
+  received_total?: string | null;
+  balance_total?: string | null;
+  delivered_at?: string | null;
+  billing_invoice_id?: number | null;
+  invoice_document_no?: string | null;
+  invoice_status?: string | null;
+  delivery_preview?: {
+    phase_code?: string | null;
+    phase_label?: string | null;
+    payment_state?: string | null;
+    invoice_state?: string | null;
+    stock_blocked?: boolean;
+  };
+  created_at?: string | null;
+};
+
+export type DeliverySourceDirectSalesResponse = {
+  count: number;
+  results: DeliverySourceDirectSale[];
+};
+
+export type DeliverySourceDirectSalePrefill = {
+  source: DeliverySourceDirectSale;
+  defaults: {
+    receiver_name?: string;
+    receiver_phone?: string;
+    delivery_address_snapshot?: string;
+    notes?: string;
+  };
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -199,6 +249,9 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
       row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "SUBSCRIPTION_DELIVERY"
         ? row.record_kind
         : undefined,
+    source_type:
+      row.source_type === "SUBSCRIPTION" || row.source_type === "DIRECT_SALE" ? row.source_type : undefined,
+    source_label: toStringOrNull(row.source_label),
     subscription: toNullableNumber(row.subscription),
     subscription_id:
       toNullableNumber(row.subscription_id) ?? toNullableNumber(row.subscription),
@@ -248,8 +301,15 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     invoice_document_no: toStringOrNull(row.invoice_document_no),
     billing_invoice_id: toNullableNumber(row.billing_invoice_id),
     service_case_id: toNullableNumber(row.service_case_id),
+    case_no: toStringOrNull(row.case_no),
     service_desk_status: toStringOrNull(row.service_desk_status),
     delivery_phase_label: toStringOrNull(row.delivery_phase_label),
+    delivery_phase_code: toStringOrNull(row.delivery_phase_code),
+    delivery_display:
+      toStringOrNull(row.delivery_display) ??
+      toStringOrNull(row.delivery_phase_label),
+    delivery_status: toStringOrNull(row.delivery_status) ?? toStringOrNull(row.delivery_phase_code),
+    invoice_state: toStringOrNull(row.invoice_state),
     payment_state: toStringOrNull(row.payment_state),
     detail_hint: toStringOrNull(row.detail_hint),
     grand_total: toStringOrNull(row.grand_total),
@@ -351,6 +411,57 @@ export function normalizeDeliverySourceSubscriptionPrefill(payload: unknown): De
   };
 }
 
+export function normalizeDeliverySourceDirectSale(payload: unknown): DeliverySourceDirectSale {
+  const row = (payload ?? {}) as Record<string, unknown>;
+  const previewRaw = row.delivery_preview;
+  const preview =
+    previewRaw && typeof previewRaw === "object"
+      ? {
+          phase_code: toStringOrNull((previewRaw as Record<string, unknown>).phase_code),
+          phase_label: toStringOrNull((previewRaw as Record<string, unknown>).phase_label),
+          payment_state: toStringOrNull((previewRaw as Record<string, unknown>).payment_state),
+          invoice_state: toStringOrNull((previewRaw as Record<string, unknown>).invoice_state),
+          stock_blocked:
+            typeof (previewRaw as Record<string, unknown>).stock_blocked === "boolean"
+              ? Boolean((previewRaw as Record<string, unknown>).stock_blocked)
+              : undefined,
+        }
+      : undefined;
+
+  return {
+    id: toNumber(row.id),
+    sale_no: toStringOrNull(row.sale_no),
+    status: toStringOrNull(row.status),
+    delivery_required: typeof row.delivery_required === "boolean" ? row.delivery_required : undefined,
+    customer_id: toNullableNumber(row.customer_id),
+    customer_name_snapshot: toStringOrNull(row.customer_name_snapshot),
+    customer_phone_snapshot: toStringOrNull(row.customer_phone_snapshot),
+    grand_total: toStringOrNull(row.grand_total),
+    received_total: toStringOrNull(row.received_total),
+    balance_total: toStringOrNull(row.balance_total),
+    delivered_at: toStringOrNull(row.delivered_at),
+    billing_invoice_id: toNullableNumber(row.billing_invoice_id),
+    invoice_document_no: toStringOrNull(row.invoice_document_no),
+    invoice_status: toStringOrNull(row.invoice_status),
+    delivery_preview: preview,
+    created_at: toStringOrNull(row.created_at),
+  };
+}
+
+export function normalizeDeliverySourceDirectSalePrefill(payload: unknown): DeliverySourceDirectSalePrefill {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const defaults = (root.defaults ?? {}) as Record<string, unknown>;
+  return {
+    source: normalizeDeliverySourceDirectSale(root.source),
+    defaults: {
+      receiver_name: toStringOrNull(defaults.receiver_name) ?? "",
+      receiver_phone: toStringOrNull(defaults.receiver_phone) ?? "",
+      delivery_address_snapshot: toStringOrNull(defaults.delivery_address_snapshot) ?? "",
+      notes: toStringOrNull(defaults.notes) ?? "",
+    },
+  };
+}
+
 function buildQuery(params: AdminDeliveryQuery = {}): string {
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q);
@@ -363,6 +474,15 @@ function buildQuery(params: AdminDeliveryQuery = {}): string {
   if (params.date_to) search.set("date_to", params.date_to);
   if (params.include_direct_sale_cases === false) {
     search.set("include_direct_sale_cases", "false");
+  }
+  if (params.source_type && params.source_type !== "ALL") {
+    search.set("source_type", params.source_type);
+  }
+  if (params.sale?.trim()) {
+    search.set("sale", params.sale.trim());
+  }
+  if (params.invoice?.trim()) {
+    search.set("invoice", params.invoice.trim());
   }
 
   const query = search.toString();
@@ -384,21 +504,49 @@ export async function getAdminDelivery(id: number | string): Promise<DeliveryRec
   return normalizeDeliveryRecord(payload);
 }
 
-export async function createAdminDelivery(payload: {
-  subscription: number;
-  status?: "PENDING" | "SCHEDULED";
-  delivery_reference?: string;
-  scheduled_date?: string | null;
-  receiver_name?: string;
-  receiver_phone?: string;
-  delivery_address_snapshot?: string;
-  notes?: string;
-}): Promise<DeliveryRecord> {
+export async function createAdminDelivery(
+  payload:
+    | {
+        subscription: number;
+        status?: "PENDING" | "SCHEDULED";
+        delivery_reference?: string;
+        scheduled_date?: string | null;
+        receiver_name?: string;
+        receiver_phone?: string;
+        delivery_address_snapshot?: string;
+        notes?: string;
+      }
+    | { direct_sale: number }
+): Promise<DeliveryRecord> {
   const response = await apiFetch<unknown>("/admin/deliveries/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
   return normalizeDeliveryRecord(response);
+}
+
+export async function listAdminDeliverySourceDirectSales(params: {
+  q?: string;
+  limit?: number;
+}): Promise<DeliverySourceDirectSalesResponse> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (typeof params.limit === "number") search.set("limit", String(params.limit));
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(`/admin/deliveries/sources/direct-sales/${query ? `?${query}` : ""}`);
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results) ? root.results : [];
+  return {
+    count: toNumber(root.count, 0),
+    results: results.map(normalizeDeliverySourceDirectSale),
+  };
+}
+
+export async function getAdminDeliverySourceDirectSalePrefill(
+  directSaleId: number | string
+): Promise<DeliverySourceDirectSalePrefill> {
+  const payload = await apiFetch<unknown>(`/admin/deliveries/sources/direct-sales/${directSaleId}/prefill/`);
+  return normalizeDeliverySourceDirectSalePrefill(payload);
 }
 
 export async function listAdminDeliverySourceSubscriptions(params: {

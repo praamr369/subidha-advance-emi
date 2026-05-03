@@ -14,7 +14,20 @@ export function OperationCard({ card }: { card: ErpCard }) {
         <SeverityBadge severity={card.severity} />
       </div>
       <div className="mt-3 text-2xl font-semibold text-foreground">{card.value || card.count}</div>
-      <div className="mt-1 text-xs text-muted-foreground">Source: {card.source}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {card.source_breakdown && card.source_breakdown.length > 0 ? (
+          <div className="space-y-0.5">
+            {card.source_breakdown.map((entry) => (
+              <div key={entry.label}>
+                <span className="font-medium text-foreground">{entry.label}</span>: {entry.count}
+              </div>
+            ))}
+            <div className="text-[11px] text-muted-foreground/90">{card.source}</div>
+          </div>
+        ) : (
+          <>Queue: {card.source}</>
+        )}
+      </div>
       {card.count === 0 ? (
         <div className="mt-3">
           <SmartEmptyState label={card.empty_state || "No records."} />
