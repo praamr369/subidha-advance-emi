@@ -1093,6 +1093,11 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
                 revealed_seed=revealed_seed,
                 performed_by=request.user,
             )
+        except LuckyDraw.DoesNotExist:
+            return Response(
+                {"detail": "Lucky draw not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except ValidationError as exc:
             message = (
                 exc.messages[0]

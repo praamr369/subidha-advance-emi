@@ -540,7 +540,7 @@ def execute_batch_draw(*, batch: Batch, revealed_seed: str, performed_by=None) -
     """
     batch = Batch.objects.select_for_update().get(pk=batch.pk)
     draw = (
-        LuckyDraw.objects.select_for_update()
+        LuckyDraw.objects.select_for_update(of=("self",))
         .select_related("batch")
         .filter(batch=batch, draw_month=1)
         .first()

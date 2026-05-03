@@ -48,11 +48,16 @@ def _eligible_winner_subscriptions(batch: Batch):
             .order_by("sort_order", "id")
             .values_list("subscription_id", flat=True)
         )
+        # PostgreSQL: FOR UPDATE cannot target nullable OUTER JOIN sides. Lock subscription
+        # base rows only, then load lucky_id/customer via a separate SELECT (same txn).
+        list(
+            Subscription.objects.select_for_update(of=("self",))
+            .filter(id__in=ordered_ids)
+            .order_by("id")
+        )
         id_to_sub = {
             s.id: s
-            for s in Subscription.objects.select_for_update()
-            .select_related("lucky_id", "customer")
-            .filter(id__in=ordered_ids)
+            for s in Subscription.objects.filter(id__in=ordered_ids).select_related("lucky_id", "customer")
         }
         ordered_subs = [id_to_sub[i] for i in ordered_ids if i in id_to_sub]
         if len(ordered_subs) != len(ordered_ids):
@@ -171,8 +176,9 @@ def create_lucky_draw_commit(batch: Batch):
 
 @transaction.atomic
 def reveal_and_execute_draw(draw_id: int, revealed_seed: str, performed_by=None):
+    # PostgreSQL rejects FOR UPDATE on nullable OUTER JOIN sides. Lock only the draw row.
     draw = (
-        LuckyDraw.objects.select_for_update()
+        LuckyDraw.objects.select_for_update(of=("self",))
         .select_related("batch", "winner_lucky_id", "winner_subscription", "winner_subscription__customer")
         .get(pk=draw_id)
     )

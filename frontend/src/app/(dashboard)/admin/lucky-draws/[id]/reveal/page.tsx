@@ -14,7 +14,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 type BatchStatus =
   | "DRAFT"
@@ -318,6 +318,42 @@ function parseErrorMessage(error: unknown): string {
   }
 }
 
+function formatRevealActionError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 400) {
+      const body = error.body as Record<string, unknown> | null | undefined;
+      if (body && typeof body.detail === "string" && body.detail.trim()) {
+        return body.detail.trim();
+      }
+      const entries = Object.entries(error.fieldErrors || {});
+      if (entries.length > 0) {
+        const [field, messages] = entries[0];
+        if (Array.isArray(messages) && messages[0]) {
+          return `${field}: ${messages[0]}`;
+        }
+      }
+      return error.readableMessage?.trim() || "Reveal validation failed.";
+    }
+    if (error.status === 403) {
+      return "You do not have permission to reveal this draw.";
+    }
+    if (error.status === 404) {
+      return "This lucky draw was not found.";
+    }
+    if (error.status >= 500) {
+      return "Server error while revealing this lucky draw. Try again or contact support.";
+    }
+    return error.readableMessage?.trim() || `Request failed (${error.status}).`;
+  }
+  if (error instanceof TypeError) {
+    return "Network unavailable. Check your connection and try again.";
+  }
+  if (error instanceof Error && /failed to fetch/i.test(error.message)) {
+    return "Network unavailable. Check your connection and try again.";
+  }
+  return parseErrorMessage(error);
+}
+
 function revealToneClass(isRevealed: boolean): string {
   return isRevealed
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -486,7 +522,7 @@ export default function AdminLuckyDrawRevealPage() {
         };
       });
     } catch (err) {
-      setError(parseErrorMessage(err));
+      setError(formatRevealActionError(err));
     } finally {
       setRevealing(false);
     }
