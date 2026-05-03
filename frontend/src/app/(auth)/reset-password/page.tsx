@@ -7,6 +7,7 @@ import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 import { AuthLayoutShell } from "@/components/auth";
 import ActionButton from "@/components/ui/ActionButton";
+import { SixDigitNumericOtp } from "@/components/ui/input-otp";
 import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { APP_NAME } from "@/lib/constants";
 import {
@@ -103,6 +104,11 @@ export default function ResetPasswordPage() {
     }
   }
 
+  const otpRelatedError =
+    Boolean(error) && /otp|reset code|digit|6-digit/i.test(error ?? "");
+  const expiredOrLocked =
+    Boolean(error) && /expired|no longer usable/i.test(error ?? "");
+
   async function handleResendOtp() {
     if (!identifier.trim()) {
       setError("Enter email, username, or phone before resending OTP.");
@@ -153,24 +159,36 @@ export default function ResetPasswordPage() {
           <label htmlFor="otp" className="mb-2 block text-sm font-medium text-slate-800">
             6-digit OTP
           </label>
-          <input
+          <SixDigitNumericOtp
             id="otp"
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
             value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
-            placeholder="Enter the reset code"
+            onChange={setOtp}
             disabled={submitting || success}
-            required
+            aria-invalid={otpRelatedError || undefined}
+            aria-describedby={expiredOrLocked ? "otp-expired-hint" : undefined}
           />
+          {expiredOrLocked ? (
+            <p
+              id="otp-expired-hint"
+              className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950"
+            >
+              This reset code may have expired or the reset session may no longer be active.{" "}
+              <Link
+                href={buildForgotPasswordHref(identifier)}
+                className="font-semibold text-amber-950 underline underline-offset-2"
+              >
+                Request a new code
+              </Link>{" "}
+              using the same identifier, then enter the fresh OTP here.
+            </p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
             <span>The OTP is delivered to the registered account email.</span>
             <button
               type="button"
               onClick={() => void handleResendOtp()}
               disabled={resending || submitting || success}
+              aria-busy={resending}
               className="font-medium text-slate-800 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             >
               {resending ? "Resending..." : "Resend OTP"}
@@ -190,7 +208,7 @@ export default function ResetPasswordPage() {
               onChange={(e) => setNewPassword(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
               placeholder="Minimum 8 characters"
-              disabled={submitting}
+              disabled={submitting || success}
               required
             />
             <button
@@ -215,7 +233,7 @@ export default function ResetPasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
               placeholder="Confirm new password"
-              disabled={submitting}
+              disabled={submitting || success}
               required
             />
             <button

@@ -13,6 +13,10 @@ export default function AdminFinanceWorkspacePage() {
       subtitle="Collections, dues, overdue, receipts, invoices, deposits, reconciliation, and mapping health visibility."
       boardTitle="Finance Operations"
       loader={loader}
+      operationalWorkspace={{
+        storageKey: "finance-admin-workspace-v1",
+        persistLayout: true,
+      }}
     />
   );
 }

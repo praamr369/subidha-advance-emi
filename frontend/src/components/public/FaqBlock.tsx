@@ -1,3 +1,11 @@
+"use client";
+
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 export type FaqItem = {
@@ -18,21 +26,18 @@ export default function FaqBlock({ items, className }: FaqBlockProps) {
         className
       )}
     >
-      <div className="grid gap-3">
-        {items.map((item) => (
-          <details
-            key={item.question}
-            className="group rounded-[1.5rem] border border-white/75 bg-white/78 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
-          >
-            <summary className="cursor-pointer list-none text-sm font-semibold text-foreground outline-none">
+      <Accordion type="multiple" className="divide-y divide-white/75 rounded-[1.5rem] border border-white/75 bg-white/78 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+        {items.map((item, index) => (
+          <AccordionItem key={`${index}-${item.question}`} value={`faq-${index}`} className="border-white/55 px-3">
+            <AccordionTrigger className="py-4 text-sm font-semibold text-foreground hover:no-underline">
               {item.question}
-            </summary>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              {item.answer}
-            </p>
-          </details>
+            </AccordionTrigger>
+            <AccordionContent>
+              <p className="pb-4 text-sm leading-6 text-muted-foreground">{item.answer}</p>
+            </AccordionContent>
+          </AccordionItem>
         ))}
-      </div>
+      </Accordion>
     </section>
   );
 }

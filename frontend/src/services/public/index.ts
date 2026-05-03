@@ -27,6 +27,8 @@ export type PublicWinner = {
   verification_status?: string | null;
   waived_emi_count?: number;
   waived_amount?: string;
+  /** Resolved catalogue image for the winner's subscription product, when present. */
+  product_image?: string | null;
 };
 
 export type PublicLatestWinnerResponse = {
@@ -65,6 +67,8 @@ export type PublicProduct = {
   category?: string | null;
   subcategory?: string | null;
   image?: string | null;
+  /** Optional extra gallery URLs when the API provides them (deduped with `image` on the client). */
+  gallery_images?: string[] | null;
   description?: string | null;
 };
 
@@ -162,9 +166,22 @@ async function fetchPublic<T>(
 }
 
 function normalizePublicProduct(product: PublicProduct): PublicProduct {
-  return {
+  const next: PublicProduct = {
     ...product,
     image: resolveApiMediaUrl(product.image),
+  };
+  if (Array.isArray(product.gallery_images)) {
+    next.gallery_images = product.gallery_images
+      .map((url) => resolveApiMediaUrl(url))
+      .filter((url): url is string => Boolean(url));
+  }
+  return next;
+}
+
+function normalizePublicWinner(row: PublicWinner): PublicWinner {
+  return {
+    ...row,
+    product_image: resolveApiMediaUrl(row.product_image),
   };
 }
 
@@ -177,11 +194,14 @@ export async function getPublicStats(): Promise<PublicStats> {
 }
 
 export async function getPublicLatestWinner(): Promise<PublicLatestWinnerResponse> {
-  return fetchPublic<PublicLatestWinnerResponse>(
+  const payload = await fetchPublic<PublicLatestWinnerResponse>(
     "/public/latest-winner/",
     { cache: "no-store" },
     "Unable to load the latest winner right now."
   );
+  return {
+    winner: payload.winner ? normalizePublicWinner(payload.winner) : null,
+  };
 }
 
 export async function getPublicWinnerHistory(
@@ -190,11 +210,15 @@ export async function getPublicWinnerHistory(
   const params = new URLSearchParams();
   params.set("limit", String(limit));
 
-  return fetchPublic<PublicWinnerHistoryResponse>(
+  const payload = await fetchPublic<PublicWinnerHistoryResponse>(
     `/public/winner-history/?${params.toString()}`,
     { cache: "no-store" },
     "Unable to load winner history right now."
   );
+  return {
+    ...payload,
+    results: payload.results.map(normalizePublicWinner),
+  };
 }
 
 export async function getPublicWinners(
@@ -203,11 +227,15 @@ export async function getPublicWinners(
   const params = new URLSearchParams();
   params.set("limit", String(limit));
 
-  return fetchPublic<PublicWinnerHistoryResponse>(
+  const payload = await fetchPublic<PublicWinnerHistoryResponse>(
     `/public/winners/?${params.toString()}`,
     { cache: "no-store" },
     "Unable to load winners right now."
   );
+  return {
+    ...payload,
+    results: payload.results.map(normalizePublicWinner),
+  };
 }
 
 export async function listPublicProducts(): Promise<{

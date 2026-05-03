@@ -11,6 +11,8 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  Fragment,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -59,8 +61,12 @@ import PortalShell from "@/components/layout/PortalShell";
 import RoleSidebar from "@/components/layout/RoleSidebar";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
+import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
 import CommandPalette from "@/components/workflows/CommandPalette";
 import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
@@ -73,6 +79,7 @@ import {
   type NavigationRole,
 } from "@/config/navigation";
 import { pushRecent, readFavorites, toggleFavorite } from "@/lib/workspace-prefs";
+import { initialsFromDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
 import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 
@@ -142,6 +149,10 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
 const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
+/** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
+const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
+const WORKSPACE_WIDTH_CSS_VALUES = ["1380px", "1580px", "1800px"] as const;
+const WORKSPACE_WIDTH_PRESET_LABELS = ["Compact", "Balanced", "Spacious"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 type OperatorMode = "SIMPLE" | "ADVANCED";
 
@@ -212,6 +223,24 @@ function readOperatorMode(): OperatorMode {
   } catch {
     return "ADVANCED";
   }
+}
+
+function readWorkspaceWidthPresetSnapshot(): string {
+  if (typeof window === "undefined") return "2";
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_WIDTH_PRESET_KEY);
+    if (raw === null) return "2";
+    const n = Number.parseInt(raw, 10);
+    if (n === 0 || n === 1 || n === 2) return String(n);
+    return "2";
+  } catch {
+    return "2";
+  }
+}
+
+function clampWorkspaceWidthPreset(value: number): 0 | 1 | 2 {
+  if (value === 0 || value === 1 || value === 2) return value;
+  return 2;
 }
 
 function segmentToLabel(segment: string) {
@@ -377,9 +406,9 @@ function UserDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
       >
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-xs font-semibold text-foreground">
-          {displayName.charAt(0).toUpperCase()}
-        </span>
+        <Avatar className="size-8 rounded-lg border-[var(--surface-border-strong)]">
+          <AvatarFallback className="rounded-lg">{initialsFromDisplayName(displayName)}</AvatarFallback>
+        </Avatar>
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">{displayName}</span>
           <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
@@ -389,9 +418,14 @@ function UserDropdown({
 
       {isOpen ? (
         <div className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100">
-          <div className="border-b border-border px-3 py-2">
-            <div className="text-sm font-semibold text-foreground">{displayName}</div>
-            <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
+          <div className="flex items-center gap-3 border-b border-border px-3 py-2">
+            <Avatar className="size-9 shrink-0 rounded-xl border-[var(--surface-border-strong)]">
+              <AvatarFallback className="rounded-xl">{initialsFromDisplayName(displayName)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-foreground">{displayName}</div>
+              <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
+            </div>
           </div>
           <Link
             href={profileHref}
@@ -437,6 +471,8 @@ function SidebarContent({
   collapsed,
   onToggleCollapse,
   onClose,
+  workspaceWidthPreset,
+  onWorkspaceWidthPresetChange,
 }: {
   role: NavigationRole;
   pathname: string;
@@ -447,6 +483,8 @@ function SidebarContent({
   collapsed: boolean;
   onToggleCollapse: () => void;
   onClose?: () => void;
+  workspaceWidthPreset: 0 | 1 | 2;
+  onWorkspaceWidthPresetChange: (preset: 0 | 1 | 2) => void;
 }) {
   const isMobile = typeof onClose === "function";
   const searchParams = useSearchParams();
@@ -850,6 +888,37 @@ function SidebarContent({
               />
             </div>
           </div>
+          {!collapsed ? (
+            <div className="mt-3.5 rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+                    Workspace width
+                  </div>
+                  <div className="mt-0.5 text-xs leading-snug text-[var(--sidebar-item-muted)]">
+                    Display preference only — how wide the main workspace column appears on this browser.
+                  </div>
+                </div>
+                <span className="shrink-0 pt-0.5 text-[11px] font-semibold tracking-wide text-[var(--sidebar-item-muted)]">
+                  {WORKSPACE_WIDTH_PRESET_LABELS[workspaceWidthPreset]}
+                </span>
+              </div>
+              <Slider
+                aria-label="Workspace content width"
+                data-testid="workspace-width-slider"
+                min={0}
+                max={2}
+                step={1}
+                value={[workspaceWidthPreset]}
+                onValueChange={(next) => {
+                  const step = next[0];
+                  if (step === undefined) return;
+                  onWorkspaceWidthPresetChange(clampWorkspaceWidthPreset(step));
+                }}
+                className="mt-3 w-full [&_[data-slot=slider-track]]:bg-white/15 [&_[data-slot=slider-range]]:bg-[var(--sidebar-item-active-border)] [&_[data-slot=slider-thumb]]:border-[var(--sidebar-rail-border)] [&_[data-slot=slider-thumb]]:bg-white"
+              />
+            </div>
+          ) : null}
           {role === "ADMIN" ? (
             <div className="mt-3.5 flex items-center justify-between rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-2.5">
               <div>
@@ -860,24 +929,37 @@ function SidebarContent({
                   {operatorMode === "SIMPLE" ? "Simple workflow view" : "Advanced ERP view"}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const next: OperatorMode = operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE";
-                  setOperatorMode(next);
+              <ToggleGroup
+                type="single"
+                value={operatorMode}
+                data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
+                aria-label="Operator navigation mode"
+                onValueChange={(value: string) => {
+                  if (value !== "SIMPLE" && value !== "ADVANCED") return;
+                  setOperatorMode(value as OperatorMode);
                   try {
-                    window.localStorage.setItem(OPERATOR_MODE_KEY, next);
+                    window.localStorage.setItem(OPERATOR_MODE_KEY, value as OperatorMode);
                   } catch {
                     // preference-only
                   }
                 }}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
-                aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
-                title={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
-                data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
+                className="border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-1"
               >
-                {operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
-              </button>
+                <ToggleGroupItem
+                  value="SIMPLE"
+                  aria-label="Simple workflow view"
+                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  Simple
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="ADVANCED"
+                  aria-label="Advanced ERP view"
+                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  Advanced
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           ) : null}
         </div>
@@ -1178,6 +1260,29 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     () => "false"
   );
   const sidebarCollapsed = sidebarCollapsedSnapshot === "true";
+  const workspaceWidthPresetSnapshot = useSyncExternalStore(
+    subscribeDashboardShell,
+    readWorkspaceWidthPresetSnapshot,
+    () => "2"
+  );
+  const workspaceWidthPreset = clampWorkspaceWidthPreset(
+    Number.parseInt(workspaceWidthPresetSnapshot, 10)
+  );
+  const workspaceShellStyle = useMemo(
+    () =>
+      ({
+        "--workspace-max-width": WORKSPACE_WIDTH_CSS_VALUES[workspaceWidthPreset],
+      }) as CSSProperties,
+    [workspaceWidthPreset]
+  );
+  const persistWorkspaceWidthPreset = useCallback((next: 0 | 1 | 2) => {
+    try {
+      window.localStorage.setItem(WORKSPACE_WIDTH_PRESET_KEY, String(next));
+    } catch {
+      // preference-only
+    }
+    notifyDashboardShellChanged();
+  }, []);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandEpoch, setCommandEpoch] = useState(0);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -1234,7 +1339,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   return (
     <DashboardShellContext.Provider value={true}>
       <WorkflowProvider role={role}>
-        <div className="relative">
+        <div className="relative" style={workspaceShellStyle}>
           <PortalShell
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>
@@ -1248,21 +1353,30 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   isLoggingOut={isLoggingOut}
                   collapsed={sidebarCollapsed}
                   onToggleCollapse={toggleSidebarCollapse}
+                  workspaceWidthPreset={workspaceWidthPreset}
+                  onWorkspaceWidthPresetChange={persistWorkspaceWidthPreset}
                 />
               </RoleSidebar>
             }
             header={
-              <Topbar
-                title={title}
-                role={role}
-                displayName={displayName}
-                onOpenSidebar={() => setMobileOpen(true)}
-                onOpenCommandPalette={openCommandPalette}
-                onOpenQuickActions={() => setQuickActionsOpen(true)}
-                onLogout={logout}
-                isLoggingOut={isLoggingOut}
-                mobileOpen={mobileOpen}
-              />
+              <Fragment>
+                <Topbar
+                  title={title}
+                  role={role}
+                  displayName={displayName}
+                  onOpenSidebar={() => setMobileOpen(true)}
+                  onOpenCommandPalette={openCommandPalette}
+                  onOpenQuickActions={() => setQuickActionsOpen(true)}
+                  onLogout={logout}
+                  isLoggingOut={isLoggingOut}
+                  mobileOpen={mobileOpen}
+                />
+                <AdminWorkspaceMenubar
+                  role={role}
+                  onOpenCommandPalette={openCommandPalette}
+                  onOpenQuickActions={() => setQuickActionsOpen(true)}
+                />
+              </Fragment>
             }
           >
             <>
@@ -1284,6 +1398,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               collapsed={false}
               onToggleCollapse={toggleSidebarCollapse}
               onClose={() => setMobileOpen(false)}
+              workspaceWidthPreset={workspaceWidthPreset}
+              onWorkspaceWidthPresetChange={persistWorkspaceWidthPreset}
             />
             </div>
           </RoleSidebar>

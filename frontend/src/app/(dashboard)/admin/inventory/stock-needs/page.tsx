@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PageHeader from "@/components/ui/PageHeader";
+import { StockNeedsOperationalWorkspace } from "@/components/workspace/StockNeedsOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { listStockNeeds } from "@/services/inventory-ops";
 
@@ -52,46 +55,13 @@ export default function StockNeedsPage() {
         </Link>
       </div>
 
-      {loading ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
-      {error ? (
-        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
+      {loading ? <LoadingBlock label="Loading stock needs…" /> : null}
+      {!loading && error ? (
+        <ErrorState title="Unable to load stock needs" description={error} />
       ) : null}
 
       {!loading && !error ? (
-        <div className="text-sm text-muted-foreground">
-          Showing {rows.length} of {count} record(s).
-        </div>
-      ) : null}
-
-      {!loading && rows.length === 0 && !error ? (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">No stock needs returned.</div>
-      ) : null}
-
-      {rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Need</th>
-                <th className="px-3 py-2 text-left font-medium">Product</th>
-                <th className="px-3 py-2 text-left font-medium">Shortage</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">Source</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-card">
-              {rows.map((r) => (
-                <tr key={String(r.id)}>
-                  <td className="px-3 py-2 whitespace-nowrap">{String(r.need_no ?? r.id)}</td>
-                  <td className="px-3 py-2">{String(r.product_name_snapshot ?? r.product ?? "—")}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{String(r.shortage_quantity ?? "—")}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{String(r.status ?? "—")}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{String(r.source_module ?? r.source_type ?? "—")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <StockNeedsOperationalWorkspace rows={rows} count={count} />
       ) : null}
     </div>
   );

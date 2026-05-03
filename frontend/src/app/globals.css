@@ -441,7 +441,28 @@ a, button, input, select, textarea {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+@keyframes caret-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .animate-caret-blink {
+    animation: none;
+    opacity: 1;
+  }
+
   .animate-skeleton-pulse {
     animation: none;
     opacity: 0.88;
@@ -506,6 +527,36 @@ button {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation-name: accordion-down;
+  animation-duration: 0.2s;
+  animation-timing-function: cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.animate-accordion-up {
+  animation-name: accordion-up;
+  animation-duration: 0.2s;
+  animation-timing-function: cubic-bezier(0.87, 0, 0.13, 1);
 }
 
 .dashboard-app {

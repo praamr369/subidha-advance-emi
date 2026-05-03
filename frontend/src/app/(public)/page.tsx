@@ -3,14 +3,14 @@ import Link from "next/link";
 
 import BrandLockup from "@/components/public/BrandLockup";
 import CtaBanner from "@/components/public/CtaBanner";
+import HomeFeaturedProductsShowcase from "@/components/public/HomeFeaturedProductsShowcase";
 import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import SectionHeader from "@/components/public/SectionHeader";
 import TrustStrip from "@/components/public/TrustStrip";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
 import { brandConfig } from "@/config/brand";
-import { formatCurrency } from "@/lib/format";
-import { getText, publicContent } from "@/lib/public-i18n";
+import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
@@ -23,15 +23,6 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/",
 });
 
-function buildApplyHref(product: { id: number; name: string; product_code: string; base_price: string }) {
-  const params = new URLSearchParams();
-  params.set("product", String(product.id));
-  params.set("product_name", product.name);
-  params.set("product_code", product.product_code);
-  params.set("price", product.base_price);
-  return `${ROUTES.public.apply}?${params.toString()}`;
-}
-
 export default async function PublicHome() {
   const language = await getPublicLanguage();
   const profile = await getResolvedPublicBusinessProfile();
@@ -43,6 +34,7 @@ export default async function PublicHome() {
 
   const heroTitle = getText(publicContent.homeHero.title, language);
   const heroSubtitle = getText(publicContent.homeHero.subtitle, language);
+  const dictionary = getPublicDictionary(asLocale(language));
 
   return (
     <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
@@ -158,29 +150,12 @@ export default async function PublicHome() {
         {products.length === 0 ? (
           <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">No products are currently published in the public catalogue.</div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {products.map((product) => (
-              <article key={product.id} className="public-card p-5">
-                <h3 className="text-base font-semibold text-foreground">{product.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Code: {product.product_code}</p>
-                <p className="mt-2 text-sm font-semibold">Base price: {formatCurrency(product.base_price)}</p>
-                <div className="mt-4 flex gap-2">
-                  <Link
-                    href={`${ROUTES.public.products}/${product.id}`}
-                    className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
-                  >
-                    View
-                  </Link>
-                  <Link
-                    href={buildApplyHref(product)}
-                    className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-                  >
-                    Apply
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+          <HomeFeaturedProductsShowcase
+            products={products}
+            ariaCarouselLabel={dictionary.common.mediaCarousel.featuredLabel}
+            prevLabel={dictionary.common.mediaCarousel.previousSlide}
+            nextLabel={dictionary.common.mediaCarousel.nextSlide}
+          />
         )}
       </section>
 

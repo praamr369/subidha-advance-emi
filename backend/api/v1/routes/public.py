@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.v1.serializers.media import serialize_media_url
 from api.v1.serializers.public import PublicProductSerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
 from api.v1.views.public_site import PublicBusinessProfileView
@@ -52,7 +53,7 @@ def _mask_public_name(raw):
     return f"{first_masked} {last_initial}."
 
 
-def _serialize_public_winner(draw: LuckyDraw):
+def _serialize_public_winner(draw: LuckyDraw, request):
     subscription = draw.winner_subscription
 
     if not subscription and draw.winner_lucky_id_id:
@@ -64,12 +65,14 @@ def _serialize_public_winner(draw: LuckyDraw):
 
     customer_name = None
     product_name = None
+    product_image = None
 
     if subscription:
         customer = getattr(subscription, "customer", None)
         product = getattr(subscription, "product", None)
         customer_name = _mask_public_name(getattr(customer, "name", None))
         product_name = getattr(product, "name", None)
+        product_image = serialize_media_url(request, getattr(product, "image", None))
 
     lucky_number = getattr(draw.winner_lucky_id, "lucky_number", None)
     draw_commit = getattr(draw, "draw_commit", None)
@@ -97,6 +100,7 @@ def _serialize_public_winner(draw: LuckyDraw):
         "winner_lucky_number": lucky_number,
         "winner_name_masked": customer_name,
         "product_name": product_name,
+        "product_image": product_image,
         "committed_hash": draw.committed_hash,
         "public_commit_hash": public_commit_hash,
         "verification_status": verification_status,
@@ -215,7 +219,7 @@ class LatestWinnerView(APIView):
         if not latest or not latest.winner_lucky_id:
             return Response({"winner": None})
 
-        return Response({"winner": _serialize_public_winner(latest)})
+        return Response({"winner": _serialize_public_winner(latest, request)})
 
 
 class PublicWinnerHistoryView(APIView):
@@ -244,7 +248,7 @@ class PublicWinnerHistoryView(APIView):
             .order_by("-draw_date", "-id")[:limit]
         )
 
-        results = [_serialize_public_winner(draw) for draw in queryset]
+        results = [_serialize_public_winner(draw, request) for draw in queryset]
 
         return Response(
             {

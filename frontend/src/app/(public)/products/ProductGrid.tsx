@@ -5,6 +5,7 @@ import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 import { ArrowUpRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 
 import PublicProductMedia from "@/components/public/PublicProductMedia";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
@@ -359,14 +360,16 @@ function ProductCard({ product }: { product: PublicProduct }) {
       <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.82)] transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)]">
         <div className="relative p-3">
           <div className="pointer-events-none absolute inset-x-7 top-3 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-          <PublicProductMedia
-            src={product.image}
-            alt={product.name}
-            badge={product.category || null}
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            className="aspect-[4/3]"
-            imageClassName="transition duration-500 group-hover:scale-[1.04]"
-          />
+          <AspectRatio ratio={4 / 3}>
+            <PublicProductMedia
+              src={product.image}
+              alt={product.name}
+              badge={product.category || null}
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              className="absolute inset-0 size-full rounded-[1.7rem]"
+              imageClassName="transition duration-500 group-hover:scale-[1.04]"
+            />
+          </AspectRatio>
         </div>
 
         <div className="space-y-4 px-5 pb-5 pt-2">

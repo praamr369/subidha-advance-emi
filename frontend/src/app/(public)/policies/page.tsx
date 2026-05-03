@@ -7,6 +7,7 @@ import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicProcessTimeline from "@/components/public/PublicProcessTimeline";
 import PublicTrustBadgeGrid from "@/components/public/PublicTrustBadgeGrid";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import { Typography } from "@/components/ui/typography";
 import {
   ADVANCE_EMI_POLICY,
   GENERIC_POLICIES,
@@ -64,13 +65,15 @@ export default function PublicPoliciesPage() {
           {Object.values(GENERIC_POLICIES).map((policy) => (
             <article key={policy.title} className="public-card p-5">
               <h2 className="text-lg font-semibold text-foreground">{policy.title}</h2>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-                {policy.points.map((point) => (
-                  <li key={point} className="rounded-lg border border-white/75 bg-white/70 px-3 py-2">
-                    {point}
-                  </li>
-                ))}
-              </ul>
+              <Typography className="mt-3">
+                <ul className="space-y-2">
+                  {policy.points.map((point) => (
+                    <li key={point} className="rounded-lg border border-white/75 bg-white/70 px-3 py-2">
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </Typography>
             </article>
           ))}
         </div>

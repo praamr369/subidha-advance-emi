@@ -4,20 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import {
+  CrmOperationalWorkspace,
+  type CrmWorkspaceSectionCard,
+} from "@/components/workspace/CrmOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { getAdminCrmWorkspace, type CrmWorkspacePayload } from "@/services/admin-erp";
 import { listCustomers } from "@/services/customers";
 import { getCrmOverview, type CrmOverviewResponse } from "@/services/crm";
-
-type SectionCard = {
-  key: string;
-  label: string;
-  purpose: string;
-  href: string;
-  count: number | null;
-  status: "loading" | "ready" | "error";
-  statusMessage: string;
-};
 
 function findPipelineCount(payload: CrmWorkspacePayload | null, key: string): number {
   const row = payload?.crm_pipeline?.find((entry) => entry.key === key);
@@ -67,7 +61,7 @@ export default function AdminCrmOverviewPage() {
     };
   }, []);
 
-  const cards = useMemo<SectionCard[]>(() => {
+  const cards = useMemo<CrmWorkspaceSectionCard[]>(() => {
     const customersLoaded = customerCount !== null;
     const partyCount = overview?.summary.party_count;
     const leadsCount = overview?.summary.lead_count;
@@ -172,29 +166,7 @@ export default function AdminCrmOverviewPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
-          <article key={card.key} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-foreground">{card.label}</h2>
-              <span className="text-xs font-medium text-muted-foreground">
-                {card.status === "loading" ? "Loading" : card.status === "error" ? "Error" : "Ready"}
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">{card.purpose}</p>
-            <p className="mt-3 text-xs text-muted-foreground">{card.statusMessage}</p>
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <span className="text-lg font-semibold text-foreground">{card.count ?? "—"}</span>
-              <Link
-                href={card.href}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
-              >
-                Open
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
+      <CrmOperationalWorkspace cards={cards} />
     </WorkspaceShell>
   );
 }

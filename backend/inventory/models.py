@@ -1216,7 +1216,7 @@ class PurchaseNeed(InventoryTimeStampedModel):
     available_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
     shortage_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
     status = models.CharField(
-        max_length=12,
+        max_length=30,
         choices=PurchaseNeedStatus.choices,
         default=PurchaseNeedStatus.OPEN,
         db_index=True,

@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import PageHeader from "@/components/ui/PageHeader";
 import { ROUTES } from "@/lib/routes";
 import { getInventoryReadiness } from "@/services/inventory-ops";
@@ -78,16 +84,21 @@ export default function InventoryReadinessPage() {
       ) : null}
 
       {warnings.length > 0 ? (
-        <section className="rounded-2xl border border-amber-500/40 bg-amber-500/5 p-4">
-          <div className="text-sm font-semibold text-foreground">Warnings</div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            {warnings.map((w) => (
-              <li key={`${w.code}-${w.message}`}>
-                <span className="font-medium text-foreground">{w.code}</span>: {w.message}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Collapsible defaultOpen className="rounded-2xl border border-amber-500/40 bg-amber-500/5">
+          <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left [&[data-state=open]>svg]:rotate-180">
+            <div className="text-sm font-semibold text-foreground">Warnings ({warnings.length})</div>
+            <ChevronDown className="size-4 shrink-0 text-amber-900/70 transition-transform duration-200" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="list-disc space-y-1 px-4 pb-4 pl-9 text-sm text-muted-foreground">
+              {warnings.map((w) => (
+                <li key={`${w.code}-${w.message}`}>
+                  <span className="font-medium text-foreground">{w.code}</span>: {w.message}
+                </li>
+              ))}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
       ) : null}
     </div>
   );

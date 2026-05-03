@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Search } from "lucide-react";
 
@@ -8,6 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import { GlobalSearchOperationalWorkspace } from "@/components/workspace/GlobalSearchOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { searchAdminGlobal, type AdminGlobalSearchResult } from "@/services/admin-erp";
 
@@ -100,25 +100,7 @@ export default function AdminGlobalSearchPage() {
           <EmptyState title="No records found" description="Try a customer name, phone number, subscription number, or payment reference." />
         ) : null}
         {!loading && !error && results.length > 0 ? (
-          <div className="grid gap-3">
-            {results.map((result) => (
-              <Link
-                key={`${result.type}:${result.deep_link}:${result.title}`}
-                href={result.deep_link}
-                className="rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">{result.title}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">{result.subtitle}</div>
-                  </div>
-                  <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                    {result.type}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <GlobalSearchOperationalWorkspace results={results} />
         ) : null}
       </div>
     </PortalPage>

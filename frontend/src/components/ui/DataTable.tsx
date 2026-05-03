@@ -3,7 +3,17 @@
 
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  TableRowContextMenu,
+  type SafeRowContextAction,
+} from "@/components/ui/table-row-context-menu";
+
+export type TableDensity = "compact" | "comfortable";
+
+export const DATA_TABLE_DENSITY_STORAGE_KEY = "subidha:table-density:v1";
 
 type Align = "left" | "center" | "right";
 
@@ -26,7 +36,23 @@ type DataTableProps<T> = {
   pageSize?: number;
   onRowClick?: (row: T) => void;
   rowActions?: (row: T) => ReactNode;
+  /** Optional right-click shortcuts (links + copy only). */
+  buildRowContextMenu?: (row: T) => SafeRowContextAction[];
+  /** Show compact / comfortable density toggle (persists per browser). */
+  showDensityToggle?: boolean;
 };
+
+function readInitialDensity(): TableDensity {
+  if (typeof window === "undefined") {
+    return "comfortable";
+  }
+  try {
+    const stored = window.localStorage.getItem(DATA_TABLE_DENSITY_STORAGE_KEY);
+    return stored === "compact" ? "compact" : "comfortable";
+  } catch {
+    return "comfortable";
+  }
+}
 
 function compareValues(
   left: string | number | null | undefined,
@@ -58,10 +84,21 @@ export default function DataTable<T extends { id?: number | string }>({
   pageSize = 15,
   onRowClick,
   rowActions,
+  buildRowContextMenu,
+  showDensityToggle = false,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [density, setDensity] = useState<TableDensity>(() => readInitialDensity());
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DATA_TABLE_DENSITY_STORAGE_KEY, density);
+    } catch {
+      // preference-only
+    }
+  }, [density]);
 
   const processedRows = useMemo(() => {
     const nextRows = [...rows];
@@ -101,6 +138,18 @@ export default function DataTable<T extends { id?: number | string }>({
     }
   };
 
+  const thCell = cn(
+    density === "compact"
+      ? "px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em]"
+      : "px-4 py-3 text-xs font-semibold uppercase tracking-[0.15em]",
+    "text-muted-foreground"
+  );
+
+  const tdCell = cn(
+    density === "compact" ? "px-3 py-2 text-xs" : "px-4 py-3.5 text-sm",
+    "text-foreground"
+  );
+
   if (loading) {
     return (
       <div className="table-surface-frame flex h-64 items-center justify-center">
@@ -120,6 +169,28 @@ export default function DataTable<T extends { id?: number | string }>({
 
   return (
     <div className="table-surface-frame">
+      {showDensityToggle ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Table density</span>
+          <ToggleGroup
+            type="single"
+            value={density}
+            onValueChange={(value: string) => {
+              if (value === "compact" || value === "comfortable") {
+                setDensity(value);
+              }
+            }}
+            aria-label="Table density"
+          >
+            <ToggleGroupItem value="comfortable" aria-label="Comfortable spacing">
+              Comfortable
+            </ToggleGroupItem>
+            <ToggleGroupItem value="compact" aria-label="Compact spacing">
+              Compact
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+      ) : null}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_86%,white_14%)]">
@@ -137,7 +208,7 @@ export default function DataTable<T extends { id?: number | string }>({
                   <th
                     key={columnKey}
                     className={cn(
-                      "px-4 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground",
+                      thCell,
                       column.align === "right" && "text-right",
                       column.align === "center" && "text-center"
                     )}
@@ -178,9 +249,7 @@ export default function DataTable<T extends { id?: number | string }>({
                 );
               })}
               {rowActions && (
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Actions
-                </th>
+                <th className={cn(thCell, "text-right")}>Actions</th>
               )}
             </tr>
           </thead>
@@ -195,56 +264,66 @@ export default function DataTable<T extends { id?: number | string }>({
                 </td>
               </tr>
             ) : (
-              pageRows.map((row, index) => (
-                <tr
-                  key={row.id ?? index}
-                  onClick={(event) => {
-                    if (!onRowClick || isInteractiveTarget(event.target)) return;
-                    onRowClick(row);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!onRowClick) return;
-                    if (isInteractiveTarget(event.target)) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
+              pageRows.map((row, index) => {
+                const rowKey = row.id ?? index;
+                const actions = buildRowContextMenu?.(row) ?? [];
+
+                const tr = (
+                  <tr
+                    onClick={(event) => {
+                      if (!onRowClick || isInteractiveTarget(event.target)) return;
                       onRowClick(row);
-                    }
-                  }}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  className={cn(
-                    "border-b border-border/80 transition-colors-smooth hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--surface-muted)_68%,transparent)]",
-                    onRowClick && "cursor-pointer"
-                  )}
-                >
-                  {columns.map((column) => {
-                    const key = String(column.key);
-                    const fallback = (row as Record<string, unknown>)[key];
-                    const content = column.render
-                      ? column.render(row)
-                      : String(fallback ?? "-");
-                    return (
-                      <td
-                        key={key}
-                        className={cn(
-                          "px-4 py-3.5 text-foreground",
-                          column.align === "right" && "text-right",
-                          column.align === "center" && "text-center"
-                        )}
-                      >
-                        {content}
+                    }}
+                    onKeyDown={(event) => {
+                      if (!onRowClick) return;
+                      if (isInteractiveTarget(event.target)) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onRowClick(row);
+                      }
+                    }}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    className={cn(
+                      "border-b border-border/80 transition-colors-smooth hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--surface-muted)_68%,transparent)]",
+                      onRowClick && "cursor-pointer"
+                    )}
+                  >
+                    {columns.map((column) => {
+                      const key = String(column.key);
+                      const fallback = (row as Record<string, unknown>)[key];
+                      const content = column.render
+                        ? column.render(row)
+                        : String(fallback ?? "-");
+                      return (
+                        <td
+                          key={key}
+                          className={cn(
+                            tdCell,
+                            column.align === "right" && "text-right",
+                            column.align === "center" && "text-center"
+                          )}
+                        >
+                          {content}
+                        </td>
+                      );
+                    })}
+                    {rowActions && (
+                      <td className={cn(tdCell, "text-right")} onClick={(e) => e.stopPropagation()}>
+                        {rowActions(row)}
                       </td>
-                    );
-                  })}
-                  {rowActions && (
-                    <td
-                      className="px-4 py-3 text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {rowActions(row)}
-                    </td>
-                  )}
-                </tr>
-              ))
+                    )}
+                  </tr>
+                );
+
+                const wrapped =
+                  buildRowContextMenu && actions.length > 0 ? (
+                    <TableRowContextMenu actions={actions}>{tr}</TableRowContextMenu>
+                  ) : (
+                    tr
+                  );
+
+                return <Fragment key={rowKey}>{wrapped}</Fragment>;
+              })
             )}
           </tbody>
         </table>

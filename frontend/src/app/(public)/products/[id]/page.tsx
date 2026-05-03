@@ -3,11 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, ShoppingCart } from "lucide-react";
 
-import PublicProductMedia from "@/components/public/PublicProductMedia";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import PublicProductDetailMedia from "@/components/public/PublicProductDetailMedia";
 import { formatCurrency } from "@/lib/format";
-import { ROUTES } from "@/lib/routes";
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
+import { ROUTES } from "@/lib/routes";
 
 type ProductDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -65,6 +67,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     notFound();
   }
 
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+
   const applyHref = buildApplyHref(product);
   const mediaState = product.image ? "Uploaded product media" : "Media pending";
   const factRows = [
@@ -103,15 +108,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="space-y-4">
-            <PublicProductMedia
-              src={product.image}
-              alt={product.name}
-              badge={product.category || "Public catalogue"}
-              sizes="(max-width: 1024px) 100vw, 54vw"
-              priority
-              className="aspect-[5/4]"
-              imageClassName="transition duration-500 hover:scale-[1.02]"
-              fallbackLabel="Product media pending"
+            <PublicProductDetailMedia
+              product={product}
+              carouselAriaLabel={dictionary.common.mediaCarousel.productGalleryLabel}
+              prevLabel={dictionary.common.mediaCarousel.previousSlide}
+              nextLabel={dictionary.common.mediaCarousel.nextSlide}
             />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {factRows.map((fact) => (

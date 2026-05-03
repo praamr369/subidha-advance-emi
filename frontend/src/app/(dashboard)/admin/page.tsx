@@ -32,6 +32,7 @@ import DashboardWidgetBoard, {
 } from "@/components/dashboard/DashboardWidgetBoard";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import ActionButton from "@/components/ui/ActionButton";
 import { PageSection } from "@/components/ui/portal-primitives";
@@ -57,6 +58,7 @@ import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
 } from "@/services/reports";
+import type { DashboardWindowPreset } from "@/services/dashboard-types";
 import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 import { getStockSummary } from "@/services/inventory";
 import { cn } from "@/lib/utils";
@@ -186,6 +188,7 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operatorMode, setOperatorMode] = useState<OperatorMode>("SIMPLE");
+  const [summaryWindow, setSummaryWindow] = useState<DashboardWindowPreset>("THIS_MONTH");
 
   useEffect(() => {
     try {
@@ -213,9 +216,9 @@ export default function AdminDashboardPage() {
         hrPayload,
       ] =
         await Promise.all([
-          getDashboardSummaryV2({ window: "THIS_MONTH" }),
+          getDashboardSummaryV2({ window: summaryWindow }),
           getAdminDashboard(),
-          getAdminAnalyticsSummary({ window: "THIS_MONTH" }),
+          getAdminAnalyticsSummary({ window: summaryWindow }),
           getAdminDeliverySummary(),
           getBranchReportingOverview({ start_date: today, end_date: today }),
           getAdminOperationsQueueSummary(),
@@ -238,7 +241,7 @@ export default function AdminDashboardPage() {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }, []);
+  }, [summaryWindow]);
 
   useEffect(() => {
     void loadPage("initial");
@@ -270,6 +273,15 @@ export default function AdminDashboardPage() {
   const invoiceBalance = analyticsOverview?.invoice_balance ?? analytics?.invoice_document_posture.summary.invoice_balance ?? "0.00";
   const openLeadCount = analyticsOverview?.open_lead_count ?? analytics?.crm_customer_posture.leads.open_count ?? 0;
   const trackedInventoryItems = analytics?.inventory_movement_posture.tracked_item_count ?? 0;
+
+  const summaryWindowLabel =
+    summaryWindow === "THIS_MONTH"
+      ? "This month"
+      : summaryWindow === "LAST_30_DAYS"
+        ? "Last 30 days"
+        : summaryWindow === "DEFAULT"
+          ? "Default window"
+          : "Custom window";
 
   const attentionItems = useMemo(
     () =>
@@ -430,7 +442,24 @@ export default function AdminDashboardPage() {
                 ? "Canonical summary includes payment adjustments in scope"
                 : "Connected to live dashboard services"}
             </span>
-            <span className="text-xs sm:text-sm">Window: this month · Today: {formatDate(todayIso())}</span>
+            <span className="text-xs sm:text-sm">
+              Window: {summaryWindowLabel} · Today: {formatDate(todayIso())}
+            </span>
+            <ToggleGroup
+              type="single"
+              value={summaryWindow}
+              onValueChange={(value: string) => {
+                if (value === "THIS_MONTH" || value === "LAST_30_DAYS" || value === "DEFAULT") {
+                  setSummaryWindow(value as DashboardWindowPreset);
+                }
+              }}
+              aria-label="Executive dashboard summary window"
+              className="border-border bg-[var(--surface-muted)]/80"
+            >
+              <ToggleGroupItem value="THIS_MONTH">This month</ToggleGroupItem>
+              <ToggleGroupItem value="LAST_30_DAYS">Last 30 days</ToggleGroupItem>
+              <ToggleGroupItem value="DEFAULT">Default</ToggleGroupItem>
+            </ToggleGroup>
           </div>
           <ActionButton
             type="button"

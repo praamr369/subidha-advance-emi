@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PipelineBoard } from "@/components/admin/erp/PipelineBoard";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import { ErpCardsOperationalWorkspace } from "@/components/workspace/ErpCardsOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import type { WorkspacePayload } from "@/services/admin-erp";
 
@@ -13,11 +14,16 @@ export function WorkspaceCardsPage({
   subtitle,
   loader,
   boardTitle,
+  operationalWorkspace,
 }: {
   title: string;
   subtitle: string;
   boardTitle: string;
   loader: () => Promise<WorkspacePayload>;
+  operationalWorkspace?: {
+    storageKey: string;
+    persistLayout?: boolean;
+  };
 }) {
   const [payload, setPayload] = useState<WorkspacePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +82,22 @@ export function WorkspaceCardsPage({
           ]}
         />
       ) : null}
-      {payload ? <PipelineBoard title={boardTitle} cards={payload.cards} /> : <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">Loading workspace...</div>}
+      {payload ? (
+        operationalWorkspace ? (
+          <ErpCardsOperationalWorkspace
+            storageKey={operationalWorkspace.storageKey}
+            persistLayout={operationalWorkspace.persistLayout ?? true}
+            boardTitle={boardTitle}
+            cards={payload.cards}
+          />
+        ) : (
+          <PipelineBoard title={boardTitle} cards={payload.cards} />
+        )
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
+          Loading workspace...
+        </div>
+      )}
     </WorkspaceShell>
   );
 }

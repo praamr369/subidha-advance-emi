@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { Bookmark, Command as CommandIcon, CornerDownLeft, History, Search, Star, X } from "lucide-react";
 
 import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "@/config/navigation";
 import { workflowsForRole, type WorkflowDefinition, type WorkflowId } from "@/config/workflows";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ModalShell from "@/components/ui/ModalShell";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
+import { lookupAdminRouteRegistry } from "@/lib/admin-route-registry-lookup";
 import { searchAdminGlobal, type AdminGlobalSearchResult } from "@/services/admin-erp";
 import {
   readFavoritesSnapshot,
@@ -76,6 +79,60 @@ function flattenNav(groups: NavGroup[]): PaletteItem[] {
 
 function normalizeQuery(value: string) {
   return value.trim().toLowerCase();
+}
+
+function wrapPaletteRowHover(params: {
+  role: NavigationRole;
+  item: PaletteItem;
+  href: string;
+  trigger: ReactElement;
+}): ReactElement {
+  const { role, item, href, trigger } = params;
+
+  if (item.kind === "global") {
+    return (
+      <HoverCard openDelay={160}>
+        <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+        <HoverCardContent className="w-80" side="left" align="start">
+          <div className="text-sm font-semibold text-foreground">{item.label}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              {item.type}
+            </span>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+              {item.status || "Open"}
+            </span>
+          </div>
+          <div className="mt-2 truncate text-[11px] font-medium text-muted-foreground">{href}</div>
+        </HoverCardContent>
+      </HoverCard>
+    );
+  }
+
+  if (role === "ADMIN" && (item.kind === "nav" || item.kind === "workflow")) {
+    const registryMatch = lookupAdminRouteRegistry(href);
+    if (!registryMatch) {
+      return trigger;
+    }
+    return (
+      <HoverCard openDelay={180}>
+        <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+        <HoverCardContent className="w-80" side="left" align="start">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{registryMatch.group}</div>
+          <div className="mt-1 text-sm font-semibold text-foreground">{registryMatch.label}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{registryMatch.description}</p>
+          {registryMatch.status === "deferred" ? (
+            <div className="mt-3 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+              Deferred in registry
+            </div>
+          ) : null}
+        </HoverCardContent>
+      </HoverCard>
+    );
+  }
+
+  return trigger;
 }
 
 function shouldIgnoreShortcutTarget(target: EventTarget | null) {
@@ -260,18 +317,27 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     );
 
     if (item.kind === "workflow") {
+      const workflowTrigger = (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openWorkflow(item.id, { query: undefined });
+          }}
+          className={cn(rowActionClassName, "text-left")}
+        >
+          {rowContent}
+        </button>
+      );
+      const workflowRow = wrapPaletteRowHover({
+        role,
+        item,
+        href: item.href,
+        trigger: workflowTrigger,
+      });
       return (
         <div key={`${item.kind}:${item.id}`} className="flex items-start gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              openWorkflow(item.id, { query: undefined });
-            }}
-            className={cn(rowActionClassName, "text-left")}
-          >
-            {rowContent}
-          </button>
+          {workflowRow}
           {sessionId ? (
             <button
               type="button"
@@ -290,11 +356,20 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
       );
     }
 
+    const linkTrigger = (
+      <Link href={item.href} onClick={onClose} className={rowActionClassName}>
+        {rowContent}
+      </Link>
+    );
+    const linkRow = wrapPaletteRowHover({
+      role,
+      item,
+      href: item.href,
+      trigger: linkTrigger,
+    });
     return (
       <div key={`${item.kind}:${item.href}`} className="flex items-start gap-2">
-        <Link href={item.href} onClick={onClose} className={rowActionClassName}>
-          {rowContent}
-        </Link>
+        {linkRow}
         {sessionId ? (
           <button
             type="button"
@@ -345,12 +420,27 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search operations, registers, workflows…"
-                className="h-11 w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-3 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                aria-describedby="command-palette-search-hint"
+                className="h-11 w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-[7.25rem] text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
               />
+              <span
+                id="command-palette-search-hint"
+                className="pointer-events-none absolute right-3 top-1/2 hidden max-w-[10rem] -translate-y-1/2 text-right text-[10px] leading-tight text-muted-foreground sm:block"
+              >
+                {role === "ADMIN"
+                  ? "Type 2+ letters to merge global ERP hits."
+                  : "Typing filters this palette list."}
+              </span>
             </div>
-            <div className="popup-control inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground">
-              <CommandIcon className="h-4 w-4" />
-              Ctrl K
+            <div className="popup-control inline-flex flex-wrap items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <CommandIcon className="h-4 w-4 shrink-0" />
+              <span className="inline-flex items-center gap-1">
+                <Kbd>Ctrl</Kbd>
+                <span className="text-[10px] font-normal text-muted-foreground">/</span>
+                <Kbd className="min-w-[26px] px-2">⌘</Kbd>
+                <span className="text-muted-foreground">+</span>
+                <Kbd>K</Kbd>
+              </span>
             </div>
           </div>
         </div>

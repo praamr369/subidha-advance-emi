@@ -5,11 +5,41 @@ import { useRouter } from "next/navigation";
 
 import PortalPage from "@/components/ui/PortalPage";
 import DataTable from "@/components/ui/DataTable";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { SafeRowContextAction } from "@/components/ui/table-row-context-menu";
+import { ROUTES } from "@/lib/routes";
 import { listPayments, type PaymentRecord } from "@/services/payments";
 import { downloadCsv } from "@/lib/export/csv";
 
 function money(value: string): string {
   return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function paymentRowContextActions(row: PaymentRecord): SafeRowContextAction[] {
+  const actions: SafeRowContextAction[] = [
+    { type: "link", label: "Open payment detail", href: `${ROUTES.admin.payments}/${row.id}` },
+    { type: "copy", label: "Copy payment ID", value: String(row.id) },
+  ];
+  const reference = row.reference_no?.trim();
+  if (reference) {
+    actions.push({ type: "copy", label: "Copy reference number", value: reference });
+  }
+  actions.push({ type: "separator" });
+  actions.push({
+    type: "link",
+    label: "Open subscription",
+    href: `${ROUTES.admin.subscriptions}/${row.subscription}`,
+  });
+  if (row.customer) {
+    actions.push({
+      type: "link",
+      label: "Open customer",
+      href: `${ROUTES.admin.customers}/${row.customer}`,
+    });
+  }
+  actions.push({ type: "separator" });
+  actions.push({ type: "link", label: "Audit events", href: ROUTES.admin.auditEvents });
+  return actions;
 }
 
 export default function AdminPaymentListPage() {
@@ -84,6 +114,28 @@ export default function AdminPaymentListPage() {
         </button>
       </section>
 
+      <section style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Quick method filter</div>
+        <ToggleGroup
+          type="single"
+          value={method || "ALL"}
+          onValueChange={(value: string) => {
+            setPage(1);
+            if (value === "ALL") {
+              setMethod("");
+            } else if (value === "CASH" || value === "UPI" || value === "BANK") {
+              setMethod(value);
+            }
+          }}
+          aria-label="Payment method filter"
+        >
+          <ToggleGroupItem value="ALL">All</ToggleGroupItem>
+          <ToggleGroupItem value="CASH">Cash</ToggleGroupItem>
+          <ToggleGroupItem value="UPI">UPI</ToggleGroupItem>
+          <ToggleGroupItem value="BANK">Bank</ToggleGroupItem>
+        </ToggleGroup>
+      </section>
+
       <section
         style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}
       >
@@ -117,6 +169,8 @@ export default function AdminPaymentListPage() {
         loading={loading}
         error={error}
         emptyText="No payments match this filter."
+        showDensityToggle
+        buildRowContextMenu={paymentRowContextActions}
         onRowClick={(row) => router.push(`/admin/payments/${row.id}`)}
         columns={[
           { key: "id", title: "Payment ID" },

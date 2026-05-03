@@ -26,11 +26,13 @@ test.describe("admin dashboard smoke", () => {
 
   test("admin advanced mode still accessible via operator mode toggle", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.getByTestId("operator-mode-toggle")).toBeVisible();
-    await expect(page.getByTestId("operator-mode-toggle")).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
-    await page.getByTestId("operator-mode-toggle").click();
-    await expect(page.getByTestId("operator-mode-toggle")).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+    const operatorToggle = page.getByTestId("operator-mode-toggle");
+    await expect(operatorToggle).toBeVisible();
+    await expect(operatorToggle).toHaveAttribute("aria-label", "Operator navigation mode");
+    await operatorToggle.getByRole("radio", { name: /advanced erp/i }).click();
     await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
+    await operatorToggle.getByRole("radio", { name: /simple workflow/i }).click();
+    await expect(page.getByRole("heading", { name: /Daily Operator Dashboard/i })).toBeVisible();
   });
 });
 

@@ -4,6 +4,7 @@ import CtaBanner from "@/components/public/CtaBanner";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import WinnerHistoryProductCarousel from "@/components/public/WinnerHistoryProductCarousel";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
@@ -59,6 +60,14 @@ export default async function WinnerHistoryPage() {
           title="Published records"
           description="If the backend has not published revealed draw records yet, the site shows an honest empty state."
         />
+        {!error && winners.length > 0 ? (
+          <WinnerHistoryProductCarousel
+            winners={winners}
+            ariaCarouselLabel={dictionary.common.mediaCarousel.winnerHighlightsLabel}
+            prevLabel={dictionary.common.mediaCarousel.previousSlide}
+            nextLabel={dictionary.common.mediaCarousel.nextSlide}
+          />
+        ) : null}
         {error ? (
           <div className="rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
             {error}

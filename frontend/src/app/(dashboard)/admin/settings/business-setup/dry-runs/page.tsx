@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import ErrorState from "@/components/feedback/ErrorState";
 import ActionButton from "@/components/ui/ActionButton";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import PageHeader from "@/components/ui/PageHeader";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -59,6 +65,35 @@ const SECTIONS: { id: string; title: string; description: string; keys: string[]
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+function DryRunProblemCell({ row }: { row: DryRunResultRow }) {
+  const expandable =
+    row.detail.length > 140 || row.status === "WARNING" || row.status === "BLOCKED" || row.status === "FAILED";
+
+  if (!expandable) {
+    return (
+      <>
+        <div className="font-medium text-foreground">{row.title}</div>
+        <div className="mt-1 text-muted-foreground">{row.detail}</div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="font-medium text-foreground">{row.title}</div>
+      <Collapsible defaultOpen={row.status === "BLOCKED"} className="mt-1">
+        <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-lg text-xs font-semibold text-primary hover:underline [&[data-state=open]>svg]:rotate-180">
+          Problem detail
+          <ChevronDown className="size-3.5 transition-transform duration-200" aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 max-w-xl whitespace-pre-wrap text-muted-foreground">{row.detail}</div>
+        </CollapsibleContent>
+      </Collapsible>
+    </>
+  );
 }
 
 function statusBadgeClass(status: string): string {
@@ -384,8 +419,7 @@ export default function DryRunControlCenterPage() {
                     <td className="px-3 py-2 align-top text-muted-foreground">{row.check}</td>
                     <td className="px-3 py-2 align-top">{row.module}</td>
                     <td className="px-3 py-2 align-top">
-                      <div className="font-medium text-foreground">{row.title}</div>
-                      <div className="mt-1 text-muted-foreground">{row.detail}</div>
+                      <DryRunProblemCell row={row} />
                     </td>
                     <td className="px-3 py-2 align-top text-muted-foreground">{row.recommended_action}</td>
                     <td className="px-3 py-2 align-top">

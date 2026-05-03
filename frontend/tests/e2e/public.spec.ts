@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 
 import { readSmokeManifest } from "./helpers/smoke-data";
 
+test("public primary navigation exposes catalogue links", async ({ page }) => {
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Primary navigation" });
+  await expect(nav.getByRole("link", { name: /products/i }).first()).toBeVisible();
+});
+
 test("public home loads with apply nav, live stats, and latest winner widget", async ({
   page,
 }) => {

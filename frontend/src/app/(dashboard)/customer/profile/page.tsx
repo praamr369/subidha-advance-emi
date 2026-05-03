@@ -25,6 +25,7 @@ import {
   QuickActionGrid,
 } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
@@ -46,6 +47,7 @@ import {
   type CustomerKycDocumentRecord,
   type CustomerReferralRecord,
 } from "@/services/customer/index";
+import { initialsFromDisplayName } from "@/lib/display-name";
 
 function money(value: string | number): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -739,23 +741,17 @@ export default function CustomerProfilePage() {
                 {photoSuccess}
               </WorkspaceNotice>
             )}
-            {photoUrl ? (
-              <div className="flex items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoUrl}
-                  alt="Profile photo"
-                  className="h-20 w-20 rounded-full border border-border object-cover"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Profile photo is set. You can upload a new one to replace it.
-                </p>
-              </div>
-            ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar className="size-20 rounded-full border-border">
+                {photoUrl ? <AvatarImage src={photoUrl} alt="Profile photo" className="rounded-full object-cover" /> : null}
+                <AvatarFallback className="rounded-full text-lg">{initialsFromDisplayName(name || data?.name || "?")}</AvatarFallback>
+              </Avatar>
               <p className="text-sm text-muted-foreground">
-                No profile photo uploaded. Click &ldquo;Upload photo&rdquo; to add one.
+                {photoUrl
+                  ? "Profile photo is set. You can upload a new one to replace it."
+                  : 'No profile photo uploaded. Click "Upload photo" to add one.'}
               </p>
-            )}
+            </div>
           </WorkspaceSection>
 
           {/* Phase 1 – KYC Documents */}
