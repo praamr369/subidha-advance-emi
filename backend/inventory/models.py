@@ -505,6 +505,22 @@ class StockAdjustmentLine(InventoryTimeStampedModel):
     )
     quantity_delta = models.DecimalField(max_digits=12, decimal_places=3)
     notes = models.CharField(max_length=255, blank=True, default="")
+    # Frozen unit economic cost used for valuation / bridge posting (not selling price).
+    unit_cost_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    # abs(quantity_delta) * unit_cost_snapshot at successful post time (audit trail).
+    valuation_amount_snapshot = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
 
     class Meta:
         db_table = "inventory_stock_adjustment_lines"
@@ -518,6 +534,143 @@ class StockAdjustmentLine(InventoryTimeStampedModel):
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class OpeningStockBatch(InventoryTimeStampedModel):
+    """CSV import identity / audit envelope (additive; duplicate-safe imports)."""
+
+    batch_key = models.CharField(max_length=64, unique=True, db_index=True)
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opening_stock_batches",
+    )
+    last_preview_payload = models.JSONField(null=True, blank=True)
+    last_apply_summary = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "inventory_opening_stock_batches"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.batch_key
+
+
+class OpeningStockEntryStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class OpeningStockEntrySource(models.TextChoices):
+    MANUAL = "MANUAL", "Manual"
+    CSV_IMPORT = "CSV_IMPORT", "CSV Import"
+
+
+class OpeningStockEntry(InventoryTimeStampedModel):
+    """
+    Auditable opening-stock workflow row (draft → posted ledger movement).
+    Posted rows are immutable; corrections use StockAdjustment drafts.
+    """
+
+    batch = models.ForeignKey(
+        OpeningStockBatch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="entries",
+    )
+    csv_row_number = models.PositiveIntegerField(null=True, blank=True)
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="opening_stock_entries",
+    )
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="opening_stock_entries",
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(QUANTITY_ZERO)],
+    )
+    unit_cost_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    valuation_amount_snapshot = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    effective_date = models.DateField(db_index=True)
+    note = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=12,
+        choices=OpeningStockEntryStatus.choices,
+        default=OpeningStockEntryStatus.DRAFT,
+        db_index=True,
+    )
+    source = models.CharField(
+        max_length=16,
+        choices=OpeningStockEntrySource.choices,
+        default=OpeningStockEntrySource.MANUAL,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_opening_stock_entries",
+    )
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="posted_opening_stock_entries",
+    )
+    posted_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    correction_adjustment = models.ForeignKey(
+        StockAdjustment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opening_stock_correction_for_entries",
+    )
+
+    class Meta:
+        db_table = "inventory_opening_stock_entries"
+        ordering = ["-effective_date", "-id"]
+        indexes = [
+            models.Index(fields=["status", "effective_date"]),
+            models.Index(fields=["inventory_item", "stock_location", "effective_date"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("batch", "csv_row_number"),
+                condition=models.Q(batch__isnull=False) & models.Q(csv_row_number__isnull=False),
+                name="opening_stock_entry_batch_csv_row_uniq",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"OSE-{self.pk}:{self.inventory_item_id}:{self.status}"
 
 
 class PurchaseBill(InventoryTimeStampedModel):

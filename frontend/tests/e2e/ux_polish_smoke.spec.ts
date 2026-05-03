@@ -17,6 +17,14 @@ test.describe("UX polish smoke", () => {
       await page.getByTestId("header-notification-bell").click();
       await expect(page.getByRole("dialog", { name: "Notifications menu" })).toBeVisible();
     });
+
+    test("opening stock workspace renders without persistent busy overlay", async ({ page }) => {
+      await page.goto("/admin/inventory/opening-stock");
+      await expect(
+        page.locator("#main-content").getByRole("heading", { name: /^Opening Stock$/i })
+      ).toBeVisible({ timeout: 45_000 });
+      await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 45_000 });
+    });
   });
 
   test.describe("customer dashboard", () => {

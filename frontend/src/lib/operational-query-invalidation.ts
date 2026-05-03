@@ -129,6 +129,21 @@ export async function invalidateAfterProductInventoryMutation(
   }
 }
 
+/** After opening stock manual post, CSV apply, or correction draft creation. */
+export async function invalidateAfterOpeningStockMutation(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "opening-stock"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-movements"] }),
+    queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-summary"] }),
+    queryClient.invalidateQueries({ queryKey: inventoryKeys.workspace() }),
+    queryClient.invalidateQueries({ queryKey: [...productKeys.all, "list"] }),
+    queryClient.invalidateQueries({ queryKey: productKeys.billingSearchPrefix }),
+    queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    invalidateDashboardCollectionsSubscriptions(queryClient),
+  ]);
+}
+
 /**
  * @deprecated Use `invalidateAfterDirectSaleCreate` or `invalidateAfterDirectSaleCollect`.
  * Broad invalidation kept for backwards compatibility with existing call sites.

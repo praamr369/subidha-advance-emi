@@ -8,15 +8,16 @@ from inventory.models import (
     GoodsReceipt,
     GoodsReceiptLine,
     InventoryItem,
+    OpeningStockEntry,
     PurchaseOrder,
     PurchaseOrderLine,
     PurchaseBill,
     PurchaseBillLine,
-    StockLocation,
     StockAdjustment,
     StockAdjustmentLine,
     StockAdjustmentStatus,
     StockLedger,
+    StockLocation,
     VendorBill,
     VendorBillLine,
     VendorContact,
@@ -112,6 +113,25 @@ class StockLedgerSerializer(serializers.ModelSerializer):
 class StockAdjustmentLineSerializer(serializers.ModelSerializer):
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
     product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+    inventory_item_standard_unit_cost = serializers.DecimalField(
+        source="inventory_item.standard_unit_cost",
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+        allow_null=True,
+    )
+    unit_cost_snapshot = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    valuation_amount_snapshot = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = StockAdjustmentLine
@@ -120,19 +140,63 @@ class StockAdjustmentLineSerializer(serializers.ModelSerializer):
             "inventory_item",
             "inventory_item_sku",
             "product_name",
+            "inventory_item_standard_unit_cost",
             "quantity_delta",
+            "unit_cost_snapshot",
+            "valuation_amount_snapshot",
             "notes",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "inventory_item_standard_unit_cost",
+            "valuation_amount_snapshot",
+        ]
+
+    def validate_unit_cost_snapshot(self, value):
+        if value is None:
+            return None
+        dec = _money(value)
+        if dec < Decimal("0.00"):
+            raise serializers.ValidationError("Unit cost cannot be negative.")
+        return dec
 
 
 def _replace_stock_adjustment_lines(adjustment: StockAdjustment, lines: list[dict]):
     adjustment.lines.all().delete()
-    StockAdjustmentLine.objects.bulk_create(
-        [StockAdjustmentLine(stock_adjustment=adjustment, **line) for line in lines]
-    )
+    if not lines:
+        return
+    bulk_rows = []
+    normalized: list[tuple[int, dict]] = []
+    item_ids: list[int] = []
+    for raw in lines:
+        inv = raw["inventory_item"]
+        pk = inv.pk if hasattr(inv, "pk") else int(inv)
+        item_ids.append(pk)
+        normalized.append((pk, raw))
+    items_by_id = InventoryItem.objects.in_bulk(set(item_ids))
+    for pk, raw in normalized:
+        item = items_by_id[pk]
+        snapshot = raw.get("unit_cost_snapshot")
+        if snapshot is not None:
+            snapshot_dec = _money(snapshot)
+        else:
+            std = item.standard_unit_cost
+            snapshot_dec = _money(std) if std is not None else None
+        bulk_rows.append(
+            StockAdjustmentLine(
+                stock_adjustment=adjustment,
+                inventory_item_id=pk,
+                quantity_delta=raw["quantity_delta"],
+                notes=(raw.get("notes") or "").strip(),
+                unit_cost_snapshot=snapshot_dec,
+                valuation_amount_snapshot=None,
+            )
+        )
+    StockAdjustmentLine.objects.bulk_create(bulk_rows)
 
 
 class StockAdjustmentSerializer(serializers.ModelSerializer):
@@ -364,6 +428,97 @@ class OpeningStockImportPreviewSerializer(serializers.Serializer):
 
 class OpeningStockImportPostSerializer(serializers.Serializer):
     as_of_date = serializers.DateField(required=True)
+
+
+_OPENING_STOCK_ENTRY_READ_FIELDS = [
+    "id",
+    "batch",
+    "batch_key",
+    "csv_row_number",
+    "inventory_item",
+    "product_code",
+    "product_name",
+    "sku",
+    "stock_location",
+    "stock_location_code",
+    "stock_location_name",
+    "quantity",
+    "unit_cost_snapshot",
+    "valuation_amount_snapshot",
+    "effective_date",
+    "note",
+    "status",
+    "source",
+    "created_by",
+    "posted_by",
+    "posted_at",
+    "cancelled_at",
+    "correction_adjustment",
+    "created_at",
+    "updated_at",
+]
+
+
+class OpeningStockEntrySerializer(serializers.ModelSerializer):
+    product_code = serializers.CharField(source="inventory_item.product.product_code", read_only=True)
+    product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+    sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
+    stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    batch_key = serializers.CharField(source="batch.batch_key", read_only=True, allow_null=True)
+
+    class Meta:
+        model = OpeningStockEntry
+        fields = _OPENING_STOCK_ENTRY_READ_FIELDS
+        read_only_fields = _OPENING_STOCK_ENTRY_READ_FIELDS
+
+
+class OpeningStockEntryWriteSerializer(serializers.ModelSerializer):
+    """Writable payload for manual draft create/update."""
+
+    class Meta:
+        model = OpeningStockEntry
+        fields = [
+            "inventory_item",
+            "stock_location",
+            "quantity",
+            "unit_cost_snapshot",
+            "effective_date",
+            "note",
+        ]
+        extra_kwargs = {
+            "effective_date": {"required": True},
+            "note": {"required": False, "allow_blank": True},
+            "unit_cost_snapshot": {"required": False, "allow_null": True},
+        }
+
+    def validate_quantity(self, value):
+        if value is not None and Decimal(str(value)) < Decimal("0"):
+            raise serializers.ValidationError("Quantity cannot be negative.")
+        return value
+
+
+class OpeningStockPostSerializer(serializers.Serializer):
+    pass
+
+
+class OpeningStockCancelSerializer(serializers.Serializer):
+    pass
+
+
+class OpeningStockCorrectionSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=True, allow_blank=False)
+    quantity_delta = serializers.DecimalField(max_digits=12, decimal_places=3, required=True)
+    unit_cost_snapshot = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True
+    )
+    adjustment_date = serializers.DateField(required=False, allow_null=True)
+
+
+class OpeningStockBulkApplySerializer(serializers.Serializer):
+    dry_run = serializers.BooleanField(required=False, default=False)
+    auto_post = serializers.BooleanField(required=False, default=False)
+    default_effective_date = serializers.DateField(required=False, allow_null=True)
 
 
 class VendorContactSerializer(serializers.ModelSerializer):

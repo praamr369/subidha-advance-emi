@@ -144,7 +144,9 @@ test("phase-4 billing, inventory, and reconciliation surfaces share the business
   await expect(page.locator("body")).toContainText("Inventory route map");
 
   await page.goto("/admin/inventory/opening-stock");
-  await expect(page.getByRole("heading", { name: "Opening Stock Import" }).first()).toBeVisible();
+  await expect(
+    page.locator("#main-content").getByRole("heading", { name: /^Opening Stock$/ })
+  ).toBeVisible();
   await expect(page.locator("body")).toContainText("Inventory route map");
 
   await page.goto("/admin/reconciliation");

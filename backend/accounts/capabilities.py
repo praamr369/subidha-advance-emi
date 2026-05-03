@@ -24,6 +24,7 @@ ROLE_CAPABILITY_FALLBACKS: dict[str, set[str]] = {
         "draw.commit",
         "draw.complete",
         "inventory.adjust",
+        "inventory.opening_stock",
         "vendor.manage",
         "crm.manage",
         "reports.export",

@@ -111,6 +111,12 @@ export const inventoryKeys = {
   requirement: (id: number) => [...inventoryKeys.all, "requirement", id] as const,
   stockMovements: (params?: Record<string, string | undefined>) =>
     [...inventoryKeys.all, "stock-movements", stableQueryParams(params ?? {})] as const,
+  /** Admin opening stock workflow (draft/post/CSV batches) */
+  openingStockEntries: (params?: Record<string, string | number | undefined>) =>
+    [...inventoryKeys.all, "opening-stock", "entries", stableQueryParams(params ?? {})] as const,
+  openingStockBatches: () => [...inventoryKeys.all, "opening-stock", "batches"] as const,
+  stockSummary: (params?: Record<string, string | number | undefined>) =>
+    [...inventoryKeys.all, "stock-summary", stableQueryParams(params ?? {})] as const,
 };
 
 export const customerKeys = {

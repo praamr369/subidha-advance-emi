@@ -335,6 +335,11 @@ def approve_stock_adjustment(*, stock_adjustment_id: int, approved_by):
     return adjustment, True
 
 
+UNIT_COST_REQUIRED_BEFORE_POSTING_MSG = (
+    "Unit cost is required before posting this stock adjustment."
+)
+
+
 @transaction.atomic
 def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     adjustment = (
@@ -342,16 +347,43 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=stock_adjustment_id)
     )
-    if adjustment.status == StockAdjustmentStatus.POSTED and adjustment.posted_journal_entry_id:
+    if adjustment.status == StockAdjustmentStatus.POSTED:
         return adjustment, False
-    if adjustment.status not in {StockAdjustmentStatus.APPROVED, StockAdjustmentStatus.POSTED}:
+    if adjustment.status != StockAdjustmentStatus.APPROVED:
         raise ValueError("Only approved stock adjustments can be posted.")
     if not (adjustment.reason or "").strip():
         raise ValueError("Reason is required before posting a stock adjustment.")
 
+    lines_list = list(
+        adjustment.lines.select_related("inventory_item").order_by("id")
+    )
+    if not lines_list:
+        raise ValueError("Stock adjustment lines are required before posting.")
+
+    adjustment_amount = Decimal("0.00")
+    for line in lines_list:
+        if line.unit_cost_snapshot is not None:
+            resolved_unit_cost = _money(line.unit_cost_snapshot)
+        else:
+            std = line.inventory_item.standard_unit_cost
+            if std is None:
+                raise ValueError(UNIT_COST_REQUIRED_BEFORE_POSTING_MSG)
+            resolved_unit_cost = _money(std)
+
+        qty_abs = abs(_quantity(line.quantity_delta))
+        line_valuation = _money(qty_abs * resolved_unit_cost)
+        adjustment_amount += line_valuation
+
+        save_fields = ["valuation_amount_snapshot", "updated_at"]
+        line.valuation_amount_snapshot = line_valuation
+        if line.unit_cost_snapshot is None:
+            line.unit_cost_snapshot = resolved_unit_cost
+            save_fields.insert(0, "unit_cost_snapshot")
+        line.save(update_fields=save_fields)
+
     created_count = 0
     existing_count = 0
-    for line in adjustment.lines.all():
+    for line in lines_list:
         movement_type = (
             StockMovementType.ADJUSTMENT_IN
             if line.quantity_delta > 0
@@ -378,18 +410,11 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     adjustment.status = StockAdjustmentStatus.POSTED
     adjustment.posted_by = posted_by
     adjustment.posted_at = timezone.now()
-    adjustment_amount = sum(
-        (
-            abs(Decimal(str(line.quantity_delta or "0.000")))
-            * Decimal(str(line.unit_cost or "0.00"))
-        )
-        for line in adjustment.lines.all()
-    )
     adjustment_journal = None
     if adjustment_amount > Decimal("0.00"):
         accounts = ensure_phase3_system_accounts()
         movement_side = next(
-            (line.quantity_delta for line in adjustment.lines.all() if line.quantity_delta != 0),
+            (line.quantity_delta for line in lines_list if line.quantity_delta != 0),
             Decimal("0.000"),
         )
         journal_lines = (

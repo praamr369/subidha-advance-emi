@@ -303,6 +303,13 @@ from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestOptionsView,
     AdminSubscriptionRequestRejectView,
 )
+from api.v1.views.admin_opening_stock import (
+    AdminOpeningStockBatchHistoryView,
+    AdminOpeningStockBulkApplyView,
+    AdminOpeningStockBulkPreviewView,
+    AdminOpeningStockEntryViewSet,
+    AdminOpeningStockTemplateView,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -317,6 +324,11 @@ router.register(r"product-categories", ProductCategoryMasterViewSet, basename="a
 router.register(r"product-subcategories", ProductSubcategoryMasterViewSet, basename="admin-product-subcategories")
 router.register(r"product-units", ProductUnitOfMeasureMasterViewSet, basename="admin-product-units")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
+router.register(
+    r"inventory/opening-stock",
+    AdminOpeningStockEntryViewSet,
+    basename="admin-opening-stock",
+)
 
 urlpatterns = [
     path("contracts/rent/", AdminRentContractCreateView.as_view()),
@@ -538,6 +550,16 @@ urlpatterns = [
     path("sales/workspace/", AdminSalesWorkspaceView.as_view()),
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
+    path(
+        "inventory/opening-stock/import/preview/",
+        AdminOpeningStockBulkPreviewView.as_view(),
+    ),
+    path(
+        "inventory/opening-stock/import/apply/",
+        AdminOpeningStockBulkApplyView.as_view(),
+    ),
+    path("inventory/opening-stock/template/", AdminOpeningStockTemplateView.as_view()),
+    path("inventory/opening-stock/batches/", AdminOpeningStockBatchHistoryView.as_view()),
     path("finance/workspace/", AdminFinanceWorkspaceView.as_view()),
     path("delivery/workspace/", AdminDeliveryWorkspaceView.as_view()),
     path("partner-operations/workspace/", AdminPartnerOperationsWorkspaceView.as_view()),

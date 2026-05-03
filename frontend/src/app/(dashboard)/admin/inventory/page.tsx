@@ -161,7 +161,7 @@ export default function AdminInventoryPage() {
         { href: ROUTES.admin.billingRegister, label: "Billing Register", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: ROUTES.admin.inventoryAdjustments, label: "Adjustments", variant: "secondary" },
-        { href: ROUTES.admin.inventoryOpeningStock, label: "Opening Stock Import", variant: "secondary" },
+        { href: ROUTES.admin.inventoryOpeningStock, label: "Opening Stock", variant: "secondary" },
       ]}
       stats={[
         { label: "Tracked Items", value: String(itemsCount), tone: "info" },

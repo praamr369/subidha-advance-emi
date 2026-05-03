@@ -7,7 +7,7 @@ type PaginatedResponse<T> = {
   results: T[];
 };
 
-type QueryValue = string | number | undefined | null;
+type QueryValue = string | number | boolean | undefined | null;
 
 function buildQuery(params: Record<string, QueryValue>): string {
   const search = new URLSearchParams();
@@ -149,6 +149,72 @@ export type OpeningStockPostResponse = {
   digest: string;
 };
 
+/** Admin `/admin/inventory/opening-stock/` workflow (draft → post, auditable). */
+export type OpeningStockEntryRow = {
+  id: number;
+  batch: number | null;
+  batch_key: string | null;
+  csv_row_number: number | null;
+  inventory_item: number;
+  product_code: string;
+  product_name: string;
+  sku: string | null;
+  stock_location: number;
+  stock_location_code: string;
+  stock_location_name: string;
+  quantity: string;
+  unit_cost_snapshot: string | null;
+  valuation_amount_snapshot: string | null;
+  effective_date: string;
+  note: string;
+  status: "DRAFT" | "POSTED" | "CANCELLED";
+  source: string;
+  created_by: number | null;
+  posted_by: number | null;
+  posted_at: string | null;
+  cancelled_at: string | null;
+  correction_adjustment: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OpeningStockBulkPreviewRow = OpeningStockPreviewRow & {
+  unit_cost?: string | null;
+  effective_date?: string | null;
+  update_mode?: string | null;
+  quantity_delta?: string | null;
+};
+
+export type OpeningStockBulkPreview = {
+  batch_key: string;
+  total_rows: number;
+  error_rows: number;
+  warning_rows: number;
+  ready_rows: number;
+  total_quantity_preview: string;
+  total_valuation_preview: string;
+  rows: OpeningStockBulkPreviewRow[];
+};
+
+export type OpeningStockBulkApplySummary = {
+  batch_key: string;
+  dry_run: boolean;
+  created: number;
+  updated: number;
+  posted: number;
+  skipped: number;
+  corrections_created: number;
+  failed: number;
+};
+
+export type OpeningStockBatchHistoryRow = {
+  batch_key: string;
+  original_filename: string;
+  created_at: string;
+  created_by_username: string | null;
+  last_apply_summary: OpeningStockBulkApplySummary | Record<string, unknown> | null;
+};
+
 export type InventoryValuationRow = {
   inventory_item_id: number;
   product_code: string;
@@ -173,7 +239,10 @@ export type StockAdjustmentLine = {
   inventory_item: number;
   inventory_item_sku?: string;
   product_name?: string;
+  inventory_item_standard_unit_cost?: string | null;
   quantity_delta: string;
+  unit_cost_snapshot?: string | null;
+  valuation_amount_snapshot?: string | null;
   notes?: string;
 };
 
@@ -265,6 +334,7 @@ export type CreateStockAdjustmentPayload = {
   lines: Array<{
     inventory_item: number;
     quantity_delta: string;
+    unit_cost_snapshot?: string | null;
     notes?: string;
   }>;
 };
@@ -397,6 +467,117 @@ export function listGoodsReceipts(params: Record<string, QueryValue> = {}) {
 
 export function listVendorBills(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<VendorBill>>(`/inventory/vendor-bills/${buildQuery(params)}`);
+}
+
+export function listAdminOpeningStockEntries(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<OpeningStockEntryRow>>(
+    `/admin/inventory/opening-stock/${buildQuery(params)}`
+  );
+}
+
+export function createAdminOpeningStockEntry(payload: {
+  inventory_item: number;
+  stock_location: number;
+  quantity: string;
+  effective_date: string;
+  unit_cost_snapshot?: string | null;
+  note?: string;
+}) {
+  return apiFetch<OpeningStockEntryRow>("/admin/inventory/opening-stock/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchAdminOpeningStockEntry(
+  id: number,
+  payload: Partial<{
+    inventory_item: number;
+    stock_location: number;
+    quantity: string;
+    effective_date: string;
+    unit_cost_snapshot: string | null;
+    note: string;
+  }>
+) {
+  return apiFetch<OpeningStockEntryRow>(`/admin/inventory/opening-stock/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function postAdminOpeningStockEntry(id: number) {
+  return apiFetch<{ updated: boolean; opening_stock_entry: OpeningStockEntryRow }>(
+    `/admin/inventory/opening-stock/${id}/post/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export function cancelAdminOpeningStockEntry(id: number) {
+  return apiFetch<{ opening_stock_entry: OpeningStockEntryRow }>(
+    `/admin/inventory/opening-stock/${id}/cancel/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export function correctionAdminOpeningStockEntry(
+  id: number,
+  payload: {
+    reason: string;
+    quantity_delta: string;
+    unit_cost_snapshot?: string | null;
+    adjustment_date?: string | null;
+  }
+) {
+  return apiFetch<{ stock_adjustment: StockAdjustment }>(
+    `/admin/inventory/opening-stock/${id}/correction/`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+}
+
+export async function previewAdminOpeningStockBulkCsv(file: File, defaultEffectiveDate?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (defaultEffectiveDate) {
+    form.append("default_effective_date", defaultEffectiveDate);
+  }
+  return apiFetch<OpeningStockBulkPreview>("/admin/inventory/opening-stock/import/preview/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function applyAdminOpeningStockBulkCsv(
+  file: File,
+  opts: {
+    dry_run?: boolean;
+    auto_post?: boolean;
+    default_effective_date?: string | null;
+  } = {}
+) {
+  const form = new FormData();
+  form.append("file", file);
+  if (opts.dry_run) form.append("dry_run", "true");
+  if (opts.auto_post) form.append("auto_post", "true");
+  if (opts.default_effective_date) {
+    form.append("default_effective_date", opts.default_effective_date);
+  }
+  return apiFetch<OpeningStockBulkApplySummary>("/admin/inventory/opening-stock/import/apply/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export function listAdminOpeningStockBatches() {
+  return apiFetch<{ count: number; results: OpeningStockBatchHistoryRow[] }>(
+    "/admin/inventory/opening-stock/batches/"
+  );
+}
+
+export async function fetchOpeningStockCsvTemplateText(): Promise<string> {
+  return apiFetch<string>("/admin/inventory/opening-stock/template/", {
+    headers: { Accept: "text/csv, */*" },
+  });
 }
 
 export async function previewOpeningStockImport(file: File) {
