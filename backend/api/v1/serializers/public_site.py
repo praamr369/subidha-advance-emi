@@ -20,13 +20,41 @@ def _validate_https_url(value: str, field_name: str) -> str:
 
 
 class PublicBusinessProfileSerializer(BusinessSetupModelSerializer):
+    """Admin-only serializer for public-facing site copy (no internal business-setup secrets)."""
+
     class Meta:
         model = PublicBusinessProfile
-        fields = "__all__"
+        fields = (
+            "id",
+            "display_name",
+            "tagline",
+            "hero_title",
+            "hero_subtitle",
+            "support_phone",
+            "support_email",
+            "whatsapp_phone",
+            "whatsapp_link",
+            "facebook_url",
+            "instagram_url",
+            "youtube_url",
+            "address_text",
+            "map_url",
+            "business_hours",
+            "public_logo_url",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = ("id", "created_at", "updated_at")
 
     def validate_support_phone(self, value: str) -> str:
         return (value or "").strip()
+
+    def validate_support_email(self, value: str) -> str:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            return ""
+        return cleaned
 
     def validate_whatsapp_phone(self, value: str) -> str:
         cleaned = (value or "").strip()

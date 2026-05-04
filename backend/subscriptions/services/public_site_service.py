@@ -44,7 +44,7 @@ def upsert_public_business_profile(
         instance=profile,
         performed_by=performed_by,
         metadata={
-            "event": "PUBLIC_BUSINESS_PROFILE_UPSERTED",
+            "event": "PUBLIC_SITE_PROFILE_UPDATED",
             "public_business_profile_id": profile.id,
             "fields": sorted(list(payload.keys())),
         },
