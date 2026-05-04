@@ -194,3 +194,110 @@ class FinanceAccountCollectionGuardTests(TestCase):
                 finance_account_id=dirty.id,
             )
         self.assertIn("operational ledger", str(ctx.exception).lower())
+
+
+class CashCounterFinanceAccountFilterTests(TestCase):
+    def test_cash_counter_filter_includes_only_cash_settlement_desks(self):
+        from accounting.services.accounting_setup_service import LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME
+        from accounting.services.finance_account_collection_guard import filter_finance_accounts_for_cash_counter
+
+        asset = ChartOfAccount.objects.create(
+            code="CTR-FLT-ASSET",
+            name="CTR Filter Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        cash_ok = FinanceAccount.objects.create(
+            name="CTR Filter Cash Desk",
+            kind=FinanceAccountKind.CASH,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        bank_row = FinanceAccount.objects.create(
+            name="CTR Filter Bank",
+            kind=FinanceAccountKind.BANK,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        ledger_anchor = FinanceAccount.objects.create(
+            name=LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+            kind=FinanceAccountKind.BANK,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=False,
+        )
+        qs = FinanceAccount.objects.filter(
+            pk__in=[cash_ok.pk, bank_row.pk, ledger_anchor.pk],
+        ).order_by("id")
+        filtered = filter_finance_accounts_for_cash_counter(qs, branch_id=None)
+        ids = set(filtered.values_list("pk", flat=True))
+        self.assertEqual(ids, {cash_ok.pk})
+
+    def test_cash_counter_filter_respects_branch_scope(self):
+        from accounting.services.finance_account_collection_guard import filter_finance_accounts_for_cash_counter
+
+        from branch_control.models import Branch, BranchStatus
+
+        asset = ChartOfAccount.objects.create(
+            code="CTR-BR-ASSET",
+            name="CTR Branch Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        branch_a = Branch.objects.create(code="CTR-A", name="Branch A", status=BranchStatus.ACTIVE)
+        branch_b = Branch.objects.create(code="CTR-B", name="Branch B", status=BranchStatus.ACTIVE)
+        cash_a = FinanceAccount.objects.create(
+            name="Cash A",
+            branch=branch_a,
+            kind=FinanceAccountKind.CASH,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        cash_b = FinanceAccount.objects.create(
+            name="Cash B",
+            branch=branch_b,
+            kind=FinanceAccountKind.CASH,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        qs = FinanceAccount.objects.filter(pk__in=[cash_a.pk, cash_b.pk]).order_by("id")
+        scoped = filter_finance_accounts_for_cash_counter(qs, branch_id=branch_a.pk)
+        self.assertEqual(set(scoped.values_list("pk", flat=True)), {cash_a.pk})
+
+    def test_validate_finance_account_for_cash_counter_rejects_profile_anchor(self):
+        from accounting.services.accounting_setup_service import LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME
+        from accounting.services.finance_account_collection_guard import validate_finance_account_for_cash_counter
+
+        from branch_control.models import Branch, BranchStatus
+
+        asset = ChartOfAccount.objects.create(
+            code="CTR-VASSET",
+            name="CTR V Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        branch = Branch.objects.create(code="CTR-VBR", name="Branch V", status=BranchStatus.ACTIVE)
+        ledger_anchor = FinanceAccount.objects.create(
+            name=LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+            branch=branch,
+            kind=FinanceAccountKind.BANK,
+            chart_account=asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=False,
+        )
+        with self.assertRaises(ValueError) as ctx:
+            validate_finance_account_for_cash_counter(finance_account=ledger_anchor, branch_id=branch.pk)
+        self.assertIn("posting profiles", str(ctx.exception).lower())

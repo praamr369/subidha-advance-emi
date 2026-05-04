@@ -28,4 +28,10 @@ test("admin accounting routes load", async ({ page }) => {
 
   await page.goto("/admin/accounting/journals");
   await expect(shellHeading(page, "Journals")).toBeVisible();
+
+  await page.goto("/admin/counters");
+  await expect(shellHeading(page, "Counter & Cash Desk Master")).toBeVisible();
+  await expect(
+    page.getByText(/Counters use cash-desk finance accounts only/i)
+  ).toBeVisible();
 });

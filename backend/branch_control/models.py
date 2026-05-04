@@ -96,11 +96,18 @@ class CashCounter(BranchControlTimeStampedModel):
 
     def clean(self):
         errors = {}
-        if self.finance_account_id and not self.finance_account.is_active:
-            errors["finance_account"] = "Counter finance account must be active."
-        finance_branch_id = getattr(self.finance_account, "branch_id", None)
-        if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
-            errors["finance_account"] = "Counter finance account must belong to the same branch."
+        if self.finance_account_id and self.branch_id:
+            from accounting.services.finance_account_collection_guard import validate_finance_account_for_cash_counter
+
+            try:
+                validate_finance_account_for_cash_counter(
+                    finance_account=self.finance_account,
+                    branch_id=self.branch_id,
+                )
+            except ValueError as exc:
+                errors["finance_account"] = str(exc)
+        elif self.finance_account_id and not self.finance_account.is_active:
+            errors["finance_account"] = "Cash counters must use an active cash-desk finance account."
         if errors:
             raise ValidationError(errors)
 

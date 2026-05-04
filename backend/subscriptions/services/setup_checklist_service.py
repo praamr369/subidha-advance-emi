@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from accounting.models import AccountingPeriod, ChartOfAccount, DocumentSequence, FinanceAccount
+from django.db.models import Q
+
+from accounting.models import (
+    AccountingPeriod,
+    ChartOfAccount,
+    ChartOfAccountType,
+    DocumentSequence,
+    FinanceAccount,
+)
 from accounts.models import User, UserRole
 from branch_control.models import Branch, BranchStatus, CashCounter
 from inventory.models import InventoryItem, StockLocation
@@ -50,6 +58,30 @@ def compute_setup_checklist():
 
     # Accounting (existing models)
     active_chart_accounts = ChartOfAccount.objects.filter(is_active=True)
+    chart_accounts_total = ChartOfAccount.objects.count()
+    chart_accounts_inactive = ChartOfAccount.objects.filter(is_active=False).count()
+    chart_active_root_accounts = active_chart_accounts.filter(parent__isnull=True).count()
+    chart_active_child_accounts = active_chart_accounts.exclude(parent__isnull=True).count()
+    chart_active_system_accounts = (
+        active_chart_accounts.exclude(system_code__isnull=True).exclude(system_code="").count()
+    )
+    chart_active_custom_accounts = active_chart_accounts.filter(
+        Q(system_code__isnull=True) | Q(system_code="")
+    ).count()
+    visible_register_count = active_chart_accounts.filter(
+        parent__isnull=True,
+        account_type__in=(
+            ChartOfAccountType.ASSET,
+            ChartOfAccountType.LIABILITY,
+            ChartOfAccountType.INCOME,
+            ChartOfAccountType.EXPENSE,
+        ),
+    ).count()
+    chart_type_counts = {
+        choice.value: active_chart_accounts.filter(account_type=choice.value).count()
+        for choice in ChartOfAccountType
+    }
+
     active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
     active_periods = AccountingPeriod.objects.all()
     active_sequences = DocumentSequence.objects.filter(is_active=True)
@@ -108,7 +140,18 @@ def compute_setup_checklist():
             label="Chart of accounts configured",
             level="required",
             is_complete=active_chart_accounts.exists(),
-            detail=f"{active_chart_accounts.count()} active chart account(s) configured." if active_chart_accounts.exists() else "Set up the chart of accounts to enable finance posting without touching the EMI ledger.",
+            detail=(
+                (
+                    f"{active_chart_accounts.count()} active chart account(s) total — "
+                    f"{chart_active_root_accounts} root account(s), {chart_active_child_accounts} child account(s); "
+                    f"{visible_register_count} active roots in ASSET/LIABILITY/INCOME/EXPENSE "
+                    f"(statement-style register tally); equity accounts add "
+                    f"{chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0)} active row(s). "
+                    "Filtered accounting screens only show rows matching current filters."
+                )
+                if active_chart_accounts.exists()
+                else "Set up the chart of accounts to enable finance posting without touching the EMI ledger."
+            ),
             route="/admin/accounting/chart-of-accounts",
         ),
         _item(
@@ -217,6 +260,19 @@ def compute_setup_checklist():
         "branches_primary_configured": bool(primary_branch_exists),
         "cash_counters_active": active_counters.count(),
         "chart_of_accounts_active": active_chart_accounts.count(),
+        "total_chart_accounts": chart_accounts_total,
+        "active_chart_accounts": active_chart_accounts.count(),
+        "inactive_chart_accounts": chart_accounts_inactive,
+        "active_root_chart_accounts": chart_active_root_accounts,
+        "active_child_chart_accounts": chart_active_child_accounts,
+        "active_system_chart_accounts": chart_active_system_accounts,
+        "active_custom_chart_accounts": chart_active_custom_accounts,
+        "visible_register_count": visible_register_count,
+        "chart_active_asset": chart_type_counts.get(ChartOfAccountType.ASSET.value, 0),
+        "chart_active_liability": chart_type_counts.get(ChartOfAccountType.LIABILITY.value, 0),
+        "chart_active_equity": chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0),
+        "chart_active_income": chart_type_counts.get(ChartOfAccountType.INCOME.value, 0),
+        "chart_active_expense": chart_type_counts.get(ChartOfAccountType.EXPENSE.value, 0),
         "finance_accounts_active": active_finance_accounts.count(),
         "finance_accounts_cash": int(has_cash_finance),
         "finance_accounts_bank": int(has_bank_finance),

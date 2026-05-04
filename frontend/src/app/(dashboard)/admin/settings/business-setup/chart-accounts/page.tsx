@@ -33,7 +33,9 @@ export default function ChartAccountsSetupGuidePage() {
     };
   }, []);
 
-  const chartAccounts = toNumber(checklist?.counts?.chart_of_accounts_active);
+  const chartActiveTotal = toNumber(checklist?.counts?.active_chart_accounts ?? checklist?.counts?.chart_of_accounts_active);
+  const chartRootsStmt = toNumber(checklist?.counts?.visible_register_count);
+  const chartChildren = toNumber(checklist?.counts?.active_child_chart_accounts);
 
   return (
     <div className="space-y-6">
@@ -51,10 +53,20 @@ export default function ChartAccountsSetupGuidePage() {
 
       <section className="grid gap-5 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="text-sm font-medium text-muted-foreground">Active chart accounts</div>
-          <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartAccounts : "—"}</div>
+          <div className="text-sm font-medium text-muted-foreground">Active chart accounts (total)</div>
+          <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Statement roots (ASSET/LIABILITY/INCOME/EXPENSE): {checklist ? chartRootsStmt : "—"}
+          </div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-2">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="text-sm font-medium text-muted-foreground">Child / sub accounts</div>
+          <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Equity-only roots and inactive rows explain gaps versus filtered tallies.
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-3">
           <div className="text-sm font-medium text-muted-foreground">Next action</div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">

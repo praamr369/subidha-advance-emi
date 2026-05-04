@@ -53,7 +53,9 @@ function emptyForm(): CounterForm {
 export default function AdminCountersPage() {
   const [rows, setRows] = useState<CashCounterRecord[]>([]);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [eligibleFinanceAccounts, setEligibleFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [eligibleError, setEligibleError] = useState<string | null>(null);
   const [cashiers, setCashiers] = useState<InternalUserRecord[]>([]);
   const [selectedCounterId, setSelectedCounterId] = useState<number | null>(null);
   const [form, setForm] = useState<CounterForm>(emptyForm());
@@ -68,22 +70,19 @@ export default function AdminCountersPage() {
     else setRefreshing(true);
 
     try {
-      const [counterPayload, branchPayload, financePayload, cashierPayload] =
-        await Promise.all([
-          listCashCounters(),
-          listBranches({ status: "ACTIVE" }),
-          listFinanceAccounts({ is_active: 1 }),
-          listInternalUsers({ role: "CASHIER", is_active: "true" }),
-        ]);
+      const [counterPayload, branchPayload, cashierPayload] = await Promise.all([
+        listCashCounters(),
+        listBranches({ status: "ACTIVE" }),
+        listInternalUsers({ role: "CASHIER", is_active: "true" }),
+      ]);
       setRows(counterPayload.results);
       setBranches(branchPayload.results);
-      setFinanceAccounts(financePayload.results);
       setCashiers(cashierPayload.results);
       setError(null);
     } catch (err) {
       setRows([]);
       setBranches([]);
-      setFinanceAccounts([]);
+      setEligibleFinanceAccounts([]);
       setCashiers([]);
       setError(toErrorMessage(err));
     } finally {
@@ -96,18 +95,47 @@ export default function AdminCountersPage() {
     void loadPage("initial");
   }, []);
 
+  useEffect(() => {
+    if (!form.branch) {
+      setEligibleFinanceAccounts([]);
+      setEligibleError(null);
+      setEligibleLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEligibleLoading(true);
+    setEligibleError(null);
+    listFinanceAccounts({
+      is_active: 1,
+      for_cash_counter: 1,
+      branch: Number(form.branch),
+      page_size: 100,
+    })
+      .then((payload) => {
+        if (!cancelled) {
+          setEligibleFinanceAccounts(payload.results);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setEligibleFinanceAccounts([]);
+          setEligibleError(toErrorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setEligibleLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.branch]);
+
   const selectedCounter = useMemo(
     () => rows.find((row) => row.id === selectedCounterId) ?? null,
     [rows, selectedCounterId]
   );
-
-  const filteredFinanceAccounts = useMemo(() => {
-    if (!form.branch) return financeAccounts;
-    return financeAccounts.filter((account) => {
-      const branchId = typeof account.branch === "number" ? account.branch : null;
-      return branchId === null || String(branchId) === form.branch;
-    });
-  }, [financeAccounts, form.branch]);
 
   const columns: EnterpriseColumnDef<CashCounterRecord>[] = [
     { key: "code", header: "Counter" },
@@ -266,9 +294,13 @@ export default function AdminCountersPage() {
 
               <WorkspaceSection
                 title={selectedCounter ? `Edit ${selectedCounter.code}` : "Create Counter"}
-                description="Each counter must stay inside one branch and map to one active finance account from the same branch."
+                description="Each counter must stay inside one branch and map to one active cash-desk finance account for the same branch. Bank and UPI posting still use their own payment accounts from collection screens."
               >
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    Counters use cash-desk finance accounts only. Bank and UPI receipts are still posted to their own
+                    payment accounts through collection forms.
+                  </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="text-sm text-slate-700">
                       <span className="mb-2 block font-medium">Code</span>
@@ -318,16 +350,27 @@ export default function AdminCountersPage() {
                         value={form.finance_account}
                         onChange={(event) => setForm((current) => ({ ...current, finance_account: event.target.value }))}
                         className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        disabled={!form.branch || eligibleLoading}
                         required
                       >
-                        <option value="">Select finance account</option>
-                        {filteredFinanceAccounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name} · {account.kind}
-                            {account.branch_code ? ` · ${account.branch_code}` : ""}
-                          </option>
-                        ))}
+                        <option value="">
+                          {eligibleLoading ? "Loading cash desks…" : form.branch ? "Select cash desk" : "Select branch first"}
+                        </option>
+                        {eligibleFinanceAccounts.map((account) => {
+                          const branchLabel = account.branch_code || account.branch_name || "—";
+                          return (
+                            <option key={account.id} value={account.id}>
+                              {account.name} · {account.kind} · {branchLabel}
+                            </option>
+                          );
+                        })}
                       </select>
+                      {eligibleError ? <p className="mt-1 text-xs text-red-600">{eligibleError}</p> : null}
+                      {form.branch && !eligibleLoading && eligibleFinanceAccounts.length === 0 && !eligibleError ? (
+                        <p className="mt-1 text-xs text-amber-800">
+                          Create an active CASH finance account for this branch before creating a counter.
+                        </p>
+                      ) : null}
                     </label>
                     <label className="text-sm text-slate-700 md:col-span-2">
                       <span className="mb-2 block font-medium">Assigned Cashier</span>

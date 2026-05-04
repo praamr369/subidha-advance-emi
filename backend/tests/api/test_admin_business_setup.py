@@ -85,6 +85,16 @@ class AdminBusinessSetupApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/business-setup/checklist/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_ready_for_go_live"])
+        counts = response.data["counts"]
+        self.assertIn("total_chart_accounts", counts)
+        self.assertIn("active_chart_accounts", counts)
+        self.assertIn("active_root_chart_accounts", counts)
+        self.assertIn("active_child_chart_accounts", counts)
+        self.assertIn("active_system_chart_accounts", counts)
+        self.assertIn("active_custom_chart_accounts", counts)
+        self.assertIn("visible_register_count", counts)
+        self.assertIn("inactive_chart_accounts", counts)
+        self.assertIn("chart_active_equity", counts)
 
     def test_reset_preview_is_read_only(self):
         self.client.force_authenticate(self.admin)

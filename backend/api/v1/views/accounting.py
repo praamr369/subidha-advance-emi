@@ -155,20 +155,26 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
         queryset = super().get_queryset()
         is_active = self.request.query_params.get("is_active")
         kind = self.request.query_params.get("kind")
-        branch_id = self.request.query_params.get("branch")
+        branch_qp = self.request.query_params.get("branch")
+        branch_id_for_counter: int | None = None
+        if branch_qp not in (None, ""):
+            try:
+                branch_id_for_counter = int(branch_qp)
+            except (TypeError, ValueError):
+                branch_id_for_counter = None
+
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active in {"1", "true", "TRUE", "yes", "YES"})
         if kind:
             queryset = queryset.filter(kind=kind.strip().upper())
-        if branch_id:
-            queryset = queryset.filter(branch_id=branch_id)
-        if self.request.query_params.get("for_payment_collection") in {
-            "1",
-            "true",
-            "TRUE",
-            "yes",
-            "YES",
-        }:
+        _truthy = {"1", "true", "TRUE", "yes", "YES"}
+        if self.request.query_params.get("for_cash_counter") in _truthy:
+            from accounting.services.finance_account_collection_guard import filter_finance_accounts_for_cash_counter
+
+            queryset = filter_finance_accounts_for_cash_counter(queryset, branch_id=branch_id_for_counter)
+        elif branch_qp:
+            queryset = queryset.filter(branch_id=branch_qp)
+        if self.request.query_params.get("for_payment_collection") in _truthy:
             queryset = filter_finance_accounts_for_payment_collection(queryset)
         return queryset
 

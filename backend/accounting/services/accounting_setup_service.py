@@ -198,7 +198,18 @@ class SetupResult:
     details: list[dict[str, Any]]
 
 
+DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
+
+
 class AccountingSetupService:
+    @staticmethod
+    def _chart_is_cash_in_hand(chart: ChartOfAccount | None) -> bool:
+        if chart is None:
+            return False
+        if chart.system_code == DEFAULT_CASH_IN_HAND_SYSTEM_CODE:
+            return True
+        return chart.name.strip().lower() == "cash in hand"
+
     @staticmethod
     def _resolve_anchor_chart_account():
         anchor = ChartOfAccount.objects.filter(system_code="DEFAULT_ASSET_CASH_IN_HAND", is_active=True).first()
@@ -377,6 +388,28 @@ class AccountingSetupService:
 
         active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
         for account in active_finance_accounts:
+            chart = account.chart_account
+            if account.kind == FinanceAccountKind.BANK and AccountingSetupService._chart_is_cash_in_hand(chart):
+                warnings.append(
+                    {
+                        "code": "BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND",
+                        "message": (
+                            f"{account.name} is a bank finance account but its primary chart link is Cash in Hand; "
+                            "use a dedicated bank/UPI ledger on the chart."
+                        ),
+                    }
+                )
+            if account.kind == FinanceAccountKind.UPI and AccountingSetupService._chart_is_cash_in_hand(chart):
+                warnings.append(
+                    {
+                        "code": "UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND",
+                        "message": (
+                            f"{account.name} is a UPI finance account but its primary chart link is Cash in Hand; "
+                            "map it to the UPI/payment-gateway style asset ledger instead."
+                        ),
+                    }
+                )
+
             has_mapping = FinanceAccountCoaMapping.objects.filter(finance_account=account, is_active=True).exists()
             if not has_mapping:
                 warnings.append({"code": "UNMAPPED_FINANCE_ACCOUNT", "message": f"{account.name} has no active COA mapping."})
@@ -475,6 +508,33 @@ class AccountingSetupService:
                         "message": (
                             f"{mapping.finance_account.name} mapping for {mapping.purpose} "
                             f"uses {mapping.chart_account.account_type}, expected {expected_types_label}."
+                        ),
+                    }
+                )
+
+            if (
+                mapping.purpose == FinanceAccountMappingPurpose.BANK_COLLECTION
+                and AccountingSetupService._chart_is_cash_in_hand(mapping.chart_account)
+            ):
+                warnings.append(
+                    {
+                        "code": "BANK_COLLECTION_MAPPED_TO_CASH_IN_HAND",
+                        "message": (
+                            f"{mapping.finance_account.name}: bank collection is mapped to Cash in Hand; "
+                            "use the bank ledger chart account instead."
+                        ),
+                    }
+                )
+            if (
+                mapping.purpose == FinanceAccountMappingPurpose.UPI_COLLECTION
+                and AccountingSetupService._chart_is_cash_in_hand(mapping.chart_account)
+            ):
+                warnings.append(
+                    {
+                        "code": "UPI_COLLECTION_MAPPED_TO_CASH_IN_HAND",
+                        "message": (
+                            f"{mapping.finance_account.name}: UPI collection is mapped to Cash in Hand; "
+                            "use the UPI / payment gateway asset ledger instead."
                         ),
                     }
                 )
