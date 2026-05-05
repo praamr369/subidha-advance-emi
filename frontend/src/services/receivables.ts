@@ -9,6 +9,8 @@ export type ReceivableSourceType =
 export type CollectionPrimaryAction =
   | "COLLECT_EMI"
   | "COLLECT_DIRECT_SALE"
+  | "OPEN_SALE"
+  | "VIEW_RECEIPTS"
   | "VIEW_ONLY"
   | "DISABLED";
 
@@ -16,6 +18,9 @@ export type CollectionPrimaryAction =
 export type UnifiedReceivableResultType =
   | "EMI"
   | "DIRECT_SALE"
+  | "DIRECT_SALE_DRAFT"
+  | "DIRECT_SALE_RECEIVABLE"
+  | "DIRECT_SALE_PAID"
   | "RENT"
   | "LEASE"
   | "DEPOSIT"
@@ -27,6 +32,9 @@ export type UnifiedReceivableResult = {
   result_type: UnifiedReceivableResultType | "";
   /** Mirrors primary_action for stable routing diagnostics. */
   action_type: string;
+  collectible?: boolean;
+  collection_workflow?: string;
+  reason_if_not_collectible?: string | null;
   secondary_badges?: UnifiedReceivableResultType[];
   source_type: ReceivableSourceType;
   source_id: number | null;
@@ -48,6 +56,9 @@ export type UnifiedReceivableResult = {
   allowed_actions: string[];
   disabled_reason: string | null;
   collection_route: string;
+  action_url?: string;
+  is_overdue?: boolean;
+  due_date?: string | null;
 };
 
 export type UnifiedReceivableSearchResponse = {
@@ -104,6 +115,8 @@ function toStringValue(value: unknown): string {
 function normalizePrimaryAction(value: unknown): CollectionPrimaryAction {
   const v = String(value || "").toUpperCase();
   if (v === "COLLECT_DIRECT_SALE") return "COLLECT_DIRECT_SALE";
+  if (v === "OPEN_SALE") return "OPEN_SALE";
+  if (v === "VIEW_RECEIPTS") return "VIEW_RECEIPTS";
   if (v === "VIEW_ONLY") return "VIEW_ONLY";
   if (v === "DISABLED") return "DISABLED";
   return "COLLECT_EMI";
@@ -117,6 +130,9 @@ function normalizeResultType(
   const allowed: UnifiedReceivableResultType[] = [
     "EMI",
     "DIRECT_SALE",
+    "DIRECT_SALE_DRAFT",
+    "DIRECT_SALE_RECEIVABLE",
+    "DIRECT_SALE_PAID",
     "RENT",
     "LEASE",
     "DEPOSIT",
@@ -149,6 +165,12 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
   return {
     result_type: normalizeResultType(row.result_type, source_type),
     action_type,
+    collectible: Boolean(row.collectible),
+    collection_workflow: toStringValue(row.collection_workflow),
+    reason_if_not_collectible:
+      typeof row.reason_if_not_collectible === "string" || row.reason_if_not_collectible === null
+        ? row.reason_if_not_collectible
+        : null,
     secondary_badges,
     source_type,
     source_id: toNumberOrNull(row.source_id),
@@ -178,6 +200,12 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
         ? row.disabled_reason
         : null,
     collection_route: routeRaw,
+    action_url: toStringValue(row.action_url),
+    is_overdue: Boolean(row.is_overdue),
+    due_date:
+      typeof row.due_date === "string" || row.due_date === null
+        ? row.due_date
+        : null,
   };
 }
 

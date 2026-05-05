@@ -233,7 +233,7 @@ def collect_direct_sale_payment(
     if invoice is None:
         raise ValueError("Linked billing invoice was not found for this direct sale.")
     if sale.status != "INVOICED":
-        raise ValueError("Only invoiced direct sales can accept later collections.")
+        raise ValueError("Direct sale must be invoiced before collection.")
     if invoice.status != BillingDocumentStatus.POSTED:
         raise ValueError("Direct-sale collections are allowed only after the retail invoice is posted.")
 
@@ -269,7 +269,7 @@ def collect_direct_sale_payment(
     position = _current_receivable_position(sale=sale, invoice=invoice)
     outstanding_before = position["outstanding"]
     if outstanding_before <= Decimal("0.00"):
-        raise ValueError("This direct sale does not have an outstanding balance.")
+        raise ValueError("Direct sale has no outstanding balance.")
     if amount > outstanding_before:
         raise ValueError("Collection amount cannot exceed the current outstanding balance.")
 

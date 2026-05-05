@@ -829,7 +829,7 @@ export default function AdminCollectionsPage() {
         },
         {
           href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
-          label: "Direct-Sale Collect",
+          label: "Direct-Sale Collection",
           variant: "secondary",
         },
         {
@@ -975,7 +975,7 @@ export default function AdminCollectionsPage() {
               action={
                 <div className="flex flex-wrap gap-2">
                   <Link href={ROUTES.admin.financeCollect} className="text-xs font-semibold text-primary hover:underline">
-                    Open Admin Collection
+                    Collect Advance EMI
                   </Link>
                   <Link href={ROUTES.admin.payments} className="text-xs font-semibold text-primary hover:underline">
                     Open Payments
@@ -1022,14 +1022,14 @@ export default function AdminCollectionsPage() {
                   }
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
-                  Open Admin Collection
+                  Collect Advance EMI
                 </Link>
 
                 <Link
                   href="/admin/finance/collect?workflow=direct-sale"
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
-                  Open Direct-Sale Collection
+                  Collect Direct Sale
                 </Link>
               </div>
             </DetailPanel>
@@ -1068,10 +1068,10 @@ export default function AdminCollectionsPage() {
                             Outstanding {money(sale.balance_total)}
                           </div>
                           <Link
-                            href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${sale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&sale_id=${sale.id}`}
                             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                           >
-                            Collect
+                            Collect Direct Sale
                           </Link>
                           <Link
                             href={`/admin/billing/direct-sales?focus_sale=${sale.id}`}

@@ -1035,10 +1035,10 @@ export default function AdminFinancePage() {
                               Outstanding {money(sale.balance_total)}
                             </div>
                             <Link
-                              href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&direct_sale=${sale.id}`}
+                              href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${sale.id}`}
                               className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
                             >
-                              Collect
+                              Collect Direct Sale
                             </Link>
                             <Link
                               href={`${ROUTES.admin.billingDirectSales}?focus_sale=${sale.id}`}

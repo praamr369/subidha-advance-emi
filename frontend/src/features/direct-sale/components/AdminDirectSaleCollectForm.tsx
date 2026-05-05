@@ -14,7 +14,6 @@ import { normalizeApiError } from "@/services/api/errors";
 import {
   collectDirectSalePayment,
   getDirectSale,
-  listDirectSales,
   type DirectSale,
   type DirectSaleCollectionResponse,
 } from "@/services/billing";
@@ -29,6 +28,7 @@ import {
   type FinanceAccount,
 } from "@/services/accounting";
 import { invalidateAfterDirectSaleCollect } from "@/lib/operational-query-invalidation";
+import { searchAdminReceivables, type UnifiedReceivableResult } from "@/services/receivables";
 
 const FIELD_CLASS_NAME =
   "w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2.5 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35";
@@ -87,7 +87,7 @@ export default function AdminDirectSaleCollectForm({
 }) {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
-  const [searchResults, setSearchResults] = useState<DirectSale[]>([]);
+  const [searchResults, setSearchResults] = useState<UnifiedReceivableResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedSale, setSelectedSale] = useState<DirectSale | null>(null);
@@ -151,18 +151,17 @@ export default function AdminDirectSaleCollectForm({
       try {
         setSearching(true);
         setSearchError(null);
-        const payload = await listDirectSales({
-          search: trimmed,
-          outstanding_only: "true",
-        });
+        const payload = await searchAdminReceivables(trimmed);
         if (!active) return;
-        setSearchResults(payload.results);
+        setSearchResults(
+          payload.results.filter((row) => row.source_type === "DIRECT_SALE")
+        );
       } catch (error) {
         if (!active) return;
         setSearchResults([]);
         setSearchError(
           normalizeApiError(error).message ||
-            "Unable to search outstanding direct sales."
+            "Unable to search direct-sale receivables."
         );
       } finally {
         if (active) {
@@ -362,46 +361,71 @@ export default function AdminDirectSaleCollectForm({
           <div className="mt-4 space-y-3">
             {searchResults.length === 0 ? (
               <EmptyState
-                title="No outstanding direct sales"
-                description={`No invoiced direct-sale receivables matched "${searchInput.trim()}".`}
+                title="No direct-sale results"
+                description={`No direct-sale references matched "${searchInput.trim()}".`}
               />
             ) : (
-              searchResults.map((sale) => (
-                <button
-                  key={sale.id}
-                  type="button"
-                  onClick={() => void handleSalePick(sale.id)}
-                  className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              searchResults.map((row) => (
+                <div
+                  key={`${row.source_type}-${row.source_id ?? row.reference_no}`}
+                  className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left shadow-sm"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-foreground">
-                        {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                        {row.display_reference || row.reference_no} · {row.customer_name || "Walk-in customer"}
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
-                        {sale.customer_phone_snapshot || "No phone"} · Invoice {sale.billing_invoice_no || "draft mirror"}
+                        {row.phone_masked || "No phone"} · Status {row.status || "UNKNOWN"}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Sale date {formatDateLabel(sale.sale_date)} · {sale.branch_name || sale.branch_code || "Primary branch"}
+                        {row.reason_if_not_collectible || row.disabled_reason || "Direct-sale receivable"}
                       </div>
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-3">
                       <div className="rounded-xl border border-border bg-background px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grand Total</div>
-                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(sale.grand_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(row.total_amount)}</div>
                       </div>
                       <div className="rounded-xl border border-border bg-background px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
-                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(sale.received_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(row.paid_amount)}</div>
                       </div>
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
-                        <div className="mt-1 text-sm font-semibold text-amber-900">{formatMoney(sale.balance_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-amber-900">{formatMoney(row.due_amount)}</div>
                       </div>
                     </div>
                   </div>
-                </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {row.primary_action === "COLLECT_DIRECT_SALE" && row.source_id ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleSalePick(row.source_id as number)}
+                        className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                      >
+                        Collect direct-sale balance
+                      </button>
+                    ) : null}
+                    {row.primary_action === "OPEN_SALE" && row.collection_route ? (
+                      <Link
+                        href={row.collection_route}
+                        className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                      >
+                        Open sale
+                      </Link>
+                    ) : null}
+                    {row.primary_action === "VIEW_RECEIPTS" && row.collection_route ? (
+                      <Link
+                        href={row.collection_route}
+                        className="inline-flex items-center rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-600"
+                      >
+                        View receipts
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
               ))
             )}
           </div>

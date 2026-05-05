@@ -1106,7 +1106,14 @@ class Phase9AContractReferenceApiTests(TestCase):
         )
         self.reference = ContractReference.objects.get(subscription=self.subscription)
 
-    def _create_direct_sale_reference(self, *, received_total: str = "0.00", grand_total: str = "100.00"):
+    def _create_direct_sale_reference(
+        self,
+        *,
+        received_total: str = "0.00",
+        grand_total: str = "100.00",
+        sale_status: str = "INVOICED",
+        invoice_status: str = BillingDocumentStatus.DRAFT,
+    ):
         fy = financial_year_for(date(2099, 1, 1))
         sequence = ensure_document_sequence(
             series_code="DIRSALE",
@@ -1120,7 +1127,7 @@ class Phase9AContractReferenceApiTests(TestCase):
             financial_year=fy,
             doc_series=sequence,
             customer=self.customer,
-            status="INVOICED",
+            status=sale_status,
             grand_total=Decimal(grand_total),
             received_total=Decimal(received_total),
             balance_total=Decimal(grand_total) - Decimal(received_total),
@@ -1136,7 +1143,7 @@ class Phase9AContractReferenceApiTests(TestCase):
             direct_sale=sale,
             billing_channel="RETAIL",
             source_type="DIRECT_SALE",
-            status=BillingDocumentStatus.DRAFT,
+            status=invoice_status,
             grand_total=Decimal(grand_total),
             received_total=Decimal(received_total),
             balance_total=Decimal(grand_total) - Decimal(received_total),
@@ -1338,6 +1345,8 @@ class Phase9AContractReferenceApiTests(TestCase):
         self.assertEqual(row["source_id"], sale.id)
         self.assertEqual(row["paid_amount"], "25.00")
         self.assertEqual(row["payment_state"], "PARTIALLY_PAID")
+        self.assertIn(row["result_type"], {"DIRECT_SALE_DRAFT", "DIRECT_SALE_RECEIVABLE", "DIRECT_SALE_PAID"})
+        self.assertIn("collection_workflow", row)
 
     def test_full_paid_direct_sale_disables_collect_action(self):
         _, ds_reference = self._create_direct_sale_reference(received_total="100.00")
@@ -1348,11 +1357,29 @@ class Phase9AContractReferenceApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         row = response.data["results"][0]
-        self.assertEqual(row["primary_action"], "VIEW_ONLY")
+        self.assertEqual(row["primary_action"], "VIEW_RECEIPTS")
         self.assertEqual(row["allowed_actions"], [])
         self.assertEqual(row["due_amount"], "0.00")
         self.assertEqual(row["payment_state"], "FULLY_PAID")
         self.assertIn("no outstanding balance", (row.get("disabled_reason") or "").lower())
+
+    def test_draft_direct_sale_is_not_collectible_and_routes_to_open_sale(self):
+        _, ds_reference = self._create_direct_sale_reference(
+            received_total="0.00",
+            sale_status="DRAFT",
+            invoice_status=BillingDocumentStatus.DRAFT,
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertEqual(row["result_type"], "DIRECT_SALE_DRAFT")
+        self.assertFalse(row["collectible"])
+        self.assertEqual(row["action_type"], "OPEN_SALE")
+        self.assertIn("/admin/billing/direct-sales", row["collection_route"])
 
     def test_unified_collect_idempotency_replays_identical_request(self):
         accounts = ensure_default_payment_collection_accounts()

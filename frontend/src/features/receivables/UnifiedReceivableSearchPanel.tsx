@@ -25,6 +25,9 @@ function badgeLabel(kind: UnifiedReceivableResultType | ""): string {
   if (!kind) return "";
   if (kind === "EMI") return "EMI";
   if (kind === "DIRECT_SALE") return "Direct Sale";
+  if (kind === "DIRECT_SALE_DRAFT") return "Direct Sale Draft";
+  if (kind === "DIRECT_SALE_RECEIVABLE") return "Direct Sale Receivable";
+  if (kind === "DIRECT_SALE_PAID") return "Direct Sale Paid";
   if (kind === "RENT") return "Rent";
   if (kind === "LEASE") return "Lease";
   if (kind === "DEPOSIT") return "Deposit";
@@ -36,6 +39,9 @@ function badgeLabel(kind: UnifiedReceivableResultType | ""): string {
 function badgeClass(kind: UnifiedReceivableResultType | ""): string {
   if (kind === "EMI") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (kind === "DIRECT_SALE") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (kind === "DIRECT_SALE_DRAFT") return "border-orange-200 bg-orange-50 text-orange-800";
+  if (kind === "DIRECT_SALE_RECEIVABLE") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (kind === "DIRECT_SALE_PAID") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (kind === "RENT") return "border-blue-200 bg-blue-50 text-blue-800";
   if (kind === "LEASE") return "border-violet-200 bg-violet-50 text-violet-800";
   if (kind === "DEPOSIT") return "border-slate-200 bg-slate-50 text-slate-800";
@@ -189,8 +195,12 @@ export default function UnifiedReceivableSearchPanel({
               row.primary_action === "COLLECT_EMI" && !onAdvanceEmiSelect && Boolean(route);
             const canDirectRoute =
               row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
+            const canOpenSaleRoute = row.primary_action === "OPEN_SALE" && Boolean(route);
+            const canViewReceiptsRoute = row.primary_action === "VIEW_RECEIPTS" && Boolean(route);
             const disabledReason =
-              row.disabled_reason || "Collection is not available for this receivable.";
+              row.reason_if_not_collectible ||
+              row.disabled_reason ||
+              "Collection is not available for this receivable.";
 
             return (
               <div
@@ -297,8 +307,26 @@ export default function UnifiedReceivableSearchPanel({
                       Open direct-sale collection
                     </Link>
                   ) : null}
+                  {canOpenSaleRoute ? (
+                    <Link
+                      href={route}
+                      data-testid="unified-receivable-open-sale-link"
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-700 px-4 text-sm font-semibold text-white transition hover:bg-orange-800"
+                    >
+                      Open sale
+                    </Link>
+                  ) : null}
+                  {canViewReceiptsRoute ? (
+                    <Link
+                      href={route}
+                      data-testid="unified-receivable-open-receipts-link"
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-700 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
+                      View receipts
+                    </Link>
+                  ) : null}
 
-                  {!canEmiInline && !canEmiRoute && !canDirectRoute ? (
+                  {!canEmiInline && !canEmiRoute && !canDirectRoute && !canOpenSaleRoute && !canViewReceiptsRoute ? (
                     <button
                       type="button"
                       disabled
@@ -311,7 +339,7 @@ export default function UnifiedReceivableSearchPanel({
                   ) : null}
                 </div>
 
-                {!canEmiInline && !canEmiRoute && !canDirectRoute && disabledReason ? (
+                {!canEmiInline && !canEmiRoute && !canDirectRoute && !canOpenSaleRoute && !canViewReceiptsRoute && disabledReason ? (
                   <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div>
                 ) : null}
               </div>

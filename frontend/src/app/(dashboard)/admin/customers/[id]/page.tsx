@@ -1407,17 +1407,23 @@ export default function AdminCustomerDetailPage() {
     [subscriptions]
   );
 
-  const outstandingDirectSales = useMemo(
+  const draftDirectSales = useMemo(
+    () =>
+      operationalProfile?.direct_sales.rows.filter((row) => row.status === "DRAFT") ?? [],
+    [operationalProfile]
+  );
+
+  const receivableDirectSales = useMemo(
     () =>
       operationalProfile?.direct_sales.rows.filter(
-        (row) => Number(row.balance_total || 0) > 0
+        (row) => row.status === "INVOICED" && Number(row.balance_total || 0) > 0
       ) ?? [],
     [operationalProfile]
   );
 
   const firstOutstandingDirectSale = useMemo(
-    () => outstandingDirectSales[0] ?? null,
-    [outstandingDirectSales]
+    () => receivableDirectSales[0] ?? null,
+    [receivableDirectSales]
   );
 
   const contractReferenceRows = useMemo(
@@ -1496,7 +1502,7 @@ export default function AdminCustomerDetailPage() {
 
     if (firstOutstandingDirectSale) {
       nextActions.push({
-        href: `/admin/finance/collect?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`,
+        href: `/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`,
         label: "Collect Direct Sale",
         variant: "primary",
       });
@@ -1964,7 +1970,10 @@ export default function AdminCustomerDetailPage() {
                           Collected {money(operationalProfile.direct_sales.summary.received_total)}
                         </div>
                         <div>
-                          Open receivables {operationalProfile.direct_sales.summary.outstanding_count}
+                          Draft sales {draftDirectSales.length}
+                        </div>
+                        <div>
+                          Open receivables {receivableDirectSales.length}
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -1976,10 +1985,17 @@ export default function AdminCustomerDetailPage() {
                         </Link>
                         {firstOutstandingDirectSale ? (
                           <Link
-                            href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`}
                             className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                           >
-                            Collect Balance
+                            Collect Direct-Sale Balance
+                          </Link>
+                        ) : draftDirectSales.length > 0 ? (
+                          <Link
+                            href={`/admin/billing/direct-sales?focus_sale=${draftDirectSales[0].id}`}
+                            className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                          >
+                            Open direct-sale draft
                           </Link>
                         ) : null}
                       </div>
@@ -2267,12 +2283,19 @@ export default function AdminCustomerDetailPage() {
                             >
                               Receipts
                             </Link>
-                            {Number(row.balance_total || 0) > 0 ? (
+                            {row.status === "INVOICED" && Number(row.balance_total || 0) > 0 ? (
                               <Link
-                                href={`/admin/finance/collect?workflow=direct-sale&direct_sale=${row.id}`}
+                                href={`/admin/finance/collect?workflow=direct-sale&sale_id=${row.id}`}
                                 className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                               >
-                                Collect Balance
+                                Collect Direct-Sale Balance
+                              </Link>
+                            ) : row.status === "DRAFT" ? (
+                              <Link
+                                href={`/admin/billing/direct-sales?focus_sale=${row.id}`}
+                                className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                              >
+                                Open draft
                               </Link>
                             ) : null}
                           </div>

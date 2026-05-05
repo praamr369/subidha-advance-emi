@@ -39,6 +39,8 @@ RENT_LEASE_DISABLED_REASON = (
 class CollectionPrimaryAction:
     COLLECT_EMI = "COLLECT_EMI"
     COLLECT_DIRECT_SALE = "COLLECT_DIRECT_SALE"
+    OPEN_SALE = "OPEN_SALE"
+    VIEW_RECEIPTS = "VIEW_RECEIPTS"
     VIEW_ONLY = "VIEW_ONLY"
     DISABLED = "DISABLED"
 
@@ -586,6 +588,19 @@ def _derive_collection_action_state(
             "disabled_reason": dr,
         }
     if contract_type == ContractReferenceType.DIRECT_SALE:
+        explicit_action = str(position.get("action_type") or "").strip().upper()
+        if explicit_action == CollectionPrimaryAction.OPEN_SALE:
+            return {
+                "primary_action": CollectionPrimaryAction.OPEN_SALE,
+                "allowed_actions": [],
+                "disabled_reason": dr,
+            }
+        if explicit_action == CollectionPrimaryAction.VIEW_RECEIPTS:
+            return {
+                "primary_action": CollectionPrimaryAction.VIEW_RECEIPTS,
+                "allowed_actions": [],
+                "disabled_reason": dr,
+            }
         if "COLLECT_DIRECT_SALE" in allowed:
             return {
                 "primary_action": CollectionPrimaryAction.COLLECT_DIRECT_SALE,
@@ -633,9 +648,21 @@ def build_canonical_collection_route(
         )
     if primary_action == CollectionPrimaryAction.COLLECT_DIRECT_SALE and ds_id:
         return (
-            f"/cashier/collect?workflow=direct-sale&direct_sale={ds_id}"
+            f"/cashier/collect?workflow=direct-sale&sale_id={ds_id}"
             if is_cashier
-            else f"/admin/finance/collect?workflow=direct-sale&direct_sale={ds_id}"
+            else f"/admin/finance/collect?workflow=direct-sale&sale_id={ds_id}"
+        )
+    if primary_action == CollectionPrimaryAction.OPEN_SALE and ds_id:
+        return (
+            f"/admin/billing/direct-sales?focus_sale={ds_id}"
+            if not is_cashier
+            else f"/cashier/collect?workflow=direct-sale&sale_id={ds_id}"
+        )
+    if primary_action == CollectionPrimaryAction.VIEW_RECEIPTS and ds_id:
+        return (
+            f"/admin/billing/receipts?direct_sale={ds_id}"
+            if not is_cashier
+            else f"/cashier/collect?workflow=direct-sale&sale_id={ds_id}"
         )
     if sub_id:
         return (
@@ -709,21 +736,43 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
         payment_state = "PARTIALLY_PAID"
     else:
         payment_state = "UNPAID"
+    is_draft = getattr(sale, "status", "") == "DRAFT"
+    is_collectible = bool(service_ready and outstanding > MONEY_ZERO)
+    if is_draft:
+        collection_type = "DIRECT_SALE_DRAFT"
+        allowed_actions: list[str] = []
+        action_type = CollectionPrimaryAction.OPEN_SALE
+        resolved_reason = "Invoice/post this direct sale before collecting receivable."
+    elif is_collectible:
+        collection_type = "DIRECT_SALE_RECEIVABLE"
+        allowed_actions = ["COLLECT_DIRECT_SALE"]
+        action_type = CollectionPrimaryAction.COLLECT_DIRECT_SALE
+        resolved_reason = None
+    else:
+        collection_type = "DIRECT_SALE_PAID"
+        allowed_actions = []
+        action_type = CollectionPrimaryAction.VIEW_RECEIPTS
+        resolved_reason = disabled_reason or "Direct sale has no outstanding balance."
+
     return {
         "due_amount": outstanding,
         "overdue_amount": MONEY_ZERO,
+        "is_overdue": False,
         "next_due_date": None,
         "status": getattr(sale, "status", "") or getattr(invoice, "status", "") or "",
         "invoice_id": getattr(invoice, "id", None),
         "paid_amount": collected_total,
         "total_amount": total_amount,
         "payment_state": payment_state,
-        "allowed_actions": ["COLLECT_DIRECT_SALE"] if service_ready and outstanding > MONEY_ZERO else [],
-        "disabled_reason": None if service_ready and outstanding > MONEY_ZERO else disabled_reason,
+        "allowed_actions": allowed_actions,
+        "action_type": action_type,
+        "collection_type": collection_type,
+        "is_collectible": is_collectible,
+        "disabled_reason": resolved_reason,
     }
 
 
-def _receivable_result_type(contract_type: str) -> str:
+def _receivable_result_type(contract_type: str, *, position: dict[str, object] | None = None) -> str:
     """Stable badge/category for cashier/admin unified search (additive API field)."""
     mapping = {
         ContractReferenceType.ADVANCE_EMI: "EMI",
@@ -731,6 +780,10 @@ def _receivable_result_type(contract_type: str) -> str:
         ContractReferenceType.RENT: "RENT",
         ContractReferenceType.LEASE: "LEASE",
     }
+    if contract_type == ContractReferenceType.DIRECT_SALE:
+        collection_type = str((position or {}).get("collection_type") or "").strip().upper()
+        if collection_type in {"DIRECT_SALE_DRAFT", "DIRECT_SALE_RECEIVABLE", "DIRECT_SALE_PAID"}:
+            return collection_type
     return mapping.get(contract_type, str(contract_type or "").strip().upper() or "UNKNOWN")
 
 
@@ -753,8 +806,17 @@ def build_receivable_result(
 
     return {
         "contract_reference_id": reference.id,
-        "result_type": _receivable_result_type(source_type),
+        "result_type": _receivable_result_type(source_type, position=position),
         "action_type": str(state["primary_action"]),
+        "collectible": bool(position.get("is_collectible", False)),
+        "collection_workflow": (
+            "SUBSCRIPTION_EMI"
+            if source_type == ContractReferenceType.ADVANCE_EMI
+            else str(position.get("collection_type") or "DIRECT_SALE_RECEIVABLE")
+            if source_type == ContractReferenceType.DIRECT_SALE
+            else source_type
+        ),
+        "reason_if_not_collectible": state["disabled_reason"],
         "source_type": source_type,
         "source_id": source_id,
         "reference_no": reference.reference_no,
@@ -767,13 +829,16 @@ def build_receivable_result(
         "paid_amount": _money_string(position.get("paid_amount")),
         "total_amount": _money_string(position.get("total_amount")),
         "overdue_amount": _money_string(position.get("overdue_amount")),
+        "is_overdue": bool(position.get("is_overdue", False)),
         "next_due_date": position.get("next_due_date"),
+        "due_date": position.get("next_due_date"),
         "status": position.get("status") or "",
         "payment_state": position.get("payment_state") or "",
         "primary_action": state["primary_action"],
         "allowed_actions": state["allowed_actions"],
         "disabled_reason": state["disabled_reason"],
         "collection_route": collection_route,
+        "action_url": collection_route,
     }
 
 

@@ -206,7 +206,8 @@ export default function AdminPaymentCollectPage({
     [searchParamKey]
   );
   const prefillDirectSaleId = useMemo(() => {
-    const raw = new URLSearchParams(searchParamKey).get("direct_sale");
+    const params = new URLSearchParams(searchParamKey);
+    const raw = params.get("sale_id") ?? params.get("direct_sale");
     return parsePositiveInteger(raw);
   }, [searchParamKey]);
   const [form, setForm] = useState<FormState>(() => buildDefaultForm());
@@ -745,7 +746,7 @@ export default function AdminPaymentCollectPage({
     return (
       <PortalPage
         title={variant === "drawer" ? "Collect direct-sale balance" : "Admin Direct-Sale Collection"}
-        subtitle="Retail receivable collection workflow for invoiced direct sales with outstanding balance."
+        subtitle="Direct-sale receivable collection workflow for invoiced direct sales with outstanding balance."
         helperNote="This path creates a retail receipt against an existing direct-sale receivable. It stays separate from EMI allocation, winner waivers, and subscription reconciliation."
         helperTone="info"
         breadcrumbs={
@@ -783,9 +784,9 @@ export default function AdminPaymentCollectPage({
 
   return (
     <PortalPage
-      title={variant === "drawer" ? "Collect payment" : "Admin Collection Entry"}
+      title={variant === "drawer" ? "Advance EMI Collection" : "Advance EMI Collection"}
       subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
-      helperNote="This screen posts into the existing payment service path; no ledger, waiver, or reconciliation semantics are altered by UI input."
+      helperNote="Advance EMI collections post against EMI schedules. Direct-sale receivable collections use the separate direct-sale retail receipt workflow."
       helperTone="info"
       breadcrumbs={
         variant === "drawer"
