@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import PortalPage from "@/components/ui/PortalPage";
@@ -44,6 +45,7 @@ import {
 } from "@/services/receivables";
 
 type AdminPaymentCollectVariant = "page" | "drawer";
+type CollectionWorkflow = "advance-emi" | "direct-sale" | "unified";
 
 type FormState = {
   subscription_id: string;
@@ -137,6 +139,59 @@ function formatDateLabel(value?: string | null): string {
   }).format(date);
 }
 
+const WORKFLOW_TABS: Array<{
+  key: CollectionWorkflow;
+  label: string;
+  href: string;
+  helper: string;
+}> = [
+  {
+    key: "advance-emi",
+    label: "Advance EMI Collection",
+    href: `${ROUTES.admin.financeCollect}?workflow=advance-emi`,
+    helper: "Posts against EMI schedules and subscription ledger.",
+  },
+  {
+    key: "direct-sale",
+    label: "Direct-Sale Collection",
+    href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
+    helper: "Posts retail receipts against invoiced direct-sale receivables.",
+  },
+  {
+    key: "unified",
+    label: "Unified Search",
+    href: `${ROUTES.admin.financeCollect}?workflow=unified`,
+    helper: "Find a customer, contract, invoice, sale, or receipt and route to the correct workflow.",
+  },
+];
+
+function WorkflowTabs({ active }: { active: CollectionWorkflow }) {
+  const current = WORKFLOW_TABS.find((tab) => tab.key === active) ?? WORKFLOW_TABS[2];
+  return (
+    <div className="space-y-3">
+      <div className="inline-flex flex-wrap rounded-xl border border-border bg-[var(--surface-muted)] p-1">
+        {WORKFLOW_TABS.map((tab) => (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            className={[
+              "inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition",
+              active === tab.key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+            ].join(" ")}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </div>
+      <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground">
+        {current.helper}
+      </div>
+    </div>
+  );
+}
+
 function normalizeOutstandingAmount(
   emi: AdminEmiCollectionCandidate | null
 ): string {
@@ -198,13 +253,17 @@ export default function AdminPaymentCollectPage({
   const canonicalSelfHref = useMemo(() => {
     return searchParamKey ? `${ROUTES.admin.financeCollect}?${searchParamKey}` : ROUTES.admin.financeCollect;
   }, [searchParamKey]);
-  const collectionWorkflow = useMemo(
-    () =>
-      new URLSearchParams(searchParamKey).get("workflow") === "direct-sale"
-        ? "direct-sale"
-        : "subscription",
-    [searchParamKey]
-  );
+  const collectionWorkflow = useMemo<CollectionWorkflow>(() => {
+    const params = new URLSearchParams(searchParamKey);
+    const workflow = (params.get("workflow") || "").trim().toLowerCase();
+    if (workflow === "direct-sale") return "direct-sale";
+    if (workflow === "advance-emi") return "advance-emi";
+    if (workflow === "unified") return "unified";
+    if (params.get("subscription") || params.get("subscription_id") || params.get("emi") || params.get("emi_id")) {
+      return "advance-emi";
+    }
+    return "advance-emi";
+  }, [searchParamKey]);
   const prefillDirectSaleId = useMemo(() => {
     const params = new URLSearchParams(searchParamKey);
     const raw = params.get("sale_id") ?? params.get("direct_sale");
@@ -773,6 +832,7 @@ export default function AdminPaymentCollectPage({
         presentation={variant === "drawer" ? "popup" : "page"}
         maxWidth={variant === "drawer" ? "100%" : undefined}
       >
+        {variant === "page" ? <WorkflowTabs active="direct-sale" /> : null}
         <AdminDirectSaleCollectForm
           variant={variant}
           canonicalSelfHref={canonicalSelfHref}
@@ -782,9 +842,47 @@ export default function AdminPaymentCollectPage({
     );
   }
 
+  if (collectionWorkflow === "unified") {
+    return (
+      <PortalPage
+        title="Payment Collection"
+        subtitle="Choose the collection workflow or search across live receivables, then route to the correct posting path."
+        helperNote="Unified search does not post money directly. It routes Advance EMI and direct-sale receivables into their separate backend-safe collection workflows."
+        helperTone="info"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin" },
+          { label: "Finance", href: ROUTES.admin.finance },
+          { label: "Payment Collection" },
+        ]}
+        actions={[
+          { label: "Collections Workspace", href: ROUTES.admin.collections, variant: "secondary" },
+          { label: "Advance EMI Collection", href: `${ROUTES.admin.financeCollect}?workflow=advance-emi`, variant: "secondary" },
+          { label: "Direct-Sale Collection", href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`, variant: "secondary" },
+        ]}
+      >
+        <div className="space-y-6">
+          <WorkflowTabs active="unified" />
+          <UnifiedReceivableSearchPanel
+            title="Unified collection search"
+            description="Find a customer, contract, invoice, sale, or receipt and route to Advance EMI collection, direct-sale collection, sale finalization, or receipt review."
+            query={unifiedSearchQuery}
+            results={unifiedSearchResults}
+            loading={unifiedSearchLoading}
+            error={unifiedSearchError}
+            searched={unifiedSearchSubmitted}
+            actionLoadingKey={unifiedActionLoadingKey}
+            lastPaymentSummary={unifiedLastPaymentSummary}
+            onQueryChange={setUnifiedSearchQuery}
+            onSearch={handleUnifiedReceivableSearch}
+          />
+        </div>
+      </PortalPage>
+    );
+  }
+
   return (
     <PortalPage
-      title={variant === "drawer" ? "Advance EMI Collection" : "Advance EMI Collection"}
+      title={variant === "drawer" ? "Admin Collection Entry" : "Admin Collection Entry"}
       subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
       helperNote="Advance EMI collections post against EMI schedules. Direct-sale receivable collections use the separate direct-sale retail receipt workflow."
       helperTone="info"
@@ -838,6 +936,7 @@ export default function AdminPaymentCollectPage({
       maxWidth={variant === "drawer" ? "100%" : undefined}
     >
       <div className="space-y-6">
+        {variant === "page" ? <WorkflowTabs active="advance-emi" /> : null}
         <QuickActionGrid>
           <KpiCard
             label="Selected subscription"

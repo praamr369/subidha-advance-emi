@@ -311,7 +311,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       items: [
         {
           label: "Collect Subscription / Direct Sale",
-          href: ROUTES.cashier.collect,
+          href: `${ROUTES.cashier.collect}?workflow=unified`,
           icon: "collectPayment",
         },
       ],

@@ -71,7 +71,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
     supportingMetric: "Verification lag",
     actions: [
       { label: "Open collections", href: "/admin/collections" },
-      { label: "Collect subscription", href: "/admin/finance/collect" },
+      { label: "Collect Advance EMI", href: "/admin/finance/collect?workflow=advance-emi" },
       { label: "Collect direct sale", href: "/admin/finance/collect?workflow=direct-sale" },
     ],
   },

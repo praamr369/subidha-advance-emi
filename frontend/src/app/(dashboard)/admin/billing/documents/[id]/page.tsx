@@ -15,6 +15,7 @@ import PrintActionBanner from "@/components/print/PrintActionBanner";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import {
   getBillingInvoice,
@@ -56,6 +57,8 @@ export default function BillingDocumentDetailPage() {
   const [debitNotes, setDebitNotes] = useState<BillingDebitNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [collectDrawerOpen, setCollectDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!documentId) {
@@ -97,7 +100,7 @@ export default function BillingDocumentDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [documentId]);
+  }, [documentId, reloadKey]);
 
   const lineColumns: EnterpriseColumnDef<BillingInvoiceLine>[] = [
     { key: "product_code", header: "Product" },
@@ -242,6 +245,24 @@ export default function BillingDocumentDetailPage() {
       {!loading && !error && invoice ? (
         <>
           <div className="receipt-print-hide space-y-5">
+            {invoice.direct_sale && Number(invoice.balance_total || 0) > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div>
+                  <div className="font-semibold">Direct-sale balance is pending</div>
+                  <div className="mt-1">
+                    Balance {accountingMoney(invoice.balance_total)} on {invoice.direct_sale_no || `Direct Sale ${invoice.direct_sale}`}.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCollectDrawerOpen(true)}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
+                >
+                  Collect Direct-Sale Balance
+                </button>
+              </div>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DetailValue label="Invoice Date" value={accountingDate(invoice.invoice_date)} />
               <DetailValue label="Billing Channel" value={invoice.billing_channel} />
@@ -386,6 +407,12 @@ export default function BillingDocumentDetailPage() {
               unitPrice: accountingMoney(line.unit_price),
               lineTotal: accountingMoney(line.line_total),
             }))}
+          />
+          <DirectSaleCollectDrawer
+            open={collectDrawerOpen}
+            saleId={invoice.direct_sale ?? null}
+            onClose={() => setCollectDrawerOpen(false)}
+            onCollected={() => setReloadKey((current) => current + 1)}
           />
         </>
       ) : null}

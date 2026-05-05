@@ -110,7 +110,7 @@ export default function AdminSalesWorkspacePage() {
       },
       {
         key: "stock-needs",
-        label: "Stock needs workspace",
+        label: "Pending Stock Requirements",
         purpose: "Unified purchase/stock need queue with REST-backed workflows.",
         href: ROUTES.admin.inventoryStockNeeds,
         available: true,

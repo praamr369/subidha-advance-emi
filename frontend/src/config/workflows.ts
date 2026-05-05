@@ -59,7 +59,7 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     description: "Post a subscription EMI collection using backend-controlled allocation and reconciliation-safe posting.",
     roles: ["ADMIN"],
     icon: "collectPayment",
-    canonicalHref: ROUTES.admin.financeCollect,
+    canonicalHref: `${ROUTES.admin.financeCollect}?workflow=advance-emi`,
     surface: "drawer",
     safetyNote: "Requires explicit confirmation before posting.",
   },

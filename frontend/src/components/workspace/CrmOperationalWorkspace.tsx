@@ -24,7 +24,7 @@ function CrmSectionCardDetail({ card }: { card: CrmWorkspaceSectionCard }) {
   return (
     <article className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-foreground">{card.label}</h2>
+        <div className="text-base font-semibold text-foreground">{card.label}</div>
         <span className="text-xs font-medium text-muted-foreground">
           {card.status === "loading"
             ? "Loading"
@@ -82,7 +82,7 @@ export function CrmOperationalWorkspace({ cards }: { cards: CrmWorkspaceSectionC
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-sm font-semibold text-foreground">{card.label}</div>
+                  <h2 className="text-sm font-semibold text-foreground">{card.label}</h2>
                   <span className="text-lg font-semibold text-foreground">{card.count ?? "—"}</span>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">{card.statusMessage}</p>

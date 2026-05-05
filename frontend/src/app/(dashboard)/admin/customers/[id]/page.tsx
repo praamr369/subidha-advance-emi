@@ -844,7 +844,7 @@ function ContractReferenceList({
                   title="Opens the collection desk using the canonical route from ContractReference."
                   className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                 >
-                  Collect Direct Sale
+                  Collect Direct-Sale Balance
                 </Link>
               ) : null}
 

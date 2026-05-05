@@ -28,7 +28,7 @@ test.describe("admin dashboard smoke", () => {
     await page.goto("/admin");
     const operatorToggle = page.getByTestId("operator-mode-toggle");
     await expect(operatorToggle).toBeVisible();
-    await expect(operatorToggle).toHaveAttribute("aria-label", "Operator navigation mode");
+    await expect(operatorToggle).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
     await operatorToggle.getByRole("radio", { name: /advanced erp/i }).click();
     await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
     await operatorToggle.getByRole("radio", { name: /simple workflow/i }).click();

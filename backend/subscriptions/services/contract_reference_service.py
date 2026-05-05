@@ -642,9 +642,9 @@ def build_canonical_collection_route(
     ds_id = reference.direct_sale_id
     if primary_action == CollectionPrimaryAction.COLLECT_EMI and sub_id:
         return (
-            f"/cashier/collect?subscription={sub_id}"
+            f"/cashier/collect?workflow=advance-emi&subscription={sub_id}"
             if is_cashier
-            else f"/admin/finance/collect?subscription={sub_id}"
+            else f"/admin/finance/collect?workflow=advance-emi&subscription={sub_id}"
         )
     if primary_action == CollectionPrimaryAction.COLLECT_DIRECT_SALE and ds_id:
         return (
@@ -1086,4 +1086,3 @@ def preview_unified_receivable_allocation(
         }
 
     raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})
-

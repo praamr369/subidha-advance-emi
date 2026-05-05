@@ -91,6 +91,14 @@ export default function BillingInvoicesPage() {
           <ActionButton href={buildAdminBillingDocumentRoute(row.id)} variant="outline">
             Open Detail
           </ActionButton>
+          {row.direct_sale && row.status === "POSTED" && Number(row.balance_total || 0) > 0 ? (
+            <ActionButton
+              href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${row.direct_sale}`}
+              variant="primary"
+            >
+              Collect Direct-Sale Balance
+            </ActionButton>
+          ) : null}
         </div>
       ),
     },

@@ -80,7 +80,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales", "Invoices", ROUTES.admin.billingInvoices, "Invoice register."),
   item("Sales", "Receipts", ROUTES.admin.billingReceipts, "Receipt register."),
   item("Sales", "Document Register", ROUTES.admin.billingRegister, "Billing document register."),
-  item("Sales", "Payment Collection", ROUTES.admin.financeCollect, "Admin payment collection entry point."),
+  item("Sales", "Direct-Sale Collection", `${ROUTES.admin.financeCollect}?workflow=direct-sale`, "Collect retail receivables against invoiced direct sales."),
 
   item("Subscriptions", "Subscription Workflows", ROUTES.admin.subscriptions, "Advance EMI, rent, lease, and partner subscription workflow landing."),
   item("Subscriptions", "Advance EMI", `${ROUTES.admin.subscriptions}?plan_type=EMI&workflow=advance`, "Advance EMI contract workflow.", {
@@ -181,7 +181,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance & Accounting", "Overdue", ROUTES.admin.emisOverdue, "Overdue queue.", {
     badgeSource: "queue.overdue_payments",
   }),
-  item("Finance & Accounting", "Payment Collection", ROUTES.admin.financeCollect, "Collect customer payment."),
+  item("Finance & Accounting", "Advance EMI Collection", `${ROUTES.admin.financeCollect}?workflow=advance-emi`, "Collect subscription EMI payments."),
+  item("Finance & Accounting", "Direct-Sale Collection", `${ROUTES.admin.financeCollect}?workflow=direct-sale`, "Collect retail direct-sale receivables."),
   item("Finance & Accounting", "Reconciliation", ROUTES.admin.financeCanonicalReconciliation, "Reconciliation queue.", {
     badgeSource: "queue.reconciliation_pending",
   }),

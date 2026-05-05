@@ -43,7 +43,7 @@ export default function StockNeedsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stock needs"
+        title="Purchase need workspace"
         description="Operational purchase/stock needs (PurchaseNeed). Mutations require admin privileges."
       />
       <div className="flex flex-wrap gap-2 text-sm">

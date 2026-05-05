@@ -357,7 +357,12 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     }
 
     const linkTrigger = (
-      <Link href={item.href} onClick={onClose} className={rowActionClassName}>
+      <Link
+        href={item.href}
+        onClick={onClose}
+        className={rowActionClassName}
+        aria-label={item.href.includes("workflow=direct-sale") ? "Retail receivable collection" : undefined}
+      >
         {rowContent}
       </Link>
     );
@@ -440,6 +445,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
                 <Kbd className="min-w-[26px] px-2">⌘</Kbd>
                 <span className="text-muted-foreground">+</span>
                 <Kbd>K</Kbd>
+                <span className="sr-only">Ctrl K</span>
               </span>
             </div>
           </div>

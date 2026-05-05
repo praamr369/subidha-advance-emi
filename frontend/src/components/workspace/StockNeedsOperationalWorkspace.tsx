@@ -29,7 +29,7 @@ export function StockNeedsOperationalWorkspace({
     if (userSelectedId && ids.includes(userSelectedId)) {
       return userSelectedId;
     }
-    return ids[0] ?? null;
+    return null;
   }, [rows, userSelectedId]);
 
   const selected = useMemo(

@@ -14,6 +14,7 @@ import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceD
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import { listFinanceAccounts } from "@/services/accounting";
 import { createAdminDirectSaleOrchestrated } from "@/services/admin-sales";
 import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
@@ -242,6 +243,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const createMode =
     orchestrationCreate ||
     (searchParams.get("mode") || "").trim().toLowerCase() === "create";
+  const customerFilter = (searchParams.get("customer") || "").trim();
   const workspaceQueriesEnabled = !createMode;
   const queryClient = useQueryClient();
 
@@ -257,9 +259,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   });
 
   const salesQuery = useQuery({
-    queryKey: directSalesKeys.adminRegister(),
+    queryKey: [...directSalesKeys.adminRegister(), { customer: customerFilter || null }],
     queryFn: async () => {
-      const payload = await listDirectSales();
+      const payload = await listDirectSales(customerFilter ? { customer: customerFilter } : {});
       return payload.results;
     },
     enabled: workspaceQueriesEnabled,
@@ -301,6 +303,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
@@ -359,6 +362,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       setForm((current) => ({ ...current, delivery_required: true }));
     }
   }, [createMode, searchParams]);
+
+  useEffect(() => {
+    if (createMode) return;
+    const raw = searchParams.get("focus_sale");
+    const saleId = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+    if (!saleId) return;
+    const sale = rows.find((row) => row.id === saleId);
+    if (!sale) return;
+    const isCollectible =
+      sale.status === "INVOICED" &&
+      String(sale.billing_invoice_status || "").toUpperCase() === "POSTED" &&
+      toNumber(sale.balance_total) > 0;
+    if (isCollectible) setCollectSaleId(sale.id);
+  }, [createMode, rows, searchParams]);
 
   const stats = useMemo(() => {
     const today = todayIso();
@@ -453,6 +470,50 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         ) : (
           "Draft"
         ),
+    },
+    {
+      key: "balance_total",
+      header: "Balance",
+      render: (row) => accountingMoney(row.balance_total),
+    },
+    {
+      key: "id",
+      header: "Action",
+      render: (row) => {
+        const balance = toNumber(row.balance_total);
+        const isDraft = row.status === "DRAFT" || !row.billing_invoice_id;
+        const invoiceStatus = String(row.billing_invoice_status || "").toUpperCase();
+        const isCollectible = row.status === "INVOICED" && invoiceStatus === "POSTED" && balance > 0;
+        if (isCollectible) {
+          return (
+            <button
+              type="button"
+              onClick={() => setCollectSaleId(row.id)}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-800 px-3 text-xs font-semibold text-white transition hover:bg-amber-900"
+            >
+              Collect balance
+            </button>
+          );
+        }
+        if (isDraft) {
+          return (
+            <Link
+              href={`${ROUTES.admin.billingDirectSales}?focus_sale=${row.id}`}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
+            >
+              Open sale / finalize invoice
+            </Link>
+          );
+        }
+        return (
+          <Link
+            href={`${ROUTES.admin.billingReceipts}?direct_sale=${row.id}`}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
+          >
+            View receipts
+          </Link>
+        );
+      },
     },
   ];
 
@@ -1789,6 +1850,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           emptyDescription="Out-of-stock direct-sale lines will create requirement alerts here."
         />
       </WorkspaceSection>
+
+      <DirectSaleCollectDrawer
+        open={collectSaleId !== null}
+        saleId={collectSaleId}
+        onClose={() => setCollectSaleId(null)}
+        onCollected={async () => {
+          await salesQuery.refetch();
+        }}
+      />
     </PortalPage>
   );
 }

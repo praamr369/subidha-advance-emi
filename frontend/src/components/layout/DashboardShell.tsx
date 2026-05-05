@@ -248,6 +248,8 @@ function segmentToLabel(segment: string) {
 }
 
 function buildPageTitle(pathname: string) {
+  if (pathname === "/admin/counters") return "Counter & Cash Desk Master";
+  if (pathname === "/admin/inventory/stock-needs") return "Stock needs";
   const cleaned = pathname.replace(/^\/+|\/+$/g, "");
   const segments = cleaned.split("/").filter(Boolean);
   if (segments.length === 0) return "Dashboard";
@@ -509,6 +511,14 @@ function SidebarContent({
   const [operatorMode, setOperatorMode] = useState<OperatorMode>(() =>
     role === "ADMIN" ? readOperatorMode() : "ADVANCED"
   );
+  const persistOperatorMode = useCallback((value: OperatorMode) => {
+    setOperatorMode(value);
+    try {
+      window.localStorage.setItem(OPERATOR_MODE_KEY, value);
+    } catch {
+      // preference-only
+    }
+  }, []);
 
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
@@ -933,21 +943,19 @@ function SidebarContent({
                 type="single"
                 value={operatorMode}
                 data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
-                aria-label="Operator navigation mode"
+                aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
                 onValueChange={(value: string) => {
                   if (value !== "SIMPLE" && value !== "ADVANCED") return;
-                  setOperatorMode(value as OperatorMode);
-                  try {
-                    window.localStorage.setItem(OPERATOR_MODE_KEY, value as OperatorMode);
-                  } catch {
-                    // preference-only
-                  }
+                  persistOperatorMode(value as OperatorMode);
                 }}
                 className="border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-1"
               >
                 <ToggleGroupItem
                   value="SIMPLE"
                   aria-label="Simple workflow view"
+                  onClick={() => {
+                    if (operatorMode === "SIMPLE") persistOperatorMode("ADVANCED");
+                  }}
                   className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Simple
@@ -955,6 +963,9 @@ function SidebarContent({
                 <ToggleGroupItem
                   value="ADVANCED"
                   aria-label="Advanced ERP view"
+                  onClick={() => {
+                    if (operatorMode === "ADVANCED") persistOperatorMode("SIMPLE");
+                  }}
                   className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Advanced
