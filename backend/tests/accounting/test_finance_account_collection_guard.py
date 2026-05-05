@@ -38,9 +38,20 @@ class FinanceAccountCollectionGuardTests(TestCase):
             code="TEST-GUARD-CLEAN",
             name="Clean Collection Desk",
         )
-        dirty = create_payment_collection_finance_account(
-            code="TEST-GUARD-DIRTY",
+        dirty_asset = ChartOfAccount.objects.create(
+            code="TEST-GUARD-DIRTY-ASSET",
+            name="Dirty Mixed Desk Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        dirty = FinanceAccount.objects.create(
             name="Dirty Mixed Desk",
+            kind=FinanceAccountKind.BANK,
+            chart_account=dirty_asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
         )
         income_chart = ChartOfAccount.objects.create(
             code="INC-GUARD-1",
@@ -80,9 +91,20 @@ class FinanceAccountCollectionGuardTests(TestCase):
         )
         emi = create_emi(subscription=subscription, month_no=1, amount=Decimal("1000.00"))
 
-        dirty = create_payment_collection_finance_account(
-            code="TEST-GUARD-EMI-FA",
+        dirty_asset = ChartOfAccount.objects.create(
+            code="TEST-GUARD-EMI-ASSET",
+            name="Rent Income Mapped Desk Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        dirty = FinanceAccount.objects.create(
             name="Rent Income Mapped Desk",
+            kind=FinanceAccountKind.BANK,
+            chart_account=dirty_asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
         )
         income_chart = ChartOfAccount.objects.create(
             code="INC-GUARD-2",
@@ -121,9 +143,20 @@ class FinanceAccountCollectionGuardTests(TestCase):
             reorder_level_qty=Decimal("1.000"),
             standard_unit_cost=Decimal("8000.00"),
         )
-        dirty = create_payment_collection_finance_account(
-            code="TEST-GUARD-DS-FA",
+        dirty_asset = ChartOfAccount.objects.create(
+            code="TEST-GUARD-DS-ASSET",
+            name="Commission Mapped Desk Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        dirty = FinanceAccount.objects.create(
             name="Commission Mapped Desk",
+            kind=FinanceAccountKind.BANK,
+            chart_account=dirty_asset,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
         )
         liability_chart = ChartOfAccount.objects.create(
             code="LIA-GUARD-1",

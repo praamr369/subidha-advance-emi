@@ -237,6 +237,7 @@ from api.v1.views.reports_center import (
 )
 from api.v1.views.admin_accounting_setup import (
     AccountingMappingSuggestionsView,
+    AccountingRepairSuggestedMappingsView,
     AccountingSetupBootstrapView,
     AccountingSetupStatusView,
     FinanceAccountMappingListCreateView,
@@ -562,6 +563,7 @@ urlpatterns = [
     path("accounting/finance-account-mappings/", FinanceAccountMappingListCreateView.as_view()),
     path("accounting/finance-account-mappings/<int:pk>/", FinanceAccountMappingPatchView.as_view()),
     path("accounting/mapping-suggestions/", AccountingMappingSuggestionsView.as_view()),
+    path("accounting/mapping-suggestions/repair/", AccountingRepairSuggestedMappingsView.as_view()),
     path("erp/summary/", AdminErpSummaryView.as_view()),
     path("erp/today-work/", AdminErpTodayWorkView.as_view()),
     path("crm/workspace/", AdminCrmWorkspaceView.as_view()),

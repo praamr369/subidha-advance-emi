@@ -82,6 +82,22 @@ class AccountingMappingSuggestionsView(_AdminBase):
         return Response(
             {
                 "suggestions": AccountingSetupService.create_default_mappings(actor=request.user, dry_run=True).__dict__,
+                "repair_preview": AccountingSetupService.repair_suggested_mappings(actor=request.user, dry_run=True),
                 "warnings": warnings,
             }
         )
+
+
+class AccountingRepairSuggestedMappingsSerializer(serializers.Serializer):
+    dry_run = serializers.BooleanField(required=False, default=False)
+
+
+class AccountingRepairSuggestedMappingsView(_AdminBase):
+    def post(self, request):
+        serializer = AccountingRepairSuggestedMappingsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        payload = AccountingSetupService.repair_suggested_mappings(
+            actor=request.user,
+            dry_run=serializer.validated_data["dry_run"],
+        )
+        return Response(payload, status=status.HTTP_200_OK)

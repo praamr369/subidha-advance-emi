@@ -14,6 +14,7 @@ import {
   getFinanceAccountMappings,
   patchFinanceAccountMapping,
   postAccountingSetupBootstrap,
+  repairSuggestedMappings,
 } from "@/services/accounting-setup";
 
 type SetupStatus = {
@@ -109,6 +110,20 @@ export default function AdminAccountingSetupPage() {
   }, [load]);
 
   const warnings = status?.warnings ?? [];
+  const warningCount = status?.warnings_count ?? warnings.length;
+  const displayStatus = warningCount > 0 ? "NEEDS_ATTENTION" : status?.status ?? "UNKNOWN";
+  const repairMappings = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await repairSuggestedMappings(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to repair suggested mappings.");
+    } finally {
+      setSaving(false);
+    }
+  }, [load]);
   const steps = useMemo(
     () => [
       "Step 1: Business finance accounts",
@@ -168,17 +183,25 @@ export default function AdminAccountingSetupPage() {
           <ActionButton variant="primary" onClick={applyRecommended} disabled={saving}>
             {saving ? "Applying..." : "Apply Recommended Mapping"}
           </ActionButton>
+          <ActionButton variant="secondary" onClick={repairMappings} disabled={saving}>
+            {saving ? "Repairing..." : "Repair suggested mappings"}
+          </ActionButton>
           <ActionButton variant="secondary" onClick={() => void load()}>
             Refresh
           </ActionButton>
         </div>
         {error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Setup status" value={status?.status ?? "UNKNOWN"} />
+          <StatCard label="Setup status" value={displayStatus} tone={warningCount > 0 ? "warning" : "success"} />
           <StatCard label="COA ready" value={status?.coa_ready ? "Yes" : "No"} />
           <StatCard label="Finance accounts ready" value={status?.finance_accounts_ready ? "Yes" : "No"} />
-          <StatCard label="Warnings" value={String(status?.warnings_count ?? 0)} tone={(status?.warnings_count ?? 0) > 0 ? "warning" : "success"} />
+          <StatCard label="Warnings" value={String(warningCount)} tone={warningCount > 0 ? "warning" : "success"} />
         </div>
+        {warningCount > 0 ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
+          </div>
+        ) : null}
 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
@@ -255,7 +278,24 @@ export default function AdminAccountingSetupPage() {
                   </tr>
                 ) : (
                   mappings.map((row) => {
-                    const warning = warnings.find((warn) => warn.message.toLowerCase().includes((row.finance_account_name || "").toLowerCase()));
+                    const warning = warnings.find((warn) => {
+                      const name = (row.finance_account_name || "").toLowerCase();
+                      const purpose = (row.purpose || "").toLowerCase();
+                      const message = warn.message.toLowerCase();
+                      return message.includes(name) || (purpose ? message.includes(purpose) : false);
+                    });
+                    const isSystemProfile = (row.finance_account_name || "").toLowerCase().includes("ledger posting profiles");
+                    const mappingStatus = !row.chart_account_name
+                      ? "Missing"
+                      : isSystemProfile
+                        ? "System-only"
+                        : warning
+                          ? "Mismatch"
+                          : "Correct";
+                    const warningText =
+                      isSystemProfile
+                        ? "System posting profile — not available for manual receipt/counter selection."
+                        : warning?.message || "—";
                     return (
                       <tr key={row.id} className="border-t border-border">
                         <td className="px-2 py-2">{row.finance_account_name || "—"}</td>
@@ -265,8 +305,8 @@ export default function AdminAccountingSetupPage() {
                           <div className="text-[11px] text-muted-foreground">{row.purpose || "—"}</div>
                         </td>
                         <td className="px-2 py-2">{row.chart_account_type || "—"}</td>
-                        <td className="px-2 py-2">{row.is_active ? "Active" : "Inactive"}</td>
-                        <td className="px-2 py-2 text-amber-700">{warning?.message || "—"}</td>
+                        <td className="px-2 py-2">{mappingStatus}</td>
+                        <td className="px-2 py-2 text-amber-700">{warningText}</td>
                         <td className="px-2 py-2">
                           <ActionButton
                             size="sm"

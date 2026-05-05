@@ -32,3 +32,10 @@ export async function patchFinanceAccountMapping(id: number, payload: Record<str
 export async function getAccountingMappingSuggestions() {
   return request("/admin/accounting/mapping-suggestions/");
 }
+
+export async function repairSuggestedMappings(dryRun = false) {
+  return request("/admin/accounting/mapping-suggestions/repair/", {
+    method: "POST",
+    body: JSON.stringify({ dry_run: dryRun }),
+  });
+}

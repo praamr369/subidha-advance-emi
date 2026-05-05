@@ -12,6 +12,10 @@ from django.utils import timezone
 from subscriptions.models import PaymentMethod
 
 MONEY_ZERO = Decimal("0.00")
+SYSTEM_LEDGER_POSTING_PROFILE_NAME = "ledger posting profiles (system)"
+DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
+DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "DEFAULT_ASSET_BANK_ACCOUNT"
+DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "DEFAULT_ASSET_UPI_GATEWAY"
 
 
 def _default_branch():
@@ -74,6 +78,14 @@ def generate_expense_claim_no() -> str:
 
 def _transition_allowed(previous_status: str | None, next_status: str | None, allowed: set[tuple[str, str]]) -> bool:
     return (previous_status or "", next_status or "") in allowed
+
+
+def _is_cash_in_hand_chart(chart: "ChartOfAccount" | None) -> bool:
+    if chart is None:
+        return False
+    if (chart.system_code or "").strip().upper() == DEFAULT_CASH_IN_HAND_SYSTEM_CODE:
+        return True
+    return (chart.name or "").strip().lower() == "cash in hand"
 
 
 def _immutable_status_guard(
@@ -518,6 +530,28 @@ class FinanceAccount(AccountingTimeStampedModel):
         errors = {}
         if self.chart_account_id and self.chart_account.account_type != ChartOfAccountType.ASSET:
             errors["chart_account"] = "Finance accounts must map to ASSET chart accounts."
+        if self.chart_account_id:
+            kind = (self.kind or "").strip().upper()
+            bank_chart = ChartOfAccount.objects.filter(
+                system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE,
+                is_active=True,
+            ).first()
+            upi_chart = ChartOfAccount.objects.filter(
+                system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE,
+                is_active=True,
+            ).first()
+            if kind == FinanceAccountKind.BANK and _is_cash_in_hand_chart(self.chart_account):
+                if bank_chart and self.chart_account_id != bank_chart.pk:
+                    errors["chart_account"] = (
+                        "Bank finance accounts cannot use Cash in Hand as primary chart account "
+                        "when a Bank Account chart exists."
+                    )
+            if kind == FinanceAccountKind.UPI and _is_cash_in_hand_chart(self.chart_account):
+                if upi_chart and self.chart_account_id != upi_chart.pk:
+                    errors["chart_account"] = (
+                        "UPI finance accounts cannot use Cash in Hand as primary chart account "
+                        "when a UPI/Payment Gateway chart exists."
+                    )
         if self.bank_last4 and len(self.bank_last4) != 4:
             errors["bank_last4"] = "bank_last4 must contain exactly 4 characters."
         if errors:
@@ -624,11 +658,44 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
             FinanceAccountMappingPurpose.SALARY_EXPENSE,
         } and account_type != ChartOfAccountType.EXPENSE:
             errors["chart_account"] = "This purpose must map to an EXPENSE chart account."
-        if self.purpose == FinanceAccountMappingPurpose.WAIVER_LOSS and account_type not in {
-            ChartOfAccountType.EXPENSE,
-            ChartOfAccountType.EQUITY,
-        }:
-            errors["chart_account"] = "Waiver/Loss must map to an EXPENSE or EQUITY chart account."
+        if self.purpose == FinanceAccountMappingPurpose.WAIVER_LOSS and account_type != ChartOfAccountType.EXPENSE:
+            errors["chart_account"] = "Waiver/Loss must map to an EXPENSE chart account."
+        if self.finance_account_id and self.chart_account_id:
+            finance_kind = (self.finance_account.kind or "").strip().upper()
+            if finance_kind == FinanceAccountKind.CASH and self.chart_account.account_type in {
+                ChartOfAccountType.INCOME,
+                ChartOfAccountType.LIABILITY,
+                ChartOfAccountType.EXPENSE,
+            }:
+                errors["chart_account"] = (
+                    "CASH finance accounts cannot map to INCOME/LIABILITY/EXPENSE chart accounts."
+                )
+            bank_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE, is_active=True).first()
+            upi_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE, is_active=True).first()
+            if (
+                self.purpose == FinanceAccountMappingPurpose.BANK_COLLECTION
+                and _is_cash_in_hand_chart(self.chart_account)
+                and bank_chart
+                and self.chart_account_id != bank_chart.pk
+            ):
+                errors["chart_account"] = "BANK_COLLECTION must map to Bank Account when Bank Account chart exists."
+            if (
+                self.purpose == FinanceAccountMappingPurpose.UPI_COLLECTION
+                and _is_cash_in_hand_chart(self.chart_account)
+                and upi_chart
+                and self.chart_account_id != upi_chart.pk
+            ):
+                errors["chart_account"] = "UPI_COLLECTION must map to UPI/Payment Gateway when that chart exists."
+            if self.purpose in {
+                FinanceAccountMappingPurpose.CASH_COLLECTION,
+                FinanceAccountMappingPurpose.BANK_COLLECTION,
+                FinanceAccountMappingPurpose.UPI_COLLECTION,
+            }:
+                is_system_only = not bool(self.finance_account.is_real_settlement_account)
+                if is_system_only or (self.finance_account.name or "").strip().lower() == SYSTEM_LEDGER_POSTING_PROFILE_NAME:
+                    errors["finance_account"] = (
+                        "System-only finance accounts cannot be used for manual collection mappings."
+                    )
         if errors:
             raise ValidationError(errors)
 

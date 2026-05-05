@@ -77,6 +77,7 @@ def compute_setup_checklist():
             ChartOfAccountType.EXPENSE,
         ),
     ).count()
+    non_statement_accounts = max(active_chart_accounts.count() - visible_register_count, 0)
     chart_type_counts = {
         choice.value: active_chart_accounts.filter(account_type=choice.value).count()
         for choice in ChartOfAccountType
@@ -147,6 +148,7 @@ def compute_setup_checklist():
                     f"{visible_register_count} active roots in ASSET/LIABILITY/INCOME/EXPENSE "
                     f"(statement-style register tally); equity accounts add "
                     f"{chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0)} active row(s). "
+                    f"Non-statement operational/control accounts: {non_statement_accounts}. "
                     "Filtered accounting screens only show rows matching current filters."
                 )
                 if active_chart_accounts.exists()
@@ -268,6 +270,10 @@ def compute_setup_checklist():
         "active_system_chart_accounts": chart_active_system_accounts,
         "active_custom_chart_accounts": chart_active_custom_accounts,
         "visible_register_count": visible_register_count,
+        "active_chart_accounts_total": active_chart_accounts.count(),
+        "statement_root_accounts": visible_register_count,
+        "child_sub_accounts": chart_active_child_accounts,
+        "non_statement_accounts": non_statement_accounts,
         "chart_active_asset": chart_type_counts.get(ChartOfAccountType.ASSET.value, 0),
         "chart_active_liability": chart_type_counts.get(ChartOfAccountType.LIABILITY.value, 0),
         "chart_active_equity": chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0),

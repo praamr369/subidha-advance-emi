@@ -181,7 +181,7 @@ PURPOSE_EXPECTED_ACCOUNT_TYPES: dict[str, tuple[str, ...]] = {
     FinanceAccountMappingPurpose.LEASE_INCOME: (ChartOfAccountType.INCOME,),
     FinanceAccountMappingPurpose.DIRECT_SALE_INCOME: (ChartOfAccountType.INCOME,),
     FinanceAccountMappingPurpose.DELIVERY_CHARGES_INCOME: (ChartOfAccountType.INCOME,),
-    FinanceAccountMappingPurpose.WAIVER_LOSS: (ChartOfAccountType.EXPENSE, ChartOfAccountType.EQUITY),
+    FinanceAccountMappingPurpose.WAIVER_LOSS: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.COMMISSION_PAYABLE: (ChartOfAccountType.LIABILITY,),
     FinanceAccountMappingPurpose.COMMISSION_EXPENSE: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.DAMAGE_RECOVERY: (ChartOfAccountType.INCOME,),
@@ -199,9 +199,26 @@ class SetupResult:
 
 
 DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
+DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "DEFAULT_ASSET_BANK_ACCOUNT"
+DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "DEFAULT_ASSET_UPI_GATEWAY"
+
+# Warnings that remain visible but do not block readiness.
+READINESS_INFORMATIONAL_WARNING_CODES: frozenset[str] = frozenset()
 
 
 class AccountingSetupService:
+    PURPOSE_TO_SYSTEM_CODE: dict[str, str] = {
+        FinanceAccountMappingPurpose.CASH_COLLECTION: DEFAULT_CASH_IN_HAND_SYSTEM_CODE,
+        FinanceAccountMappingPurpose.BANK_COLLECTION: DEFAULT_BANK_ACCOUNT_SYSTEM_CODE,
+        FinanceAccountMappingPurpose.UPI_COLLECTION: DEFAULT_UPI_GATEWAY_SYSTEM_CODE,
+        FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE: "DEFAULT_ASSET_CUSTOMER_RECEIVABLES",
+        FinanceAccountMappingPurpose.DIRECT_SALE_INCOME: "DEFAULT_INC_DIRECT_SALE",
+        FinanceAccountMappingPurpose.EMI_INCOME: "DEFAULT_INC_EMI",
+        FinanceAccountMappingPurpose.INVENTORY_ASSET: "DEFAULT_ASSET_INVENTORY",
+        FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY: "DEFAULT_LIAB_SECURITY_DEPOSIT",
+        FinanceAccountMappingPurpose.WAIVER_LOSS: "DEFAULT_EXP_WAIVER_LOSS",
+    }
+
     @staticmethod
     def _chart_is_cash_in_hand(chart: ChartOfAccount | None) -> bool:
         if chart is None:
@@ -209,6 +226,102 @@ class AccountingSetupService:
         if chart.system_code == DEFAULT_CASH_IN_HAND_SYSTEM_CODE:
             return True
         return chart.name.strip().lower() == "cash in hand"
+
+    @staticmethod
+    def _resolve_chart_by_system_code(system_code: str) -> ChartOfAccount | None:
+        return ChartOfAccount.objects.filter(system_code=system_code, is_active=True).first()
+
+    @staticmethod
+    def _primary_chart_for_seeded_finance_row(*, name: str, kind: str) -> ChartOfAccount | None:
+        """Primary chart for default settlement / ledger-anchor finance rows (seed + repair)."""
+        ledger_key = LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME.strip().lower()
+        if name.strip().lower() == ledger_key:
+            return (
+                AccountingSetupService._resolve_chart_by_system_code(DEFAULT_BANK_ACCOUNT_SYSTEM_CODE)
+                or AccountingSetupService._resolve_anchor_chart_account()
+            )
+        if kind == FinanceAccountKind.CASH:
+            return AccountingSetupService._resolve_anchor_chart_account()
+        if kind == FinanceAccountKind.UPI:
+            return (
+                AccountingSetupService._resolve_chart_by_system_code(DEFAULT_UPI_GATEWAY_SYSTEM_CODE)
+                or AccountingSetupService._resolve_anchor_chart_account()
+            )
+        if kind == FinanceAccountKind.BANK:
+            return (
+                AccountingSetupService._resolve_chart_by_system_code(DEFAULT_BANK_ACCOUNT_SYSTEM_CODE)
+                or AccountingSetupService._resolve_anchor_chart_account()
+            )
+        return AccountingSetupService._resolve_anchor_chart_account()
+
+    @staticmethod
+    def _mapping_notes_allow_auto_repair(notes: str | None) -> bool:
+        n = (notes or "").strip().lower()
+        if not n:
+            return True
+        if "default day-one mapping" in n:
+            return True
+        if "suggested repair" in n:
+            return True
+        if n.startswith("auto-mapped"):
+            return True
+        return False
+
+    @staticmethod
+    def resolve_expected_chart_for_purpose(purpose: str) -> ChartOfAccount | None:
+        system_code = AccountingSetupService.PURPOSE_TO_SYSTEM_CODE.get(purpose)
+        if not system_code:
+            return None
+        return AccountingSetupService._resolve_chart_by_system_code(system_code)
+
+    @staticmethod
+    def validate_finance_account_primary_chart_alignment(
+        *,
+        kind: str,
+        chart_account: ChartOfAccount,
+        finance_account: FinanceAccount | None = None,
+    ) -> None:
+        """
+        Enforce sensible primary chart links for finance accounts (API / master updates).
+
+        Ledger posting profile anchor is excluded from bank-vs-cash strictness.
+        """
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        ledger_key = LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME.strip().lower()
+        if finance_account is not None:
+            if finance_account.name.strip().lower() == ledger_key and not finance_account.is_real_settlement_account:
+                return
+
+        kind_norm = (kind or "").strip().upper()
+        if chart_account.account_type != ChartOfAccountType.ASSET:
+            raise DjangoValidationError(
+                {"chart_account": "Finance accounts must map to an ASSET chart account."},
+            )
+
+        bank_chart = AccountingSetupService._resolve_chart_by_system_code(DEFAULT_BANK_ACCOUNT_SYSTEM_CODE)
+        upi_chart = AccountingSetupService._resolve_chart_by_system_code(DEFAULT_UPI_GATEWAY_SYSTEM_CODE)
+
+        if kind_norm == FinanceAccountKind.BANK and AccountingSetupService._chart_is_cash_in_hand(chart_account):
+            if bank_chart and chart_account.pk != bank_chart.pk:
+                raise DjangoValidationError(
+                    {
+                        "chart_account": (
+                            "Bank finance accounts cannot use Cash in Hand as the primary chart account "
+                            "when a Bank Account ledger exists on the chart."
+                        ),
+                    },
+                )
+        if kind_norm == FinanceAccountKind.UPI and AccountingSetupService._chart_is_cash_in_hand(chart_account):
+            if upi_chart and chart_account.pk != upi_chart.pk:
+                raise DjangoValidationError(
+                    {
+                        "chart_account": (
+                            "UPI finance accounts cannot use Cash in Hand as the primary chart account "
+                            "when a UPI / payment gateway asset ledger exists."
+                        ),
+                    },
+                )
 
     @staticmethod
     def _resolve_anchor_chart_account():
@@ -252,8 +365,7 @@ class AccountingSetupService:
         created = 0
         existing = 0
         details: list[dict[str, Any]] = []
-        fallback_asset = AccountingSetupService._resolve_anchor_chart_account()
-        if fallback_asset is None and not dry_run:
+        if not dry_run and AccountingSetupService._resolve_anchor_chart_account() is None:
             raise ValueError("No ASSET chart account available. Seed chart of accounts first.")
 
         for name, kind in SETTLEMENT_FINANCE_ACCOUNTS:
@@ -266,10 +378,13 @@ class AccountingSetupService:
             details.append({"name": name, "status": "created"})
             if dry_run:
                 continue
+            primary = AccountingSetupService._primary_chart_for_seeded_finance_row(name=name, kind=kind)
+            if primary is None:
+                raise ValueError("No suitable chart account for default finance account seeding.")
             instance = FinanceAccount.objects.create(
                 name=name,
                 kind=kind,
-                chart_account=fallback_asset,
+                chart_account=primary,
                 is_active=True,
                 is_real_settlement_account=True,
             )
@@ -289,10 +404,16 @@ class AccountingSetupService:
             created += 1
             details.append({"name": ledger_name, "status": "created"})
             if not dry_run:
+                ledger_primary = AccountingSetupService._primary_chart_for_seeded_finance_row(
+                    name=ledger_name,
+                    kind=FinanceAccountKind.BANK,
+                )
+                if ledger_primary is None:
+                    raise ValueError("No suitable chart account for ledger profile anchor.")
                 ledger = FinanceAccount.objects.create(
                     name=ledger_name,
                     kind=FinanceAccountKind.BANK,
-                    chart_account=fallback_asset,
+                    chart_account=ledger_primary,
                     is_active=True,
                     is_real_settlement_account=False,
                     notes="System ledger-profile anchor — not a settlement desk.",
@@ -349,6 +470,125 @@ class AccountingSetupService:
         return SetupResult(created=created, existing=existing, details=details)
 
     @staticmethod
+    @transaction.atomic
+    def repair_suggested_mappings(*, actor=None, dry_run: bool = False) -> dict[str, Any]:
+        """
+        Repair default finance-account primary charts and auto-repairable COA mappings.
+
+        Does not change historical ledger lines. Mapping rows with non-default user notes are skipped.
+        """
+        finance_repairs = 0
+        mapping_repairs = 0
+        details: list[dict[str, Any]] = []
+
+        name_targets: list[tuple[str, str]] = [
+            ("Main Cash Desk", DEFAULT_CASH_IN_HAND_SYSTEM_CODE),
+            ("Branch Cash Desk", DEFAULT_CASH_IN_HAND_SYSTEM_CODE),
+            ("Main Bank Account", DEFAULT_BANK_ACCOUNT_SYSTEM_CODE),
+            ("UPI Account", DEFAULT_UPI_GATEWAY_SYSTEM_CODE),
+            ("Payment Gateway Settlement Account", DEFAULT_BANK_ACCOUNT_SYSTEM_CODE),
+            (LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME, DEFAULT_BANK_ACCOUNT_SYSTEM_CODE),
+        ]
+        for name, code in name_targets:
+            fa = FinanceAccount.objects.filter(name__iexact=name.strip()).select_for_update().first()
+            chart = AccountingSetupService._resolve_chart_by_system_code(code)
+            if not fa or not chart or fa.chart_account_id == chart.id:
+                continue
+            details.append(
+                {
+                    "type": "finance_account_primary",
+                    "finance_account_id": fa.pk,
+                    "name": fa.name,
+                    "old_chart_account_id": fa.chart_account_id,
+                    "new_chart_account_id": chart.pk,
+                }
+            )
+            finance_repairs += 1
+            if not dry_run:
+                old_id = fa.chart_account_id
+                fa.chart_account = chart
+                fa.save(update_fields=["chart_account", "updated_at"])
+                log_audit(
+                    action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                    instance=fa,
+                    performed_by=actor,
+                    metadata={
+                        "event": "ACCOUNTING_SETUP_SUGGESTED_REPAIR",
+                        "source": "SUGGESTED_REPAIR",
+                        "finance_account_id": fa.pk,
+                        "old_chart_account_id": old_id,
+                        "new_chart_account_id": chart.pk,
+                    },
+                )
+
+        for finance_name, chart_name, purpose, _ in DEFAULT_MAPPINGS:
+            finance = FinanceAccount.objects.filter(name__iexact=finance_name.strip()).first()
+            chart = AccountingSetupService.resolve_expected_chart_for_purpose(purpose) or ChartOfAccount.objects.filter(
+                name__iexact=chart_name.strip(),
+                is_active=True,
+            ).first()
+            if not finance or not chart:
+                continue
+            mapping = FinanceAccountCoaMapping.objects.filter(
+                finance_account=finance,
+                purpose=purpose,
+                is_active=True,
+            ).select_for_update().first()
+            if not mapping or mapping.chart_account_id == chart.id:
+                continue
+            if not AccountingSetupService._mapping_notes_allow_auto_repair(mapping.notes):
+                details.append(
+                    {
+                        "type": "mapping_skipped_user_notes",
+                        "finance_account_id": finance.pk,
+                        "purpose": purpose,
+                    }
+                )
+                continue
+            details.append(
+                {
+                    "type": "finance_coa_mapping",
+                    "finance_account_id": finance.pk,
+                    "purpose": purpose,
+                    "old_chart_account_id": mapping.chart_account_id,
+                    "new_chart_account_id": chart.pk,
+                }
+            )
+            mapping_repairs += 1
+            if not dry_run:
+                old_c = mapping.chart_account_id
+                mapping.chart_account = chart
+                prior = (mapping.notes or "").strip()
+                if not prior:
+                    mapping.notes = "Default day-one mapping (Suggested repair)"
+                elif "suggested repair" not in prior.lower():
+                    mapping.notes = f"{prior} (Suggested repair)".strip()
+                mapping.updated_by = actor
+                mapping.save(update_fields=["chart_account", "notes", "updated_by", "updated_at"])
+                log_audit(
+                    action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                    instance=mapping,
+                    performed_by=actor,
+                    metadata={
+                        "event": "ACCOUNTING_SETUP_MAPPING_SUGGESTED_REPAIR",
+                        "source": "SUGGESTED_REPAIR",
+                        "finance_account_id": finance.pk,
+                        "purpose": purpose,
+                        "old_chart_account_id": old_c,
+                        "new_chart_account_id": chart.pk,
+                    },
+                )
+
+        validation = AccountingSetupService.validate_accounting_setup()
+        return {
+            "dry_run": dry_run,
+            "finance_primary_repairs": finance_repairs,
+            "mapping_repairs": mapping_repairs,
+            "details": details,
+            "validation": validation,
+        }
+
+    @staticmethod
     def missing_required_coa_codes() -> list[str]:
         missing: list[str] = []
         for _, _, code in REQUIRED_COA:
@@ -389,7 +629,10 @@ class AccountingSetupService:
         active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
         for account in active_finance_accounts:
             chart = account.chart_account
+            name_lower = account.name.strip().lower()
             if account.kind == FinanceAccountKind.BANK and AccountingSetupService._chart_is_cash_in_hand(chart):
+                if name_lower == ledger_key and not account.is_real_settlement_account:
+                    continue
                 warnings.append(
                     {
                         "code": "BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND",
@@ -400,6 +643,8 @@ class AccountingSetupService:
                     }
                 )
             if account.kind == FinanceAccountKind.UPI and AccountingSetupService._chart_is_cash_in_hand(chart):
+                if name_lower == ledger_key and not account.is_real_settlement_account:
+                    continue
                 warnings.append(
                     {
                         "code": "UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND",
@@ -594,14 +839,7 @@ class AccountingSetupService:
         ).exists()
         settlement_ready = FinanceAccount.objects.filter(is_active=True, is_real_settlement_account=True).exists()
 
-        blocking_codes = {
-            "MISSING_REQUIRED_PURPOSE",
-            "MAPPING_ACCOUNT_TYPE_MISMATCH",
-            "DUPLICATE_DEFAULT_MAPPING",
-            "MISSING_ACTIVE_SETTLEMENT_ACCOUNT",
-            "MISSING_LEDGER_PROFILE_ANCHOR",
-        }
-        blocking_warnings = [w for w in warnings if w.get("code") in blocking_codes]
+        blocking_warnings = [w for w in warnings if w.get("code") not in READINESS_INFORMATIONAL_WARNING_CODES]
 
         coa_ready = len(missing_coa) == 0
         finance_accounts_ready = settlement_ready and ledger_anchor_present

@@ -14,6 +14,22 @@ from accounting.services.accounting_setup_service import AccountingSetupService
 
 
 class AccountingSemanticSetupWarningsTests(TestCase):
+    def test_main_bank_account_mapped_to_cash_in_hand_creates_warning(self):
+        AccountingSetupService.bootstrap(dry_run=False)
+        cash_hand = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        main_bank = FinanceAccount.objects.get(name__iexact="Main Bank Account")
+        FinanceAccount.objects.filter(pk=main_bank.pk).update(chart_account=cash_hand)
+        warnings = AccountingSetupService.get_setup_warnings()
+        self.assertTrue(any(w["code"] == "BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND" for w in warnings))
+
+    def test_upi_account_mapped_to_cash_in_hand_creates_warning(self):
+        AccountingSetupService.bootstrap(dry_run=False)
+        cash_hand = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        upi = FinanceAccount.objects.get(name__iexact="UPI Account")
+        FinanceAccount.objects.filter(pk=upi.pk).update(chart_account=cash_hand)
+        warnings = AccountingSetupService.get_setup_warnings()
+        self.assertTrue(any(w["code"] == "UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND" for w in warnings))
+
     def test_warns_when_bank_finance_primary_chart_is_cash_in_hand(self):
         cash_hand = ChartOfAccount.objects.create(
             code="SEM-CIH",

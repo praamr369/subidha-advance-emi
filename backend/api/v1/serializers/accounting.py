@@ -324,6 +324,29 @@ class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid mapping purpose.")
         return value
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        payload = {
+            "finance_account": attrs.get("finance_account", getattr(instance, "finance_account", None)),
+            "chart_account": attrs.get("chart_account", getattr(instance, "chart_account", None)),
+            "purpose": attrs.get("purpose", getattr(instance, "purpose", None)),
+            "is_default": attrs.get("is_default", getattr(instance, "is_default", False)),
+            "is_active": attrs.get("is_active", getattr(instance, "is_active", True)),
+            "notes": attrs.get("notes", getattr(instance, "notes", "")),
+            "created_by": getattr(instance, "created_by", None),
+            "updated_by": attrs.get("updated_by", getattr(instance, "updated_by", None)),
+        }
+        candidate = instance or FinanceAccountCoaMapping(**payload)
+        if instance is not None:
+            for field, value in payload.items():
+                setattr(candidate, field, value)
+        try:
+            candidate.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs
+
 class JournalEntryLineSerializer(serializers.ModelSerializer):
     chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
     chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
