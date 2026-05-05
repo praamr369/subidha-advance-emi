@@ -109,6 +109,7 @@ from api.v1.views.direct_sale_workspace import (
     AdminDirectSalePreviewView,
     AdminInventoryRequirementListView,
 )
+from api.v1.views.billing import AdminDirectSaleFinalizeInvoiceView
 from api.v1.views.paginated_registers import PaginatedSubscriptionAdminViewSet
 from api.v1.views.admin_reconciliation import (
     PaymentReconciliationDetailView,
@@ -245,6 +246,7 @@ from api.v1.views.admin_accounting_setup import (
 )
 from api.v1.views.admin_inventory_ops import (
     AdminInventoryReadinessView,
+    AdminInventoryStockNeedCancelView,
     AdminInventoryStockNeedListCreateView,
     AdminInventoryStockNeedPatchView,
 )
@@ -253,6 +255,7 @@ from api.v1.views.admin_sales_ops import (
     AdminSalesDirectSaleListCreateView,
 )
 from api.v1.views.admin_operations_queues import (
+    AdminOperationsNextActionsView,
     AdminOperationsQueueSummaryView,
     AdminOperationsRequestQueuesView,
     AdminPartnerOperationsSummaryView,
@@ -467,6 +470,7 @@ urlpatterns = [
     path("billing/products/search/", AdminBillingProductSearchView.as_view()),
     path("billing/product-search/", AdminBillingProductSearchView.as_view()),
     path("direct-sales/preview/", AdminDirectSalePreviewView.as_view()),
+    path("billing/direct-sales/<int:pk>/finalize-invoice/", AdminDirectSaleFinalizeInvoiceView.as_view()),
     path("inventory/requirements/", AdminInventoryRequirementListView.as_view()),
     path("receipts/", AdminReceiptRegisterView.as_view()),
     path("receipts/<int:pk>/pdf/", AdminReceiptPdfView.as_view()),
@@ -533,6 +537,7 @@ urlpatterns = [
     path("operations/partners/", AdminOperationsPartnersView.as_view()),
     path("operations/crm/", AdminOperationsCrmView.as_view()),
     path("operations/queue-summary/", AdminOperationsQueueSummaryView.as_view()),
+    path("operations/next-actions/", AdminOperationsNextActionsView.as_view()),
     path("operations/request-queues/", AdminOperationsRequestQueuesView.as_view()),
     path("partner-operations/summary/", AdminPartnerOperationsSummaryView.as_view()),
     path("partner-payment-requests/", AdminPartnerPaymentRequestsView.as_view()),
@@ -579,6 +584,7 @@ urlpatterns = [
     path("inventory/readiness/", AdminInventoryReadinessView.as_view()),
     path("inventory/stock-needs/", AdminInventoryStockNeedListCreateView.as_view()),
     path("inventory/stock-needs/<int:pk>/", AdminInventoryStockNeedPatchView.as_view()),
+    path("inventory/stock-needs/<int:pk>/cancel/", AdminInventoryStockNeedCancelView.as_view()),
     path("sales/direct-sales/", AdminSalesDirectSaleListCreateView.as_view()),
     path("sales/direct-sales/<int:pk>/", AdminSalesDirectSaleDetailView.as_view()),
     path(

@@ -11,8 +11,10 @@ from api.v1.serializers.inventory_admin import (
     AdminPurchaseNeedPatchSerializer,
     AdminPurchaseNeedSerializer,
 )
+from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
 from inventory.models import PurchaseNeed
 from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
+from subscriptions.services.operational_cancellation_service import cancel_stock_requirement
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -89,3 +91,23 @@ class AdminInventoryStockNeedPatchView(_AdminBase):
             },
         )
         return Response(AdminPurchaseNeedSerializer(updated).data)
+
+
+class AdminInventoryStockNeedCancelView(_AdminBase):
+    @transaction.atomic
+    def post(self, request, pk):
+        serializer = OperationalCancellationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = cancel_stock_requirement(
+                requirement_id=int(pk),
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                internal_note=serializer.validated_data.get("internal_note", ""),
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        need = PurchaseNeed.objects.get(pk=pk)
+        return Response({"updated": True, "result": result, "stock_requirement": AdminPurchaseNeedSerializer(need).data})

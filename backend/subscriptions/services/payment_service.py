@@ -28,6 +28,7 @@ from subscriptions.models import (
     LuckyIdStatus,
     MONEY_ZERO,
     Payment,
+    OperationalCancellation,
     PaymentReconciliation,
     PaymentReconciliationEvent,
     ReconciliationEventType,
@@ -809,6 +810,34 @@ def reverse_payment_for_admin(
             "emi_id": payment.emi_id,
             "amount": str(payment.amount),
             "reason": reason,
+        },
+    )
+    if not reason:
+        raise ValueError("Reversal reason is required.")
+    if OperationalCancellation.objects.filter(
+        source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+        source_id=payment.id,
+    ).exists():
+        raise ValueError("Payment already has an audited reversal.")
+    OperationalCancellation.objects.create(
+        source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+        source_id=payment.id,
+        source_reference=payment.reference_no or f"PAY-{payment.id}",
+        customer=payment.customer,
+        partner=getattr(payment.subscription, "partner", None),
+        amount_snapshot=payment.amount,
+        status_before="POSTED",
+        status_after="REVERSED",
+        cancellation_type=OperationalCancellation.CancellationType.PAYMENT_REVERSAL,
+        reason=reason,
+        requested_by=reversed_by,
+        approved_by=reversed_by,
+        cancelled_by=reversed_by,
+        reversal_reference=f"PAYMENT_REVERSAL:{payment.id}",
+        metadata={
+            "payment_id": payment.id,
+            "subscription_id": payment.subscription_id,
+            "emi_id": payment.emi_id,
         },
     )
 

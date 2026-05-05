@@ -26,6 +26,7 @@ from billing.services.direct_sale_delivery_bridge_service import (
     direct_sale_delivery_phase,
     get_direct_sale_delivery_case,
 )
+from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from billing.services.billing_service import (
     _ensure_credit_sequence,
     _ensure_debit_sequence,
@@ -283,6 +284,12 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     delivery_display = serializers.SerializerMethodField()
     delivery_request_id = serializers.SerializerMethodField()
     requirement_count = serializers.SerializerMethodField()
+    operational_state = serializers.SerializerMethodField()
+    next_actions = serializers.SerializerMethodField()
+    blocking_reasons = serializers.SerializerMethodField()
+    payment_state = serializers.SerializerMethodField()
+    inventory_state = serializers.SerializerMethodField()
+    collection_state = serializers.SerializerMethodField()
     customer_mode = serializers.ChoiceField(
         choices=[("EXISTING", "Existing Customer"), ("NEW", "New Customer"), ("WALK_IN", "Walk-in Snapshot")],
         required=False,
@@ -369,6 +376,12 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "delivery_display",
             "delivery_request_id",
             "requirement_count",
+            "operational_state",
+            "next_actions",
+            "blocking_reasons",
+            "payment_state",
+            "inventory_state",
+            "collection_state",
             "customer_mode",
             "walkin_create_customer_profile",
             "new_customer_name",
@@ -567,6 +580,31 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             status=PurchaseNeedStatus.OPEN,
         ).filter(legacy | keyed).count()
 
+    def _operational_state(self, obj):
+        if hasattr(obj, "_operational_state_cache"):
+            return obj._operational_state_cache
+        payload = get_direct_sale_operational_state(obj)
+        obj._operational_state_cache = payload
+        return payload
+
+    def get_operational_state(self, obj):
+        return self._operational_state(obj)["operational_state"]
+
+    def get_next_actions(self, obj):
+        return self._operational_state(obj)["next_actions"]
+
+    def get_blocking_reasons(self, obj):
+        return self._operational_state(obj)["blocking_reasons"]
+
+    def get_payment_state(self, obj):
+        return self._operational_state(obj)["payment_state"]
+
+    def get_inventory_state(self, obj):
+        return self._operational_state(obj)["inventory_state"]
+
+    def get_collection_state(self, obj):
+        return self._operational_state(obj)["collection_state"]
+
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):
     lines = BillingInvoiceLineSerializer(many=True)
@@ -582,6 +620,9 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     direct_sale_no = serializers.CharField(source="direct_sale.sale_no", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    operational_state = serializers.SerializerMethodField()
+    next_actions = serializers.SerializerMethodField()
+    blocking_reasons = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingInvoice
@@ -627,6 +668,9 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "approved_at",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "operational_state",
+            "next_actions",
+            "blocking_reasons",
             "lines",
             "created_at",
             "updated_at",
@@ -675,6 +719,24 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
         if lines is not None:
             _replace_invoice_lines(instance, lines)
         return instance
+
+    def _direct_sale_state(self, obj):
+        sale = getattr(obj, "direct_sale", None)
+        if sale is None:
+            return None
+        return get_direct_sale_operational_state(sale)
+
+    def get_operational_state(self, obj):
+        state = self._direct_sale_state(obj)
+        return state.get("operational_state") if state else None
+
+    def get_next_actions(self, obj):
+        state = self._direct_sale_state(obj)
+        return state.get("next_actions") if state else []
+
+    def get_blocking_reasons(self, obj):
+        state = self._direct_sale_state(obj)
+        return state.get("blocking_reasons") if state else []
 
 
 class BillingCreditNoteLineSerializer(serializers.ModelSerializer):

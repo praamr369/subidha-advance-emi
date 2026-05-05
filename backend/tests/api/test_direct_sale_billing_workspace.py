@@ -437,3 +437,51 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         ]
         self.assertTrue(any(row.get("direct_sale_id") == sale_id for row in ds_rows))
         self.assertGreaterEqual(delivery_resp.data.get("direct_sale_delivery_count", 0), 1)
+
+    def test_draft_sale_exposes_operational_state_and_finalize_action(self):
+        response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data.get("operational_state"), "DRAFT_NEEDS_INVOICE")
+        self.assertIn("FINALIZE_INVOICE", response.data.get("next_actions") or [])
+        self.assertNotIn("COLLECT_DIRECT_SALE_BALANCE", response.data.get("next_actions") or [])
+
+    def test_finalize_invoice_endpoint_is_idempotent(self):
+        create_resp = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED, create_resp.data)
+        sale_id = create_resp.data["id"]
+
+        finalize_first = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize_first.status_code, status.HTTP_200_OK, finalize_first.data)
+        self.assertTrue(finalize_first.data.get("updated"))
+        self.assertEqual(finalize_first.data["direct_sale"]["status"], "INVOICED")
+        self.assertIn(
+            finalize_first.data["direct_sale"].get("operational_state"),
+            {"RECEIVABLE_READY", "PARTIAL_PAYMENT_HOLD", "PAID_STOCK_BLOCKED", "PAID_READY_FOR_DELIVERY"},
+        )
+
+        finalize_second = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize_second.status_code, status.HTTP_200_OK, finalize_second.data)
+        self.assertFalse(finalize_second.data.get("updated"))
+        self.assertEqual(finalize_second.data["direct_sale"]["status"], "INVOICED")
+
+    def test_collect_endpoint_rejects_draft_sale(self):
+        create_resp = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED, create_resp.data)
+        sale_id = create_resp.data["id"]
+        collect_resp = self.client.post(
+            f"/api/v1/billing/direct-sales/{sale_id}/collect/",
+            {
+                "amount": "100.00",
+            },
+            format="json",
+        )
+        self.assertEqual(collect_resp.status_code, status.HTTP_400_BAD_REQUEST, collect_resp.data)
+        self.assertIn("invoiced", str(collect_resp.data).lower())

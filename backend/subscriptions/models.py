@@ -192,6 +192,7 @@ class EmiStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     PAID = "PAID", "Paid"
     WAIVED = "WAIVED", "Waived"
+    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class PaymentMethod(models.TextChoices):
@@ -3525,6 +3526,112 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action_type} - {self.model_name}#{self.object_id}"
+
+
+class OperationalCancellation(models.Model):
+    class SourceType(models.TextChoices):
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+        BILLING_INVOICE = "BILLING_INVOICE", "Billing Invoice"
+        BILLING_RECEIPT = "BILLING_RECEIPT", "Billing Receipt"
+        SUBSCRIPTION = "SUBSCRIPTION", "Subscription"
+        EMI_PAYMENT = "EMI_PAYMENT", "EMI Payment"
+        DELIVERY = "DELIVERY", "Delivery"
+        STOCK_REQUIREMENT = "STOCK_REQUIREMENT", "Stock Requirement"
+        PURCHASE_INVOICE = "PURCHASE_INVOICE", "Purchase Invoice"
+        RENT_CONTRACT = "RENT_CONTRACT", "Rent Contract"
+        LEASE_CONTRACT = "LEASE_CONTRACT", "Lease Contract"
+        RENT_LEASE_INVOICE = "RENT_LEASE_INVOICE", "Rent/Lease Invoice"
+        PAYOUT_BATCH = "PAYOUT_BATCH", "Payout Batch"
+        OTHER = "OTHER", "Other"
+
+    class CancellationType(models.TextChoices):
+        CANCEL_DRAFT = "CANCEL_DRAFT", "Cancel Draft"
+        VOID_UNPOSTED = "VOID_UNPOSTED", "Void Unposted"
+        CANCEL_WITH_REVERSAL = "CANCEL_WITH_REVERSAL", "Cancel With Reversal"
+        PAYMENT_REVERSAL = "PAYMENT_REVERSAL", "Payment Reversal"
+        DELIVERY_CANCEL = "DELIVERY_CANCEL", "Delivery Cancel"
+        STOCK_REQUIREMENT_CANCEL = "STOCK_REQUIREMENT_CANCEL", "Stock Requirement Cancel"
+        CONTRACT_TERMINATION = "CONTRACT_TERMINATION", "Contract Termination"
+
+    source_type = models.CharField(max_length=40, choices=SourceType.choices, db_index=True)
+    source_id = models.PositiveIntegerField(db_index=True)
+    source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="operational_cancellations",
+    )
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="partner_operational_cancellations",
+    )
+    amount_snapshot = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status_before = models.CharField(max_length=40, blank=True, default="")
+    status_after = models.CharField(max_length=40, blank=True, default="")
+    cancellation_type = models.CharField(max_length=40, choices=CancellationType.choices, db_index=True)
+    reason = models.TextField()
+    internal_note = models.TextField(blank=True, default="")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="requested_operational_cancellations",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_operational_cancellations",
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="cancelled_operational_records",
+    )
+    cancelled_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    reversal_reference = models.CharField(max_length=120, null=True, blank=True, db_index=True)
+    audit_log_reference = models.CharField(max_length=120, null=True, blank=True)
+
+    class Meta:
+        db_table = "operational_cancellations"
+        ordering = ["-cancelled_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_type", "source_id"],
+                name="uq_operational_cancellation_source",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["source_type", "cancelled_at"]),
+            models.Index(fields=["customer", "cancelled_at"]),
+            models.Index(fields=["cancelled_by", "cancelled_at"]),
+        ]
+
+    def clean(self):
+        if not (self.reason or "").strip():
+            raise ValidationError({"reason": "Cancellation reason is required."})
+        if not self.cancelled_by_id:
+            raise ValidationError({"cancelled_by": "Cancelled by is required."})
+
+    def save(self, *args, **kwargs):
+        self.source_reference = (self.source_reference or "").strip()
+        self.status_before = (self.status_before or "").strip().upper()
+        self.status_after = (self.status_after or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.internal_note = (self.internal_note or "").strip()
+        self.reversal_reference = (self.reversal_reference or "").strip() or None
+        self.audit_log_reference = (self.audit_log_reference or "").strip() or None
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 # =====================================================

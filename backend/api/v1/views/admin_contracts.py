@@ -212,12 +212,12 @@ class ContractCancelView(APIView):
         reason = (request.data.get("reason") or "").strip()
         force = bool(request.data.get("force_after_activation", False))
 
-        from subscriptions.services.contract_lifecycle_service import cancel_contract
+        from subscriptions.services.operational_cancellation_service import cancel_subscription
         from django.core.exceptions import ValidationError
         try:
-            sub = cancel_contract(
-                subscription=sub,
-                performed_by=request.user,
+            cancel_subscription(
+                subscription_id=sub.id,
+                actor=request.user,
                 reason=reason,
                 force_after_activation=force,
             )

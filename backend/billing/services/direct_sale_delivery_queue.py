@@ -13,6 +13,7 @@ from billing.services.direct_sale_delivery_bridge_service import (
     TERMINAL_CASE_STATUSES,
     compute_direct_sale_delivery_snapshot,
 )
+from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from inventory.services.demand_planning_service import stock_status_for_delivery
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from subscriptions.models import DeliveryStatus
@@ -50,6 +51,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
     product = case.product
     balance = Decimal(str(getattr(sale, "balance_total", None) or "0.00")).quantize(Decimal("0.01"))
     snap = compute_direct_sale_delivery_snapshot(sale=sale)
+    op = get_direct_sale_operational_state(sale)
     phase_code = snap["phase_code"]
     phase_label = snap["phase_label"]
     mapped_status = map_case_status_to_delivery_status(case.status)
@@ -153,6 +155,9 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "delivery_status": phase_code,
         "delivery_display": phase_label,
         "payment_state": snap.get("payment_state") or ("PAID" if balance <= Decimal("0.00") else "OUTSTANDING"),
+        "operational_state": op["operational_state"],
+        "next_actions": op["next_actions"],
+        "blocking_reasons": op["blocking_reasons"],
         "detail_hint": "Direct Sale Delivery (Service Desk)",
     }
 

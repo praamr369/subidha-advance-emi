@@ -23,6 +23,8 @@ from subscriptions.models import (
     SubscriptionRequest,
     SubscriptionRequestStatus,
 )
+from billing.models import BillingDocumentStatus, DirectSale, DirectSaleStatus
+from inventory.models import PurchaseNeed, PurchaseNeedStatus
 
 
 def _queue_payload(*, key: str, count: int, oldest_date: date | None, detail_url: str, badge_source: str) -> dict:
@@ -169,4 +171,115 @@ def list_partner_payment_requests() -> dict:
             }
             for row in rows[:200]
         ],
+    }
+
+
+def build_admin_next_actions() -> dict:
+    direct_sale_draft_qs = DirectSale.objects.filter(status=DirectSaleStatus.DRAFT)
+    direct_sale_due_qs = DirectSale.objects.filter(status=DirectSaleStatus.INVOICED, balance_total__gt=0)
+    blocked_sale_ids = [
+        int(v)
+        for v in PurchaseNeed.objects.filter(
+            source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
+            status=PurchaseNeedStatus.OPEN,
+            source_object_id__regex=r"^[0-9]+$",
+        ).values_list("source_object_id", flat=True)
+    ]
+    direct_sale_paid_stock_blocked_qs = DirectSale.objects.filter(
+        status=DirectSaleStatus.INVOICED,
+        balance_total__lte=0,
+        id__in=blocked_sale_ids,
+    )
+    stock_requirement_qs = PurchaseNeed.objects.filter(
+        source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
+        status=PurchaseNeedStatus.OPEN,
+    )
+    delivery_hold_invoice_qs = DirectSale.objects.filter(
+        delivery_required=True,
+        status=DirectSaleStatus.DRAFT,
+    )
+    delivery_hold_payment_qs = DirectSale.objects.filter(
+        delivery_required=True,
+        status=DirectSaleStatus.INVOICED,
+        balance_total__gt=0,
+    )
+
+    queues = [
+        {
+            "key": "direct_sale_draft_needs_invoice",
+            "count": direct_sale_draft_qs.count(),
+            "priority": "HIGH",
+            "next_action": "FINALIZE_INVOICE",
+            "link": "/admin/billing/direct-sales",
+        },
+        {
+            "key": "direct_sale_receivable_due",
+            "count": direct_sale_due_qs.count(),
+            "priority": "HIGH",
+            "next_action": "COLLECT_DIRECT_SALE_BALANCE",
+            "link": "/admin/finance/collect?workflow=direct-sale",
+        },
+        {
+            "key": "direct_sale_stock_blocked",
+            "count": direct_sale_paid_stock_blocked_qs.count(),
+            "priority": "MEDIUM",
+            "next_action": "RESOLVE_STOCK_REQUIREMENT",
+            "link": "/admin/inventory/stock-needs",
+        },
+        {
+            "key": "stock_requirement_open",
+            "count": stock_requirement_qs.count(),
+            "priority": "MEDIUM",
+            "next_action": "OPEN_PURCHASE_NEED",
+            "link": "/admin/inventory/stock-needs",
+        },
+        {
+            "key": "delivery_hold_invoice_pending",
+            "count": delivery_hold_invoice_qs.count(),
+            "priority": "HIGH",
+            "next_action": "FINALIZE_INVOICE",
+            "link": "/admin/deliveries",
+        },
+        {
+            "key": "delivery_hold_payment_due",
+            "count": delivery_hold_payment_qs.count(),
+            "priority": "HIGH",
+            "next_action": "COLLECT_DIRECT_SALE_BALANCE",
+            "link": "/admin/deliveries",
+        },
+        {
+            "key": "emi_due_today",
+            "count": Emi.objects.filter(status=EmiStatus.PENDING, due_date=timezone.localdate()).count(),
+            "priority": "MEDIUM",
+            "next_action": "COLLECT_EMI",
+            "link": "/admin/collections",
+        },
+        {
+            "key": "emi_overdue",
+            "count": Emi.objects.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).count(),
+            "priority": "HIGH",
+            "next_action": "COLLECT_EMI",
+            "link": "/admin/emis/overdue",
+        },
+        {
+            "key": "reconciliation_pending",
+            "count": PaymentReconciliation.objects.filter(Q(status=ReconciliationStatus.PENDING) | Q(is_flagged=True)).count(),
+            "priority": "MEDIUM",
+            "next_action": "OPEN_RECONCILIATION",
+            "link": "/admin/accounting/reconciliation",
+        },
+        {
+            "key": "invoice_pending_post",
+            "count": DirectSale.objects.filter(
+                billing_invoices__status=BillingDocumentStatus.DRAFT,
+                status__in=[DirectSaleStatus.DRAFT, DirectSaleStatus.CONFIRMED],
+            ).distinct().count(),
+            "priority": "MEDIUM",
+            "next_action": "POST_INVOICE",
+            "link": "/admin/billing/invoices?source_type=DIRECT_SALE",
+        },
+    ]
+    return {
+        "count": len(queues),
+        "results": queues,
     }

@@ -721,6 +721,9 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
     from billing.services.direct_sale_collection_service import (
         get_direct_sale_receivable_position,
     )
+    from billing.services.direct_sale_operational_state import (
+        get_direct_sale_operational_state,
+    )
 
     position = get_direct_sale_receivable_position(direct_sale_id=sale.id)
     outstanding = _money(position["outstanding"])
@@ -753,6 +756,7 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
         allowed_actions = []
         action_type = CollectionPrimaryAction.VIEW_RECEIPTS
         resolved_reason = disabled_reason or "Direct sale has no outstanding balance."
+    operational = get_direct_sale_operational_state(sale)
 
     return {
         "due_amount": outstanding,
@@ -769,6 +773,12 @@ def direct_sale_receivable_position(sale) -> dict[str, object]:
         "collection_type": collection_type,
         "is_collectible": is_collectible,
         "disabled_reason": resolved_reason,
+        "operational_state": operational.get("operational_state"),
+        "next_actions": operational.get("next_actions") or [],
+        "blocking_reasons": operational.get("blocking_reasons") or [],
+        "inventory_state": operational.get("inventory_state"),
+        "delivery_state": operational.get("delivery_state"),
+        "collection_state": operational.get("collection_state"),
     }
 
 
@@ -839,6 +849,12 @@ def build_receivable_result(
         "disabled_reason": state["disabled_reason"],
         "collection_route": collection_route,
         "action_url": collection_route,
+        "operational_state": position.get("operational_state") or "",
+        "next_actions": position.get("next_actions") or [],
+        "blocking_reasons": position.get("blocking_reasons") or [],
+        "inventory_state": position.get("inventory_state") or "",
+        "delivery_state": position.get("delivery_state") or "",
+        "collection_state": position.get("collection_state") or "",
     }
 
 

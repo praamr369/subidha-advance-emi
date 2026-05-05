@@ -13,11 +13,20 @@ import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-cen
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import PortalPage from "@/components/ui/PortalPage";
+import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import OperationalNextStepsPanel from "@/components/workflows/OperationalNextStepsPanel";
 import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import { listFinanceAccounts } from "@/services/accounting";
 import { createAdminDirectSaleOrchestrated } from "@/services/admin-sales";
-import { createDirectSale, listDirectSales, type DirectSale, type DirectSaleLine } from "@/services/billing";
+import {
+  cancelDirectSale,
+  adminFinalizeDirectSaleInvoice,
+  createDirectSale,
+  listDirectSales,
+  type DirectSale,
+  type DirectSaleLine,
+} from "@/services/billing";
 import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
@@ -304,6 +313,8 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
+  const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
@@ -480,28 +491,80 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       key: "id",
       header: "Action",
       render: (row) => {
+        const nextActions = row.next_actions || [];
+        const isFinalize = nextActions.includes("FINALIZE_INVOICE") || nextActions.includes("POST_INVOICE");
+        const isCollect = nextActions.includes("COLLECT_DIRECT_SALE_BALANCE");
+        const isStockBlocked = nextActions.includes("RESOLVE_STOCK_REQUIREMENT") || nextActions.includes("OPEN_PURCHASE_NEED");
+        const isSchedule = nextActions.includes("SCHEDULE_DELIVERY");
         const balance = toNumber(row.balance_total);
         const isDraft = row.status === "DRAFT" || !row.billing_invoice_id;
         const invoiceStatus = String(row.billing_invoice_status || "").toUpperCase();
         const isCollectible = row.status === "INVOICED" && invoiceStatus === "POSTED" && balance > 0;
-        if (isCollectible) {
+        if (isCollect || isCollectible) {
           return (
-            <button
-              type="button"
-              onClick={() => setCollectSaleId(row.id)}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-800 px-3 text-xs font-semibold text-white transition hover:bg-amber-900"
-            >
-              Collect balance
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCollectSaleId(row.id)}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-800 px-3 text-xs font-semibold text-white transition hover:bg-amber-900"
+              >
+                Collect balance
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelSaleTarget(row)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
+              >
+                Cancel sale
+              </button>
+            </div>
           );
         }
-        if (isDraft) {
+        if (isFinalize || isDraft) {
+          return (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await adminFinalizeDirectSaleInvoice(row.id);
+                    setNotice(`Direct sale ${row.sale_no || `#${row.id}`} finalized and posted.`);
+                    await salesQuery.refetch();
+                  } catch (err) {
+                    setCreateFormError(accountingErrorMessage(err, "Direct-sale invoice finalization failed."));
+                  }
+                }}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
+              >
+                Finalize/Post invoice
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelSaleTarget(row)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
+              >
+                Cancel draft
+              </button>
+            </div>
+          );
+        }
+        if (isStockBlocked) {
           return (
             <Link
-              href={`${ROUTES.admin.billingDirectSales}?focus_sale=${row.id}`}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
+              href={ROUTES.admin.inventoryStockNeeds}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-700 px-3 text-xs font-semibold text-white transition hover:bg-amber-800"
             >
-              Open sale / finalize invoice
+              Resolve stock requirement
+            </Link>
+          );
+        }
+        if (isSchedule) {
+          return (
+            <Link
+              href={ROUTES.admin.deliveries}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800"
+            >
+              Schedule delivery
             </Link>
           );
         }
@@ -1783,6 +1846,19 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         groups={BILLING_CONTROL_DIRECTORY_GROUPS}
       />
 
+      <OperationalNextStepsPanel
+        title="Direct Sale Workflow Guidance"
+        context="Draft sale -> finalize/post invoice -> collect receivable -> resolve stock -> release delivery."
+        state={rows[0]?.operational_state || "NO_DIRECT_SALE"}
+        blockers={rows[0]?.blocking_reasons || []}
+        nextActions={rows[0]?.next_actions || []}
+        relatedLinks={[
+          { label: "Collections", href: `${ROUTES.admin.financeCollect}?workflow=direct-sale` },
+          { label: "Stock needs", href: ROUTES.admin.inventoryStockNeeds },
+          { label: "Deliveries", href: ROUTES.admin.deliveries },
+        ]}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Direct Sale Billing Desk</h2>
@@ -1857,6 +1933,49 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         onClose={() => setCollectSaleId(null)}
         onCollected={async () => {
           await salesQuery.refetch();
+        }}
+      />
+
+      <AdminCancellationDialog
+        open={cancelSaleTarget !== null}
+        sourceType="DIRECT_SALE"
+        sourceReference={cancelSaleTarget?.sale_no || `SALE-${cancelSaleTarget?.id || ""}`}
+        currentStatus={cancelSaleTarget?.status || ""}
+        affected={{
+          invoices: true,
+          receipts: Number(cancelSaleTarget?.received_total || 0) > 0,
+          delivery: Boolean(cancelSaleTarget?.delivery_required),
+          stock_requirements: true,
+        }}
+        financialImpactSummary={`Grand total ${accountingMoney(cancelSaleTarget?.grand_total || 0)} · Received ${accountingMoney(cancelSaleTarget?.received_total || 0)} · Balance ${accountingMoney(cancelSaleTarget?.balance_total || 0)}`}
+        blockedReason={
+          cancelSaleTarget?.status === "DELIVERED"
+            ? "Delivered direct sales require return/reversal workflow before cancellation."
+            : null
+        }
+        requiresReceiptReversal={Number(cancelSaleTarget?.received_total || 0) > 0}
+        onClose={() => {
+          if (!cancelSubmitting) setCancelSaleTarget(null);
+        }}
+        submitting={cancelSubmitting}
+        confirmLabel="Confirm sale cancellation"
+        onConfirm={async (payload) => {
+          if (!cancelSaleTarget) return;
+          setCancelSubmitting(true);
+          try {
+            await cancelDirectSale(cancelSaleTarget.id, {
+              ...payload,
+              reversal_policy: "REVERSE_RECEIPTS",
+            });
+            setNotice(`Direct sale ${cancelSaleTarget.sale_no || `#${cancelSaleTarget.id}`} cancelled with audit trail.`);
+            setCancelSaleTarget(null);
+            await salesQuery.refetch();
+            await requirementsQuery.refetch();
+          } catch (err) {
+            throw new Error(accountingErrorMessage(err, "Direct sale cancellation failed."));
+          } finally {
+            setCancelSubmitting(false);
+          }
         }}
       />
     </PortalPage>

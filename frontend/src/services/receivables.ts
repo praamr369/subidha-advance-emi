@@ -59,6 +59,12 @@ export type UnifiedReceivableResult = {
   action_url?: string;
   is_overdue?: boolean;
   due_date?: string | null;
+  operational_state?: string;
+  next_actions?: string[];
+  blocking_reasons?: string[];
+  inventory_state?: string;
+  delivery_state?: string;
+  collection_state?: string;
 };
 
 export type UnifiedReceivableSearchResponse = {
@@ -206,6 +212,12 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
       typeof row.due_date === "string" || row.due_date === null
         ? row.due_date
         : null,
+    operational_state: toStringValue(row.operational_state),
+    next_actions: Array.isArray(row.next_actions) ? row.next_actions.map((item) => String(item)) : [],
+    blocking_reasons: Array.isArray(row.blocking_reasons) ? row.blocking_reasons.map((item) => String(item)) : [],
+    inventory_state: toStringValue(row.inventory_state),
+    delivery_state: toStringValue(row.delivery_state),
+    collection_state: toStringValue(row.collection_state),
   };
 }
 

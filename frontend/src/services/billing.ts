@@ -125,6 +125,12 @@ export type DirectSale = {
   delivery_display?: string;
   delivery_request_id?: number | null;
   requirement_count?: number;
+  operational_state?: string;
+  next_actions?: string[];
+  blocking_reasons?: string[];
+  payment_state?: string;
+  inventory_state?: string;
+  collection_state?: string;
   lines: DirectSaleLine[];
 };
 
@@ -200,6 +206,28 @@ export type DirectSaleCollectionResponse = {
   outstanding_after: string;
 };
 
+export type OperationalCancellationPayload = {
+  reason: string;
+  internal_note?: string;
+  confirm: boolean;
+  reversal_policy?: "NONE" | "REVERSE_RECEIPTS" | "CREATE_CREDIT_NOTE" | "MANUAL_SETTLEMENT";
+  force_after_activation?: boolean;
+};
+
+export type OperationalCancellationResponse<T> = {
+  updated: boolean;
+  result: {
+    source_type: string;
+    source_id: number;
+    previous_status: string;
+    new_status: string;
+    cancellation_id?: number | null;
+    reversal_reference?: string | null;
+    blocked_reason?: string;
+    next_required_action?: string;
+  };
+} & T;
+
 export type BillingInvoice = {
   id: number;
   document_no?: string | null;
@@ -235,6 +263,9 @@ export type BillingInvoice = {
   terms?: string;
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
+  operational_state?: string | null;
+  next_actions?: string[];
+  blocking_reasons?: string[];
   lines: BillingInvoiceLine[];
 };
 
@@ -458,6 +489,23 @@ export function markDirectSaleDelivered(id: number, delivery_reference = "") {
   );
 }
 
+export function finalizeDirectSaleInvoice(id: number) {
+  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(`/billing/direct-sales/${id}/finalize-invoice/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function adminFinalizeDirectSaleInvoice(id: number) {
+  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(
+    `/admin/billing/direct-sales/${id}/finalize-invoice/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
 export function collectDirectSalePayment(
   id: number,
   payload: DirectSaleCollectionPayload
@@ -466,6 +514,16 @@ export function collectDirectSalePayment(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function cancelDirectSale(id: number, payload: OperationalCancellationPayload) {
+  return apiFetch<OperationalCancellationResponse<{ direct_sale: DirectSale }>>(
+    `/billing/direct-sales/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function approveBillingInvoice(id: number) {
@@ -484,6 +542,16 @@ export function postBillingInvoice(id: number) {
     {
       method: "POST",
       body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelBillingInvoice(id: number, payload: OperationalCancellationPayload) {
+  return apiFetch<OperationalCancellationResponse<{ invoice: BillingInvoice }>>(
+    `/billing/invoices/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     }
   );
 }
@@ -595,6 +663,13 @@ export function voidReceiptDocument(id: number, reason: string) {
   return apiFetch<{ updated: boolean; receipt: ReceiptDocument }>(`/billing/receipts/${id}/void/`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export function reverseReceiptDocument(id: number, payload: { reason: string }) {
+  return apiFetch<{ updated: boolean; receipt: ReceiptDocument }>(`/billing/receipts/${id}/reverse/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

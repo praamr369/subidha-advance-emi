@@ -43,6 +43,7 @@ from subscriptions.services.delivery_service import (
     transition_subscription_delivery_status,
     update_subscription_delivery_metadata,
 )
+from subscriptions.services.operational_cancellation_service import record_delivery_cancellation_audit
 
 
 def _apply_delivery_filters(queryset, request):
@@ -512,7 +513,16 @@ class AdminDeliveryCancelView(APIView):
                 reason=serializer.validated_data["reason"],
                 notes=serializer.validated_data.get("notes"),
             )
+            record_delivery_cancellation_audit(
+                delivery=delivery,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+            )
         except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)

@@ -633,6 +633,66 @@ def confirm_direct_sale(*, direct_sale_id: int, confirmed_by):
 
 
 @transaction.atomic
+def finalize_direct_sale_invoice(*, direct_sale_id: int, finalized_by):
+    """Finalize a draft direct sale by approving and posting its linked invoice."""
+    DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
+    sale = (
+        DirectSale.objects.prefetch_related("lines", "billing_invoices")
+        .select_related("customer", "doc_series", "finance_account")
+        .get(pk=direct_sale_id)
+    )
+    if sale.status == DirectSaleStatus.CANCELLED:
+        raise ValueError("Cancelled direct sales cannot be finalized.")
+    if sale.status == DirectSaleStatus.INVOICED:
+        return sale, False
+    if sale.status != DirectSaleStatus.DRAFT:
+        raise ValueError("Only draft direct sales can be finalized.")
+    if not sale.lines.exists():
+        raise ValueError("Direct sales require at least one line before invoice finalization.")
+
+    invoice = _sync_direct_sale_invoice(
+        sale=sale,
+        line_payloads=_serialize_direct_sale_line_payloads(
+            [
+                {
+                    "product": line.product,
+                    "inventory_item": line.inventory_item,
+                    "description": line.description,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
+                    "discount_amount": line.discount_amount,
+                    "taxable_value": line.taxable_value,
+                    "gst_rate": line.gst_rate,
+                    "cgst_amount": line.cgst_amount,
+                    "sgst_amount": line.sgst_amount,
+                    "igst_amount": line.igst_amount,
+                    "line_total": line.line_total,
+                    "hsn_sac_code": line.hsn_sac_code,
+                }
+                for line in sale.lines.select_related("product", "inventory_item")
+            ]
+        ),
+    )
+    approved_invoice, _ = approve_billing_invoice(invoice_id=invoice.id, approved_by=finalized_by)
+    posted_invoice, _ = post_billing_invoice(invoice_id=approved_invoice.id, posted_by=finalized_by)
+
+    refreshed = DirectSale.objects.get(pk=sale.id)
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=refreshed,
+        performed_by=finalized_by,
+        metadata={
+            "event": "DIRECT_SALE_INVOICE_FINALIZED",
+            "direct_sale_id": refreshed.id,
+            "sale_no": refreshed.sale_no,
+            "invoice_id": posted_invoice.id,
+            "invoice_no": posted_invoice.document_no,
+        },
+    )
+    return refreshed, True
+
+
+@transaction.atomic
 def mark_direct_sale_delivered(*, direct_sale_id: int, delivered_by, delivery_reference: str = ""):
     DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
     sale = DirectSale.objects.get(pk=direct_sale_id)

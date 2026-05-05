@@ -8,6 +8,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin, IsCashierOrAdmin
+from billing.models import DirectSale
+from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from billing.models import DirectSaleLine
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
 from subscriptions.models import Product
@@ -313,6 +315,15 @@ class AdminInventoryRequirementListView(APIView):
             queryset = queryset.filter(created_at__date__lte=date_to)
         rows = []
         for need in queryset[:200]:
+            sale = None
+            if need.source_module == PurchaseNeed.SourceModule.DIRECT_SALE and str(need.source_object_id or "").isdigit():
+                sale = (
+                    DirectSale.objects.select_related("customer")
+                    .prefetch_related("billing_invoices")
+                    .filter(pk=int(need.source_object_id))
+                    .first()
+                )
+            sale_state = get_direct_sale_operational_state(sale) if sale else None
             rows.append(
                 {
                     "id": need.id,
@@ -328,6 +339,12 @@ class AdminInventoryRequirementListView(APIView):
                     "status": need.status,
                     "priority": need.priority,
                     "note": need.note,
+                    "sale_id": sale.id if sale else None,
+                    "sale_no": sale.sale_no if sale else None,
+                    "invoice_id": sale_state["invoice_id"] if sale_state else None,
+                    "invoice_number": sale_state["invoice_number"] if sale_state else None,
+                    "operational_state": sale_state["operational_state"] if sale_state else None,
+                    "next_actions": sale_state["next_actions"] if sale_state else [],
                     "created_at": need.created_at,
                 }
             )

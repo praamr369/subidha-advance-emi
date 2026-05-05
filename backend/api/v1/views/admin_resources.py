@@ -44,6 +44,7 @@ from api.v1.serializers.admin_resources import (
     ProductUnitOfMeasureMasterSerializer,
     CustomerKycDecisionSerializer,
 )
+from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
 from api.v1.serializers.admin_resources import (
     SubscriptionAdminSerializer,
     SubscriptionAdminDetailSerializer,
@@ -2355,6 +2356,8 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     serializer_class = SubscriptionAdminSerializer
 
     def get_serializer_class(self):
+        if self.action == "cancel_subscription":
+            return OperationalCancellationActionSerializer
         if self.action == "retrieve":
             return SubscriptionAdminDetailSerializer
         return SubscriptionAdminSerializer
@@ -2399,6 +2402,41 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_subscription(self, request, pk=None):
+        subscription = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from subscriptions.services.operational_cancellation_service import cancel_subscription
+
+        try:
+            result = cancel_subscription(
+                subscription_id=subscription.id,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                internal_note=serializer.validated_data.get("internal_note", ""),
+                force_after_activation=serializer.validated_data.get("force_after_activation", False),
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except (ValidationError, ValueError) as exc:
+            return Response(
+                {"detail": getattr(exc, "message_dict", None) or getattr(exc, "detail", None) or str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
+        return Response(
+            {
+                "updated": True,
+                "result": result,
+                "subscription": SubscriptionAdminDetailSerializer(
+                    refreshed,
+                    context={"request": request},
+                ).data,
+            }
+        )
 
     def get_queryset(self):
         if self.action == "retrieve":

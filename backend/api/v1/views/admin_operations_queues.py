@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from subscriptions.services.admin_operations_queue_service import (
+    build_admin_next_actions,
     build_admin_queue_summary,
     list_partner_payment_requests,
 )
@@ -21,6 +22,11 @@ class AdminOperationsQueueSummaryView(_AdminBase):
 class AdminOperationsRequestQueuesView(_AdminBase):
     def get(self, request):
         return Response(build_admin_queue_summary())
+
+
+class AdminOperationsNextActionsView(_AdminBase):
+    def get(self, request):
+        return Response(build_admin_next_actions())
 
 
 class AdminPartnerOperationsSummaryView(_AdminBase):
