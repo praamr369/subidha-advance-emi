@@ -177,6 +177,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance & Accounting", "Finance Workspace", ROUTES.admin.finance, "Finance operations workspace."),
   item("Finance & Accounting", "Accounting Control Center", ROUTES.admin.accountingControlCenter, "Accounting KPIs and controls."),
   item("Finance & Accounting", "Collections", ROUTES.admin.collections, "Collections register."),
+  item("Finance & Accounting", "Outstanding Ledger", ROUTES.admin.outstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and standalone invoices."),
   item("Finance & Accounting", "Dues", ROUTES.admin.emisPending, "Due EMI and demand queue."),
   item("Finance & Accounting", "Overdue", ROUTES.admin.emisOverdue, "Overdue queue.", {
     badgeSource: "queue.overdue_payments",

@@ -97,8 +97,8 @@ export default function OverdueReportPage() {
           variant: "secondary",
         },
         {
-          href: "/admin/emis/overdue",
-          label: "Open Overdue Workspace",
+          href: "/admin/outstandings?operation=advance_emi&state=overdue",
+          label: "Open Unified Outstanding Ledger",
           variant: "secondary",
         },
       ]}
@@ -226,7 +226,7 @@ export default function OverdueReportPage() {
                 value={rows.length > 0 ? "Open" : "Clear"}
                 subtext="Operational follow-up workspace"
                 tone={rows.length > 0 ? "warning" : "success"}
-                href="/admin/emis/overdue"
+                href="/admin/outstandings?operation=advance_emi&state=overdue"
               />
             </div>
 

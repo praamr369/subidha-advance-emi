@@ -105,3 +105,20 @@ test("latest winner section shows a truthful live or empty state", async ({
     /No winner published yet|Latest published draw result/i
   );
 });
+
+test("public fair draw pages surface commitment and masked winner trust details", async ({
+  page,
+}) => {
+  const manifest = readSmokeManifest();
+
+  await page.goto("/lucky-plan/fair-draw");
+  await expect(page.getByRole("heading", { name: "Fair Draw" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Commitment hash first, reveal later");
+  await expect(page.locator("body")).toContainText("Sealed envelope");
+
+  await page.goto(`/lucky-plan/fair-draw/${manifest.entities.public.winner_draw_id}`);
+  await expect(page.getByRole("heading", { name: /Fair Draw #/ })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Public verification record");
+  await expect(page.locator("body")).toContainText("Masked public winner detail");
+  await expect(page.locator("body")).not.toContainText("customer_phone");
+});

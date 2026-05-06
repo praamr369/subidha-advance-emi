@@ -339,6 +339,10 @@ from api.v1.views.admin_opening_stock import (
     AdminOpeningStockEntryViewSet,
     AdminOpeningStockTemplateView,
 )
+from api.v1.views.admin_outstandings import (
+    AdminOutstandingsExportCsvView,
+    AdminOutstandingsView,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -655,5 +659,7 @@ urlpatterns = [
     path("notifications/", AdminNotificationListView.as_view()),
     path("notifications/unread-count/", AdminUnreadNotificationCountView.as_view()),
     path("notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view()),
+    path("outstandings/", AdminOutstandingsView.as_view()),
+    path("outstandings/export.csv", AdminOutstandingsExportCsvView.as_view()),
     path("", include(router.urls)),
 ]

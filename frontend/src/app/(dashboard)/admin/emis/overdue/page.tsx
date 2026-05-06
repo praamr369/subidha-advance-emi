@@ -270,8 +270,8 @@ export default function OverdueEmiPage() {
       ]}
       actions={[
         {
-          href: "/admin/collections",
-          label: "Open Collections",
+          href: "/admin/outstandings?operation=advance_emi&state=overdue",
+          label: "Open Unified Outstanding Ledger",
           variant: "primary",
         },
         {
