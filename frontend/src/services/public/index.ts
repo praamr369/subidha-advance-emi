@@ -31,6 +31,61 @@ export type PublicWinner = {
   product_image?: string | null;
 };
 
+export type PublicLuckyDrawSummary = {
+  id: number;
+  batch_code: string;
+  draw_month: number;
+  draw_date: string;
+  commitment_published_at?: string | null;
+  reveal_timestamp?: string | null;
+  public_commit_hash?: string | null;
+  eligible_snapshot_count?: number;
+  public_verification_status?: string | null;
+  verification_status?: string | null;
+  public_explanation?: string | null;
+  winner_benefit_note?: string | null;
+  waiver_scope?: string | null;
+  winner_name_masked?: string | null;
+  winner_lucky_number?: number | null;
+  product_name?: string | null;
+  product_image?: string | null;
+  waived_emi_count?: number;
+  waived_amount?: string | null;
+};
+
+export type PublicLuckyDrawSummaryResponse = {
+  draw: PublicLuckyDrawSummary | null;
+};
+
+export type PublicLuckyDrawCertificateResponse = {
+  certificate: PublicLuckyDrawSummary | null;
+};
+
+export type PublicLuckyDrawVerification = {
+  id: number;
+  batch_code: string;
+  draw_month: number;
+  public_commit_hash?: string | null;
+  commitment_published_at?: string | null;
+  reveal_timestamp?: string | null;
+  eligible_snapshot_count?: number;
+  public_verification_status?: string | null;
+  verification_status?: string | null;
+  revealed_seed?: string | null;
+  hash_matches?: boolean | null;
+  recalculated_hash?: string | null;
+  verification_message?: string | null;
+  public_explanation?: string | null;
+};
+
+export type PublicLuckyDrawVerificationResponse = {
+  verification: PublicLuckyDrawVerification | null;
+};
+
+export type PublicLuckyDrawWinnerResponse = {
+  winner: PublicLuckyDrawSummary | null;
+};
+
 export type PublicLatestWinnerResponse = {
   winner: PublicWinner | null;
 };
@@ -185,6 +240,13 @@ function normalizePublicWinner(row: PublicWinner): PublicWinner {
   };
 }
 
+function normalizePublicLuckyDraw(row: PublicLuckyDrawSummary): PublicLuckyDrawSummary {
+  return {
+    ...row,
+    product_image: resolveApiMediaUrl(row.product_image),
+  };
+}
+
 export async function getPublicStats(): Promise<PublicStats> {
   return fetchPublic<PublicStats>(
     "/public/stats/",
@@ -201,6 +263,64 @@ export async function getPublicLatestWinner(): Promise<PublicLatestWinnerRespons
   );
   return {
     winner: payload.winner ? normalizePublicWinner(payload.winner) : null,
+  };
+}
+
+export async function getPublicLuckyDrawLatestSummary(): Promise<PublicLuckyDrawSummaryResponse> {
+  const payload = await fetchPublic<PublicLuckyDrawSummaryResponse>(
+    "/public/lucky-draws/latest/",
+    { cache: "no-store" },
+    "Unable to load the latest Lucky Draw summary right now."
+  );
+  return {
+    draw: payload.draw ? normalizePublicLuckyDraw(payload.draw) : null,
+  };
+}
+
+export async function getPublicLuckyDrawSummary(drawId: number | string): Promise<PublicLuckyDrawSummaryResponse> {
+  const payload = await fetchPublic<PublicLuckyDrawSummaryResponse>(
+    `/public/lucky-draws/${drawId}/trust-summary/`,
+    { cache: "no-store" },
+    "Unable to load the Lucky Draw summary right now."
+  );
+  return {
+    draw: payload.draw ? normalizePublicLuckyDraw(payload.draw) : null,
+  };
+}
+
+export async function getPublicLuckyDrawCertificate(
+  drawId: number | string
+): Promise<PublicLuckyDrawCertificateResponse> {
+  const payload = await fetchPublic<PublicLuckyDrawCertificateResponse>(
+    `/public/lucky-draws/${drawId}/certificate/`,
+    { cache: "no-store" },
+    "Unable to load the Lucky Draw certificate right now."
+  );
+  return {
+    certificate: payload.certificate ? normalizePublicLuckyDraw(payload.certificate) : null,
+  };
+}
+
+export async function getPublicLuckyDrawVerification(
+  drawId: number | string
+): Promise<PublicLuckyDrawVerificationResponse> {
+  return fetchPublic<PublicLuckyDrawVerificationResponse>(
+    `/public/lucky-draws/${drawId}/verification/`,
+    { cache: "no-store" },
+    "Unable to load the Lucky Draw verification right now."
+  );
+}
+
+export async function getPublicLuckyDrawWinner(
+  drawId: number | string
+): Promise<PublicLuckyDrawWinnerResponse> {
+  const payload = await fetchPublic<PublicLuckyDrawWinnerResponse>(
+    `/public/lucky-draws/${drawId}/winner/`,
+    { cache: "no-store" },
+    "Unable to load the Lucky Draw winner right now."
+  );
+  return {
+    winner: payload.winner ? normalizePublicLuckyDraw(payload.winner) : null,
   };
 }
 

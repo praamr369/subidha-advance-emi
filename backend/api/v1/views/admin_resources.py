@@ -985,6 +985,7 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
     queryset = (
         LuckyDraw.objects.select_related(
             "batch",
+            "draw_commit",
             "winner_lucky_id",
             "winner_subscription",
             "winner_subscription__customer",

@@ -22,6 +22,7 @@ from subscriptions.models import (
     ContractReturnConditionStatus,
     Customer,
     DocumentVerificationStatus,
+    DrawEligibilitySnapshot,
     Emi,
     EmiStatus,
     LeaseSubscriptionProfile,
@@ -572,6 +573,7 @@ class EmiAdminSerializer(serializers.ModelSerializer):
 
 class LuckyDrawAdminSerializer(serializers.ModelSerializer):
     batch_code = serializers.CharField(source="batch.batch_code", read_only=True)
+    draw_commit_id = serializers.IntegerField(source="draw_commit.id", read_only=True)
 
     winner_lucky_number = serializers.IntegerField(
         source="winner_lucky_id.lucky_number",
@@ -585,6 +587,13 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
 
     winner_subscription_number = serializers.SerializerMethodField()
     winner_customer_name = serializers.SerializerMethodField()
+    public_commit_hash = serializers.SerializerMethodField()
+    commitment_published_at = serializers.SerializerMethodField()
+    eligible_snapshot_count = serializers.SerializerMethodField()
+    verification_status = serializers.SerializerMethodField()
+    public_verification_status = serializers.SerializerMethodField()
+    public_winner_name_masked = serializers.SerializerMethodField()
+    public_explanation = serializers.SerializerMethodField()
 
     class Meta:
         model = LuckyDraw
@@ -592,18 +601,26 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
             "id",
             "batch",
             "batch_code",
+            "draw_commit_id",
             "committed_hash",
             "revealed_seed",
+            "public_commit_hash",
+            "commitment_published_at",
+            "eligible_snapshot_count",
             "winner_lucky_id",
             "winner_lucky_number",
             "winner_subscription",
             "winner_subscription_id",
             "winner_subscription_number",
             "winner_customer_name",
+            "public_winner_name_masked",
             "draw_date",
             "draw_month",
             "is_revealed",
             "revealed_at",
+            "verification_status",
+            "public_verification_status",
+            "public_explanation",
             "waived_emi_count",
             "waived_amount",
             "waiver_scope",
@@ -612,11 +629,19 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "batch_code",
+            "draw_commit_id",
             "winner_lucky_number",
             "winner_subscription_id",
             "winner_subscription_number",
             "winner_customer_name",
+            "public_commit_hash",
+            "commitment_published_at",
+            "eligible_snapshot_count",
+            "public_winner_name_masked",
             "revealed_at",
+            "verification_status",
+            "public_verification_status",
+            "public_explanation",
             "waived_emi_count",
             "waived_amount",
             "waiver_scope",
@@ -638,6 +663,62 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
         if not subscription or not getattr(subscription, "customer_id", None):
             return None
         return getattr(subscription.customer, "name", None)
+
+    def get_public_commit_hash(self, obj):
+        draw_commit = getattr(obj, "draw_commit", None)
+        if draw_commit and getattr(draw_commit, "public_commit_hash", None):
+            return draw_commit.public_commit_hash
+        return obj.committed_hash
+
+    def get_commitment_published_at(self, obj):
+        draw_commit = getattr(obj, "draw_commit", None)
+        if draw_commit and getattr(draw_commit, "committed_at", None):
+            return draw_commit.committed_at
+        return getattr(obj, "created_at", None) or obj.draw_date
+
+    def get_eligible_snapshot_count(self, obj):
+        draw_commit = getattr(obj, "draw_commit", None)
+        if not draw_commit:
+            return 0
+        return DrawEligibilitySnapshot.objects.filter(
+            batch=obj.batch,
+            snapshot_version=draw_commit.snapshot_version,
+        ).count()
+
+    def get_verification_status(self, obj):
+        return "coordinated" if getattr(obj, "draw_commit_id", None) else "legacy"
+
+    def get_public_verification_status(self, obj):
+        if getattr(obj, "draw_commit_id", None):
+            return "revealed_verified" if obj.is_revealed else "committed_unrevealed"
+        return "legacy_revealed" if obj.is_revealed else "legacy_committed"
+
+    def get_public_winner_name_masked(self, obj):
+        subscription = getattr(obj, "winner_subscription", None)
+        if not subscription or not getattr(subscription, "customer_id", None):
+            return None
+        raw = getattr(subscription.customer, "name", None)
+        if not raw:
+            return None
+        normalized = " ".join(part for part in str(raw).strip().split(" ") if part)
+        if not normalized:
+            return None
+        parts = normalized.split(" ")
+        if len(parts) == 1:
+            token = parts[0]
+            if len(token) <= 2:
+                return f"{token[0]}*" if token else None
+            return f"{token[:2]}***"
+        first = parts[0]
+        last_initial = parts[-1][:1].upper()
+        first_masked = f"{first[:2]}***" if len(first) > 2 else f"{first[:1]}*"
+        return f"{first_masked} {last_initial}."
+
+    def get_public_explanation(self, obj):
+        return (
+            "The commitment hash is like a sealed envelope: it is published first, "
+            "then the seed is revealed later so the draw can be verified against the original commitment."
+        )
 
     def validate(self, attrs):
         data = {}

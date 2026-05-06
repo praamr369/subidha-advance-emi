@@ -85,6 +85,7 @@ export default async function LuckyPlanPage() {
         description="Get help on product selection, batch availability, tenure, and monthly amount comfort."
         actions={[
           { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
+          { href: ROUTES.public.fairDraw, label: "View fair draw", variant: "secondary" },
           { href: ROUTES.public.products, label: "View Products", variant: "secondary" },
           { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "secondary" },
           { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },

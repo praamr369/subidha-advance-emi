@@ -13,12 +13,16 @@ export type LuckyDrawRecord = {
   id: number;
   batch?: number;
   batch_code?: string;
+  draw_commit_id?: number | null;
   draw_month?: number;
   draw_date?: string;
   executed_at?: string;
   is_revealed?: boolean;
+  revealed_at?: string | null;
   winner_lucky_id?: number | null;
   winner_lucky_number?: number | null;
+  winner_customer_name?: string | null;
+  winner_subscription_number?: string | null;
   winner_context?: {
     winner_lucky_id: number;
     winner_lucky_number: number;
@@ -26,8 +30,18 @@ export type LuckyDrawRecord = {
     batch_id: number;
   } | null;
   committed_hash?: string;
+  public_commit_hash?: string | null;
+  commitment_published_at?: string | null;
+  eligible_snapshot_count?: number | null;
   revealed_seed?: string | null;
   created_at?: string;
+  verification_status?: string | null;
+  public_verification_status?: string | null;
+  public_winner_name_masked?: string | null;
+  public_explanation?: string | null;
+  waived_emi_count?: number | null;
+  waived_amount?: string | null;
+  waiver_scope?: string | null;
 };
 
 export type BatchDrawSummary = {

@@ -13,6 +13,7 @@ export const ROUTES = {
     visionTrust: "/vision-trust",
     winners: "/winners",
     winnerHistory: "/winner-history",
+    fairDraw: "/lucky-plan/fair-draw",
     contact: "/contact",
     blog: "/blog",
     login: "/login",
@@ -62,6 +63,7 @@ export const ROUTES = {
     auditEvents: "/admin/audit/events",
 
     collections: "/admin/collections",
+    outstandings: "/admin/outstandings",
     leads: "/admin/leads",
     supportRequests: "/admin/support-requests",
     customers: "/admin/customers",
