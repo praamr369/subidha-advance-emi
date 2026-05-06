@@ -4,6 +4,7 @@ from datetime import datetime, time
 from decimal import Decimal
 
 from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from billing.models import BillingDocumentStatus, DirectSale, DirectSaleStatus
@@ -64,6 +65,20 @@ def _date_to_service_due_at(scheduled_date):
     return dt
 
 
+def _lock_direct_sale_case(*, case_id: int) -> tuple[ServiceDeskCase, DirectSale]:
+    case = ServiceDeskCase.objects.select_for_update(of=("self",)).get(
+        pk=case_id,
+        case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+    )
+    if not case.direct_sale_id:
+        raise ValueError("Delivery case is not linked to a direct sale.")
+    try:
+        sale = DirectSale.objects.select_for_update(of=("self",)).get(pk=case.direct_sale_id)
+    except ObjectDoesNotExist as exc:
+        raise ValueError("Delivery case is linked to a missing direct sale.") from exc
+    return case, sale
+
+
 @transaction.atomic
 def schedule_direct_sale_delivery(
     *,
@@ -75,10 +90,7 @@ def schedule_direct_sale_delivery(
     delivery_address_snapshot: str = "",
     notes: str = "",
 ):
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
-        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
-    )
-    sale = DirectSale.objects.select_for_update().get(pk=case.direct_sale_id)
+    case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate(sale=sale)
     if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED}:
         raise ValueError("Direct sale is already delivered.")
@@ -126,10 +138,7 @@ def update_direct_sale_delivery_metadata(
     failure_or_cancellation_reason: str | None = None,
     operational_notes: str | None = None,
 ):
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
-        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
-    )
-    DirectSale.objects.select_for_update().get(pk=case.direct_sale_id)
+    case, _ = _lock_direct_sale_case(case_id=case_id)
 
     update_fields: list[str] = []
     if scheduled_date is not None:
@@ -167,10 +176,7 @@ def update_direct_sale_delivery_metadata(
 
 @transaction.atomic
 def dispatch_direct_sale_delivery(*, case_id: int, actor, notes: str = ""):
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
-        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
-    )
-    sale = DirectSale.objects.select_for_update().get(pk=case.direct_sale_id)
+    case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate(sale=sale)
     if case.status not in {ServiceDeskCaseStatus.AUTHORIZED, ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW}:
         raise ValueError("Only scheduled direct-sale deliveries can be dispatched.")
@@ -192,10 +198,7 @@ def mark_direct_sale_delivered(
     delivery_note: str = "",
     delivered_at=None,
 ):
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
-        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
-    )
-    sale = DirectSale.objects.select_for_update().get(pk=case.direct_sale_id)
+    case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate(sale=sale)
     if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED} or sale.delivered_at:
         raise ValueError("Direct sale is already delivered.")
@@ -228,9 +231,7 @@ def mark_direct_sale_delivered(
 def cancel_direct_sale_delivery(*, case_id: int, actor, reason: str, notes: str = ""):
     if not (reason or "").strip():
         raise ValueError("Cancellation reason is required.")
-    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
-        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
-    )
+    case, _ = _lock_direct_sale_case(case_id=case_id)
     if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED}:
         raise ValueError("Delivered direct-sale delivery cannot be cancelled.")
     case.status = ServiceDeskCaseStatus.CANCELLED
@@ -247,7 +248,7 @@ def add_direct_sale_delivery_note(*, case_id: int, actor, note: str):
     note = (note or "").strip()
     if not note:
         raise ValueError("Note is required.")
-    case = ServiceDeskCase.objects.select_for_update().get(pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY)
+    case, _ = _lock_direct_sale_case(case_id=case_id)
     case.internal_notes = ((case.internal_notes or "").strip() + "\n" + note).strip()
     case.save(update_fields=["internal_notes", "updated_at"])
     _audit("DIRECT_SALE_DELIVERY_NOTE_ADDED", case=case, actor=actor)

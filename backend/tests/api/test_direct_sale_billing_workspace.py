@@ -602,6 +602,29 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(cancelled.status_code, status.HTTP_400_BAD_REQUEST, cancelled.data)
         self.assertIn("cannot be cancelled", str(cancelled.data).lower())
 
+    def test_orphan_direct_sale_delivery_case_returns_400_not_500_for_dispatch_or_deliver(self):
+        orphan_case = ServiceDeskCase.objects.create(
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+            status=ServiceDeskCaseStatus.OPEN,
+            issue_summary="Orphan direct-sale delivery case",
+        )
+
+        dispatch = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{orphan_case.id}/dispatch/",
+            {"notes": "Try dispatch"},
+            format="json",
+        )
+        self.assertEqual(dispatch.status_code, status.HTTP_400_BAD_REQUEST, dispatch.data)
+        self.assertIn("not linked to a direct sale", str(dispatch.data).lower())
+
+        deliver = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{orphan_case.id}/mark-delivered/",
+            {"receiver_name": "Receiver A"},
+            format="json",
+        )
+        self.assertEqual(deliver.status_code, status.HTTP_400_BAD_REQUEST, deliver.data)
+        self.assertIn("not linked to a direct sale", str(deliver.data).lower())
+
     def test_draft_sale_exposes_operational_state_and_finalize_action(self):
         response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
