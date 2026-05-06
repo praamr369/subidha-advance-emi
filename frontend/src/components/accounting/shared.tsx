@@ -71,7 +71,23 @@ export function accountingErrorMessage(
     const errorRecord = error as Record<string, unknown>;
     for (const key of ["body", "details"]) {
       if (!(key in errorRecord)) continue;
-      const messages = collectErrorMessages(errorRecord[key]);
+      const raw = errorRecord[key];
+      if (raw && typeof raw === "object") {
+        const structured = raw as Record<string, unknown>;
+        if (structured.code === "DIRECT_SALE_FINALIZE_BLOCKED") {
+          const parts: string[] = [];
+          if (typeof structured.detail === "string" && structured.detail.trim()) {
+            parts.push(structured.detail.trim());
+          }
+          if (Array.isArray(structured.blocking_reasons)) {
+            parts.push(
+              ...structured.blocking_reasons.map(String).filter((s) => s.trim())
+            );
+          }
+          if (parts.length) return parts.join(" — ");
+        }
+      }
+      const messages = collectErrorMessages(raw);
       if (messages.length) return messages.join("; ");
     }
   }

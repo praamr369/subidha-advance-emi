@@ -578,7 +578,7 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         return PurchaseNeed.objects.filter(
             source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
             status=PurchaseNeedStatus.OPEN,
-        ).filter(legacy | keyed).count()
+        ).filter(legacy | keyed).filter(Q(shortage_quantity__gt=Decimal("0.000"))).count()
 
     def _operational_state(self, obj):
         if hasattr(obj, "_operational_state_cache"):

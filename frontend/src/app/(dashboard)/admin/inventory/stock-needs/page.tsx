@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -18,27 +18,24 @@ export default function StockNeedsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-    listStockNeeds({ limit: "100" })
-      .then((payload) => {
-        if (!mounted) return;
-        const p = payload as { results?: Row[]; count?: number };
-        setRows(p.results ?? []);
-        setCount(typeof p.count === "number" ? p.count : (p.results ?? []).length);
-        setError(null);
-      })
-      .catch((err) => {
-        if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Failed to load stock needs.");
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
+  const loadRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const payload = await listStockNeeds({ limit: "100" });
+      const p = payload as { results?: Row[]; count?: number };
+      setRows(p.results ?? []);
+      setCount(typeof p.count === "number" ? p.count : (p.results ?? []).length);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load stock needs.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
 
   return (
     <div className="space-y-6">
@@ -61,7 +58,7 @@ export default function StockNeedsPage() {
       ) : null}
 
       {!loading && !error ? (
-        <StockNeedsOperationalWorkspace rows={rows} count={count} />
+        <StockNeedsOperationalWorkspace rows={rows} count={count} onRefresh={loadRows} />
       ) : null}
     </div>
   );

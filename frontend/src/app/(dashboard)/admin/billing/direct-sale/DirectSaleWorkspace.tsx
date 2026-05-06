@@ -34,6 +34,7 @@ import {
   searchBillingProducts,
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
+import { recheckStockNeed } from "@/services/inventory-ops";
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingInvoicesRoute,
@@ -290,6 +291,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
   const rows = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
   const requirements = useMemo(() => requirementsQuery.data ?? [], [requirementsQuery.data]);
+  const guidanceSale = useMemo(() => {
+    if (!rows.length) return null;
+    const draft = rows.find((r) => r.status === "DRAFT");
+    if (draft) return draft;
+    const withBlockers = rows.find((r) => (r.blocking_reasons || []).length > 0);
+    if (withBlockers) return withBlockers;
+    return rows[0];
+  }, [rows]);
   const financeAccounts = financeAccountsQuery.data ?? [];
 
   const salesLoading = workspaceQueriesEnabled && salesQuery.isPending;
@@ -315,6 +324,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
   const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [recheckingRequirementId, setRecheckingRequirementId] = useState<number | null>(null);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
@@ -393,7 +403,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     const draftSales = rows.filter((row) => row.status === "DRAFT").length;
     const todaySales = rows.filter((row) => row.sale_date === today).length;
     const deliveryHold = rows.filter((row) => row.delivery_required && !row.delivered_at).length;
-    const pendingRequirements = requirements.filter((row) => row.status === "OPEN").length;
+    const pendingRequirements = requirements.filter(
+      (row) => row.status === "OPEN" && toNumber(row.shortage_quantity) > 0,
+    ).length;
     return { draftSales, todaySales, deliveryHold, pendingRequirements };
   }, [requirements, rows]);
 
@@ -503,13 +515,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         if (isCollect || isCollectible) {
           return (
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setCollectSaleId(row.id)}
+              <Link
+                href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${row.id}`}
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-800 px-3 text-xs font-semibold text-white transition hover:bg-amber-900"
               >
-                Collect balance
-              </button>
+                Collect Direct-Sale Balance
+              </Link>
               <button
                 type="button"
                 onClick={() => setCancelSaleTarget(row)}
@@ -1849,11 +1860,16 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       <OperationalNextStepsPanel
         title="Direct Sale Workflow Guidance"
         context="Draft sale -> finalize/post invoice -> collect receivable -> resolve stock -> release delivery."
-        state={rows[0]?.operational_state || "NO_DIRECT_SALE"}
-        blockers={rows[0]?.blocking_reasons || []}
-        nextActions={rows[0]?.next_actions || []}
+        state={guidanceSale?.operational_state || "NO_DIRECT_SALE"}
+        blockers={guidanceSale?.blocking_reasons || []}
+        nextActions={guidanceSale?.next_actions || []}
         relatedLinks={[
-          { label: "Collections", href: `${ROUTES.admin.financeCollect}?workflow=direct-sale` },
+          {
+            label: "Collections",
+            href: guidanceSale?.id
+              ? `${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${guidanceSale.id}`
+              : `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
+          },
           { label: "Stock needs", href: ROUTES.admin.inventoryStockNeeds },
           { label: "Deliveries", href: ROUTES.admin.deliveries },
         ]}
@@ -1917,6 +1933,41 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             { key: "shortage_quantity", header: "Shortage" },
             { key: "priority", header: "Priority" },
             { key: "status", header: "Status" },
+            {
+              key: "id",
+              header: "Recheck",
+              render: (row) => (
+                <button
+                  type="button"
+                  disabled={recheckingRequirementId === row.id}
+                  onClick={async () => {
+                    setRecheckingRequirementId(row.id);
+                    setCreateFormError(null);
+                    try {
+                      const payload = (await recheckStockNeed(row.id)) as {
+                        recheck?: { outcome?: string; message?: string };
+                      };
+                      const msg = (payload?.recheck?.message ?? "").trim();
+                      const oc = payload?.recheck?.outcome ?? "";
+                      setNotice(
+                        msg ||
+                          (oc ? `Stock need recheck: ${oc}` : "Stock availability rechecked."),
+                      );
+                      await Promise.all([requirementsQuery.refetch(), salesQuery.refetch()]);
+                    } catch (err) {
+                      setCreateFormError(
+                        accountingErrorMessage(err, "Stock need recheck failed."),
+                      );
+                    } finally {
+                      setRecheckingRequirementId(null);
+                    }
+                  }}
+                  className="inline-flex h-8 items-center rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {recheckingRequirementId === row.id ? "…" : "Recheck stock"}
+                </button>
+              ),
+            },
             { key: "created_at", header: "Created", render: (row) => accountingDate(row.created_at) },
           ]}
           loading={requirementsLoading}

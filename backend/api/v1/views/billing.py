@@ -22,6 +22,7 @@ from billing.models import (
     ReceiptDocument,
 )
 from accounting.services.books_service import build_cash_book, build_daily_billing_book
+from billing.services.direct_sale_finalize_response import build_finalize_invoice_api_response
 from billing.services.billing_service import (
     approve_billing_credit_note,
     approve_billing_debit_note,
@@ -65,6 +66,29 @@ from api.v1.serializers.billing import (
     ReceiptVoidSerializer,
 )
 from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
+
+
+def _raise_direct_sale_finalize_blocked(message: str) -> None:
+    m = (message or "").lower()
+    hints: list[str] = []
+    if any(x in m for x in ("number", "series", "document", "invoice numbering")):
+        hints.append("OPEN_DOCUMENT_NUMBERING_SETTINGS")
+    if "line" in m or "product" in m:
+        hints.append("EDIT_DIRECT_SALE_LINES")
+    if "customer" in m or "snapshot" in m or "gst" in m or "place of supply" in m:
+        hints.append("EDIT_DIRECT_SALE_OR_CUSTOMER")
+    if "finance_account" in m or "chart" in m or "ledger" in m or "journal" in m:
+        hints.append("OPEN_ACCOUNTING_SETUP")
+    if not hints:
+        hints.append("REVIEW_ERROR_DETAIL")
+    raise ValidationError(
+        {
+            "code": "DIRECT_SALE_FINALIZE_BLOCKED",
+            "detail": message,
+            "blocking_reasons": [message],
+            "next_actions": hints,
+        }
+    )
 
 
 class AdminBillingModelViewSet(viewsets.ModelViewSet):
@@ -308,9 +332,12 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
         except DirectSale.DoesNotExist as exc:
             raise Http404 from exc
         except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        payload = DirectSaleSerializer(sale, context=self.get_serializer_context())
-        return Response({"updated": updated, "direct_sale": payload.data})
+            _raise_direct_sale_finalize_blocked(str(exc))
+        return Response(
+            build_finalize_invoice_api_response(
+                sale=sale, updated=updated, request=request
+            )
+        )
 
 
 class BillingInvoiceViewSet(AdminBillingModelViewSet):
@@ -792,6 +819,5 @@ class AdminDirectSaleFinalizeInvoiceView(APIView):
         except DirectSale.DoesNotExist as exc:
             raise Http404 from exc
         except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        payload = DirectSaleSerializer(sale, context={"request": request})
-        return Response({"updated": updated, "direct_sale": payload.data})
+            _raise_direct_sale_finalize_blocked(str(exc))
+        return Response(build_finalize_invoice_api_response(sale=sale, updated=updated, request=request))

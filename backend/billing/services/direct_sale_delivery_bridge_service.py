@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from billing.models import BillingDocumentStatus, DirectSale, DirectSaleStatus
-from inventory.services.demand_planning_service import stock_status_for_delivery
+from billing.models import DirectSale, DirectSaleStatus
+from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from service_desk.models import (
     ServiceDeskCase,
     ServiceDeskCaseStatus,
@@ -56,29 +56,11 @@ def _invoice_financial_label(invoice) -> str:
     return (invoice.status or "").strip().upper() or "UNKNOWN"
 
 
-def _stock_blocked_for_sale(*, sale: DirectSale) -> bool:
-    """
-    Conservative operational gate: treat severe shortage signals as dispatch-blocking.
-    Does not mutate inventory or reservations.
-    """
-    try:
-        line = sale.lines.select_related("product").first()
-        product_id = getattr(line, "product_id", None)
-        if product_id is None:
-            return False
-        payload = stock_status_for_delivery(product_id=product_id)
-        token = (payload.get("status") or "").strip().lower()
-        return token in {"purchase needed", "not available"}
-    except Exception:
-        return False
-
-
 def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
     """
-    Canonical delivery UX snapshot for direct-sale rows (additive fields for APIs/UI).
+    Canonical delivery UX snapshot aligned with get_direct_sale_operational_state.
 
-    Ordering reflects operational precedence: cancelled/completed pipelines first,
-    then physical delivery states, draft holds, payment holds, stock gates, dispatch-ready.
+    Invoice posting is allowed before dispatch; payment and stock gates follow posted AR.
     """
     balance = _balance_decimal(sale)
     received = _received_decimal(sale)
@@ -94,7 +76,11 @@ def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
             "stock_blocked": False,
         }
 
-    if sale.status == DirectSaleStatus.CANCELLED:
+    op = get_direct_sale_operational_state(sale)
+    dst = op["delivery_state"]
+    ost = str(op["operational_state"])
+
+    if sale.status == DirectSaleStatus.CANCELLED or ost == "CANCELLED":
         return {
             "phase_code": "CANCELLED",
             "phase_label": "Cancelled",
@@ -103,19 +89,8 @@ def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
             "stock_blocked": False,
         }
 
-    if sale.status == DirectSaleStatus.INVOICED:
-        return {
-            "phase_code": "COMPLETED",
-            "phase_label": "Completed",
-            "payment_state": "PAID" if balance <= Decimal("0.00") else "OUTSTANDING",
-            "invoice_state": invoice_state,
-            "stock_blocked": False,
-        }
-
     delivered_pipeline = sale.delivered_at is not None or sale.status == DirectSaleStatus.DELIVERED
-    if delivered_pipeline:
-        inv_posted = invoice is not None and invoice.status == BillingDocumentStatus.POSTED
-        label = "Delivered · Invoice pending" if not inv_posted else "Delivered"
+    if delivered_pipeline or ost == "DELIVERED_COMPLETE":
         if received > Decimal("0.00") and balance > Decimal("0.00"):
             pay_state = "PARTIAL"
         elif balance > Decimal("0.00"):
@@ -124,59 +99,56 @@ def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
             pay_state = "PAID"
         return {
             "phase_code": "DELIVERED_PIPELINE",
-            "phase_label": label,
+            "phase_label": "Delivered · Completed",
             "payment_state": pay_state,
             "invoice_state": invoice_state,
             "stock_blocked": False,
         }
 
-    if balance > Decimal("0.00"):
-        pay_state = "PARTIAL" if received > Decimal("0.00") else "OUTSTANDING"
-        label = (
-            "Delivery hold · Draft sale · Payment due"
-            if sale.status == DirectSaleStatus.DRAFT
-            else "Delivery required · Payment hold"
-        )
-        return {
-            "phase_code": "PAYMENT_HOLD",
-            "phase_label": label,
-            "payment_state": pay_state,
-            "invoice_state": invoice_state,
-            "stock_blocked": _stock_blocked_for_sale(sale=sale),
-        }
+    phase_map = {
+        "INVOICE_PENDING": (
+            "DRAFT_HOLD",
+            "Delivery hold · Invoice pending",
+        ),
+        "PAYMENT_HOLD": (
+            "PAYMENT_HOLD",
+            "Delivery hold · Payment due",
+        ),
+        "STOCK_BLOCKED": (
+            "STOCK_BLOCKED",
+            "Delivery blocked · Stock outstanding",
+        ),
+        "READY_FOR_DELIVERY": (
+            "READY_FOR_DELIVERY",
+            "Ready for delivery",
+        ),
+        "DELIVERED": (
+            "COMPLETED",
+            "Completed",
+        ),
+        "COUNTER_SALE_COMPLETE": (
+            "COMPLETED",
+            "Completed",
+        ),
+        "CANCELLED": (
+            "CANCELLED",
+            "Cancelled",
+        ),
+    }
+    phase_code, phase_label = phase_map.get(dst, ("PAYMENT_HOLD", "Delivery hold"))
+    stock_blocked = dst == "STOCK_BLOCKED"
 
-    if sale.status == DirectSaleStatus.DRAFT:
-        return {
-            "phase_code": "DRAFT_HOLD",
-            "phase_label": "Delivery hold · Draft sale",
-            "payment_state": "PAID",
-            "invoice_state": invoice_state,
-            "stock_blocked": _stock_blocked_for_sale(sale=sale),
-        }
-
-    stock_blocked = _stock_blocked_for_sale(sale=sale)
-    if stock_blocked:
-        return {
-            "phase_code": "STOCK_BLOCKED",
-            "phase_label": "Delivery blocked · Stock unavailable",
-            "payment_state": "PAID",
-            "invoice_state": invoice_state,
-            "stock_blocked": True,
-        }
-
-    if sale.status == DirectSaleStatus.CONFIRMED:
-        return {
-            "phase_code": "READY_FOR_DELIVERY",
-            "phase_label": "Ready for delivery",
-            "payment_state": "PAID",
-            "invoice_state": invoice_state,
-            "stock_blocked": False,
-        }
+    if balance > Decimal("0.00") and received > Decimal("0.00"):
+        pay_state = "PARTIAL"
+    elif balance > Decimal("0.00"):
+        pay_state = "OUTSTANDING"
+    else:
+        pay_state = "PAID"
 
     return {
-        "phase_code": "PAYMENT_HOLD",
-        "phase_label": "Delivery required · Payment hold",
-        "payment_state": "OUTSTANDING" if balance > Decimal("0.00") else "PAID",
+        "phase_code": phase_code,
+        "phase_label": phase_label,
+        "payment_state": pay_state,
         "invoice_state": invoice_state,
         "stock_blocked": stock_blocked,
     }

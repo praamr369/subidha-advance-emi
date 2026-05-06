@@ -14,6 +14,11 @@ from api.v1.serializers.inventory_admin import (
 from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
 from inventory.models import PurchaseNeed
 from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
+from inventory.services.purchase_need_reconciliation_service import (
+    parse_direct_sale_id_from_need_source,
+    recheck_purchase_need_availability,
+    reconcile_direct_sale_stock_requirements,
+)
 from subscriptions.services.operational_cancellation_service import cancel_stock_requirement
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
@@ -91,6 +96,38 @@ class AdminInventoryStockNeedPatchView(_AdminBase):
             },
         )
         return Response(AdminPurchaseNeedSerializer(updated).data)
+
+
+class AdminInventoryStockNeedRecheckView(_AdminBase):
+    @transaction.atomic
+    def post(self, request, pk):
+        need = PurchaseNeed.objects.filter(pk=pk).first()
+        if need is None:
+            return Response({"detail": "Stock need not found."}, status=status.HTTP_404_NOT_FOUND)
+        result = recheck_purchase_need_availability(need_id=int(pk), actor=request.user)
+        need.refresh_from_db()
+        if need.source_module == PurchaseNeed.SourceModule.DIRECT_SALE:
+            sale_id = parse_direct_sale_id_from_need_source(need.source_object_id)
+            if sale_id is not None:
+                reconcile_direct_sale_stock_requirements(direct_sale_id=sale_id, actor=request.user)
+                try:
+                    from billing.models import DirectSale
+                    from billing.services.direct_sale_delivery_bridge_service import (
+                        sync_direct_sale_delivery_case,
+                    )
+
+                    sale = DirectSale.objects.filter(pk=sale_id).first()
+                    if sale is not None:
+                        sync_direct_sale_delivery_case(sale=sale, actor=request.user)
+                except Exception:
+                    pass
+        refreshed = PurchaseNeed.objects.get(pk=pk)
+        return Response(
+            {
+                "recheck": result,
+                "stock_requirement": AdminPurchaseNeedSerializer(refreshed).data,
+            }
+        )
 
 
 class AdminInventoryStockNeedCancelView(_AdminBase):

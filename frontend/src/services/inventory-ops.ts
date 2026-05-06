@@ -23,3 +23,10 @@ export async function patchStockNeed(id: number, payload: Record<string, unknown
     body: JSON.stringify(payload),
   });
 }
+
+export async function recheckStockNeed(id: number) {
+  return request(`/admin/inventory/stock-needs/${id}/recheck/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}

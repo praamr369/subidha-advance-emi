@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from accounting.models import DocumentSequence
 from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
-from inventory.models import InventoryItem, PurchaseNeed, StockLocation, Warehouse
+from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus, StockLocation, Warehouse
 from inventory.services.purchase_need_service import direct_sale_purchase_need_source_key
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from tests.helpers import (
@@ -366,7 +366,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertFalse(ServiceDeskCase.objects.filter(direct_sale_id=response.data["id"]).exists())
         self.assertEqual(response.data.get("delivery_status"), "NONE")
 
-    def test_delivery_required_unpaid_creates_payment_hold_case_and_labels(self):
+    def test_delivery_required_unpaid_creates_invoice_pending_case_and_labels(self):
         payload = self._payload()
         payload["delivery_required"] = True
         response = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
@@ -374,7 +374,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
         self.assertEqual(case.case_type, ServiceDeskCaseType.DIRECT_SALE_DELIVERY)
         self.assertEqual(case.status, ServiceDeskCaseStatus.OPEN)
-        self.assertEqual(response.data.get("delivery_status"), "PAYMENT_HOLD")
+        self.assertEqual(response.data.get("delivery_status"), "DRAFT_HOLD")
         self.assertEqual(response.data.get("delivery_request_id"), case.id)
 
     def test_explicit_requirement_when_stock_covers_sale_still_creates_need(self):
@@ -398,7 +398,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertTrue(Warehouse.objects.filter(code="PRIMARY").exists())
         self.assertEqual(PurchaseNeed.objects.count(), 1)
 
-    def test_full_prepayment_delivery_ready_promotes_case_and_matches_labels(self):
+    def test_full_prepayment_delivery_ready_after_finalize_invoice(self):
         payload = self._payload()
         payload["delivery_required"] = True
         payload["received_total"] = "23000.00"
@@ -417,11 +417,15 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(case.status, ServiceDeskCaseStatus.OPEN)
         self.assertEqual(response.data.get("delivery_status"), "DRAFT_HOLD")
 
-        confirm = self.client.post(f"/api/v1/billing/direct-sales/{sale_id}/confirm/", {}, format="json")
-        self.assertEqual(confirm.status_code, status.HTTP_200_OK, confirm.data)
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
         case.refresh_from_db()
         self.assertEqual(case.status, ServiceDeskCaseStatus.AUTHORIZED)
-        self.assertEqual(confirm.data["direct_sale"].get("delivery_status"), "READY_FOR_DELIVERY")
+        self.assertEqual(finalize.data["direct_sale"].get("delivery_status"), "READY_FOR_DELIVERY")
 
     def test_admin_delivery_register_includes_direct_sale_case_rows(self):
         payload = self._payload()
@@ -485,3 +489,33 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         )
         self.assertEqual(collect_resp.status_code, status.HTTP_400_BAD_REQUEST, collect_resp.data)
         self.assertIn("invoiced", str(collect_resp.data).lower())
+
+    def test_finalize_invoice_not_blocked_by_open_purchase_need(self):
+        create_resp = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED, create_resp.data)
+        sale_id = create_resp.data["id"]
+        self.assertTrue(PurchaseNeed.objects.filter(source_module=PurchaseNeed.SourceModule.DIRECT_SALE).exists())
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+        self.assertEqual(finalize.data["direct_sale"]["status"], "INVOICED")
+
+    def test_admin_stock_need_recheck_resolves_when_atp_covers(self):
+        create_resp = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED, create_resp.data)
+        need = PurchaseNeed.objects.get()
+        self.assertEqual(need.status, PurchaseNeedStatus.OPEN)
+        self.inventory_item.opening_stock_qty = Decimal("50.000")
+        self.inventory_item.save(update_fields=["opening_stock_qty"])
+        recheck = self.client.post(f"/api/v1/admin/inventory/stock-needs/{need.id}/recheck/", {}, format="json")
+        self.assertEqual(recheck.status_code, status.HTTP_200_OK, recheck.data)
+        self.assertEqual(recheck.data.get("recheck", {}).get("outcome"), "RESOLVED_BY_AVAILABLE_STOCK")
+        need.refresh_from_db()
+        self.assertEqual(need.status, PurchaseNeedStatus.FULFILLED)
+
+        again = self.client.post(f"/api/v1/admin/inventory/stock-needs/{need.id}/recheck/", {}, format="json")
+        self.assertEqual(again.status_code, status.HTTP_200_OK, again.data)
+        self.assertEqual(again.data.get("recheck", {}).get("outcome"), "NO_CHANGE")

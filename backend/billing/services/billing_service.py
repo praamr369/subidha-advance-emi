@@ -428,20 +428,14 @@ def _assert_invoice_delivery_gate(invoice: BillingInvoice):
 
 
 def _assert_direct_sale_delivery_gate(invoice: BillingInvoice):
-    if not invoice.direct_sale_id:
-        return
-    if invoice.document_type != BillingInvoiceType.INVOICE:
-        return
-    sale = invoice.direct_sale
-    if not sale.delivery_required:
-        return
-    if sale.delivered_at is None or sale.status not in {
-        DirectSaleStatus.DELIVERED,
-        DirectSaleStatus.INVOICED,
-    }:
-        raise ValueError(
-            "Direct-sale final invoices can only be posted after the sale is marked delivered."
-        )
+    """
+    Retail direct-sale invoices may be posted before physical delivery.
+
+    Delivery readiness (dispatch, service-desk promotion) is enforced in
+    direct_sale_delivery_bridge_service / operational state, not at invoice post time.
+    Open PurchaseNeed rows must not block AR posting or receivable creation.
+    """
+    return
 
 
 @transaction.atomic
@@ -645,8 +639,8 @@ def finalize_direct_sale_invoice(*, direct_sale_id: int, finalized_by):
         raise ValueError("Cancelled direct sales cannot be finalized.")
     if sale.status == DirectSaleStatus.INVOICED:
         return sale, False
-    if sale.status != DirectSaleStatus.DRAFT:
-        raise ValueError("Only draft direct sales can be finalized.")
+    if sale.status not in {DirectSaleStatus.DRAFT, DirectSaleStatus.CONFIRMED}:
+        raise ValueError("Only draft or confirmed direct sales can be finalized.")
     if not sale.lines.exists():
         raise ValueError("Direct sales require at least one line before invoice finalization.")
 
@@ -676,7 +670,14 @@ def finalize_direct_sale_invoice(*, direct_sale_id: int, finalized_by):
     approved_invoice, _ = approve_billing_invoice(invoice_id=invoice.id, approved_by=finalized_by)
     posted_invoice, _ = post_billing_invoice(invoice_id=approved_invoice.id, posted_by=finalized_by)
 
+    from inventory.services.purchase_need_reconciliation_service import (
+        reconcile_direct_sale_stock_requirements,
+    )
+    from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+    reconcile_direct_sale_stock_requirements(direct_sale_id=sale.id, actor=finalized_by)
     refreshed = DirectSale.objects.get(pk=sale.id)
+    sync_direct_sale_delivery_case(sale=refreshed, actor=finalized_by)
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=refreshed,

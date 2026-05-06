@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from django.db.models import Q
+
 from billing.models import BillingDocumentStatus, DirectSaleStatus
 from inventory.models import PurchaseNeed, PurchaseNeedStatus
 
@@ -30,14 +32,19 @@ def _latest_invoice(sale):
 
 
 def _open_requirement_count(sale) -> int:
+    """
+    Count direct-sale PurchaseNeeds that still block dispatch: OPEN with positive shortage snapshot.
+    OPEN rows with zero shortage (covered by ATP) do not block delivery or payment-finalized gates.
+    """
     legacy = {"source_module": PurchaseNeed.SourceModule.DIRECT_SALE, "source_object_id": str(sale.id)}
     keyed = {
         "source_module": PurchaseNeed.SourceModule.DIRECT_SALE,
         "source_object_id__startswith": f"ds:{sale.id}:p:",
     }
+    q_short = Q(shortage_quantity__gt=Decimal("0.000"))
     return (
-        PurchaseNeed.objects.filter(status=PurchaseNeedStatus.OPEN, **legacy).count()
-        + PurchaseNeed.objects.filter(status=PurchaseNeedStatus.OPEN, **keyed).count()
+        PurchaseNeed.objects.filter(status=PurchaseNeedStatus.OPEN, **legacy).filter(q_short).count()
+        + PurchaseNeed.objects.filter(status=PurchaseNeedStatus.OPEN, **keyed).filter(q_short).count()
     )
 
 

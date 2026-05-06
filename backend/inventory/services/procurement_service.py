@@ -20,6 +20,9 @@ from inventory.models import (
     PurchaseOrderStatus,
 )
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.purchase_need_reconciliation_service import (
+    reconcile_direct_sale_needs_after_inventory_in,
+)
 from inventory.services.stock_service import create_stock_ledger_entry
 from subscriptions.models import AuditLog
 
@@ -109,6 +112,10 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
             "created_stock_entries": created_count,
             "existing_stock_entries": existing_count,
         },
+    )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids={line.inventory_item.product_id for line in receipt.lines.all()},
+        actor=posted_by,
     )
     return receipt, True
 

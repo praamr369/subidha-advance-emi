@@ -23,6 +23,9 @@ from inventory.models import (
     StockMovementType,
 )
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.purchase_need_reconciliation_service import (
+    reconcile_direct_sale_needs_after_inventory_in,
+)
 from subscriptions.models import AuditLog
 
 
@@ -488,6 +491,10 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
             "existing_count": existing_count,
         },
     )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids={line.inventory_item.product_id for line in lines_list},
+        actor=posted_by,
+    )
     return adjustment, True
 
 
@@ -589,6 +596,10 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
             "existing_count": existing_count,
             "journal_entry_id": journal_entry.id,
         },
+    )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids={line.inventory_item.product_id for line in purchase_bill.lines.all()},
+        actor=posted_by,
     )
     return purchase_bill, True
 

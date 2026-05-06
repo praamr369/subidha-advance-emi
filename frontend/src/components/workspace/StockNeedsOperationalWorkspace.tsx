@@ -7,6 +7,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import OperationalResizableWorkspace from "./OperationalResizableWorkspace";
 
 import { cn } from "@/lib/utils";
+import { accountingErrorMessage } from "@/components/accounting/shared";
+import { recheckStockNeed } from "@/services/inventory-ops";
 
 type Row = Record<string, unknown>;
 
@@ -17,11 +19,16 @@ function rowId(row: Row) {
 export function StockNeedsOperationalWorkspace({
   rows,
   count,
+  onRefresh,
 }: {
   rows: Row[];
   count: number;
+  onRefresh?: () => void | Promise<void>;
 }) {
   const [userSelectedId, setUserSelectedId] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+  const [recheckSummary, setRecheckSummary] = useState<string | null>(null);
 
   const activeId = useMemo(() => {
     if (rows.length === 0) return null;
@@ -105,6 +112,47 @@ export function StockNeedsOperationalWorkspace({
       <p className="mt-1 text-xs text-muted-foreground">
         Values shown exactly as returned — no synthesized fields.
       </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={rechecking}
+          onClick={async () => {
+            const id = Number(selected.id);
+            if (!Number.isFinite(id)) return;
+            setRechecking(true);
+            setRecheckError(null);
+            setRecheckSummary(null);
+            try {
+              const payload = (await recheckStockNeed(id)) as {
+                recheck?: { outcome?: string; message?: string };
+              };
+              const outcome = payload?.recheck?.outcome ?? "";
+              const message = (payload?.recheck?.message ?? "").trim();
+              setRecheckSummary(
+                message || (outcome ? `Recheck outcome: ${outcome}` : "Recheck completed.")
+              );
+              await onRefresh?.();
+            } catch (err) {
+              setRecheckError(accountingErrorMessage(err, "Recheck failed."));
+            } finally {
+              setRechecking(false);
+            }
+          }}
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800 px-3 text-xs font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {rechecking ? "Rechecking…" : "Recheck stock availability"}
+        </button>
+      </div>
+      {recheckError ? (
+        <p className="mt-2 text-sm text-destructive" role="alert">
+          {recheckError}
+        </p>
+      ) : null}
+      {recheckSummary ? (
+        <p className="mt-2 text-sm text-emerald-800" role="status">
+          {recheckSummary}
+        </p>
+      ) : null}
       <dl className="mt-4 grid gap-2 text-sm">
         {Object.keys(selected)
           .sort((a, b) => a.localeCompare(b))

@@ -18,6 +18,9 @@ from inventory.models import (
     StockMovementType,
 )
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.purchase_need_reconciliation_service import (
+    reconcile_direct_sale_needs_after_inventory_in,
+)
 from inventory.services.stock_service import (
     create_stock_ledger_entry,
     generate_stock_adjustment_number,
@@ -198,6 +201,10 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
             "valuation_amount_snapshot": str(entry.valuation_amount_snapshot),
             "phase": "posted",
         },
+    )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids=[entry.inventory_item.product_id],
+        actor=posted_by,
     )
     return entry, True
 

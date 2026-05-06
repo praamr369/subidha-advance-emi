@@ -253,10 +253,7 @@ class DirectSale(BillingTimeStampedModel):
             finance_branch_id = getattr(self.finance_account, "branch_id", None)
             if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
                 errors["finance_account"] = "Selected finance account must belong to the sale branch."
-        if self.delivery_required and self.status in {
-            DirectSaleStatus.DELIVERED,
-            DirectSaleStatus.INVOICED,
-        } and not self.delivered_at:
+        if self.delivery_required and self.status == DirectSaleStatus.DELIVERED and not self.delivered_at:
             errors["delivered_at"] = "Delivered sales must store the delivery timestamp."
         if errors:
             raise ValidationError(errors)
