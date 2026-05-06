@@ -10,6 +10,7 @@ import type { SafeRowContextAction } from "@/components/ui/table-row-context-men
 import { ROUTES } from "@/lib/routes";
 import { listPayments, type PaymentRecord } from "@/services/payments";
 import { downloadCsv } from "@/lib/export/csv";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 
 function money(value: string): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -179,6 +180,17 @@ export default function AdminPaymentListPage() {
             key: "emi_month_no",
             title: "EMI Ref",
             render: (row) => (row.emi_month_no ? `Month ${row.emi_month_no}` : "-"),
+          },
+          {
+            key: "customer_name",
+            title: "Customer",
+            render: (row) => (
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || `Customer #${row.customer ?? "—"}`}
+                scope="admin"
+              />
+            ),
           },
           {
             key: "amount",

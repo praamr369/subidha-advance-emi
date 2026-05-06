@@ -30,8 +30,14 @@ from api.v1.views.direct_sale_workspace import (
     CashierBillingProductSearchView,
     CashierDirectSalePreviewView,
 )
+from api.v1.views.customer_intelligence import CustomerOperationalSummaryView
 
 urlpatterns = [
+    path(
+        "customers/<int:pk>/operational-summary/",
+        CustomerOperationalSummaryView.as_view(),
+        name="cashier-customer-operational-summary",
+    ),
     path("dashboard/", CashierDashboardView.as_view(), name="cashier-dashboard"),
     path("pending-emis/", CashierPendingEmis.as_view(), name="cashier-pending-emis"),
     path("pending-direct-sales/", CashierPendingDirectSales.as_view(), name="cashier-pending-direct-sales"),

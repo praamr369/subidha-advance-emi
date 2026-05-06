@@ -11,6 +11,7 @@ import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   DataTableShell,
   DetailPanel,
@@ -812,7 +813,11 @@ export default function AdminSubscriptionsPage() {
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                             <div className="font-medium">
-                              {row.customer_name || "Unknown customer"}
+                              <CustomerIntelligenceTrigger
+                                customerId={row.customer_id}
+                                customerName={row.customer_name || "Unknown customer"}
+                                scope="admin"
+                              />
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               {row.customer_phone || "No phone"}

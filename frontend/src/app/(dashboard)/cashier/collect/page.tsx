@@ -18,6 +18,7 @@ import {
 import StatusBadge from "@/components/ui/status-badge";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
 import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   collectAdvance,
   collectPayment,
@@ -1025,7 +1026,11 @@ export default function CashierCollectPage() {
                     Customer
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
-                    {lookup?.customer_name || "—"}
+                    <CustomerIntelligenceTrigger
+                      customerId={lookup?.customer_id}
+                      customerName={lookup?.customer_name || "—"}
+                      scope="cashier"
+                    />
                   </div>
                 </div>
                 <div>

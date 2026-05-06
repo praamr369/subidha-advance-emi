@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import TableToolbar from "@/components/ui/TableToolbar";
 import ActionButton from "@/components/ui/ActionButton";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -456,7 +457,13 @@ export default function AdminCustomersPage() {
         sortable: true,
         render: (row) => (
           <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.name}</div>
+            <div className="font-medium text-foreground">
+              <CustomerIntelligenceTrigger
+                customerId={row.id}
+                customerName={row.name}
+                scope="admin"
+              />
+            </div>
             <div className="text-xs text-muted-foreground">Customer #{row.id}</div>
           </div>
         ),

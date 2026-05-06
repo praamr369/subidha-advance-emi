@@ -184,6 +184,7 @@ from api.v1.views.admin_reports import (
     AdminRevenueAggregateView,
     AdminRevenueSummaryView,
 )
+from api.v1.views.customer_intelligence import CustomerOperationalSummaryView
 from api.v1.views.admin_phase5_control import (
     AdminAccountingAuditTrailView,
     AdminAccountingCashBankSummaryView,
@@ -352,6 +353,11 @@ router.register(
 )
 
 urlpatterns = [
+    path(
+        "customers/<int:pk>/operational-summary/",
+        CustomerOperationalSummaryView.as_view(),
+        name="admin-customer-operational-summary",
+    ),
     path("contracts/rent/", AdminRentContractCreateView.as_view()),
     path("contracts/lease/", AdminLeaseContractCreateView.as_view()),
     path("rent-contracts/<int:pk>/pdf/", AdminRentContractPdfView.as_view()),

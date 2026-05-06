@@ -9,10 +9,13 @@ from billing.models import BillingInvoice, DirectSale, ReceiptDocument
 from subscriptions.models import Customer, PublicLead, PublicLeadStatus
 from subscriptions.models import (
     ContractReference,
+    DeliveryStatus,
     EmiStatus,
     FinancialLedger,
     Payment,
     PlanType,
+    SubscriptionDelivery,
+    SupportRequestStatus,
     SubscriptionDocument,
 )
 from subscriptions.services.contract_reference_service import build_receivable_result
@@ -532,4 +535,109 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "count": len(partner_rows),
             "rows": list(partner_rows.values()),
         },
+    }
+
+
+def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
+    profile = build_customer_operational_profile(customer)
+    overview = profile.get("overview", {})
+    subscriptions = profile.get("subscriptions", {})
+    direct_sales = profile.get("direct_sales", {})
+    payments = profile.get("payments", {})
+
+    active_subscriptions = int(overview.get("active_subscriptions", 0) or 0)
+    overdue_emi_count = int(subscriptions.get("summary", {}).get("pending_emis", 0) or 0)
+    pending_delivery_count = SubscriptionDelivery.objects.filter(
+        subscription__customer=customer,
+        status__in=[
+            DeliveryStatus.PENDING,
+            DeliveryStatus.SCHEDULED,
+            DeliveryStatus.DISPATCHED,
+            DeliveryStatus.OUT_FOR_DELIVERY,
+            DeliveryStatus.RETURN_REQUESTED,
+            DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE,
+        ],
+    ).count()
+    open_service_count = customer.support_requests.filter(
+        status__in=[SupportRequestStatus.SUBMITTED, SupportRequestStatus.UNDER_REVIEW]
+    ).count()
+    last_payment_date = next(
+        (
+            row.get("payment_date")
+            for row in payments.get("rows", [])
+            if not row.get("is_reversed")
+        ),
+        None,
+    )
+
+    risk_status = "GOOD"
+    if open_service_count > 0:
+        risk_status = "SERVICE_OPEN"
+    if pending_delivery_count > 0:
+        risk_status = "DELIVERY_PENDING"
+    if overdue_emi_count > 0:
+        risk_status = "OVERDUE"
+    elif active_subscriptions > 0 and Decimal(str(overview.get("subscription_outstanding_amount") or "0.00")) > Decimal("0.00"):
+        risk_status = "DUE"
+
+    contract_reference_rows = profile.get("contract_references", {}).get("rows", [])
+    rent_lease_contracts = [
+        row
+        for row in contract_reference_rows
+        if str(row.get("source_type", "")).upper() in {"RENT", "LEASE"}
+    ]
+
+    return {
+        "customer": {
+            "id": profile.get("customer", {}).get("id"),
+            "name": profile.get("customer", {}).get("name"),
+            "phone": profile.get("customer", {}).get("phone"),
+            "kyc_id": profile.get("customer", {}).get("kyc_status"),
+            "status": "ACTIVE" if bool(profile.get("customer", {}).get("user_is_active")) else "INACTIVE",
+        },
+        "summary": {
+            "active_subscriptions": active_subscriptions,
+            "subscription_outstanding": _money(overview.get("subscription_outstanding_amount")),
+            "direct_sale_outstanding": _money(
+                direct_sales.get("summary", {}).get("outstanding_total")
+            ),
+            "rent_lease_outstanding": "0.00",
+            "overdue_emi_count": overdue_emi_count,
+            "pending_delivery_count": pending_delivery_count,
+            "open_service_count": open_service_count,
+            "last_payment_date": last_payment_date,
+            "risk_status": risk_status,
+        },
+        "subscriptions": subscriptions.get("rows", []),
+        "direct_sales": direct_sales.get("rows", []),
+        "rent_lease_contracts": rent_lease_contracts,
+        "deliveries": list(
+            SubscriptionDelivery.objects.filter(subscription__customer=customer)
+            .select_related("subscription")
+            .order_by("-created_at", "-id")
+            .values(
+                "id",
+                "subscription_id",
+                "delivery_reference",
+                "status",
+                "scheduled_date",
+                "delivered_at",
+                "created_at",
+            )[:10]
+        ),
+        "service_tickets": list(
+            customer.support_requests.order_by("-created_at", "-id").values(
+                "id",
+                "status",
+                "category",
+                "subject",
+                "created_at",
+                "resolved_at",
+            )[:10]
+        ),
+        "recent_activity": (
+            payments.get("rows", [])[:5]
+            + direct_sales.get("rows", [])[:5]
+            + subscriptions.get("rows", [])[:5]
+        )[:12],
     }
