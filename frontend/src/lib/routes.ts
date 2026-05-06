@@ -178,6 +178,9 @@ export const ROUTES = {
 
     finance: "/admin/finance",
     financeWorkspace: "/admin/finance/workspace",
+    brandData: "/admin/brand-data",
+    financeReversalControl: "/admin/finance/reversal-control",
+    financeReversalReconciliation: "/admin/finance/reversal-reconciliation",
     financeReconciliation: "/admin/finance/reconciliation",
     paymentReconciliation: "/admin/payments/reconciliation",
     financeCommissions: "/admin/finance/commissions",
@@ -263,6 +266,7 @@ export const ROUTES = {
     deliveries: "/customer/deliveries",
     profile: "/customer/profile",
     support: "/customer/support",
+    supportNew: "/customer/support/new",
     emis: "/customer/emis",
     payments: "/customer/payments",
   },

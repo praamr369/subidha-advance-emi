@@ -41,6 +41,12 @@ from api.v1.views.subscription_requests import (
     CustomerSubscriptionRequestListCreateView,
     CustomerSubscriptionRequestOptionsView,
 )
+from api.v1.views.customer_support_tickets import (
+    CustomerSupportTicketCommentView,
+    CustomerSupportTicketDetailView,
+    CustomerSupportTicketListCreateView,
+    CustomerSupportTicketReopenView,
+)
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
@@ -77,6 +83,10 @@ urlpatterns = [
     path("documents/", CustomerDocumentListView.as_view()),
     path("payment-schedule/", CustomerPaymentScheduleView.as_view()),
     path("account-statement/", CustomerAccountStatementView.as_view()),
+    path("support/tickets/", CustomerSupportTicketListCreateView.as_view()),
+    path("support/tickets/<int:pk>/", CustomerSupportTicketDetailView.as_view()),
+    path("support/tickets/<int:pk>/comment/", CustomerSupportTicketCommentView.as_view()),
+    path("support/tickets/<int:pk>/reopen/", CustomerSupportTicketReopenView.as_view()),
     path("support-requests/", CustomerSupportRequestListCreateView.as_view()),
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
 ]

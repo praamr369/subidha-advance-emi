@@ -68,6 +68,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
     badgeSource: "queue.customer_kyc_pending",
   }),
   item("CRM", "Support / Service Cases", ROUTES.admin.supportRequests, "Customer support and service intake."),
+  item(
+    "CRM",
+    "Issue Management Desk",
+    ROUTES.admin.serviceDesk,
+    "Unified TKT queue for customer issues (EMI, rent, lease, delivery, payments) with read-only operational context."
+  ),
 
   item("Sales", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
   item("Sales", "Direct Sales", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
@@ -176,6 +182,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 
   item("Finance & Accounting", "Finance Workspace", ROUTES.admin.finance, "Finance operations workspace."),
   item("Finance & Accounting", "Accounting Control Center", ROUTES.admin.accountingControlCenter, "Accounting KPIs and controls."),
+  item("Finance & Accounting", "Reversal & Return Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions."),
+  item("Finance & Accounting", "Reversal Reconciliation", ROUTES.admin.financeReversalReconciliation, "Queue for unresolved reversal, refund, stock return, and delivery return links."),
   item("Finance & Accounting", "Collections", ROUTES.admin.collections, "Collections register."),
   item("Finance & Accounting", "Outstanding Ledger", ROUTES.admin.outstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and standalone invoices."),
   item("Finance & Accounting", "Dues", ROUTES.admin.emisPending, "Due EMI and demand queue."),
@@ -218,6 +226,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   ),
   item("Settings & Setup", "Accounting Setup", ROUTES.admin.settingsBusinessSetup, "Accounting and business setup entry point."),
   item("Settings & Setup", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
+  item("Settings & Setup", "Brand & Business Data Center", ROUTES.admin.brandData, "Import-preview-review-apply center for public business profile, social links, and media references."),
   item("Settings & Setup", "Backup / Export / System Readiness", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
 ];
 

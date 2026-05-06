@@ -278,6 +278,19 @@ from api.v1.views.admin_support_requests import (
     AdminSupportRequestResolveView,
     AdminSupportRequestStatusUpdateView,
 )
+from api.v1.views.admin_support_tickets import (
+    AdminSupportTicketAssignView,
+    AdminSupportTicketCloseView,
+    AdminSupportTicketCommentView,
+    AdminSupportTicketDashboardView,
+    AdminSupportTicketDetailPatchView,
+    AdminSupportTicketInternalNoteView,
+    AdminSupportTicketLinkView,
+    AdminSupportTicketListCreateView,
+    AdminSupportTicketRejectView,
+    AdminSupportTicketReopenView,
+    AdminSupportTicketResolveView,
+)
 from api.v1.views.admin_erp import (
     AdminCrmWorkspaceView,
     AdminDeliveryWorkspaceView,
@@ -342,6 +355,25 @@ from api.v1.views.admin_opening_stock import (
 from api.v1.views.admin_outstandings import (
     AdminOutstandingsExportCsvView,
     AdminOutstandingsView,
+)
+from api.v1.views.admin_brand_data import (
+    AdminBrandDataApplyView,
+    AdminBrandDataAuditView,
+    AdminBrandDataGoogleBusinessPreviewView,
+    AdminBrandDataManualPreviewView,
+    AdminBrandDataSocialLinkActionView,
+    AdminBrandDataSourcesView,
+    AdminBrandDataYoutubePreviewView,
+)
+from api.v1.views.reversal_control import (
+    AdminReversalCaseApproveView,
+    AdminReversalCaseDetailView,
+    AdminReversalCaseListCreateView,
+    AdminReversalCasePostView,
+    AdminReversalCaseReconcileView,
+    AdminReversalCaseRejectView,
+    AdminReversalControlDashboardView,
+    AdminReversalReconciliationQueueView,
 )
 
 router = DefaultRouter()
@@ -456,6 +488,17 @@ urlpatterns = [
     path("support-requests/<int:pk>/assign/", AdminSupportRequestAssignView.as_view()),
     path("support-requests/<int:pk>/notes/", AdminSupportRequestNoteUpdateView.as_view()),
     path("support-requests/<int:pk>/resolve/", AdminSupportRequestResolveView.as_view()),
+    path("support/dashboard/", AdminSupportTicketDashboardView.as_view()),
+    path("support/tickets/", AdminSupportTicketListCreateView.as_view()),
+    path("support/tickets/<int:pk>/", AdminSupportTicketDetailPatchView.as_view()),
+    path("support/tickets/<int:pk>/assign/", AdminSupportTicketAssignView.as_view()),
+    path("support/tickets/<int:pk>/comment/", AdminSupportTicketCommentView.as_view()),
+    path("support/tickets/<int:pk>/internal-note/", AdminSupportTicketInternalNoteView.as_view()),
+    path("support/tickets/<int:pk>/link/", AdminSupportTicketLinkView.as_view()),
+    path("support/tickets/<int:pk>/resolve/", AdminSupportTicketResolveView.as_view()),
+    path("support/tickets/<int:pk>/reject/", AdminSupportTicketRejectView.as_view()),
+    path("support/tickets/<int:pk>/close/", AdminSupportTicketCloseView.as_view()),
+    path("support/tickets/<int:pk>/reopen/", AdminSupportTicketReopenView.as_view()),
     path("internal-users/", AdminInternalUserListView.as_view()),
     path("internal-users/create/", AdminInternalUserCreateView.as_view()),
     path("internal-users/<int:pk>/", AdminInternalUserDetailView.as_view()),
@@ -661,5 +704,20 @@ urlpatterns = [
     path("notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view()),
     path("outstandings/", AdminOutstandingsView.as_view()),
     path("outstandings/export.csv", AdminOutstandingsExportCsvView.as_view()),
+    path("brand-data/sources/", AdminBrandDataSourcesView.as_view()),
+    path("brand-data/import/manual/preview/", AdminBrandDataManualPreviewView.as_view()),
+    path("brand-data/import/google-business/preview/", AdminBrandDataGoogleBusinessPreviewView.as_view()),
+    path("brand-data/import/youtube/preview/", AdminBrandDataYoutubePreviewView.as_view()),
+    path("brand-data/import/social-link/", AdminBrandDataSocialLinkActionView.as_view()),
+    path("brand-data/apply/", AdminBrandDataApplyView.as_view()),
+    path("brand-data/audit/", AdminBrandDataAuditView.as_view()),
+    path("finance/reversal-control/", AdminReversalControlDashboardView.as_view()),
+    path("finance/reversal-cases/", AdminReversalCaseListCreateView.as_view()),
+    path("finance/reversal-cases/<int:pk>/", AdminReversalCaseDetailView.as_view()),
+    path("finance/reversal-cases/<int:pk>/approve/", AdminReversalCaseApproveView.as_view()),
+    path("finance/reversal-cases/<int:pk>/post/", AdminReversalCasePostView.as_view()),
+    path("finance/reversal-cases/<int:pk>/reject/", AdminReversalCaseRejectView.as_view()),
+    path("finance/reversal-cases/<int:pk>/reconcile/", AdminReversalCaseReconcileView.as_view()),
+    path("finance/reversal-reconciliation/", AdminReversalReconciliationQueueView.as_view()),
     path("", include(router.urls)),
 ]

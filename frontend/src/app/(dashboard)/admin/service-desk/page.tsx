@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { MessageSquareWarning, RotateCcw, Wrench } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
@@ -15,6 +15,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getServiceDeskOverview, type ServiceDeskOverview } from "@/services/service-desk";
+import { listAdminSupportTickets, type SupportTicketListItem } from "@/services/support";
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -32,6 +33,23 @@ export default function AdminServiceDeskOverviewPage() {
   const [payload, setPayload] = useState<ServiceDeskOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [issueTickets, setIssueTickets] = useState<SupportTicketListItem[]>([]);
+  const [issueCount, setIssueCount] = useState(0);
+  const [issueSummary, setIssueSummary] = useState<{ total: number; open: number } | null>(null);
+  const [issueLoading, setIssueLoading] = useState(true);
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const [issueQ, setIssueQ] = useState("");
+
+  const filteredIssueTickets = useMemo(() => {
+    const q = issueQ.trim().toLowerCase();
+    if (!q) return issueTickets;
+    return issueTickets.filter(
+      (row) =>
+        row.ticket_no.toLowerCase().includes(q) ||
+        row.subject.toLowerCase().includes(q) ||
+        String(row.id) === q
+    );
+  }, [issueTickets, issueQ]);
 
   async function loadPage() {
     try {
@@ -50,6 +68,28 @@ export default function AdminServiceDeskOverviewPage() {
   useEffect(() => {
     void loadPage();
   }, []);
+
+  const loadIssues = useCallback(async () => {
+    setIssueLoading(true);
+    try {
+      const data = await listAdminSupportTickets({});
+      setIssueTickets(data.results);
+      setIssueCount(data.count);
+      setIssueSummary({ total: data.summary.total, open: data.summary.open });
+      setIssueError(null);
+    } catch (err) {
+      setIssueTickets([]);
+      setIssueCount(0);
+      setIssueSummary(null);
+      setIssueError(toErrorMessage(err, "Unable to load issue tickets."));
+    } finally {
+      setIssueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadIssues();
+  }, [loadIssues]);
 
   return (
     <PortalPage
@@ -88,6 +128,102 @@ export default function AdminServiceDeskOverviewPage() {
             onRetry={() => void loadPage()}
           />
         ) : null}
+
+        <WorkspaceSection
+          title="Customer issue tickets (TKT)"
+          description="Unified support desk for EMI, rent, lease, delivery, and billing questions. Links are read-only references; no payment or EMI posting happens here."
+        >
+          {issueLoading ? <LoadingBlock label="Loading issue tickets…" /> : null}
+          {!issueLoading && issueError ? (
+            <ErrorState title="Issue queue error" description={issueError} onRetry={() => void loadIssues()} />
+          ) : null}
+          {!issueLoading && !issueError ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatCard
+                  label="Open issues"
+                  value={String(issueSummary?.open ?? 0)}
+                  subtext="Non-terminal workflow states."
+                  tone={(issueSummary?.open ?? 0) > 0 ? "warning" : "success"}
+                />
+                <StatCard
+                  label="Total tickets"
+                  value={String(issueCount)}
+                  subtext="Matches current filters."
+                  tone="info"
+                />
+                <div className="flex flex-col justify-end gap-2">
+                  <label className="text-xs text-muted-foreground">
+                    Search subject / ticket / phone
+                    <input
+                      className="mt-1 w-full rounded-lg border border-border bg-[var(--surface-card)] px-2 py-1 text-sm"
+                      value={issueQ}
+                      onChange={(e) => setIssueQ(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+              {issueTickets.length === 0 ? (
+                <EmptyState
+                  title="No tickets"
+                  description="Customer submissions will appear here with TKT-FY-##### numbers."
+                />
+              ) : filteredIssueTickets.length === 0 ? (
+                <EmptyState
+                  title="No matches"
+                  description="Try a different search on the loaded page of tickets."
+                />
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full min-w-[720px] text-left text-sm">
+                    <thead className="bg-[var(--surface-muted)] text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2">Ticket</th>
+                        <th className="px-3 py-2">Subject</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Priority</th>
+                        <th className="px-3 py-2">Age</th>
+                        <th className="px-3 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredIssueTickets.map((row) => {
+                        const created = Date.parse(row.created_at);
+                        const ageDays =
+                          Number.isFinite(created) && !Number.isNaN(created)
+                            ? Math.max(0, Math.round((Date.now() - created) / 86400000))
+                            : null;
+                        return (
+                          <tr key={row.id} className="border-t border-border">
+                            <td className="px-3 py-2 font-mono text-xs">{row.ticket_no}</td>
+                            <td className="px-3 py-2">{row.subject}</td>
+                            <td className="px-3 py-2">
+                              <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs">
+                                {row.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs">{row.priority}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {ageDays === null ? "—" : `${ageDays}d`}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <Link
+                                href={`/admin/service-desk/${row.id}`}
+                                className="text-primary underline-offset-2 hover:underline"
+                              >
+                                Open
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </WorkspaceSection>
 
         {!loading && !error && payload ? (
           <>

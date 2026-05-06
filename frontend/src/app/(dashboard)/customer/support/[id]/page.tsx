@@ -1,357 +1,183 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
-import {
-  WorkspaceNotice,
-  WorkspaceTimeline,
-  type WorkspaceTimelineItem,
-} from "@/components/ui/role-workspace";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import { ROUTES } from "@/lib/routes";
 import {
-  getCustomerSupportRequest,
-  type CustomerSupportRequest,
-} from "@/services/customer";
+  commentCustomerSupportTicket,
+  getCustomerSupportTicket,
+  reopenCustomerSupportTicket,
+  type SupportTicketDetail,
+} from "@/services/support";
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+export default function CustomerSupportTicketDetailPage() {
+  const params = useParams();
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? Number(rawId) : NaN;
 
-function formatCategoryLabel(value: string | null | undefined): string {
-  return (value || "OTHER").replaceAll("_", " ");
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Unable to load support request detail.";
-}
-
-export default function CustomerSupportRequestDetailPage() {
-  const params = useParams<{ id: string }>();
-  const requestId = Number(params?.id ?? 0);
-
-  const [supportRequest, setSupportRequest] =
-    useState<CustomerSupportRequest | null>(null);
+  const [ticket, setTicket] = useState<SupportTicketDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!Number.isFinite(requestId) || requestId <= 0) {
-        setSupportRequest(null);
-        setError("Invalid support request id.");
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getCustomerSupportRequest(requestId);
-        setSupportRequest(payload);
-        setError(null);
-      } catch (err) {
-        setSupportRequest(null);
-        setError(toErrorMessage(err));
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
-    },
-    [requestId]
-  );
+  const load = useCallback(async () => {
+    if (!Number.isFinite(id) || id <= 0) {
+      setError("Invalid ticket.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const t = await getCustomerSupportTicket(id);
+      setTicket(t);
+      setError(null);
+    } catch (e) {
+      setTicket(null);
+      setError(e instanceof Error ? e.message : "Unable to load ticket.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    void load();
+  }, [load]);
 
-  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
-    if (!supportRequest) return [];
-
-    const items: WorkspaceTimelineItem[] = [
-      {
-        id: `${supportRequest.id}-submitted`,
-        title: "Support request submitted",
-        description:
-          supportRequest.payment_reference_no || supportRequest.subscription_number
-            ? "The request was created with linked receipt or subscription context."
-            : "The request was created as a general account query.",
-        timestamp: formatDateTime(supportRequest.created_at),
-        badge: <StatusBadge status="SUBMITTED" label="Submitted" />,
-        meta: (
-          <>
-            Category {formatCategoryLabel(supportRequest.category)}
-            {supportRequest.payment_reference_no
-              ? ` · Ref ${supportRequest.payment_reference_no}`
-              : ""}
-          </>
-        ),
-      },
-    ];
-
-    if (supportRequest.updated_at && supportRequest.updated_at !== supportRequest.created_at) {
-      items.push({
-        id: `${supportRequest.id}-updated`,
-        title: "Request updated",
-        description: "Branch review or case progression updated the request record.",
-        timestamp: formatDateTime(supportRequest.updated_at),
-        badge: <StatusBadge status={supportRequest.status || "OPEN"} />,
-      });
+  async function onComment(e: FormEvent) {
+    e.preventDefault();
+    if (!ticket || !comment.trim()) return;
+    setBusy(true);
+    try {
+      const next = await commentCustomerSupportTicket(ticket.id, comment.trim());
+      setTicket(next);
+      setComment("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post comment.");
+    } finally {
+      setBusy(false);
     }
+  }
 
-    if (supportRequest.resolved_at || String(supportRequest.status).toUpperCase() === "CLOSED") {
-      items.push({
-        id: `${supportRequest.id}-resolved`,
-        title: "Resolution recorded",
-        description:
-          supportRequest.resolution_summary ||
-          "The request was closed without a customer-visible resolution summary.",
-        timestamp: formatDateTime(supportRequest.resolved_at || supportRequest.updated_at),
-        badge: <StatusBadge status="CLOSED" label="Closed" />,
-      });
+  async function onReopen() {
+    if (!ticket) return;
+    setBusy(true);
+    try {
+      const next = await reopenCustomerSupportTicket(ticket.id, "");
+      setTicket(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reopen.");
+    } finally {
+      setBusy(false);
     }
+  }
 
-    return items;
-  }, [supportRequest]);
+  if (loading) {
+    return (
+      <PortalPage title="Support ticket" breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}>
+        <LoadingBlock label="Loading ticket…" />
+      </PortalPage>
+    );
+  }
+
+  if (error || !ticket) {
+    return (
+      <PortalPage title="Support ticket" breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}>
+        <ErrorState title="Ticket unavailable" description={error || "Not found."} onRetry={() => void load()} />
+      </PortalPage>
+    );
+  }
+
+  const canReopen = ["RESOLVED", "CLOSED", "REJECTED"].includes(ticket.status);
 
   return (
     <PortalPage
-      eyebrow="Customer Support"
-      title={
-        supportRequest
-          ? `Support Request #${supportRequest.id}`
-          : "Support Request Detail"
-      }
-      subtitle="Track the current state of a customer-submitted support request without leaving the customer workspace shell."
-      helperNote="Support timelines explain review progress only. Receipt, payment, and subscription records remain the source of financial truth."
-      helperTone="info"
+      eyebrow="Support ticket"
+      title={ticket.ticket_no}
+      subtitle={ticket.subject}
       breadcrumbs={[
-        { label: "Customer", href: "/customer" },
-        { label: "Support", href: "/customer/support" },
-        {
-          label: supportRequest
-            ? `Request #${supportRequest.id}`
-            : "Request Detail",
-        },
+        { label: "Customer", href: ROUTES.customer.dashboard },
+        { label: "Support", href: ROUTES.customer.support },
+        { label: ticket.ticket_no },
       ]}
-      actions={[
-        {
-          href: "/customer/support",
-          label: "Back to Support",
-          variant: "primary",
-        },
-        supportRequest?.payment
-          ? {
-              href: `/customer/payments/${supportRequest.payment}`,
-              label: "Receipt",
-              variant: "secondary",
-            }
-          : {
-              href: "/customer/payments",
-              label: "Payments",
-              variant: "secondary",
-            },
-        supportRequest?.subscription
-          ? {
-              href: `/customer/subscriptions/${supportRequest.subscription}`,
-              label: "Subscription",
-              variant: "secondary",
-            }
-          : {
-              href: "/customer/subscriptions",
-              label: "Subscriptions",
-              variant: "secondary",
-            },
-      ]}
-      stats={[
-        {
-          label: "Status",
-          value: supportRequest?.status || "—",
-          tone:
-            supportRequest?.status === "CLOSED"
-              ? "success"
-              : supportRequest?.status === "UNDER_REVIEW"
-                ? "info"
-                : "warning",
-        },
-        {
-          label: "Category",
-          value: formatCategoryLabel(supportRequest?.category),
-        },
-        {
-          label: "Submitted",
-          value: formatDateTime(supportRequest?.created_at),
-        },
-        {
-          label: "Updated",
-          value: formatDateTime(supportRequest?.updated_at),
-        },
-      ]}
-      statusBadge={{
-        label: supportRequest?.status || "Customer support tracking",
-        tone:
-          supportRequest?.status === "CLOSED"
-            ? "success"
-            : supportRequest?.status === "UNDER_REVIEW"
-              ? "info"
-              : "warning",
-      }}
+      actions={[{ href: ROUTES.customer.support, label: "All tickets", variant: "secondary" }]}
+      statusBadge={{ label: ticket.status, tone: "info" }}
     >
-      <div className="space-y-6">
-        <WorkspaceSection
-          title="Request posture"
-          description="Current request scope and branch-visible progress from the customer support record."
-          action={
-            <ActionButton
-              variant="outline"
-              onClick={() => void loadPage("refresh")}
-              disabled={loading || refreshing}
-              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
-          }
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailItem
-              label="Request reference"
-              value={supportRequest ? `Request #${supportRequest.id}` : "—"}
-            />
-            <DetailItem
-              label="Status"
-              value={
-                supportRequest ? (
-                  <StatusBadge status={supportRequest.status || "OPEN"} size="md" />
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <DetailItem
-              label="Submitted at"
-              value={formatDateTime(supportRequest?.created_at)}
-            />
-            <DetailItem
-              label="Last updated"
-              value={formatDateTime(supportRequest?.updated_at)}
-            />
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-6">
+          <WorkspaceSection title="Details">
+            <p className="whitespace-pre-wrap text-sm text-foreground">{ticket.description}</p>
+            {ticket.resolution_summary ? (
+              <div className="mt-4 rounded-lg border border-border bg-[var(--surface-muted)]/40 p-3 text-sm">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Resolution</div>
+                <p className="mt-1 whitespace-pre-wrap">{ticket.resolution_summary}</p>
+              </div>
+            ) : null}
+          </WorkspaceSection>
+          <WorkspaceSection title="Conversation">
+            {ticket.comments.length === 0 ? (
+              <EmptyState title="No replies yet" description="The team will respond here." />
+            ) : (
+              <ul className="space-y-3">
+                {ticket.comments.map((c) => (
+                  <li key={c.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+                    <div className="text-xs text-muted-foreground">
+                      {c.author?.username || "User"} · {new Date(c.created_at).toLocaleString("en-IN")}
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form onSubmit={onComment} className="mt-4 space-y-2">
+              <textarea
+                className="min-h-[80px] w-full rounded-lg border border-border bg-[var(--surface-card)] px-3 py-2 text-sm"
+                placeholder="Add a message"
+                value={comment}
+                onChange={(ev) => setComment(ev.target.value)}
+              />
+              <ActionButton type="submit" disabled={busy || !comment.trim()}>
+                Send reply
+              </ActionButton>
+            </form>
+          </WorkspaceSection>
+          <WorkspaceSection title="Timeline (summary)">
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              {ticket.timeline.slice(-12).map((row, idx) => (
+                <li key={`${String(row.at)}-${idx}`}>
+                  {(row.event_type as string) || row.kind} · {String(row.at)}
+                </li>
+              ))}
+            </ul>
+          </WorkspaceSection>
+        </div>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-[var(--surface-card)] p-4 text-sm">
+            <DetailItem label="Status" value={<StatusBadge status={ticket.status} />} />
+            <DetailItem label="Priority" value={ticket.priority} />
+            <DetailItem label="Category" value={ticket.category.replaceAll("_", " ")} />
+            <DetailItem label="Opened" value={new Date(ticket.created_at).toLocaleString("en-IN")} />
           </div>
-        </WorkspaceSection>
-
-        {loading ? <LoadingBlock label="Loading support request..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load support request"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-
-        {!loading && !error && !supportRequest ? (
-          <EmptyState
-            title="Support request not found"
-            description="The requested support record could not be loaded from your account."
-          />
-        ) : null}
-
-        {!loading && !error && supportRequest ? (
-          <>
-            <WorkspaceSection
-              title="Issue detail"
-              description="Exact issue scope and linked record context submitted from your customer account."
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem
-                  label="Category"
-                  value={formatCategoryLabel(supportRequest.category)}
-                />
-                <DetailItem
-                  label="Linked payment"
-                  value={
-                    supportRequest.payment_reference_no
-                      ? `Ref ${supportRequest.payment_reference_no}`
-                      : supportRequest.payment
-                        ? `Payment #${supportRequest.payment}`
-                        : "No payment attached"
-                  }
-                />
-                <DetailItem
-                  label="Linked subscription"
-                  value={
-                    supportRequest.subscription_number ||
-                    (supportRequest.subscription
-                      ? `SUB-${supportRequest.subscription}`
-                      : "No subscription attached")
-                  }
-                />
-                <DetailItem
-                  label="Payment date"
-                  value={formatDateTime(supportRequest.payment_date)}
-                />
-              </div>
-
-              <div className="mt-4 rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-                <div className="enterprise-eyebrow">Submitted message</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
-                  {supportRequest.message || "No message submitted."}
-                </div>
-              </div>
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Support timeline"
-              description="Case milestones derived from the customer support record itself."
-            >
-              <WorkspaceTimeline items={timelineItems} />
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Resolution"
-              description="A resolution summary appears here once the request is closed."
-            >
-              {String(supportRequest.status).toUpperCase() === "CLOSED" ? (
-                <WorkspaceNotice tone="success" title="Request closed">
-                  <div>{supportRequest.resolution_summary || "The request was closed without a customer-visible resolution summary."}</div>
-                  <div className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-emerald-800">
-                    Resolved {formatDateTime(supportRequest.resolved_at || supportRequest.updated_at)}
-                  </div>
-                </WorkspaceNotice>
-              ) : (
-                <WorkspaceNotice tone="info" title="Resolution pending">
-                  The branch has not closed this request yet. Check the timeline above for the latest review movement.
-                </WorkspaceNotice>
-              )}
-            </WorkspaceSection>
-          </>
-        ) : null}
+          {canReopen ? (
+            <ActionButton variant="outline" disabled={busy} onClick={() => void onReopen()}>
+              Reopen ticket
+            </ActionButton>
+          ) : null}
+          <WorkspaceSection title="Context" description="Read-only snapshot from linked records.">
+            <pre className="max-h-64 overflow-auto rounded-lg bg-[var(--surface-muted)] p-2 text-xs">
+              {JSON.stringify(ticket.operational_context, null, 2)}
+            </pre>
+          </WorkspaceSection>
+        </div>
       </div>
     </PortalPage>
   );

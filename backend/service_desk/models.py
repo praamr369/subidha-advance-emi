@@ -409,3 +409,17 @@ class ServiceDeskCaseLine(ServiceDeskTimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+
+from service_desk.support_ticket_models import (  # noqa: E402,F401
+    SupportTicket,
+    SupportTicketAttachment,
+    SupportTicketCategory,
+    SupportTicketComment,
+    SupportTicketEvent,
+    SupportTicketEventType,
+    SupportTicketLink,
+    SupportTicketLinkType,
+    SupportTicketPriority,
+    SupportTicketSource,
+    SupportTicketStatus,
+)
