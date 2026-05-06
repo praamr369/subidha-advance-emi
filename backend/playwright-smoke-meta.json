@@ -1,0 +1,67 @@
+{
+  "roles": {
+    "admin": {
+      "id": 1,
+      "name": "smoke_admin",
+      "role": "ADMIN",
+      "dashboard_path": "/admin"
+    },
+    "cashier": {
+      "id": 2,
+      "name": "smoke_cashier",
+      "role": "CASHIER",
+      "dashboard_path": "/cashier"
+    },
+    "partner": {
+      "id": 3,
+      "name": "smoke_partner",
+      "role": "PARTNER",
+      "dashboard_path": "/partner"
+    },
+    "customer": {
+      "id": 4,
+      "name": "smoke_customer",
+      "role": "CUSTOMER",
+      "dashboard_path": "/customer"
+    }
+  },
+  "real_login": {
+    "secret": "SmokeLogin123!",
+    "invalid_secret": "SmokeLogin123!x",
+    "roles": {
+      "admin": {
+        "username": "smoke_admin",
+        "dashboard_path": "/admin"
+      },
+      "cashier": {
+        "username": "smoke_cashier",
+        "dashboard_path": "/cashier"
+      }
+    }
+  },
+  "entities": {
+    "admin_collection": {
+      "subscription_id": 2,
+      "emi_id": 7,
+      "customer_name": "Smoke Customer"
+    },
+    "cashier_collection": {
+      "subscription_id": 3,
+      "emi_id": 14,
+      "customer_phone": "9100000005",
+      "customer_name": "Cashier Flow Customer"
+    },
+    "preseed_payment": {
+      "payment_id": 1,
+      "reference_no": "SMOKE-PAID-001",
+      "subscription_id": 1,
+      "customer_name": "Smoke Customer"
+    },
+    "batch_create": {
+      "status": "DRAFT",
+      "total_slots": 100,
+      "duration_months": 6,
+      "draw_day": 12
+    }
+  }
+}

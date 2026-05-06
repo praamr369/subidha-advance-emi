@@ -104,6 +104,7 @@ class AdminInventoryStockNeedRecheckView(_AdminBase):
         need = PurchaseNeed.objects.filter(pk=pk).first()
         if need is None:
             return Response({"detail": "Stock need not found."}, status=status.HTTP_404_NOT_FOUND)
+        previous_status = need.status
         result = recheck_purchase_need_availability(need_id=int(pk), actor=request.user)
         need.refresh_from_db()
         if need.source_module == PurchaseNeed.SourceModule.DIRECT_SALE:
@@ -122,8 +123,30 @@ class AdminInventoryStockNeedRecheckView(_AdminBase):
                 except Exception:
                     pass
         refreshed = PurchaseNeed.objects.get(pk=pk)
+        required = str(refreshed.required_quantity)
+        available = str(refreshed.available_quantity)
+        shortage = str(refreshed.shortage_quantity)
+        new_status = refreshed.status
+        resolved = (
+            str(result.get("outcome") or "").strip().upper() == "RESOLVED_BY_AVAILABLE_STOCK"
+            or (refreshed.shortage_quantity or 0) <= 0
+        )
         return Response(
             {
+                # New additive envelope (requested shape)
+                "updated": bool(result.get("updated")),
+                "need": AdminPurchaseNeedSerializer(refreshed).data,
+                "previous_status": previous_status,
+                "new_status": new_status,
+                "available_quantity": f"{refreshed.available_quantity:.3f}",
+                "required_quantity": f"{refreshed.required_quantity:.3f}",
+                "shortage_quantity": f"{refreshed.shortage_quantity:.3f}",
+                "message": (
+                    "Stock requirement resolved by current available stock."
+                    if resolved
+                    else "Stock is still short for this requirement."
+                ),
+                # Backward-compatible payload used by existing UI/tests
                 "recheck": result,
                 "stock_requirement": AdminPurchaseNeedSerializer(refreshed).data,
             }

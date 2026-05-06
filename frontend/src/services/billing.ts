@@ -497,7 +497,21 @@ export function finalizeDirectSaleInvoice(id: number) {
 }
 
 export function adminFinalizeDirectSaleInvoice(id: number) {
-  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(
+  return apiFetch<{
+    updated: boolean;
+    sale_id: number;
+    sale_number?: string | null;
+    invoice_id?: number | null;
+    invoice_number?: string | null;
+    status?: string;
+    balance_total?: string;
+    operational_state?: string;
+    next_actions?: string[];
+    blocking_reasons?: string[];
+    delivery_display?: string;
+    requirement_count?: number;
+    direct_sale: DirectSale;
+  }>(
     `/admin/billing/direct-sales/${id}/finalize-invoice/`,
     {
       method: "POST",

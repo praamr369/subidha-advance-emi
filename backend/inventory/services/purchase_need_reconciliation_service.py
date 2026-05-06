@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
+from subscriptions.models import Product
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -34,6 +35,59 @@ def parse_direct_sale_id_from_need_source(source_object_id: str | None) -> int |
 
 def _qty(value) -> Decimal:
     return Decimal(str(value or QUANTITY_ZERO)).quantize(Decimal("0.001"))
+
+
+def _clean_token(value: object | None) -> str:
+    return str(value or "").strip().upper()
+
+
+def _resolve_inventory_item_for_need(*, need: PurchaseNeed) -> tuple[InventoryItem | None, dict]:
+    """
+    Resolve the InventoryItem used for ATP calculation.
+
+    Priority (matches UI + requirements):
+    - inventory_item_id from need.demand_snapshot (if present)
+    - need.product_id (canonical FK)
+    - product_code / sku fallback from need.demand_snapshot
+
+    This does NOT mutate need.product_id (auditability).
+    """
+    snapshot = (need.demand_snapshot or {}) if isinstance(need.demand_snapshot, dict) else {}
+    snap_item_id = snapshot.get("inventory_item_id") or snapshot.get("inventoryItemId")
+    try:
+        snap_item_id_int = int(snap_item_id) if snap_item_id not in (None, "", 0, "0") else None
+    except (TypeError, ValueError):
+        snap_item_id_int = None
+
+    if snap_item_id_int:
+        item = InventoryItem.objects.filter(pk=snap_item_id_int).first()
+        if item is not None:
+            return item, {"strategy": "INVENTORY_ITEM_ID", "inventory_item_id": item.id, "product_id": item.product_id}
+
+    if need.product_id:
+        item = InventoryItem.objects.filter(product_id=need.product_id).first()
+        if item is not None:
+            return item, {"strategy": "PRODUCT_ID", "inventory_item_id": item.id, "product_id": need.product_id}
+
+    product_code = _clean_token(snapshot.get("product_code") or snapshot.get("product_code_snapshot") or snapshot.get("productCode"))
+    sku = _clean_token(snapshot.get("sku") or snapshot.get("sku_snapshot") or snapshot.get("display_sku"))
+    candidate = product_code or sku
+    if candidate:
+        product = Product.objects.filter(product_code__iexact=candidate).first() or Product.objects.filter(sku__iexact=candidate).first()
+        if product is not None:
+            item = InventoryItem.objects.filter(product_id=product.id).first()
+            if item is not None:
+                return item, {
+                    "strategy": "SKU_OR_PRODUCT_CODE_FALLBACK",
+                    "matched_token": candidate,
+                    "inventory_item_id": item.id,
+                    "product_id": product.id,
+                }
+
+    return None, {
+        "strategy": "NOT_RESOLVED",
+        "reason": "No inventory item resolved for this need (product has no inventory profile or snapshot lacks SKU/product_code).",
+    }
 
 
 def available_quantity_for_product(*, product_id: int) -> Decimal:
@@ -93,7 +147,8 @@ def recheck_purchase_need_availability(*, need_id: int, actor=None) -> dict:
             "message": "Recheck only updates operational purchase-need rows.",
         }
 
-    available = available_quantity_for_product(product_id=need.product_id)
+    resolved_item, resolution = _resolve_inventory_item_for_need(need=need)
+    available = _qty(resolved_item.available_qty()) if resolved_item is not None else QUANTITY_ZERO
     required = _qty(need.required_quantity)
     shortage = max(QUANTITY_ZERO, required - available)
 
@@ -105,6 +160,7 @@ def recheck_purchase_need_availability(*, need_id: int, actor=None) -> dict:
         "available_quantity": f"{available:.3f}",
         "required_quantity": f"{required:.3f}",
         "shortage_quantity": f"{shortage:.3f}",
+        "availability_resolution": resolution,
     }
     update_fields = ["available_quantity", "shortage_quantity", "demand_snapshot", "updated_at"]
 

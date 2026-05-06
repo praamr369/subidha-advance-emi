@@ -538,11 +538,43 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 type="button"
                 onClick={async () => {
                   try {
-                    await adminFinalizeDirectSaleInvoice(row.id);
+                    const finalized = await adminFinalizeDirectSaleInvoice(row.id);
                     setNotice(`Direct sale ${row.sale_no || `#${row.id}`} finalized and posted.`);
-                    await salesQuery.refetch();
+                    await Promise.all([
+                      salesQuery.refetch(),
+                      requirementsQuery.refetch(),
+                      queryClient.invalidateQueries({ queryKey: ["inventory", "stock-summary"], exact: false }),
+                      queryClient.invalidateQueries({ queryKey: ["deliveries"], exact: false }),
+                    ]);
+                    if (
+                      finalized?.direct_sale?.status === "INVOICED" &&
+                      String(finalized?.direct_sale?.billing_invoice_status || "").toUpperCase() === "POSTED" &&
+                      toNumber(finalized?.direct_sale?.balance_total) > 0
+                    ) {
+                      setCollectSaleId(finalized.direct_sale.id);
+                    }
                   } catch (err) {
-                    setCreateFormError(accountingErrorMessage(err, "Direct-sale invoice finalization failed."));
+                    if (err instanceof ApiError) {
+                      const body = (err.body || {}) as Record<string, unknown>;
+                      const detail =
+                        typeof body.detail === "string" ? body.detail.trim() : "";
+                      const reasons = Array.isArray(body.blocking_reasons)
+                        ? (body.blocking_reasons as unknown[]).filter((r) => typeof r === "string")
+                        : [];
+                      const actions = Array.isArray(body.next_actions)
+                        ? (body.next_actions as unknown[]).filter((r) => typeof r === "string")
+                        : [];
+                      const parts = [
+                        detail || "Direct-sale invoice finalization failed.",
+                        reasons.length ? `Blocking: ${reasons.join(" | ")}` : null,
+                        actions.length ? `Next actions: ${actions.join(", ")}` : null,
+                      ].filter(Boolean);
+                      setCreateFormError(parts.join("\n"));
+                      return;
+                    }
+                    setCreateFormError(
+                      accountingErrorMessage(err, "Direct-sale invoice finalization failed.")
+                    );
                   }
                 }}
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
@@ -1946,14 +1978,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                     try {
                       const payload = (await recheckStockNeed(row.id)) as {
                         recheck?: { outcome?: string; message?: string };
+                        message?: string;
                       };
-                      const msg = (payload?.recheck?.message ?? "").trim();
+                      const msg = (payload?.message ?? payload?.recheck?.message ?? "").trim();
                       const oc = payload?.recheck?.outcome ?? "";
                       setNotice(
                         msg ||
                           (oc ? `Stock need recheck: ${oc}` : "Stock availability rechecked."),
                       );
-                      await Promise.all([requirementsQuery.refetch(), salesQuery.refetch()]);
+                      await Promise.all([
+                        requirementsQuery.refetch(),
+                        salesQuery.refetch(),
+                        queryClient.invalidateQueries({ queryKey: ["inventory", "stock-summary"], exact: false }),
+                        queryClient.invalidateQueries({ queryKey: ["deliveries"], exact: false }),
+                      ]);
                     } catch (err) {
                       setCreateFormError(
                         accountingErrorMessage(err, "Stock need recheck failed."),

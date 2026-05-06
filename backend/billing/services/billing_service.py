@@ -271,6 +271,26 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
             ),
             created_by=actor,
         )
+        if need is not None:
+            # Additive snapshot hints for future reconciliation (do not affect inventory ledgers).
+            snapshot = need.demand_snapshot or {}
+            snapshot.update(
+                {
+                    "inventory_item_id": getattr(inventory_item, "id", None),
+                    "sku": (getattr(inventory_item, "sku", None) or "").strip().upper() or None,
+                    "product_code": (getattr(product, "product_code", None) or "").strip().upper() or None,
+                    "sale_id": int(sale.id),
+                    "sale_no": (sale.sale_no or "").strip(),
+                    "branch_id": sale.branch_id,
+                }
+            )
+            updates = []
+            if need.branch_id is None and sale.branch_id:
+                need.branch_id = sale.branch_id
+                updates.append("branch")
+            need.demand_snapshot = snapshot
+            updates.append("demand_snapshot")
+            need.save(update_fields=[*updates, "updated_at"])
         if need is not None and created:
             schedule_direct_sale_stock_requirement_notifications(
                 purchase_need_id=need.id,
