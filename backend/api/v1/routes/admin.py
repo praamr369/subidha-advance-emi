@@ -30,6 +30,11 @@ from api.v1.views.contract_references import (
     AdminUnifiedReceivableCollectView,
 )
 from api.v1.views.admin_deliveries import (
+    AdminDirectSaleDeliveryCancelView,
+    AdminDirectSaleDeliveryDispatchView,
+    AdminDirectSaleDeliveryMarkDeliveredView,
+    AdminDirectSaleDeliveryNoteView,
+    AdminDirectSaleDeliveryScheduleView,
     AdminDeliveryCancelView,
     AdminDeliveryDetailView,
     AdminDeliveryListCreateView,
@@ -418,6 +423,14 @@ urlpatterns = [
     path("deliveries/<int:pk>/cancel/", AdminDeliveryCancelView.as_view()),
     path("deliveries/<int:pk>/request-return/", AdminDeliveryRequestReturnView.as_view()),
     path("deliveries/<int:pk>/mark-returned/", AdminDeliveryMarkReturnedView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/schedule/", AdminDirectSaleDeliveryScheduleView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/dispatch/", AdminDirectSaleDeliveryDispatchView.as_view()),
+    path(
+        "deliveries/direct-sale-cases/<int:case_id>/mark-delivered/",
+        AdminDirectSaleDeliveryMarkDeliveredView.as_view(),
+    ),
+    path("deliveries/direct-sale-cases/<int:case_id>/cancel/", AdminDirectSaleDeliveryCancelView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/note/", AdminDirectSaleDeliveryNoteView.as_view()),
     path("leads/", AdminLeadListView.as_view()),
     path("leads/<int:pk>/", AdminLeadDetailView.as_view()),
     path("leads/<int:pk>/status/", AdminLeadStatusUpdateView.as_view()),

@@ -436,11 +436,54 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
 
         delivery_resp = self.client.get("/api/v1/admin/deliveries/")
         self.assertEqual(delivery_resp.status_code, status.HTTP_200_OK, delivery_resp.data)
-        ds_rows = [
-            row for row in delivery_resp.data["results"] if row.get("record_kind") == "DIRECT_SALE_CASE"
-        ]
+        ds_rows = [row for row in delivery_resp.data["results"] if row.get("source_type") == "DIRECT_SALE"]
         self.assertTrue(any(row.get("direct_sale_id") == sale_id for row in ds_rows))
         self.assertGreaterEqual(delivery_resp.data.get("direct_sale_delivery_count", 0), 1)
+        row = next(row for row in ds_rows if row.get("direct_sale_id") == sale_id)
+        self.assertIn("action_endpoints", row)
+        self.assertIn("/direct-sale-cases/", (row.get("action_endpoints") or {}).get("schedule", ""))
+
+    def test_admin_can_schedule_dispatch_and_deliver_direct_sale_case(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        payload["received_total"] = "23000.00"
+        payload["balance_total"] = "0.00"
+        payload["subtotal"] = "24000.00"
+        payload["discount_total"] = "1000.00"
+        payload["taxable_total"] = "23000.00"
+        payload["tax_total"] = "0.00"
+        payload["grand_total"] = "23000.00"
+        self.inventory_item.opening_stock_qty = Decimal("50.000")
+        self.inventory_item.save(update_fields=["opening_stock_qty"])
+        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data["id"]
+        finalize = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/", {}, format="json")
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+        case = ServiceDeskCase.objects.get(direct_sale_id=sale_id)
+
+        schedule = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/schedule/",
+            {"receiver_name": "Receiver A"},
+            format="json",
+        )
+        self.assertEqual(schedule.status_code, status.HTTP_200_OK, schedule.data)
+        dispatch = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/dispatch/",
+            {"notes": "Dispatched"},
+            format="json",
+        )
+        self.assertEqual(dispatch.status_code, status.HTTP_200_OK, dispatch.data)
+        delivered = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/mark-delivered/",
+            {"receiver_name": "Receiver A", "delivery_note": "Handed over"},
+            format="json",
+        )
+        self.assertEqual(delivered.status_code, status.HTTP_200_OK, delivered.data)
+        case.refresh_from_db()
+        self.assertEqual(case.status, ServiceDeskCaseStatus.RESOLVED)
+        case.direct_sale.refresh_from_db()
+        self.assertIsNotNone(case.direct_sale.delivered_at)
 
     def test_draft_sale_exposes_operational_state_and_finalize_action(self):
         response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")

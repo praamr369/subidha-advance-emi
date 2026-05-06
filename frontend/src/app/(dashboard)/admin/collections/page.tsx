@@ -16,6 +16,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   DataTableShell,
   DetailPanel,
@@ -48,6 +49,7 @@ import {
 type EmiRow = {
   id: number;
   subscription: number;
+  customer_id?: number | null;
   customer_name?: string;
   customer_phone?: string;
   month_no: number;
@@ -130,6 +132,12 @@ function normalizeEmi(row: Record<string, unknown>): EmiRow {
   return {
     id: Number(row.id ?? 0),
     subscription: Number(row.subscription ?? 0),
+    customer_id:
+      typeof row.customer_id === "number"
+        ? row.customer_id
+        : typeof row.customer === "number"
+          ? row.customer
+          : null,
     customer_name:
       typeof row.customer_name === "string" ? row.customer_name : undefined,
     customer_phone:
@@ -281,7 +289,11 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                 <tr key={row.id} className="align-top hover:bg-muted/30 transition">
                   <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                     <div className="font-medium">
-                      {row.customer_name || "Unknown customer"}
+                      <CustomerIntelligenceTrigger
+                        customerId={row.customer_id}
+                        customerName={row.customer_name || "Unknown customer"}
+                        scope="admin"
+                      />
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {row.customer_phone || "No phone"}
@@ -577,7 +589,12 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="font-medium text-foreground">
-                    {row.customer_name || "Unknown customer"} · SUB-{row.subscription}
+                    <CustomerIntelligenceTrigger
+                      customerId={row.customer_id}
+                      customerName={row.customer_name || "Unknown customer"}
+                      scope="admin"
+                    />{" "}
+                    · SUB-{row.subscription}
                   </div>
                   {daysOverdue > 30 && (
                     <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -1053,7 +1070,12 @@ export default function AdminCollectionsPage() {
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="text-sm font-semibold text-foreground">
-                            {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                            {sale.sale_no || `SALE-${sale.id}`} ·{" "}
+                            <CustomerIntelligenceTrigger
+                              customerId={sale.customer ?? null}
+                              customerName={sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                              scope="admin"
+                            />
                           </div>
                           <div className="mt-1 text-sm text-muted-foreground">
                             Invoice {sale.billing_invoice_no || "—"} · {sale.branch_name || sale.branch_code || "Primary branch"}

@@ -9,6 +9,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { normalizeApiError } from "@/services/api/errors";
 import {
@@ -451,7 +452,14 @@ export default function AdminDirectSaleCollectForm({
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-foreground">
-                        {row.display_reference || row.reference_no} · {row.customer_name || "Walk-in customer"}
+                        {row.display_reference || row.reference_no} ·{" "}
+                        <CustomerIntelligenceTrigger
+                          customerId={
+                            typeof row.customer_id === "number" ? row.customer_id : null
+                          }
+                          customerName={row.customer_name || "Walk-in customer"}
+                          scope="admin"
+                        />
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
                         {row.phone_masked || "No phone"} · Status {row.status || "UNKNOWN"}
@@ -527,7 +535,13 @@ export default function AdminDirectSaleCollectForm({
             </div>
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</div>
-              <div className="mt-1 text-base font-semibold text-foreground">{selectedSale.customer_name || selectedSale.customer_name_snapshot || "Walk-in customer"}</div>
+              <div className="mt-1 text-base font-semibold text-foreground">
+                <CustomerIntelligenceTrigger
+                  customerId={selectedSale.customer ?? null}
+                  customerName={selectedSale.customer_name || selectedSale.customer_name_snapshot || "Walk-in customer"}
+                  scope="admin"
+                />
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invoice</div>

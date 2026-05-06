@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { DashboardGridSkeleton } from "@/components/feedback/Skeleton";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
@@ -456,7 +457,13 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     {
       key: "customer_name_snapshot",
       header: "Customer",
-      render: (row) => row.customer_name_snapshot || row.customer_name || "Walk-in",
+      render: (row) => (
+        <CustomerIntelligenceTrigger
+          customerId={row.customer ?? null}
+          customerName={row.customer_name_snapshot || row.customer_name || "Walk-in"}
+          scope="admin"
+        />
+      ),
     },
     {
       key: "status",
@@ -602,12 +609,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           );
         }
         if (isSchedule) {
+          const serviceDeskCaseId = (row as { service_desk_case_id?: number | null }).service_desk_case_id;
+          const label = row.delivered_at ? "View delivery" : serviceDeskCaseId ? "Manage delivery" : "Schedule delivery";
           return (
             <Link
-              href={ROUTES.admin.deliveries}
+              href={`${ROUTES.admin.deliveries}?source_type=DIRECT_SALE&focus_sale=${row.id}`}
               className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800"
             >
-              Schedule delivery
+              {label}
             </Link>
           );
         }

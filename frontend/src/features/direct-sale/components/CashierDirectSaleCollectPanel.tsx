@@ -7,6 +7,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import {
@@ -457,7 +458,12 @@ export default function CashierDirectSaleCollectPanel({
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-1">
                       <div className="text-sm font-semibold text-foreground">
-                        {result.sale_no || `SALE-${result.direct_sale_id}`} · {result.customer_name || "Unknown customer"}
+                        {result.sale_no || `SALE-${result.direct_sale_id}`} ·{" "}
+                        <CustomerIntelligenceTrigger
+                          customerId={result.customer_id}
+                          customerName={result.customer_name || "Unknown customer"}
+                          scope="cashier"
+                        />
                       </div>
                       <div className="text-sm text-slate-600">
                         {result.customer_phone || "No phone"} · Invoice {result.billing_invoice_no || "—"}
@@ -510,7 +516,13 @@ export default function CashierDirectSaleCollectPanel({
             <div className="grid gap-4 md:grid-cols-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Customer</div>
-                <div className="mt-1 text-base font-semibold text-foreground">{lookup.customer_name || "—"}</div>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  <CustomerIntelligenceTrigger
+                    customerId={lookup.customer_id}
+                    customerName={lookup.customer_name || "—"}
+                    scope="cashier"
+                  />
+                </div>
               </div>
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Phone</div>

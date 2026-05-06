@@ -17,7 +17,7 @@ export type DeliveryBucket = "" | "PENDING" | "DELIVERED" | "READY_DISPATCH";
 
 export type DeliveryRecord = {
   id: number;
-  record_kind?: "SUBSCRIPTION_DELIVERY" | "DIRECT_SALE_CASE";
+  record_kind?: "SUBSCRIPTION_DELIVERY" | "DIRECT_SALE_CASE" | "DIRECT_SALE_DELIVERY";
   source_type?: "SUBSCRIPTION" | "DIRECT_SALE";
   source_label?: string | null;
   subscription?: number | null;
@@ -77,6 +77,22 @@ export type DeliveryRecord = {
   delivery_status?: string | null;
   invoice_state?: string | null;
   payment_state?: string | null;
+  stock_state?: string | null;
+  delivery_state?: string | null;
+  status_label?: string | null;
+  case_id?: number | null;
+  action_endpoints?: {
+    schedule?: string | null;
+    dispatch?: string | null;
+    mark_delivered?: string | null;
+    cancel?: string | null;
+    note?: string | null;
+  } | null;
+  links?: {
+    open_invoice?: string | null;
+    open_direct_sale?: string | null;
+    open_service_case?: string | null;
+  } | null;
   detail_hint?: string | null;
   grand_total?: string | null;
   balance_total?: string | null;
@@ -246,7 +262,7 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
   return {
     id: toNumber(row.id),
     record_kind:
-      row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "SUBSCRIPTION_DELIVERY"
+      row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "DIRECT_SALE_DELIVERY" || row.record_kind === "SUBSCRIPTION_DELIVERY"
         ? row.record_kind
         : undefined,
     source_type:
@@ -311,6 +327,28 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     delivery_status: toStringOrNull(row.delivery_status) ?? toStringOrNull(row.delivery_phase_code),
     invoice_state: toStringOrNull(row.invoice_state),
     payment_state: toStringOrNull(row.payment_state),
+    stock_state: toStringOrNull(row.stock_state),
+    delivery_state: toStringOrNull(row.delivery_state),
+    status_label: toStringOrNull(row.status_label),
+    case_id: toNullableNumber(row.case_id),
+    action_endpoints:
+      row.action_endpoints && typeof row.action_endpoints === "object"
+        ? ({
+            schedule: toStringOrNull((row.action_endpoints as Record<string, unknown>).schedule),
+            dispatch: toStringOrNull((row.action_endpoints as Record<string, unknown>).dispatch),
+            mark_delivered: toStringOrNull((row.action_endpoints as Record<string, unknown>).mark_delivered),
+            cancel: toStringOrNull((row.action_endpoints as Record<string, unknown>).cancel),
+            note: toStringOrNull((row.action_endpoints as Record<string, unknown>).note),
+          } as DeliveryRecord["action_endpoints"])
+        : null,
+    links:
+      row.links && typeof row.links === "object"
+        ? ({
+            open_invoice: toStringOrNull((row.links as Record<string, unknown>).open_invoice),
+            open_direct_sale: toStringOrNull((row.links as Record<string, unknown>).open_direct_sale),
+            open_service_case: toStringOrNull((row.links as Record<string, unknown>).open_service_case),
+          } as DeliveryRecord["links"])
+        : null,
     detail_hint: toStringOrNull(row.detail_hint),
     grand_total: toStringOrNull(row.grand_total),
     balance_total: toStringOrNull(row.balance_total),
@@ -671,6 +709,53 @@ export async function markAdminDeliveryReturned(
     body: JSON.stringify(payload),
   });
   return normalizeDeliveryRecord(response);
+}
+
+async function postDirectSaleCaseAction(path: string, payload: Record<string, unknown>): Promise<DeliveryRecord> {
+  const response = await apiFetch<{ delivery?: unknown }>(path, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return normalizeDeliveryRecord(response?.delivery ?? {});
+}
+
+export async function scheduleDirectSaleDeliveryCase(
+  caseId: number | string,
+  payload: {
+    scheduled_date?: string | null;
+    receiver_name?: string;
+    receiver_phone?: string;
+    delivery_address_snapshot?: string;
+    notes?: string;
+  }
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/schedule/`, payload);
+}
+
+export async function dispatchDirectSaleDeliveryCase(
+  caseId: number | string,
+  payload: { notes?: string } = {}
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/dispatch/`, payload);
+}
+
+export async function markDirectSaleDeliveryCaseDelivered(
+  caseId: number | string,
+  payload: {
+    receiver_name?: string;
+    receiver_phone?: string;
+    delivery_note?: string;
+    delivered_at?: string | null;
+  }
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/mark-delivered/`, payload);
+}
+
+export async function cancelDirectSaleDeliveryCase(
+  caseId: number | string,
+  payload: { reason: string; notes?: string }
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/cancel/`, payload);
 }
 
 export async function listCustomerDeliveries(params: {

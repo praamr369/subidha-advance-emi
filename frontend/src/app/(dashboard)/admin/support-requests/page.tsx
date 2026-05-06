@@ -6,6 +6,7 @@ import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes"
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
@@ -152,7 +153,11 @@ export default function AdminSupportRequestsPage() {
         render: (row: AdminSupportRequest) => (
           <div>
             <div className="font-medium text-foreground">
-              {row.customer_name || "—"}
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "—"}
+                scope="admin"
+              />
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {row.customer_phone || "—"}

@@ -28,6 +28,13 @@ from api.v1.serializers.delivery import (
 )
 from billing.models import DirectSale, DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+from billing.services.direct_sale_delivery_actions import (
+    add_direct_sale_delivery_note,
+    cancel_direct_sale_delivery,
+    dispatch_direct_sale_delivery,
+    mark_direct_sale_delivered,
+    schedule_direct_sale_delivery,
+)
 from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
@@ -648,3 +655,91 @@ class AdminDeliverySourceDirectSalePrefillView(APIView):
                 },
             }
         )
+
+
+class _DirectSaleScheduleSerializer(serializers.Serializer):
+    scheduled_date = serializers.DateField(required=False, allow_null=True)
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class _DirectSaleDispatchSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class _DirectSaleDeliveredSerializer(serializers.Serializer):
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_note = serializers.CharField(required=False, allow_blank=True)
+    delivered_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class AdminDirectSaleDeliveryScheduleView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleScheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = schedule_direct_sale_delivery(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryDispatchView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleDispatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = dispatch_direct_sale_delivery(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryMarkDeliveredView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleDeliveredSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = mark_direct_sale_delivered(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = AdminSubscriptionDeliveryReasonSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = cancel_direct_sale_delivery(
+                case_id=case_id,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                notes=serializer.validated_data.get("notes", ""),
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        note = (request.data.get("note") or "").strip()
+        try:
+            case = add_direct_sale_delivery_note(case_id=case_id, actor=request.user, note=note)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})

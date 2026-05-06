@@ -7,6 +7,7 @@ import { Filter, Search } from "lucide-react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import {
   DataTableShell,
@@ -178,7 +179,11 @@ export default function OverdueEmiPage() {
         render: (row) => (
           <div className="space-y-1">
             <div className="font-medium text-foreground">
-              {row.customer_name || "Unknown customer"}
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "Unknown customer"}
+                scope="admin"
+              />
             </div>
             <div className="text-xs text-muted-foreground">
               {row.customer_phone || "No phone on record"}

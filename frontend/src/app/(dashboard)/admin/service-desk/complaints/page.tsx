@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -73,7 +74,13 @@ export default function AdminServiceDeskComplaintsPage() {
         title: "Customer",
         render: (row: ServiceDeskComplaint) => (
           <div>
-            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
+            <div className="font-medium text-foreground">
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "—"}
+                scope="admin"
+              />
+            </div>
             <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
           </div>
         ),
@@ -142,4 +149,3 @@ export default function AdminServiceDeskComplaintsPage() {
     </PortalPage>
   );
 }
-

@@ -30,6 +30,14 @@ function CustomerSummarySkeleton() {
   return <div className="text-xs text-muted-foreground">Loading customer summary...</div>;
 }
 
+function CustomerSummaryError({ message }: { message: string }) {
+  return <div className="text-xs text-destructive">{message}</div>;
+}
+
+function CustomerSummaryEmpty() {
+  return <div className="text-xs text-muted-foreground">No customer summary is available.</div>;
+}
+
 function CustomerIntelligencePopover({ data }: { data: CustomerOperationalSummaryResponse }) {
   return (
     <div className="space-y-2 text-xs">
@@ -53,16 +61,33 @@ function CustomerIntelligenceDrawer({
   onClose,
   data,
   customerId,
+  scope,
+  loading,
+  error,
+  onRefresh,
 }: {
   open: boolean;
   onClose: () => void;
   data: CustomerOperationalSummaryResponse | null;
   customerId: number;
+  scope: "admin" | "cashier";
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
 }) {
+  const profileHref = scope === "cashier" ? `/admin/customers/${customerId}` : `/admin/customers/${customerId}`;
+  const collectHref =
+    scope === "cashier"
+      ? `/cashier/collect`
+      : `/admin/finance/collect?customer=${customerId}`;
   return (
     <DrawerShell open={open} onClose={onClose} title="Customer Intelligence Preview" description="Operational snapshot for collection and CRM actions." size="wide">
-      {!data ? (
+      {loading ? (
         <CustomerSummarySkeleton />
+      ) : error ? (
+        <CustomerSummaryError message={error} />
+      ) : !data ? (
+        <CustomerSummaryEmpty />
       ) : (
         <div className="space-y-4 text-sm">
           <div className="flex items-center justify-between">
@@ -84,15 +109,15 @@ function CustomerIntelligenceDrawer({
             <div>Last payment: {data.summary.last_payment_date || "—"}</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`/admin/finance/collect?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">Collect payment</Link>
-            <Link href={`/admin/customers/${customerId}`} className="rounded border px-3 py-1.5 text-xs">View customer profile</Link>
+            <Link href={collectHref} className="rounded border px-3 py-1.5 text-xs">Collect payment</Link>
+            <Link href={profileHref} className="rounded border px-3 py-1.5 text-xs">View customer profile</Link>
             <Link href={`/admin/subscriptions/create?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">Create subscription</Link>
             <Link href={`/admin/deliveries?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">View deliveries</Link>
             <Link href={`/admin/service-desk?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">View service tickets</Link>
             <button
               type="button"
               className="rounded border px-3 py-1.5 text-xs"
-              onClick={() => invalidateCustomerOperationalSummary(customerId)}
+              onClick={onRefresh}
             >
               Refresh
             </button>
@@ -116,40 +141,85 @@ export function CustomerIntelligenceTrigger({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [data, setData] = useState<CustomerOperationalSummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isHoverCapable, setIsHoverCapable] = useState(false);
   const canPreview = typeof customerId === "number" && customerId > 0;
-  const hoverDisabled = typeof window !== "undefined" && window.matchMedia("(hover: none)").matches;
 
   const load = useCallback(async () => {
     if (!canPreview) return;
     setLoading(true);
+    setError(null);
     try {
       const payload = await getCustomerOperationalSummary(customerId, scope);
       setData(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load customer summary.");
     } finally {
       setLoading(false);
     }
   }, [canPreview, customerId, scope]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const apply = () => setIsHoverCapable(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
     if (!hoverOpen && !drawerOpen) return;
     void load();
   }, [drawerOpen, hoverOpen, load]);
+
+  const handleRefresh = useCallback(() => {
+    if (!canPreview) return;
+    invalidateCustomerOperationalSummary(customerId);
+    void load();
+  }, [canPreview, customerId, load]);
 
   if (!canPreview) return <span>{customerName}</span>;
 
   return (
     <>
-      <HoverCard open={hoverOpen && !hoverDisabled} onOpenChange={setHoverOpen} openDelay={300} closeDelay={100}>
+      <HoverCard open={hoverOpen && isHoverCapable} onOpenChange={setHoverOpen} openDelay={300} closeDelay={160}>
         <HoverCardTrigger asChild>
-          <button type="button" className="text-left font-medium text-foreground underline-offset-4 hover:underline" onClick={() => setDrawerOpen(true)}>
+          <button
+            type="button"
+            className="text-left font-medium text-foreground underline-offset-4 hover:underline"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setDrawerOpen(true);
+            }}
+            aria-label={`Open customer intelligence for ${customerName}`}
+          >
             {customerName}
           </button>
         </HoverCardTrigger>
-        <HoverCardContent className="w-80">
-          {loading || !data ? <CustomerSummarySkeleton /> : <CustomerIntelligencePopover data={data} />}
+        <HoverCardContent className="z-[280] w-80" side="bottom" align="start" collisionPadding={12} avoidCollisions sticky="partial">
+          {loading ? (
+            <CustomerSummarySkeleton />
+          ) : error ? (
+            <CustomerSummaryError message={error} />
+          ) : data ? (
+            <CustomerIntelligencePopover data={data} />
+          ) : (
+            <CustomerSummaryEmpty />
+          )}
         </HoverCardContent>
       </HoverCard>
-      <CustomerIntelligenceDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} data={data} customerId={customerId} />
+      <CustomerIntelligenceDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        data={data}
+        customerId={customerId}
+        scope={scope}
+        loading={loading}
+        error={error}
+        onRefresh={handleRefresh}
+      />
     </>
   );
 }

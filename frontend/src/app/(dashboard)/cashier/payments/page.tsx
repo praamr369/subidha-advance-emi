@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   DataTableShell,
   DetailPanel,
@@ -135,7 +136,13 @@ export default function CashierPaymentsPage() {
         title: "Customer",
         render: (row) => (
           <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
+            <div className="font-medium text-foreground">
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "—"}
+                scope="cashier"
+              />
+            </div>
             <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
           </div>
         ),

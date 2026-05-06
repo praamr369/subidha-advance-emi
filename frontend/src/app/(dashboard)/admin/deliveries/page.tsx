@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import PortalPage from "@/components/ui/PortalPage";
 import {
   buildAdminBillingDocumentRoute,
@@ -15,12 +16,16 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
+  cancelDirectSaleDeliveryCase,
   createAdminDelivery,
+  dispatchDirectSaleDeliveryCase,
   getAdminDeliverySourceDirectSalePrefill,
   getAdminDeliverySourceSubscriptionPrefill,
   listAdminDeliveries,
   listAdminDeliverySourceDirectSales,
   listAdminDeliverySourceSubscriptions,
+  markDirectSaleDeliveryCaseDelivered,
+  scheduleDirectSaleDeliveryCase,
   type DeliveryBucket,
   type DeliveryListResponse,
   type DeliveryRecord,
@@ -154,6 +159,7 @@ export default function AdminDeliveriesPage() {
   const [createAddress, setCreateAddress] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [actingCaseId, setActingCaseId] = useState<number | null>(null);
   const [sourceQuery, setSourceQuery] = useState("");
   const [sourceLoading, setSourceLoading] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
@@ -1062,14 +1068,14 @@ export default function AdminDeliveriesPage() {
                         <div className="mt-1 text-xs text-muted-foreground">
                           Created {formatDateTime(row.created_at)}
                         </div>
-                        {row.record_kind === "DIRECT_SALE_CASE" ? (
+                        {row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "DIRECT_SALE_DELIVERY" ? (
                           <div className="mt-2 inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-800">
                             Direct Sale
                           </div>
                         ) : null}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
-                        {row.record_kind === "DIRECT_SALE_CASE" ? (
+                        {row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "DIRECT_SALE_DELIVERY" ? (
                           <>
                             <div className="font-medium text-foreground">
                               {row.sale_no || `Sale #${row.direct_sale_id ?? row.id}`}
@@ -1092,7 +1098,13 @@ export default function AdminDeliveriesPage() {
                         )}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
-                        <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
+                        <div className="font-medium text-foreground">
+                          <CustomerIntelligenceTrigger
+                            customerId={row.customer_id}
+                            customerName={row.customer_name || "—"}
+                            scope="admin"
+                          />
+                        </div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           {row.customer_phone || "—"}
                         </div>
@@ -1110,12 +1122,12 @@ export default function AdminDeliveriesPage() {
                             ? row.delivery_display || row.delivery_phase_label || row.payment_state || "—"
                             : `Fulfillment ${row.fulfillment_status || "PENDING"}`}
                         </div>
-                        {row.record_kind === "DIRECT_SALE_CASE" ? (
+                        {row.record_kind === "DIRECT_SALE_CASE" || row.record_kind === "DIRECT_SALE_DELIVERY" ? (
                           <div className="mt-1 text-[11px] text-muted-foreground">
                             Payment {row.payment_state || "—"} · Invoice {row.invoice_state || "—"}
                           </div>
                         ) : null}
-                        {row.record_kind === "DIRECT_SALE_CASE" && row.service_desk_status ? (
+                        {row.record_kind !== "SUBSCRIPTION_DELIVERY" && row.service_desk_status ? (
                           <div className="mt-1 text-[11px] text-muted-foreground">
                             Desk {row.service_desk_status}
                           </div>
@@ -1135,8 +1147,53 @@ export default function AdminDeliveriesPage() {
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
                         <div className="flex flex-col gap-2">
-                          {row.record_kind === "DIRECT_SALE_CASE" ? (
+                          {row.record_kind !== "SUBSCRIPTION_DELIVERY" ? (
                             <>
+                              {row.case_id || row.service_case_id ? (
+                                <button
+                                  type="button"
+                                  disabled={actingCaseId === (row.case_id || row.service_case_id)}
+                                  onClick={async () => {
+                                    const caseId = row.case_id || row.service_case_id;
+                                    if (!caseId) return;
+                                    const action = window.prompt("Action: schedule | dispatch | deliver | cancel");
+                                    if (!action) return;
+                                    try {
+                                      setActingCaseId(caseId);
+                                      if (action === "schedule") {
+                                        await scheduleDirectSaleDeliveryCase(caseId, {
+                                          receiver_name: row.receiver_name || undefined,
+                                          receiver_phone: row.receiver_phone || undefined,
+                                        });
+                                      } else if (action === "dispatch") {
+                                        await dispatchDirectSaleDeliveryCase(caseId, {});
+                                      } else if (action === "deliver") {
+                                        await markDirectSaleDeliveryCaseDelivered(caseId, {
+                                          receiver_name: row.receiver_name || row.customer_name || "",
+                                          receiver_phone: row.receiver_phone || row.customer_phone || undefined,
+                                          delivery_note: "Delivered from admin delivery register",
+                                        });
+                                      } else if (action === "cancel") {
+                                        const reason = window.prompt("Cancel reason");
+                                        if (!reason) return;
+                                        await cancelDirectSaleDeliveryCase(caseId, { reason });
+                                      } else {
+                                        setMessage("Unknown direct-sale action.");
+                                        return;
+                                      }
+                                      await loadPage("refresh");
+                                      setMessage("Direct-sale delivery updated.");
+                                    } catch (err) {
+                                      setError(toErrorMessage(err, "Direct-sale delivery action failed."));
+                                    } finally {
+                                      setActingCaseId(null);
+                                    }
+                                  }}
+                                  className="text-primary underline-offset-4 hover:underline disabled:opacity-60"
+                                >
+                                  Manage delivery
+                                </button>
+                              ) : null}
                               {row.billing_invoice_id ? (
                                 <Link
                                   href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}

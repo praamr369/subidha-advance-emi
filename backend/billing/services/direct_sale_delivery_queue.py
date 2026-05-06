@@ -92,11 +92,13 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         else None
     )
 
+    case_id = case.id
     return {
-        "record_kind": "DIRECT_SALE_CASE",
+        "record_kind": "DIRECT_SALE_DELIVERY",
         "source_type": "DIRECT_SALE",
         "source_label": sale.sale_no or f"Direct sale #{sale.id}",
-        "id": case.id,
+        "id": case_id,
+        "case_id": case_id,
         "service_case_id": case.id,
         "case_no": case.case_no,
         "subscription": None,
@@ -125,10 +127,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "cancelled_at": None,
         "return_requested_at": None,
         "returned_at": None,
-        "receiver_name": customer_name or None,
-        "receiver_phone": customer_phone or None,
+        "receiver_name": (case.reporter_name_snapshot or customer_name or "").strip() or None,
+        "receiver_phone": (case.reporter_phone_snapshot or customer_phone or "").strip() or None,
         "delivery_address_snapshot": delivery_address_snapshot or None,
-        "notes": (case.issue_summary or "").strip() or None,
+        "notes": (case.internal_notes or case.issue_summary or "").strip() or None,
         "failure_reason": None,
         "stock_blocked_reason": stock_hint,
         "created_by_id": None,
@@ -158,6 +160,21 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "operational_state": op["operational_state"],
         "next_actions": op["next_actions"],
         "blocking_reasons": op["blocking_reasons"],
+        "status_label": phase_label,
+        "stock_state": op.get("inventory_state"),
+        "delivery_state": snap.get("phase_code"),
+        "action_endpoints": {
+            "schedule": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/schedule/",
+            "dispatch": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/dispatch/",
+            "mark_delivered": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/mark-delivered/",
+            "cancel": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/cancel/",
+            "note": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/note/",
+        },
+        "links": {
+            "open_invoice": f"/admin/billing/documents/{getattr(invoice, 'id', '')}" if getattr(invoice, "id", None) else None,
+            "open_direct_sale": f"/admin/billing/direct-sale?highlight_sale={sale.id}",
+            "open_service_case": f"/admin/service-desk/cases/{case_id}",
+        },
         "detail_hint": "Direct Sale Delivery (Service Desk)",
     }
 
