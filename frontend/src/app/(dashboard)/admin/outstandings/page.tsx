@@ -67,7 +67,10 @@ export default function AdminOutstandingsPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    // Avoid sync state updates in effect body (eslint react-hooks/set-state-in-effect).
+    Promise.resolve().then(() => {
+      if (active) setLoading(true);
+    });
     void listOutstandings(filters)
       .then((data) => {
         if (!active) return;

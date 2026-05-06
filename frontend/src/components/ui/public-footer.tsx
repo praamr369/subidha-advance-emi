@@ -39,6 +39,7 @@ export default async function PublicFooter() {
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_0.9fr] lg:px-8">
         <div className="public-card max-w-xl p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={profile.resolved_tagline} />
+          <p className="mt-2 text-xs font-medium text-slate-600">Advance EMI • Rent • Lease • Direct Sale</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Trusted local retail support for furniture, electronics, and home appliances in {brandConfig.publicBranchLocation}.
           </p>

@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
-import SectionHeader from "@/components/public/SectionHeader";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";

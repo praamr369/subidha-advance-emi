@@ -87,9 +87,6 @@ export default function AdminLuckyDrawDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraw(null);
-    setError(null);
-
     getLuckyDraw(drawId)
       .then((payload) => {
         setDraw(payload);

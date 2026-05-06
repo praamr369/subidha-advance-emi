@@ -15,6 +15,7 @@ const links = [
   { href: ROUTES.admin.inventoryStockNeeds, label: "Stock needs" },
   { href: "/admin/accounting/setup", label: "Accounting mappings" },
   { href: "/admin/settings/business-setup/document-numbering", label: "Document Numbering" },
+  { href: ROUTES.admin.brandData, label: "Brand Data Center" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
   { href: ROUTES.admin.settingsBusinessSetupDryRuns, label: "Dry runs" },
 ];
