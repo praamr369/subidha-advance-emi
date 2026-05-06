@@ -8,7 +8,7 @@ function SkeletonBlock({ className }: BaseProps) {
   return (
     <div
       className={cn(
-        "motion-safe:animate-skeleton-pulse rounded-lg bg-[var(--surface-muted)]",
+        "skeleton-shimmer motion-safe:animate-skeleton-pulse rounded-lg bg-[var(--surface-muted)]",
         className
       )}
       aria-hidden="true"

@@ -216,12 +216,12 @@ function readExpandedGroups(): Record<string, boolean> {
 }
 
 function readOperatorMode(): OperatorMode {
-  if (typeof window === "undefined") return "ADVANCED";
+  if (typeof window === "undefined") return "SIMPLE";
   try {
     const raw = window.localStorage.getItem(OPERATOR_MODE_KEY);
-    return raw === "SIMPLE" ? "SIMPLE" : "ADVANCED";
+    return raw === "ADVANCED" ? "ADVANCED" : "SIMPLE";
   } catch {
-    return "ADVANCED";
+    return "SIMPLE";
   }
 }
 
@@ -518,6 +518,7 @@ function SidebarContent({
     } catch {
       // preference-only
     }
+    notifyDashboardShellChanged();
   }, []);
 
   const favoriteLinks = useMemo(() => {
@@ -948,14 +949,16 @@ function SidebarContent({
                   if (value !== "SIMPLE" && value !== "ADVANCED") return;
                   persistOperatorMode(value as OperatorMode);
                 }}
+                onClick={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
+                }}
                 className="border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-1"
               >
                 <ToggleGroupItem
                   value="SIMPLE"
                   aria-label="Simple workflow view"
-                  onClick={() => {
-                    if (operatorMode === "SIMPLE") persistOperatorMode("ADVANCED");
-                  }}
+                  onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
                   className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Simple
@@ -963,9 +966,7 @@ function SidebarContent({
                 <ToggleGroupItem
                   value="ADVANCED"
                   aria-label="Advanced ERP view"
-                  onClick={() => {
-                    if (operatorMode === "ADVANCED") persistOperatorMode("SIMPLE");
-                  }}
+                  onClick={() => persistOperatorMode("ADVANCED")}
                   className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Advanced

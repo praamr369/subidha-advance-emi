@@ -11,22 +11,27 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
   FileText,
   Landmark,
   LayoutGrid,
+  LockKeyhole,
   Package,
+  Plus,
   RefreshCw,
   ReceiptText,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
   Truck,
+  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DashboardGridSkeleton } from "@/components/feedback/Skeleton";
 import DashboardWidgetBoard, {
   type DashboardWidgetDefinition,
 } from "@/components/dashboard/DashboardWidgetBoard";
@@ -48,6 +53,7 @@ import {
   buildAdminDeliveriesRoute,
   buildAdminReconciliationRoute,
 } from "@/lib/route-builders";
+import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { getAdminDashboard, type AdminDashboardResponse } from "@/services/admin";
 import { getBranchReportingOverview, type BranchReportingOverview } from "@/services/branch-control";
@@ -64,6 +70,7 @@ import { getStockSummary } from "@/services/inventory";
 import { cn } from "@/lib/utils";
 
 const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
+const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 type OperatorMode = "SIMPLE" | "ADVANCED";
 
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
@@ -77,6 +84,11 @@ type QueueSummaryPayload = {
     oldest_pending_date?: string | null;
     detail_url?: string;
   }[];
+};
+
+type CountPayload = {
+  count?: number;
+  results?: unknown[];
 };
 
 function toErrorMessage(error: unknown): string {
@@ -94,6 +106,34 @@ function todayIso(): string {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
     today.getDate()
   ).padStart(2, "0")}`;
+}
+
+function formatDateTime(value: Date | null): string {
+  if (!value) return "Not refreshed yet";
+  return value.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function extractCount(payload: CountPayload | unknown): number {
+  if (payload && typeof payload === "object") {
+    const objectPayload = payload as CountPayload;
+    if (typeof objectPayload.count === "number" && Number.isFinite(objectPayload.count)) {
+      return objectPayload.count;
+    }
+    if (Array.isArray(objectPayload.results)) return objectPayload.results.length;
+  }
+  return Array.isArray(payload) ? payload.length : 0;
+}
+
+async function getReadyToLockBatchCount(): Promise<number> {
+  try {
+    const payload = await apiFetch<CountPayload | unknown>("/admin/batches/?status=READY_TO_LOCK");
+    return extractCount(payload);
+  } catch {
+    return 0;
+  }
 }
 
 function LaunchCard({
@@ -133,6 +173,90 @@ function LaunchCard({
       <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{description}</p>
       {meta ? <div className="mt-2.5 text-xs font-medium text-foreground/90">{meta}</div> : null}
     </Link>
+  );
+}
+
+function CommandMetricCard({
+  label,
+  value,
+  helper,
+  href,
+  icon,
+  tone = "default",
+}: {
+  label: string;
+  value: ReactNode;
+  helper: ReactNode;
+  href?: string;
+  icon: ReactNode;
+  tone?: "default" | "success" | "warning" | "info";
+}) {
+  const toneClass =
+    tone === "warning"
+      ? "border-amber-200 bg-amber-50/80 text-amber-900"
+      : tone === "success"
+        ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
+        : tone === "info"
+          ? "border-sky-200 bg-sky-50/80 text-sky-900"
+          : "border-[color-mix(in_oklab,var(--surface-border-strong)_72%,white_28%)] bg-white text-foreground";
+
+  const content = (
+    <div
+      className={cn(
+        "group relative h-full overflow-hidden rounded-[1.35rem] border p-4 shadow-[0_18px_48px_-38px_rgba(76,45,24,0.55)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 motion-safe:transition motion-safe:hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-38px_rgba(76,45,24,0.62)]",
+        toneClass
+      )}
+    >
+      <div className="absolute inset-x-4 top-0 h-px bg-[color-mix(in_oklab,var(--accent)_56%,white_44%)]" />
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+          <div className="mt-2 text-2xl font-bold tracking-normal text-foreground sm:text-3xl">{value}</div>
+        </div>
+        <div className="rounded-2xl border border-[color-mix(in_oklab,var(--accent)_42%,white_58%)] bg-[color-mix(in_oklab,var(--accent)_18%,white_82%)] p-2.5 text-[color-mix(in_oklab,var(--accent-foreground)_86%,black_14%)]">
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-sm leading-5 text-muted-foreground">{helper}</p>
+      {href ? (
+        <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          Open details <ArrowUpRight className="h-3.5 w-3.5" />
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return href ? (
+    <Link href={href} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
+}
+
+function CommandSection({
+  title,
+  description,
+  children,
+  action,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <section className="rounded-[1.45rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_70%,white_30%)] bg-white/95 p-4 shadow-[0_18px_54px_-44px_rgba(76,45,24,0.55)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+        </div>
+        {action}
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }
 
@@ -184,6 +308,8 @@ export default function AdminDashboardPage() {
   const [queueSummary, setQueueSummary] = useState<QueueSummaryPayload | null>(null);
   const [stockSummary, setStockSummary] = useState<StockSummaryPayload | null>(null);
   const [hrSummary, setHrSummary] = useState<HrSummary | null>(null);
+  const [readyToLockBatches, setReadyToLockBatches] = useState<number | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,12 +317,22 @@ export default function AdminDashboardPage() {
   const [summaryWindow, setSummaryWindow] = useState<DashboardWindowPreset>("THIS_MONTH");
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(OPERATOR_MODE_KEY);
-      setOperatorMode(stored === "ADVANCED" ? "ADVANCED" : "SIMPLE");
-    } catch {
-      setOperatorMode("SIMPLE");
+    function syncOperatorMode() {
+      try {
+        const stored = window.localStorage.getItem(OPERATOR_MODE_KEY);
+        setOperatorMode(stored === "ADVANCED" ? "ADVANCED" : "SIMPLE");
+      } catch {
+        setOperatorMode("SIMPLE");
+      }
     }
+
+    syncOperatorMode();
+    window.addEventListener("storage", syncOperatorMode);
+    window.addEventListener(DASHBOARD_SHELL_EVENT, syncOperatorMode);
+    return () => {
+      window.removeEventListener("storage", syncOperatorMode);
+      window.removeEventListener(DASHBOARD_SHELL_EVENT, syncOperatorMode);
+    };
   }, []);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
@@ -214,6 +350,7 @@ export default function AdminDashboardPage() {
         queuePayload,
         stockPayload,
         hrPayload,
+        readyToLockPayload,
       ] =
         await Promise.all([
           getDashboardSummaryV2({ window: summaryWindow }),
@@ -224,6 +361,7 @@ export default function AdminDashboardPage() {
           getAdminOperationsQueueSummary(),
           getStockSummary(),
           getHrSummary(),
+          getReadyToLockBatchCount(),
         ]);
 
       setCanonical(canonicalPayload);
@@ -234,6 +372,8 @@ export default function AdminDashboardPage() {
       setQueueSummary(queuePayload as QueueSummaryPayload);
       setStockSummary(stockPayload);
       setHrSummary(hrPayload);
+      setReadyToLockBatches(readyToLockPayload);
+      setLastUpdatedAt(new Date());
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -252,6 +392,10 @@ export default function AdminDashboardPage() {
   const settlementPosture = summary ? buildSettlementPosture(summary) : null;
   const reconciliationPosture = buildReconciliationPosture(reconciliation);
   const todayNet = todayBranch?.collections.net_amount ?? legacy?.collections?.today_net_amount ?? "0.00";
+  const todayTransactions =
+    todayBranch?.collections.count ?? legacy?.collections?.today_transaction_count ?? 0;
+  const pendingEmiCount = summary?.pending_emis ?? legacy?.emi?.pending ?? 0;
+  const pendingEmiAmount = summary?.total_pending_amount ?? legacy?.summary?.total_pending_amount ?? "0.00";
   const overdueCount = summary?.overdue_emis ?? legacy?.emi?.overdue ?? 0;
   const overdueAmount = summary?.overdue_amount ?? legacy?.summary?.overdue_amount ?? "0.00";
   const reconciliationFlags = reconciliation?.flagged_count ?? 0;
@@ -259,6 +403,8 @@ export default function AdminDashboardPage() {
     ? deliverySummary.pending + deliverySummary.scheduled + deliverySummary.in_transit
     : 0;
   const nextDraw = legacy?.batches?.next_draw_batch;
+  const activeSubscriptions = summary?.active_subscriptions ?? legacy?.subscriptions?.active ?? 0;
+  const openBatches = legacy?.batches?.open_batches ?? legacy?.operations?.open_batches ?? 0;
   const widgetStorageKey = "subidha:dashboard-widgets:admin:v1";
   const outstandingRaw = summary?.outstanding_amount ?? legacy?.financial?.total_outstanding ?? "0.00";
   const outstandingNum = toNumber(outstandingRaw);
@@ -273,6 +419,13 @@ export default function AdminDashboardPage() {
   const invoiceBalance = analyticsOverview?.invoice_balance ?? analytics?.invoice_document_posture.summary.invoice_balance ?? "0.00";
   const openLeadCount = analyticsOverview?.open_lead_count ?? analytics?.crm_customer_posture.leads.open_count ?? 0;
   const trackedInventoryItems = analytics?.inventory_movement_posture.tracked_item_count ?? 0;
+  const recentPayments = legacy?.recent_activity ?? [];
+  const pendingCommissionCount =
+    analyticsOverview?.pending_commission_count ?? legacy?.commission_summary?.pending_count ?? 0;
+  const pendingCommissionAmount =
+    analyticsOverview?.pending_commission_amount ?? legacy?.commission_summary?.pending_commission ?? "0.00";
+  const draftPayoutCount = analytics?.finance_posture.payout_batches.draft_count ?? 0;
+  const lowStockCount = stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
 
   const summaryWindowLabel =
     summaryWindow === "THIS_MONTH"
@@ -332,8 +485,11 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <PortalPage title="Executive Dashboard" subtitle="Operational summary and quick launch." breadcrumbs={[{ label: "Admin" }]}>
-        <LoadingBlock label="Loading executive dashboard..." />
+      <PortalPage title="Admin Dashboard" subtitle="Operational summary and quick launch." breadcrumbs={[{ label: "Admin" }]}>
+        <div className="space-y-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
+          <DashboardGridSkeleton cards={8} />
+          <LoadingBlock label="Loading admin command center..." />
+        </div>
       </PortalPage>
     );
   }
@@ -341,7 +497,7 @@ export default function AdminDashboardPage() {
   if (error) {
     return (
       <PortalPage
-        title="Executive Dashboard"
+        title="Admin Dashboard"
         subtitle="Operational summary and quick launch."
         breadcrumbs={[{ label: "Admin" }]}
       >
@@ -354,9 +510,9 @@ export default function AdminDashboardPage() {
     return (
       <PortalPage
         eyebrow="Admin"
-        title="Daily Operator Dashboard"
-        subtitle="Today’s summary, urgent alerts, and quick actions for daily shop operations."
-        helperNote="This is the primary daily dashboard. Use Advanced mode for deeper ERP and accounting surfaces."
+        title="Admin Dashboard"
+        subtitle="Live collection, EMI, batch, draw, and reconciliation signals for daily shop operations."
+        helperNote={`This is the primary daily dashboard. Last updated ${formatDateTime(lastUpdatedAt)}. Dashboard numbers are read-only summaries from backend services.`}
         helperTone="info"
         breadcrumbs={[{ label: "Admin" }]}
         actions={[
@@ -366,49 +522,144 @@ export default function AdminDashboardPage() {
         ]}
       >
         <div className="space-y-6">
-          <section className="rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4">
-            <div className="text-base font-semibold text-amber-900">
-              You have {pendingTasksToday} tasks pending today
-            </div>
-            <div className="mt-1 text-sm text-amber-900/80">
-              Prioritize payment collection, delivery actions, KYC, and HR approvals first.
+          <section className="overflow-hidden rounded-[1.7rem] border border-[color-mix(in_oklab,var(--accent)_42%,white_58%)] bg-[linear-gradient(135deg,#ffffff_0%,#fffaf0_44%,#f8efe2_100%)] p-5 shadow-[0_24px_70px_-52px_rgba(76,45,24,0.7)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-[color-mix(in_oklab,var(--accent-foreground)_86%,black_14%)]">
+                  <Clock3 className="h-4 w-4" />
+                  Today: {formatDate(todayIso())}
+                  <span className="rounded-full border border-[color-mix(in_oklab,var(--accent)_44%,white_56%)] bg-white/70 px-2 py-0.5 normal-case text-muted-foreground">
+                    {pendingTasksToday} action signals
+                  </span>
+                </div>
+                <h1 className="mt-3 text-2xl font-bold tracking-normal text-foreground sm:text-3xl">
+                  Daily Operator Dashboard
+                  <span className="sr-only"> Executive Dashboard</span>
+                </h1>
+                <div className="mt-1 text-sm font-semibold text-[color-mix(in_oklab,var(--accent-foreground)_82%,black_18%)]">
+                  Shop operations at a glance
+                </div>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  Prioritize collection, overdue EMI follow-up, batch readiness, lucky draw review, and reconciliation warnings without changing any financial records from this screen.
+                </p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  You have {pendingTasksToday} tasks pending today from live operations signals.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    { href: ROUTES.admin.operations, label: "Operations workspace" },
+                    { href: ROUTES.admin.erp, label: "ERP workspace" },
+                    { href: ROUTES.admin.bi, label: "BI control" },
+                  ].map((shortcut) => (
+                    <Link
+                      key={shortcut.href}
+                      href={shortcut.href}
+                      className="rounded-full border border-[color-mix(in_oklab,var(--accent)_42%,white_58%)] bg-white px-3 py-1.5 text-sm font-semibold text-[color-mix(in_oklab,var(--accent-foreground)_86%,black_14%)] shadow-sm motion-safe:transition hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--accent)_8%,white_92%)]"
+                    >
+                      {shortcut.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <ActionButton
+                type="button"
+                variant="outline"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing}
+                leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </ActionButton>
             </div>
           </section>
 
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Collections today" value={money(todayNet)} subtext="Branch reporting (today)" icon={<Wallet className="h-5 w-5" />} />
-            <StatCard label="Overdue follow-up" value={String(overdueCount)} subtext={money(overdueAmount)} tone={overdueCount > 0 ? "warning" : "success"} icon={<AlertTriangle className="h-5 w-5" />} href={ROUTES.admin.financeCollect} />
-            <StatCard label="Delivery actions" value={String(deliveryActions)} subtext={`${deliverySummary?.pending ?? 0} pending`} tone={deliveryActions > 0 ? "warning" : "success"} icon={<Truck className="h-5 w-5" />} href={ROUTES.admin.deliveries} />
-            <StatCard label="HR actions" value={String((hrSummary?.pending_leave_requests ?? 0) + (hrSummary?.pending_expense_claims ?? 0))} subtext={`${hrSummary?.today_absent ?? 0} absent today`} tone="warning" icon={<Users className="h-5 w-5" />} href={ROUTES.admin.hr} />
+            <CommandMetricCard label="Today collection" value={money(todayNet)} helper={`${todayTransactions} collection transaction rows from today's branch reporting.`} tone="success" href={ROUTES.admin.branchReporting} icon={<Wallet className="h-5 w-5" />} />
+            <CommandMetricCard label="Pending EMI" value={String(pendingEmiCount)} helper={`${money(pendingEmiAmount)} pending amount from canonical summary.`} tone={pendingEmiCount > 0 ? "info" : "success"} href={ROUTES.admin.emisPending} icon={<CalendarClock className="h-5 w-5" />} />
+            <CommandMetricCard label="Overdue EMI" value={String(overdueCount)} helper={overdueCount > 0 ? `${money(overdueAmount)} overdue exposure needs follow-up.` : "No overdue rows in current summary."} tone={overdueCount > 0 ? "warning" : "success"} href={ROUTES.admin.emisOverdue} icon={<AlertTriangle className="h-5 w-5" />} />
+            <CommandMetricCard label="Active subscriptions" value={String(activeSubscriptions)} helper="Active contracts from canonical dashboard summary." href={ROUTES.admin.subscriptions} icon={<FileText className="h-5 w-5" />} />
+            <CommandMetricCard label="Open batches" value={String(openBatches)} helper="Open batch count from admin dashboard payload." href={ROUTES.admin.batches} icon={<LayoutGrid className="h-5 w-5" />} />
+            <CommandMetricCard label="Ready-to-lock batches" value={readyToLockBatches ?? "—"} helper="Read-only count from the batch register filtered by READY_TO_LOCK." tone={(readyToLockBatches ?? 0) > 0 ? "warning" : "success"} href={`${ROUTES.admin.batches}?status=READY_TO_LOCK`} icon={<LockKeyhole className="h-5 w-5" />} />
+            <CommandMetricCard label="Lucky draw status" value={nextDraw?.batch_code ?? "—"} helper={nextDraw?.draw_date ? `${nextDraw.days_until_draw ?? 0} days to ${formatDate(nextDraw.draw_date)}.` : "No next draw scheduled in dashboard payload."} href={ROUTES.admin.luckyDraws} icon={<ClipboardCheck className="h-5 w-5" />} />
+            <CommandMetricCard label="Reconciliation warnings" value={String(reconciliationFlags)} helper={reconciliationFlags > 0 ? "Flagged rows require controlled review." : "No flags in the current reconciliation surface."} tone={reconciliationFlags > 0 ? "warning" : "success"} href={reconciliationFlags > 0 ? buildAdminReconciliationRoute({ flagged: true }) : ROUTES.admin.reconciliation} icon={<ShieldCheck className="h-5 w-5" />} />
           </section>
 
-          <PageSection>
-            <h2 className="text-sm font-semibold text-foreground">Urgent alerts</h2>
-            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <CommandSection
+            title="Quick actions"
+            description="Only real admin routes and guided workflows are shown. Payment posting remains server-controlled."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <LaunchCard title="Create customer" description="Add a customer before enrollment." href={`${ROUTES.admin.customers}/create`} icon={<UserPlus className="h-5 w-5" />} />
+              <LaunchCard title="Create subscription" description="Open Advance EMI contract creation." href={ROUTES.admin.subscriptionsAdvanceEmiCreate} icon={<Plus className="h-5 w-5" />} />
+              <LaunchCard title="Collect payment" description="Open controlled collection workflow." href={`${ROUTES.admin.financeCollect}?workflow=advance-emi`} icon={<Banknote className="h-5 w-5" />} />
+              <LaunchCard title="View overdue EMIs" description="Review overdue queue before follow-up." href={ROUTES.admin.emisOverdue} icon={<AlertTriangle className="h-5 w-5" />} />
+              <LaunchCard title="Lock batch" description="Open ready-to-lock batches; lock from batch detail/control center." href={`${ROUTES.admin.batches}?status=READY_TO_LOCK`} icon={<LockKeyhole className="h-5 w-5" />} />
+              <LaunchCard title="Run reconciliation" description="Open reconciliation workspace for controlled review." href={ROUTES.admin.reconciliation} icon={<ClipboardCheck className="h-5 w-5" />} />
+              <LaunchCard title="View reports" description="Open reports center for live operational reports." href={ROUTES.admin.reports} icon={<BarChart3 className="h-5 w-5" />} />
+              <LaunchCard title="Open operations" description="Resolve delivery, KYC, request, and support queues." href={ROUTES.admin.operationsCommandCenter} icon={<LayoutGrid className="h-5 w-5" />} />
+              <LaunchCard title="Prepare delivery" description="Open the delivery workspace for pending handover and dispatch work." href={ROUTES.admin.deliveryWorkspace} icon={<Truck className="h-5 w-5" />} />
+            </div>
+          </CommandSection>
+
+          <div className="grid items-start gap-6 xl:grid-cols-2">
+            <CommandSection
+              title="Urgent alerts"
+              description="Overdue, reconciliation, and delivery signals from real dashboard services."
+            >
+              <div className="grid gap-3">
               {attentionItems.length === 0 ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">No urgent alerts in current snapshot.</div>
               ) : (
                 attentionItems.map((item, index) => (
-                  <Link key={`urgent-${item.title}-${index}`} href={item.href} className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 hover:bg-[var(--surface-muted)]">
+                  <Link key={`urgent-${item.title}-${index}`} href={item.href} className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 motion-safe:transition motion-safe:hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]">
                     <div className="text-sm font-semibold text-foreground">{item.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
                   </Link>
                 ))
               )}
             </div>
-          </PageSection>
+            </CommandSection>
 
-          <PageSection>
-            <h2 className="text-sm font-semibold text-foreground">Quick actions</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <LaunchCard title="Collect payment" description="Open payment collection workflow." href={ROUTES.admin.financeCollect} icon={<Banknote className="h-5 w-5" />} />
-              <LaunchCard title="Open operations queue" description="Resolve queue actions with one click." href={ROUTES.admin.operations} icon={<ClipboardCheck className="h-5 w-5" />} />
-              <LaunchCard title="Prepare delivery" description="Schedule or update delivery tasks." href={ROUTES.admin.deliveries} icon={<Truck className="h-5 w-5" />} />
-              <LaunchCard title="Review KYC" description="Resolve customer KYC pending queue." href={`${ROUTES.admin.customers}?kyc_status=PENDING`} icon={<ShieldCheck className="h-5 w-5" />} />
-              <LaunchCard title="HR approvals" description="Leave and expense approvals." href={ROUTES.admin.hr} icon={<Users className="h-5 w-5" />} />
-              <LaunchCard title="Global search" description="Jump directly to record workflows." href={ROUTES.admin.globalSearch} icon={<Sparkles className="h-5 w-5" />} />
+            <CommandSection
+              title="Recent payments"
+              description="Latest payment activity from the admin dashboard payload. Reversed rows remain visibly distinct."
+            >
+              {recentPayments.length === 0 ? (
+                <div className="rounded-xl border border-border bg-[var(--surface-muted)]/60 px-4 py-3 text-sm text-muted-foreground">No recent payment rows returned.</div>
+              ) : (
+                <div className="grid gap-2">
+                  {recentPayments.slice(0, 5).map((payment, index) => (
+                    <Link
+                      key={`${payment.payment_id ?? index}-${payment.created_at ?? payment.payment_date ?? index}`}
+                      href={payment.payment_id ? `${ROUTES.admin.payments}/${payment.payment_id}` : ROUTES.admin.payments}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-border bg-white px-3 py-3 motion-safe:transition motion-safe:hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]"
+                    >
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">{payment.customer_name ?? "Unknown customer"}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {payment.subscription_number ?? "No subscription"} · {payment.method ?? "Method unavailable"}
+                          {payment.is_reversed ? " · Reversed" : ""}
+                        </div>
+                      </div>
+                      <div className="text-right text-sm font-semibold text-foreground">{money(payment.amount ?? "0.00")}</div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CommandSection>
+          </div>
+
+          <CommandSection
+            title="Operational alerts"
+            description="Partner, payout, delivery, and inventory alerts are shown only where existing endpoints returned data."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <LaunchCard title="Partner commission alerts" description={`${pendingCommissionCount} pending commission rows.`} href={ROUTES.admin.financeCommissions} icon={<Banknote className="h-5 w-5" />} meta={money(pendingCommissionAmount)} />
+              <LaunchCard title="Payout batches" description={`${draftPayoutCount} draft payout batches from analytics.`} href={ROUTES.admin.financePayoutBatches} icon={<ReceiptText className="h-5 w-5" />} meta="Partner payouts" />
+              <LaunchCard title="Delivery workload" description={`${deliveryActions} pending, scheduled, or in-transit delivery actions.`} href={buildAdminDeliveriesRoute({ bucket: "PENDING" })} icon={<Truck className="h-5 w-5" />} meta={`${deliverySummary?.pending ?? 0} pending`} />
+              <LaunchCard title="Inventory alerts" description={`${lowStockCount} stock rows below reorder level.`} href={ROUTES.admin.inventoryStockOnHand} icon={<Package className="h-5 w-5" />} meta={`${trackedInventoryItems} tracked items`} />
             </div>
-          </PageSection>
+          </CommandSection>
         </div>
       </PortalPage>
     );

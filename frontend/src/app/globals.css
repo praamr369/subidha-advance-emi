@@ -441,6 +441,31 @@ a, button, input, select, textarea {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 46%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes caret-blink {
   0%,
   70%,
@@ -466,6 +491,11 @@ a, button, input, select, textarea {
   .animate-skeleton-pulse {
     animation: none;
     opacity: 0.88;
+  }
+
+  .skeleton-shimmer::after {
+    animation: none;
+    opacity: 0;
   }
 
   .animate-in,
