@@ -30,6 +30,14 @@ def _money(value) -> str:
     return f"{Decimal(str(value or '0.00')).quantize(Decimal('0.01')):.2f}"
 
 
+def _support_subject(category: str, message: str) -> str:
+    category_label = str(category or "").strip().replace("_", " ").title()
+    if category_label:
+        return category_label
+    cleaned = " ".join((message or "").strip().split())
+    return cleaned[:80]
+
+
 def sync_customer_login_identity(
     customer: Customer,
     *,
@@ -625,16 +633,28 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
                 "created_at",
             )[:10]
         ),
-        "service_tickets": list(
-            customer.support_requests.order_by("-created_at", "-id").values(
+        "service_tickets": [
+            {
+                "id": row["id"],
+                "status": row["status"],
+                "category": row["category"],
+                "subject": _support_subject(row.get("category", ""), row.get("message", "")),
+                "title": _support_subject(row.get("category", ""), row.get("message", "")),
+                "message": row.get("message", ""),
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+                "resolution_summary": row.get("resolution_summary", ""),
+            }
+            for row in customer.support_requests.order_by("-created_at", "-id").values(
                 "id",
                 "status",
                 "category",
-                "subject",
+                "message",
                 "created_at",
-                "resolved_at",
+                "updated_at",
+                "resolution_summary",
             )[:10]
-        ),
+        ],
         "recent_activity": (
             payments.get("rows", [])[:5]
             + direct_sales.get("rows", [])[:5]

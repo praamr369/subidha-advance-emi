@@ -81,7 +81,10 @@ export type DeliveryRecord = {
   delivery_state?: string | null;
   status_label?: string | null;
   case_id?: number | null;
+  next_actions?: string[];
+  blocking_reasons?: string[];
   action_endpoints?: {
+    save_metadata?: string | null;
     schedule?: string | null;
     dispatch?: string | null;
     mark_delivered?: string | null;
@@ -91,12 +94,18 @@ export type DeliveryRecord = {
   links?: {
     open_invoice?: string | null;
     open_direct_sale?: string | null;
+    open_customer?: string | null;
     open_service_case?: string | null;
   } | null;
   detail_hint?: string | null;
   grand_total?: string | null;
   balance_total?: string | null;
   received_total?: string | null;
+  sale_number?: string | null;
+  invoice_id?: number | null;
+  invoice_number?: string | null;
+  operational_notes?: string | null;
+  failure_or_cancellation_reason?: string | null;
 };
 
 export type DeliveryReportSummary = {
@@ -314,8 +323,11 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     stock_blocked_reason: toStringOrNull(row.stock_blocked_reason),
     direct_sale_id: toNullableNumber(row.direct_sale_id),
     sale_no: toStringOrNull(row.sale_no),
-    invoice_document_no: toStringOrNull(row.invoice_document_no),
-    billing_invoice_id: toNullableNumber(row.billing_invoice_id),
+    sale_number: toStringOrNull(row.sale_number) ?? toStringOrNull(row.sale_no),
+    invoice_id: toNullableNumber(row.invoice_id) ?? toNullableNumber(row.billing_invoice_id),
+    invoice_number: toStringOrNull(row.invoice_number) ?? toStringOrNull(row.invoice_document_no),
+    invoice_document_no: toStringOrNull(row.invoice_document_no) ?? toStringOrNull(row.invoice_number),
+    billing_invoice_id: toNullableNumber(row.billing_invoice_id) ?? toNullableNumber(row.invoice_id),
     service_case_id: toNullableNumber(row.service_case_id),
     case_no: toStringOrNull(row.case_no),
     service_desk_status: toStringOrNull(row.service_desk_status),
@@ -331,9 +343,16 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     delivery_state: toStringOrNull(row.delivery_state),
     status_label: toStringOrNull(row.status_label),
     case_id: toNullableNumber(row.case_id),
+    next_actions: Array.isArray(row.next_actions)
+      ? (row.next_actions.filter((entry) => typeof entry === "string") as string[])
+      : [],
+    blocking_reasons: Array.isArray(row.blocking_reasons)
+      ? (row.blocking_reasons.filter((entry) => typeof entry === "string") as string[])
+      : [],
     action_endpoints:
       row.action_endpoints && typeof row.action_endpoints === "object"
         ? ({
+            save_metadata: toStringOrNull((row.action_endpoints as Record<string, unknown>).save_metadata),
             schedule: toStringOrNull((row.action_endpoints as Record<string, unknown>).schedule),
             dispatch: toStringOrNull((row.action_endpoints as Record<string, unknown>).dispatch),
             mark_delivered: toStringOrNull((row.action_endpoints as Record<string, unknown>).mark_delivered),
@@ -346,6 +365,7 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
         ? ({
             open_invoice: toStringOrNull((row.links as Record<string, unknown>).open_invoice),
             open_direct_sale: toStringOrNull((row.links as Record<string, unknown>).open_direct_sale),
+            open_customer: toStringOrNull((row.links as Record<string, unknown>).open_customer),
             open_service_case: toStringOrNull((row.links as Record<string, unknown>).open_service_case),
           } as DeliveryRecord["links"])
         : null,
@@ -353,6 +373,9 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     grand_total: toStringOrNull(row.grand_total),
     balance_total: toStringOrNull(row.balance_total),
     received_total: toStringOrNull(row.received_total),
+    operational_notes: toStringOrNull(row.operational_notes) ?? toStringOrNull(row.notes),
+    failure_or_cancellation_reason:
+      toStringOrNull(row.failure_or_cancellation_reason) ?? toStringOrNull(row.failure_reason),
   };
 }
 
@@ -539,6 +562,11 @@ export async function getAdminDeliverySummary(params: AdminDeliveryQuery = {}): 
 
 export async function getAdminDelivery(id: number | string): Promise<DeliveryRecord> {
   const payload = await apiFetch<unknown>(`/admin/deliveries/${id}/`);
+  return normalizeDeliveryRecord(payload);
+}
+
+export async function getAdminDirectSaleDeliveryCase(caseId: number | string): Promise<DeliveryRecord> {
+  const payload = await apiFetch<unknown>(`/admin/deliveries/direct-sale-cases/${caseId}/`);
   return normalizeDeliveryRecord(payload);
 }
 
@@ -756,6 +784,34 @@ export async function cancelDirectSaleDeliveryCase(
   payload: { reason: string; notes?: string }
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/cancel/`, payload);
+}
+
+export async function updateDirectSaleDeliveryCaseMetadata(
+  caseId: number | string,
+  payload: {
+    scheduled_date?: string | null;
+    receiver_name?: string;
+    receiver_phone?: string;
+    delivery_address_snapshot?: string;
+    failure_or_cancellation_reason?: string;
+    operational_notes?: string;
+  }
+): Promise<DeliveryRecord> {
+  const response = await apiFetch<{ delivery?: unknown }>(
+    `/admin/deliveries/direct-sale-cases/${caseId}/metadata/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+  return normalizeDeliveryRecord(response?.delivery ?? {});
+}
+
+export async function addDirectSaleDeliveryCaseNote(
+  caseId: number | string,
+  payload: { note: string }
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/note/`, payload);
 }
 
 export async function listCustomerDeliveries(params: {

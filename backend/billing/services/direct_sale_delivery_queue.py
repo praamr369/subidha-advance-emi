@@ -67,7 +67,8 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
             ]
         ).strip(),
     ]
-    delivery_address_snapshot = "\n".join(p for p in addr_parts if p)
+    sale_address_snapshot = "\n".join(p for p in addr_parts if p)
+    delivery_address_snapshot = (case.issue_details or "").strip() or sale_address_snapshot
 
     customer_name = (getattr(sale, "customer_name_snapshot", "") or "").strip()
     customer_phone = (getattr(sale, "customer_phone_snapshot", "") or "").strip()
@@ -93,6 +94,9 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
     )
 
     case_id = case.id
+    scheduled_date = case.service_due_at.date().isoformat() if case.service_due_at else None
+    operational_notes = (case.internal_notes or "").strip() or None
+    failure_or_cancellation_reason = (case.resolution_summary or "").strip() or None
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
         "source_type": "DIRECT_SALE",
@@ -119,7 +123,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "status": mapped_status,
         "service_desk_status": case.status,
         "delivery_reference": (getattr(sale, "delivery_reference", "") or "").strip() or case.case_no,
-        "scheduled_date": None,
+        "scheduled_date": scheduled_date,
         "dispatched_at": None,
         "out_for_delivery_at": None,
         "delivered_at": getattr(sale, "delivered_at", None),
@@ -130,8 +134,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "receiver_name": (case.reporter_name_snapshot or customer_name or "").strip() or None,
         "receiver_phone": (case.reporter_phone_snapshot or customer_phone or "").strip() or None,
         "delivery_address_snapshot": delivery_address_snapshot or None,
-        "notes": (case.internal_notes or case.issue_summary or "").strip() or None,
-        "failure_reason": None,
+        "notes": operational_notes,
+        "operational_notes": operational_notes,
+        "failure_reason": failure_or_cancellation_reason,
+        "failure_or_cancellation_reason": failure_or_cancellation_reason,
         "stock_blocked_reason": stock_hint,
         "created_by_id": None,
         "created_by_username": None,
@@ -145,7 +151,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "inventory_stock_status": inventory_snapshot.get("status") if inventory_snapshot else None,
         "inventory_available_qty": inventory_snapshot.get("available") if inventory_snapshot else None,
         "direct_sale_id": sale.id,
+        "sale_number": sale.sale_no,
         "sale_no": sale.sale_no,
+        "invoice_id": getattr(invoice, "id", None),
+        "invoice_number": inv_no,
         "invoice_document_no": inv_no,
         "billing_invoice_id": getattr(invoice, "id", None),
         "invoice_state": snap.get("invoice_state"),
@@ -164,6 +173,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "stock_state": op.get("inventory_state"),
         "delivery_state": snap.get("phase_code"),
         "action_endpoints": {
+            "save_metadata": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/metadata/",
             "schedule": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/schedule/",
             "dispatch": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/dispatch/",
             "mark_delivered": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/mark-delivered/",
@@ -173,6 +183,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "links": {
             "open_invoice": f"/admin/billing/documents/{getattr(invoice, 'id', '')}" if getattr(invoice, "id", None) else None,
             "open_direct_sale": f"/admin/billing/direct-sale?highlight_sale={sale.id}",
+            "open_customer": f"/admin/customers/{getattr(sale, 'customer_id', '')}" if getattr(sale, "customer_id", None) else None,
             "open_service_case": f"/admin/service-desk/cases/{case_id}",
         },
         "detail_hint": "Direct Sale Delivery (Service Desk)",

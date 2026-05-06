@@ -16,16 +16,13 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
-  cancelDirectSaleDeliveryCase,
   createAdminDelivery,
-  dispatchDirectSaleDeliveryCase,
   getAdminDeliverySourceDirectSalePrefill,
   getAdminDeliverySourceSubscriptionPrefill,
   listAdminDeliveries,
   listAdminDeliverySourceDirectSales,
   listAdminDeliverySourceSubscriptions,
   markDirectSaleDeliveryCaseDelivered,
-  scheduleDirectSaleDeliveryCase,
   type DeliveryBucket,
   type DeliveryListResponse,
   type DeliveryRecord,
@@ -413,7 +410,7 @@ export default function AdminDeliveriesPage() {
         );
         setCreateNotes("");
         await loadPage("refresh");
-        router.push(`${ROUTES.admin.serviceDeskCases}/${deskId}`);
+        router.push(`/admin/deliveries/direct-sale-cases/${deskId}${queryString ? `?${queryString}` : ""}`);
       } catch (err) {
         setError(toErrorMessage(err, "Failed to sync direct-sale delivery desk row."));
       } finally {
@@ -1132,6 +1129,18 @@ export default function AdminDeliveriesPage() {
                             Desk {row.service_desk_status}
                           </div>
                         ) : null}
+                        {row.record_kind !== "SUBSCRIPTION_DELIVERY" &&
+                        (row.payment_state !== "PAID" || row.invoice_state !== "POSTED" || row.stock_state === "STOCK_BLOCKED") ? (
+                          <div className="mt-1 text-[11px] font-medium text-amber-700">
+                            Blocked: {[
+                              row.payment_state !== "PAID" ? "payment due" : null,
+                              row.invoice_state !== "POSTED" ? "invoice pending" : null,
+                              row.stock_state === "STOCK_BLOCKED" ? "stock outstanding" : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="border-b border-border px-4 py-3 text-sm">
                         {formatDate(row.scheduled_date)}
@@ -1150,56 +1159,21 @@ export default function AdminDeliveriesPage() {
                           {row.record_kind !== "SUBSCRIPTION_DELIVERY" ? (
                             <>
                               {row.case_id || row.service_case_id ? (
-                                <button
-                                  type="button"
-                                  disabled={actingCaseId === (row.case_id || row.service_case_id)}
-                                  onClick={async () => {
-                                    const caseId = row.case_id || row.service_case_id;
-                                    if (!caseId) return;
-                                    const action = window.prompt("Action: schedule | dispatch | deliver | cancel");
-                                    if (!action) return;
-                                    try {
-                                      setActingCaseId(caseId);
-                                      if (action === "schedule") {
-                                        await scheduleDirectSaleDeliveryCase(caseId, {
-                                          receiver_name: row.receiver_name || undefined,
-                                          receiver_phone: row.receiver_phone || undefined,
-                                        });
-                                      } else if (action === "dispatch") {
-                                        await dispatchDirectSaleDeliveryCase(caseId, {});
-                                      } else if (action === "deliver") {
-                                        await markDirectSaleDeliveryCaseDelivered(caseId, {
-                                          receiver_name: row.receiver_name || row.customer_name || "",
-                                          receiver_phone: row.receiver_phone || row.customer_phone || undefined,
-                                          delivery_note: "Delivered from admin delivery register",
-                                        });
-                                      } else if (action === "cancel") {
-                                        const reason = window.prompt("Cancel reason");
-                                        if (!reason) return;
-                                        await cancelDirectSaleDeliveryCase(caseId, { reason });
-                                      } else {
-                                        setMessage("Unknown direct-sale action.");
-                                        return;
-                                      }
-                                      await loadPage("refresh");
-                                      setMessage("Direct-sale delivery updated.");
-                                    } catch (err) {
-                                      setError(toErrorMessage(err, "Direct-sale delivery action failed."));
-                                    } finally {
-                                      setActingCaseId(null);
-                                    }
-                                  }}
-                                  className="text-primary underline-offset-4 hover:underline disabled:opacity-60"
+                                <Link
+                                  href={`/admin/deliveries/direct-sale-cases/${row.case_id || row.service_case_id}${
+                                    queryString ? `?${queryString}` : ""
+                                  }`}
+                                  className="text-primary underline-offset-4 hover:underline"
                                 >
-                                  Manage delivery
-                                </button>
+                                  Manage Delivery
+                                </Link>
                               ) : null}
                               {row.billing_invoice_id ? (
                                 <Link
                                   href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}
                                   className="text-primary underline-offset-4 hover:underline"
                                 >
-                                  Open invoice
+                                  Open Invoice
                                 </Link>
                               ) : null}
                               <Link
@@ -1210,14 +1184,40 @@ export default function AdminDeliveriesPage() {
                                 }
                                 className="text-primary underline-offset-4 hover:underline"
                               >
-                                Direct Sale workspace
+                                Open Direct Sale
                               </Link>
-                              <Link
-                                href={`${ROUTES.admin.serviceDeskCases}/${row.service_case_id ?? row.id}`}
-                                className="text-primary underline-offset-4 hover:underline"
-                              >
-                                Service desk case
-                              </Link>
+                              {row.status === "SCHEDULED" &&
+                              row.payment_state === "PAID" &&
+                              row.invoice_state === "POSTED" &&
+                              row.stock_state !== "STOCK_BLOCKED" &&
+                              (row.case_id || row.service_case_id) ? (
+                                <button
+                                  type="button"
+                                  disabled={actingCaseId === (row.case_id || row.service_case_id)}
+                                  onClick={async () => {
+                                    const caseId = row.case_id || row.service_case_id;
+                                    if (!caseId) return;
+                                    if (!window.confirm("Mark this direct-sale delivery as delivered?")) return;
+                                    try {
+                                      setActingCaseId(caseId);
+                                      await markDirectSaleDeliveryCaseDelivered(caseId, {
+                                        receiver_name: row.receiver_name || row.customer_name || "",
+                                        receiver_phone: row.receiver_phone || row.customer_phone || undefined,
+                                        delivery_note: "Delivered from delivery register quick action.",
+                                      });
+                                      await loadPage("refresh");
+                                      setMessage("Direct-sale delivery marked delivered.");
+                                    } catch (err) {
+                                      setError(toErrorMessage(err, "Unable to mark delivery as delivered."));
+                                    } finally {
+                                      setActingCaseId(null);
+                                    }
+                                  }}
+                                  className="text-emerald-700 underline-offset-4 hover:underline disabled:opacity-60"
+                                >
+                                  Mark Delivered
+                                </button>
+                              ) : null}
                             </>
                           ) : (
                             <>

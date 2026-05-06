@@ -38,6 +38,16 @@ function CustomerSummaryEmpty() {
   return <div className="text-xs text-muted-foreground">No customer summary is available.</div>;
 }
 
+function supportTicketTitle(ticket: Record<string, unknown>): string {
+  const title = String(ticket.title || ticket.subject || "").trim();
+  if (title) return title;
+  const message = String(ticket.message || "").trim();
+  if (message) return message.slice(0, 80);
+  const category = String(ticket.category || "").trim().replaceAll("_", " ");
+  if (category) return category;
+  return "Service request";
+}
+
 function CustomerIntelligencePopover({ data }: { data: CustomerOperationalSummaryResponse }) {
   return (
     <div className="space-y-2 text-xs">
@@ -122,6 +132,22 @@ function CustomerIntelligenceDrawer({
               Refresh
             </button>
           </div>
+          {(data.service_tickets || []).length > 0 ? (
+            <div className="space-y-2 rounded border bg-muted/40 p-3">
+              <div className="text-xs font-semibold text-muted-foreground">Recent service tickets</div>
+              {(data.service_tickets || []).slice(0, 3).map((ticket, index) => {
+                const row = (ticket || {}) as Record<string, unknown>;
+                return (
+                  <div key={String(row.id || index)} className="text-xs">
+                    <div className="font-medium text-foreground">{supportTicketTitle(row)}</div>
+                    <div className="text-muted-foreground">
+                      {String(row.status || "OPEN")} · {String(row.category || "GENERAL")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       )}
     </DrawerShell>

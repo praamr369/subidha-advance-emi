@@ -609,11 +609,21 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           );
         }
         if (isSchedule) {
-          const serviceDeskCaseId = (row as { service_desk_case_id?: number | null }).service_desk_case_id;
-          const label = row.delivered_at ? "View delivery" : serviceDeskCaseId ? "Manage delivery" : "Schedule delivery";
+          const deliveryCaseId = row.delivery_request_id ?? null;
+          const isManageState =
+            row.operational_state === "PAID_READY_FOR_DELIVERY" ||
+            row.delivery_status === "READY_FOR_DELIVERY";
+          const label = row.delivered_at
+            ? "View Delivery"
+            : isManageState
+              ? "Manage Delivery"
+              : "Schedule Delivery";
+          const href = deliveryCaseId
+            ? `/admin/deliveries/direct-sale-cases/${deliveryCaseId}`
+            : `${ROUTES.admin.deliveries}?source_type=DIRECT_SALE&focus_sale=${row.id}`;
           return (
             <Link
-              href={`${ROUTES.admin.deliveries}?source_type=DIRECT_SALE&focus_sale=${row.id}`}
+              href={href}
               className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800"
             >
               {label}

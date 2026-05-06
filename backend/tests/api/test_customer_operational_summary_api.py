@@ -4,6 +4,7 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from subscriptions.models import CustomerSupportRequest
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
@@ -98,3 +99,28 @@ class CustomerOperationalSummaryApiTests(APITestCase):
             f"/api/v1/admin/customers/{self.customer.id}/operational-summary/"
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_operational_summary_support_ticket_payload_uses_safe_subject_fallback(self):
+        CustomerSupportRequest.objects.create(
+            customer=self.customer,
+            category="PAYMENT_ISSUE",
+            message="Need correction for duplicate receipt entry in April cycle.",
+            status="SUBMITTED",
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-summary/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(len(response.data["service_tickets"]), 1)
+        ticket = response.data["service_tickets"][0]
+        self.assertEqual(ticket["category"], "PAYMENT_ISSUE")
+        self.assertEqual(
+            ticket["subject"],
+            "Payment Issue",
+        )
+        self.assertEqual(
+            ticket["title"],
+            "Payment Issue",
+        )
+        self.assertIn("duplicate receipt", ticket["message"])

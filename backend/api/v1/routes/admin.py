@@ -31,8 +31,10 @@ from api.v1.views.contract_references import (
 )
 from api.v1.views.admin_deliveries import (
     AdminDirectSaleDeliveryCancelView,
+    AdminDirectSaleDeliveryDetailView,
     AdminDirectSaleDeliveryDispatchView,
     AdminDirectSaleDeliveryMarkDeliveredView,
+    AdminDirectSaleDeliveryMetadataView,
     AdminDirectSaleDeliveryNoteView,
     AdminDirectSaleDeliveryScheduleView,
     AdminDeliveryCancelView,
@@ -424,6 +426,8 @@ urlpatterns = [
     path("deliveries/<int:pk>/request-return/", AdminDeliveryRequestReturnView.as_view()),
     path("deliveries/<int:pk>/mark-returned/", AdminDeliveryMarkReturnedView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/schedule/", AdminDirectSaleDeliveryScheduleView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/", AdminDirectSaleDeliveryDetailView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/metadata/", AdminDirectSaleDeliveryMetadataView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/dispatch/", AdminDirectSaleDeliveryDispatchView.as_view()),
     path(
         "deliveries/direct-sale-cases/<int:case_id>/mark-delivered/",

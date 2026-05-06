@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, time
 from decimal import Decimal
 
 from django.db import transaction
@@ -54,6 +55,15 @@ def _serialize_result(case: ServiceDeskCase) -> dict:
     return serialize_direct_sale_delivery_case(case)
 
 
+def _date_to_service_due_at(scheduled_date):
+    if not scheduled_date:
+        return None
+    dt = datetime.combine(scheduled_date, time(hour=10, minute=0, second=0))
+    if timezone.is_naive(dt):
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
 @transaction.atomic
 def schedule_direct_sale_delivery(
     *,
@@ -77,6 +87,8 @@ def schedule_direct_sale_delivery(
     case.status = ServiceDeskCaseStatus.AUTHORIZED
     case.authorized_at = case.authorized_at or timezone.now()
     case.authorized_by = case.authorized_by or actor
+    if scheduled_date:
+        case.service_due_at = _date_to_service_due_at(scheduled_date)
     case.reporter_name_snapshot = (receiver_name or case.reporter_name_snapshot or "").strip()
     case.reporter_phone_snapshot = (receiver_phone or case.reporter_phone_snapshot or "").strip()
     note_parts = [f"Scheduled date: {scheduled_date}" if scheduled_date else "", notes.strip()]
@@ -92,12 +104,64 @@ def schedule_direct_sale_delivery(
             "authorized_by",
             "reporter_name_snapshot",
             "reporter_phone_snapshot",
+            "service_due_at",
             "internal_notes",
             "issue_details",
             "updated_at",
         ]
     )
     _audit("DIRECT_SALE_DELIVERY_SCHEDULED", case=case, actor=actor)
+    return case
+
+
+@transaction.atomic
+def update_direct_sale_delivery_metadata(
+    *,
+    case_id: int,
+    actor,
+    scheduled_date=None,
+    receiver_name: str | None = None,
+    receiver_phone: str | None = None,
+    delivery_address_snapshot: str | None = None,
+    failure_or_cancellation_reason: str | None = None,
+    operational_notes: str | None = None,
+):
+    case = ServiceDeskCase.objects.select_for_update().select_related("direct_sale").get(
+        pk=case_id, case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY
+    )
+    DirectSale.objects.select_for_update().get(pk=case.direct_sale_id)
+
+    update_fields: list[str] = []
+    if scheduled_date is not None:
+        case.service_due_at = _date_to_service_due_at(scheduled_date)
+        update_fields.append("service_due_at")
+    if receiver_name is not None:
+        case.reporter_name_snapshot = (receiver_name or "").strip()
+        update_fields.append("reporter_name_snapshot")
+    if receiver_phone is not None:
+        case.reporter_phone_snapshot = (receiver_phone or "").strip()
+        update_fields.append("reporter_phone_snapshot")
+    if delivery_address_snapshot is not None:
+        case.issue_details = (delivery_address_snapshot or "").strip()
+        update_fields.append("issue_details")
+    if failure_or_cancellation_reason is not None:
+        case.resolution_summary = (failure_or_cancellation_reason or "").strip()
+        update_fields.append("resolution_summary")
+    if operational_notes is not None:
+        case.internal_notes = (operational_notes or "").strip()
+        update_fields.append("internal_notes")
+
+    if update_fields:
+        case.save(update_fields=list(dict.fromkeys(update_fields + ["updated_at"])))
+
+    _audit(
+        "DIRECT_SALE_DELIVERY_METADATA_UPDATED",
+        case=case,
+        actor=actor,
+        metadata={
+            "updated_fields": update_fields,
+        },
+    )
     return case
 
 

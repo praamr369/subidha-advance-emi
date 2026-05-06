@@ -11,6 +11,7 @@ from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDo
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus, StockLocation, Warehouse
 from inventory.services.purchase_need_service import direct_sale_purchase_need_source_key
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
+from subscriptions.models import AuditLog
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -86,6 +87,29 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
             "received_total": "0.00",
             "lines": [line],
         }
+
+    def _create_paid_ready_delivery_case(self) -> ServiceDeskCase:
+        payload = self._payload()
+        payload["delivery_required"] = True
+        payload["received_total"] = "23000.00"
+        payload["balance_total"] = "0.00"
+        payload["subtotal"] = "24000.00"
+        payload["discount_total"] = "1000.00"
+        payload["taxable_total"] = "23000.00"
+        payload["tax_total"] = "0.00"
+        payload["grand_total"] = "23000.00"
+        self.inventory_item.opening_stock_qty = Decimal("50.000")
+        self.inventory_item.save(update_fields=["opening_stock_qty"])
+        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data["id"]
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+        return ServiceDeskCase.objects.get(direct_sale_id=sale_id)
 
     def test_billing_product_search_finds_by_name_code_and_sku(self):
         for query in ["Workspace Sofa", "WS-SOFA-001", "WS-SOFA-SKU-001"]:
@@ -444,23 +468,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertIn("/direct-sale-cases/", (row.get("action_endpoints") or {}).get("schedule", ""))
 
     def test_admin_can_schedule_dispatch_and_deliver_direct_sale_case(self):
-        payload = self._payload()
-        payload["delivery_required"] = True
-        payload["received_total"] = "23000.00"
-        payload["balance_total"] = "0.00"
-        payload["subtotal"] = "24000.00"
-        payload["discount_total"] = "1000.00"
-        payload["taxable_total"] = "23000.00"
-        payload["tax_total"] = "0.00"
-        payload["grand_total"] = "23000.00"
-        self.inventory_item.opening_stock_qty = Decimal("50.000")
-        self.inventory_item.save(update_fields=["opening_stock_qty"])
-        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
-        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
-        sale_id = created.data["id"]
-        finalize = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/", {}, format="json")
-        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
-        case = ServiceDeskCase.objects.get(direct_sale_id=sale_id)
+        case = self._create_paid_ready_delivery_case()
 
         schedule = self.client.post(
             f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/schedule/",
@@ -484,6 +492,115 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(case.status, ServiceDeskCaseStatus.RESOLVED)
         case.direct_sale.refresh_from_db()
         self.assertIsNotNone(case.direct_sale.delivered_at)
+
+    def test_direct_sale_delivery_detail_endpoint_exposes_operational_payload(self):
+        case = self._create_paid_ready_delivery_case()
+        response = self.client.get(f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["record_kind"], "DIRECT_SALE_DELIVERY")
+        self.assertEqual(response.data["source_type"], "DIRECT_SALE")
+        self.assertEqual(response.data["case_id"], case.id)
+        self.assertIn("sale_number", response.data)
+        self.assertIn("invoice_id", response.data)
+        self.assertIn("invoice_number", response.data)
+        self.assertIn("action_endpoints", response.data)
+        self.assertIn("save_metadata", response.data["action_endpoints"])
+
+    def test_direct_sale_delivery_metadata_patch_updates_case_fields(self):
+        case = self._create_paid_ready_delivery_case()
+        response = self.client.patch(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/metadata/",
+            {
+                "scheduled_date": "2026-05-20",
+                "receiver_name": "Receiver Metadata",
+                "receiver_phone": "9000011111",
+                "delivery_address_snapshot": "Shop Street\nAsansol",
+                "failure_or_cancellation_reason": "Customer requested evening slot",
+                "operational_notes": "Call before dispatch.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        delivery = response.data["delivery"]
+        self.assertEqual(delivery["scheduled_date"], "2026-05-20")
+        self.assertEqual(delivery["receiver_name"], "Receiver Metadata")
+        self.assertEqual(delivery["receiver_phone"], "9000011111")
+        self.assertEqual(delivery["delivery_address_snapshot"], "Shop Street\nAsansol")
+        self.assertEqual(
+            delivery["failure_or_cancellation_reason"],
+            "Customer requested evening slot",
+        )
+        self.assertEqual(delivery["operational_notes"], "Call before dispatch.")
+        case.refresh_from_db()
+        self.assertEqual(case.reporter_name_snapshot, "Receiver Metadata")
+        self.assertEqual(case.reporter_phone_snapshot, "9000011111")
+        self.assertEqual(case.issue_details, "Shop Street\nAsansol")
+        self.assertEqual(case.resolution_summary, "Customer requested evening slot")
+        self.assertEqual(case.internal_notes, "Call before dispatch.")
+        self.assertIsNotNone(case.service_due_at)
+        self.assertEqual(case.service_due_at.date(), date(2026, 5, 20))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name="ServiceDeskCase",
+                object_id=case.id,
+                metadata__event="DIRECT_SALE_DELIVERY_METADATA_UPDATED",
+            ).exists()
+        )
+
+    def test_dispatch_and_deliver_are_blocked_when_payment_due(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data["id"]
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+        case = ServiceDeskCase.objects.get(direct_sale_id=sale_id)
+
+        dispatch = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/dispatch/",
+            {},
+            format="json",
+        )
+        self.assertEqual(dispatch.status_code, status.HTTP_400_BAD_REQUEST, dispatch.data)
+        self.assertIn("payment is due", str(dispatch.data).lower())
+
+        deliver = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/mark-delivered/",
+            {"receiver_name": "Receiver A"},
+            format="json",
+        )
+        self.assertEqual(deliver.status_code, status.HTTP_400_BAD_REQUEST, deliver.data)
+        self.assertIn("payment is due", str(deliver.data).lower())
+
+    def test_direct_sale_cancel_requires_reason(self):
+        case = self._create_paid_ready_delivery_case()
+        response = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/cancel/",
+            {"reason": ""},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+
+    def test_delivered_direct_sale_case_cannot_be_cancelled(self):
+        case = self._create_paid_ready_delivery_case()
+        delivered = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/mark-delivered/",
+            {"receiver_name": "Receiver A", "delivery_note": "Delivered"},
+            format="json",
+        )
+        self.assertEqual(delivered.status_code, status.HTTP_200_OK, delivered.data)
+        cancelled = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/cancel/",
+            {"reason": "Cancel attempt"},
+            format="json",
+        )
+        self.assertEqual(cancelled.status_code, status.HTTP_400_BAD_REQUEST, cancelled.data)
+        self.assertIn("cannot be cancelled", str(cancelled.data).lower())
 
     def test_draft_sale_exposes_operational_state_and_finalize_action(self):
         response = self.client.post("/api/v1/billing/direct-sales/", self._payload(), format="json")

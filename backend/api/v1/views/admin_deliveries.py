@@ -13,7 +13,7 @@ from billing.services.direct_sale_delivery_queue import (
     merge_delivery_summaries,
     serialize_direct_sale_delivery_case,
 )
-from service_desk.models import ServiceDeskCaseStatus
+from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from api.v1.serializers.delivery import (
     AdminDeliveryDirectSaleSourceSerializer,
     AdminDeliveryDirectSaleSourcesQuerySerializer,
@@ -34,6 +34,7 @@ from billing.services.direct_sale_delivery_actions import (
     dispatch_direct_sale_delivery,
     mark_direct_sale_delivered,
     schedule_direct_sale_delivery,
+    update_direct_sale_delivery_metadata,
 )
 from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
@@ -401,6 +402,19 @@ class AdminDeliveryDetailView(APIView):
         return get_object_or_404(get_delivery_queryset(), pk=pk)
 
     def get(self, request, pk):
+        source_type = (request.query_params.get("source_type") or "").strip().upper()
+        if source_type in {"DIRECT_SALE", "DIRECT-SALE", "DIRECT_SALE_DELIVERY"}:
+            case = get_object_or_404(
+                ServiceDeskCase.objects.select_related(
+                    "direct_sale",
+                    "direct_sale__customer",
+                    "billing_invoice",
+                    "product",
+                ),
+                pk=pk,
+                case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+            )
+            return Response(serialize_direct_sale_delivery_case(case))
         delivery = self.get_object(pk)
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
 
@@ -676,6 +690,15 @@ class _DirectSaleDeliveredSerializer(serializers.Serializer):
     delivered_at = serializers.DateTimeField(required=False, allow_null=True)
 
 
+class _DirectSaleMetadataSerializer(serializers.Serializer):
+    scheduled_date = serializers.DateField(required=False, allow_null=True)
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
+    failure_or_cancellation_reason = serializers.CharField(required=False, allow_blank=True)
+    operational_notes = serializers.CharField(required=False, allow_blank=True)
+
+
 class AdminDirectSaleDeliveryScheduleView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -740,6 +763,40 @@ class AdminDirectSaleDeliveryNoteView(APIView):
         note = (request.data.get("note") or "").strip()
         try:
             case = add_direct_sale_delivery_note(case_id=case_id, actor=request.user, note=note)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, case_id: int):
+        case = get_object_or_404(
+            ServiceDeskCase.objects.select_related(
+                "direct_sale",
+                "direct_sale__customer",
+                "billing_invoice",
+                "product",
+            ),
+            pk=case_id,
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        )
+        return Response(serialize_direct_sale_delivery_case(case))
+
+
+class AdminDirectSaleDeliveryMetadataView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request, case_id: int):
+        serializer = _DirectSaleMetadataSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = update_direct_sale_delivery_metadata(
+                case_id=case_id,
+                actor=request.user,
+                **serializer.validated_data,
+            )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
