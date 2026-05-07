@@ -131,6 +131,9 @@ export type DirectSale = {
   payment_state?: string;
   inventory_state?: string;
   collection_state?: string;
+  active_receipt_total?: string;
+  void_receipt_total?: string;
+  receipt_status?: string;
   lines: DirectSaleLine[];
 };
 
@@ -266,6 +269,8 @@ export type BillingInvoice = {
   operational_state?: string | null;
   next_actions?: string[];
   blocking_reasons?: string[];
+  active_receipt_total?: string;
+  void_receipt_total?: string;
   lines: BillingInvoiceLine[];
 };
 

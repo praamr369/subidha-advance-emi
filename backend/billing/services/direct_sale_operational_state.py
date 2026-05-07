@@ -60,7 +60,7 @@ def _derive_state(*, sale, invoice_status: str, paid_amount: Decimal, due_amount
             next_actions=["VIEW_AUDIT"],
         )
 
-    if sale.status == DirectSaleStatus.DELIVERED:
+    if sale.status == DirectSaleStatus.DELIVERED or bool(getattr(sale, "delivered_at", None)):
         return _OperationalState(
             operational_state="DELIVERED_COMPLETE",
             payment_state="PAID" if due_amount <= Decimal("0.00") else "PARTIAL",

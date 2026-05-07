@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.services.bridge_posting_service import post_bridge_entry
@@ -44,6 +45,29 @@ from subscriptions.services.audit_service import log_audit
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def recalculate_invoice_settlement(invoice: BillingInvoice) -> BillingInvoice:
+    active_receipt_total = _money(
+        invoice.receipts.filter(status=BillingDocumentStatus.POSTED).aggregate(total=Sum("amount"))["total"]
+    )
+    invoice.received_total = active_receipt_total
+    invoice.balance_total = _money(invoice.grand_total) - active_receipt_total
+    invoice.save(update_fields=["received_total", "balance_total", "updated_at"])
+    return invoice
+
+
+def recalculate_direct_sale_settlement(sale: DirectSale) -> DirectSale:
+    active_receipt_total = _money(
+        sale.receipts.filter(
+            receipt_type=ReceiptType.RETAIL_RECEIPT,
+            status=BillingDocumentStatus.POSTED,
+        ).aggregate(total=Sum("amount"))["total"]
+    )
+    sale.received_total = active_receipt_total
+    sale.balance_total = _money(sale.grand_total) - active_receipt_total
+    sale.save(update_fields=["received_total", "balance_total", "updated_at"])
+    return sale
 
 
 def _issue_series_number(sequence, *, prefix_fallback: str) -> str:
@@ -1086,6 +1110,8 @@ def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
     ReceiptDocument.objects.select_for_update(of=("self",)).get(pk=receipt_id)
     receipt = (
         ReceiptDocument.objects.select_related(
+            "billing_invoice",
+            "direct_sale",
             "finance_account",
             "finance_account__chart_account",
             "posted_journal_entry",
@@ -1141,6 +1167,10 @@ def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
     receipt.status = BillingDocumentStatus.VOID
     receipt.notes = f"{(receipt.notes or '').strip()}\nVoid reason: {reason}".strip()
     receipt.save(update_fields=["status", "notes", "updated_at"])
+    if receipt.billing_invoice_id:
+        recalculate_invoice_settlement(receipt.billing_invoice)
+    if receipt.direct_sale_id:
+        recalculate_direct_sale_settlement(receipt.direct_sale)
     _log_accounting_event(
         event="BILLING_RECEIPT_VOIDED",
         instance=receipt,

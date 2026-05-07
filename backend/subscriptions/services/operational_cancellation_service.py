@@ -146,23 +146,33 @@ def _reverse_posted_journal_for_source(*, source_instance, purpose: str, reason:
 @transaction.atomic
 def cancel_billing_invoice(*, invoice_id: int, actor, reason: str, internal_note: str = "", reversal_policy: str = "NONE") -> dict:
     from billing.models import BillingDocumentStatus, BillingInvoice, ReceiptDocument
+    from billing.services.billing_service import recalculate_direct_sale_settlement, recalculate_invoice_settlement
 
     _require_admin(actor)
     reason = _clean_reason(reason)
     invoice = BillingInvoice.objects.select_for_update(of=("self",)).select_related(
         "customer", "direct_sale", "posted_journal_entry"
     ).get(pk=invoice_id)
+    recalculate_invoice_settlement(invoice)
+    if invoice.direct_sale_id:
+        recalculate_direct_sale_settlement(invoice.direct_sale)
     previous_status = invoice.status
     source_type = OperationalCancellation.SourceType.BILLING_INVOICE
 
     if previous_status in {BillingDocumentStatus.CANCELLED, BillingDocumentStatus.VOID}:
         raise ValidationError({"detail": "Invoice is already cancelled or void."})
 
-    active_receipts = ReceiptDocument.objects.filter(billing_invoice=invoice).exclude(
-        status__in=[BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED]
+    active_receipts = ReceiptDocument.objects.filter(
+        billing_invoice=invoice,
+        status=BillingDocumentStatus.POSTED,
     )
     if active_receipts.exists() or Decimal(str(invoice.received_total or MONEY_ZERO)) > MONEY_ZERO:
-        raise ValidationError({"detail": "Reverse linked receipts before cancelling this invoice."})
+        raise ValidationError(
+            {
+                "detail": "Reverse linked receipts before cancelling this invoice.",
+                "blocking_reasons": ["Reverse linked receipts before cancelling this invoice."],
+            }
+        )
 
     reversal_reference = None
     if previous_status == BillingDocumentStatus.POSTED:

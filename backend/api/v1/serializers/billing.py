@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from rest_framework import serializers
 
 from accounting.models import DocumentSequence
@@ -45,6 +45,21 @@ from subscriptions.services.customer_service import find_or_create_customer
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def _receipt_totals(queryset) -> tuple[Decimal, Decimal]:
+    active_total = _money(queryset.filter(status=BillingDocumentStatus.POSTED).aggregate(total=Sum("amount"))["total"])
+    void_total = _money(queryset.filter(status=BillingDocumentStatus.VOID).aggregate(total=Sum("amount"))["total"])
+    return active_total, void_total
+
+
+def _receipt_status_label(*, active_total: Decimal, void_total: Decimal) -> str:
+    states: list[str] = []
+    if active_total > Decimal("0.00"):
+        states.append("POSTED")
+    if void_total > Decimal("0.00"):
+        states.append("VOID")
+    return " / ".join(states) or "NONE"
 
 
 class EmptyBillingActionSerializer(serializers.Serializer):
@@ -290,6 +305,9 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     payment_state = serializers.SerializerMethodField()
     inventory_state = serializers.SerializerMethodField()
     collection_state = serializers.SerializerMethodField()
+    active_receipt_total = serializers.SerializerMethodField()
+    void_receipt_total = serializers.SerializerMethodField()
+    receipt_status = serializers.SerializerMethodField()
     customer_mode = serializers.ChoiceField(
         choices=[("EXISTING", "Existing Customer"), ("NEW", "New Customer"), ("WALK_IN", "Walk-in Snapshot")],
         required=False,
@@ -382,6 +400,9 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "payment_state",
             "inventory_state",
             "collection_state",
+            "active_receipt_total",
+            "void_receipt_total",
+            "receipt_status",
             "customer_mode",
             "walkin_create_customer_profile",
             "new_customer_name",
@@ -605,6 +626,18 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     def get_collection_state(self, obj):
         return self._operational_state(obj)["collection_state"]
 
+    def get_active_receipt_total(self, obj):
+        active_total, _void_total = _receipt_totals(obj.receipts.all())
+        return str(active_total)
+
+    def get_void_receipt_total(self, obj):
+        _active_total, void_total = _receipt_totals(obj.receipts.all())
+        return str(void_total)
+
+    def get_receipt_status(self, obj):
+        active_total, void_total = _receipt_totals(obj.receipts.all())
+        return _receipt_status_label(active_total=active_total, void_total=void_total)
+
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):
     lines = BillingInvoiceLineSerializer(many=True)
@@ -623,6 +656,8 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     operational_state = serializers.SerializerMethodField()
     next_actions = serializers.SerializerMethodField()
     blocking_reasons = serializers.SerializerMethodField()
+    active_receipt_total = serializers.SerializerMethodField()
+    void_receipt_total = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingInvoice
@@ -671,6 +706,8 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "operational_state",
             "next_actions",
             "blocking_reasons",
+            "active_receipt_total",
+            "void_receipt_total",
             "lines",
             "created_at",
             "updated_at",
@@ -737,6 +774,14 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     def get_blocking_reasons(self, obj):
         state = self._direct_sale_state(obj)
         return state.get("blocking_reasons") if state else []
+
+    def get_active_receipt_total(self, obj):
+        active_total, _void_total = _receipt_totals(obj.receipts.all())
+        return str(active_total)
+
+    def get_void_receipt_total(self, obj):
+        _active_total, void_total = _receipt_totals(obj.receipts.all())
+        return str(void_total)
 
 
 class BillingCreditNoteLineSerializer(serializers.ModelSerializer):

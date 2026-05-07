@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, Vendor as AccountingVendor
-from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSaleReturnStatus, PurchaseReturn
+from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSale, DirectSaleReturnStatus, PurchaseReturn
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.reversal_service import (
     cancel_direct_sale_before_invoice,
@@ -186,23 +186,33 @@ class ReversalServiceTests(TestCase):
         invoice = sale.billing_invoices.first()
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
 
         eligibility = get_direct_sale_return_eligibility(direct_sale_id=sale.id)
-        self.assertIn("DELIVERED_RETURN", eligibility["allowed_actions"])
+        self.assertIn("RETURN_PRODUCT", eligibility["allowed_actions"])
+        self.assertIn("EXCHANGE_PRODUCT", eligibility["allowed_actions"])
         self.assertEqual(eligibility["sold_lines"][0]["max_returnable_quantity"], "2.000")
+        self.assertEqual(eligibility["active_receipt_total"], "0.00")
+        self.assertEqual(eligibility["void_receipt_total"], "0.00")
 
     def test_void_receipt_keeps_trace(self):
-        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        payload = self._sale_payload()
+        payload["received_total"] = Decimal("2000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
         invoice = sale.billing_invoices.first()
-        invoice.received_total = Decimal("500.00")
-        invoice.balance_total = Decimal("1500.00")
-        invoice.save(update_fields=["received_total", "balance_total", "updated_at"])
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
         receipt = invoice.receipts.first()
         receipt, updated = void_receipt_with_reason(receipt_id=receipt.id, reason="Wrong customer", performed_by=self.admin)
+        invoice.refresh_from_db()
+        sale.refresh_from_db()
+        receipt.refresh_from_db()
         self.assertTrue(updated)
         self.assertEqual(receipt.status, BillingDocumentStatus.VOID)
+        self.assertEqual(invoice.received_total, Decimal("0.00"))
+        self.assertEqual(invoice.balance_total, invoice.grand_total)
+        self.assertEqual(sale.received_total, Decimal("0.00"))
+        self.assertEqual(sale.balance_total, sale.grand_total)
 
     def test_refund_cannot_exceed_customer_credit(self):
         with self.assertRaises(ValueError):

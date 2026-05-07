@@ -32,6 +32,9 @@ export type DirectSaleReturnEligibility = {
   sale_status: string;
   invoice_status: string;
   delivery_status: string;
+  active_receipt_total: string;
+  void_receipt_total: string;
+  outstanding_balance: string;
   sold_lines: Array<{
     direct_sale_line_id: number;
     product_id: number;
@@ -50,6 +53,7 @@ export type DirectSaleReturnEligibility = {
     balance_total: string;
   };
   allowed_actions: string[];
+  blocking_reasons?: string[];
 };
 
 function query(params: Record<string, string | number | undefined>): string {

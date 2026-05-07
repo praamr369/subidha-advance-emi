@@ -5,7 +5,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
-from billing.services.billing_service import create_direct_sale
+from billing.models import DirectSale
+from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from inventory.models import InventoryItem
 from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_product
 
@@ -61,3 +62,21 @@ class ReversalCenterApiTests(APITestCase):
         self.client.force_authenticate(user=self.admin)
         response = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/", {"reason": ""}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delivered_direct_sale_eligibility_allows_return_and_exchange_without_pre_invoice_cancel(self):
+        sale = self._create_sale()
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(f"/api/v1/admin/billing/direct-sales/{sale.id}/return-eligibility/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["sale_status"], "INVOICED")
+        self.assertEqual(response.data["invoice_status"], "POSTED")
+        self.assertEqual(response.data["delivery_status"], "DELIVERED")
+        self.assertIn("RETURN_PRODUCT", response.data["allowed_actions"])
+        self.assertIn("EXCHANGE_PRODUCT", response.data["allowed_actions"])
+        self.assertNotIn("PRE_INVOICE_CANCEL", response.data["allowed_actions"])

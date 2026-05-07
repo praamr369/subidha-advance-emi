@@ -148,20 +148,35 @@ def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
         .values("direct_sale_line_id")
         .annotate(total=Sum("quantity"))
     }
-    receipt_summary = sale.receipts.aggregate(total=Sum("amount"))
     delivered = bool(sale.delivered_at) or sale.status == DirectSaleStatus.DELIVERED
+    active_receipt_total = _money(
+        sale.receipts.filter(status=BillingDocumentStatus.POSTED).aggregate(total=Sum("amount"))["total"]
+    )
+    void_receipt_total = _money(
+        sale.receipts.filter(status=BillingDocumentStatus.VOID).aggregate(total=Sum("amount"))["total"]
+    )
+    outstanding_balance = _money(sale.grand_total) - active_receipt_total
+    posted_receipt_count = sale.receipts.filter(status=BillingDocumentStatus.POSTED).count()
     invoiced = posted_invoice is not None or sale.status == DirectSaleStatus.INVOICED
     allowed_actions = []
-    if not invoiced and sale.status not in {DirectSaleStatus.CANCELLED}:
+    blocking_reasons: list[str] = []
+    if sale.status == DirectSaleStatus.CANCELLED:
+        blocking_reasons.append("Sale is cancelled.")
+    if sale.status == DirectSaleStatus.CANCELLED:
+        allowed_actions = []
+    elif delivered:
+        allowed_actions.extend(["RETURN_PRODUCT", "EXCHANGE_PRODUCT"])
+        blocking_reasons.append("Delivered direct sales must use return or exchange workflow.")
+    elif not invoiced and sale.status in {DirectSaleStatus.DRAFT, DirectSaleStatus.CONFIRMED}:
         allowed_actions.append("PRE_INVOICE_CANCEL")
-    if invoiced and not delivered:
+    elif invoiced:
         allowed_actions.append("POST_INVOICE_CANCEL")
-    if delivered and sale.status not in {DirectSaleStatus.CANCELLED}:
-        allowed_actions.extend(["DELIVERED_RETURN", "DELIVERED_EXCHANGE", "DAMAGED_RETURN", "PARTIAL_RETURN"])
+        if posted_receipt_count > 0:
+            blocking_reasons.append("Reverse linked receipts before cancelling this invoice.")
     return {
         "direct_sale_id": sale.id,
         "sale_status": sale.status,
-        "invoice_status": getattr(invoice, "status", ""),
+        "invoice_status": getattr(posted_invoice or invoice, "status", ""),
         "delivery_status": "DELIVERED" if delivered else "PENDING",
         "sold_lines": [
             {
@@ -178,12 +193,16 @@ def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
             for line in sale.lines.all()
         ],
         "receipt_summary": {
-            "posted_receipt_count": sale.receipts.filter(status=BillingDocumentStatus.POSTED).count(),
-            "posted_receipt_total": str(_money(receipt_summary.get("total"))),
-            "received_total": str(sale.received_total),
-            "balance_total": str(sale.balance_total),
+            "posted_receipt_count": posted_receipt_count,
+            "posted_receipt_total": str(active_receipt_total),
+            "received_total": str(active_receipt_total),
+            "balance_total": str(outstanding_balance),
         },
+        "active_receipt_total": str(active_receipt_total),
+        "void_receipt_total": str(void_receipt_total),
+        "outstanding_balance": str(outstanding_balance),
         "allowed_actions": allowed_actions,
+        "blocking_reasons": blocking_reasons,
     }
 
 

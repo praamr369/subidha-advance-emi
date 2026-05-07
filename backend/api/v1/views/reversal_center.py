@@ -218,13 +218,26 @@ class AdminReturnPostView(_AdminBase):
 
 class AdminReceiptVoidReasonView(_AdminBase):
     def post(self, request, pk: int):
+        from api.v1.serializers.billing import BillingInvoiceSerializer, DirectSaleSerializer
+
         serializer = ReasonSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             receipt, updated = void_receipt_with_reason(receipt_id=pk, reason=serializer.validated_data["reason"], performed_by=request.user)
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
-        return Response({"updated": updated, "id": receipt.id, "status": receipt.status})
+        invoice = receipt.billing_invoice if receipt.billing_invoice_id else None
+        direct_sale = receipt.direct_sale if receipt.direct_sale_id else None
+        return Response(
+            {
+                "updated": updated,
+                "id": receipt.id,
+                "status": receipt.status,
+                "invoice": BillingInvoiceSerializer(invoice, context={"request": request}).data if invoice else None,
+                "direct_sale": DirectSaleSerializer(direct_sale, context={"request": request}).data if direct_sale else None,
+                "return_eligibility": get_direct_sale_return_eligibility(direct_sale_id=direct_sale.id) if direct_sale else None,
+            }
+        )
 
 
 class AdminCustomerCreditsView(_AdminBase):

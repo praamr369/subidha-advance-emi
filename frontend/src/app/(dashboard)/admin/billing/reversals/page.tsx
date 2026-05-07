@@ -231,7 +231,9 @@ export default function AdminBillingReversalsPage() {
             {eligibility ? (
               <div className="mt-3 space-y-2 text-xs">
                 <div>Status: {eligibility.sale_status} · Invoice: {eligibility.invoice_status || "N/A"} · Delivery: {eligibility.delivery_status}</div>
+                <div>Receipts: active {eligibility.active_receipt_total} · void {eligibility.void_receipt_total} · Outstanding {eligibility.outstanding_balance}</div>
                 <div>Allowed actions: {eligibility.allowed_actions.join(", ") || "None"}</div>
+                {(eligibility.blocking_reasons || []).length ? <div>Blocking reasons: {eligibility.blocking_reasons?.join(" | ")}</div> : null}
                 {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
                   <div key={line.direct_sale_line_id} className="rounded border p-2">
                     Line {line.direct_sale_line_id}: max returnable {line.max_returnable_quantity} · already returned {line.already_returned_quantity}

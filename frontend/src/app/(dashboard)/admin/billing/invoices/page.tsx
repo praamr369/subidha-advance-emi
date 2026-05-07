@@ -252,9 +252,9 @@ export default function BillingInvoicesPage() {
         sourceReference={cancelTarget?.document_no || `INV-${cancelTarget?.id || ""}`}
         currentStatus={cancelTarget?.status || ""}
         financialImpactSummary={`Grand total ${accountingMoney(cancelTarget?.grand_total || 0)} · Received ${accountingMoney(cancelTarget?.received_total || 0)} · Balance ${accountingMoney(cancelTarget?.balance_total || 0)}`}
-        requiresReceiptReversal={Number(cancelTarget?.received_total || 0) > 0}
+        requiresReceiptReversal={Number(cancelTarget?.active_receipt_total || 0) > 0}
         affected={{
-          receipts: true,
+          receipts: Number(cancelTarget?.active_receipt_total || 0) > 0,
           invoices: true,
         }}
         onClose={() => {

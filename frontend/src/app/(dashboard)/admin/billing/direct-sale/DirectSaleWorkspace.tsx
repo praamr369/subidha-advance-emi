@@ -504,9 +504,19 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         ),
     },
     {
+      key: "received_total",
+      header: "Received",
+      render: (row) => accountingMoney(row.received_total),
+    },
+    {
       key: "balance_total",
       header: "Balance",
       render: (row) => accountingMoney(row.balance_total),
+    },
+    {
+      key: "receipt_status",
+      header: "Receipt Status",
+      render: (row) => row.receipt_status || "NONE",
     },
     {
       key: "id",
@@ -521,7 +531,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         const isDraft = row.status === "DRAFT" || !row.billing_invoice_id;
         const invoiceStatus = String(row.billing_invoice_status || "").toUpperCase();
         const isCollectible = row.status === "INVOICED" && invoiceStatus === "POSTED" && balance > 0;
-        const isDelivered = row.status === "DELIVERED";
+        const isDelivered =
+          Boolean(row.delivered_at) ||
+          row.status === "DELIVERED" ||
+          row.operational_state === "DELIVERED_COMPLETE" ||
+          row.delivery_status === "DELIVERED" ||
+          row.delivery_status === "COUNTER_SALE_COMPLETE";
         const isReturnedOrCancelled = row.status === "CANCELLED";
         const eligibilityButton = (
           <button
@@ -532,7 +547,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
               try {
                 const payload = await getAdminDirectSaleReturnEligibility(row.id);
                 setNotice(
-                  `Return eligibility for ${row.sale_no || `#${row.id}`}: ${payload.allowed_actions.join(", ") || "view only"}.`
+                  `Return eligibility for ${row.sale_no || `#${row.id}`}: ${payload.allowed_actions.join(", ") || "view only"}. Receipt ${payload.active_receipt_total} active / ${payload.void_receipt_total} void. Outstanding ${payload.outstanding_balance}.`
                 );
               } catch (err) {
                 setCreateFormError(accountingErrorMessage(err, "Return eligibility failed to load."));
@@ -2112,7 +2127,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         currentStatus={cancelSaleTarget?.status || ""}
         affected={{
           invoices: true,
-          receipts: Number(cancelSaleTarget?.received_total || 0) > 0,
+          receipts: Number(cancelSaleTarget?.active_receipt_total || 0) > 0,
           delivery: Boolean(cancelSaleTarget?.delivery_required),
           stock_requirements: true,
         }}
@@ -2122,7 +2137,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             ? "Delivered direct sales require return/reversal workflow before cancellation."
             : null
         }
-        requiresReceiptReversal={Number(cancelSaleTarget?.received_total || 0) > 0}
+        requiresReceiptReversal={Number(cancelSaleTarget?.active_receipt_total || 0) > 0}
         onClose={() => {
           if (!cancelSubmitting) setCancelSaleTarget(null);
         }}
