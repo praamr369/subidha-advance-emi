@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from accounting.services.bridge_posting_service import post_bridge_entry
@@ -14,6 +15,7 @@ from billing.models import (
     BillingCreditNote,
     BillingCreditNoteLine,
     BillingDocumentStatus,
+    BillingInvoiceLine,
     BillingInvoice,
     CustomerCreditLedger,
     CustomerRefund,
@@ -157,41 +159,56 @@ def _return_stock_already_posted(*, return_id: int, line_id: int) -> bool:
 
 
 def _candidate_invoice_lines(*, direct_sale_line) -> list:
-    invoice = (
-        direct_sale_line.direct_sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED)
-        .prefetch_related("lines")
-        .order_by("-invoice_date", "-id")
-        .first()
-    )
-    if invoice is None:
-        return []
     return list(
-        invoice.lines.filter(
-            inventory_item_id=direct_sale_line.inventory_item_id,
-            description=direct_sale_line.description,
-            unit_price=direct_sale_line.unit_price,
-        )
+        BillingInvoiceLine.objects.filter(invoice__direct_sale=direct_sale_line.direct_sale).filter(
+            Q(inventory_item_id=direct_sale_line.inventory_item_id)
+            | Q(product_id=direct_sale_line.product_id)
+            | Q(description=direct_sale_line.description)
+        ).values_list("invoice_id", "id")
     )
 
 
 def get_sale_out_quantity(direct_sale_line) -> Decimal:
-    invoice_lines = _candidate_invoice_lines(direct_sale_line=direct_sale_line)
-    if not invoice_lines:
-        return Decimal("0.000")
-    refs = [f"{line.invoice_id}:{line.id}" for line in invoice_lines]
-    aggregate = StockLedger.objects.filter(
+    invoice_line_pairs = _candidate_invoice_lines(direct_sale_line=direct_sale_line)
+    sale = direct_sale_line.direct_sale
+    by_invoice_line = Decimal("0.000")
+    if invoice_line_pairs:
+        refs = [f"{invoice_id}:{line_id}" for invoice_id, line_id in invoice_line_pairs]
+        aggregate = StockLedger.objects.filter(
+            movement_type=StockMovementType.SALE_OUT,
+            reference_model="BillingInvoiceLine",
+            reference_id__in=refs,
+        ).aggregate(total=Sum("quantity_out"))
+        by_invoice_line = _qty(aggregate.get("total"))
+    if by_invoice_line > Decimal("0.000"):
+        return by_invoice_line
+    fallback_q = Q(reference_model="DirectSaleLine", reference_id=str(direct_sale_line.id))
+    if sale.sale_no:
+        fallback_q = fallback_q | Q(notes__icontains=sale.sale_no)
+    fallback_q = fallback_q | Q(notes__icontains=f"sale {sale.id}")
+    fallback = StockLedger.objects.filter(
         movement_type=StockMovementType.SALE_OUT,
-        reference_model="BillingInvoiceLine",
-        reference_id__in=refs,
-    ).aggregate(total=Sum("quantity_out"))
-    return _qty(aggregate.get("total"))
+        inventory_item_id=direct_sale_line.inventory_item_id,
+    ).filter(fallback_q).aggregate(total=Sum("quantity_out"))
+    return _qty(fallback.get("total"))
 
 
 def get_returned_quantity(direct_sale_line) -> Decimal:
-    aggregate = DirectSaleReturnLine.objects.filter(
+    posted_return_lines = DirectSaleReturnLine.objects.filter(
         direct_sale_line=direct_sale_line,
         direct_sale_return__status=DirectSaleReturnStatus.POSTED,
-    ).aggregate(total=Sum("quantity"))
+    )
+    refs = [f"{line.direct_sale_return_id}:{line.id}" for line in posted_return_lines.only("id", "direct_sale_return_id")]
+    if refs:
+        ledger_aggregate = StockLedger.objects.filter(
+            movement_type=StockMovementType.SALE_RETURN_IN,
+            reference_model="DirectSaleReturnLine",
+            reference_id__in=refs,
+        ).aggregate(total=Sum("quantity_in"))
+        ledger_total = _qty(ledger_aggregate.get("total"))
+        if ledger_total > Decimal("0.000"):
+            return ledger_total
+    aggregate = posted_return_lines.aggregate(total=Sum("quantity"))
     return _qty(aggregate.get("total"))
 
 
@@ -383,10 +400,27 @@ def get_direct_sale_return_eligibility(
     is_collectible = is_operationally_active and outstanding_balance > Decimal("0.00")
     is_dashboard_visible = is_operationally_active
     has_returnable_line = any(qty > Decimal("0.000") for qty in returnable_by_line.values())
+    sale_credit_totals = CustomerCreditLedger.objects.filter(
+        customer_id=sale.customer_id,
+        direct_sale_return__direct_sale_id=sale.id,
+    ).aggregate(credit=Sum("credit_amount"), debit=Sum("debit_amount"))
+    sale_credit_balance = _money(sale_credit_totals.get("credit")) - _money(sale_credit_totals.get("debit"))
+    refund_paid = _money(
+        CustomerRefund.objects.filter(
+            customer_id=sale.customer_id,
+            direct_sale_return__direct_sale_id=sale.id,
+            status=CustomerRefundStatus.PAID,
+        ).aggregate(total=Sum("amount")).get("total")
+    )
+    net_customer_value = max(Decimal("0.00"), sale_credit_balance - refund_paid)
+    customer_value_settled = net_customer_value <= Decimal("0.00")
+    can_create_return = delivered and any(qty > Decimal("0.000") for qty in returnable_by_line.values()) and not stock_setup_required
+    can_create_exchange = can_create_return
     can_finalize_reversal = (
         posted_receipt_count == 0
         and getattr(invoice_for_payload, "status", "") in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED}
         and (not delivered or not has_returnable_line)
+        and customer_value_settled
     )
     finalize_blocking_reasons: list[str] = []
     if posted_receipt_count > 0:
@@ -398,8 +432,31 @@ def get_direct_sale_return_eligibility(
         finalize_blocking_reasons.append("Invoice must be reversed or voided before final archive.")
     if delivered and has_returnable_line:
         finalize_blocking_reasons.append("Delivered lines still have returnable quantity. Post SALE_RETURN_IN first.")
-    if is_operationally_active:
-        finalize_blocking_reasons.append("Create customer credit/refund decision and finalize audited cancellation.")
+    if not customer_value_settled:
+        finalize_blocking_reasons.append("Customer value is unsettled. Complete credit/refund decision first.")
+    workflow_steps = [
+        {"key": "RECEIPT_VOIDED", "label": "Receipt voided", "status": "DONE" if posted_receipt_count == 0 else "REQUIRED"},
+        {
+            "key": "INVOICE_REVERSED_OR_VOIDED",
+            "label": "Invoice reversed/voided",
+            "status": "DONE" if getattr(invoice_for_payload, "status", "") in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED} else "REQUIRED",
+        },
+        {
+            "key": "PRODUCT_RETURNED_TO_STOCK",
+            "label": "Product returned to stock",
+            "status": "DONE" if (not delivered or not has_returnable_line) else "REQUIRED",
+        },
+        {
+            "key": "CUSTOMER_VALUE_SETTLED",
+            "label": "Customer credit/refund decision",
+            "status": "DONE" if customer_value_settled else "BLOCKED",
+        },
+        {
+            "key": "FINALIZE_ARCHIVE",
+            "label": "Finalize/archive sale",
+            "status": "DONE" if can_finalize_reversal else "BLOCKED",
+        },
+    ]
     default_destination_row = (
         destination_catalog[ReturnStockDestination.INSPECTION][0]
         if destination_catalog[ReturnStockDestination.INSPECTION]
@@ -524,6 +581,9 @@ def get_direct_sale_return_eligibility(
         "replacement_stock_available": replacement_stock_available,
         "stock_blocking_reasons": stock_blocking_reasons,
         "allowed_actions": allowed_actions,
+        "workflow_steps": workflow_steps,
+        "can_create_return": can_create_return,
+        "can_create_exchange": can_create_exchange,
         "blocking_reasons": blocking_reasons,
         "stock_setup_required": stock_setup_required,
         "stock_setup_message": (
@@ -646,7 +706,7 @@ def create_direct_sale_return(
     ):
         raise ValueError(f"{stock_destination.title()} returns require stock_location_id.")
     if not lines:
-        raise ValueError("At least one return line is required.")
+        raise DjangoValidationError({"lines": ["At least one return line is required."]})
 
     sale = DirectSale.objects.select_for_update(of=("self",)).prefetch_related("lines", "billing_invoices").get(pk=direct_sale_id)
     destination_catalog = _return_destination_catalog()
@@ -685,10 +745,10 @@ def create_direct_sale_return(
         sale_line_id = int(row.get("direct_sale_line_id") or 0)
         quantity = _qty(row.get("quantity"))
         if sale_line_id <= 0 or quantity <= Decimal("0.000"):
-            raise ValueError("Each return line needs valid direct_sale_line_id and quantity.")
+            raise DjangoValidationError({"lines": ["Each return line needs valid direct_sale_line_id and quantity."]})
         sale_line = by_line.get(sale_line_id)
         if sale_line is None:
-            raise ValueError(f"Direct sale line {sale_line_id} not found.")
+            raise DjangoValidationError({"lines": [f"Direct sale line {sale_line_id} not found in this sale."]})
 
         sold_qty = _qty(sale_line.quantity)
         returned_qty = _reserved_return_quantity(sale_line)
@@ -697,8 +757,8 @@ def create_direct_sale_return(
         if return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL and sale_out_qty <= Decimal("0.000"):
             allowed_qty = max(Decimal("0.000"), sold_qty - returned_qty)
         if quantity > allowed_qty:
-            raise ValueError(
-                f"Return quantity exceeds posted sale-out quantity for line {sale_line.id}. Remaining: {allowed_qty}."
+            raise DjangoValidationError(
+                {"lines": [f"Return quantity exceeds returnable quantity for line {sale_line.id}. Remaining: {allowed_qty}."]}
             )
 
         unit_price = _money(sale_line.unit_price)

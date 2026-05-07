@@ -98,6 +98,9 @@ export type DirectSaleReturnEligibility = {
   missing_location_types?: string[];
   can_finalize_reversal?: boolean;
   finalize_blocking_reasons?: string[];
+  can_create_return?: boolean;
+  can_create_exchange?: boolean;
+  workflow_steps?: Array<{ key: string; label: string; status: "DONE" | "REQUIRED" | "BLOCKED" }>;
   is_operationally_active?: boolean;
   is_collectible?: boolean;
   is_dashboard_visible?: boolean;
@@ -199,6 +202,16 @@ export async function searchAdminInventoryItems(
   }>;
 }> {
   return apiFetch(`/admin/inventory/items/search/${query({ q })}`);
+}
+
+export async function setupAdminReturnLocations(): Promise<{
+  created_count: number;
+  existing_count: number;
+}> {
+  return apiFetch("/admin/inventory/locations/setup-return-locations/", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function approveAdminDirectSaleReturn(returnId: number): Promise<{ updated: boolean }> {

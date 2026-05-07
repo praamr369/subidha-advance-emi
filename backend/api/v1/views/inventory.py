@@ -554,6 +554,36 @@ class AdminInventoryItemSearchView(APIView):
         return Response({"count": len(rows), "results": rows})
 
 
+class AdminReturnLocationsSetupView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        required = [
+            ("RET-INSP", "Return Inspection", "WAREHOUSE"),
+            ("RET-DMG", "Return Damaged", "WAREHOUSE"),
+            ("RET-SVC", "Return Service", "WAREHOUSE"),
+        ]
+        created = []
+        existing = []
+        for code, name, location_type in required:
+            location, was_created = StockLocation.objects.get_or_create(
+                code=code,
+                defaults={"name": name, "location_type": location_type, "is_active": True, "notes": "Auto-created for reversal return workflow"},
+            )
+            if was_created:
+                created.append({"id": location.id, "code": location.code, "name": location.name})
+            else:
+                existing.append({"id": location.id, "code": location.code, "name": location.name})
+        return Response(
+            {
+                "created_count": len(created),
+                "existing_count": len(existing),
+                "created": created,
+                "existing": existing,
+            }
+        )
+
+
 class OpeningStockImportPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     parser_classes = [MultiPartParser, FormParser]

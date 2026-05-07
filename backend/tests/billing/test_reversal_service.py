@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, Vendor as AccountingVendor
@@ -63,7 +64,7 @@ class ReversalServiceTests(TestCase):
             movement_type=StockMovementType.SALE_OUT,
             reference_model="BillingInvoiceLine",
         ).count()
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             cancel_direct_sale_before_invoice(direct_sale_id=sale.id, reason="Too late", performed_by=self.admin)
 
     def test_sale_return_posts_credit_note_and_stock_return_in(self):
@@ -111,7 +112,7 @@ class ReversalServiceTests(TestCase):
         invoice = sale.billing_invoices.first()
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             create_direct_sale_return(
                 direct_sale_id=sale.id,
                 reason="Invalid qty",
@@ -225,13 +226,30 @@ class ReversalServiceTests(TestCase):
         self.assertIn("customer_name", eligibility)
         self.assertIn("stock_destinations", eligibility)
 
+    def test_returnable_quantity_uses_sale_out_even_when_invoice_void(self):
+        payload = self._sale_payload()
+        payload["received_total"] = Decimal("2000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        receipt = invoice.receipts.first()
+        void_receipt_with_reason(receipt_id=receipt.id, reason="Void for test", performed_by=self.admin)
+        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Cancel for returnability test")
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=sale.id)
+        self.assertEqual(eligibility["invoice_status"], BillingDocumentStatus.VOID)
+        self.assertEqual(eligibility["return_lines"][0]["sale_out_quantity"], "2.000")
+        self.assertEqual(eligibility["return_lines"][0]["already_returned_quantity"], "0.000")
+        self.assertEqual(eligibility["return_lines"][0]["returnable_quantity"], "2.000")
+
     def test_return_rejects_line_not_belonging_to_sale(self):
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
         invoice = sale.billing_invoices.first()
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
         other_sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             create_direct_sale_return(
                 direct_sale_id=sale.id,
                 reason="Invalid line",
@@ -246,7 +264,7 @@ class ReversalServiceTests(TestCase):
         invoice = sale.billing_invoices.first()
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             create_direct_sale_return(
                 direct_sale_id=sale.id,
                 reason="Try sellable without confirmation",
@@ -276,7 +294,7 @@ class ReversalServiceTests(TestCase):
         self.assertFalse(StockLedger.objects.filter(reference_model="ReceiptDocument", reference_id=str(receipt.id)).exists())
 
     def test_refund_cannot_exceed_customer_credit(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             create_customer_refund(customer_id=self.customer.id, amount="1.00", method="CASH_REFUND", finance_account_id=self.cash_account.id, reason="No credit")
 
     def test_purchase_return_creates_purchase_return_out(self):
@@ -371,7 +389,7 @@ class ReversalServiceTests(TestCase):
         ret.save(update_fields=["status", "updated_at"])
         post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, DjangoValidationError)):
             create_direct_sale_return(
                 direct_sale_id=sale.id,
                 reason="Duplicate return",

@@ -103,6 +103,13 @@ class ReversalCenterApiTests(APITestCase):
         self.assertTrue(response.data["stock_setup_required"])
         self.assertIn("INSPECTION", response.data["missing_location_types"])
 
+    def test_setup_return_locations_endpoint_creates_missing_locations(self):
+        StockLocation.objects.filter(code__in=["RET-INSP", "RET-DMG", "RET-SVC"]).delete()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post("/api/v1/admin/inventory/locations/setup-return-locations/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertGreaterEqual(response.data["created_count"], 1)
+
     def test_inventory_ledger_filters_show_return_and_exchange_movements(self):
         replacement_product = create_product(name="Rev API Replacement", product_code="REV-API-002", base_price=Decimal("1200.00"))
         replacement_item = InventoryItem.objects.create(product=replacement_product, sku="REV-API-SKU-002", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("5.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("900.00"))

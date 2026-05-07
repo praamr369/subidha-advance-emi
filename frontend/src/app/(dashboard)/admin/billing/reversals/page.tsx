@@ -21,6 +21,7 @@ import {
   getAdminDirectSaleReturnEligibility,
   listAdminReversals,
   searchAdminInventoryItems,
+  setupAdminReturnLocations,
   payAdminCustomerRefund,
   postAdminDirectSaleReturn,
   postAdminPurchaseReturn,
@@ -41,6 +42,9 @@ export default function AdminBillingReversalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [returnFormError, setReturnFormError] = useState<string | null>(null);
+  const [stockSetupError, setStockSetupError] = useState<string | null>(null);
 
   const [type, setType] = useState<string>("");
   const [status, setStatus] = useState("");
@@ -157,6 +161,9 @@ export default function AdminBillingReversalsPage() {
       await action();
       setNotice(success);
       setError(null);
+      setActionError(null);
+      setReturnFormError(null);
+      setStockSetupError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
         queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-movements"] }),
@@ -170,7 +177,7 @@ export default function AdminBillingReversalsPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setActionError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
@@ -182,6 +189,7 @@ export default function AdminBillingReversalsPage() {
     >
       <div className="space-y-6">
         {notice ? <div className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</div> : null}
+        {actionError ? <div className="rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">{actionError}</div> : null}
         <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-7">
           <div className="rounded border p-2">Pending Returns: {grouped.pendingReturns}</div>
           <div className="rounded border p-2">Approved Returns: {grouped.approvedReturns}</div>
@@ -230,6 +238,7 @@ export default function AdminBillingReversalsPage() {
             <div className="mb-2 rounded border bg-muted/20 p-2 text-xs">
               Sale: {eligibility?.sale_no || "N/A"} | Customer: {eligibility?.customer_name || "N/A"} {eligibility?.customer_phone_masked ? `(${eligibility.customer_phone_masked})` : ""}
             </div>
+            {stockSetupError ? <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">{stockSetupError}</div> : null}
             {debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <select className="h-10 rounded border px-2" value={returnKind} onChange={(e) => setReturnKind(e.target.value as DirectSaleReturnKind)} aria-label="Return Kind">
@@ -297,6 +306,7 @@ export default function AdminBillingReversalsPage() {
                 </table>
               )}
             </div>
+            {returnFormError ? <div className="mb-2 rounded border border-rose-300 bg-rose-50 p-2 text-xs text-rose-900">{returnFormError}</div> : null}
             <select className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} aria-label="Stock Destination Location">
               <option value="">Select stock destination</option>
               {(eligibility?.stock_destinations || []).map((location) => (
@@ -305,12 +315,30 @@ export default function AdminBillingReversalsPage() {
                 </option>
               ))}
             </select>
+            {eligibility?.stock_setup_required ? (
+              <button
+                className="mt-2 rounded border px-3 py-2 text-xs"
+                onClick={() => {
+                  void runAction(
+                    async () => {
+                      await setupAdminReturnLocations();
+                      setStockSetupError(null);
+                    },
+                    "Return locations setup completed.",
+                  );
+                }}
+              >
+                Create Missing Return Locations
+              </button>
+            ) : null}
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
-            <button className="rounded border px-3 py-2 text-sm" onClick={() => {
+            <button className="rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={Boolean(eligibility?.stock_setup_required) || !(eligibility?.can_create_return ?? true)} onClick={() => {
               if (!returnReason.trim()) { setError("Return reason is required."); return; }
+              if (eligibility?.stock_setup_required) { setStockSetupError(eligibility.stock_setup_message || "Create missing return locations first."); return; }
               const lines = (eligibility?.return_lines || [])
                 .map((line) => ({ direct_sale_line_id: line.sale_line_id, quantity: returnQuantities[line.sale_line_id] || "0" }))
                 .filter((line) => Number(line.quantity) > 0);
+              if (!lines.length) { setReturnFormError("At least one return line is required."); return; }
               void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, confirm_sellable_destination: stockDestination === "SELLABLE", lines }), "Return created.");
             }}>Create Return</button>
           </div>
@@ -353,7 +381,7 @@ export default function AdminBillingReversalsPage() {
               ))}
             </select>
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={exchangeReason} onChange={(e) => setExchangeReason(e.target.value)} placeholder="Reason" />
-            <button className="rounded border px-3 py-2 text-sm" onClick={() => {
+            <button className="rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={!(eligibility?.can_create_exchange ?? true)} onClick={() => {
               if (!exchangeReason.trim()) { setError("Exchange reason is required."); return; }
               const firstReturnLine = (eligibility?.return_lines || []).find((line) => Number(returnQuantities[line.sale_line_id] || "0") > 0) || eligibility?.return_lines?.[0];
               if (!firstReturnLine) { setError("No returnable sale line available for exchange."); return; }
@@ -381,11 +409,9 @@ export default function AdminBillingReversalsPage() {
                 {eligibility.stock_setup_required ? <div className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">{eligibility.stock_setup_message} Missing: {(eligibility.missing_location_types || []).join(", ")}</div> : null}
                 <div className="rounded border p-2">
                   <div className="font-semibold">Workflow checklist</div>
-                  <div>Receipt voided: {Number(eligibility.receipt_summary?.active_receipt_count || 0) === 0 ? "Done" : "Required"}</div>
-                  <div>Invoice reversed/voided: {["VOID", "REVERSED", "CANCELLED"].includes(eligibility.invoice_status || "") ? "Done" : "Required"}</div>
-                  <div>Product returned to stock: {(eligibility.return_lines || []).every((line) => Number(line.returnable_quantity) <= 0) ? "Done" : "Required"}</div>
-                  <div>Customer credit/refund decision: {eligibility.is_operationally_active ? "Blocked" : "Done"}</div>
-                  <div>Finalize/archive sale: {eligibility.can_finalize_reversal ? "Done" : "Blocked"}</div>
+                  {(eligibility.workflow_steps || []).map((step) => (
+                    <div key={step.key}>{step.label}: {step.status}</div>
+                  ))}
                 </div>
                 {!eligibility.can_finalize_reversal ? <div>Finalize blockers: {(eligibility.finalize_blocking_reasons || []).join(" | ")}</div> : null}
                 {eligibility.can_finalize_reversal ? (

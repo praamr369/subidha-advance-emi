@@ -181,6 +181,10 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
         default_stock_destination_id: 5,
         can_finalize_reversal: false,
         finalize_blocking_reasons: ["Invoice must be reversed/voided first"],
+        workflow_steps: [
+          { key: "RECEIPT_VOIDED", label: "Receipt voided", status: "DONE" },
+          { key: "INVOICE_REVERSED_OR_VOIDED", label: "Invoice reversed/voided", status: "DONE" },
+        ],
       }),
     });
   });
@@ -196,4 +200,38 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
   await expect(page.locator("body")).toContainText("Receipts: active 0.00 · void 21000.00 · Outstanding 21000.00");
   await expect(page.locator("body")).toContainText("Workflow checklist");
   await expect(page.locator("body")).toContainText("Finalize blockers");
+});
+
+test("create return disabled when stock setup missing", async ({ page }) => {
+  await page.route("**/api/v1/admin/billing/returns/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, results: [] }) });
+  });
+  await page.route("**/api/v1/admin/billing/direct-sales/1/return-eligibility/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        direct_sale_id: 1,
+        sale_status: "DELIVERED",
+        invoice_status: "VOID",
+        delivery_status: "DELIVERED",
+        active_receipt_total: "0.00",
+        void_receipt_total: "21000.00",
+        outstanding_balance: "0.00",
+        receipt_summary: { posted_receipt_count: 0, posted_receipt_total: "0.00", received_total: "0.00", balance_total: "0.00", active_receipt_count: 0, void_receipt_count: 1 },
+        allowed_actions: ["RETURN_PRODUCT", "EXCHANGE_PRODUCT"],
+        return_lines: [{ sale_line_id: 77, product_id: 8, product_name: "Chair", sku: "CHAIR-01", inventory_item_id: 9, sold_quantity: "1.000", already_returned_quantity: "0.000", returnable_quantity: "1.000", default_return_quantity: "1.000", unit_price: "1000.00", line_total: "1000.00" }],
+        stock_setup_required: true,
+        stock_setup_message: "Create INSPECTION, DAMAGED, and SERVICE stock locations before processing returns.",
+        missing_location_types: ["INSPECTION", "DAMAGED", "SERVICE"],
+        can_create_return: false,
+        can_finalize_reversal: false,
+        workflow_steps: [],
+        sold_lines: [],
+      }),
+    });
+  });
+  await page.goto("/admin/billing/reversals?direct_sale=1");
+  await expect(page.getByText("Create INSPECTION, DAMAGED, and SERVICE stock locations before processing returns.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create Return" })).toBeDisabled();
 });
