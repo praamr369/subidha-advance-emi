@@ -81,7 +81,9 @@ export default function AdminServiceDeskOverviewPage() {
       setIssueTickets([]);
       setIssueCount(0);
       setIssueSummary(null);
-      setIssueError(toErrorMessage(err, "Unable to load issue tickets."));
+      setIssueError(
+        err instanceof Error && err.message.trim() ? err.message : "Unable to load issue tickets."
+      );
     } finally {
       setIssueLoading(false);
     }

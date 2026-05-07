@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -154,7 +153,7 @@ export default function CustomerSupportTicketDetailPage() {
             <ul className="space-y-2 text-xs text-muted-foreground">
               {ticket.timeline.slice(-12).map((row, idx) => (
                 <li key={`${String(row.at)}-${idx}`}>
-                  {(row.event_type as string) || row.kind} · {String(row.at)}
+                  {String(row.event_type ?? row.kind ?? "")} · {String(row.at ?? "")}
                 </li>
               ))}
             </ul>

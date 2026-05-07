@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
 import PortalPage from "@/components/ui/PortalPage";
@@ -178,14 +176,12 @@ export default function CustomerSupportNewPage() {
               Attachments: file upload is not enabled in this build; describe any evidence in the text above.
             </p>
           </FormSection>
-          <FormActions>
-            <ActionButton type="submit" disabled={submitting}>
-              {submitting ? "Submitting…" : "Submit request"}
-            </ActionButton>
-            <Link href={ROUTES.customer.support} className="text-sm text-muted-foreground underline">
-              Cancel
-            </Link>
-          </FormActions>
+          <FormActions
+            submitLabel="Submit request"
+            submitLoadingLabel="Submitting…"
+            submitting={submitting}
+            cancel={{ label: "Cancel", href: ROUTES.customer.support }}
+          />
         </form>
       ) : null}
     </PortalPage>
