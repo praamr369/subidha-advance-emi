@@ -13,8 +13,18 @@ class ReasonSerializer(serializers.Serializer):
 
 
 class DirectSaleReturnCreateLineSerializer(serializers.Serializer):
-    direct_sale_line_id = serializers.IntegerField(min_value=1)
+    direct_sale_line_id = serializers.IntegerField(required=False, min_value=1)
+    sale_line_id = serializers.IntegerField(required=False, min_value=1)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
+
+    def validate(self, attrs):
+        direct_id = attrs.get("direct_sale_line_id")
+        sale_id = attrs.get("sale_line_id")
+        resolved = direct_id or sale_id
+        if not resolved:
+            raise serializers.ValidationError("sale_line_id is required.")
+        attrs["direct_sale_line_id"] = resolved
+        return attrs
 
 
 class DirectSaleReturnCreateSerializer(serializers.Serializer):

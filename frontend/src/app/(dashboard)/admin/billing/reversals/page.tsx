@@ -20,6 +20,7 @@ import {
   createAdminPurchaseReturn,
   getAdminDirectSaleReturnEligibility,
   listAdminReversals,
+  searchAdminInventoryItems,
   payAdminCustomerRefund,
   postAdminDirectSaleReturn,
   postAdminPurchaseReturn,
@@ -35,6 +36,7 @@ const types: ReversalType[] = ["sale_return", "receipt_void", "customer_refund",
 
 export default function AdminBillingReversalsPage() {
   const searchParams = useSearchParams();
+  const debugMode = searchParams.get("debug") === "1";
   const [rows, setRows] = useState<ReversalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +55,6 @@ export default function AdminBillingReversalsPage() {
   const [voidReason, setVoidReason] = useState("");
 
   const [returnSaleId, setReturnSaleId] = useState("");
-  const [returnLineId, setReturnLineId] = useState("");
-  const [returnQty, setReturnQty] = useState("1");
   const [returnKind, setReturnKind] = useState<DirectSaleReturnKind>("DELIVERED_RETURN");
   const [returnCondition, setReturnCondition] = useState("NEEDS_INSPECTION");
   const [refundMode, setRefundMode] = useState("CUSTOMER_CREDIT");
@@ -63,15 +63,17 @@ export default function AdminBillingReversalsPage() {
   const [returnReason, setReturnReason] = useState("");
   const [eligibilitySaleId, setEligibilitySaleId] = useState("");
   const [eligibility, setEligibility] = useState<DirectSaleReturnEligibility | null>(null);
+  const [loadingEligibility, setLoadingEligibility] = useState(false);
+  const [returnQuantities, setReturnQuantities] = useState<Record<number, string>>({});
 
   const [exchangeSaleId, setExchangeSaleId] = useState("");
-  const [exchangeReturnLineId, setExchangeReturnLineId] = useState("");
-  const [exchangeReturnQty, setExchangeReturnQty] = useState("1");
   const [exchangeInventoryItemId, setExchangeInventoryItemId] = useState("");
   const [exchangeReplacementLocationId, setExchangeReplacementLocationId] = useState("");
   const [exchangeQty, setExchangeQty] = useState("1");
   const [exchangeUnitPrice, setExchangeUnitPrice] = useState("");
   const [exchangeReason, setExchangeReason] = useState("");
+  const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventorySearchRows, setInventorySearchRows] = useState<Array<{ id: number; product_name: string; sku: string; available_by_location: Array<{ stock_location_id: number; stock_location_name: string; available_quantity: string }> }>>([]);
 
   const [refundCustomerId, setRefundCustomerId] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
@@ -98,6 +100,28 @@ export default function AdminBillingReversalsPage() {
       setEligibilitySaleId(exchangeSale);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!eligibilitySaleId) return;
+    setLoadingEligibility(true);
+    void getAdminDirectSaleReturnEligibility(Number(eligibilitySaleId))
+      .then((payload) => {
+        setEligibility(payload);
+        setReturnSaleId(String(payload.direct_sale_id));
+        setExchangeSaleId(String(payload.direct_sale_id));
+        setReturnKind((payload.default_return_kind as DirectSaleReturnKind) || "DELIVERED_RETURN");
+        setReturnCondition(payload.default_condition || "NEEDS_INSPECTION");
+        setRefundMode(payload.default_refund_mode || "CUSTOMER_CREDIT");
+        setStockLocationId(String(payload.default_stock_destination_id || ""));
+        const initial: Record<number, string> = {};
+        (payload.return_lines || []).forEach((line) => {
+          initial[line.sale_line_id] = line.default_return_quantity || line.returnable_quantity || "0";
+        });
+        setReturnQuantities(initial);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load return eligibility."))
+      .finally(() => setLoadingEligibility(false));
+  }, [eligibilitySaleId]);
 
   async function load() {
     setLoading(true);
@@ -140,6 +164,10 @@ export default function AdminBillingReversalsPage() {
         queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
         queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
       ]);
+      if (eligibilitySaleId) {
+        const refreshed = await getAdminDirectSaleReturnEligibility(Number(eligibilitySaleId));
+        setEligibility(refreshed);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
@@ -198,8 +226,11 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Create Return</div>
-            <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, and stock ledger rows will remain unchanged. The system will create reversal documents, credit notes, and stock ledger movements.</p>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" />
+            <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, delivery, and stock ledger rows will remain unchanged. The system will create reversal documents and additive stock movements.</p>
+            <div className="mb-2 rounded border bg-muted/20 p-2 text-xs">
+              Sale: {eligibility?.sale_no || "N/A"} | Customer: {eligibility?.customer_name || "N/A"} {eligibility?.customer_phone_masked ? `(${eligibility.customer_phone_masked})` : ""}
+            </div>
+            {debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <select className="h-10 rounded border px-2" value={returnKind} onChange={(e) => setReturnKind(e.target.value as DirectSaleReturnKind)} aria-label="Return Kind">
                 <option value="POST_INVOICE_CANCEL">POST_INVOICE_CANCEL</option>
@@ -240,40 +271,93 @@ export default function AdminBillingReversalsPage() {
                 <option value="ADJUST_AGAINST_DUE">ADJUST_AGAINST_DUE</option>
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input className="h-10 rounded border px-2" value={returnLineId} onChange={(e) => setReturnLineId(e.target.value)} placeholder="Sale Line ID" />
-              <input className="h-10 rounded border px-2" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} placeholder="Qty" />
+            <div className="mb-2 rounded border p-2 text-xs">
+              {(eligibility?.return_lines || []).length === 0 ? "No returnable lines." : (
+                <table className="min-w-full">
+                  <thead>
+                    <tr>
+                      <th className="px-1 py-1 text-left">Product</th>
+                      <th className="px-1 py-1 text-left">SKU</th>
+                      <th className="px-1 py-1 text-left">Returnable</th>
+                      <th className="px-1 py-1 text-left">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(eligibility?.return_lines || []).map((line) => (
+                      <tr key={line.sale_line_id} className="border-t">
+                        <td className="px-1 py-1">{line.product_name}</td>
+                        <td className="px-1 py-1">{line.sku || "-"}</td>
+                        <td className="px-1 py-1">{line.returnable_quantity}</td>
+                        <td className="px-1 py-1">
+                          <input className="h-8 w-24 rounded border px-2" value={returnQuantities[line.sale_line_id] || "0"} onChange={(e) => setReturnQuantities((prev) => ({ ...prev, [line.sale_line_id]: e.target.value }))} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Stock Location ID for inspection/damaged/service" />
+            <select className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} aria-label="Stock Destination Location">
+              <option value="">Select stock destination</option>
+              {(eligibility?.stock_destinations || []).map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name} ({location.type})
+                </option>
+              ))}
+            </select>
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!returnReason.trim()) { setError("Return reason is required."); return; }
-              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, confirm_sellable_destination: stockDestination === "SELLABLE", lines: [{ direct_sale_line_id: Number(returnLineId), quantity: returnQty }] }), "Return created.");
+              const lines = (eligibility?.return_lines || [])
+                .map((line) => ({ direct_sale_line_id: line.sale_line_id, quantity: returnQuantities[line.sale_line_id] || "0" }))
+                .filter((line) => Number(line.quantity) > 0);
+              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, confirm_sellable_destination: stockDestination === "SELLABLE", lines }), "Return created.");
             }}>Create Return</button>
           </div>
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Exchange Product</div>
             <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, and stock ledger rows will remain unchanged. The system will create reversal documents, credit notes, and stock ledger movements.</p>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" />
-            <div className="grid grid-cols-2 gap-2">
-              <input className="h-10 rounded border px-2" value={exchangeReturnLineId} onChange={(e) => setExchangeReturnLineId(e.target.value)} placeholder="Old Sale Line ID" />
-              <input className="h-10 rounded border px-2" value={exchangeReturnQty} onChange={(e) => setExchangeReturnQty(e.target.value)} placeholder="Old Qty" />
-            </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <input className="h-10 rounded border px-2" value={exchangeInventoryItemId} onChange={(e) => setExchangeInventoryItemId(e.target.value)} placeholder="New Inventory Item ID" />
-              <input className="h-10 rounded border px-2" value={exchangeReplacementLocationId} onChange={(e) => setExchangeReplacementLocationId(e.target.value)} placeholder="New Stock Location ID" />
+            {debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
+            <input className="h-10 w-full rounded border px-2" value={inventoryQuery} onChange={(e) => setInventoryQuery(e.target.value)} placeholder="Search replacement by product/SKU" />
+            <button className="mt-2 rounded border px-3 py-2 text-sm" onClick={() => {
+              void searchAdminInventoryItems(inventoryQuery).then((payload) => setInventorySearchRows(payload.results)).catch((err) => setError(err instanceof Error ? err.message : "Inventory search failed."));
+            }}>Search Replacement</button>
+            <select className="mt-2 h-10 w-full rounded border px-2" value={exchangeInventoryItemId} onChange={(e) => setExchangeInventoryItemId(e.target.value)} aria-label="Replacement Inventory Item">
+              <option value="">Select replacement item</option>
+              {inventorySearchRows.map((row) => (
+                <option key={row.id} value={row.id}>{row.product_name} ({row.sku || "No SKU"})</option>
+              ))}
+            </select>
+            <select className="mt-2 h-10 w-full rounded border px-2" value={exchangeReplacementLocationId} onChange={(e) => setExchangeReplacementLocationId(e.target.value)} aria-label="Replacement Stock Location">
+              <option value="">Select replacement location</option>
+              {(inventorySearchRows.find((row) => String(row.id) === exchangeInventoryItemId)?.available_by_location || []).map((loc) => (
+                <option key={loc.stock_location_id} value={loc.stock_location_id}>
+                  {loc.stock_location_name} (Qty {loc.available_quantity})
+                </option>
+              ))}
+            </select>
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <input className="h-10 rounded border px-2" value={exchangeQty} onChange={(e) => setExchangeQty(e.target.value)} placeholder="New Qty" />
+              <input className="h-10 rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
             </div>
-            <input className="mt-2 h-10 w-full rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
             <div className="mt-2 rounded border border-border bg-muted/30 p-2 text-xs">
               Replacement value {(Number(exchangeQty || 0) * Number(exchangeUnitPrice || 0)).toFixed(2)}. Backend will classify the difference as customer payable, customer credit, or zero-difference exchange.
             </div>
-            <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Returned Stock Location ID" />
+            <select className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} aria-label="Returned Stock Location">
+              <option value="">Select returned stock location</option>
+              {(eligibility?.stock_destinations || []).map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name} ({location.type})
+                </option>
+              ))}
+            </select>
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={exchangeReason} onChange={(e) => setExchangeReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!exchangeReason.trim()) { setError("Exchange reason is required."); return; }
-              void runAction(() => createAdminDirectSaleExchange(Number(exchangeSaleId), { reason: exchangeReason, stock_destination: "INSPECTION", stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, returned_lines: [{ direct_sale_line_id: Number(exchangeReturnLineId), quantity: exchangeReturnQty }], replacement_lines: [{ inventory_item_id: Number(exchangeInventoryItemId), stock_location_id: exchangeReplacementLocationId ? Number(exchangeReplacementLocationId) : undefined, quantity: exchangeQty, unit_price: exchangeUnitPrice }] }), "Exchange created.");
+              const firstReturnLine = (eligibility?.return_lines || []).find((line) => Number(returnQuantities[line.sale_line_id] || "0") > 0) || eligibility?.return_lines?.[0];
+              if (!firstReturnLine) { setError("No returnable sale line available for exchange."); return; }
+              void runAction(() => createAdminDirectSaleExchange(Number(exchangeSaleId), { reason: exchangeReason, stock_destination: "INSPECTION", stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, returned_lines: [{ direct_sale_line_id: firstReturnLine.sale_line_id, quantity: returnQuantities[firstReturnLine.sale_line_id] || firstReturnLine.returnable_quantity }], replacement_lines: [{ inventory_item_id: Number(exchangeInventoryItemId), stock_location_id: exchangeReplacementLocationId ? Number(exchangeReplacementLocationId) : undefined, quantity: exchangeQty, unit_price: exchangeUnitPrice }] }), "Exchange created.");
             }}>Create Exchange</button>
           </div>
 
@@ -286,6 +370,7 @@ export default function AdminBillingReversalsPage() {
                 setEligibility(payload);
               }, "Return eligibility loaded.");
             }}>View Return Eligibility</button>
+            {loadingEligibility ? <div className="mt-2 text-xs">Loading eligibility...</div> : null}
             {eligibility ? (
               <div className="mt-3 space-y-2 text-xs">
                 <div>Status: {eligibility.sale_status} · Invoice: {eligibility.invoice_status || "N/A"} · Delivery: {eligibility.delivery_status}</div>
@@ -293,6 +378,29 @@ export default function AdminBillingReversalsPage() {
                 <div>Allowed actions: {eligibility.allowed_actions.join(", ") || "None"}</div>
                 {eligibility.replacement_stock_available ? <div>Replacement stock available: {eligibility.replacement_stock_available}</div> : null}
                 {(eligibility.blocking_reasons || []).length ? <div>Blocking reasons: {eligibility.blocking_reasons?.join(" | ")}</div> : null}
+                {eligibility.stock_setup_required ? <div className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">{eligibility.stock_setup_message} Missing: {(eligibility.missing_location_types || []).join(", ")}</div> : null}
+                <div className="rounded border p-2">
+                  <div className="font-semibold">Workflow checklist</div>
+                  <div>Receipt voided: {Number(eligibility.receipt_summary?.active_receipt_count || 0) === 0 ? "Done" : "Required"}</div>
+                  <div>Invoice reversed/voided: {["VOID", "REVERSED", "CANCELLED"].includes(eligibility.invoice_status || "") ? "Done" : "Required"}</div>
+                  <div>Product returned to stock: {(eligibility.return_lines || []).every((line) => Number(line.returnable_quantity) <= 0) ? "Done" : "Required"}</div>
+                  <div>Customer credit/refund decision: {eligibility.is_operationally_active ? "Blocked" : "Done"}</div>
+                  <div>Finalize/archive sale: {eligibility.can_finalize_reversal ? "Done" : "Blocked"}</div>
+                </div>
+                {!eligibility.can_finalize_reversal ? <div>Finalize blockers: {(eligibility.finalize_blocking_reasons || []).join(" | ")}</div> : null}
+                {eligibility.can_finalize_reversal ? (
+                  <button
+                    className="rounded border px-3 py-2 text-xs"
+                    onClick={() => {
+                      void runAction(
+                        () => cancelAdminDirectSale(eligibility.direct_sale_id, "Finalize full cancellation/archive after reversal controls satisfied."),
+                        "Sale finalized and archived.",
+                      );
+                    }}
+                  >
+                    Finalize Full Cancellation / Archive Sale
+                  </button>
+                ) : null}
                 {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
                   <div key={line.direct_sale_line_id} className="rounded border p-2">
                     Line {line.direct_sale_line_id}: sold {line.sold_quantity} · returned {line.already_returned_quantity} · returnable {line.returnable_quantity || line.max_returnable_quantity}

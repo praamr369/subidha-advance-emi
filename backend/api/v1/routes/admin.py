@@ -259,6 +259,7 @@ from api.v1.views.admin_inventory_ops import (
     AdminInventoryStockNeedListCreateView,
     AdminInventoryStockNeedPatchView,
 )
+from api.v1.views.inventory import AdminInventoryItemSearchView
 from api.v1.views.admin_sales_ops import (
     AdminSalesDirectSaleDetailView,
     AdminSalesDirectSaleListCreateView,
@@ -670,6 +671,7 @@ urlpatterns = [
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
     path("inventory/readiness/", AdminInventoryReadinessView.as_view()),
+    path("inventory/items/search/", AdminInventoryItemSearchView.as_view()),
     path("inventory/stock-needs/", AdminInventoryStockNeedListCreateView.as_view()),
     path("inventory/stock-needs/<int:pk>/", AdminInventoryStockNeedPatchView.as_view()),
     path("inventory/stock-needs/<int:pk>/recheck/", AdminInventoryStockNeedRecheckView.as_view()),

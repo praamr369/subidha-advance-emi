@@ -83,6 +83,25 @@ class ReversalCenterApiTests(APITestCase):
         self.assertIn("RETURN_PRODUCT", response.data["allowed_actions"])
         self.assertIn("EXCHANGE_PRODUCT", response.data["allowed_actions"])
         self.assertNotIn("PRE_INVOICE_CANCEL", response.data["allowed_actions"])
+        self.assertIn("customer_name", response.data)
+        self.assertIn("return_lines", response.data)
+        self.assertIn("stock_destinations", response.data)
+        self.assertEqual(
+            response.data["return_lines"][0]["default_return_quantity"],
+            response.data["return_lines"][0]["returnable_quantity"],
+        )
+
+    def test_return_eligibility_stock_setup_guidance_when_missing_locations(self):
+        sale = self._create_sale()
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        StockLocation.objects.filter(id=self.inspection_location.id).delete()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(f"/api/v1/admin/billing/direct-sales/{sale.id}/return-eligibility/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["stock_setup_required"])
+        self.assertIn("INSPECTION", response.data["missing_location_types"])
 
     def test_inventory_ledger_filters_show_return_and_exchange_movements(self):
         replacement_product = create_product(name="Rev API Replacement", product_code="REV-API-002", base_price=Decimal("1200.00"))
@@ -134,3 +153,13 @@ class ReversalCenterApiTests(APITestCase):
         exchange_types = {row["movement_type"] for row in exchange_response.data["results"]}
         self.assertIn(StockMovementType.SALE_RETURN_IN, exchange_types)
         self.assertIn(StockMovementType.SALE_OUT, exchange_types)
+
+    def test_inventory_item_search_returns_product_and_stock_by_location(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/admin/inventory/items/search/?q=REV-API-SKU-001")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertGreaterEqual(response.data["count"], 1)
+        first = response.data["results"][0]
+        self.assertIn("product_name", first)
+        self.assertIn("sku", first)
+        self.assertIn("available_by_location", first)

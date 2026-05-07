@@ -64,7 +64,48 @@ export type DirectSaleReturnEligibility = {
     allowed_stock_destinations?: string[];
     stock_blocking_reasons?: string[];
   }>;
+  return_lines?: Array<{
+    sale_line_id: number;
+    product_id: number;
+    product_name: string;
+    sku?: string;
+    inventory_item_id: number | null;
+    sold_quantity: string;
+    sale_out_quantity?: string;
+    already_returned_quantity: string;
+    returnable_quantity: string;
+    default_return_quantity?: string;
+    unit_price: string;
+    line_total: string;
+  }>;
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_phone_masked?: string;
+  stock_destinations?: Array<{
+    id: number;
+    name: string;
+    code: string;
+    type: ReturnStockDestination;
+    is_sellable: boolean;
+    requires_condition_confirmation: boolean;
+  }>;
+  default_stock_destination_id?: number | null;
+  default_return_kind?: DirectSaleReturnKind;
+  default_condition?: string;
+  default_refund_mode?: string;
+  stock_setup_required?: boolean;
+  stock_setup_message?: string;
+  missing_location_types?: string[];
+  can_finalize_reversal?: boolean;
+  finalize_blocking_reasons?: string[];
+  is_operationally_active?: boolean;
+  is_collectible?: boolean;
+  is_dashboard_visible?: boolean;
   receipt_summary: {
+    active_receipt_count?: number;
+    void_receipt_count?: number;
+    active_receipt_total?: string;
+    void_receipt_total?: string;
     posted_receipt_count: number;
     posted_receipt_total: string;
     received_total: string;
@@ -136,6 +177,28 @@ export async function createAdminDirectSaleExchange(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function searchAdminInventoryItems(
+  q: string
+): Promise<{
+  count: number;
+  results: Array<{
+    id: number;
+    inventory_item_id: number;
+    product_id: number;
+    product_name: string;
+    sku: string;
+    default_stock_location_id: number | null;
+    available_by_location: Array<{
+      stock_location_id: number;
+      stock_location_name: string;
+      stock_location_code: string;
+      available_quantity: string;
+    }>;
+  }>;
+}> {
+  return apiFetch(`/admin/inventory/items/search/${query({ q })}`);
 }
 
 export async function approveAdminDirectSaleReturn(returnId: number): Promise<{ updated: boolean }> {

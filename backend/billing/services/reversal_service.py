@@ -51,6 +51,28 @@ from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
 
+def _mask_phone(phone: str | None) -> str:
+    raw = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(raw) < 4:
+        return ""
+    return f"{'*' * max(0, len(raw) - 4)}{raw[-4:]}"
+
+
+def _location_matches(location: StockLocation, token: str) -> bool:
+    haystack = f"{location.code} {location.name}".upper()
+    return token.upper() in haystack
+
+
+def _return_destination_catalog() -> dict[str, list[StockLocation]]:
+    rows = list(StockLocation.objects.filter(is_active=True).order_by("name", "id"))
+    return {
+        ReturnStockDestination.INSPECTION: [row for row in rows if _location_matches(row, "INSPECTION") or _location_matches(row, "INSP")],
+        ReturnStockDestination.DAMAGED: [row for row in rows if _location_matches(row, "DAMAGED") or _location_matches(row, "DMG")],
+        ReturnStockDestination.SERVICE: [row for row in rows if _location_matches(row, "SERVICE") or _location_matches(row, "SVC")],
+        ReturnStockDestination.SELLABLE: rows,
+    }
+
+
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
 
@@ -322,6 +344,15 @@ def get_direct_sale_return_eligibility(
     invoice_for_payload = posted_invoice or invoice
     sale_out_by_line = {line.id: get_sale_out_quantity(line) for line in sale.lines.all()}
     returnable_by_line = {line.id: get_returnable_quantity(line) for line in sale.lines.all()}
+    destination_catalog = _return_destination_catalog()
+    missing_location_types = []
+    if not destination_catalog[ReturnStockDestination.INSPECTION]:
+        missing_location_types.append(ReturnStockDestination.INSPECTION)
+    if not destination_catalog[ReturnStockDestination.DAMAGED]:
+        missing_location_types.append(ReturnStockDestination.DAMAGED)
+    if not destination_catalog[ReturnStockDestination.SERVICE]:
+        missing_location_types.append(ReturnStockDestination.SERVICE)
+    stock_setup_required = bool(missing_location_types)
     allowed_actions = []
     blocking_reasons: list[str] = []
     if sale.status == DirectSaleStatus.CANCELLED:
@@ -336,12 +367,51 @@ def get_direct_sale_return_eligibility(
         allowed_actions.append("POST_INVOICE_CANCEL")
         if posted_receipt_count > 0:
             blocking_reasons.append("ACTIVE_RECEIPT_EXISTS")
+    if stock_setup_required:
+        blocking_reasons.append("STOCK_SETUP_REQUIRED")
     if not blocking_reasons:
         blocking_reasons.append("NONE")
+    active_receipt_count = posted_receipt_count
+    void_receipt_count = sale.receipts.filter(status=BillingDocumentStatus.VOID).count()
+    direct_sale_active_statuses = {
+        DirectSaleStatus.DRAFT,
+        DirectSaleStatus.CONFIRMED,
+        DirectSaleStatus.INVOICED,
+        DirectSaleStatus.DELIVERED,
+    }
+    is_operationally_active = sale.status in direct_sale_active_statuses
+    is_collectible = is_operationally_active and outstanding_balance > Decimal("0.00")
+    is_dashboard_visible = is_operationally_active
+    has_returnable_line = any(qty > Decimal("0.000") for qty in returnable_by_line.values())
+    can_finalize_reversal = (
+        posted_receipt_count == 0
+        and getattr(invoice_for_payload, "status", "") in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED}
+        and (not delivered or not has_returnable_line)
+    )
+    finalize_blocking_reasons: list[str] = []
+    if posted_receipt_count > 0:
+        finalize_blocking_reasons.append("Active posted receipts must be voided.")
+    if getattr(invoice_for_payload, "status", "") not in {
+        BillingDocumentStatus.VOID,
+        BillingDocumentStatus.CANCELLED,
+    }:
+        finalize_blocking_reasons.append("Invoice must be reversed or voided before final archive.")
+    if delivered and has_returnable_line:
+        finalize_blocking_reasons.append("Delivered lines still have returnable quantity. Post SALE_RETURN_IN first.")
+    if is_operationally_active:
+        finalize_blocking_reasons.append("Create customer credit/refund decision and finalize audited cancellation.")
+    default_destination_row = (
+        destination_catalog[ReturnStockDestination.INSPECTION][0]
+        if destination_catalog[ReturnStockDestination.INSPECTION]
+        else None
+    )
     return {
         "sale_id": sale.id,
         "direct_sale_id": sale.id,
         "sale_no": sale.sale_no or "",
+        "customer_id": sale.customer_id,
+        "customer_name": sale.customer_name_snapshot or getattr(sale.customer, "name", ""),
+        "customer_phone_masked": _mask_phone(sale.customer_phone_snapshot or getattr(sale.customer, "phone", "")),
         "sale_status": sale.status,
         "invoice_id": getattr(invoice_for_payload, "id", None),
         "invoice_no": getattr(invoice_for_payload, "document_no", "") or "",
@@ -361,16 +431,21 @@ def get_direct_sale_return_eligibility(
             ReturnStockDestination.SELLABLE,
         ],
         "default_stock_destination": ReturnStockDestination.INSPECTION,
-        "sold_lines": [
+        "return_lines": [
             {
+                "sale_line_id": line.id,
                 "direct_sale_line_id": line.id,
                 "product_id": line.product_id,
+                "product_name": getattr(line.product, "name", "") if getattr(line, "product", None) else line.description,
+                "sku": line.sku_snapshot or getattr(getattr(line, "inventory_item", None), "sku", ""),
                 "inventory_item_id": line.inventory_item_id,
                 "description": line.description,
                 "sold_quantity": str(_qty(line.quantity)),
+                "sale_out_quantity": str(sale_out_by_line.get(line.id, Decimal("0.000"))),
                 "already_returned_quantity": str(returned.get(line.id, Decimal("0.000"))),
                 "max_returnable_quantity": str(get_returnable_quantity(line)),
                 "returnable_quantity": str(get_returnable_quantity(line)),
+                "default_return_quantity": str(get_returnable_quantity(line)),
                 "unit_price": str(line.unit_price),
                 "line_total": str(line.line_total),
                 "original_sale_out_posted": sale_out_by_line.get(line.id, Decimal("0.000")) > Decimal("0.000"),
@@ -387,7 +462,57 @@ def get_direct_sale_return_eligibility(
             }
             for line in sale.lines.all()
         ],
+        "sold_lines": [
+            {
+                "direct_sale_line_id": line.id,
+                "product_id": line.product_id,
+                "inventory_item_id": line.inventory_item_id,
+                "description": line.description,
+                "sold_quantity": str(_qty(line.quantity)),
+                "already_returned_quantity": str(returned.get(line.id, Decimal("0.000"))),
+                "max_returnable_quantity": str(get_returnable_quantity(line)),
+                "returnable_quantity": str(get_returnable_quantity(line)),
+                "unit_price": str(line.unit_price),
+                "line_total": str(line.line_total),
+            }
+            for line in sale.lines.all()
+        ],
+        "stock_destinations": [
+            {
+                "id": row.id,
+                "name": row.name,
+                "code": row.code,
+                "type": (
+                    ReturnStockDestination.INSPECTION
+                    if row in destination_catalog[ReturnStockDestination.INSPECTION]
+                    else ReturnStockDestination.DAMAGED
+                    if row in destination_catalog[ReturnStockDestination.DAMAGED]
+                    else ReturnStockDestination.SERVICE
+                    if row in destination_catalog[ReturnStockDestination.SERVICE]
+                    else ReturnStockDestination.SELLABLE
+                ),
+                "is_sellable": (
+                    row not in destination_catalog[ReturnStockDestination.INSPECTION]
+                    and row not in destination_catalog[ReturnStockDestination.DAMAGED]
+                    and row not in destination_catalog[ReturnStockDestination.SERVICE]
+                ),
+                "requires_condition_confirmation": (
+                    row not in destination_catalog[ReturnStockDestination.INSPECTION]
+                    and row not in destination_catalog[ReturnStockDestination.DAMAGED]
+                    and row not in destination_catalog[ReturnStockDestination.SERVICE]
+                ),
+            }
+            for row in destination_catalog[ReturnStockDestination.SELLABLE]
+        ],
+        "default_stock_destination_id": getattr(default_destination_row, "id", None),
+        "default_return_kind": DirectSaleReturnKind.DELIVERED_RETURN if delivered else DirectSaleReturnKind.POST_INVOICE_CANCEL,
+        "default_condition": "NEEDS_INSPECTION",
+        "default_refund_mode": "CUSTOMER_CREDIT",
         "receipt_summary": {
+            "active_receipt_count": active_receipt_count,
+            "void_receipt_count": void_receipt_count,
+            "active_receipt_total": str(active_receipt_total),
+            "void_receipt_total": str(void_receipt_total),
             "posted_receipt_count": posted_receipt_count,
             "posted_receipt_total": str(active_receipt_total),
             "received_total": str(active_receipt_total),
@@ -400,6 +525,18 @@ def get_direct_sale_return_eligibility(
         "stock_blocking_reasons": stock_blocking_reasons,
         "allowed_actions": allowed_actions,
         "blocking_reasons": blocking_reasons,
+        "stock_setup_required": stock_setup_required,
+        "stock_setup_message": (
+            "Create INSPECTION, DAMAGED, and SERVICE stock locations before processing returns."
+            if stock_setup_required
+            else ""
+        ),
+        "missing_location_types": missing_location_types,
+        "can_finalize_reversal": can_finalize_reversal,
+        "finalize_blocking_reasons": finalize_blocking_reasons,
+        "is_operationally_active": is_operationally_active,
+        "is_collectible": is_collectible,
+        "is_dashboard_visible": is_dashboard_visible,
     }
 
 
@@ -512,6 +649,11 @@ def create_direct_sale_return(
         raise ValueError("At least one return line is required.")
 
     sale = DirectSale.objects.select_for_update(of=("self",)).prefetch_related("lines", "billing_invoices").get(pk=direct_sale_id)
+    destination_catalog = _return_destination_catalog()
+    if stock_destination != ReturnStockDestination.SELLABLE and not destination_catalog.get(stock_destination):
+        raise ValueError(
+            f"{stock_destination.title()} stock setup is missing. Create a matching stock location first."
+        )
     invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
     if invoice is None:
         raise ValueError("Posted original invoice is required for direct sale return.")

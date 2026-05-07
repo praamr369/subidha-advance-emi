@@ -21,13 +21,14 @@ test("cancel and void actions require reason", async ({ page }) => {
 test("return and refund forms render with required controls", async ({ page }) => {
   await page.goto("/admin/billing/reversals");
   await expect(page.getByRole("button", { name: "Create Return" })).toBeVisible();
-  await expect(page.getByPlaceholder("Sale Line ID", { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Sale Line ID", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Return Kind")).toBeVisible();
-  await expect(page.getByLabel("Stock Destination")).toBeVisible();
+  await expect(page.getByLabel("Stock Destination", { exact: true })).toBeVisible();
 
   await expect(page.getByText("Exchange Product")).toBeVisible();
-  await expect(page.getByPlaceholder("Old Sale Line ID")).toBeVisible();
-  await expect(page.getByPlaceholder("New Inventory Item ID")).toBeVisible();
+  await expect(page.getByPlaceholder("Old Sale Line ID")).toHaveCount(0);
+  await expect(page.getByPlaceholder("New Inventory Item ID")).toHaveCount(0);
+  await expect(page.getByPlaceholder("Search replacement by product/SKU")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "View Return Eligibility" })).toBeVisible();
   await expect(page.getByPlaceholder("Direct Sale ID").first()).toBeVisible();
@@ -158,6 +159,8 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
       contentType: "application/json",
       body: JSON.stringify({
         direct_sale_id: 1,
+        sale_no: "SALE-2026-27-00001",
+        customer_name: "Smoke Customer",
         sale_status: "INVOICED",
         invoice_status: "POSTED",
         delivery_status: "DELIVERED",
@@ -173,6 +176,11 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
         allowed_actions: ["RETURN_PRODUCT", "EXCHANGE_PRODUCT"],
         blocking_reasons: ["Delivered direct sales must use return or exchange workflow."],
         sold_lines: [],
+        return_lines: [{ sale_line_id: 77, product_id: 8, product_name: "Chair", sku: "CHAIR-01", inventory_item_id: 9, sold_quantity: "1.000", already_returned_quantity: "0.000", returnable_quantity: "1.000", default_return_quantity: "1.000", unit_price: "1000.00", line_total: "1000.00" }],
+        stock_destinations: [{ id: 5, name: "Inspection", code: "INSP", type: "INSPECTION", is_sellable: false, requires_condition_confirmation: false }],
+        default_stock_destination_id: 5,
+        can_finalize_reversal: false,
+        finalize_blocking_reasons: ["Invoice must be reversed/voided first"],
       }),
     });
   });
@@ -186,4 +194,6 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
   await eligibilityCard.getByRole("button", { name: "View Return Eligibility" }).click();
   await expect(page.locator("body")).toContainText("Allowed actions: RETURN_PRODUCT, EXCHANGE_PRODUCT");
   await expect(page.locator("body")).toContainText("Receipts: active 0.00 · void 21000.00 · Outstanding 21000.00");
+  await expect(page.locator("body")).toContainText("Workflow checklist");
+  await expect(page.locator("body")).toContainText("Finalize blockers");
 });

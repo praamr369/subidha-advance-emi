@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -36,6 +37,7 @@ from inventory.services.stock_service import (
     build_stock_summary,
     post_stock_adjustment,
 )
+from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
 from inventory.services.valuation_service import build_inventory_valuation
 from api.v1.permissions import IsAdmin
@@ -507,6 +509,49 @@ class InventoryValuationView(APIView):
             as_of_date=request.query_params.get("as_of_date"),
         )
         return Response(payload)
+
+
+class AdminInventoryItemSearchView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        term = (request.query_params.get("q") or "").strip()
+        queryset = InventoryItem.objects.select_related("product", "default_stock_location").filter(is_active=True)
+        if term:
+            queryset = queryset.filter(
+                Q(product__name__icontains=term)
+                | Q(sku__icontains=term)
+                | Q(product__product_code__icontains=term)
+            )
+        queryset = queryset.order_by("product__name", "id")[:30]
+        rows = []
+        locations = list(StockLocation.objects.filter(is_active=True).order_by("name", "id"))
+        for item in queryset:
+            by_location = []
+            for location in locations:
+                qty = _location_quantity(inventory_item=item, stock_location=location)
+                if qty <= 0:
+                    continue
+                by_location.append(
+                    {
+                        "stock_location_id": location.id,
+                        "stock_location_name": location.name,
+                        "stock_location_code": location.code,
+                        "available_quantity": str(qty),
+                    }
+                )
+            rows.append(
+                {
+                    "id": item.id,
+                    "inventory_item_id": item.id,
+                    "product_id": item.product_id,
+                    "product_name": item.product.name,
+                    "sku": item.sku or "",
+                    "default_stock_location_id": item.default_stock_location_id,
+                    "available_by_location": by_location,
+                }
+            )
+        return Response({"count": len(rows), "results": rows})
 
 
 class OpeningStockImportPreviewView(APIView):

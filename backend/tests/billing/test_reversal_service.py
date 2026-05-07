@@ -221,6 +221,39 @@ class ReversalServiceTests(TestCase):
         self.assertEqual(eligibility["sold_lines"][0]["returnable_quantity"], "2.000")
         self.assertEqual(eligibility["active_receipt_total"], "0.00")
         self.assertEqual(eligibility["void_receipt_total"], "0.00")
+        self.assertEqual(eligibility["return_lines"][0]["default_return_quantity"], "2.000")
+        self.assertIn("customer_name", eligibility)
+        self.assertIn("stock_destinations", eligibility)
+
+    def test_return_rejects_line_not_belonging_to_sale(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        other_sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        with self.assertRaises(ValueError):
+            create_direct_sale_return(
+                direct_sale_id=sale.id,
+                reason="Invalid line",
+                stock_destination="INSPECTION",
+                stock_location_id=self.inspection_location.id,
+                lines=[{"direct_sale_line_id": other_sale.lines.first().id, "quantity": "1.000"}],
+                performed_by=self.admin,
+            )
+
+    def test_sellable_destination_requires_explicit_confirmation(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        with self.assertRaises(ValueError):
+            create_direct_sale_return(
+                direct_sale_id=sale.id,
+                reason="Try sellable without confirmation",
+                stock_destination="SELLABLE",
+                lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+                performed_by=self.admin,
+            )
 
     def test_void_receipt_keeps_trace(self):
         payload = self._sale_payload()
