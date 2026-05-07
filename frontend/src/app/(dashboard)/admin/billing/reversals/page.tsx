@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -33,6 +34,7 @@ import {
 const types: ReversalType[] = ["sale_return", "receipt_void", "customer_refund", "purchase_return"];
 
 export default function AdminBillingReversalsPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<ReversalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,8 @@ export default function AdminBillingReversalsPage() {
   const [returnLineId, setReturnLineId] = useState("");
   const [returnQty, setReturnQty] = useState("1");
   const [returnKind, setReturnKind] = useState<DirectSaleReturnKind>("DELIVERED_RETURN");
+  const [returnCondition, setReturnCondition] = useState("NEEDS_INSPECTION");
+  const [refundMode, setRefundMode] = useState("CUSTOMER_CREDIT");
   const [stockDestination, setStockDestination] = useState<ReturnStockDestination>("INSPECTION");
   const [stockLocationId, setStockLocationId] = useState("");
   const [returnReason, setReturnReason] = useState("");
@@ -81,6 +85,19 @@ export default function AdminBillingReversalsPage() {
   const [purchaseStockLocationId, setPurchaseStockLocationId] = useState("");
   const [purchaseReason, setPurchaseReason] = useState("");
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const directSale = searchParams.get("direct_sale") || "";
+    const exchangeSale = searchParams.get("exchange_sale") || "";
+    if (directSale) {
+      setReturnSaleId(directSale);
+      setEligibilitySaleId(directSale);
+    }
+    if (exchangeSale) {
+      setExchangeSaleId(exchangeSale);
+      setEligibilitySaleId(exchangeSale);
+    }
+  }, [searchParams]);
 
   async function load() {
     setLoading(true);
@@ -181,7 +198,7 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Create Return</div>
-            <p className="mb-2 text-xs text-muted-foreground">Original invoice and receipt will remain unchanged. A reversal/credit note and stock ledger entries will be created.</p>
+            <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, and stock ledger rows will remain unchanged. The system will create reversal documents, credit notes, and stock ledger movements.</p>
             <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" />
             <div className="mb-2 grid grid-cols-2 gap-2">
               <select className="h-10 rounded border px-2" value={returnKind} onChange={(e) => setReturnKind(e.target.value as DirectSaleReturnKind)} aria-label="Return Kind">
@@ -198,6 +215,31 @@ export default function AdminBillingReversalsPage() {
                 <option value="SERVICE">SERVICE</option>
               </select>
             </div>
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <select className="h-10 rounded border px-2" value={returnCondition} onChange={(e) => {
+                const next = e.target.value;
+                setReturnCondition(next);
+                if (next === "SELLABLE") setStockDestination("SELLABLE");
+                if (next === "NEEDS_INSPECTION") setStockDestination("INSPECTION");
+                if (next === "DAMAGED") {
+                  setReturnKind("DAMAGED_RETURN");
+                  setStockDestination("DAMAGED");
+                }
+                if (next === "SERVICE_REPAIR") setStockDestination("SERVICE");
+              }} aria-label="Return condition">
+                <option value="SELLABLE">SELLABLE</option>
+                <option value="NEEDS_INSPECTION">NEEDS_INSPECTION</option>
+                <option value="DAMAGED">DAMAGED</option>
+                <option value="SERVICE_REPAIR">SERVICE_REPAIR</option>
+              </select>
+              <select className="h-10 rounded border px-2" value={refundMode} onChange={(e) => setRefundMode(e.target.value)} aria-label="Refund mode">
+                <option value="CUSTOMER_CREDIT">CUSTOMER_CREDIT</option>
+                <option value="CASH_REFUND_LATER">CASH_REFUND_LATER</option>
+                <option value="UPI_REFUND_LATER">UPI_REFUND_LATER</option>
+                <option value="BANK_REFUND_LATER">BANK_REFUND_LATER</option>
+                <option value="ADJUST_AGAINST_DUE">ADJUST_AGAINST_DUE</option>
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <input className="h-10 rounded border px-2" value={returnLineId} onChange={(e) => setReturnLineId(e.target.value)} placeholder="Sale Line ID" />
               <input className="h-10 rounded border px-2" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} placeholder="Qty" />
@@ -212,7 +254,7 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Exchange Product</div>
-            <p className="mb-2 text-xs text-muted-foreground">Original invoice and receipt will remain unchanged. Exchange difference is shown as customer payable or credit.</p>
+            <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, and stock ledger rows will remain unchanged. The system will create reversal documents, credit notes, and stock ledger movements.</p>
             <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" />
             <div className="grid grid-cols-2 gap-2">
               <input className="h-10 rounded border px-2" value={exchangeReturnLineId} onChange={(e) => setExchangeReturnLineId(e.target.value)} placeholder="Old Sale Line ID" />
@@ -224,6 +266,9 @@ export default function AdminBillingReversalsPage() {
               <input className="h-10 rounded border px-2" value={exchangeQty} onChange={(e) => setExchangeQty(e.target.value)} placeholder="New Qty" />
             </div>
             <input className="mt-2 h-10 w-full rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
+            <div className="mt-2 rounded border border-border bg-muted/30 p-2 text-xs">
+              Replacement value {(Number(exchangeQty || 0) * Number(exchangeUnitPrice || 0)).toFixed(2)}. Backend will classify the difference as customer payable, customer credit, or zero-difference exchange.
+            </div>
             <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Returned Stock Location ID" />
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={exchangeReason} onChange={(e) => setExchangeReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {

@@ -36,7 +36,7 @@ import {
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
-import { getAdminDirectSaleReturnEligibility } from "@/services/reversals";
+import { getAdminDirectSaleReturnEligibility, type DirectSaleReturnEligibility } from "@/services/reversals";
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingInvoicesRoute,
@@ -327,6 +327,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [eligibilityLoadingSaleId, setEligibilityLoadingSaleId] = useState<number | null>(null);
+  const [returnEligibility, setReturnEligibility] = useState<DirectSaleReturnEligibility | null>(null);
   const [recheckingRequirementId, setRecheckingRequirementId] = useState<number | null>(null);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -546,6 +547,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
               setEligibilityLoadingSaleId(row.id);
               try {
                 const payload = await getAdminDirectSaleReturnEligibility(row.id);
+                setReturnEligibility(payload);
                 setNotice(
                   `Return eligibility for ${row.sale_no || `#${row.id}`}: ${payload.allowed_actions.join(", ") || "view only"}. Receipt ${payload.active_receipt_total} active / ${payload.void_receipt_total} void. Outstanding ${payload.outstanding_balance}.`
                 );
@@ -658,13 +660,6 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
               >
                 Cancel Sale
-              </button>
-              <button
-                type="button"
-                onClick={() => setCancelSaleTarget(row)}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
-              >
-                Cancel draft
               </button>
             </div>
           );
@@ -2026,6 +2021,62 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         >
           {notice}
         </div>
+      ) : null}
+
+      {returnEligibility ? (
+        <WorkspaceSection
+          title="View Return Eligibility"
+          description="Settlement, delivery state, and returnable quantities from the backend return-eligibility endpoint."
+        >
+          <div className="grid gap-3 text-sm md:grid-cols-4">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted-foreground">Sale</p>
+              <p className="font-semibold">{returnEligibility.sale_no || `#${returnEligibility.direct_sale_id}`}</p>
+              <p>{returnEligibility.sale_status}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted-foreground">Invoice</p>
+              <p className="font-semibold">{returnEligibility.invoice_no || "N/A"}</p>
+              <p>{returnEligibility.invoice_status || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted-foreground">Receipts</p>
+              <p>Active {accountingMoney(returnEligibility.active_receipt_total)}</p>
+              <p>Void {accountingMoney(returnEligibility.void_receipt_total)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted-foreground">Allowed actions</p>
+              <p className="font-semibold">{returnEligibility.allowed_actions.join(", ") || "View only"}</p>
+              <p>Default stock {returnEligibility.default_stock_destination || "INSPECTION"}</p>
+            </div>
+          </div>
+          <div className="mt-3 overflow-hidden rounded-lg border border-border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40 text-left">
+                <tr>
+                  <th className="px-3 py-2">Line</th>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">Sold</th>
+                  <th className="px-3 py-2">Returned</th>
+                  <th className="px-3 py-2">Returnable</th>
+                  <th className="px-3 py-2">Stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnEligibility.sold_lines.map((line) => (
+                  <tr key={line.direct_sale_line_id} className="border-t">
+                    <td className="px-3 py-2">{line.direct_sale_line_id}</td>
+                    <td className="px-3 py-2">{line.description}</td>
+                    <td className="px-3 py-2">{line.sold_quantity}</td>
+                    <td className="px-3 py-2">{line.already_returned_quantity}</td>
+                    <td className="px-3 py-2">{line.returnable_quantity || line.max_returnable_quantity}</td>
+                    <td className="px-3 py-2">{line.original_sale_out_posted ? "SALE_OUT posted" : "SALE_OUT missing"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </WorkspaceSection>
       ) : null}
 
       {salesLoading ? (

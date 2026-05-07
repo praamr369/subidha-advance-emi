@@ -171,6 +171,7 @@ def cancel_billing_invoice(*, invoice_id: int, actor, reason: str, internal_note
             {
                 "detail": "Reverse linked receipts before cancelling this invoice.",
                 "blocking_reasons": ["Reverse linked receipts before cancelling this invoice."],
+                "blocking_reason_codes": ["ACTIVE_RECEIPT_EXISTS"],
             }
         )
 
@@ -304,11 +305,17 @@ def cancel_direct_sale(*, direct_sale_id: int, actor, reason: str, internal_note
     if previous_status == DirectSaleStatus.DELIVERED or sale.delivered_at:
         raise ValidationError({"detail": "Delivered direct sales require a return/reversal workflow before cancellation."})
 
-    active_receipts = ReceiptDocument.objects.filter(direct_sale=sale).exclude(
-        status__in=[BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED]
+    active_receipts = ReceiptDocument.objects.filter(
+        direct_sale=sale,
+        status=BillingDocumentStatus.POSTED,
     )
     if active_receipts.exists() or Decimal(str(sale.received_total or MONEY_ZERO)) > MONEY_ZERO:
-        raise ValidationError({"detail": "Reverse direct-sale receipts before cancelling this sale."})
+        raise ValidationError(
+            {
+                "detail": "Reverse direct-sale receipts before cancelling this sale.",
+                "blocking_reasons": ["ACTIVE_RECEIPT_EXISTS"],
+            }
+        )
 
     invoices = list(sale.billing_invoices.select_for_update(of=("self",)).all())
     for invoice in invoices:

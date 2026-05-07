@@ -28,13 +28,26 @@ export type DirectSaleReturnKind =
 export type ReturnStockDestination = "SELLABLE" | "INSPECTION" | "DAMAGED" | "SERVICE";
 
 export type DirectSaleReturnEligibility = {
+  sale_id?: number;
   direct_sale_id: number;
+  sale_no?: string;
   sale_status: string;
+  invoice_id?: number | null;
+  invoice_no?: string;
   invoice_status: string;
   delivery_status: string;
   active_receipt_total: string;
   void_receipt_total: string;
+  invoice_received_total?: string;
+  invoice_balance_total?: string;
+  direct_sale_received_total?: string;
+  direct_sale_balance_total?: string;
   outstanding_balance: string;
+  already_returned_quantities?: Record<string, string>;
+  returnable_quantities?: Record<string, string>;
+  original_sale_out_posted?: boolean;
+  allowed_stock_destinations?: ReturnStockDestination[];
+  default_stock_destination?: ReturnStockDestination;
   sold_lines: Array<{
     direct_sale_line_id: number;
     product_id: number;
@@ -84,8 +97,11 @@ export async function cancelAdminDirectSale(directSaleId: number, reason: string
   });
 }
 
-export async function getAdminDirectSaleReturnEligibility(directSaleId: number): Promise<DirectSaleReturnEligibility> {
-  return apiFetch(`/admin/billing/direct-sales/${directSaleId}/return-eligibility/`);
+export async function getAdminDirectSaleReturnEligibility(
+  directSaleId: number,
+  params: Record<string, string | number | undefined> = {}
+): Promise<DirectSaleReturnEligibility> {
+  return apiFetch(`/admin/billing/direct-sales/${directSaleId}/return-eligibility/${query(params)}`);
 }
 
 export async function createAdminDirectSaleReturn(

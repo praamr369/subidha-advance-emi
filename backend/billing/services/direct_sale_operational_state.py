@@ -68,7 +68,11 @@ def _derive_state(*, sale, invoice_status: str, paid_amount: Decimal, due_amount
             delivery_state="DELIVERED",
             collection_state="NOT_COLLECTIBLE" if due_amount <= Decimal("0.00") else "COLLECTIBLE",
             blocking_reasons=[],
-            next_actions=["VIEW_RECEIPTS"] if due_amount <= Decimal("0.00") else ["COLLECT_DIRECT_SALE_BALANCE"],
+            next_actions=(
+                ["RETURN_PRODUCT", "EXCHANGE_PRODUCT", "VIEW_RECEIPTS"]
+                if due_amount <= Decimal("0.00")
+                else ["COLLECT_DIRECT_SALE_BALANCE", "RETURN_PRODUCT", "EXCHANGE_PRODUCT"]
+            ),
         )
 
     if sale.status == DirectSaleStatus.DRAFT:
@@ -133,7 +137,7 @@ def _derive_state(*, sale, invoice_status: str, paid_amount: Decimal, due_amount
         delivery_state="COUNTER_SALE_COMPLETE",
         collection_state="NOT_COLLECTIBLE",
         blocking_reasons=[],
-        next_actions=["VIEW_RECEIPTS"],
+        next_actions=["RETURN_PRODUCT", "EXCHANGE_PRODUCT", "VIEW_RECEIPTS"],
     )
 
 

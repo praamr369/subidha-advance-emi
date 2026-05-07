@@ -173,6 +173,18 @@ def get_returned_quantity(direct_sale_line) -> Decimal:
     return _qty(aggregate.get("total"))
 
 
+def _reserved_return_quantity(direct_sale_line) -> Decimal:
+    aggregate = DirectSaleReturnLine.objects.filter(
+        direct_sale_line=direct_sale_line,
+        direct_sale_return__status__in=[
+            DirectSaleReturnStatus.DRAFT,
+            DirectSaleReturnStatus.APPROVED,
+            DirectSaleReturnStatus.POSTED,
+        ],
+    ).aggregate(total=Sum("quantity"))
+    return _qty(aggregate.get("total"))
+
+
 def get_returnable_quantity(direct_sale_line) -> Decimal:
     sold_qty = _qty(direct_sale_line.quantity)
     sale_out_qty = get_sale_out_quantity(direct_sale_line)
@@ -307,26 +319,48 @@ def get_direct_sale_return_eligibility(
             stock_blocking_reasons.append("Replacement stock location is required for exchange.")
         elif _location_quantity(inventory_item=replacement_item, stock_location=replacement_location) < requested_qty:
             stock_blocking_reasons.append("Replacement stock is insufficient at the selected location.")
+    invoice_for_payload = posted_invoice or invoice
+    sale_out_by_line = {line.id: get_sale_out_quantity(line) for line in sale.lines.all()}
+    returnable_by_line = {line.id: get_returnable_quantity(line) for line in sale.lines.all()}
     allowed_actions = []
     blocking_reasons: list[str] = []
     if sale.status == DirectSaleStatus.CANCELLED:
-        blocking_reasons.append("Sale is cancelled.")
+        blocking_reasons.append("ALREADY_REVERSED")
     if sale.status == DirectSaleStatus.CANCELLED:
         allowed_actions = []
     elif delivered:
         allowed_actions.extend(["RETURN_PRODUCT", "EXCHANGE_PRODUCT"])
-        blocking_reasons.append("Delivered direct sales must use return or exchange workflow.")
     elif not invoiced and sale.status in {DirectSaleStatus.DRAFT, DirectSaleStatus.CONFIRMED}:
         allowed_actions.append("PRE_INVOICE_CANCEL")
     elif invoiced:
         allowed_actions.append("POST_INVOICE_CANCEL")
         if posted_receipt_count > 0:
-            blocking_reasons.append("Reverse linked receipts before cancelling this invoice.")
+            blocking_reasons.append("ACTIVE_RECEIPT_EXISTS")
+    if not blocking_reasons:
+        blocking_reasons.append("NONE")
     return {
+        "sale_id": sale.id,
         "direct_sale_id": sale.id,
+        "sale_no": sale.sale_no or "",
         "sale_status": sale.status,
-        "invoice_status": getattr(posted_invoice or invoice, "status", ""),
+        "invoice_id": getattr(invoice_for_payload, "id", None),
+        "invoice_no": getattr(invoice_for_payload, "document_no", "") or "",
+        "invoice_status": getattr(invoice_for_payload, "status", ""),
         "delivery_status": "DELIVERED" if delivered else "PENDING",
+        "invoice_received_total": str(_money(getattr(invoice_for_payload, "received_total", Decimal("0.00")))),
+        "invoice_balance_total": str(_money(getattr(invoice_for_payload, "balance_total", Decimal("0.00")))),
+        "direct_sale_received_total": str(_money(sale.received_total)),
+        "direct_sale_balance_total": str(_money(sale.balance_total)),
+        "already_returned_quantities": {str(k): str(v) for k, v in returned.items()},
+        "returnable_quantities": {str(k): str(v) for k, v in returnable_by_line.items()},
+        "original_sale_out_posted": any(qty > Decimal("0.000") for qty in sale_out_by_line.values()),
+        "allowed_stock_destinations": [
+            ReturnStockDestination.INSPECTION,
+            ReturnStockDestination.DAMAGED,
+            ReturnStockDestination.SERVICE,
+            ReturnStockDestination.SELLABLE,
+        ],
+        "default_stock_destination": ReturnStockDestination.INSPECTION,
         "sold_lines": [
             {
                 "direct_sale_line_id": line.id,
@@ -339,7 +373,7 @@ def get_direct_sale_return_eligibility(
                 "returnable_quantity": str(get_returnable_quantity(line)),
                 "unit_price": str(line.unit_price),
                 "line_total": str(line.line_total),
-                "original_sale_out_posted": get_sale_out_quantity(line) > Decimal("0.000"),
+                "original_sale_out_posted": sale_out_by_line.get(line.id, Decimal("0.000")) > Decimal("0.000"),
                 "return_stock_destination_required": True,
                 "allowed_stock_destinations": [
                     ReturnStockDestination.INSPECTION,
@@ -348,7 +382,7 @@ def get_direct_sale_return_eligibility(
                     ReturnStockDestination.SELLABLE,
                 ],
                 "stock_blocking_reasons": (
-                    [] if get_sale_out_quantity(line) > Decimal("0.000") else ["Original SALE_OUT stock movement was not found."]
+                    [] if sale_out_by_line.get(line.id, Decimal("0.000")) > Decimal("0.000") else ["ORIGINAL_SALE_OUT_NOT_POSTED"]
                 ),
             }
             for line in sale.lines.all()
@@ -407,6 +441,15 @@ def open_direct_sale_cancellation_case(*, direct_sale_id: int, reason: str, perf
     if posted_invoice is None:
         sale, updated = cancel_direct_sale_before_invoice(direct_sale_id=direct_sale_id, reason=reason, performed_by=performed_by)
         return {"workflow": "PRE_INVOICE_CANCEL", "updated": updated, "direct_sale_id": sale.id, "status": sale.status}
+    if delivered:
+        return {
+            "workflow": "RETURN_OR_EXCHANGE_REQUIRED",
+            "updated": False,
+            "direct_sale_id": sale.id,
+            "status": sale.status,
+            "blocking_reasons": ["DELIVERY_RETURN_REQUIRED"],
+            "allowed_actions": ["RETURN_PRODUCT", "EXCHANGE_PRODUCT"],
+        }
 
     return_kind = DirectSaleReturnKind.DELIVERED_RETURN if delivered else DirectSaleReturnKind.POST_INVOICE_CANCEL
     lines = [{"direct_sale_line_id": line.id, "quantity": line.quantity} for line in sale.lines.all()]
@@ -506,7 +549,7 @@ def create_direct_sale_return(
             raise ValueError(f"Direct sale line {sale_line_id} not found.")
 
         sold_qty = _qty(sale_line.quantity)
-        returned_qty = get_returned_quantity(sale_line)
+        returned_qty = _reserved_return_quantity(sale_line)
         sale_out_qty = get_sale_out_quantity(sale_line)
         allowed_qty = get_returnable_quantity(sale_line)
         if return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL and sale_out_qty <= Decimal("0.000"):

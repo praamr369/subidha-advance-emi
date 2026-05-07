@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.db.models import Q, Sum
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
@@ -37,6 +38,12 @@ class _AdminBase(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
 
+def _as_drf_validation_error(exc: Exception) -> ValidationError:
+    if isinstance(exc, DjangoValidationError) and hasattr(exc, "message_dict"):
+        return ValidationError(exc.message_dict)
+    return ValidationError({"detail": str(exc)})
+
+
 class AdminDirectSaleCancelView(_AdminBase):
     def post(self, request, pk: int):
         serializer = ReasonSerializer(data=request.data)
@@ -48,8 +55,8 @@ class AdminDirectSaleCancelView(_AdminBase):
                 performed_by=request.user,
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response(result)
 
 
@@ -68,8 +75,8 @@ class AdminDirectSaleReturnCreateView(_AdminBase):
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
                 confirm_sellable_destination=serializer.validated_data.get("confirm_sellable_destination", False),
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"direct_sale_return_id": ret.id, "return_no": ret.return_no, "status": ret.status}, status=status.HTTP_201_CREATED)
 
 
@@ -88,8 +95,8 @@ class AdminDirectSaleExchangeCreateView(_AdminBase):
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
                 confirm_sellable_destination=serializer.validated_data.get("confirm_sellable_destination", False),
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response(
             {
                 "direct_sale_return_id": ret.id,
@@ -214,8 +221,8 @@ class AdminReturnApproveView(_AdminBase):
     def post(self, request, pk: int):
         try:
             ret, updated = approve_direct_sale_return(return_id=pk, performed_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"updated": updated, "id": ret.id, "status": ret.status})
 
 
@@ -223,8 +230,8 @@ class AdminReturnPostView(_AdminBase):
     def post(self, request, pk: int):
         try:
             ret, updated = post_direct_sale_return(return_id=pk, posted_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"updated": updated, "id": ret.id, "status": ret.status, "credit_note_id": ret.credit_note_id})
 
 
@@ -236,8 +243,8 @@ class AdminReceiptVoidReasonView(_AdminBase):
         serializer.is_valid(raise_exception=True)
         try:
             receipt, updated = void_receipt_with_reason(receipt_id=pk, reason=serializer.validated_data["reason"], performed_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         invoice = receipt.billing_invoice if receipt.billing_invoice_id else None
         direct_sale = receipt.direct_sale if receipt.direct_sale_id else None
         return Response(
@@ -283,8 +290,8 @@ class AdminCustomerRefundCreateView(_AdminBase):
         serializer.is_valid(raise_exception=True)
         try:
             refund = create_customer_refund(customer_id=pk, performed_by=request.user, **serializer.validated_data)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"id": refund.id, "refund_no": refund.refund_no, "status": refund.status}, status=status.HTTP_201_CREATED)
 
 
@@ -292,8 +299,8 @@ class AdminCustomerRefundApproveView(_AdminBase):
     def post(self, request, pk: int):
         try:
             refund, updated = approve_customer_refund(refund_id=pk, performed_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"updated": updated, "id": refund.id, "status": refund.status})
 
 
@@ -301,8 +308,8 @@ class AdminCustomerRefundPayView(_AdminBase):
     def post(self, request, pk: int):
         try:
             refund, updated = pay_customer_refund(refund_id=pk, paid_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"updated": updated, "id": refund.id, "status": refund.status})
 
 
@@ -318,8 +325,8 @@ class AdminPurchaseReturnCreateView(_AdminBase):
                 performed_by=request.user,
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"id": purchase_return.id, "return_no": purchase_return.return_no, "status": purchase_return.status}, status=status.HTTP_201_CREATED)
 
 
@@ -327,6 +334,6 @@ class AdminPurchaseReturnPostView(_AdminBase):
     def post(self, request, pk: int):
         try:
             purchase_return, updated = post_purchase_return(purchase_return_id=pk, posted_by=request.user)
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
         return Response({"updated": updated, "id": purchase_return.id, "status": purchase_return.status})
