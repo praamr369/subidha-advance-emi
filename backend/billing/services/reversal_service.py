@@ -36,8 +36,17 @@ from billing.services.billing_service import (
     post_billing_credit_note,
     void_receipt_document,
 )
-from inventory.models import InventoryItem, PurchaseBill, PurchaseBillStatus, StockLedger, StockLocation, StockMovementType
+from inventory.models import (
+    InventoryItem,
+    PurchaseBill,
+    PurchaseBillStatus,
+    SOFT_HOLD_MOVEMENT_TYPES,
+    StockLedger,
+    StockLocation,
+    StockMovementType,
+)
 from inventory.services.stock_movement_service import post_movement
+from inventory.services.stock_service import create_stock_ledger_entry
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -81,7 +90,7 @@ def _clean_return_kind(value: str | None) -> str:
 
 
 def _clean_stock_destination(value: str | None) -> str:
-    destination = str(value or ReturnStockDestination.SELLABLE).strip().upper()
+    destination = str(value or ReturnStockDestination.INSPECTION).strip().upper()
     valid = {choice[0] for choice in ReturnStockDestination.choices}
     if destination not in valid:
         raise ValueError("Invalid stock destination.")
@@ -94,8 +103,27 @@ def _stock_location_for_destination(*, destination: str, stock_location_id: int 
             return StockLocation.objects.get(pk=stock_location_id)
         return getattr(inventory_item, "default_stock_location", None)
     if not stock_location_id:
-        raise ValueError("Inspection, damaged, and service returns require stock_location_id.")
+        raise ValueError(
+            f"{destination.title()} returns require an explicit stock location. Create/select a dedicated {destination} location in inventory setup."
+        )
     return StockLocation.objects.get(pk=stock_location_id)
+
+
+def _location_quantity(*, inventory_item: InventoryItem, stock_location: StockLocation | None) -> Decimal:
+    aggregate = inventory_item.stock_ledger.exclude(
+        movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES)
+    ).filter(
+        stock_location=stock_location
+    ).aggregate(
+        total_in=Sum("quantity_in"),
+        total_out=Sum("quantity_out"),
+    )
+    total_in = _qty(aggregate.get("total_in"))
+    total_out = _qty(aggregate.get("total_out"))
+    opening = Decimal("0.000")
+    if stock_location and inventory_item.default_stock_location_id == stock_location.id:
+        opening = _qty(inventory_item.opening_stock_qty)
+    return opening + total_in - total_out
 
 
 def _return_stock_already_posted(*, return_id: int, line_id: int) -> bool:
@@ -106,35 +134,139 @@ def _return_stock_already_posted(*, return_id: int, line_id: int) -> bool:
     ).exists()
 
 
+def _candidate_invoice_lines(*, direct_sale_line) -> list:
+    invoice = (
+        direct_sale_line.direct_sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED)
+        .prefetch_related("lines")
+        .order_by("-invoice_date", "-id")
+        .first()
+    )
+    if invoice is None:
+        return []
+    return list(
+        invoice.lines.filter(
+            inventory_item_id=direct_sale_line.inventory_item_id,
+            description=direct_sale_line.description,
+            unit_price=direct_sale_line.unit_price,
+        )
+    )
+
+
+def get_sale_out_quantity(direct_sale_line) -> Decimal:
+    invoice_lines = _candidate_invoice_lines(direct_sale_line=direct_sale_line)
+    if not invoice_lines:
+        return Decimal("0.000")
+    refs = [f"{line.invoice_id}:{line.id}" for line in invoice_lines]
+    aggregate = StockLedger.objects.filter(
+        movement_type=StockMovementType.SALE_OUT,
+        reference_model="BillingInvoiceLine",
+        reference_id__in=refs,
+    ).aggregate(total=Sum("quantity_out"))
+    return _qty(aggregate.get("total"))
+
+
+def get_returned_quantity(direct_sale_line) -> Decimal:
+    aggregate = DirectSaleReturnLine.objects.filter(
+        direct_sale_line=direct_sale_line,
+        direct_sale_return__status=DirectSaleReturnStatus.POSTED,
+    ).aggregate(total=Sum("quantity"))
+    return _qty(aggregate.get("total"))
+
+
+def get_returnable_quantity(direct_sale_line) -> Decimal:
+    sold_qty = _qty(direct_sale_line.quantity)
+    sale_out_qty = get_sale_out_quantity(direct_sale_line)
+    returned_qty = get_returned_quantity(direct_sale_line)
+    return max(Decimal("0.000"), min(sold_qty, sale_out_qty) - returned_qty)
+
+
+def post_sale_return_stock_movement(*, ret: DirectSaleReturn, line: DirectSaleReturnLine, posted_by):
+    sale_out_qty = get_sale_out_quantity(line.direct_sale_line)
+    if sale_out_qty <= Decimal("0.000"):
+        if ret.return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL:
+            return None, False, "ORIGINAL_SALE_OUT_NOT_POSTED"
+        raise ValueError("Original SALE_OUT stock movement was not found for the returned item.")
+    if line.quantity > get_returnable_quantity(line.direct_sale_line):
+        raise ValueError(f"Return quantity exceeds posted sale-out quantity for line {line.direct_sale_line_id}.")
+    location = _stock_location_for_destination(
+        destination=ret.stock_destination,
+        stock_location_id=ret.stock_location_id,
+        inventory_item=line.inventory_item,
+    )
+    entry, created = create_stock_ledger_entry(
+        inventory_item=line.inventory_item,
+        movement_type=StockMovementType.SALE_RETURN_IN,
+        movement_date=timezone.localdate(),
+        stock_location=location,
+        quantity_in=line.quantity,
+        reference_model="DirectSaleReturnLine",
+        reference_id=f"{ret.id}:{line.id}",
+        notes=f"{ret.return_no} for original sale {ret.direct_sale.sale_no or ret.direct_sale_id}",
+        posted_by=posted_by,
+        posted_journal_entry=getattr(ret.credit_note, "posted_journal_entry", None),
+    )
+    return entry, created, None
+
+
+def post_exchange_replacement_stock_movement(*, ret: DirectSaleReturn, posted_by) -> dict:
+    created_count = 0
+    existing_count = 0
+    replacement_lines = list((ret.metadata or {}).get("exchange_replacement_lines") or [])
+    for index, row in enumerate(replacement_lines, start=1):
+        item = InventoryItem.objects.select_related("product", "default_stock_location").get(pk=int(row["inventory_item_id"]))
+        qty = _qty(row["quantity"])
+        location_id = row.get("stock_location_id")
+        location = StockLocation.objects.get(pk=location_id) if location_id else item.default_stock_location
+        if location is None:
+            raise ValueError("Replacement stock location is required for exchange posting.")
+        available = _location_quantity(inventory_item=item, stock_location=location)
+        if available < qty:
+            raise ValueError(
+                f"Insufficient stock for replacement item {item.sku or item.id} at {location.name}. Available: {available}, Requested: {qty}."
+            )
+        _entry, created = create_stock_ledger_entry(
+            inventory_item=item,
+            movement_type=StockMovementType.SALE_OUT,
+            movement_date=timezone.localdate(),
+            stock_location=location,
+            quantity_out=qty,
+            reference_model="DirectSaleExchangeReplacement",
+            reference_id=f"{ret.id}:{index}",
+            notes=f"Exchange replacement for {ret.return_no} against sale {ret.direct_sale.sale_no or ret.direct_sale_id}",
+            posted_by=posted_by,
+            posted_journal_entry=getattr(ret.credit_note, "posted_journal_entry", None),
+        )
+        created_count += 1 if created else 0
+        existing_count += 0 if created else 1
+    return {"created_count": created_count, "existing_count": existing_count}
+
+
 def _post_direct_sale_return_stock(*, ret: DirectSaleReturn, posted_by) -> dict:
     created_count = 0
     existing_count = 0
+    skipped_count = 0
     for line in ret.lines.select_related("inventory_item").all():
         if not line.inventory_item_id or not line.inventory_item.stock_tracking_enabled:
             continue
         if _return_stock_already_posted(return_id=ret.id, line_id=line.id):
             existing_count += 1
             continue
-        post_movement(
-            inventory_item=line.inventory_item,
-            movement_type=StockMovementType.SALE_RETURN_IN,
-            quantity=line.quantity,
-            movement_date=timezone.localdate(),
-            stock_location=_stock_location_for_destination(
-                destination=ret.stock_destination,
-                stock_location_id=ret.stock_location_id,
-                inventory_item=line.inventory_item,
-            ),
-            reference_model="DirectSaleReturnLine",
-            reference_id=f"{ret.id}:{line.id}",
-            posted_by=posted_by,
-            notes=f"{ret.return_no} {ret.return_kind} to {ret.stock_destination}",
-        )
-        created_count += 1
-    return {"created_count": created_count, "existing_count": existing_count}
+        _entry, created, skipped_reason = post_sale_return_stock_movement(ret=ret, line=line, posted_by=posted_by)
+        if skipped_reason:
+            skipped_count += 1
+            continue
+        created_count += 1 if created else 0
+        existing_count += 0 if created else 1
+    return {"created_count": created_count, "existing_count": existing_count, "skipped_count": skipped_count}
 
 
-def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
+def get_direct_sale_return_eligibility(
+    *,
+    direct_sale_id: int,
+    replacement_inventory_item_id: int | None = None,
+    replacement_stock_location_id: int | None = None,
+    replacement_quantity=None,
+) -> dict:
     sale = DirectSale.objects.prefetch_related("lines", "billing_invoices", "receipts").get(pk=direct_sale_id)
     invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
     posted_invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
@@ -158,6 +290,23 @@ def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
     outstanding_balance = _money(sale.grand_total) - active_receipt_total
     posted_receipt_count = sale.receipts.filter(status=BillingDocumentStatus.POSTED).count()
     invoiced = posted_invoice is not None or sale.status == DirectSaleStatus.INVOICED
+    replacement_stock_available = None
+    stock_blocking_reasons: list[str] = []
+    if replacement_inventory_item_id:
+        replacement_item = InventoryItem.objects.select_related("default_stock_location").get(pk=replacement_inventory_item_id)
+        replacement_location = (
+            StockLocation.objects.get(pk=replacement_stock_location_id)
+            if replacement_stock_location_id
+            else replacement_item.default_stock_location
+        )
+        replacement_stock_available = str(
+            _location_quantity(inventory_item=replacement_item, stock_location=replacement_location)
+        ) if replacement_location else None
+        requested_qty = _qty(replacement_quantity or "1.000")
+        if replacement_location is None:
+            stock_blocking_reasons.append("Replacement stock location is required for exchange.")
+        elif _location_quantity(inventory_item=replacement_item, stock_location=replacement_location) < requested_qty:
+            stock_blocking_reasons.append("Replacement stock is insufficient at the selected location.")
     allowed_actions = []
     blocking_reasons: list[str] = []
     if sale.status == DirectSaleStatus.CANCELLED:
@@ -186,9 +335,21 @@ def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
                 "description": line.description,
                 "sold_quantity": str(_qty(line.quantity)),
                 "already_returned_quantity": str(returned.get(line.id, Decimal("0.000"))),
-                "max_returnable_quantity": str(_qty(line.quantity) - returned.get(line.id, Decimal("0.000"))),
+                "max_returnable_quantity": str(get_returnable_quantity(line)),
+                "returnable_quantity": str(get_returnable_quantity(line)),
                 "unit_price": str(line.unit_price),
                 "line_total": str(line.line_total),
+                "original_sale_out_posted": get_sale_out_quantity(line) > Decimal("0.000"),
+                "return_stock_destination_required": True,
+                "allowed_stock_destinations": [
+                    ReturnStockDestination.INSPECTION,
+                    ReturnStockDestination.DAMAGED,
+                    ReturnStockDestination.SERVICE,
+                    ReturnStockDestination.SELLABLE,
+                ],
+                "stock_blocking_reasons": (
+                    [] if get_sale_out_quantity(line) > Decimal("0.000") else ["Original SALE_OUT stock movement was not found."]
+                ),
             }
             for line in sale.lines.all()
         ],
@@ -201,6 +362,8 @@ def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
         "active_receipt_total": str(active_receipt_total),
         "void_receipt_total": str(void_receipt_total),
         "outstanding_balance": str(outstanding_balance),
+        "replacement_stock_available": replacement_stock_available,
+        "stock_blocking_reasons": stock_blocking_reasons,
         "allowed_actions": allowed_actions,
         "blocking_reasons": blocking_reasons,
     }
@@ -253,7 +416,7 @@ def open_direct_sale_cancellation_case(*, direct_sale_id: int, reason: str, perf
         reason=reason,
         performed_by=performed_by,
         return_kind=return_kind,
-        stock_destination=ReturnStockDestination.SELLABLE,
+        stock_destination=ReturnStockDestination.INSPECTION,
         stock_location_id=stock_location_id,
     )
     log_audit(
@@ -285,16 +448,23 @@ def create_direct_sale_return(
     reason: str,
     performed_by,
     return_kind: str = DirectSaleReturnKind.DELIVERED_RETURN,
-    stock_destination: str = ReturnStockDestination.SELLABLE,
+    stock_destination: str = ReturnStockDestination.INSPECTION,
     stock_location_id: int | None = None,
+    confirm_sellable_destination: bool = False,
 ):
     reason = _require_reason(reason)
     return_kind = _clean_return_kind(return_kind)
     stock_destination = _clean_stock_destination(stock_destination)
+    if stock_destination == ReturnStockDestination.SELLABLE and not confirm_sellable_destination:
+        raise ValueError("SELLABLE return destination requires explicit admin confirmation.")
     if return_kind == DirectSaleReturnKind.DAMAGED_RETURN and stock_destination == ReturnStockDestination.SELLABLE:
         raise ValueError("Damaged returns cannot be sent directly to sellable stock.")
-    if stock_destination != ReturnStockDestination.SELLABLE and not stock_location_id:
-        raise ValueError("Non-sellable returns require stock_location_id.")
+    if (
+        return_kind != DirectSaleReturnKind.POST_INVOICE_CANCEL
+        and stock_destination != ReturnStockDestination.SELLABLE
+        and not stock_location_id
+    ):
+        raise ValueError(f"{stock_destination.title()} returns require stock_location_id.")
     if not lines:
         raise ValueError("At least one return line is required.")
 
@@ -305,16 +475,10 @@ def create_direct_sale_return(
 
     if sale.status not in {DirectSaleStatus.INVOICED, DirectSaleStatus.DELIVERED}:
         raise ValueError("Return is allowed only for delivered/invoiced direct sales.")
+    if return_kind != DirectSaleReturnKind.POST_INVOICE_CANCEL and stock_destination != ReturnStockDestination.SELLABLE:
+        _stock_location_for_destination(destination=stock_destination, stock_location_id=stock_location_id)
 
     by_line = {line.id: line for line in sale.lines.all()}
-    returned_by_sale_line: dict[int, Decimal] = defaultdict(lambda: Decimal("0.000"))
-    existing_returns = DirectSaleReturnLine.objects.filter(
-        direct_sale_line_id__in=list(by_line.keys()),
-        direct_sale_return__status__in=[DirectSaleReturnStatus.APPROVED, DirectSaleReturnStatus.POSTED],
-    ).values("direct_sale_line_id").annotate(total=Sum("quantity"))
-    for row in existing_returns:
-        returned_by_sale_line[int(row["direct_sale_line_id"])] = _qty(row["total"])
-
     seq = _fy_sequence("BILL_RET", "RET", timezone.localdate())
     ds_return = DirectSaleReturn.objects.create(
         return_no=_issue_series_number(seq, prefix_fallback=f"RET-{sale.id}"),
@@ -342,11 +506,14 @@ def create_direct_sale_return(
             raise ValueError(f"Direct sale line {sale_line_id} not found.")
 
         sold_qty = _qty(sale_line.quantity)
-        already_returned = returned_by_sale_line[sale_line.id]
-        allowed_qty = sold_qty - already_returned
+        returned_qty = get_returned_quantity(sale_line)
+        sale_out_qty = get_sale_out_quantity(sale_line)
+        allowed_qty = get_returnable_quantity(sale_line)
+        if return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL and sale_out_qty <= Decimal("0.000"):
+            allowed_qty = max(Decimal("0.000"), sold_qty - returned_qty)
         if quantity > allowed_qty:
             raise ValueError(
-                f"Return quantity exceeds remaining sold quantity for line {sale_line.id}. Remaining: {allowed_qty}."
+                f"Return quantity exceeds posted sale-out quantity for line {sale_line.id}. Remaining: {allowed_qty}."
             )
 
         unit_price = _money(sale_line.unit_price)
@@ -435,7 +602,12 @@ def post_direct_sale_return(*, return_id: int, posted_by):
         )
 
     note, _ = post_billing_credit_note(credit_note_id=note.id, posted_by=posted_by)
-    stock_result = _post_direct_sale_return_stock(ret=ret, posted_by=posted_by) if ret.stock_effect else {"created_count": 0, "existing_count": 0}
+    stock_result = _post_direct_sale_return_stock(ret=ret, posted_by=posted_by) if ret.stock_effect else {"created_count": 0, "existing_count": 0, "skipped_count": 0}
+    exchange_stock_result = (
+        post_exchange_replacement_stock_movement(ret=ret, posted_by=posted_by)
+        if ret.return_kind == DirectSaleReturnKind.DELIVERED_EXCHANGE
+        else {"created_count": 0, "existing_count": 0}
+    )
     ret.credit_note = note
     ret.status = DirectSaleReturnStatus.POSTED
     ret.posted_by = posted_by
@@ -443,6 +615,9 @@ def post_direct_sale_return(*, return_id: int, posted_by):
     metadata = dict(ret.metadata or {})
     metadata["stock_created_count"] = stock_result["created_count"]
     metadata["stock_existing_count"] = stock_result["existing_count"]
+    metadata["stock_skipped_count"] = stock_result.get("skipped_count", 0)
+    metadata["exchange_replacement_stock_created_count"] = exchange_stock_result["created_count"]
+    metadata["exchange_replacement_stock_existing_count"] = exchange_stock_result["existing_count"]
     ret.metadata = metadata
     ret.save(update_fields=["credit_note", "status", "posted_by", "posted_at", "metadata", "updated_at"])
 
@@ -469,6 +644,7 @@ def create_direct_sale_exchange(
     performed_by,
     stock_destination: str = ReturnStockDestination.INSPECTION,
     stock_location_id: int | None = None,
+    confirm_sellable_destination: bool = False,
 ):
     reason = _require_reason(reason)
     if not replacement_lines:
@@ -481,6 +657,7 @@ def create_direct_sale_exchange(
         return_kind=DirectSaleReturnKind.DELIVERED_EXCHANGE,
         stock_destination=stock_destination,
         stock_location_id=stock_location_id,
+        confirm_sellable_destination=confirm_sellable_destination,
     )
     replacement_total = Decimal("0.00")
     replacement_summary = []
@@ -490,19 +667,21 @@ def create_direct_sale_exchange(
         unit_price = _money(row.get("unit_price"))
         if item_id <= 0 or qty <= Decimal("0.000") or unit_price < Decimal("0.00"):
             raise ValueError("Replacement lines require inventory_item_id, quantity, and unit_price.")
-        item = InventoryItem.objects.select_related("product").get(pk=item_id)
-        line_total = _money(qty * unit_price)
-        post_movement(
-            inventory_item=item,
-            movement_type=StockMovementType.SALE_OUT,
-            quantity=qty,
-            movement_date=timezone.localdate(),
-            stock_location=item.default_stock_location,
-            reference_model="DirectSaleExchangeReplacement",
-            reference_id=f"{ret.id}:{item.id}",
-            posted_by=performed_by,
-            notes=f"Exchange replacement for {ret.return_no}",
+        item = InventoryItem.objects.select_related("product", "default_stock_location").get(pk=item_id)
+        replacement_location_id = row.get("stock_location_id")
+        replacement_location = (
+            StockLocation.objects.get(pk=int(replacement_location_id))
+            if replacement_location_id
+            else item.default_stock_location
         )
+        if replacement_location is None:
+            raise ValueError("Replacement stock location is required for exchange.")
+        available = _location_quantity(inventory_item=item, stock_location=replacement_location)
+        if available < qty:
+            raise ValueError(
+                f"Insufficient stock for replacement item {item.sku or item.id} at {replacement_location.name}. Available: {available}, Requested: {qty}."
+            )
+        line_total = _money(qty * unit_price)
         replacement_total += line_total
         replacement_summary.append(
             {
@@ -512,6 +691,8 @@ def create_direct_sale_exchange(
                 "quantity": str(qty),
                 "unit_price": str(unit_price),
                 "line_total": str(line_total),
+                "stock_location_id": replacement_location.id,
+                "stock_location_name": replacement_location.name,
             }
         )
 
@@ -681,7 +862,7 @@ def pay_customer_refund(*, refund_id: int, paid_by):
 
 
 @transaction.atomic
-def create_purchase_return(*, purchase_bill_id: int, lines: list[dict], reason: str, performed_by):
+def create_purchase_return(*, purchase_bill_id: int, lines: list[dict], reason: str, performed_by, stock_location_id: int | None = None):
     reason = _require_reason(reason)
     if not lines:
         raise ValueError("At least one purchase return line is required.")
@@ -705,6 +886,7 @@ def create_purchase_return(*, purchase_bill_id: int, lines: list[dict], reason: 
         purchase_bill=bill,
         vendor=bill.vendor,
         reason=reason,
+        metadata={"stock_location_id": stock_location_id or bill.stock_location_id},
     )
 
     subtotal = Decimal("0.00")
@@ -762,17 +944,26 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
     if purchase_return.status != PurchaseReturnStatus.DRAFT:
         raise ValueError("Only draft purchase return can be posted.")
 
+    stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or purchase_return.purchase_bill.stock_location_id
+    stock_location = StockLocation.objects.filter(pk=stock_location_id).first() if stock_location_id else None
+    if stock_location is None:
+        raise ValueError("Purchase return requires a valid source stock location.")
     for line in purchase_return.lines.all():
+        available = _location_quantity(inventory_item=line.inventory_item, stock_location=stock_location)
+        if available < line.quantity:
+            raise ValueError(
+                f"Insufficient stock at {stock_location.name} for purchase return line {line.id}. Available: {available}, Requested: {line.quantity}."
+            )
         post_movement(
             inventory_item=line.inventory_item,
             movement_type=StockMovementType.PURCHASE_RETURN_OUT,
             quantity=line.quantity,
             movement_date=purchase_return.return_date,
-            stock_location=purchase_return.purchase_bill.stock_location,
-            reference_model="PurchaseReturn",
-            reference_id=purchase_return.id,
+            stock_location=stock_location,
+            reference_model="PurchaseReturnLine",
+            reference_id=f"{purchase_return.id}:{line.id}",
             posted_by=posted_by,
-            notes=f"Purchase return {purchase_return.return_no}",
+            notes=f"Purchase return {purchase_return.return_no} from {stock_location.name}",
         )
 
     accounts = ensure_phase3_system_accounts()

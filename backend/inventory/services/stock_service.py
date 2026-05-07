@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
@@ -668,6 +668,11 @@ def build_stock_ledger(
     movement_type: str | None = None,
     reference_model: str | None = None,
     branch_id: int | None = None,
+    direct_sale_id: int | None = None,
+    direct_sale_return_id: int | None = None,
+    exchange_return_id: int | None = None,
+    purchase_return_id: int | None = None,
+    credit_note_id: int | None = None,
 ):
     queryset = StockLedger.objects.select_related(
         "inventory_item",
@@ -691,6 +696,25 @@ def build_stock_ledger(
             queryset = queryset.filter(movement_type__in=movement_types)
     if reference_model:
         queryset = queryset.filter(reference_model__iexact=str(reference_model).strip())
+    if direct_sale_id:
+        from billing.models import BillingInvoice
+
+        invoice_ids = list(BillingInvoice.objects.filter(direct_sale_id=direct_sale_id).values_list("id", flat=True))
+        sale_q = Q()
+        for invoice_id in invoice_ids:
+            sale_q |= Q(reference_model="BillingInvoiceLine", reference_id__startswith=f"{invoice_id}:")
+        queryset = queryset.filter(sale_q) if sale_q else queryset.none()
+    if direct_sale_return_id:
+        queryset = queryset.filter(reference_model="DirectSaleReturnLine", reference_id__startswith=f"{direct_sale_return_id}:")
+    if exchange_return_id:
+        queryset = queryset.filter(
+            Q(reference_model="DirectSaleReturnLine", reference_id__startswith=f"{exchange_return_id}:")
+            | Q(reference_model="DirectSaleExchangeReplacement", reference_id__startswith=f"{exchange_return_id}:")
+        )
+    if purchase_return_id:
+        queryset = queryset.filter(reference_model="PurchaseReturnLine", reference_id__startswith=f"{purchase_return_id}:")
+    if credit_note_id:
+        queryset = queryset.filter(reference_model="BillingCreditNoteLine", reference_id__startswith=f"{credit_note_id}:")
     queryset = queryset.order_by("-movement_date", "-created_at", "-id")
 
     results = [

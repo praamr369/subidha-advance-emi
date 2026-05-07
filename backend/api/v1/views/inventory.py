@@ -478,6 +478,11 @@ class StockLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             movement_type=request.query_params.get("movement_type"),
             reference_model=request.query_params.get("reference_model"),
             branch_id=request.query_params.get("branch"),
+            direct_sale_id=request.query_params.get("direct_sale"),
+            direct_sale_return_id=request.query_params.get("direct_sale_return"),
+            exchange_return_id=request.query_params.get("exchange"),
+            purchase_return_id=request.query_params.get("purchase_return"),
+            credit_note_id=request.query_params.get("credit_note"),
         )
         return Response(payload)
 

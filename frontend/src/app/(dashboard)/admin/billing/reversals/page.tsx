@@ -1,11 +1,13 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import { directSalesKeys, inventoryKeys } from "@/lib/query-keys";
 import { ROUTES } from "@/lib/routes";
 import {
   approveAdminCustomerRefund,
@@ -52,7 +54,7 @@ export default function AdminBillingReversalsPage() {
   const [returnLineId, setReturnLineId] = useState("");
   const [returnQty, setReturnQty] = useState("1");
   const [returnKind, setReturnKind] = useState<DirectSaleReturnKind>("DELIVERED_RETURN");
-  const [stockDestination, setStockDestination] = useState<ReturnStockDestination>("SELLABLE");
+  const [stockDestination, setStockDestination] = useState<ReturnStockDestination>("INSPECTION");
   const [stockLocationId, setStockLocationId] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const [eligibilitySaleId, setEligibilitySaleId] = useState("");
@@ -62,6 +64,7 @@ export default function AdminBillingReversalsPage() {
   const [exchangeReturnLineId, setExchangeReturnLineId] = useState("");
   const [exchangeReturnQty, setExchangeReturnQty] = useState("1");
   const [exchangeInventoryItemId, setExchangeInventoryItemId] = useState("");
+  const [exchangeReplacementLocationId, setExchangeReplacementLocationId] = useState("");
   const [exchangeQty, setExchangeQty] = useState("1");
   const [exchangeUnitPrice, setExchangeUnitPrice] = useState("");
   const [exchangeReason, setExchangeReason] = useState("");
@@ -75,7 +78,9 @@ export default function AdminBillingReversalsPage() {
   const [purchaseBillId, setPurchaseBillId] = useState("");
   const [purchaseLineId, setPurchaseLineId] = useState("");
   const [purchaseQty, setPurchaseQty] = useState("1");
+  const [purchaseStockLocationId, setPurchaseStockLocationId] = useState("");
   const [purchaseReason, setPurchaseReason] = useState("");
+  const queryClient = useQueryClient();
 
   async function load() {
     setLoading(true);
@@ -111,6 +116,13 @@ export default function AdminBillingReversalsPage() {
       await action();
       setNotice(success);
       setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: directSalesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-movements"] }),
+        queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-summary"] }),
+        queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
+        queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "requirements"] }),
+      ]);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
@@ -194,7 +206,7 @@ export default function AdminBillingReversalsPage() {
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!returnReason.trim()) { setError("Return reason is required."); return; }
-              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, lines: [{ direct_sale_line_id: Number(returnLineId), quantity: returnQty }] }), "Return created.");
+              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, confirm_sellable_destination: stockDestination === "SELLABLE", lines: [{ direct_sale_line_id: Number(returnLineId), quantity: returnQty }] }), "Return created.");
             }}>Create Return</button>
           </div>
 
@@ -208,14 +220,15 @@ export default function AdminBillingReversalsPage() {
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
               <input className="h-10 rounded border px-2" value={exchangeInventoryItemId} onChange={(e) => setExchangeInventoryItemId(e.target.value)} placeholder="New Inventory Item ID" />
+              <input className="h-10 rounded border px-2" value={exchangeReplacementLocationId} onChange={(e) => setExchangeReplacementLocationId(e.target.value)} placeholder="New Stock Location ID" />
               <input className="h-10 rounded border px-2" value={exchangeQty} onChange={(e) => setExchangeQty(e.target.value)} placeholder="New Qty" />
-              <input className="h-10 rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
             </div>
+            <input className="mt-2 h-10 w-full rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
             <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Returned Stock Location ID" />
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={exchangeReason} onChange={(e) => setExchangeReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!exchangeReason.trim()) { setError("Exchange reason is required."); return; }
-              void runAction(() => createAdminDirectSaleExchange(Number(exchangeSaleId), { reason: exchangeReason, stock_destination: "INSPECTION", stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, returned_lines: [{ direct_sale_line_id: Number(exchangeReturnLineId), quantity: exchangeReturnQty }], replacement_lines: [{ inventory_item_id: Number(exchangeInventoryItemId), quantity: exchangeQty, unit_price: exchangeUnitPrice }] }), "Exchange created.");
+              void runAction(() => createAdminDirectSaleExchange(Number(exchangeSaleId), { reason: exchangeReason, stock_destination: "INSPECTION", stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, returned_lines: [{ direct_sale_line_id: Number(exchangeReturnLineId), quantity: exchangeReturnQty }], replacement_lines: [{ inventory_item_id: Number(exchangeInventoryItemId), stock_location_id: exchangeReplacementLocationId ? Number(exchangeReplacementLocationId) : undefined, quantity: exchangeQty, unit_price: exchangeUnitPrice }] }), "Exchange created.");
             }}>Create Exchange</button>
           </div>
 
@@ -233,10 +246,11 @@ export default function AdminBillingReversalsPage() {
                 <div>Status: {eligibility.sale_status} · Invoice: {eligibility.invoice_status || "N/A"} · Delivery: {eligibility.delivery_status}</div>
                 <div>Receipts: active {eligibility.active_receipt_total} · void {eligibility.void_receipt_total} · Outstanding {eligibility.outstanding_balance}</div>
                 <div>Allowed actions: {eligibility.allowed_actions.join(", ") || "None"}</div>
+                {eligibility.replacement_stock_available ? <div>Replacement stock available: {eligibility.replacement_stock_available}</div> : null}
                 {(eligibility.blocking_reasons || []).length ? <div>Blocking reasons: {eligibility.blocking_reasons?.join(" | ")}</div> : null}
                 {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
                   <div key={line.direct_sale_line_id} className="rounded border p-2">
-                    Line {line.direct_sale_line_id}: max returnable {line.max_returnable_quantity} · already returned {line.already_returned_quantity}
+                    Line {line.direct_sale_line_id}: sold {line.sold_quantity} · returned {line.already_returned_quantity} · returnable {line.returnable_quantity || line.max_returnable_quantity}
                   </div>
                 ))}
               </div>
@@ -267,10 +281,11 @@ export default function AdminBillingReversalsPage() {
               <input className="h-10 rounded border px-2" value={purchaseLineId} onChange={(e) => setPurchaseLineId(e.target.value)} placeholder="Bill Line ID" />
               <input className="h-10 rounded border px-2" value={purchaseQty} onChange={(e) => setPurchaseQty(e.target.value)} placeholder="Qty" />
             </div>
+            <input className="mt-2 h-10 w-full rounded border px-2" value={purchaseStockLocationId} onChange={(e) => setPurchaseStockLocationId(e.target.value)} placeholder="Vendor-return Stock Location ID" />
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!purchaseReason.trim()) { setError("Purchase return reason is required."); return; }
-              void runAction(() => createAdminPurchaseReturn(Number(purchaseBillId), { reason: purchaseReason, lines: [{ purchase_bill_line_id: Number(purchaseLineId), quantity: purchaseQty }] }), "Purchase return created.");
+              void runAction(() => createAdminPurchaseReturn(Number(purchaseBillId), { reason: purchaseReason, stock_location_id: purchaseStockLocationId ? Number(purchaseStockLocationId) : undefined, lines: [{ purchase_bill_line_id: Number(purchaseLineId), quantity: purchaseQty }] }), "Purchase return created.");
             }}>Create Purchase Return</button>
           </div>
         </div>

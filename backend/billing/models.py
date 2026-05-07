@@ -1281,6 +1281,7 @@ class PurchaseReturn(BillingTimeStampedModel):
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    metadata = models.JSONField(default=dict, blank=True)
     posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_return")
     posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_purchase_returns")
     posted_at = models.DateTimeField(null=True, blank=True, db_index=True)

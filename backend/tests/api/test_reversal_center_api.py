@@ -7,7 +7,8 @@ from rest_framework.test import APITestCase
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from billing.models import DirectSale
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
-from inventory.models import InventoryItem
+from billing.services.reversal_service import create_direct_sale_exchange, create_direct_sale_return, post_direct_sale_return
+from inventory.models import InventoryItem, StockLocation, StockMovementType
 from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_product
 
 
@@ -18,7 +19,9 @@ class ReversalCenterApiTests(APITestCase):
         self.cashier = create_cashier_user(username="rev_api_cashier", phone="9386222222")
         self.customer = create_customer_profile(name="Rev API Customer", phone="7386222221")
         self.product = create_product(name="Rev API Product", product_code="REV-API-001", base_price=Decimal("1000.00"))
-        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="REV-API-SKU-001", opening_stock_qty=Decimal("10.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
+        self.sellable_location = StockLocation.objects.create(code="REV-SELL", name="Rev Sellable")
+        self.inspection_location = StockLocation.objects.create(code="REV-INSP", name="Rev Inspection")
+        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="REV-API-SKU-001", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("10.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
         cash_chart = ChartOfAccount.objects.create(code="REV-API-CASH-001", name="Rev API Cash", account_type=ChartOfAccountType.ASSET)
         self.cash_account = FinanceAccount.objects.create(name="Rev API Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
 
@@ -80,3 +83,54 @@ class ReversalCenterApiTests(APITestCase):
         self.assertIn("RETURN_PRODUCT", response.data["allowed_actions"])
         self.assertIn("EXCHANGE_PRODUCT", response.data["allowed_actions"])
         self.assertNotIn("PRE_INVOICE_CANCEL", response.data["allowed_actions"])
+
+    def test_inventory_ledger_filters_show_return_and_exchange_movements(self):
+        replacement_product = create_product(name="Rev API Replacement", product_code="REV-API-002", base_price=Decimal("1200.00"))
+        replacement_item = InventoryItem.objects.create(product=replacement_product, sku="REV-API-SKU-002", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("5.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("900.00"))
+        return_sale = self._create_sale()
+        return_invoice = return_sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=return_invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=return_invoice.id, posted_by=self.admin)
+
+        ret = create_direct_sale_return(
+            direct_sale_id=return_sale.id,
+            reason="Filter return",
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            lines=[{"direct_sale_line_id": return_sale.lines.first().id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        ret.status = "APPROVED"
+        ret.save(update_fields=["status", "updated_at"])
+        post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+
+        exchange_sale = self._create_sale()
+        exchange_invoice = exchange_sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=exchange_invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=exchange_invoice.id, posted_by=self.admin)
+
+        exchange = create_direct_sale_exchange(
+            direct_sale_id=exchange_sale.id,
+            returned_lines=[{"direct_sale_line_id": exchange_sale.lines.first().id, "quantity": "1.000"}],
+            replacement_lines=[{"inventory_item_id": replacement_item.id, "quantity": "1.000", "unit_price": "1200.00"}],
+            reason="Filter exchange",
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            performed_by=self.admin,
+        )
+        exchange.status = "APPROVED"
+        exchange.save(update_fields=["status", "updated_at"])
+        post_direct_sale_return(return_id=exchange.id, posted_by=self.admin)
+
+        self.client.force_authenticate(user=self.admin)
+        return_response = self.client.get(f"/api/v1/inventory/stock-ledger/?direct_sale_return={ret.id}")
+        exchange_response = self.client.get(f"/api/v1/inventory/stock-ledger/?exchange={exchange.id}")
+
+        self.assertEqual(return_response.status_code, status.HTTP_200_OK, return_response.data)
+        self.assertTrue(
+            any(row["movement_type"] == StockMovementType.SALE_RETURN_IN for row in return_response.data["results"])
+        )
+        self.assertEqual(exchange_response.status_code, status.HTTP_200_OK, exchange_response.data)
+        exchange_types = {row["movement_type"] for row in exchange_response.data["results"]}
+        self.assertIn(StockMovementType.SALE_RETURN_IN, exchange_types)
+        self.assertIn(StockMovementType.SALE_OUT, exchange_types)

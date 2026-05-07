@@ -178,8 +178,12 @@ test("return eligibility panel shows allowed post-sale actions", async ({ page }
   });
 
   await page.goto("/admin/billing/reversals");
-  await page.getByPlaceholder("Direct Sale ID").first().fill("1");
-  await page.getByRole("button", { name: "View Return Eligibility" }).click();
+  const eligibilityCard = page
+    .locator("div.rounded.border.p-3")
+    .filter({ has: page.getByText("View Return Eligibility") })
+    .first();
+  await eligibilityCard.getByPlaceholder("Direct Sale ID").fill("1");
+  await eligibilityCard.getByRole("button", { name: "View Return Eligibility" }).click();
   await expect(page.locator("body")).toContainText("Allowed actions: RETURN_PRODUCT, EXCHANGE_PRODUCT");
   await expect(page.locator("body")).toContainText("Receipts: active 0.00 · void 21000.00 · Outstanding 21000.00");
 });

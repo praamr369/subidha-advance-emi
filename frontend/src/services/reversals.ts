@@ -43,8 +43,13 @@ export type DirectSaleReturnEligibility = {
     sold_quantity: string;
     already_returned_quantity: string;
     max_returnable_quantity: string;
+    returnable_quantity?: string;
     unit_price: string;
     line_total: string;
+    original_sale_out_posted?: boolean;
+    return_stock_destination_required?: boolean;
+    allowed_stock_destinations?: string[];
+    stock_blocking_reasons?: string[];
   }>;
   receipt_summary: {
     posted_receipt_count: number;
@@ -54,6 +59,8 @@ export type DirectSaleReturnEligibility = {
   };
   allowed_actions: string[];
   blocking_reasons?: string[];
+  replacement_stock_available?: string | null;
+  stock_blocking_reasons?: string[];
 };
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -88,6 +95,7 @@ export async function createAdminDirectSaleReturn(
     return_kind?: DirectSaleReturnKind;
     stock_destination?: ReturnStockDestination;
     stock_location_id?: number;
+    confirm_sellable_destination?: boolean;
     lines: Array<{ direct_sale_line_id: number; quantity: string | number }>;
   }
 ): Promise<{ direct_sale_return_id: number }> {
@@ -103,8 +111,9 @@ export async function createAdminDirectSaleExchange(
     reason: string;
     stock_destination?: ReturnStockDestination;
     stock_location_id?: number;
+    confirm_sellable_destination?: boolean;
     returned_lines: Array<{ direct_sale_line_id: number; quantity: string | number }>;
-    replacement_lines: Array<{ inventory_item_id: number; description?: string; quantity: string | number; unit_price: string | number }>;
+    replacement_lines: Array<{ inventory_item_id: number; stock_location_id?: number; description?: string; quantity: string | number; unit_price: string | number }>;
   }
 ): Promise<{ direct_sale_return_id: number; exchange_amount_due: string; exchange_customer_credit: string }> {
   return apiFetch(`/admin/billing/direct-sales/${directSaleId}/exchange/`, {
@@ -155,7 +164,11 @@ export async function payAdminCustomerRefund(refundId: number): Promise<{ update
 
 export async function createAdminPurchaseReturn(
   purchaseId: number,
-  payload: { reason: string; lines: Array<{ purchase_bill_line_id: number; quantity: string | number }> }
+  payload: {
+    reason: string;
+    stock_location_id?: number;
+    lines: Array<{ purchase_bill_line_id: number; quantity: string | number }>;
+  }
 ): Promise<{ id: number; return_no: string }> {
   return apiFetch(`/admin/purchases/${purchaseId}/returns/`, { method: "POST", body: JSON.stringify(payload) });
 }

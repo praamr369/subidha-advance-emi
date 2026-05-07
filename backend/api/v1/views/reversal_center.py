@@ -66,6 +66,7 @@ class AdminDirectSaleReturnCreateView(_AdminBase):
                 return_kind=serializer.validated_data.get("return_kind"),
                 stock_destination=serializer.validated_data.get("stock_destination"),
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
+                confirm_sellable_destination=serializer.validated_data.get("confirm_sellable_destination", False),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -85,6 +86,7 @@ class AdminDirectSaleExchangeCreateView(_AdminBase):
                 performed_by=request.user,
                 stock_destination=serializer.validated_data.get("stock_destination"),
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
+                confirm_sellable_destination=serializer.validated_data.get("confirm_sellable_destination", False),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -102,7 +104,17 @@ class AdminDirectSaleExchangeCreateView(_AdminBase):
 
 class AdminDirectSaleReturnEligibilityView(_AdminBase):
     def get(self, request, pk: int):
-        return Response(get_direct_sale_return_eligibility(direct_sale_id=pk))
+        replacement_inventory_item_id = request.query_params.get("replacement_inventory_item_id")
+        replacement_stock_location_id = request.query_params.get("replacement_stock_location_id")
+        replacement_quantity = request.query_params.get("replacement_quantity")
+        return Response(
+            get_direct_sale_return_eligibility(
+                direct_sale_id=pk,
+                replacement_inventory_item_id=int(replacement_inventory_item_id) if replacement_inventory_item_id else None,
+                replacement_stock_location_id=int(replacement_stock_location_id) if replacement_stock_location_id else None,
+                replacement_quantity=replacement_quantity,
+            )
+        )
 
 
 class AdminReturnListView(_AdminBase):
@@ -304,6 +316,7 @@ class AdminPurchaseReturnCreateView(_AdminBase):
                 lines=serializer.validated_data["lines"],
                 reason=serializer.validated_data["reason"],
                 performed_by=request.user,
+                stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
