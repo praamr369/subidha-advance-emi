@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from subscriptions.models import AuditLog, OperationalCancellation
 from subscriptions.services.audit_service import log_audit
@@ -23,6 +24,28 @@ def _clean_reason(reason: str | None) -> str:
 
 def _to_decimal(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def _parse_source_identity(payload: dict) -> tuple[int | None, str]:
+    raw_source_id = payload.get("source_id")
+    source_reference = str(payload.get("source_reference") or "").strip()
+    if raw_source_id in (None, ""):
+        return None, source_reference
+    try:
+        parsed = int(str(raw_source_id).strip())
+    except (TypeError, ValueError):
+        return None, source_reference or str(raw_source_id).strip()
+    if parsed <= 0:
+        return None, source_reference
+    return parsed, source_reference
+
+
+def _clean_cancellation_type(value: str | None) -> str:
+    cancellation_type = str(value or "MANUAL_SETTLEMENT").strip().upper()
+    valid = {choice[0] for choice in OperationalCancellation.CancellationType.choices}
+    if cancellation_type not in valid:
+        raise ValidationError({"reversal_type": f"{cancellation_type} is not a valid cancellation type."})
+    return cancellation_type
 
 
 def _status_of(case: OperationalCancellation) -> str:
@@ -73,16 +96,20 @@ def open_reversal_case(*, actor, payload: dict) -> dict:
     _require_admin(actor)
     reason = _clean_reason(payload.get("reason"))
     source_type = str(payload.get("source_type") or "").strip().upper()
-    source_id = int(payload.get("source_id") or 0)
-    if not source_type or source_id <= 0:
-        raise ValueError("source_type and source_id are required.")
+    source_id, source_reference = _parse_source_identity(payload)
+    cancellation_type = _clean_cancellation_type(payload.get("reversal_type"))
+    if not source_type:
+        raise ValidationError({"source_type": "source_type is required."})
+    if source_id is None and not source_reference:
+        raise ValidationError({"source_id": "source_id or source_reference is required."})
 
-    existing = OperationalCancellation.objects.select_for_update(of=("self",)).filter(
-        source_type=source_type,
-        source_id=source_id,
-    ).first()
-    if existing is not None and _status_of(existing) in WORKFLOW_OPEN:
-        raise ValueError("An active reversal case already exists for this source.")
+    if source_id is not None:
+        existing = OperationalCancellation.objects.select_for_update(of=("self",)).filter(
+            source_type=source_type,
+            source_id=source_id,
+        ).first()
+        if existing is not None and _status_of(existing) in WORKFLOW_OPEN:
+            raise ValidationError({"detail": "An active reversal case already exists for this source."})
 
     metadata = {
         "workflow_status": "DRAFT",
@@ -99,13 +126,13 @@ def open_reversal_case(*, actor, payload: dict) -> dict:
     case = OperationalCancellation.objects.create(
         source_type=source_type,
         source_id=source_id,
-        source_reference=str(payload.get("source_reference") or "").strip(),
+        source_reference=source_reference,
         customer_id=payload.get("customer_id") or None,
         partner_id=payload.get("partner_id") or None,
         amount_snapshot=_to_decimal(payload.get("amount_snapshot")),
         status_before=str(payload.get("status_before") or "").strip().upper(),
         status_after=str(payload.get("status_after") or "").strip().upper(),
-        cancellation_type=str(payload.get("reversal_type") or "MANUAL_SETTLEMENT").strip().upper()[:40],
+        cancellation_type=cancellation_type,
         reason=reason,
         internal_note=str(payload.get("internal_note") or "").strip(),
         requested_by=actor,
@@ -116,7 +143,13 @@ def open_reversal_case(*, actor, payload: dict) -> dict:
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=case,
         performed_by=actor,
-        metadata={"event": "REVERSAL_CASE_OPENED", "case_id": case.id, "source_type": source_type, "source_id": source_id},
+        metadata={
+            "event": "REVERSAL_CASE_OPENED",
+            "case_id": case.id,
+            "source_type": source_type,
+            "source_id": source_id,
+            "source_reference": source_reference,
+        },
     )
     return _serialize_case(case)
 

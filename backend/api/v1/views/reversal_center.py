@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.reversal_center import (
     CustomerRefundCreateSerializer,
+    DirectSaleExchangeCreateSerializer,
     DirectSaleReturnCreateSerializer,
     PurchaseReturnCreateSerializer,
     ReasonSerializer,
@@ -20,8 +21,11 @@ from billing.services.reversal_service import (
     approve_direct_sale_return,
     cancel_direct_sale_before_invoice,
     create_customer_refund,
+    create_direct_sale_exchange,
     create_direct_sale_return,
     create_purchase_return,
+    get_direct_sale_return_eligibility,
+    open_direct_sale_cancellation_case,
     pay_customer_refund,
     post_direct_sale_return,
     post_purchase_return,
@@ -38,14 +42,15 @@ class AdminDirectSaleCancelView(_AdminBase):
         serializer = ReasonSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            sale, updated = cancel_direct_sale_before_invoice(
+            result = open_direct_sale_cancellation_case(
                 direct_sale_id=pk,
                 reason=serializer.validated_data["reason"],
                 performed_by=request.user,
+                stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
-        return Response({"updated": updated, "direct_sale_id": sale.id, "status": sale.status})
+        return Response(result)
 
 
 class AdminDirectSaleReturnCreateView(_AdminBase):
@@ -58,10 +63,46 @@ class AdminDirectSaleReturnCreateView(_AdminBase):
                 lines=serializer.validated_data["lines"],
                 reason=serializer.validated_data["reason"],
                 performed_by=request.user,
+                return_kind=serializer.validated_data.get("return_kind"),
+                stock_destination=serializer.validated_data.get("stock_destination"),
+                stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         return Response({"direct_sale_return_id": ret.id, "return_no": ret.return_no, "status": ret.status}, status=status.HTTP_201_CREATED)
+
+
+class AdminDirectSaleExchangeCreateView(_AdminBase):
+    def post(self, request, pk: int):
+        serializer = DirectSaleExchangeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            ret = create_direct_sale_exchange(
+                direct_sale_id=pk,
+                returned_lines=serializer.validated_data["returned_lines"],
+                replacement_lines=serializer.validated_data["replacement_lines"],
+                reason=serializer.validated_data["reason"],
+                performed_by=request.user,
+                stock_destination=serializer.validated_data.get("stock_destination"),
+                stock_location_id=serializer.validated_data.get("stock_location_id"),
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(
+            {
+                "direct_sale_return_id": ret.id,
+                "return_no": ret.return_no,
+                "status": ret.status,
+                "exchange_amount_due": str(ret.exchange_amount_due),
+                "exchange_customer_credit": str(ret.exchange_customer_credit),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminDirectSaleReturnEligibilityView(_AdminBase):
+    def get(self, request, pk: int):
+        return Response(get_direct_sale_return_eligibility(direct_sale_id=pk))
 
 
 class AdminReturnListView(_AdminBase):

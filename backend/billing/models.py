@@ -1125,6 +1125,21 @@ class DirectSaleReturnStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class DirectSaleReturnKind(models.TextChoices):
+    POST_INVOICE_CANCEL = "POST_INVOICE_CANCEL", "Post-Invoice Cancel"
+    DELIVERED_RETURN = "DELIVERED_RETURN", "Delivered Return"
+    DELIVERED_EXCHANGE = "DELIVERED_EXCHANGE", "Delivered Exchange"
+    DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
+    PARTIAL_RETURN = "PARTIAL_RETURN", "Partial Return"
+
+
+class ReturnStockDestination(models.TextChoices):
+    SELLABLE = "SELLABLE", "Sellable"
+    INSPECTION = "INSPECTION", "Inspection"
+    DAMAGED = "DAMAGED", "Damaged"
+    SERVICE = "SERVICE", "Service"
+
+
 class RefundMethod(models.TextChoices):
     CASH_REFUND = "CASH_REFUND", "Cash Refund"
     UPI_REFUND = "UPI_REFUND", "UPI Refund"
@@ -1157,11 +1172,33 @@ class DirectSaleReturn(BillingTimeStampedModel):
     )
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="direct_sale_returns")
     status = models.CharField(max_length=16, choices=DirectSaleReturnStatus.choices, default=DirectSaleReturnStatus.DRAFT, db_index=True)
+    return_kind = models.CharField(
+        max_length=24,
+        choices=DirectSaleReturnKind.choices,
+        default=DirectSaleReturnKind.DELIVERED_RETURN,
+        db_index=True,
+    )
+    stock_destination = models.CharField(
+        max_length=16,
+        choices=ReturnStockDestination.choices,
+        default=ReturnStockDestination.SELLABLE,
+        db_index=True,
+    )
+    stock_location = models.ForeignKey(
+        "inventory.StockLocation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="direct_sale_returns",
+    )
     reason = models.TextField()
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    exchange_amount_due = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    exchange_customer_credit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     stock_effect = models.BooleanField(default=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_direct_sale_returns"
     )

@@ -3551,13 +3551,14 @@ class OperationalCancellation(models.Model):
         CANCEL_DRAFT = "CANCEL_DRAFT", "Cancel Draft"
         VOID_UNPOSTED = "VOID_UNPOSTED", "Void Unposted"
         CANCEL_WITH_REVERSAL = "CANCEL_WITH_REVERSAL", "Cancel With Reversal"
+        MANUAL_SETTLEMENT = "MANUAL_SETTLEMENT", "Manual Settlement"
         PAYMENT_REVERSAL = "PAYMENT_REVERSAL", "Payment Reversal"
         DELIVERY_CANCEL = "DELIVERY_CANCEL", "Delivery Cancel"
         STOCK_REQUIREMENT_CANCEL = "STOCK_REQUIREMENT_CANCEL", "Stock Requirement Cancel"
         CONTRACT_TERMINATION = "CONTRACT_TERMINATION", "Contract Termination"
 
     source_type = models.CharField(max_length=40, choices=SourceType.choices, db_index=True)
-    source_id = models.PositiveIntegerField(db_index=True)
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
     source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
     customer = models.ForeignKey(
         Customer,

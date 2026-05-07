@@ -12,8 +12,10 @@ import {
   approveAdminDirectSaleReturn,
   cancelAdminDirectSale,
   createAdminCustomerRefund,
+  createAdminDirectSaleExchange,
   createAdminDirectSaleReturn,
   createAdminPurchaseReturn,
+  getAdminDirectSaleReturnEligibility,
   listAdminReversals,
   payAdminCustomerRefund,
   postAdminDirectSaleReturn,
@@ -21,6 +23,9 @@ import {
   voidAdminReceipt,
   type ReversalRow,
   type ReversalType,
+  type DirectSaleReturnEligibility,
+  type DirectSaleReturnKind,
+  type ReturnStockDestination,
 } from "@/services/reversals";
 
 const types: ReversalType[] = ["sale_return", "receipt_void", "customer_refund", "purchase_return"];
@@ -46,7 +51,20 @@ export default function AdminBillingReversalsPage() {
   const [returnSaleId, setReturnSaleId] = useState("");
   const [returnLineId, setReturnLineId] = useState("");
   const [returnQty, setReturnQty] = useState("1");
+  const [returnKind, setReturnKind] = useState<DirectSaleReturnKind>("DELIVERED_RETURN");
+  const [stockDestination, setStockDestination] = useState<ReturnStockDestination>("SELLABLE");
+  const [stockLocationId, setStockLocationId] = useState("");
   const [returnReason, setReturnReason] = useState("");
+  const [eligibilitySaleId, setEligibilitySaleId] = useState("");
+  const [eligibility, setEligibility] = useState<DirectSaleReturnEligibility | null>(null);
+
+  const [exchangeSaleId, setExchangeSaleId] = useState("");
+  const [exchangeReturnLineId, setExchangeReturnLineId] = useState("");
+  const [exchangeReturnQty, setExchangeReturnQty] = useState("1");
+  const [exchangeInventoryItemId, setExchangeInventoryItemId] = useState("");
+  const [exchangeQty, setExchangeQty] = useState("1");
+  const [exchangeUnitPrice, setExchangeUnitPrice] = useState("");
+  const [exchangeReason, setExchangeReason] = useState("");
 
   const [refundCustomerId, setRefundCustomerId] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
@@ -151,23 +169,83 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Create Return</div>
+            <p className="mb-2 text-xs text-muted-foreground">Original invoice and receipt will remain unchanged. A reversal/credit note and stock ledger entries will be created.</p>
             <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" />
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <select className="h-10 rounded border px-2" value={returnKind} onChange={(e) => setReturnKind(e.target.value as DirectSaleReturnKind)} aria-label="Return Kind">
+                <option value="POST_INVOICE_CANCEL">POST_INVOICE_CANCEL</option>
+                <option value="DELIVERED_RETURN">DELIVERED_RETURN</option>
+                <option value="DELIVERED_EXCHANGE">DELIVERED_EXCHANGE</option>
+                <option value="DAMAGED_RETURN">DAMAGED_RETURN</option>
+                <option value="PARTIAL_RETURN">PARTIAL_RETURN</option>
+              </select>
+              <select className="h-10 rounded border px-2" value={stockDestination} onChange={(e) => setStockDestination(e.target.value as ReturnStockDestination)} aria-label="Stock Destination">
+                <option value="SELLABLE">SELLABLE</option>
+                <option value="INSPECTION">INSPECTION</option>
+                <option value="DAMAGED">DAMAGED</option>
+                <option value="SERVICE">SERVICE</option>
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <input className="h-10 rounded border px-2" value={returnLineId} onChange={(e) => setReturnLineId(e.target.value)} placeholder="Sale Line ID" />
               <input className="h-10 rounded border px-2" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} placeholder="Qty" />
             </div>
+            <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Stock Location ID for inspection/damaged/service" />
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!returnReason.trim()) { setError("Return reason is required."); return; }
-              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, lines: [{ direct_sale_line_id: Number(returnLineId), quantity: returnQty }] }), "Return created.");
+              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, lines: [{ direct_sale_line_id: Number(returnLineId), quantity: returnQty }] }), "Return created.");
             }}>Create Return</button>
+          </div>
+
+          <div className="rounded border p-3">
+            <div className="mb-2 text-sm font-semibold">Exchange Product</div>
+            <p className="mb-2 text-xs text-muted-foreground">Original invoice and receipt will remain unchanged. Exchange difference is shown as customer payable or credit.</p>
+            <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" />
+            <div className="grid grid-cols-2 gap-2">
+              <input className="h-10 rounded border px-2" value={exchangeReturnLineId} onChange={(e) => setExchangeReturnLineId(e.target.value)} placeholder="Old Sale Line ID" />
+              <input className="h-10 rounded border px-2" value={exchangeReturnQty} onChange={(e) => setExchangeReturnQty(e.target.value)} placeholder="Old Qty" />
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <input className="h-10 rounded border px-2" value={exchangeInventoryItemId} onChange={(e) => setExchangeInventoryItemId(e.target.value)} placeholder="New Inventory Item ID" />
+              <input className="h-10 rounded border px-2" value={exchangeQty} onChange={(e) => setExchangeQty(e.target.value)} placeholder="New Qty" />
+              <input className="h-10 rounded border px-2" value={exchangeUnitPrice} onChange={(e) => setExchangeUnitPrice(e.target.value)} placeholder="New Unit Price" />
+            </div>
+            <input className="mt-2 h-10 w-full rounded border px-2" value={stockLocationId} onChange={(e) => setStockLocationId(e.target.value)} placeholder="Returned Stock Location ID" />
+            <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={exchangeReason} onChange={(e) => setExchangeReason(e.target.value)} placeholder="Reason" />
+            <button className="rounded border px-3 py-2 text-sm" onClick={() => {
+              if (!exchangeReason.trim()) { setError("Exchange reason is required."); return; }
+              void runAction(() => createAdminDirectSaleExchange(Number(exchangeSaleId), { reason: exchangeReason, stock_destination: "INSPECTION", stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, returned_lines: [{ direct_sale_line_id: Number(exchangeReturnLineId), quantity: exchangeReturnQty }], replacement_lines: [{ inventory_item_id: Number(exchangeInventoryItemId), quantity: exchangeQty, unit_price: exchangeUnitPrice }] }), "Exchange created.");
+            }}>Create Exchange</button>
+          </div>
+
+          <div className="rounded border p-3">
+            <div className="mb-2 text-sm font-semibold">View Return Eligibility</div>
+            <input className="mb-2 h-10 w-full rounded border px-2" value={eligibilitySaleId} onChange={(e) => setEligibilitySaleId(e.target.value)} placeholder="Direct Sale ID" />
+            <button className="rounded border px-3 py-2 text-sm" onClick={() => {
+              void runAction(async () => {
+                const payload = await getAdminDirectSaleReturnEligibility(Number(eligibilitySaleId));
+                setEligibility(payload);
+              }, "Return eligibility loaded.");
+            }}>View Return Eligibility</button>
+            {eligibility ? (
+              <div className="mt-3 space-y-2 text-xs">
+                <div>Status: {eligibility.sale_status} · Invoice: {eligibility.invoice_status || "N/A"} · Delivery: {eligibility.delivery_status}</div>
+                <div>Allowed actions: {eligibility.allowed_actions.join(", ") || "None"}</div>
+                {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
+                  <div key={line.direct_sale_line_id} className="rounded border p-2">
+                    Line {line.direct_sale_line_id}: max returnable {line.max_returnable_quantity} · already returned {line.already_returned_quantity}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Create Refund</div>
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundCustomerId} onChange={(e) => setRefundCustomerId(e.target.value)} placeholder="Customer ID" />
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} placeholder="Amount" />
-            <select className="mb-2 h-10 w-full rounded border px-2" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as typeof refundMethod)}>
+            <select className="mb-2 h-10 w-full rounded border px-2" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as typeof refundMethod)} aria-label="Refund Method">
               <option value="CASH_REFUND">CASH_REFUND</option>
               <option value="UPI_REFUND">UPI_REFUND</option>
               <option value="BANK_REFUND">BANK_REFUND</option>

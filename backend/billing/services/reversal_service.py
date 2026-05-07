@@ -20,6 +20,7 @@ from billing.models import (
     CustomerRefundStatus,
     DirectSale,
     DirectSaleReturn,
+    DirectSaleReturnKind,
     DirectSaleReturnLine,
     DirectSaleReturnStatus,
     DirectSaleStatus,
@@ -27,6 +28,7 @@ from billing.models import (
     PurchaseReturnLine,
     PurchaseReturnStatus,
     RefundMethod,
+    ReturnStockDestination,
 )
 from billing.services.billing_service import (
     _ensure_credit_sequence,
@@ -34,7 +36,7 @@ from billing.services.billing_service import (
     post_billing_credit_note,
     void_receipt_document,
 )
-from inventory.models import PurchaseBill, PurchaseBillStatus, StockMovementType
+from inventory.models import InventoryItem, PurchaseBill, PurchaseBillStatus, StockLedger, StockLocation, StockMovementType
 from inventory.services.stock_movement_service import post_movement
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
@@ -70,6 +72,121 @@ def _customer_credit_balance(customer_id: int) -> Decimal:
     return _money(agg.get("credit_total")) - _money(agg.get("debit_total"))
 
 
+def _clean_return_kind(value: str | None) -> str:
+    return_kind = str(value or DirectSaleReturnKind.DELIVERED_RETURN).strip().upper()
+    valid = {choice[0] for choice in DirectSaleReturnKind.choices}
+    if return_kind not in valid:
+        raise ValueError("Invalid direct sale return kind.")
+    return return_kind
+
+
+def _clean_stock_destination(value: str | None) -> str:
+    destination = str(value or ReturnStockDestination.SELLABLE).strip().upper()
+    valid = {choice[0] for choice in ReturnStockDestination.choices}
+    if destination not in valid:
+        raise ValueError("Invalid stock destination.")
+    return destination
+
+
+def _stock_location_for_destination(*, destination: str, stock_location_id: int | None, inventory_item=None):
+    if destination == ReturnStockDestination.SELLABLE:
+        if stock_location_id:
+            return StockLocation.objects.get(pk=stock_location_id)
+        return getattr(inventory_item, "default_stock_location", None)
+    if not stock_location_id:
+        raise ValueError("Inspection, damaged, and service returns require stock_location_id.")
+    return StockLocation.objects.get(pk=stock_location_id)
+
+
+def _return_stock_already_posted(*, return_id: int, line_id: int) -> bool:
+    return StockLedger.objects.filter(
+        movement_type=StockMovementType.SALE_RETURN_IN,
+        reference_model="DirectSaleReturnLine",
+        reference_id=f"{return_id}:{line_id}",
+    ).exists()
+
+
+def _post_direct_sale_return_stock(*, ret: DirectSaleReturn, posted_by) -> dict:
+    created_count = 0
+    existing_count = 0
+    for line in ret.lines.select_related("inventory_item").all():
+        if not line.inventory_item_id or not line.inventory_item.stock_tracking_enabled:
+            continue
+        if _return_stock_already_posted(return_id=ret.id, line_id=line.id):
+            existing_count += 1
+            continue
+        post_movement(
+            inventory_item=line.inventory_item,
+            movement_type=StockMovementType.SALE_RETURN_IN,
+            quantity=line.quantity,
+            movement_date=timezone.localdate(),
+            stock_location=_stock_location_for_destination(
+                destination=ret.stock_destination,
+                stock_location_id=ret.stock_location_id,
+                inventory_item=line.inventory_item,
+            ),
+            reference_model="DirectSaleReturnLine",
+            reference_id=f"{ret.id}:{line.id}",
+            posted_by=posted_by,
+            notes=f"{ret.return_no} {ret.return_kind} to {ret.stock_destination}",
+        )
+        created_count += 1
+    return {"created_count": created_count, "existing_count": existing_count}
+
+
+def get_direct_sale_return_eligibility(*, direct_sale_id: int) -> dict:
+    sale = DirectSale.objects.prefetch_related("lines", "billing_invoices", "receipts").get(pk=direct_sale_id)
+    invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
+    posted_invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
+    line_ids = [line.id for line in sale.lines.all()]
+    returned = {
+        int(row["direct_sale_line_id"]): _qty(row["total"])
+        for row in DirectSaleReturnLine.objects.filter(
+            direct_sale_line_id__in=line_ids,
+            direct_sale_return__status__in=[DirectSaleReturnStatus.APPROVED, DirectSaleReturnStatus.POSTED],
+        )
+        .values("direct_sale_line_id")
+        .annotate(total=Sum("quantity"))
+    }
+    receipt_summary = sale.receipts.aggregate(total=Sum("amount"))
+    delivered = bool(sale.delivered_at) or sale.status == DirectSaleStatus.DELIVERED
+    invoiced = posted_invoice is not None or sale.status == DirectSaleStatus.INVOICED
+    allowed_actions = []
+    if not invoiced and sale.status not in {DirectSaleStatus.CANCELLED}:
+        allowed_actions.append("PRE_INVOICE_CANCEL")
+    if invoiced and not delivered:
+        allowed_actions.append("POST_INVOICE_CANCEL")
+    if delivered and sale.status not in {DirectSaleStatus.CANCELLED}:
+        allowed_actions.extend(["DELIVERED_RETURN", "DELIVERED_EXCHANGE", "DAMAGED_RETURN", "PARTIAL_RETURN"])
+    return {
+        "direct_sale_id": sale.id,
+        "sale_status": sale.status,
+        "invoice_status": getattr(invoice, "status", ""),
+        "delivery_status": "DELIVERED" if delivered else "PENDING",
+        "sold_lines": [
+            {
+                "direct_sale_line_id": line.id,
+                "product_id": line.product_id,
+                "inventory_item_id": line.inventory_item_id,
+                "description": line.description,
+                "sold_quantity": str(_qty(line.quantity)),
+                "already_returned_quantity": str(returned.get(line.id, Decimal("0.000"))),
+                "max_returnable_quantity": str(_qty(line.quantity) - returned.get(line.id, Decimal("0.000"))),
+                "unit_price": str(line.unit_price),
+                "line_total": str(line.line_total),
+            }
+            for line in sale.lines.all()
+        ],
+        "receipt_summary": {
+            "posted_receipt_count": sale.receipts.filter(status=BillingDocumentStatus.POSTED).count(),
+            "posted_receipt_total": str(_money(receipt_summary.get("total"))),
+            "received_total": str(sale.received_total),
+            "balance_total": str(sale.balance_total),
+        },
+        "allowed_actions": allowed_actions,
+    }
+
+
 @transaction.atomic
 def cancel_direct_sale_before_invoice(*, direct_sale_id: int, reason: str, performed_by):
     reason = _require_reason(reason)
@@ -91,7 +208,7 @@ def cancel_direct_sale_before_invoice(*, direct_sale_id: int, reason: str, perfo
     sale.save(update_fields=["status", "notes", "updated_at"])
 
     log_audit(
-        action_type=AuditLog.ActionType.SUBSCRIPTION_CANCELLED,
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=sale,
         performed_by=performed_by,
         metadata={"event": "DIRECT_SALE_CANCELLED_BEFORE_INVOICE", "direct_sale_id": sale.id, "reason": reason},
@@ -100,8 +217,65 @@ def cancel_direct_sale_before_invoice(*, direct_sale_id: int, reason: str, perfo
 
 
 @transaction.atomic
-def create_direct_sale_return(*, direct_sale_id: int, lines: list[dict], reason: str, performed_by):
+def open_direct_sale_cancellation_case(*, direct_sale_id: int, reason: str, performed_by, stock_location_id: int | None = None):
     reason = _require_reason(reason)
+    sale = DirectSale.objects.select_for_update(of=("self",)).prefetch_related("billing_invoices", "lines").get(pk=direct_sale_id)
+    posted_invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
+    delivered = bool(sale.delivered_at) or sale.status == DirectSaleStatus.DELIVERED
+    if posted_invoice is None:
+        sale, updated = cancel_direct_sale_before_invoice(direct_sale_id=direct_sale_id, reason=reason, performed_by=performed_by)
+        return {"workflow": "PRE_INVOICE_CANCEL", "updated": updated, "direct_sale_id": sale.id, "status": sale.status}
+
+    return_kind = DirectSaleReturnKind.DELIVERED_RETURN if delivered else DirectSaleReturnKind.POST_INVOICE_CANCEL
+    lines = [{"direct_sale_line_id": line.id, "quantity": line.quantity} for line in sale.lines.all()]
+    ds_return = create_direct_sale_return(
+        direct_sale_id=direct_sale_id,
+        lines=lines,
+        reason=reason,
+        performed_by=performed_by,
+        return_kind=return_kind,
+        stock_destination=ReturnStockDestination.SELLABLE,
+        stock_location_id=stock_location_id,
+    )
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=ds_return,
+        performed_by=performed_by,
+        metadata={
+            "event": "DIRECT_SALE_CANCELLATION_CASE_OPENED",
+            "direct_sale_id": direct_sale_id,
+            "return_id": ds_return.id,
+            "return_kind": return_kind,
+        },
+    )
+    return {
+        "workflow": return_kind,
+        "updated": True,
+        "direct_sale_id": sale.id,
+        "direct_sale_return_id": ds_return.id,
+        "return_no": ds_return.return_no,
+        "status": ds_return.status,
+    }
+
+
+@transaction.atomic
+def create_direct_sale_return(
+    *,
+    direct_sale_id: int,
+    lines: list[dict],
+    reason: str,
+    performed_by,
+    return_kind: str = DirectSaleReturnKind.DELIVERED_RETURN,
+    stock_destination: str = ReturnStockDestination.SELLABLE,
+    stock_location_id: int | None = None,
+):
+    reason = _require_reason(reason)
+    return_kind = _clean_return_kind(return_kind)
+    stock_destination = _clean_stock_destination(stock_destination)
+    if return_kind == DirectSaleReturnKind.DAMAGED_RETURN and stock_destination == ReturnStockDestination.SELLABLE:
+        raise ValueError("Damaged returns cannot be sent directly to sellable stock.")
+    if stock_destination != ReturnStockDestination.SELLABLE and not stock_location_id:
+        raise ValueError("Non-sellable returns require stock_location_id.")
     if not lines:
         raise ValueError("At least one return line is required.")
 
@@ -128,6 +302,9 @@ def create_direct_sale_return(*, direct_sale_id: int, lines: list[dict], reason:
         direct_sale=sale,
         original_invoice=invoice,
         customer=sale.customer,
+        return_kind=return_kind,
+        stock_destination=stock_destination,
+        stock_location_id=stock_location_id,
         reason=reason,
         stock_effect=True,
     )
@@ -225,7 +402,7 @@ def post_direct_sale_return(*, return_id: int, posted_by):
         taxable_adjustment=ret.subtotal,
         tax_adjustment=ret.tax_total,
         total_adjustment=ret.grand_total,
-        stock_effect=ret.stock_effect,
+        stock_effect=False,
     )
     for line in ret.lines.all():
         BillingCreditNoteLine.objects.create(
@@ -239,21 +416,116 @@ def post_direct_sale_return(*, return_id: int, posted_by):
         )
 
     note, _ = post_billing_credit_note(credit_note_id=note.id, posted_by=posted_by)
+    stock_result = _post_direct_sale_return_stock(ret=ret, posted_by=posted_by) if ret.stock_effect else {"created_count": 0, "existing_count": 0}
     ret.credit_note = note
     ret.status = DirectSaleReturnStatus.POSTED
     ret.posted_by = posted_by
     ret.posted_at = timezone.now()
-    ret.save(update_fields=["credit_note", "status", "posted_by", "posted_at", "updated_at"])
+    metadata = dict(ret.metadata or {})
+    metadata["stock_created_count"] = stock_result["created_count"]
+    metadata["stock_existing_count"] = stock_result["existing_count"]
+    ret.metadata = metadata
+    ret.save(update_fields=["credit_note", "status", "posted_by", "posted_at", "metadata", "updated_at"])
 
-    create_customer_credit_from_credit_note(
-        customer_id=ret.customer_id,
-        credit_note_id=note.id,
-        direct_sale_return_id=ret.id,
-        amount=ret.grand_total,
-        performed_by=posted_by,
-    )
+    credit_amount = ret.exchange_customer_credit if ret.return_kind == DirectSaleReturnKind.DELIVERED_EXCHANGE else ret.grand_total
+    if _money(credit_amount) > Decimal("0.00"):
+        create_customer_credit_from_credit_note(
+            customer_id=ret.customer_id,
+            credit_note_id=note.id,
+            direct_sale_return_id=ret.id,
+            amount=credit_amount,
+            performed_by=posted_by,
+        )
 
     return ret, True
+
+
+@transaction.atomic
+def create_direct_sale_exchange(
+    *,
+    direct_sale_id: int,
+    returned_lines: list[dict],
+    replacement_lines: list[dict],
+    reason: str,
+    performed_by,
+    stock_destination: str = ReturnStockDestination.INSPECTION,
+    stock_location_id: int | None = None,
+):
+    reason = _require_reason(reason)
+    if not replacement_lines:
+        raise ValueError("At least one replacement line is required.")
+    ret = create_direct_sale_return(
+        direct_sale_id=direct_sale_id,
+        lines=returned_lines,
+        reason=reason,
+        performed_by=performed_by,
+        return_kind=DirectSaleReturnKind.DELIVERED_EXCHANGE,
+        stock_destination=stock_destination,
+        stock_location_id=stock_location_id,
+    )
+    replacement_total = Decimal("0.00")
+    replacement_summary = []
+    for row in replacement_lines:
+        item_id = int(row.get("inventory_item_id") or 0)
+        qty = _qty(row.get("quantity"))
+        unit_price = _money(row.get("unit_price"))
+        if item_id <= 0 or qty <= Decimal("0.000") or unit_price < Decimal("0.00"):
+            raise ValueError("Replacement lines require inventory_item_id, quantity, and unit_price.")
+        item = InventoryItem.objects.select_related("product").get(pk=item_id)
+        line_total = _money(qty * unit_price)
+        post_movement(
+            inventory_item=item,
+            movement_type=StockMovementType.SALE_OUT,
+            quantity=qty,
+            movement_date=timezone.localdate(),
+            stock_location=item.default_stock_location,
+            reference_model="DirectSaleExchangeReplacement",
+            reference_id=f"{ret.id}:{item.id}",
+            posted_by=performed_by,
+            notes=f"Exchange replacement for {ret.return_no}",
+        )
+        replacement_total += line_total
+        replacement_summary.append(
+            {
+                "inventory_item_id": item.id,
+                "product_id": item.product_id,
+                "description": str(row.get("description") or item.product.name),
+                "quantity": str(qty),
+                "unit_price": str(unit_price),
+                "line_total": str(line_total),
+            }
+        )
+
+    return_total = _money(ret.grand_total)
+    amount_due = max(Decimal("0.00"), _money(replacement_total - return_total))
+    customer_credit = max(Decimal("0.00"), _money(return_total - replacement_total))
+    metadata = dict(ret.metadata or {})
+    metadata["exchange_replacement_lines"] = replacement_summary
+    metadata["exchange_replacement_total"] = str(_money(replacement_total))
+    metadata["event"] = "DIRECT_SALE_EXCHANGE_CREATED"
+    ret.exchange_amount_due = amount_due
+    ret.exchange_customer_credit = customer_credit
+    ret.metadata = metadata
+    ret.save(update_fields=["exchange_amount_due", "exchange_customer_credit", "metadata", "updated_at"])
+    if customer_credit > Decimal("0.00"):
+        # Actual customer credit is posted with the credit note when the return is approved and posted.
+        metadata["pending_customer_credit_after_post"] = str(customer_credit)
+        ret.metadata = metadata
+        ret.save(update_fields=["metadata", "updated_at"])
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=ret,
+        performed_by=performed_by,
+        metadata={
+            "event": "DIRECT_SALE_EXCHANGE_REQUESTED",
+            "direct_sale_id": direct_sale_id,
+            "return_id": ret.id,
+            "replacement_total": str(_money(replacement_total)),
+            "amount_due": str(amount_due),
+            "customer_credit": str(customer_credit),
+        },
+    )
+    return ret
 
 
 def void_receipt_with_reason(*, receipt_id: int, reason: str, performed_by):

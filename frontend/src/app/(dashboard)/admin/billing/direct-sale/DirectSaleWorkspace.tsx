@@ -36,6 +36,7 @@ import {
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
+import { getAdminDirectSaleReturnEligibility } from "@/services/reversals";
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingInvoicesRoute,
@@ -325,6 +326,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
   const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [eligibilityLoadingSaleId, setEligibilityLoadingSaleId] = useState<number | null>(null);
   const [recheckingRequirementId, setRecheckingRequirementId] = useState<number | null>(null);
   const [customerModeError, setCustomerModeError] = useState<string | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -519,6 +521,52 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         const isDraft = row.status === "DRAFT" || !row.billing_invoice_id;
         const invoiceStatus = String(row.billing_invoice_status || "").toUpperCase();
         const isCollectible = row.status === "INVOICED" && invoiceStatus === "POSTED" && balance > 0;
+        const isDelivered = row.status === "DELIVERED";
+        const isReturnedOrCancelled = row.status === "CANCELLED";
+        const eligibilityButton = (
+          <button
+            type="button"
+            disabled={eligibilityLoadingSaleId === row.id}
+            onClick={async () => {
+              setEligibilityLoadingSaleId(row.id);
+              try {
+                const payload = await getAdminDirectSaleReturnEligibility(row.id);
+                setNotice(
+                  `Return eligibility for ${row.sale_no || `#${row.id}`}: ${payload.allowed_actions.join(", ") || "view only"}.`
+                );
+              } catch (err) {
+                setCreateFormError(accountingErrorMessage(err, "Return eligibility failed to load."));
+              } finally {
+                setEligibilityLoadingSaleId(null);
+              }
+            }}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            View Return Eligibility
+          </button>
+        );
+        if (isReturnedOrCancelled) {
+          return <div className="flex flex-wrap gap-2">{eligibilityButton}</div>;
+        }
+        if (isDelivered) {
+          return (
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`${ROUTES.admin.billingReversals}?direct_sale=${row.id}`}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
+              >
+                Return Product
+              </Link>
+              <Link
+                href={`${ROUTES.admin.billingReversals}?exchange_sale=${row.id}`}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
+              >
+                Exchange Product
+              </Link>
+              {eligibilityButton}
+            </div>
+          );
+        }
         if (isCollect || isCollectible) {
           return (
             <div className="flex flex-wrap gap-2">
@@ -533,8 +581,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 onClick={() => setCancelSaleTarget(row)}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
               >
-                Cancel sale
+                Post-Invoice Cancel/Reversal
               </button>
+              {eligibilityButton}
             </div>
           );
         }
@@ -587,6 +636,13 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
               >
                 Finalize/Post invoice
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelSaleTarget(row)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
+              >
+                Cancel Sale
               </button>
               <button
                 type="button"

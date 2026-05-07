@@ -3,19 +3,22 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
-from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSaleReturnStatus
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, Vendor as AccountingVendor
+from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSaleReturnStatus, PurchaseReturn
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.reversal_service import (
     cancel_direct_sale_before_invoice,
     create_customer_refund,
+    create_direct_sale_exchange,
     create_direct_sale_return,
+    create_purchase_return,
+    get_direct_sale_return_eligibility,
     post_direct_sale_return,
     post_purchase_return,
     void_receipt_with_reason,
 )
-from inventory.models import InventoryItem, PurchaseBill, PurchaseBillLine, StockLedger, StockMovementType, Vendor
-from subscriptions.models import Emi, LuckyDraw, Payment, Waiver
+from inventory.models import InventoryItem, PurchaseBill, PurchaseBillLine, StockLedger, StockLocation, StockMovementType, Vendor
+from subscriptions.models import Emi, LuckyDraw, Payment
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
 
@@ -25,7 +28,9 @@ class ReversalServiceTests(TestCase):
         self.admin = create_admin_user(username="rv_admin", phone="9386111111")
         self.customer = create_customer_profile(name="RV Customer", phone="7386111111")
         self.product = create_product(name="RV Product", product_code="RV-P-001", base_price=Decimal("1000.00"))
-        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="RV-SKU-001", opening_stock_qty=Decimal("20.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
+        self.sellable_location = StockLocation.objects.create(code="RV-SELL", name="RV Sellable")
+        self.damaged_location = StockLocation.objects.create(code="RV-DMG", name="RV Damaged")
+        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="RV-SKU-001", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("20.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
         cash_chart = ChartOfAccount.objects.create(code="RV-CASH-001", name="RV Cash", account_type=ChartOfAccountType.ASSET)
         self.cash_account = FinanceAccount.objects.create(name="RV Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
 
@@ -59,7 +64,6 @@ class ReversalServiceTests(TestCase):
     def test_sale_return_posts_credit_note_and_stock_return_in(self):
         payment_count_before = Payment.objects.count()
         emi_count_before = Emi.objects.count()
-        waiver_count_before = Waiver.objects.count()
         draw_count_before = LuckyDraw.objects.count()
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
         invoice = sale.billing_invoices.first()
@@ -73,10 +77,9 @@ class ReversalServiceTests(TestCase):
 
         self.assertEqual(ret.status, DirectSaleReturnStatus.POSTED)
         self.assertIsNotNone(ret.credit_note_id)
-        self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_RETURN_IN, reference_model="BillingCreditNoteLine").exists())
+        self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_RETURN_IN, reference_model="DirectSaleReturnLine").exists())
         self.assertEqual(Payment.objects.count(), payment_count_before)
         self.assertEqual(Emi.objects.count(), emi_count_before)
-        self.assertEqual(Waiver.objects.count(), waiver_count_before)
         self.assertEqual(LuckyDraw.objects.count(), draw_count_before)
 
     def test_return_cannot_exceed_sold_quantity(self):
@@ -86,6 +89,107 @@ class ReversalServiceTests(TestCase):
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
         with self.assertRaises(ValueError):
             create_direct_sale_return(direct_sale_id=sale.id, reason="Invalid qty", lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "3.000"}], performed_by=self.admin)
+
+    def test_damaged_return_does_not_go_to_sellable_location(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        ret = create_direct_sale_return(
+            direct_sale_id=sale.id,
+            reason="Damaged during customer use",
+            return_kind="DAMAGED_RETURN",
+            stock_destination="DAMAGED",
+            stock_location_id=self.damaged_location.id,
+            lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+
+        self.assertTrue(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.SALE_RETURN_IN,
+                reference_model="DirectSaleReturnLine",
+                stock_location=self.damaged_location,
+            ).exists()
+        )
+        self.assertFalse(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.SALE_RETURN_IN,
+                reference_model="DirectSaleReturnLine",
+                stock_location=self.sellable_location,
+            ).exists()
+        )
+
+    def test_exchange_posts_return_in_and_replacement_out_with_amount_due(self):
+        replacement_product = create_product(name="RV Replacement", product_code="RV-P-002", base_price=Decimal("1300.00"))
+        replacement_item = InventoryItem.objects.create(product=replacement_product, sku="RV-SKU-002", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("5.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("900.00"))
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        ret = create_direct_sale_exchange(
+            direct_sale_id=sale.id,
+            returned_lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            replacement_lines=[{"inventory_item_id": replacement_item.id, "quantity": "1.000", "unit_price": "1300.00"}],
+            reason="Customer selected higher model",
+            stock_destination="INSPECTION",
+            stock_location_id=self.damaged_location.id,
+            performed_by=self.admin,
+        )
+        self.assertEqual(ret.exchange_amount_due, Decimal("300.00"))
+        self.assertEqual(ret.exchange_customer_credit, Decimal("0.00"))
+        self.assertTrue(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.SALE_OUT,
+                reference_model="DirectSaleExchangeReplacement",
+                reference_id=f"{ret.id}:{replacement_item.id}",
+            ).exists()
+        )
+
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+        self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_RETURN_IN, reference_model="DirectSaleReturnLine").exists())
+        self.assertFalse(CustomerCreditLedger.objects.filter(direct_sale_return=ret).exists())
+
+    def test_exchange_lower_value_creates_customer_credit_on_post(self):
+        replacement_product = create_product(name="RV Lower Replacement", product_code="RV-P-003", base_price=Decimal("800.00"))
+        replacement_item = InventoryItem.objects.create(product=replacement_product, sku="RV-SKU-003", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("5.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("500.00"))
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        ret = create_direct_sale_exchange(
+            direct_sale_id=sale.id,
+            returned_lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            replacement_lines=[{"inventory_item_id": replacement_item.id, "quantity": "1.000", "unit_price": "800.00"}],
+            reason="Customer selected lower model",
+            stock_destination="INSPECTION",
+            stock_location_id=self.damaged_location.id,
+            performed_by=self.admin,
+        )
+        self.assertEqual(ret.exchange_amount_due, Decimal("0.00"))
+        self.assertEqual(ret.exchange_customer_credit, Decimal("200.00"))
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+        self.assertTrue(CustomerCreditLedger.objects.filter(direct_sale_return=ret, credit_amount=Decimal("200.00")).exists())
+
+    def test_return_eligibility_reports_remaining_quantities_and_actions(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=sale.id)
+        self.assertIn("DELIVERED_RETURN", eligibility["allowed_actions"])
+        self.assertEqual(eligibility["sold_lines"][0]["max_returnable_quantity"], "2.000")
 
     def test_void_receipt_keeps_trace(self):
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
@@ -141,3 +245,6 @@ class ReversalServiceTests(TestCase):
                 reference_id=str(purchase_return.id),
             ).exists()
         )
+
+    def test_purchase_return_vendor_uses_accounting_vendor_model(self):
+        self.assertIs(PurchaseReturn._meta.get_field("vendor").remote_field.model, AccountingVendor)

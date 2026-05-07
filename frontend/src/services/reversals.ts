@@ -18,6 +18,40 @@ export type ReversalListResponse = {
   results: ReversalRow[];
 };
 
+export type DirectSaleReturnKind =
+  | "POST_INVOICE_CANCEL"
+  | "DELIVERED_RETURN"
+  | "DELIVERED_EXCHANGE"
+  | "DAMAGED_RETURN"
+  | "PARTIAL_RETURN";
+
+export type ReturnStockDestination = "SELLABLE" | "INSPECTION" | "DAMAGED" | "SERVICE";
+
+export type DirectSaleReturnEligibility = {
+  direct_sale_id: number;
+  sale_status: string;
+  invoice_status: string;
+  delivery_status: string;
+  sold_lines: Array<{
+    direct_sale_line_id: number;
+    product_id: number;
+    inventory_item_id: number | null;
+    description: string;
+    sold_quantity: string;
+    already_returned_quantity: string;
+    max_returnable_quantity: string;
+    unit_price: string;
+    line_total: string;
+  }>;
+  receipt_summary: {
+    posted_receipt_count: number;
+    posted_receipt_total: string;
+    received_total: string;
+    balance_total: string;
+  };
+  allowed_actions: string[];
+};
+
 function query(params: Record<string, string | number | undefined>): string {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -39,11 +73,37 @@ export async function cancelAdminDirectSale(directSaleId: number, reason: string
   });
 }
 
+export async function getAdminDirectSaleReturnEligibility(directSaleId: number): Promise<DirectSaleReturnEligibility> {
+  return apiFetch(`/admin/billing/direct-sales/${directSaleId}/return-eligibility/`);
+}
+
 export async function createAdminDirectSaleReturn(
   directSaleId: number,
-  payload: { reason: string; lines: Array<{ direct_sale_line_id: number; quantity: string | number }> }
+  payload: {
+    reason: string;
+    return_kind?: DirectSaleReturnKind;
+    stock_destination?: ReturnStockDestination;
+    stock_location_id?: number;
+    lines: Array<{ direct_sale_line_id: number; quantity: string | number }>;
+  }
 ): Promise<{ direct_sale_return_id: number }> {
   return apiFetch(`/admin/billing/direct-sales/${directSaleId}/returns/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createAdminDirectSaleExchange(
+  directSaleId: number,
+  payload: {
+    reason: string;
+    stock_destination?: ReturnStockDestination;
+    stock_location_id?: number;
+    returned_lines: Array<{ direct_sale_line_id: number; quantity: string | number }>;
+    replacement_lines: Array<{ inventory_item_id: number; description?: string; quantity: string | number; unit_price: string | number }>;
+  }
+): Promise<{ direct_sale_return_id: number; exchange_amount_due: string; exchange_customer_credit: string }> {
+  return apiFetch(`/admin/billing/direct-sales/${directSaleId}/exchange/`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
