@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.cache import cache
@@ -15,12 +15,14 @@ from tests.helpers import (
     create_batch,
     create_customer_profile,
     create_customer_user,
+    create_customer_user,
     create_emi,
     create_lucky_id,
     create_product,
     create_subscription,
 )
 from subscriptions.services.payment_service import record_emi_payment
+from subscriptions.models import SubscriptionStatus
 
 
 class AdminDashboardApiTests(APITestCase):
@@ -179,3 +181,50 @@ class AdminDashboardApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/dashboard/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cancelled_subscription_is_excluded_from_operational_dashboard_kpis(self):
+        cancelled_customer = create_customer_profile(
+            user=create_customer_user(
+                username="dashboard_cancelled_customer",
+                phone="7304000010",
+            ),
+            name="Cancelled Ops Customer",
+            phone="7304000010",
+        )
+        cancelled_product = create_product(
+            name="Cancelled Ops Product",
+            product_code="DASH-CAN-001",
+            base_price=Decimal("1200.00"),
+        )
+        cancelled_batch = create_batch(
+            batch_code="DASHCAN2026",
+            duration_months=6,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 3, 1),
+            status="OPEN",
+        )
+        cancelled_lucky_id = create_lucky_id(batch=cancelled_batch, lucky_number=30)
+        cancelled_subscription = create_subscription(
+            customer=cancelled_customer,
+            product=cancelled_product,
+            batch=cancelled_batch,
+            lucky_id=cancelled_lucky_id,
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("200.00"),
+            tenure_months=6,
+        )
+        cancelled_subscription.status = SubscriptionStatus.CANCELLED
+        cancelled_subscription.save(update_fields=["status"])
+        create_emi(
+            subscription=cancelled_subscription,
+            month_no=1,
+            amount=Decimal("200.00"),
+            due_date=timezone.localdate() - timedelta(days=5),
+        )
+
+        response = self.client.get("/api/v1/admin/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        due_ids = {row["subscription_id"] for row in response.data.get("due_subscriptions", [])}
+        self.assertNotIn(cancelled_subscription.id, due_ids)

@@ -237,7 +237,7 @@ export default function OverdueReportPage() {
               {rows.length === 0 ? (
                 <EmptyState
                   title="No overdue EMI records found"
-                  description="There are no overdue EMI records in the current report view."
+                  description="No active overdue records. Cancelled and reversed records are available in history/reversal center."
                 />
               ) : (
                 <DataTable<EmiRecord>

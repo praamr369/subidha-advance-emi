@@ -10,7 +10,12 @@ from typing import Any
 from django.db.models import Prefetch
 from django.utils import timezone
 
-from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleStatus
+from core.services.operational_visibility import (
+    direct_sale_active_q,
+    invoice_active_q,
+    subscription_collectible_q,
+)
+from billing.models import BillingInvoice, DirectSale
 from subscriptions.models import Emi, EmiStatus, PlanType, q2
 
 MONEY_ZERO = Decimal("0.00")
@@ -186,6 +191,7 @@ def _collect_subscription_rows(*, today: date) -> list[dict[str, Any]]:
             "subscription__lucky_id",
         )
         .filter(status=EmiStatus.PENDING)
+        .filter(subscription_collectible_q("subscription__"))
         .order_by("due_date", "id")
     )
     for emi in emis:
@@ -249,7 +255,7 @@ def _collect_direct_sale_rows(*, today: date) -> list[dict[str, Any]]:
     sales = (
         DirectSale.objects.select_related("customer")
         .prefetch_related(Prefetch("lines"), Prefetch("billing_invoices"))
-        .exclude(status=DirectSaleStatus.CANCELLED)
+        .filter(direct_sale_active_q())
         .filter(balance_total__gt=MONEY_ZERO)
         .order_by("sale_date", "id")
     )
@@ -305,7 +311,7 @@ def _collect_standalone_invoice_rows(*, today: date) -> list[dict[str, Any]]:
     invoices = (
         BillingInvoice.objects.select_related("customer", "subscription", "direct_sale")
         .filter(balance_total__gt=MONEY_ZERO)
-        .exclude(status__in=[BillingDocumentStatus.CANCELLED, BillingDocumentStatus.VOID])
+        .filter(invoice_active_q())
         .filter(subscription__isnull=True, direct_sale__isnull=True)
         .order_by("invoice_date", "id")
     )

@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.services.operational_visibility import subscription_dashboard_visible_q
 from api.v1.serializers.media import serialize_media_url
 from api.v1.serializers.public import PublicProductSerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
@@ -358,12 +359,13 @@ class PublicStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        visible_subscriptions = Subscription.objects.filter(subscription_dashboard_visible_q())
         return Response(
             {
                 "total_batches": Batch.objects.count(),
-                "total_subscriptions": Subscription.objects.count(),
-                "active_subscriptions": Subscription.objects.filter(status="ACTIVE").count(),
-                "total_winners": Subscription.objects.filter(
+                "total_subscriptions": visible_subscriptions.count(),
+                "active_subscriptions": visible_subscriptions.filter(status="ACTIVE").count(),
+                "total_winners": visible_subscriptions.filter(
                     winner_history_q()
                 ).distinct().count(),
             }

@@ -12,6 +12,11 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from branch_control.services.branch_service import assigned_branch_ids_for_user
+from core.services.operational_visibility import (
+    direct_sale_active_q,
+    subscription_collectible_q,
+    subscription_dashboard_visible_q,
+)
 from subscriptions.models import (
     ContractReference,
     ContractReferenceSequence,
@@ -447,7 +452,12 @@ def _contract_reference_queryset(*, user, audience: str):
         "direct_sale",
         "invoice",
     )
-    return _apply_role_scope(queryset, user=user, audience=audience)
+    queryset = _apply_role_scope(queryset, user=user, audience=audience)
+    return queryset.filter(
+        Q(subscription__isnull=True) | subscription_dashboard_visible_q("subscription__")
+    ).filter(
+        Q(direct_sale__isnull=True) | direct_sale_active_q("direct_sale__")
+    )
 
 
 def search_contract_references(
@@ -490,6 +500,16 @@ def search_contract_references(
 
 
 def _advance_emi_position(subscription: Subscription) -> dict[str, object]:
+    if not Subscription.objects.filter(pk=subscription.pk).filter(subscription_collectible_q()).exists():
+        return {
+            "due_amount": MONEY_ZERO,
+            "overdue_amount": MONEY_ZERO,
+            "next_due_date": None,
+            "status": subscription.status,
+            "emi_id": None,
+            "allowed_actions": [],
+            "disabled_reason": "Subscription is cancelled/reversed for active collection.",
+        }
     rows = []
     overdue_amount = MONEY_ZERO
     today = timezone.localdate()

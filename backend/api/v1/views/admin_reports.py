@@ -9,6 +9,10 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.dashboard_surfaces import DashboardWindowQuerySerializer
+from core.services.operational_visibility import (
+    subscription_collectible_q,
+    subscription_dashboard_visible_q,
+)
 from subscriptions.services.admin_reporting_analytics_service import (
     build_admin_reporting_analytics_summary,
 )
@@ -70,7 +74,9 @@ class AdminEmiAggregateView(APIView):
 
     def get(self, request):
         today = timezone.now().date()
-        pending = Emi.objects.filter(status=EmiStatus.PENDING)
+        pending = Emi.objects.filter(status=EmiStatus.PENDING).filter(
+            subscription_collectible_q("subscription__")
+        )
         overdue = pending.filter(due_date__lt=today)
 
         return Response(
@@ -133,7 +139,7 @@ class AdminReconciliationAttentionAggregateView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        subscriptions = Subscription.objects.all()
+        subscriptions = Subscription.objects.filter(subscription_dashboard_visible_q())
         return Response(build_reconciliation_attention_payload(subscriptions))
 
 
@@ -144,8 +150,10 @@ class AdminPartnerAggregateView(APIView):
         rows = []
         for partner_id in Subscription.objects.exclude(
             partner__isnull=True
-        ).values_list("partner_id", flat=True).distinct():
-            sub_qs = Subscription.objects.filter(partner_id=partner_id)
+        ).filter(subscription_dashboard_visible_q()).values_list("partner_id", flat=True).distinct():
+            sub_qs = Subscription.objects.filter(partner_id=partner_id).filter(
+                subscription_dashboard_visible_q()
+            )
             pay_qs = Payment.objects.filter(subscription__partner_id=partner_id)
             commission_qs = Commission.objects.filter(partner_id=partner_id)
 
@@ -210,7 +218,9 @@ class AdminEmiSummaryView(APIView):
 
     def get(self, request):
         today = timezone.now().date()
-        summary = Emi.objects.aggregate(
+        summary = Emi.objects.filter(
+            subscription_collectible_q("subscription__")
+        ).aggregate(
             total_emis=Count("id"),
             pending_count=Count("id", filter=Q(status=EmiStatus.PENDING)),
             pending_amount=Coalesce(

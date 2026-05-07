@@ -5,6 +5,10 @@ from datetime import date
 from django.db.models import Min, Q
 from django.utils import timezone
 
+from core.services.operational_visibility import (
+    direct_sale_active_q,
+    subscription_collectible_q,
+)
 from subscriptions.models import (
     Emi,
     EmiStatus,
@@ -51,7 +55,10 @@ def build_admin_queue_summary() -> dict:
     reconciliation_qs = PaymentReconciliation.objects.filter(Q(status=ReconciliationStatus.PENDING) | Q(is_flagged=True))
     contract_approval_qs = Subscription.objects.filter(status="PENDING_APPROVAL")
     contract_activation_qs = Subscription.objects.filter(status="APPROVED")
-    overdue_payment_qs = Emi.objects.filter(status=EmiStatus.PENDING, due_date__lt=today)
+    overdue_payment_qs = Emi.objects.filter(
+        status=EmiStatus.PENDING,
+        due_date__lt=today,
+    ).filter(subscription_collectible_q("subscription__"))
     support_qs = CustomerSupportRequest.objects.filter(status__in=[SupportRequestStatus.SUBMITTED, SupportRequestStatus.UNDER_REVIEW])
     blocked_delivery_qs = SubscriptionDelivery.objects.filter(status=DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE)
 
@@ -175,8 +182,11 @@ def list_partner_payment_requests() -> dict:
 
 
 def build_admin_next_actions() -> dict:
-    direct_sale_draft_qs = DirectSale.objects.filter(status=DirectSaleStatus.DRAFT)
-    direct_sale_due_qs = DirectSale.objects.filter(status=DirectSaleStatus.INVOICED, balance_total__gt=0)
+    direct_sale_draft_qs = DirectSale.objects.filter(status=DirectSaleStatus.DRAFT).filter(direct_sale_active_q())
+    direct_sale_due_qs = DirectSale.objects.filter(
+        status=DirectSaleStatus.INVOICED,
+        balance_total__gt=0,
+    ).filter(direct_sale_active_q())
     blocked_sale_ids = [
         int(v)
         for v in PurchaseNeed.objects.filter(
@@ -189,7 +199,7 @@ def build_admin_next_actions() -> dict:
         status=DirectSaleStatus.INVOICED,
         balance_total__lte=0,
         id__in=blocked_sale_ids,
-    )
+    ).filter(direct_sale_active_q())
     stock_requirement_qs = PurchaseNeed.objects.filter(
         source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
         status=PurchaseNeedStatus.OPEN,
@@ -197,12 +207,12 @@ def build_admin_next_actions() -> dict:
     delivery_hold_invoice_qs = DirectSale.objects.filter(
         delivery_required=True,
         status=DirectSaleStatus.DRAFT,
-    )
+    ).filter(direct_sale_active_q())
     delivery_hold_payment_qs = DirectSale.objects.filter(
         delivery_required=True,
         status=DirectSaleStatus.INVOICED,
         balance_total__gt=0,
-    )
+    ).filter(direct_sale_active_q())
 
     queues = [
         {
@@ -249,14 +259,20 @@ def build_admin_next_actions() -> dict:
         },
         {
             "key": "emi_due_today",
-            "count": Emi.objects.filter(status=EmiStatus.PENDING, due_date=timezone.localdate()).count(),
+            "count": Emi.objects.filter(
+                status=EmiStatus.PENDING,
+                due_date=timezone.localdate(),
+            ).filter(subscription_collectible_q("subscription__")).count(),
             "priority": "MEDIUM",
             "next_action": "COLLECT_EMI",
             "link": "/admin/collections",
         },
         {
             "key": "emi_overdue",
-            "count": Emi.objects.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).count(),
+            "count": Emi.objects.filter(
+                status=EmiStatus.PENDING,
+                due_date__lt=timezone.localdate(),
+            ).filter(subscription_collectible_q("subscription__")).count(),
             "priority": "HIGH",
             "next_action": "COLLECT_EMI",
             "link": "/admin/emis/overdue",

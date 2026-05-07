@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import UserRole
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from subscriptions.models import SubscriptionStatus
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -141,6 +142,20 @@ class CashierApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["detail"], "Customer not found.")
+
+    def test_cashier_pending_emis_excludes_cancelled_subscription(self):
+        self.subscription.status = SubscriptionStatus.CANCELLED
+        self.subscription.save(update_fields=["status"])
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(
+            f"/api/v1/cashier/pending-emis/?phone={self.customer.phone}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["total_pending_emis"], 0)
+        self.assertEqual(response.data["overdue_emi_count"], 0)
+        self.assertEqual(response.data["emis"], [])
 
     def test_cashier_collect_payment_success(self):
         self.client.force_authenticate(user=self.admin)

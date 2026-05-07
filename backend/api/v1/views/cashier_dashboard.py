@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from branch_control.services.branch_service import scope_queryset_to_user_branches
+from core.services.operational_visibility import subscription_collectible_q
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.admin_resources import EmiAdminSerializer as EmiSerializer
 from api.v1.serializers.payment import PaymentSerializer
@@ -27,6 +28,7 @@ def _pending_emi_queryset(*, user):
             "subscription__lucky_id",
         )
         .filter(status=EmiStatus.PENDING)
+        .filter(subscription_collectible_q("subscription__"))
         .order_by("due_date", "month_no", "id")
     )
     return scope_queryset_to_user_branches(

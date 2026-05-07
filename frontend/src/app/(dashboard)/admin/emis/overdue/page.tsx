@@ -344,7 +344,7 @@ export default function OverdueEmiPage() {
             {rows.length === 0 ? (
               <EmptyState
                 title="No overdue EMI records"
-                description="No overdue pending EMI rows are currently available for follow-up."
+                description="No active overdue records. Cancelled and reversed records are available in history/reversal center."
               />
             ) : (
               <>

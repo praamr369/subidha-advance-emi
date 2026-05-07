@@ -44,6 +44,24 @@ class AdminOutstandingsApiTests(APITestCase):
             amount=Decimal("1000.00"),
             due_date=self.today - timedelta(days=8),
         )
+        self.cancelled_subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_id=create_lucky_id(batch=self.batch, lucky_number=29),
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("100.00"),
+            tenure_months=12,
+            start_date=self.today - timedelta(days=40),
+        )
+        self.cancelled_subscription.status = SubscriptionStatus.CANCELLED
+        self.cancelled_subscription.save(update_fields=["status"])
+        self.cancelled_emi_due = create_emi(
+            subscription=self.cancelled_subscription,
+            month_no=1,
+            amount=Decimal("100.00"),
+            due_date=self.today - timedelta(days=9),
+        )
 
         self.rent_sub = Subscription.objects.create(
             customer=self.customer,
@@ -208,6 +226,13 @@ class AdminOutstandingsApiTests(APITestCase):
         lease_emi = Emi.objects.filter(subscription=self.lease_sub).first()
         self.assertEqual(by_source[("EMI", rent_emi.id)]["operation_type"], "rent")
         self.assertEqual(by_source[("EMI", lease_emi.id)]["operation_type"], "lease")
+
+    def test_cancelled_subscription_emi_does_not_appear(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/admin/outstandings/?operation=advance_emi")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        ids = {row["source_id"] for row in response.data["results"]}
+        self.assertNotIn(self.cancelled_emi_due.id, ids)
 
     def test_billing_invoice_linked_to_direct_sale_is_not_double_counted(self):
         self.client.force_authenticate(user=self.admin)
