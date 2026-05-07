@@ -1237,7 +1237,7 @@ class CustomerRefund(BillingTimeStampedModel):
 class PurchaseReturn(BillingTimeStampedModel):
     return_no = models.CharField(max_length=48, unique=True, db_index=True)
     purchase_bill = models.ForeignKey("inventory.PurchaseBill", on_delete=models.PROTECT, related_name="purchase_returns")
-    vendor = models.ForeignKey("inventory.Vendor", on_delete=models.PROTECT, related_name="purchase_returns")
+    vendor = models.ForeignKey("accounting.Vendor", on_delete=models.PROTECT, related_name="purchase_returns")
     status = models.CharField(max_length=16, choices=PurchaseReturnStatus.choices, default=PurchaseReturnStatus.DRAFT, db_index=True)
     return_date = models.DateField(default=timezone.localdate, db_index=True)
     reason = models.TextField()

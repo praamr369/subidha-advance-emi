@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from billing.models import RefundMethod
@@ -11,7 +13,7 @@ class ReasonSerializer(serializers.Serializer):
 
 class DirectSaleReturnCreateLineSerializer(serializers.Serializer):
     direct_sale_line_id = serializers.IntegerField(min_value=1)
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=0.001)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
 
 
 class DirectSaleReturnCreateSerializer(serializers.Serializer):
@@ -20,7 +22,7 @@ class DirectSaleReturnCreateSerializer(serializers.Serializer):
 
 
 class CustomerRefundCreateSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0.01)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     method = serializers.ChoiceField(choices=RefundMethod.choices)
     finance_account_id = serializers.IntegerField(min_value=1)
     reason = serializers.CharField(required=True, allow_blank=False)
@@ -29,7 +31,7 @@ class CustomerRefundCreateSerializer(serializers.Serializer):
 
 class PurchaseReturnCreateLineSerializer(serializers.Serializer):
     purchase_bill_line_id = serializers.IntegerField(min_value=1)
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=0.001)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
 
 
 class PurchaseReturnCreateSerializer(serializers.Serializer):

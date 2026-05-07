@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
                 ("posted_by", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="posted_purchase_returns", to=settings.AUTH_USER_MODEL)),
                 ("posted_journal_entry", models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="purchase_return", to="accounting.journalentry")),
                 ("purchase_bill", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="purchase_returns", to="inventory.purchasebill")),
-                ("vendor", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="purchase_returns", to="inventory.vendor")),
+                ("vendor", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="purchase_returns", to="accounting.vendor")),
             ],
             options={"db_table": "billing_purchase_returns", "ordering": ["-created_at", "-id"]},
         ),
