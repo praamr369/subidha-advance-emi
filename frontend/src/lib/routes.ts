@@ -107,6 +107,7 @@ export const ROUTES = {
     billingCreditNotes: "/admin/billing/credit-notes",
     billingDebitNotes: "/admin/billing/debit-notes",
     billingDocuments: "/admin/billing/documents",
+    billingReversals: "/admin/billing/reversals",
 
     inventory: "/admin/inventory",
     inventoryItems: "/admin/inventory/items",

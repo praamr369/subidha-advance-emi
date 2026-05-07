@@ -1,0 +1,143 @@
+from datetime import date
+from decimal import Decimal
+
+from django.test import TestCase
+
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSaleReturnStatus
+from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
+from billing.services.reversal_service import (
+    cancel_direct_sale_before_invoice,
+    create_customer_refund,
+    create_direct_sale_return,
+    post_direct_sale_return,
+    post_purchase_return,
+    void_receipt_with_reason,
+)
+from inventory.models import InventoryItem, PurchaseBill, PurchaseBillLine, StockLedger, StockMovementType, Vendor
+from subscriptions.models import Emi, LuckyDraw, Payment, Waiver
+from tests.helpers import create_admin_user, create_customer_profile, create_product
+
+
+class ReversalServiceTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = create_admin_user(username="rv_admin", phone="9386111111")
+        self.customer = create_customer_profile(name="RV Customer", phone="7386111111")
+        self.product = create_product(name="RV Product", product_code="RV-P-001", base_price=Decimal("1000.00"))
+        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="RV-SKU-001", opening_stock_qty=Decimal("20.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
+        cash_chart = ChartOfAccount.objects.create(code="RV-CASH-001", name="RV Cash", account_type=ChartOfAccountType.ASSET)
+        self.cash_account = FinanceAccount.objects.create(name="RV Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
+
+    def _sale_payload(self):
+        return {
+            "sale_date": date(2026, 4, 15),
+            "customer": self.customer,
+            "tax_mode": "NON_GST",
+            "finance_account": self.cash_account,
+            "delivery_required": False,
+            "received_total": Decimal("0.00"),
+            "customer_name_snapshot": self.customer.name,
+            "customer_phone_snapshot": self.customer.phone,
+            "lines": [{"product": self.product, "inventory_item": self.inventory_item, "description": "RV line", "quantity": Decimal("2.000"), "unit_price": Decimal("1000.00"), "discount_amount": Decimal("0.00"), "taxable_value": Decimal("2000.00"), "gst_rate": None, "cgst_amount": Decimal("0.00"), "sgst_amount": Decimal("0.00"), "igst_amount": Decimal("0.00"), "line_total": Decimal("2000.00"), "hsn_sac_code": ""}],
+        }
+
+    def test_cancel_direct_sale_before_invoice_requires_reason_and_works(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        sale, updated = cancel_direct_sale_before_invoice(direct_sale_id=sale.id, reason="Customer requested stop", performed_by=self.admin)
+        self.assertTrue(updated)
+        self.assertEqual(sale.status, "CANCELLED")
+
+    def test_invoiced_sale_cannot_be_cancelled(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        with self.assertRaises(ValueError):
+            cancel_direct_sale_before_invoice(direct_sale_id=sale.id, reason="Too late", performed_by=self.admin)
+
+    def test_sale_return_posts_credit_note_and_stock_return_in(self):
+        payment_count_before = Payment.objects.count()
+        emi_count_before = Emi.objects.count()
+        waiver_count_before = Waiver.objects.count()
+        draw_count_before = LuckyDraw.objects.count()
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+
+        ret = create_direct_sale_return(direct_sale_id=sale.id, reason="Damaged edge", lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}], performed_by=self.admin)
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+
+        self.assertEqual(ret.status, DirectSaleReturnStatus.POSTED)
+        self.assertIsNotNone(ret.credit_note_id)
+        self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_RETURN_IN, reference_model="BillingCreditNoteLine").exists())
+        self.assertEqual(Payment.objects.count(), payment_count_before)
+        self.assertEqual(Emi.objects.count(), emi_count_before)
+        self.assertEqual(Waiver.objects.count(), waiver_count_before)
+        self.assertEqual(LuckyDraw.objects.count(), draw_count_before)
+
+    def test_return_cannot_exceed_sold_quantity(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        with self.assertRaises(ValueError):
+            create_direct_sale_return(direct_sale_id=sale.id, reason="Invalid qty", lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "3.000"}], performed_by=self.admin)
+
+    def test_void_receipt_keeps_trace(self):
+        sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        invoice.received_total = Decimal("500.00")
+        invoice.balance_total = Decimal("1500.00")
+        invoice.save(update_fields=["received_total", "balance_total", "updated_at"])
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        receipt = invoice.receipts.first()
+        receipt, updated = void_receipt_with_reason(receipt_id=receipt.id, reason="Wrong customer", performed_by=self.admin)
+        self.assertTrue(updated)
+        self.assertEqual(receipt.status, BillingDocumentStatus.VOID)
+
+    def test_refund_cannot_exceed_customer_credit(self):
+        with self.assertRaises(ValueError):
+            create_customer_refund(customer_id=self.customer.id, amount="1.00", method="CASH_REFUND", finance_account_id=self.cash_account.id, reason="No credit")
+
+    def test_purchase_return_creates_purchase_return_out(self):
+        vendor = Vendor.objects.create(name="RV Vendor")
+        pb = PurchaseBill.objects.create(
+            bill_no="PB-RV-001",
+            bill_date=date(2026, 4, 10),
+            vendor=vendor,
+            status="POSTED",
+            subtotal=Decimal("1400.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1400.00"),
+            finance_account=self.cash_account,
+        )
+        line = PurchaseBillLine.objects.create(
+            purchase_bill=pb,
+            inventory_item=self.inventory_item,
+            description="Purchase",
+            quantity=Decimal("2.000"),
+            unit_cost=Decimal("700.00"),
+            taxable_value=Decimal("1400.00"),
+            tax_amount=Decimal("0.00"),
+            line_total=Decimal("1400.00"),
+        )
+        purchase_return = create_purchase_return(
+            purchase_bill_id=pb.id,
+            reason="Vendor defect",
+            lines=[{"purchase_bill_line_id": line.id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        purchase_return, _ = post_purchase_return(purchase_return_id=purchase_return.id, posted_by=self.admin)
+        self.assertEqual(purchase_return.status, "POSTED")
+        self.assertTrue(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.PURCHASE_RETURN_OUT,
+                reference_model="PurchaseReturn",
+                reference_id=str(purchase_return.id),
+            ).exists()
+        )

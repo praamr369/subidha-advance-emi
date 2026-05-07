@@ -1881,6 +1881,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           href: ROUTES.admin.billingRegister,
           variant: "secondary",
         },
+        {
+          label: "Reversal Center",
+          href: ROUTES.admin.billingReversals,
+          variant: "secondary",
+        },
       ]}
       stats={
         salesLoading

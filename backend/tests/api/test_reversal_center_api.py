@@ -1,0 +1,63 @@
+from datetime import date
+from decimal import Decimal
+
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from billing.services.billing_service import create_direct_sale
+from inventory.models import InventoryItem
+from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_product
+
+
+class ReversalCenterApiTests(APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = create_admin_user(username="rev_api_admin", phone="9386222221")
+        self.cashier = create_cashier_user(username="rev_api_cashier", phone="9386222222")
+        self.customer = create_customer_profile(name="Rev API Customer", phone="7386222221")
+        self.product = create_product(name="Rev API Product", product_code="REV-API-001", base_price=Decimal("1000.00"))
+        self.inventory_item = InventoryItem.objects.create(product=self.product, sku="REV-API-SKU-001", opening_stock_qty=Decimal("10.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
+        cash_chart = ChartOfAccount.objects.create(code="REV-API-CASH-001", name="Rev API Cash", account_type=ChartOfAccountType.ASSET)
+        self.cash_account = FinanceAccount.objects.create(name="Rev API Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
+
+    def _create_sale(self):
+        return create_direct_sale(
+            payload={
+                "sale_date": date(2026, 4, 15),
+                "customer": self.customer,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account,
+                "delivery_required": False,
+                "received_total": Decimal("0.00"),
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [{"product": self.product, "inventory_item": self.inventory_item, "description": "Line", "quantity": Decimal("1.000"), "unit_price": Decimal("1000.00"), "discount_amount": Decimal("0.00"), "taxable_value": Decimal("1000.00"), "gst_rate": None, "cgst_amount": Decimal("0.00"), "sgst_amount": Decimal("0.00"), "igst_amount": Decimal("0.00"), "line_total": Decimal("1000.00"), "hsn_sac_code": ""}],
+            },
+            created_by=self.admin,
+        )
+
+    def test_reversal_endpoints_are_admin_only(self):
+        sale = self._create_sale()
+
+        self.client.force_authenticate(user=self.cashier)
+        response = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/",
+            {"reason": "No"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.admin)
+        ok = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/",
+            {"reason": "Customer changed mind"},
+            format="json",
+        )
+        self.assertEqual(ok.status_code, status.HTTP_200_OK, ok.data)
+
+    def test_cancel_reason_required(self):
+        sale = self._create_sale()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/", {"reason": ""}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

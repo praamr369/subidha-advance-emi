@@ -375,6 +375,21 @@ from api.v1.views.reversal_control import (
     AdminReversalControlDashboardView,
     AdminReversalReconciliationQueueView,
 )
+from api.v1.views.reversal_center import (
+    AdminCustomerCreditsView,
+    AdminCustomerRefundApproveView,
+    AdminCustomerRefundCreateView,
+    AdminCustomerRefundPayView,
+    AdminDirectSaleCancelView,
+    AdminDirectSaleReturnCreateView,
+    AdminPurchaseReturnCreateView,
+    AdminPurchaseReturnPostView,
+    AdminReceiptVoidReasonView,
+    AdminReturnApproveView,
+    AdminReturnDetailView,
+    AdminReturnListView,
+    AdminReturnPostView,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -719,5 +734,18 @@ urlpatterns = [
     path("finance/reversal-cases/<int:pk>/reject/", AdminReversalCaseRejectView.as_view()),
     path("finance/reversal-cases/<int:pk>/reconcile/", AdminReversalCaseReconcileView.as_view()),
     path("finance/reversal-reconciliation/", AdminReversalReconciliationQueueView.as_view()),
+    path("billing/direct-sales/<int:pk>/cancel/", AdminDirectSaleCancelView.as_view()),
+    path("billing/direct-sales/<int:pk>/returns/", AdminDirectSaleReturnCreateView.as_view()),
+    path("billing/returns/", AdminReturnListView.as_view()),
+    path("billing/returns/<int:pk>/", AdminReturnDetailView.as_view()),
+    path("billing/returns/<int:pk>/approve/", AdminReturnApproveView.as_view()),
+    path("billing/returns/<int:pk>/post/", AdminReturnPostView.as_view()),
+    path("billing/receipts/<int:pk>/void/", AdminReceiptVoidReasonView.as_view()),
+    path("customers/<int:pk>/credits/", AdminCustomerCreditsView.as_view()),
+    path("customers/<int:pk>/refunds/", AdminCustomerRefundCreateView.as_view()),
+    path("customers/refunds/<int:pk>/approve/", AdminCustomerRefundApproveView.as_view()),
+    path("customers/refunds/<int:pk>/pay/", AdminCustomerRefundPayView.as_view()),
+    path("purchases/<int:pk>/returns/", AdminPurchaseReturnCreateView.as_view()),
+    path("purchases/returns/<int:pk>/post/", AdminPurchaseReturnPostView.as_view()),
     path("", include(router.urls)),
 ]
