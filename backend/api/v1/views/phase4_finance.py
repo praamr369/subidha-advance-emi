@@ -14,7 +14,8 @@ from api.v1.serializers.billing import (
     CustomerDirectSaleSummarySerializer,
 )
 from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
-from billing.models import BillingInvoice, DirectSale, ReceiptDocument
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
+from core.services.operational_visibility import INACTIVE_DIRECT_SALE_STATUSES
 from subscriptions.models import (
     PlanType,
     RentLeaseBillingDemand,
@@ -771,13 +772,17 @@ class CustomerDirectSaleSummaryView(APIView):
             total_paid += Decimal(str(row.received_total or "0.00"))
             outstanding = _direct_sale_outstanding_amount(row)
             status_token = (row.status or "").upper()
-            is_payable_status = status_token not in {"DRAFT", "CANCELLED"}
+            invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
+            invoice_status = (getattr(invoice, "status", "") or "").strip().upper()
+            is_payable_status = (
+                status_token not in INACTIVE_DIRECT_SALE_STATUSES
+                and invoice_status == BillingDocumentStatus.POSTED
+            )
             if is_payable_status:
                 total_due += outstanding
             if is_payable_status and outstanding > Decimal("0.00"):
                 overdue_count += 1
             if index == 0:
-                invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
                 latest_invoice = {
                     "id": row.id,
                     "document_number": row.sale_no,

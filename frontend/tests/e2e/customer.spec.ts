@@ -4,7 +4,7 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("customer") });
 
-test("customer dashboard, subscription requests, subscriptions, and payments routes load with live nav only", async ({
+test("customer dashboard, subscriptions, and payments routes load with role-safe nav", async ({
   page,
 }) => {
   await page.goto("/customer");
@@ -15,18 +15,18 @@ test("customer dashboard, subscription requests, subscriptions, and payments rou
 
   await page
     .getByRole("complementary")
-    .getByRole("link", { name: "Plan Requests", exact: true })
+    .getByRole("link", { name: "Lucky Draw", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/customer\/subscription-requests$/);
+  await expect(page).toHaveURL(/\/customer\/subscriptions$/);
   await expect(
     page
-      .getByRole("heading", { name: "Subscription Requests", exact: true })
+      .getByRole("heading", { name: "My Subscriptions", exact: true })
       .last()
   ).toBeVisible();
 
   await page
     .getByRole("complementary")
-    .getByRole("link", { name: "Subscriptions", exact: true })
+    .getByRole("link", { name: "My Contracts", exact: true })
     .click();
   await expect(page).toHaveURL(/\/customer\/subscriptions$/);
   await expect(
@@ -35,16 +35,12 @@ test("customer dashboard, subscription requests, subscriptions, and payments rou
 
   await page
     .getByRole("complementary")
-    .getByRole("link", { name: "Payments", exact: true })
+    .getByRole("link", { name: "Payments & Receipts", exact: true })
     .click();
   await expect(page).toHaveURL(/\/customer\/payments$/);
   await expect(page.getByRole("heading", { name: "My Payments" })).toBeVisible();
 
-  await page
-    .getByRole("complementary")
-    .getByRole("link", { name: "Direct Sales", exact: true })
-    .click();
-  await expect(page).toHaveURL(/\/customer\/direct-sales$/);
+  await page.goto("/customer/direct-sales");
   await expect(page.getByRole("heading", { name: "Direct Sales" }).last()).toBeVisible();
 });
 
@@ -229,7 +225,7 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
       }),
     });
   });
-  await page.route("**/api/v1/notifications/summary/", async (route) => {
+  await page.route("**/api/v1/customer/notifications/summary/", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -482,7 +478,7 @@ test("customer legacy emis route redirects to subscriptions", async ({ page }) =
 });
 
 test("customer notifications page loads", async ({ page }) => {
-  await page.route("**/api/v1/notifications/?*", async (route) => {
+  await page.route("**/api/v1/customer/notifications/?*", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

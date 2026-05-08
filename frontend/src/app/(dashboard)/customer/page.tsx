@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { NotificationSummaryResponse } from "@/services/notifications";
-import { getNotificationSummary } from "@/services/notifications";
+import { getCustomerNotificationSummary } from "@/services/notifications";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -162,7 +162,7 @@ export default function CustomerDashboardPage() {
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
           getCustomerDirectSaleSummary(),
           listCustomerDirectSales({ page: 1, pageSize: 5 }),
-          getNotificationSummary(),
+          getCustomerNotificationSummary(),
         ]);
 
         if (legacyResult.status !== "fulfilled") {

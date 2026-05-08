@@ -33,6 +33,10 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { getPartnerDashboard } from "@/services/partner";
 import {
+  getPartnerNotificationSummary,
+  type NotificationSummaryResponse,
+} from "@/services/notifications";
+import {
   getDashboardSummaryV2,
   listDashboardOverdue,
   listDashboardRecentPayments,
@@ -67,6 +71,8 @@ export default function PartnerDashboardPage() {
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
+  const [notificationSummary, setNotificationSummary] =
+    useState<NotificationSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +105,7 @@ export default function PartnerDashboardPage() {
           upcomingPayload,
           recentPaymentsPayload,
           winnersPayload,
+          notificationPayload,
         ] = await Promise.all([
           getPartnerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
@@ -106,6 +113,7 @@ export default function PartnerDashboardPage() {
           listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+          getPartnerNotificationSummary(),
         ]);
 
         setLegacy(legacyPayload);
@@ -114,11 +122,13 @@ export default function PartnerDashboardPage() {
         setUpcoming(upcomingPayload);
         setRecentPayments(recentPaymentsPayload);
         setWinnerItems(winnersPayload);
+        setNotificationSummary(notificationPayload);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
         setLegacy(null);
         setCanonical(null);
+        setNotificationSummary(null);
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
@@ -204,6 +214,11 @@ export default function PartnerDashboardPage() {
                 label: "Pending Commission",
                 value: money(legacy.summary.pending_commission),
                 tone: "warning",
+              },
+              {
+                label: "Unread Alerts",
+                value: String(notificationSummary?.unread_count ?? 0),
+                tone: "info",
               },
             ]
           : []

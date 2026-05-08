@@ -97,3 +97,45 @@ export async function markAllNotificationsRead(): Promise<{ updated_count: numbe
 export async function getNotificationSummary(): Promise<NotificationSummaryResponse> {
   return apiFetch("/notifications/summary/");
 }
+
+export async function listCustomerNotifications(params?: {
+  module?: string;
+  category?: string;
+  severity?: string;
+  unread?: boolean;
+  limit?: number;
+}): Promise<NotificationListResponse> {
+  return apiFetch(`/customer/notifications/${buildQuery(params ?? {})}`);
+}
+
+export async function getCustomerNotificationSummary(): Promise<NotificationSummaryResponse> {
+  return apiFetch("/customer/notifications/summary/");
+}
+
+export async function listPartnerNotifications(params?: {
+  module?: string;
+  category?: string;
+  severity?: string;
+  unread?: boolean;
+  limit?: number;
+}): Promise<NotificationListResponse> {
+  return apiFetch(`/partner/notifications/${buildQuery(params ?? {})}`);
+}
+
+export async function getPartnerNotificationSummary(): Promise<NotificationSummaryResponse> {
+  return apiFetch("/partner/notifications/summary/");
+}
+
+export async function listVendorNotifications(params?: {
+  module?: string;
+  category?: string;
+  severity?: string;
+  unread?: boolean;
+  limit?: number;
+}): Promise<NotificationListResponse> {
+  return apiFetch(`/vendor/notifications/${buildQuery(params ?? {})}`);
+}
+
+export async function getVendorNotificationSummary(): Promise<NotificationSummaryResponse> {
+  return apiFetch("/vendor/notifications/summary/");
+}

@@ -245,7 +245,9 @@ export default function BillingDocumentDetailPage() {
       {!loading && !error && invoice ? (
         <>
           <div className="receipt-print-hide space-y-5">
-            {invoice.direct_sale && Number(invoice.balance_total || 0) > 0 ? (
+            {invoice.direct_sale &&
+            String(invoice.status || "").toUpperCase() === "POSTED" &&
+            Number(invoice.balance_total || 0) > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <div>
                   <div className="font-semibold">Direct-sale balance is pending</div>
@@ -260,6 +262,15 @@ export default function BillingDocumentDetailPage() {
                 >
                   Collect Direct-Sale Balance
                 </button>
+              </div>
+            ) : null}
+            {invoice.direct_sale &&
+            ["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(invoice.status || "").toUpperCase()) ? (
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+                <div className="font-semibold">Direct sale reversed/archived</div>
+                <div className="mt-1 text-muted-foreground">
+                  This direct sale has been reversed/returned and archived from active collection. Documents remain visible for history and audit.
+                </div>
               </div>
             ) : null}
 

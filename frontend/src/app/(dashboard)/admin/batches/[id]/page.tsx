@@ -64,10 +64,21 @@ type BatchSummaryRecord = {
 type LuckyIdRow = {
   id: number;
   lucky_number: number | null;
-  status: "AVAILABLE" | "ASSIGNED" | "WON" | "BLOCKED" | "CANCELLED" | "UNKNOWN";
+  status:
+    | "AVAILABLE"
+    | "ASSIGNED"
+    | "WON"
+    | "BLOCKED"
+    | "CANCELLED"
+    | "RELEASED"
+    | "FROZEN"
+    | "FROZEN_CANCELLED_HOLDER"
+    | "UNKNOWN";
   customer_name?: string;
   subscription_id?: number | null;
   subscription_number?: string;
+  assignable?: boolean;
+  assignment_note?: string;
 };
 
 type SubscriptionRow = {
@@ -154,7 +165,10 @@ function normalizeLuckyIdStatus(
     normalized === "AVAILABLE" ||
     normalized === "ASSIGNED" ||
     normalized === "BLOCKED" ||
-    normalized === "CANCELLED"
+    normalized === "CANCELLED" ||
+    normalized === "RELEASED" ||
+    normalized === "FROZEN" ||
+    normalized === "FROZEN_CANCELLED_HOLDER"
   ) {
     return normalized;
   }
@@ -203,13 +217,14 @@ function normalizeBatchSummary(raw: Record<string, unknown>): BatchSummaryRecord
 }
 
 function normalizeLuckyIdRow(raw: Record<string, unknown>): LuckyIdRow {
+  const state = toStringValue(raw.assignment_state).trim().toUpperCase();
   return {
     id: toNumber(raw.id),
     lucky_number:
       toNullableNumber(raw.lucky_number) ??
       toNullableNumber(raw.number) ??
       toNullableNumber(raw.lucky_no),
-    status: normalizeLuckyIdStatus(raw.status),
+    status: normalizeLuckyIdStatus(state || raw.status),
     customer_name:
       toStringValue(raw.customer_name).trim() ||
       toStringValue(raw.customer_display_name).trim() ||
@@ -219,6 +234,8 @@ function normalizeLuckyIdRow(raw: Record<string, unknown>): LuckyIdRow {
       toStringValue(raw.subscription_number).trim() ||
       toStringValue(raw.subscription_code).trim() ||
       undefined,
+    assignable: typeof raw.assignable === "boolean" ? raw.assignable : undefined,
+    assignment_note: toStringValue(raw.assignment_note).trim() || undefined,
   };
 }
 
@@ -643,10 +660,15 @@ export default function AdminBatchDetailPage() {
                                   ? row.subscription_number
                                   : row.status === "AVAILABLE"
                                     ? "No subscription"
+                                    : row.status === "RELEASED"
+                                      ? "Released from cancelled contract"
                                     : row.status === "WON"
                                       ? "Missing winner subscription link"
                                       : "Missing subscription link"}
                               </div>
+                              {row.assignment_note ? (
+                                <div className="mt-1 text-xs text-muted-foreground">{row.assignment_note}</div>
+                              ) : null}
                             </td>
 
                             <td className="border-b border-border px-4 py-3 text-sm text-foreground">

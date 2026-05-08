@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from billing.models import DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import (
     TERMINAL_CASE_STATUSES,
     compute_direct_sale_delivery_snapshot,
 )
 from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
+from billing.services.reversal_service import get_returnable_quantity
 from inventory.services.demand_planning_service import stock_status_for_delivery
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from subscriptions.models import DeliveryStatus
@@ -55,6 +57,42 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
     phase_code = snap["phase_code"]
     phase_label = snap["phase_label"]
     mapped_status = map_case_status_to_delivery_status(case.status)
+    source_status = (getattr(sale, "status", "") or "").strip().upper() or "UNKNOWN"
+    source_reversed = source_status in {
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+        DirectSaleStatus.CANCELLED,
+    }
+    source_archived = source_status in {
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+        DirectSaleStatus.CANCELLED,
+    }
+    returnable_exists = False
+    if source_reversed:
+        try:
+            for line in sale.lines.all():
+                if get_returnable_quantity(line) > Decimal("0.000"):
+                    returnable_exists = True
+                    break
+        except Exception:
+            returnable_exists = False
+
+    history_only = bool(source_reversed or phase_code == "HISTORY_ONLY")
+    normal_delivery_pending = bool(not source_reversed and case.status in ACTIVE_DIRECT_SALE_CASE_STATUSES)
+    normal_delivery_completed = bool(
+        not source_reversed and case.status in DIRECT_SALE_SUCCESS_TERMINAL_STATUSES
+    )
+    return_pickup_required = bool(source_reversed and returnable_exists)
+    return_pickup_completed = bool(source_reversed and not returnable_exists)
 
     addr_parts = [
         (getattr(sale, "delivery_snapshot_address_line1", "") or "").strip(),
@@ -97,6 +135,17 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
     scheduled_date = case.service_due_at.date().isoformat() if case.service_due_at else None
     operational_notes = (case.internal_notes or "").strip() or None
     failure_or_cancellation_reason = (case.resolution_summary or "").strip() or None
+    action_endpoints = {}
+    if not source_reversed:
+        action_endpoints = {
+            "save_metadata": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/metadata/",
+            "schedule": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/schedule/",
+            "dispatch": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/dispatch/",
+            "mark_delivered": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/mark-delivered/",
+            "cancel": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/cancel/",
+            "note": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/note/",
+        }
+
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
         "source_type": "DIRECT_SALE",
@@ -148,6 +197,15 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "fulfillment_status": None,
         "is_terminal": case.status in TERMINAL_CASE_STATUSES,
         "is_active_delivery": case.status in ACTIVE_DIRECT_SALE_CASE_STATUSES,
+        "normal_delivery_pending": normal_delivery_pending,
+        "normal_delivery_completed": normal_delivery_completed,
+        "return_pickup_required": return_pickup_required,
+        "return_pickup_completed": return_pickup_completed,
+        "history_only": history_only,
+        "source_status": source_status,
+        "source_reversed": source_reversed,
+        "source_archived": source_archived,
+        "is_actionable": bool(normal_delivery_pending),
         "inventory_stock_status": inventory_snapshot.get("status") if inventory_snapshot else None,
         "inventory_available_qty": inventory_snapshot.get("available") if inventory_snapshot else None,
         "direct_sale_id": sale.id,
@@ -172,14 +230,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "status_label": phase_label,
         "stock_state": op.get("inventory_state"),
         "delivery_state": snap.get("phase_code"),
-        "action_endpoints": {
-            "save_metadata": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/metadata/",
-            "schedule": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/schedule/",
-            "dispatch": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/dispatch/",
-            "mark_delivered": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/mark-delivered/",
-            "cancel": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/cancel/",
-            "note": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/note/",
-        },
+        "action_endpoints": action_endpoints,
         "links": {
             "open_invoice": f"/admin/billing/documents/{getattr(invoice, 'id', '')}" if getattr(invoice, "id", None) else None,
             "open_direct_sale": f"/admin/billing/direct-sale?highlight_sale={sale.id}",
@@ -200,7 +251,17 @@ def direct_sale_delivery_cases_queryset(*, active_only: bool = True):
         .order_by("-created_at", "-id")
     )
     if active_only:
-        qs = qs.filter(status__in=ACTIVE_DIRECT_SALE_CASE_STATUSES)
+        qs = qs.filter(status__in=ACTIVE_DIRECT_SALE_CASE_STATUSES).exclude(
+            direct_sale__status__in=[
+                DirectSaleStatus.CANCELLED,
+                DirectSaleStatus.CANCELLED_PRE_INVOICE,
+                DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+                DirectSaleStatus.REVERSED_POST_INVOICE,
+                DirectSaleStatus.RETURNED,
+                DirectSaleStatus.ARCHIVED,
+                DirectSaleStatus.EXCHANGED_CLOSED,
+            ]
+        )
     return qs
 
 

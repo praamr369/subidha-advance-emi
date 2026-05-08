@@ -4,7 +4,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.v1.permissions import IsAdmin, IsCashier
+from api.v1.permissions import IsAdmin, IsCashier, IsCustomer, IsPartner, IsVendor
 from api.v1.serializers.notifications import NotificationSerializer
 from system_jobs.models import Notification
 
@@ -187,3 +187,27 @@ class NotificationSummaryView(APIView):
                 "latest": NotificationSerializer(latest, many=True).data,
             }
         )
+
+
+class CustomerNotificationListView(NotificationListView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+
+class CustomerNotificationSummaryView(NotificationSummaryView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+
+class PartnerNotificationListView(NotificationListView):
+    permission_classes = [permissions.IsAuthenticated, IsPartner]
+
+
+class PartnerNotificationSummaryView(NotificationSummaryView):
+    permission_classes = [permissions.IsAuthenticated, IsPartner]
+
+
+class VendorNotificationListView(NotificationListView):
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
+
+
+class VendorNotificationSummaryView(NotificationSummaryView):
+    permission_classes = [permissions.IsAuthenticated, IsVendor]

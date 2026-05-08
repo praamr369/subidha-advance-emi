@@ -113,6 +113,13 @@ class DirectSaleStatus(models.TextChoices):
     DELIVERED = "DELIVERED", "Delivered"
     INVOICED = "INVOICED", "Invoiced"
     CANCELLED = "CANCELLED", "Cancelled"
+    # Additive lifecycle states for post-invoice reversal/archive workflows.
+    CANCELLED_PRE_INVOICE = "CANCELLED_PRE_INVOICE", "Cancelled (Pre-invoice)"
+    CANCELLED_AFTER_DELIVERY = "CANCELLED_AFTER_DELIVERY", "Cancelled (After delivery)"
+    REVERSED_POST_INVOICE = "REVERSED_POST_INVOICE", "Reversed (Post-invoice)"
+    RETURNED = "RETURNED", "Returned"
+    EXCHANGED_CLOSED = "EXCHANGED_CLOSED", "Exchange closed"
+    ARCHIVED = "ARCHIVED", "Archived"
 
 
 class DirectSale(BillingTimeStampedModel):
@@ -155,7 +162,7 @@ class DirectSale(BillingTimeStampedModel):
         related_name="direct_sales",
     )
     status = models.CharField(
-        max_length=16,
+        max_length=32,
         choices=DirectSaleStatus.choices,
         default=DirectSaleStatus.DRAFT,
         db_index=True,
@@ -264,6 +271,22 @@ class DirectSale(BillingTimeStampedModel):
             immutable_statuses={
                 DirectSaleStatus.INVOICED,
                 DirectSaleStatus.CANCELLED,
+                DirectSaleStatus.CANCELLED_PRE_INVOICE,
+                DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+                DirectSaleStatus.REVERSED_POST_INVOICE,
+                DirectSaleStatus.RETURNED,
+                DirectSaleStatus.EXCHANGED_CLOSED,
+                DirectSaleStatus.ARCHIVED,
+            },
+            allowed={
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.REVERSED_POST_INVOICE),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.RETURNED),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.CANCELLED_AFTER_DELIVERY),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.ARCHIVED),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.EXCHANGED_CLOSED),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.RETURNED),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.CANCELLED_AFTER_DELIVERY),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.ARCHIVED),
             },
         )
         self.sale_no = (self.sale_no or "").strip().upper() or None

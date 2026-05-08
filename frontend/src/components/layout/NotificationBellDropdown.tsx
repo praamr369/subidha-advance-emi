@@ -15,9 +15,15 @@ import {
   getAdminNotificationUnreadCount,
   getCashierNotificationUnreadCount,
   getNotificationSummary,
+  getCustomerNotificationSummary,
+  getPartnerNotificationSummary,
+  getVendorNotificationSummary,
   listAdminNotifications,
   listCashierNotifications,
   listNotifications,
+  listCustomerNotifications,
+  listPartnerNotifications,
+  listVendorNotifications,
   markAdminNotificationRead,
   markAllNotificationsRead,
   markCashierNotificationRead,
@@ -39,6 +45,9 @@ function centerHref(role: NavigationRole): string {
     case "CASHIER":
       return ROUTES.cashier.notifications;
     case "CUSTOMER":
+      return ROUTES.customer.notifications;
+    case "VENDOR":
+      return ROUTES.vendor.notifications;
     default:
       return ROUTES.customer.notifications;
   }
@@ -65,10 +74,15 @@ async function fetchBellSnapshot(role: NavigationRole): Promise<NotificationBell
       unread: countRes.unread_count ?? listRes.unread_count ?? 0,
     };
   }
-  const [listRes, summary] = await Promise.all([
-    listNotifications({ limit: 6 }),
-    getNotificationSummary(),
-  ]);
+  const [listRes, summary] = await Promise.all(
+    role === "CUSTOMER"
+      ? [listCustomerNotifications({ limit: 6 }), getCustomerNotificationSummary()]
+      : role === "PARTNER"
+        ? [listPartnerNotifications({ limit: 6 }), getPartnerNotificationSummary()]
+        : role === "VENDOR"
+          ? [listVendorNotifications({ limit: 6 }), getVendorNotificationSummary()]
+          : [listNotifications({ limit: 6 }), getNotificationSummary()]
+  );
   return {
     items: listRes.results ?? [],
     unread: summary.unread_count ?? listRes.unread_count ?? 0,
@@ -159,7 +173,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   const badge =
     unreadCount === null ? null : unreadCount > 99 ? "99+" : String(Math.max(0, unreadCount));
 
-  const showMarkAll = (role === "CUSTOMER" || role === "PARTNER") && items.some((n) => !n.is_read);
+  const showMarkAll = (role === "CUSTOMER" || role === "PARTNER" || role === "VENDOR") && items.some((n) => !n.is_read);
 
   return (
     <div className="relative shrink-0" ref={rootRef}>

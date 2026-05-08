@@ -113,6 +113,7 @@ from subscriptions.services.winner_state_service import (
     sync_winner_state,
     winner_history_q,
 )
+from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 
 # ... rest of the file
 
@@ -1150,7 +1151,10 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="available")
     def available(self, request):
-        queryset = self.get_queryset().filter(status=LuckyIdStatus.AVAILABLE)[:100]
+        queryset = self.get_queryset().filter(
+            status=LuckyIdStatus.AVAILABLE,
+            batch__status__in=PRE_LOCK_BATCH_STATUSES,
+        )[:100]
         serializer = self.get_serializer(queryset, many=True)
         return Response(
             {

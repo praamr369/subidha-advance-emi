@@ -2,7 +2,10 @@
 
 import NotificationCenterPanel from "@/components/notifications/NotificationCenterPanel";
 import { ROUTES } from "@/lib/routes";
-import { listNotifications, markNotificationRead } from "@/services/notifications";
+import {
+  listPartnerNotifications,
+  markNotificationRead,
+} from "@/services/notifications";
 
 export default function PartnerNotificationsPage() {
   return (
@@ -15,7 +18,7 @@ export default function PartnerNotificationsPage() {
           { label: "Partner", href: ROUTES.partner.dashboard },
           { label: "Notifications" },
         ]}
-        list={listNotifications}
+        list={listPartnerNotifications}
         markRead={markNotificationRead}
       />
     </div>

@@ -61,6 +61,15 @@ export type DeliveryRecord = {
   fulfillment_status?: string | null;
   is_terminal?: boolean;
   is_active_delivery?: boolean;
+  normal_delivery_pending?: boolean;
+  normal_delivery_completed?: boolean;
+  return_pickup_required?: boolean;
+  return_pickup_completed?: boolean;
+  history_only?: boolean;
+  source_status?: string | null;
+  source_reversed?: boolean;
+  source_archived?: boolean;
+  is_actionable?: boolean;
   history_count?: number;
   inventory_stock_status?: "available" | "not available" | "reserved" | "purchase needed" | string;
   inventory_available_qty?: string | null;

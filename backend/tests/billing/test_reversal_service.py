@@ -53,7 +53,7 @@ class ReversalServiceTests(TestCase):
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)
         sale, updated = cancel_direct_sale_before_invoice(direct_sale_id=sale.id, reason="Customer requested stop", performed_by=self.admin)
         self.assertTrue(updated)
-        self.assertEqual(sale.status, "CANCELLED")
+        self.assertEqual(sale.status, "CANCELLED_PRE_INVOICE")
 
     def test_invoiced_sale_cannot_be_cancelled(self):
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)

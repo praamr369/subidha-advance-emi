@@ -555,8 +555,17 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
         .prefetch_related("lines", "billing_invoices")
         .get(pk=direct_sale_id)
     )
-    if sale.status in {DirectSaleStatus.INVOICED, DirectSaleStatus.CANCELLED}:
-        raise ValueError("Invoiced or cancelled direct sales cannot be edited.")
+    if sale.status in {
+        DirectSaleStatus.INVOICED,
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
+        raise ValueError("Invoiced or archived direct sales cannot be edited.")
 
     lines = payload.pop("lines", None)
     if "sale_date" in payload and "financial_year" not in payload:
@@ -645,7 +654,15 @@ def confirm_direct_sale(*, direct_sale_id: int, confirmed_by):
     sale = DirectSale.objects.prefetch_related("lines").get(pk=direct_sale_id)
     if sale.status in {DirectSaleStatus.CONFIRMED, DirectSaleStatus.DELIVERED, DirectSaleStatus.INVOICED}:
         return sale, False
-    if sale.status == DirectSaleStatus.CANCELLED:
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
         raise ValueError("Cancelled direct sales cannot be confirmed.")
     if not sale.lines.exists():
         raise ValueError("Direct sales require at least one line before confirmation.")
@@ -679,7 +696,15 @@ def finalize_direct_sale_invoice(*, direct_sale_id: int, finalized_by):
         .select_related("customer", "doc_series", "finance_account")
         .get(pk=direct_sale_id)
     )
-    if sale.status == DirectSaleStatus.CANCELLED:
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
         raise ValueError("Cancelled direct sales cannot be finalized.")
     if sale.status == DirectSaleStatus.INVOICED:
         return sale, False

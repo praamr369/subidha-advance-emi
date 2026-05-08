@@ -80,11 +80,19 @@ def compute_direct_sale_delivery_snapshot(*, sale: DirectSale) -> dict:
     dst = op["delivery_state"]
     ost = str(op["operational_state"])
 
-    if sale.status == DirectSaleStatus.CANCELLED or ost == "CANCELLED":
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    } or ost in {"CANCELLED", "HISTORY_ONLY"}:
         return {
-            "phase_code": "CANCELLED",
-            "phase_label": "Cancelled",
-            "payment_state": "PAID" if balance <= Decimal("0.00") else "OUTSTANDING",
+            "phase_code": "HISTORY_ONLY",
+            "phase_label": "History only · Reversed/archived",
+            "payment_state": "NOT_APPLICABLE",
             "invoice_state": invoice_state,
             "stock_blocked": False,
         }
@@ -182,15 +190,30 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
         schedule_direct_sale_delivery_ready_notifications,
     )
 
-    if (
-        not sale.delivery_required
-        or sale.status == DirectSaleStatus.CANCELLED
-        or sale.pk is None
-    ):
+    if not sale.delivery_required or sale.pk is None:
         return None
 
-    snapshot = compute_direct_sale_delivery_snapshot(sale=sale)
+    terminal_source_statuses = {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }
     case = get_direct_sale_delivery_case(sale=sale)
+    if sale.status in terminal_source_statuses:
+        if case is None:
+            return None
+        if case.status not in TERMINAL_CASE_STATUSES:
+            case.status = ServiceDeskCaseStatus.CANCELLED
+            case.resolution_summary = (case.resolution_summary or "").strip() or "Source sale reversed/archived."
+            case.internal_notes = (case.internal_notes or "").strip() or "Delivery workspace auto-closed due to reversal/archive."
+            case.save(update_fields=["status", "resolution_summary", "internal_notes", "updated_at"])
+        return case
+
+    snapshot = compute_direct_sale_delivery_snapshot(sale=sale)
     if case is not None and case.status in TERMINAL_CASE_STATUSES:
         return case
 

@@ -292,6 +292,7 @@ export const ROUTES = {
   vendor: {
     root: "/vendor",
     dashboard: "/vendor",
+    notifications: "/vendor/notifications",
     profile: "/vendor/profile",
     orders: "/vendor/orders",
     quotes: "/vendor/quotes",

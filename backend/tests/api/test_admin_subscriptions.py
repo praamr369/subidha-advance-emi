@@ -242,3 +242,24 @@ class AdminSubscriptionDetailApiTests(APITestCase):
             "Winner markers exist, but Lucky ID status is not WON.",
             response.data["reconciliation_flags"]["warnings"],
         )
+
+    def test_subscription_create_returns_clean_error_for_frozen_lucky_id(self):
+        self.batch.status = "LOCKED"
+        self.batch.save(update_fields=["status"])
+        self.lucky_id.status = "AVAILABLE"
+        self.lucky_id.save(update_fields=["status"])
+
+        payload = {
+            "customer": self.customer.id,
+            "product": self.product.id,
+            "partner": self.partner.id,
+            "plan_type": "EMI",
+            "tenure_months": self.batch.duration_months,
+            "start_date": "2026-03-01",
+            "batch": self.batch.id,
+            "lucky_id": self.lucky_id.id,
+        }
+        response = self.client.post("/api/v1/admin/subscriptions/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("lucky_id", response.data)
+        self.assertNotIn("uq_subscription_per_lucky_id", str(response.data))

@@ -15,7 +15,7 @@ from core.services.operational_visibility import (
     invoice_active_q,
     subscription_collectible_q,
 )
-from billing.models import BillingInvoice, DirectSale
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale
 from subscriptions.models import Emi, EmiStatus, PlanType, q2
 
 MONEY_ZERO = Decimal("0.00")
@@ -256,6 +256,8 @@ def _collect_direct_sale_rows(*, today: date) -> list[dict[str, Any]]:
         DirectSale.objects.select_related("customer")
         .prefetch_related(Prefetch("lines"), Prefetch("billing_invoices"))
         .filter(direct_sale_active_q())
+        .filter(billing_invoices__status=BillingDocumentStatus.POSTED)
+        .distinct()
         .filter(balance_total__gt=MONEY_ZERO)
         .order_by("sale_date", "id")
     )

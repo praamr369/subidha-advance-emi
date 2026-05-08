@@ -80,7 +80,19 @@ export type DirectSale = {
   cash_counter?: number | null;
   cash_counter_code?: string | null;
   cash_counter_name?: string | null;
-  status: "DRAFT" | "CONFIRMED" | "DELIVERED" | "INVOICED" | "CANCELLED";
+  status:
+    | "DRAFT"
+    | "CONFIRMED"
+    | "DELIVERED"
+    | "INVOICED"
+    | "CANCELLED"
+    | "CANCELLED_PRE_INVOICE"
+    | "CANCELLED_AFTER_DELIVERY"
+    | "REVERSED_POST_INVOICE"
+    | "RETURNED"
+    | "EXCHANGED_CLOSED"
+    | "ARCHIVED"
+    | string;
   tax_mode: "GST" | "NON_GST";
   tax_calculation_mode?: "NON_GST" | "GST_INCLUSIVE" | "GST_EXCLUSIVE";
   customer_gst_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
@@ -100,6 +112,17 @@ export type DirectSale = {
   grand_total: string;
   received_total: string;
   balance_total: string;
+  is_operationally_active?: boolean;
+  is_collectible?: boolean;
+  is_outstanding_visible?: boolean;
+  is_dashboard_visible?: boolean;
+  is_archived?: boolean;
+  active_outstanding_amount?: string;
+  historical_amount?: string;
+  is_actionable?: boolean;
+  is_history_only?: boolean;
+  blocking_reason?: string | null;
+  action_label?: string;
   customer_name_snapshot?: string;
   customer_phone_snapshot?: string;
   customer_snapshot_email?: string;
@@ -249,7 +272,7 @@ export type BillingInvoice = {
   source_type?: string;
   source_reference?: string;
   tax_mode: string;
-  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID";
+  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID" | "REVERSED" | "CREDITED_FULLY" | string;
   finance_account?: number | null;
   finance_account_name?: string | null;
   subtotal: string;

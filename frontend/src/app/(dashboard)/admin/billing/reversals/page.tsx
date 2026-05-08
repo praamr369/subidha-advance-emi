@@ -14,6 +14,7 @@ import {
   approveAdminCustomerRefund,
   approveAdminDirectSaleReturn,
   cancelAdminDirectSale,
+  finalizeAdminDirectSaleReversal,
   createAdminCustomerRefund,
   createAdminDirectSaleExchange,
   createAdminDirectSaleReturn,
@@ -55,6 +56,10 @@ export default function AdminBillingReversalsPage() {
 
   const [cancelSaleId, setCancelSaleId] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelCardError, setCancelCardError] = useState<string | null>(null);
+
+  const [finalizeReason, setFinalizeReason] = useState("");
+  const [finalizeCardError, setFinalizeCardError] = useState<string | null>(null);
 
   const [voidReceiptId, setVoidReceiptId] = useState("");
   const [voidReason, setVoidReason] = useState("");
@@ -93,12 +98,16 @@ export default function AdminBillingReversalsPage() {
   const [purchaseReason, setPurchaseReason] = useState("");
   const queryClient = useQueryClient();
 
+  const allowPreInvoiceCancel = (eligibility?.allowed_actions || []).includes("PRE_INVOICE_CANCEL");
+  const showReturnAsCompleted = (Number(eligibility?.returnable_quantity || "0") <= 0) && (Number(eligibility?.posted_return_count || 0) > 0);
+
   useEffect(() => {
     const directSale = searchParams.get("direct_sale") || "";
     const exchangeSale = searchParams.get("exchange_sale") || "";
     if (directSale) {
       setReturnSaleId(directSale);
       setEligibilitySaleId(directSale);
+      setCancelSaleId(directSale);
     }
     if (exchangeSale) {
       setExchangeSaleId(exchangeSale);
@@ -216,15 +225,31 @@ export default function AdminBillingReversalsPage() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded border p-3">
-            <div className="mb-2 text-sm font-semibold">Cancel Sale</div>
-            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={cancelSaleId} onChange={(e) => setCancelSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
-            <input className="mb-2 h-10 w-full rounded border px-2" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason (required)" />
-            <button className="rounded border px-3 py-2 text-sm" onClick={() => {
-              if (!cancelReason.trim()) { setError("Cancel reason is required."); return; }
-              void runAction(() => cancelAdminDirectSale(Number(cancelSaleId), cancelReason), "Sale cancelled.");
-            }}>Cancel Sale</button>
-          </div>
+          {allowPreInvoiceCancel || !hasDirectSaleContext || debugMode ? (
+            <div className="rounded border p-3">
+              <div className="mb-2 text-sm font-semibold">Cancel Sale</div>
+              {cancelCardError ? <div className="mb-2 rounded border border-rose-300 bg-rose-50 p-2 text-xs text-rose-900">{cancelCardError}</div> : null}
+              {!hasDirectSaleContext || debugMode ? (
+                <input className="mb-2 h-10 w-full rounded border px-2" value={cancelSaleId} onChange={(e) => setCancelSaleId(e.target.value)} placeholder="Direct Sale ID" />
+              ) : null}
+              <input className="mb-2 h-10 w-full rounded border px-2" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason (required)" />
+              <button className="rounded border px-3 py-2 text-sm" onClick={() => {
+                setCancelCardError(null);
+                if (!cancelReason.trim()) { setCancelCardError("Cancel reason is required."); return; }
+                const dsId = hasDirectSaleContext ? Number(eligibility?.direct_sale_id || cancelSaleId) : Number(cancelSaleId);
+                if (!dsId || Number.isNaN(dsId)) { setCancelCardError("Direct sale id is required."); return; }
+                void runAction(() => cancelAdminDirectSale(dsId, cancelReason), "Sale cancelled.")
+                  .catch((err) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    setCancelCardError(
+                      msg.includes("finalize") || msg.includes("Finalize")
+                        ? "This sale is already delivered/returned. Use Finalize Reversal instead."
+                        : msg
+                    );
+                  });
+              }}>Cancel Sale</button>
+            </div>
+          ) : null}
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Void Receipt</div>
@@ -242,6 +267,11 @@ export default function AdminBillingReversalsPage() {
             <div className="mb-2 rounded border bg-muted/20 p-2 text-xs">
               Sale: {eligibility?.sale_no || "N/A"} | Customer: {eligibility?.customer_name || "N/A"} {eligibility?.customer_phone_masked ? `(${eligibility.customer_phone_masked})` : ""}
             </div>
+            {showReturnAsCompleted ? (
+              <div className="mb-2 rounded border border-emerald-600/40 bg-emerald-600/10 p-2 text-xs text-emerald-900">
+                Product returned to stock: <span className="font-medium">Done</span>. Further returns are not required.
+              </div>
+            ) : null}
             {stockSetupError ? <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">{stockSetupError}</div> : null}
             {(!hasDirectSaleContext || debugMode) ? <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <div className="mb-2 grid grid-cols-2 gap-2">
@@ -336,7 +366,7 @@ export default function AdminBillingReversalsPage() {
               </button>
             ) : null}
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
-            <button className="rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={Boolean(eligibility?.stock_setup_required) || !(eligibility?.can_create_return ?? true)} onClick={() => {
+            <button className="rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={showReturnAsCompleted || Boolean(eligibility?.stock_setup_required) || !(eligibility?.can_create_return ?? true)} onClick={() => {
               if (!returnReason.trim()) { setReturnFormError("Return reason is required."); return; }
               if (eligibility?.stock_setup_required) { setStockSetupError(eligibility.stock_setup_message || "Create missing return locations first."); return; }
               const lines = (eligibility?.return_lines || [])
@@ -438,15 +468,28 @@ export default function AdminBillingReversalsPage() {
                   className="rounded border px-3 py-2 text-xs disabled:opacity-50"
                   disabled={!eligibility.can_finalize_reversal}
                   onClick={() => {
+                    setFinalizeCardError(null);
                     if (!eligibility.can_finalize_reversal) return;
+                    const dsId = eligibility.direct_sale_id;
+                    const reason = finalizeReason.trim() || "Finalize full cancellation/archive after reversal controls satisfied.";
                     void runAction(
-                      () => cancelAdminDirectSale(eligibility.direct_sale_id, "Finalize full cancellation/archive after reversal controls satisfied."),
+                      () => finalizeAdminDirectSaleReversal(dsId, { reason, confirm: true }),
                       "Sale finalized and archived.",
-                    );
+                    ).catch((err) => {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      setFinalizeCardError(msg);
+                    });
                   }}
                 >
                   Finalize Full Cancellation / Archive Sale
                 </button>
+                {finalizeCardError ? <div className="mt-2 rounded border border-rose-300 bg-rose-50 p-2 text-xs text-rose-900">{finalizeCardError}</div> : null}
+                <input
+                  className="mt-2 h-10 w-full rounded border px-2 text-sm"
+                  value={finalizeReason}
+                  onChange={(e) => setFinalizeReason(e.target.value)}
+                  placeholder="Finalize reason (optional)"
+                />
                 {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
                   <div key={line.direct_sale_line_id} className="rounded border p-2">
                     Line {line.direct_sale_line_id}: sold {line.sold_quantity} · returned {line.already_returned_quantity} · returnable {line.returnable_quantity || line.max_returnable_quantity}

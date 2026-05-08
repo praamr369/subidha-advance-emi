@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.db.models import Q, Sum
-from rest_framework import permissions, status
+from rest_framework import permissions, serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +26,7 @@ from billing.services.reversal_service import (
     create_direct_sale_return,
     create_purchase_return,
     get_direct_sale_return_eligibility,
+    finalize_direct_sale_reversal,
     open_direct_sale_cancellation_case,
     pay_customer_refund,
     post_direct_sale_return,
@@ -46,6 +47,8 @@ def _as_drf_validation_error(exc: Exception) -> ValidationError:
 
 class AdminDirectSaleCancelView(_AdminBase):
     def post(self, request, pk: int):
+        if pk <= 0:
+            raise ValidationError({"direct_sale_id": ["Direct sale id is required."]})
         serializer = ReasonSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -55,9 +58,36 @@ class AdminDirectSaleCancelView(_AdminBase):
                 performed_by=request.user,
                 stock_location_id=serializer.validated_data.get("stock_location_id"),
             )
-        except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
+        except ObjectDoesNotExist as exc:
+            raise ValidationError({"direct_sale_id": ["Direct sale not found."]}) from exc
+        except (ValueError, DjangoValidationError) as exc:
             raise _as_drf_validation_error(exc) from exc
         return Response(result)
+
+
+class _ReasonConfirmSerializer(ReasonSerializer):
+    confirm = serializers.BooleanField(default=False)
+
+
+class AdminDirectSaleFinalizeReversalView(_AdminBase):
+    def post(self, request, pk: int):
+        if pk <= 0:
+            raise ValidationError({"direct_sale_id": ["Direct sale id is required."]})
+        serializer = _ReasonConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = finalize_direct_sale_reversal(
+                direct_sale_id=pk,
+                reason=serializer.validated_data["reason"],
+                confirm=bool(serializer.validated_data.get("confirm")),
+                performed_by=request.user,
+            )
+        except ObjectDoesNotExist as exc:
+            raise ValidationError({"direct_sale_id": ["Direct sale not found."]}) from exc
+        except (ValueError, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=pk)
+        return Response({"result": result, "eligibility": eligibility})
 
 
 class AdminDirectSaleReturnCreateView(_AdminBase):

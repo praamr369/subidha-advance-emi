@@ -232,6 +232,17 @@ def collect_direct_sale_payment(
         )
     if invoice is None:
         raise ValueError("Linked billing invoice was not found for this direct sale.")
+    inactive_sale_statuses = {
+        "CANCELLED",
+        "CANCELLED_PRE_INVOICE",
+        "CANCELLED_AFTER_DELIVERY",
+        "REVERSED_POST_INVOICE",
+        "RETURNED",
+        "ARCHIVED",
+        "EXCHANGED_CLOSED",
+    }
+    if (sale.status or "").strip().upper() in inactive_sale_statuses:
+        raise ValueError("This direct sale is reversed/returned and is not collectible.")
     if sale.status != "INVOICED":
         raise ValueError("Direct sale must be invoiced before collection.")
     if invoice.status != BillingDocumentStatus.POSTED:

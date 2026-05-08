@@ -29,3 +29,12 @@ This pass consolidates admin navigation and dashboard surfaces into an operation
 - `pending_draw_count`
 
 Counts are read-only and scoped to active operational queues.
+
+## Dashboard usability notes
+
+- Admin dashboard should present a command-center structure with:
+  - financial posture highlights
+  - queue pressure indicators
+  - launch cards for key operational workflows
+- If any summary endpoint is unavailable, show safe empty/error cards instead of synthetic KPI values.
+- Keep reversal and return controls visible only in relevant operational contexts.

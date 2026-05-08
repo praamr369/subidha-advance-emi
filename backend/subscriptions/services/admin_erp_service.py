@@ -535,6 +535,16 @@ def build_admin_erp_summary() -> dict:
         case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
         status__in=ACTIVE_DIRECT_SALE_CASE_STATUSES,
         direct_sale__delivery_required=True,
+    ).exclude(
+        direct_sale__status__in=[
+            DirectSaleStatus.CANCELLED,
+            DirectSaleStatus.CANCELLED_PRE_INVOICE,
+            DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+            DirectSaleStatus.REVERSED_POST_INVOICE,
+            DirectSaleStatus.RETURNED,
+            DirectSaleStatus.ARCHIVED,
+            DirectSaleStatus.EXCHANGED_CLOSED,
+        ]
     )
 
     delivery_pending_sub = SubscriptionDelivery.objects.filter(status=DeliveryStatus.PENDING).count()

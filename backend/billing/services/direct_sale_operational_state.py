@@ -49,15 +49,41 @@ def _open_requirement_count(sale) -> int:
 
 
 def _derive_state(*, sale, invoice_status: str, paid_amount: Decimal, due_amount: Decimal, requirement_count: int) -> _OperationalState:
-    if sale.status == DirectSaleStatus.CANCELLED:
+    inactive_invoice_statuses = {
+        BillingDocumentStatus.VOID,
+        BillingDocumentStatus.CANCELLED,
+        "REVERSED",
+        "CREDITED_FULLY",
+    }
+
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
         return _OperationalState(
-            operational_state="CANCELLED",
-            payment_state="CANCELLED",
+            operational_state="HISTORY_ONLY",
+            payment_state="N/A",
             inventory_state="N/A",
-            delivery_state="CANCELLED",
+            delivery_state="HISTORY_ONLY",
             collection_state="NOT_COLLECTIBLE",
-            blocking_reasons=["Sale is cancelled."],
-            next_actions=["VIEW_AUDIT"],
+            blocking_reasons=["Sale is reversed/returned and archived from active operations."],
+            next_actions=["VIEW_DOCUMENTS", "VIEW_AUDIT", "OPEN_REVERSAL_CENTER"],
+        )
+
+    if invoice_status in inactive_invoice_statuses:
+        return _OperationalState(
+            operational_state="REVERSAL_IN_PROGRESS",
+            payment_state="N/A",
+            inventory_state="N/A",
+            delivery_state="HISTORY_ONLY" if bool(getattr(sale, "delivered_at", None)) else "INVOICE_PENDING",
+            collection_state="NOT_COLLECTIBLE",
+            blocking_reasons=["Invoice is void/reversed; direct-sale collection is blocked."],
+            next_actions=["OPEN_REVERSAL_CENTER", "VIEW_DOCUMENTS", "VIEW_AUDIT"],
         )
 
     if sale.status == DirectSaleStatus.DELIVERED or bool(getattr(sale, "delivered_at", None)):

@@ -8,17 +8,17 @@ from django.utils import timezone
 
 from subscriptions.models import (
     AuditLog,
-    BatchStatus,
     DeliveryStatus,
     EmiStatus,
-    LuckyId,
-    LuckyIdStatus,
     OperationalCancellation,
     PlanType,
     Subscription,
     SubscriptionStatus,
 )
 from subscriptions.services.audit_service import log_audit
+from subscriptions.services.lucky_id_release_service import (
+    release_lucky_id_for_cancelled_subscription,
+)
 
 MONEY_ZERO = Decimal("0.00")
 
@@ -424,21 +424,17 @@ def cancel_subscription(*, subscription_id: int, actor, reason: str, internal_no
     pending_emi_count = pending_emis.count()
     pending_emis.update(status=EmiStatus.CANCELLED)
 
-    release_lucky_id = False
-    if (
-        subscription.plan_type == PlanType.EMI
-        and subscription.lucky_id_id
-        and subscription.batch
-        and subscription.batch.status in {BatchStatus.DRAFT, BatchStatus.OPEN, BatchStatus.FULL}
-    ):
-        release_lucky_id = True
-        LuckyId.objects.filter(pk=subscription.lucky_id_id).update(status=LuckyIdStatus.AVAILABLE)
-
     Subscription.objects.filter(pk=subscription.pk).update(
         status=SubscriptionStatus.CANCELLED,
         cancellation_reason=reason,
         cancelled_at=timezone.now(),
         cancelled_by_id=getattr(actor, "pk", None),
+    )
+    subscription.refresh_from_db(fields=["id", "batch_id", "lucky_id_id", "status", "customer_id"])
+    lucky_release_result = release_lucky_id_for_cancelled_subscription(
+        subscription=subscription,
+        actor=actor,
+        reason=reason,
     )
 
     cancellation = _create_cancellation(
@@ -457,8 +453,9 @@ def cancel_subscription(*, subscription_id: int, actor, reason: str, internal_no
         metadata={
             "force_after_activation": force_after_activation,
             "pending_emi_count_cancelled": pending_emi_count,
-            "lucky_id_released": release_lucky_id,
-            "batch_status": getattr(subscription.batch, "status", None),
+            "lucky_id_released": bool(lucky_release_result.get("released")),
+            "lucky_id_release_blocked": bool(lucky_release_result.get("blocked")),
+            "batch_status": lucky_release_result.get("batch_status"),
         },
     )
     log_audit(
@@ -470,7 +467,8 @@ def cancel_subscription(*, subscription_id: int, actor, reason: str, internal_no
             "old_status": previous_status,
             "new_status": SubscriptionStatus.CANCELLED,
             "operational_cancellation_id": cancellation.id,
-            "lucky_id_released": release_lucky_id,
+            "lucky_id_released": bool(lucky_release_result.get("released")),
+            "lucky_id_release_blocked": bool(lucky_release_result.get("blocked")),
         },
     )
     return _result(

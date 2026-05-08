@@ -361,6 +361,8 @@ def get_direct_sale_return_eligibility(
     invoice_for_payload = posted_invoice or invoice
     sale_out_by_line = {line.id: get_sale_out_quantity(line) for line in sale.lines.all()}
     returnable_by_line = {line.id: get_returnable_quantity(line) for line in sale.lines.all()}
+    returned_quantity_total = sum(returned.values(), Decimal("0.000"))
+    returnable_quantity_total = sum(returnable_by_line.values(), Decimal("0.000"))
     destination_catalog = _return_destination_catalog()
     missing_location_types = []
     if not destination_catalog[ReturnStockDestination.INSPECTION]:
@@ -376,10 +378,12 @@ def get_direct_sale_return_eligibility(
         blocking_reasons.append("ALREADY_REVERSED")
     if sale.status == DirectSaleStatus.CANCELLED:
         allowed_actions = []
-    elif delivered:
-        allowed_actions.extend(["RETURN_PRODUCT", "EXCHANGE_PRODUCT"])
     elif not invoiced and sale.status in {DirectSaleStatus.DRAFT, DirectSaleStatus.CONFIRMED}:
         allowed_actions.append("PRE_INVOICE_CANCEL")
+    elif delivered:
+        # Delivered: return/exchange only when there's still returnable quantity.
+        if any(qty > Decimal("0.000") for qty in returnable_by_line.values()):
+            allowed_actions.extend(["RETURN_PRODUCT", "EXCHANGE_PRODUCT"])
     elif invoiced:
         allowed_actions.append("POST_INVOICE_CANCEL")
         if posted_receipt_count > 0:
@@ -412,34 +416,53 @@ def get_direct_sale_return_eligibility(
             status=CustomerRefundStatus.PAID,
         ).aggregate(total=Sum("amount")).get("total")
     )
+    refund_any_total = _money(
+        CustomerRefund.objects.filter(
+            customer_id=sale.customer_id,
+            direct_sale_return__direct_sale_id=sale.id,
+        ).exclude(status=CustomerRefundStatus.CANCELLED).aggregate(total=Sum("amount")).get("total")
+    )
     net_customer_value = max(Decimal("0.00"), sale_credit_balance - refund_paid)
-    customer_value_settled = net_customer_value <= Decimal("0.00")
+    # "Settled" for finalize means the decision has been recorded:
+    # - customer credit exists, OR
+    # - refund exists (any non-cancelled status), OR
+    # - nothing was collected (no active receipts) so there is no customer value to settle.
+    customer_credit_created_or_not_required = bool(
+        sale_credit_balance > Decimal("0.00") or refund_any_total > Decimal("0.00") or active_receipt_total <= Decimal("0.00")
+    )
+    customer_value_settled = customer_credit_created_or_not_required
     can_create_return = delivered and any(qty > Decimal("0.000") for qty in returnable_by_line.values()) and not stock_setup_required
     can_create_exchange = can_create_return
+    allowed_invoice_close_statuses = {
+        BillingDocumentStatus.VOID,
+        BillingDocumentStatus.CANCELLED,
+        "REVERSED",
+        "CREDITED_FULLY",
+    }
     can_finalize_reversal = (
         posted_receipt_count == 0
-        and getattr(invoice_for_payload, "status", "") in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED}
+        and getattr(invoice_for_payload, "status", "") in allowed_invoice_close_statuses
         and (not delivered or not has_returnable_line)
-        and customer_value_settled
+        and customer_credit_created_or_not_required
     )
     finalize_blocking_reasons: list[str] = []
     if posted_receipt_count > 0:
         finalize_blocking_reasons.append("Active posted receipts must be voided.")
-    if getattr(invoice_for_payload, "status", "") not in {
-        BillingDocumentStatus.VOID,
-        BillingDocumentStatus.CANCELLED,
-    }:
+    if getattr(invoice_for_payload, "status", "") not in allowed_invoice_close_statuses:
         finalize_blocking_reasons.append("Invoice must be reversed or voided before final archive.")
     if delivered and has_returnable_line:
         finalize_blocking_reasons.append("Delivered lines still have returnable quantity. Post SALE_RETURN_IN first.")
     if not customer_value_settled:
-        finalize_blocking_reasons.append("Customer value is unsettled. Complete credit/refund decision first.")
+        finalize_blocking_reasons.append("Customer value decision is missing. Create customer credit or refund decision first.")
+
+    if can_finalize_reversal:
+        allowed_actions.extend(["FINALIZE_REVERSAL", "ARCHIVE_SALE"])
     workflow_steps = [
         {"key": "RECEIPT_VOIDED", "label": "Receipt voided", "status": "DONE" if posted_receipt_count == 0 else "REQUIRED"},
         {
             "key": "INVOICE_REVERSED_OR_VOIDED",
             "label": "Invoice reversed/voided",
-            "status": "DONE" if getattr(invoice_for_payload, "status", "") in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED} else "REQUIRED",
+            "status": "DONE" if getattr(invoice_for_payload, "status", "") in allowed_invoice_close_statuses else "REQUIRED",
         },
         {
             "key": "PRODUCT_RETURNED_TO_STOCK",
@@ -578,6 +601,9 @@ def get_direct_sale_return_eligibility(
         "active_receipt_total": str(active_receipt_total),
         "void_receipt_total": str(void_receipt_total),
         "outstanding_balance": str(outstanding_balance),
+        "returned_quantity": str(returned_quantity_total),
+        "returnable_quantity": str(returnable_quantity_total),
+        "posted_return_count": DirectSaleReturn.objects.filter(direct_sale_id=sale.id, status=DirectSaleReturnStatus.POSTED).count(),
         "replacement_stock_available": replacement_stock_available,
         "stock_blocking_reasons": stock_blocking_reasons,
         "allowed_actions": allowed_actions,
@@ -594,6 +620,7 @@ def get_direct_sale_return_eligibility(
         "missing_location_types": missing_location_types,
         "can_finalize_reversal": can_finalize_reversal,
         "finalize_blocking_reasons": finalize_blocking_reasons,
+        "customer_credit_created_or_not_required": customer_credit_created_or_not_required,
         "is_operationally_active": is_operationally_active,
         "is_collectible": is_collectible,
         "is_dashboard_visible": is_dashboard_visible,
@@ -610,13 +637,13 @@ def cancel_direct_sale_before_invoice(*, direct_sale_id: int, reason: str, perfo
     if posted_invoice_exists:
         raise ValueError("Direct sale cannot be cancelled after posted invoice. Use return/credit flow.")
 
-    if sale.status == DirectSaleStatus.CANCELLED:
+    if sale.status in {DirectSaleStatus.CANCELLED, DirectSaleStatus.CANCELLED_PRE_INVOICE}:
         return sale, False
 
     if sale.receipts.filter(status=BillingDocumentStatus.POSTED).exists():
         raise ValueError("Posted receipt exists. Use customer credit/refund flow; silent cancellation is blocked.")
 
-    sale.status = DirectSaleStatus.CANCELLED
+    sale.status = DirectSaleStatus.CANCELLED_PRE_INVOICE
     sale.notes = f"{(sale.notes or '').strip()}\nCancellation reason: {reason}".strip()
     sale.save(update_fields=["status", "notes", "updated_at"])
 
@@ -633,12 +660,20 @@ def cancel_direct_sale_before_invoice(*, direct_sale_id: int, reason: str, perfo
 def open_direct_sale_cancellation_case(*, direct_sale_id: int, reason: str, performed_by, stock_location_id: int | None = None):
     reason = _require_reason(reason)
     sale = DirectSale.objects.select_for_update(of=("self",)).prefetch_related("billing_invoices", "lines").get(pk=direct_sale_id)
+    latest_invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
     posted_invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
+    latest_invoice_status = (getattr(latest_invoice, "status", "") or "").strip().upper()
     delivered = bool(sale.delivered_at) or sale.status == DirectSaleStatus.DELIVERED
-    if posted_invoice is None:
+    if posted_invoice is None and (latest_invoice is None or latest_invoice_status in {"DRAFT", "APPROVED"}) and sale.status in {
+        DirectSaleStatus.DRAFT,
+        DirectSaleStatus.CONFIRMED,
+    }:
         sale, updated = cancel_direct_sale_before_invoice(direct_sale_id=direct_sale_id, reason=reason, performed_by=performed_by)
         return {"workflow": "PRE_INVOICE_CANCEL", "updated": updated, "direct_sale_id": sale.id, "status": sale.status}
     if delivered:
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=direct_sale_id)
+        if bool(eligibility.get("can_finalize_reversal")):
+            raise ValueError("Use finalize reversal/archive workflow for delivered returned sale.")
         return {
             "workflow": "RETURN_OR_EXCHANGE_REQUIRED",
             "updated": False,
@@ -678,6 +713,69 @@ def open_direct_sale_cancellation_case(*, direct_sale_id: int, reason: str, perf
         "return_no": ds_return.return_no,
         "status": ds_return.status,
     }
+
+
+@transaction.atomic
+def finalize_direct_sale_reversal(*, direct_sale_id: int, reason: str, confirm: bool, performed_by) -> dict:
+    """
+    Finalize the reversal lifecycle for a direct sale once:
+    - no active receipts exist,
+    - invoice is void/cancelled,
+    - returnable quantity is 0 (if delivered),
+    - customer credit/refund decision is recorded.
+
+    This is operational finalization only: it does NOT post stock movements, bills, payments, or accounting journals.
+    """
+    reason = _require_reason(reason)
+    if not bool(confirm):
+        raise ValueError("confirm=true is required to finalize reversal.")
+
+    eligibility = get_direct_sale_return_eligibility(direct_sale_id=direct_sale_id)
+    if not bool(eligibility.get("can_finalize_reversal")):
+        blockers = eligibility.get("finalize_blocking_reasons") or []
+        raise ValueError("Finalize is blocked. " + (" | ".join(blockers) if blockers else ""))
+
+    sale = DirectSale.objects.select_for_update(of=("self",)).get(pk=direct_sale_id)
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+    }:
+        return {"updated": False, "direct_sale_id": sale.id, "status": sale.status}
+
+    delivered = bool(getattr(sale, "delivered_at", None)) or sale.status == DirectSaleStatus.DELIVERED
+    has_posted_return = sale.sale_returns.filter(status=DirectSaleReturnStatus.POSTED).exists()
+    if delivered and has_posted_return:
+        next_status = DirectSaleStatus.RETURNED
+    elif delivered:
+        next_status = DirectSaleStatus.CANCELLED_AFTER_DELIVERY
+    else:
+        next_status = DirectSaleStatus.REVERSED_POST_INVOICE
+
+    sale.status = next_status
+    sale.notes = f"{(sale.notes or '').strip()}\nFinalized reversal/archive reason: {reason}".strip()
+    sale.save(update_fields=["status", "notes", "updated_at"])
+    try:
+        from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+
+        sale.refresh_from_db()
+        sync_direct_sale_delivery_case(sale=sale, actor=performed_by)
+    except Exception:
+        pass
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=sale,
+        performed_by=performed_by,
+        metadata={
+            "event": "DIRECT_SALE_REVERSAL_FINALIZED",
+            "direct_sale_id": sale.id,
+            "reason": reason,
+            "status_after": sale.status,
+        },
+    )
+    return {"updated": True, "direct_sale_id": sale.id, "status": sale.status}
 
 
 @transaction.atomic

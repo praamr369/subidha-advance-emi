@@ -66,6 +66,12 @@ class ReversalCenterApiTests(APITestCase):
         response = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/", {"reason": ""}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_cancel_invalid_direct_sale_id_returns_field_error(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post("/api/v1/admin/billing/direct-sales/0/cancel/", {"reason": "x"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("direct_sale_id", response.data)
+
     def test_delivered_direct_sale_eligibility_allows_return_and_exchange_without_pre_invoice_cancel(self):
         sale = self._create_sale()
         invoice = sale.billing_invoices.first()
@@ -219,3 +225,92 @@ class ReversalCenterApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+
+    def test_delivered_returned_sale_rejects_cancel_and_prefers_finalize(self):
+        sale = self._create_sale()
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+
+        self.client.force_authenticate(user=self.admin)
+        # Cancel invoice (and void any posted receipts if present) to allow return workflow
+        receipt = invoice.receipts.first()
+        if receipt is not None:
+            self.client.post(
+                f"/api/v1/admin/billing/receipts/{receipt.id}/void/",
+                {"reason": "Void"},
+                format="json",
+            )
+        self.client.post(f"/api/v1/billing/invoices/{invoice.id}/cancel/", {"reason": "Cancel invoice", "confirm": True}, format="json")
+
+        ret = create_direct_sale_return(
+            direct_sale_id=sale.id,
+            reason="Full return",
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        ret.status = "APPROVED"
+        ret.save(update_fields=["status", "updated_at"])
+        post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+
+        cancel = self.client.post(f"/api/v1/admin/billing/direct-sales/{sale.id}/cancel/", {"reason": "Try cancel"}, format="json")
+        self.assertEqual(cancel.status_code, status.HTTP_400_BAD_REQUEST, cancel.data)
+        self.assertIn("finalize", str(cancel.data).lower())
+
+    def test_finalize_reversal_archives_sale_and_blocks_collection(self):
+        sale = self._create_sale()
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+
+        self.client.force_authenticate(user=self.admin)
+        receipt = invoice.receipts.first()
+        if receipt is not None:
+            void_response = self.client.post(
+                f"/api/v1/admin/billing/receipts/{receipt.id}/void/",
+                {"reason": "Void receipt for full reversal finalize"},
+                format="json",
+            )
+            self.assertEqual(void_response.status_code, status.HTTP_200_OK, void_response.data)
+
+        cancel_invoice = self.client.post(
+            f"/api/v1/billing/invoices/{invoice.id}/cancel/",
+            {"reason": "Void invoice for full reversal finalize", "confirm": True},
+            format="json",
+        )
+        self.assertEqual(cancel_invoice.status_code, status.HTTP_200_OK, cancel_invoice.data)
+
+        ret = create_direct_sale_return(
+            direct_sale_id=sale.id,
+            reason="Full delivered return",
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        ret.status = "APPROVED"
+        ret.save(update_fields=["status", "updated_at"])
+        post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale.id}/finalize-reversal/",
+            {"reason": "Finalize delivered return archive", "confirm": True},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+
+        sale.refresh_from_db()
+        self.assertIn(sale.status, {"RETURNED", "CANCELLED_AFTER_DELIVERY", "REVERSED_POST_INVOICE"})
+
+        self.client.force_authenticate(user=self.cashier)
+        collect = self.client.post(
+            "/api/v1/cashier/collect-direct-sale/",
+            {"direct_sale_id": sale.id, "amount": "100.00", "finance_account_id": self.cash_account.id},
+            format="json",
+        )
+        self.assertEqual(collect.status_code, status.HTTP_400_BAD_REQUEST, collect.data)
+        self.assertIn("not collectible", str(collect.data).lower())

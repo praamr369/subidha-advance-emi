@@ -43,6 +43,10 @@ export type DirectSaleReturnEligibility = {
   direct_sale_received_total?: string;
   direct_sale_balance_total?: string;
   outstanding_balance: string;
+  returned_quantity?: string;
+  returnable_quantity?: string;
+  posted_return_count?: number;
+  customer_credit_created_or_not_required?: boolean;
   already_returned_quantities?: Record<string, string>;
   returnable_quantities?: Record<string, string>;
   original_sale_out_posted?: boolean;
@@ -138,6 +142,16 @@ export async function cancelAdminDirectSale(directSaleId: number, reason: string
   return apiFetch(`/admin/billing/direct-sales/${directSaleId}/cancel/`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export async function finalizeAdminDirectSaleReversal(
+  directSaleId: number,
+  payload: { reason: string; confirm: boolean }
+): Promise<{ result: { updated: boolean; direct_sale_id: number; status: string }; eligibility: DirectSaleReturnEligibility }> {
+  return apiFetch(`/admin/billing/direct-sales/${directSaleId}/finalize-reversal/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

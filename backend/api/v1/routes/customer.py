@@ -47,9 +47,16 @@ from api.v1.views.customer_support_tickets import (
     CustomerSupportTicketListCreateView,
     CustomerSupportTicketReopenView,
 )
+from api.v1.views.notifications import (
+    CustomerNotificationListView,
+    CustomerNotificationSummaryView,
+)
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
+    path("dashboard/summary/", CustomerDashboard.as_view()),
+    path("notifications/", CustomerNotificationListView.as_view()),
+    path("notifications/summary/", CustomerNotificationSummaryView.as_view()),
     path("profile/", CustomerProfileView.as_view()),
     path("profile/photo/", CustomerPhotoUploadView.as_view()),
     path("kyc/documents/", CustomerKycDocumentListView.as_view()),

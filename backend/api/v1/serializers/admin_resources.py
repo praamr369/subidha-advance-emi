@@ -53,6 +53,7 @@ from subscriptions.services.delivery_service import (
 from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
+from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 
 
 def q2(value: Decimal) -> Decimal:
@@ -763,6 +764,9 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     subscription_id = serializers.SerializerMethodField()
     subscription_number = serializers.SerializerMethodField()
+    assignable = serializers.SerializerMethodField()
+    assignment_state = serializers.SerializerMethodField()
+    assignment_note = serializers.SerializerMethodField()
 
     class Meta:
         model = LuckyId
@@ -775,6 +779,9 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             "customer_name",
             "subscription_id",
             "subscription_number",
+            "assignable",
+            "assignment_state",
+            "assignment_note",
             "created_at",
         ]
         read_only_fields = [
@@ -783,6 +790,9 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             "customer_name",
             "subscription_id",
             "subscription_number",
+            "assignable",
+            "assignment_state",
+            "assignment_note",
             "created_at",
         ]
 
@@ -822,6 +832,47 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             or getattr(subscription, "subscription_code", None)
             or f"SUB-{subscription.id}"
         )
+
+    def _has_release_audit(self, obj) -> bool:
+        cache = getattr(self, "_release_audit_cache", None)
+        if cache is None:
+            cache = {}
+            self._release_audit_cache = cache
+        if obj.pk not in cache:
+            cache[obj.pk] = AuditLog.objects.filter(
+                model_name="Subscription",
+                metadata__event="LUCKY_ID_RELEASED_FROM_CANCELLED_SUBSCRIPTION",
+                metadata__lucky_id=obj.pk,
+            ).exists()
+        return cache[obj.pk]
+
+    def get_assignable(self, obj):
+        return (
+            obj.status == LuckyIdStatus.AVAILABLE
+            and getattr(obj.batch, "status", None) in PRE_LOCK_BATCH_STATUSES
+        )
+
+    def get_assignment_state(self, obj):
+        if obj.status == LuckyIdStatus.WON:
+            return "WON"
+        if self.get_assignable(obj):
+            if self._has_release_audit(obj):
+                return "RELEASED"
+            return "AVAILABLE"
+        linked = self._linked_subscription(obj)
+        if linked and linked.status == SubscriptionStatus.CANCELLED:
+            return "FROZEN_CANCELLED_HOLDER"
+        if obj.status == LuckyIdStatus.ASSIGNED:
+            return "ASSIGNED"
+        return "FROZEN"
+
+    def get_assignment_note(self, obj):
+        state = self.get_assignment_state(obj)
+        if state == "RELEASED":
+            return "Released from cancelled contract — available for reassignment"
+        if state in {"FROZEN_CANCELLED_HOLDER", "FROZEN"}:
+            return "Frozen after lock — not assignable"
+        return ""
 
     def validate(self, attrs):
         instance = self.instance
@@ -1692,6 +1743,10 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"lucky_id": "Selected Lucky ID is already assigned."}
                 )
+            if lucky_id_changed and batch.status not in PRE_LOCK_BATCH_STATUSES:
+                raise serializers.ValidationError(
+                    {"lucky_id": "Selected Lucky ID is frozen for assignment in this batch status."}
+                )
 
         if plan_type in {PlanType.RENT, PlanType.LEASE}:
             if batch is not None or lucky_id is not None:
@@ -1748,6 +1803,10 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             if locked_lucky.status != LuckyIdStatus.AVAILABLE:
                 raise serializers.ValidationError(
                     {"lucky_id": "Selected Lucky ID is no longer available."}
+                )
+            if batch and batch.status not in PRE_LOCK_BATCH_STATUSES:
+                raise serializers.ValidationError(
+                    {"lucky_id": "Selected Lucky ID is no longer assignable for this batch status."}
                 )
             validated_data["lucky_id"] = locked_lucky
 

@@ -25,8 +25,16 @@ def _as_decimal(value: object) -> Decimal:
 def _validate_delivery_gate(*, sale: DirectSale):
     if not sale.delivery_required:
         raise ValueError("Delivery is disabled for this direct sale.")
-    if sale.status == DirectSaleStatus.CANCELLED:
-        raise ValueError("Cancelled direct sales cannot be delivered.")
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
+        raise ValueError("This direct sale is reversed/archived and cannot be delivered.")
     invoice = _latest_invoice(sale)
     if invoice is None or invoice.status != BillingDocumentStatus.POSTED:
         raise ValueError("Cannot proceed because invoice is not posted.")

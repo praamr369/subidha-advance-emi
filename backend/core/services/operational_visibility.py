@@ -20,9 +20,11 @@ COLLECTIBLE_SUBSCRIPTION_STATUSES = {
 INACTIVE_DIRECT_SALE_STATUSES = {
     "CANCELLED",
     "CANCELLED_PRE_INVOICE",
+    "CANCELLED_AFTER_DELIVERY",
     "REVERSED_POST_INVOICE",
     "RETURNED",
     "EXCHANGED_CLOSED",
+    "ARCHIVED",
 }
 
 INACTIVE_INVOICE_STATUSES = {
@@ -72,4 +74,3 @@ def filter_active_direct_sales(queryset: QuerySet, *, prefix: str = "") -> Query
 
 def filter_active_invoices(queryset: QuerySet, *, prefix: str = "") -> QuerySet:
     return queryset.filter(invoice_active_q(prefix))
-

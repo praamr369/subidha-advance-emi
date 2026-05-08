@@ -304,6 +304,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                 internal_note=serializer.validated_data.get("internal_note", ""),
                 reversal_policy=serializer.validated_data.get("reversal_policy", "NONE"),
             )
+        except DirectSale.DoesNotExist as exc:
+            raise ValidationError({"direct_sale_id": ["Direct sale not found."]}) from exc
         except PermissionError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except ValueError as exc:

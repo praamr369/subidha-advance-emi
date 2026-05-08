@@ -308,6 +308,17 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     active_receipt_total = serializers.SerializerMethodField()
     void_receipt_total = serializers.SerializerMethodField()
     receipt_status = serializers.SerializerMethodField()
+    is_operationally_active = serializers.SerializerMethodField()
+    is_collectible = serializers.SerializerMethodField()
+    is_outstanding_visible = serializers.SerializerMethodField()
+    is_dashboard_visible = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    active_outstanding_amount = serializers.SerializerMethodField()
+    historical_amount = serializers.SerializerMethodField()
+    is_actionable = serializers.SerializerMethodField()
+    is_history_only = serializers.SerializerMethodField()
+    blocking_reason = serializers.SerializerMethodField()
+    action_label = serializers.SerializerMethodField()
     customer_mode = serializers.ChoiceField(
         choices=[("EXISTING", "Existing Customer"), ("NEW", "New Customer"), ("WALK_IN", "Walk-in Snapshot")],
         required=False,
@@ -403,6 +414,17 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "active_receipt_total",
             "void_receipt_total",
             "receipt_status",
+            "is_operationally_active",
+            "is_collectible",
+            "is_outstanding_visible",
+            "is_dashboard_visible",
+            "is_archived",
+            "active_outstanding_amount",
+            "historical_amount",
+            "is_actionable",
+            "is_history_only",
+            "blocking_reason",
+            "action_label",
             "customer_mode",
             "walkin_create_customer_profile",
             "new_customer_name",
@@ -637,6 +659,75 @@ class DirectSaleSerializer(serializers.ModelSerializer):
     def get_receipt_status(self, obj):
         active_total, void_total = _receipt_totals(obj.receipts.all())
         return _receipt_status_label(active_total=active_total, void_total=void_total)
+
+    def _latest_invoice_status(self, obj) -> str:
+        inv = self._latest_invoice(obj)
+        return (getattr(inv, "status", "") or "").strip().upper()
+
+    def get_is_operationally_active(self, obj) -> bool:
+        return obj.status not in {
+            "CANCELLED",
+            "CANCELLED_PRE_INVOICE",
+            "CANCELLED_AFTER_DELIVERY",
+            "REVERSED_POST_INVOICE",
+            "RETURNED",
+            "ARCHIVED",
+            "EXCHANGED_CLOSED",
+        }
+
+    def get_is_archived(self, obj) -> bool:
+        return not self.get_is_operationally_active(obj)
+
+    def get_is_collectible(self, obj) -> bool:
+        if not self.get_is_operationally_active(obj):
+            return False
+        if (obj.status or "").strip().upper() != "INVOICED":
+            return False
+        return self._latest_invoice_status(obj) == "POSTED"
+
+    def get_active_outstanding_amount(self, obj) -> str:
+        if not self.get_is_collectible(obj):
+            return "0.00"
+        return f"{Decimal(str(obj.balance_total or '0.00')).quantize(Decimal('0.01')):.2f}"
+
+    def get_historical_amount(self, obj) -> str:
+        return f"{Decimal(str(obj.grand_total or '0.00')).quantize(Decimal('0.01')):.2f}"
+
+    def get_is_outstanding_visible(self, obj) -> bool:
+        if not self.get_is_collectible(obj):
+            return False
+        try:
+            return Decimal(str(obj.balance_total or "0.00")) > Decimal("0.00")
+        except Exception:
+            return False
+
+    def get_is_dashboard_visible(self, obj) -> bool:
+        return self.get_is_outstanding_visible(obj) or self.get_is_collectible(obj)
+
+    def get_is_dashboard_visible(self, obj) -> bool:
+        return self.get_is_operationally_active(obj) and self._latest_invoice_status(obj) == "POSTED"
+
+    def get_is_actionable(self, obj) -> bool:
+        return self.get_is_collectible(obj) and self.get_is_outstanding_visible(obj)
+
+    def get_is_history_only(self, obj) -> bool:
+        return not self.get_is_operationally_active(obj)
+
+    def get_blocking_reason(self, obj) -> str | None:
+        if self.get_is_collectible(obj):
+            return None
+        if not self.get_is_operationally_active(obj):
+            return "This direct sale has been reversed/returned and archived from active collection."
+        if self._latest_invoice_status(obj) != "POSTED":
+            return "Direct-sale collection is available only after the retail invoice is posted."
+        return "This direct sale is not collectible."
+
+    def get_action_label(self, obj) -> str:
+        if self.get_is_actionable(obj):
+            return "Collect Direct-Sale Balance"
+        if not self.get_is_operationally_active(obj):
+            return "View Documents"
+        return "Open Details"
 
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):

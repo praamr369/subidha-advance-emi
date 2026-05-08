@@ -1114,6 +1114,28 @@ export default function AdminDeliveriesPage() {
                         >
                           {row.status}
                         </span>
+                        {row.source_reversed ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-800">
+                              Source reversed
+                            </span>
+                            {row.return_pickup_required ? (
+                              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                Return pickup required
+                              </span>
+                            ) : null}
+                            {row.return_pickup_completed ? (
+                              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                                Return completed
+                              </span>
+                            ) : null}
+                            {row.history_only ? (
+                              <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground">
+                                History only
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="mt-2 text-xs text-muted-foreground">
                           {row.record_kind === "DIRECT_SALE_CASE"
                             ? row.delivery_display || row.delivery_phase_label || row.payment_state || "—"
@@ -1165,8 +1187,13 @@ export default function AdminDeliveriesPage() {
                                   }`}
                                   className="text-primary underline-offset-4 hover:underline"
                                 >
-                                  Manage Delivery
+                                  {row.source_reversed ? "View Delivery (History)" : "Manage Delivery"}
                                 </Link>
+                              ) : null}
+                              {row.source_reversed ? (
+                                <div className="text-xs text-muted-foreground">
+                                  Original delivery is preserved for history. The source sale has been reversed.
+                                </div>
                               ) : null}
                               {row.billing_invoice_id ? (
                                 <Link

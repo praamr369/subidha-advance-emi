@@ -235,7 +235,7 @@ test("partner commissions filters keep toolbar visible and narrow rows by status
 });
 
 test("partner notifications page loads", async ({ page }) => {
-  await page.route("**/api/v1/notifications/?*", async (route) => {
+  await page.route("**/api/v1/partner/notifications/?*", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -257,6 +257,17 @@ test("partner notifications page loads", async ({ page }) => {
             source_job_id: null,
           },
         ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/partner/notifications/summary/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        unread_count: 1,
+        high_priority_count: 0,
+        latest: [],
       }),
     });
   });

@@ -2,7 +2,10 @@
 
 import NotificationCenterPanel from "@/components/notifications/NotificationCenterPanel";
 import { ROUTES } from "@/lib/routes";
-import { listNotifications, markNotificationRead } from "@/services/notifications";
+import {
+  listCustomerNotifications,
+  markNotificationRead,
+} from "@/services/notifications";
 
 export default function CustomerNotificationsPage() {
   return (
@@ -15,7 +18,7 @@ export default function CustomerNotificationsPage() {
           { label: "Customer", href: ROUTES.customer.dashboard },
           { label: "Notifications" },
         ]}
-        list={listNotifications}
+        list={listCustomerNotifications}
         markRead={markNotificationRead}
       />
     </div>

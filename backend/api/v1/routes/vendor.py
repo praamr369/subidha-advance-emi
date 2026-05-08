@@ -12,9 +12,16 @@ from api.v1.views.vendor_ops import (
     VendorSelfQuoteRequestsView,
     VendorSelfQuoteSubmitView,
 )
+from api.v1.views.notifications import (
+    VendorNotificationListView,
+    VendorNotificationSummaryView,
+)
 
 urlpatterns = [
     path("dashboard/", VendorSelfDashboardView.as_view()),
+    path("dashboard/summary/", VendorSelfDashboardView.as_view()),
+    path("notifications/", VendorNotificationListView.as_view()),
+    path("notifications/summary/", VendorNotificationSummaryView.as_view()),
     path("profile/", VendorSelfProfileView.as_view()),
     path("ledger/", VendorSelfLedgerView.as_view()),
     path("outstanding/", VendorSelfOutstandingView.as_view()),

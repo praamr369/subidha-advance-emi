@@ -538,7 +538,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           row.operational_state === "DELIVERED_COMPLETE" ||
           row.delivery_status === "DELIVERED" ||
           row.delivery_status === "COUNTER_SALE_COMPLETE";
-        const isReturnedOrCancelled = row.status === "CANCELLED";
+        const isReturnedOrCancelled =
+          Boolean((row as any).is_archived) ||
+          Boolean((row as any).is_history_only) ||
+          ["CANCELLED", "CANCELLED_PRE_INVOICE", "CANCELLED_AFTER_DELIVERY", "REVERSED_POST_INVOICE", "RETURNED", "ARCHIVED", "EXCHANGED_CLOSED"].includes(
+            String(row.status || "").toUpperCase()
+          );
         const eligibilityButton = (
           <button
             type="button"
@@ -563,7 +568,25 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           </button>
         );
         if (isReturnedOrCancelled) {
-          return <div className="flex flex-wrap gap-2">{eligibilityButton}</div>;
+          return (
+            <div className="flex flex-wrap gap-2">
+              {eligibilityButton}
+              {row.billing_invoice_id ? (
+                <Link
+                  href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
+                >
+                  View Documents
+                </Link>
+              ) : null}
+              <Link
+                href={`/admin/billing/reversals?direct_sale=${row.id}`}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
+              >
+                View Reversal Case
+              </Link>
+            </div>
+          );
         }
         if (isDelivered) {
           return (

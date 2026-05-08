@@ -8,7 +8,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import type { NotificationListResponse, SystemNotification } from "@/services/notifications";
 
-type Role = "admin" | "cashier" | "partner" | "customer";
+type Role = "admin" | "cashier" | "partner" | "customer" | "vendor";
 
 type Props = {
   role: Role;

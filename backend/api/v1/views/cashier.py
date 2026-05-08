@@ -15,6 +15,7 @@ from api.v1.serializers.finance_operations import (
     CashierPaymentCollectionSerializer,
 )
 from billing.models import DirectSale
+from core.services.operational_visibility import invoice_active_q
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from branch_control.services.branch_service import scope_queryset_to_user_branches
 from subscriptions.services.customer_advance_service import CustomerAdvanceService
@@ -52,6 +53,9 @@ def _outstanding_direct_sale_queryset(*, user):
         )
         .prefetch_related("billing_invoices")
         .filter(status="INVOICED", balance_total__gt=Decimal("0.00"))
+        .filter(invoice_active_q(prefix="billing_invoices__"))
+        .filter(billing_invoices__status="POSTED")
+        .distinct()
         .order_by("sale_date", "id")
     )
     return scope_queryset_to_user_branches(

@@ -275,6 +275,67 @@ test("direct sale query hides raw id fields and allows return when eligible", as
   });
   await page.goto("/admin/billing/reversals?direct_sale=1");
   await expect(page.getByPlaceholder("Direct Sale ID")).toHaveCount(1); // only eligibility viewer field
+  await expect(page.getByText("Cancel Sale")).toBeVisible();
+  await expect(page.getByText("This sale is already invoiced/delivered/returned")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create Return" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Finalize Full Cancellation / Archive Sale" })).toBeDisabled();
+});
+
+test("finalize reversal uses route direct_sale id and calls finalize endpoint", async ({ page }) => {
+  await page.route("**/api/v1/admin/billing/returns/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, results: [] }) });
+  });
+  await page.route("**/api/v1/admin/billing/direct-sales/1/return-eligibility/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        direct_sale_id: 1,
+        sale_no: "SALE-2026-27-00001",
+        customer_name: "Amrita Roy",
+        sale_status: "DELIVERED",
+        invoice_status: "VOID",
+        delivery_status: "DELIVERED",
+        active_receipt_total: "0.00",
+        void_receipt_total: "21000.00",
+        outstanding_balance: "0.00",
+        receipt_summary: { posted_receipt_count: 0, posted_receipt_total: "0.00", received_total: "0.00", balance_total: "0.00", active_receipt_count: 0, void_receipt_count: 1 },
+        allowed_actions: ["FINALIZE_REVERSAL", "ARCHIVE_SALE"],
+        can_create_return: false,
+        can_create_exchange: false,
+        can_finalize_reversal: true,
+        finalize_blocking_reasons: [],
+        returnable_quantity: "0.000",
+        returned_quantity: "1.000",
+        posted_return_count: 1,
+        workflow_steps: [
+          { key: "RECEIPT_VOIDED", label: "Receipt voided", status: "DONE" },
+          { key: "INVOICE_REVERSED_OR_VOIDED", label: "Invoice reversed/voided", status: "DONE" },
+          { key: "PRODUCT_RETURNED_TO_STOCK", label: "Product returned to stock", status: "DONE" },
+          { key: "CUSTOMER_VALUE_SETTLED", label: "Customer credit/refund decision", status: "DONE" },
+          { key: "FINALIZE_ARCHIVE", label: "Finalize/archive sale", status: "DONE" },
+        ],
+        sold_lines: [],
+        return_lines: [],
+        stock_destinations: [{ id: 5, name: "Inspection", code: "INSP", type: "INSPECTION", is_sellable: false, requires_condition_confirmation: false }],
+      }),
+    });
+  });
+
+  let finalizePayload: any = null;
+  await page.route("**/api/v1/admin/billing/direct-sales/1/finalize-reversal/", async (route) => {
+    finalizePayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ result: { updated: true, direct_sale_id: 1, status: "CANCELLED" }, eligibility: { direct_sale_id: 1, allowed_actions: [] } }),
+    });
+  });
+
+  await page.goto("/admin/billing/reversals?direct_sale=1");
+  await expect(page.getByRole("button", { name: "Finalize Full Cancellation / Archive Sale" })).toBeEnabled();
+  await page.getByRole("button", { name: "Finalize Full Cancellation / Archive Sale" }).click();
+  await expect.poll(() => finalizePayload).not.toBeNull();
+  expect(finalizePayload.confirm).toBeTruthy();
+  expect(typeof finalizePayload.reason).toBe("string");
 });

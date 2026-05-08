@@ -23,7 +23,11 @@ export default function SidebarHoverCard({
   primaryAction,
 }: SidebarHoverCardProps) {
   return (
-    <div className="absolute left-full top-0 z-50 ml-3 w-72 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-3 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]">
+    <div
+      role="dialog"
+      aria-label={`${title} quick actions`}
+      className="absolute left-full top-0 z-50 ml-3 w-72 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-3 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
+    >
       <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
           {title}

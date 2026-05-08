@@ -1268,7 +1268,17 @@ class Subscription(TimeStampedModel):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    Q(plan_type=PlanType.EMI, batch__isnull=False, lucky_id__isnull=False)
+                    Q(
+                        plan_type=PlanType.EMI,
+                        status=SubscriptionStatus.CANCELLED,
+                        batch__isnull=False,
+                    )
+                    | Q(
+                        plan_type=PlanType.EMI,
+                        batch__isnull=False,
+                        lucky_id__isnull=False,
+                    )
+                    & ~Q(status=SubscriptionStatus.CANCELLED)
                     | ~Q(plan_type=PlanType.EMI)
                 ),
                 name="chk_batch_and_lucky_required_for_emi",
@@ -1314,7 +1324,9 @@ class Subscription(TimeStampedModel):
                 raise ValidationError({"batch": "EMI subscription requires a batch."})
 
             if not self.lucky_id:
-                raise ValidationError({"lucky_id": "EMI subscription requires a lucky ID."})
+                if self.status != SubscriptionStatus.CANCELLED:
+                    raise ValidationError({"lucky_id": "EMI subscription requires a lucky ID."})
+                return
 
             if self.lucky_id.batch_id != self.batch_id:
                 raise ValidationError({"lucky_id": "Lucky ID must belong to the selected batch."})

@@ -145,7 +145,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
 
   PARTNER: [
     {
-      title: "Overview",
+      title: "Dashboard",
       icon: "dashboard",
       items: [
         {
@@ -156,57 +156,42 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Customers",
+      title: "My Customers",
       icon: "customers",
       items: [
         {
-          label: "Customers",
+          label: "My Customers",
           href: ROUTES.partner.customers,
           icon: "customers",
         },
       ],
     },
     {
-      title: "Subscriptions",
-      icon: "subscriptions",
+      title: "Leads",
+      icon: "leads",
       items: [
         {
-          label: "Subscriptions",
-          href: ROUTES.partner.subscriptions,
-          icon: "subscriptions",
-        },
-      ],
-    },
-    {
-      title: "Collections",
-      icon: "collections",
-      items: [
-        {
-          label: "Collections",
-          href: ROUTES.partner.collections,
-          icon: "collections",
-        },
-        {
-          label: "Payments",
-          href: ROUTES.partner.payments,
-          icon: "payments",
-        },
-        {
-          label: "Collection Requests",
-          href: ROUTES.partner.collectionRequests,
-          icon: "collections",
+          label: "Leads",
+          href: ROUTES.partner.subscriptionRequests,
+          icon: "leads",
         },
       ],
     },
     {
       title: "Commissions",
-      icon: "commissions",
+      icon: "collections",
       items: [
         {
           label: "Commissions",
           href: ROUTES.partner.commissions,
           icon: "commissions",
         },
+      ],
+    },
+    {
+      title: "Payouts",
+      icon: "payoutBatches",
+      items: [
         {
           label: "Payouts",
           href: ROUTES.partner.payouts,
@@ -215,19 +200,20 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Support",
-      icon: "support",
+      title: "Statements",
+      icon: "reports",
       items: [
         {
-          label: "Subscription Requests",
-          href: ROUTES.partner.subscriptionRequests,
-          icon: "support",
-        },
-        {
-          label: "Reports",
+          label: "Statements",
           href: ROUTES.partner.reports,
           icon: "reports",
         },
+      ],
+    },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
         {
           label: "Notifications",
           href: ROUTES.partner.notifications,
@@ -250,40 +236,61 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "My Plan",
+      title: "My Contracts",
       icon: "subscriptions",
       items: [
         {
-          label: "Subscriptions",
+          label: "My Contracts",
           href: ROUTES.customer.subscriptions,
           icon: "subscriptions",
         },
       ],
     },
     {
-      title: "Payments",
+      title: "Payments & Receipts",
       icon: "payments",
       items: [
         {
-          label: "Payments",
+          label: "Payments & Receipts",
           href: ROUTES.customer.payments,
           icon: "payments",
-        },
-        {
-          label: "Direct Sales",
-          href: ROUTES.customer.directSales,
-          icon: "billing",
         },
       ],
     },
     {
-      title: "Winner Status",
-      icon: "luckyDraws",
+      title: "Delivery",
+      icon: "deliveries",
       items: [
         {
-          label: "Plan Requests",
-          href: ROUTES.customer.subscriptionRequests,
+          label: "Delivery",
+          href: ROUTES.customer.deliveries,
+          icon: "deliveries",
+        },
+      ],
+    },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
+        {
+          label: "Support",
+          href: ROUTES.customer.support,
+          icon: "support",
+        },
+        {
+          label: "Returns / Service",
+          href: ROUTES.customer.support,
+          icon: "serviceDesk",
+        },
+        {
+          label: "Lucky Draw",
+          href: ROUTES.customer.subscriptions,
           icon: "luckyDraws",
+        },
+        {
+          label: "Notifications",
+          href: ROUTES.customer.notifications,
+          icon: "reminders",
         },
       ],
     },
@@ -295,27 +302,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           label: "Profile",
           href: ROUTES.customer.profile,
           icon: "profile",
-        },
-      ],
-    },
-    {
-      title: "Support",
-      icon: "support",
-      items: [
-        {
-          label: "Deliveries",
-          href: ROUTES.customer.deliveries,
-          icon: "deliveries",
-        },
-        {
-          label: "Support",
-          href: ROUTES.customer.support,
-          icon: "support",
-        },
-        {
-          label: "Notifications",
-          href: ROUTES.customer.notifications,
-          icon: "reminders",
         },
       ],
     },
@@ -366,6 +352,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       title: "Vendor Portal",
       items: [
         { label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." },
+        { label: "Notifications", href: "/vendor/notifications", icon: "reminders", description: "Role-safe vendor alerts." },
         { label: "Profile", href: "/vendor/profile", icon: "crm", description: "Vendor profile and service areas." },
         { label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." },
         { label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." },

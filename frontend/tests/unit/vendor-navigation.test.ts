@@ -14,9 +14,11 @@ test("admin sidebar includes Vendors & Procurement group", () => {
   assert.ok(registrySource.includes("Vendor Ledger"));
   assert.ok(registrySource.includes("ROUTES.admin.vendorsProducts"));
   assert.ok(registrySource.includes("Online Enquiries"));
+});
 
 test("vendor role navigation exists", () => {
   assert.ok(navigationSource.includes("VENDOR: ["));
   assert.ok(navigationSource.includes('href: "/vendor/quotes"'));
   assert.ok(navigationSource.includes('href: "/vendor/ledger"'));
+  assert.ok(navigationSource.includes('href: "/vendor/notifications"'));
 });

@@ -9,6 +9,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
+import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import {
   listOutstandings,
@@ -109,7 +110,7 @@ export default function AdminOutstandingsPage() {
       {
         key: "reference",
         title: "Reference",
-        render: (row) => row.contract_reference || row.document_no || `#${row.source_id}`,
+        render: (row) => row.contract_reference || row.document_no || "Reference unavailable",
       },
       { key: "product_summary", title: "Product" },
       {
@@ -132,7 +133,11 @@ export default function AdminOutstandingsPage() {
         title: "Age",
         render: (row) => `${row.overdue_days}d`,
       },
-      { key: "status", title: "Status" },
+      {
+        key: "status",
+        title: "Status",
+        render: (row) => <StatusBadge status={row.status} hideIcon />,
+      },
       {
         key: "actions",
         title: "Actions",
