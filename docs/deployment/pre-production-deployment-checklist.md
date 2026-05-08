@@ -52,7 +52,9 @@ bash scripts/check-local-env.sh
 source ../.venv/bin/activate && python3 manage.py check
 source ../.venv/bin/activate && python3 manage.py makemigrations --check --dry-run
 source ../.venv/bin/activate && python3 manage.py showmigrations
+source ../.venv/bin/activate && python3 manage.py migrate billing 0012
 source ../.venv/bin/activate && python3 manage.py test tests.api.test_reversal_control_blockers tests.billing.test_reversal_service tests.api.test_reversal_center_api
+source ../.venv/bin/activate && python3 manage.py test tests.api.test_permissions tests.api.test_admin_outstandings tests.api.test_public_stats tests.api.test_direct_sale_billing_workspace tests.api.test_partner tests.api.test_lucky_draw_public_trust tests.api.test_dashboard_navigation_badges
 
 # frontend
 cd ../frontend
@@ -89,3 +91,4 @@ npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_
 - Vendor smoke may skip locally when `frontend/tests/e2e/.auth/vendor.json` is missing.
 - Expected explicit skip message: `vendor auth state missing; run auth setup or provide vendor.json`.
 - `backend/playwright-smoke-meta.json` may appear during smoke runs; it is generated and git-ignored.
+- For local/dev validation, `billing 0012_alter_directsale_status` is expected applied before manual testing.

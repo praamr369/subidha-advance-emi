@@ -32,3 +32,6 @@
 - smoke setup remains responsible for deterministic seed + auth state generation
 - vendor auth-state missing is an explicit skip path, not a silent pass
 - no fake data added to production code paths
+- local/dev manual-testing gate now expects `billing 0012_alter_directsale_status` applied before running high-risk bundle.
+- broader high-risk backend validation command:
+  - `source ../.venv/bin/activate && python3 manage.py test tests.api.test_permissions tests.api.test_admin_outstandings tests.api.test_public_stats tests.api.test_direct_sale_billing_workspace tests.api.test_partner tests.api.test_lucky_draw_public_trust tests.api.test_dashboard_navigation_badges`

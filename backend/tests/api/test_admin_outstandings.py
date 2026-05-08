@@ -115,7 +115,7 @@ class AdminOutstandingsApiTests(APITestCase):
             financial_year="2026-2027",
             doc_series=self.doc_series,
             customer=self.customer,
-            status=DirectSaleStatus.CONFIRMED,
+            status=DirectSaleStatus.INVOICED,
             subtotal=Decimal("2500.00"),
             discount_total=Decimal("0.00"),
             taxable_total=Decimal("2500.00"),
@@ -165,6 +165,9 @@ class AdminOutstandingsApiTests(APITestCase):
             customer_name_snapshot=self.customer.name,
             customer_phone_snapshot=self.customer.phone,
         )
+        BillingInvoice.objects.filter(pk=self.linked_invoice.id).update(status="POSTED")
+        self.linked_invoice.refresh_from_db(fields=["status"])
+
         self.standalone_invoice = BillingInvoice.objects.create(
             document_no="INV-OUT-STD-001",
             invoice_date=self.today + timedelta(days=2),
