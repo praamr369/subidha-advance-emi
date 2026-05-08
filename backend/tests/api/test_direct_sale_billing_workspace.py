@@ -114,7 +114,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
     def test_billing_product_search_finds_by_name_code_and_sku(self):
         for query in ["Workspace Sofa", "WS-SOFA-001", "WS-SOFA-SKU-001"]:
             response = self.client.get(
-                "/api/v1/admin/billing/product-search/",
+                "/api/v1/admin/billing/products/search/",
                 {"q": query, "include_inventory": "true", "page_size": 10},
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
@@ -123,7 +123,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
 
     def test_billing_product_search_includes_inventory_fields(self):
         response = self.client.get(
-            "/api/v1/admin/billing/product-search/",
+            "/api/v1/admin/billing/products/search/",
             {"q": "WS-SOFA", "include_inventory": "true", "direct_sale_enabled": "true"},
         )
 
@@ -135,6 +135,15 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertTrue(row["stock_tracking_enabled"])
         self.assertTrue(row["delivery_stock_bridge_enabled"])
         self.assertTrue(row["inventory_ready"])
+
+    def test_billing_product_search_legacy_alias_kept_for_backward_compatibility(self):
+        response = self.client.get(
+            "/api/v1/admin/billing/product-search/",
+            {"q": "WS-SOFA", "include_inventory": "true"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        ids = {row["id"] for row in response.data["results"]}
+        self.assertIn(self.product.id, ids)
 
     def test_direct_sale_defaults_unit_price_and_discount_does_not_change_base_price(self):
         before_price = self.product.base_price
@@ -647,7 +656,13 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(finalize_first.data["direct_sale"]["status"], "INVOICED")
         self.assertIn(
             finalize_first.data["direct_sale"].get("operational_state"),
-            {"RECEIVABLE_READY", "PARTIAL_PAYMENT_HOLD", "PAID_STOCK_BLOCKED", "PAID_READY_FOR_DELIVERY"},
+            {
+                "RECEIVABLE_READY",
+                "PARTIAL_PAYMENT_HOLD",
+                "PAID_STOCK_BLOCKED",
+                "PAID_READY_FOR_DELIVERY",
+                "DELIVERED_COMPLETE",
+            },
         )
 
         finalize_second = self.client.post(

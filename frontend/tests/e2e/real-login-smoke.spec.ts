@@ -2,9 +2,6 @@ import { expect, test } from "@playwright/test";
 
 import { readSmokeMeta, type RealLoginRole } from "./helpers/smoke-meta";
 
-const meta = readSmokeMeta();
-const loginMeta = meta.real_login;
-
 function normalizePath(value: string): string {
   return value.endsWith("/") && value !== "/" ? value.slice(0, -1) : value;
 }
@@ -20,6 +17,7 @@ async function submitThroughForm(page, username: string, secret: string) {
 
 test.describe("real login smoke", () => {
   test("login page loads and failed submission shows a sane error", async ({ page }) => {
+    const loginMeta = readSmokeMeta().real_login;
     const adminUsername = loginMeta.roles.admin.username;
 
     await submitThroughForm(page, adminUsername, loginMeta.invalid_secret);
@@ -32,6 +30,7 @@ test.describe("real login smoke", () => {
 
   for (const role of ["admin", "cashier"] as RealLoginRole[]) {
     test(`${role} real form submission reaches the correct dashboard`, async ({ page }) => {
+      const loginMeta = readSmokeMeta().real_login;
       const roleInfo = loginMeta.roles[role];
       const expectedPath = normalizePath(roleInfo.dashboard_path);
 

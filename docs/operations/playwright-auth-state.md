@@ -16,6 +16,13 @@
   - `vendor auth state missing; run auth setup or provide vendor.json`
 
 ## Regeneration
+Run preflight first:
+
+```bash
+cd frontend
+npm run playwright:check
+```
+
 Run setup-backed smoke once:
 
 ```bash
@@ -44,3 +51,11 @@ ls frontend/tests/e2e/.auth/vendor.json
 - Never commit:
   - `frontend/tests/e2e/.auth/*.json`
   - `frontend/tests/e2e/.generated/smoke-manifest.json` when it includes environment-specific tokens.
+  - `backend/playwright-smoke-meta.json`
+  - `playwright-report/`
+  - `test-results/`
+
+## Smoke Metadata and Test Listing
+- `npx playwright test --list` must not require pre-existing smoke metadata.
+- metadata is generated during smoke setup/bootstrap and is expected to be absent before setup.
+- real-login smoke reads metadata lazily at test runtime to keep test discovery stable.

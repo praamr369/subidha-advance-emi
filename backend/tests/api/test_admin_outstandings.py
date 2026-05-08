@@ -216,6 +216,48 @@ class AdminOutstandingsApiTests(APITestCase):
         ids = {row["source_id"] for row in response.data["results"]}
         self.assertNotIn(self.cancelled_sale.id, ids)
 
+    def test_archived_and_returned_direct_sales_do_not_appear_in_active_outstanding(self):
+        archived_sale = DirectSale.objects.create(
+            sale_no="SALE-OUT-003",
+            sale_date=self.today - timedelta(days=12),
+            financial_year="2026-2027",
+            doc_series=self.doc_series,
+            customer=self.customer,
+            status=DirectSaleStatus.ARCHIVED,
+            subtotal=Decimal("1200.00"),
+            discount_total=Decimal("0.00"),
+            taxable_total=Decimal("1200.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1200.00"),
+            received_total=Decimal("100.00"),
+            balance_total=Decimal("1100.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        returned_sale = DirectSale.objects.create(
+            sale_no="SALE-OUT-004",
+            sale_date=self.today - timedelta(days=11),
+            financial_year="2026-2027",
+            doc_series=self.doc_series,
+            customer=self.customer,
+            status=DirectSaleStatus.RETURNED,
+            subtotal=Decimal("1800.00"),
+            discount_total=Decimal("0.00"),
+            taxable_total=Decimal("1800.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1800.00"),
+            received_total=Decimal("200.00"),
+            balance_total=Decimal("1600.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/admin/outstandings/?operation=direct_sale")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        ids = {row["source_id"] for row in response.data["results"]}
+        self.assertNotIn(archived_sale.id, ids)
+        self.assertNotIn(returned_sale.id, ids)
+
     def test_subscription_emi_rent_lease_dues_appear_with_correct_operation_type(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.get("/api/v1/admin/outstandings/")
@@ -242,6 +284,43 @@ class AdminOutstandingsApiTests(APITestCase):
         self.assertEqual(len(linked_invoice_rows), 0)
         standalone_rows = [row for row in response.data["results"] if row["source_type"] == "BILLING_INVOICE" and row["source_id"] == self.standalone_invoice.id]
         self.assertEqual(len(standalone_rows), 1)
+
+    def test_void_reversed_credited_invoices_are_excluded_from_active_outstanding(self):
+        created_ids = []
+        for status_value in ("VOID", "REVERSED", "CREDITED_FULLY"):
+            row = BillingInvoice.objects.create(
+                document_no=f"INV-OUT-{status_value}",
+                invoice_date=self.today,
+                financial_year="2026-2027",
+                document_type=BillingInvoiceType.INVOICE,
+                doc_series=self.doc_series,
+                customer=self.customer,
+                source_type="MANUAL",
+                source_reference=f"manual-{status_value.lower()}",
+                status="DRAFT",
+                subtotal=Decimal("1500.00"),
+                discount_total=Decimal("0.00"),
+                taxable_total=Decimal("1500.00"),
+                tax_total=Decimal("0.00"),
+                grand_total=Decimal("1500.00"),
+                received_total=Decimal("0.00"),
+                balance_total=Decimal("1500.00"),
+                customer_name_snapshot=self.customer.name,
+                customer_phone_snapshot=self.customer.phone,
+            )
+            created_ids.append(row.id)
+        # Status transitions to these terminal values are handled through service flows;
+        # update rows directly here to assert visibility filtering only.
+        BillingInvoice.objects.filter(pk=created_ids[0]).update(status="VOID")
+        BillingInvoice.objects.filter(pk=created_ids[1]).update(status="REVERSED")
+        BillingInvoice.objects.filter(pk=created_ids[2]).update(status="CREDITED_FULLY")
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/admin/outstandings/?operation=billing_invoice")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        source_refs = {row.get("source_reference") for row in response.data["results"]}
+        self.assertNotIn("manual-void", source_refs)
+        self.assertNotIn("manual-reversed", source_refs)
+        self.assertNotIn("manual-credited_fully", source_refs)
 
     def test_filters_operation_state_q_and_age_bucket_work(self):
         self.client.force_authenticate(user=self.admin)

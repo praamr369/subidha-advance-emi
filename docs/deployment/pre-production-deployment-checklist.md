@@ -43,11 +43,15 @@ npm run build
 
 ## 6) Mandatory Command Validation
 ```bash
+# repo root backend env check
+bash scripts/check-local-env.sh
+
 # backend
 cd backend
 bash scripts/check-local-env.sh
 source ../.venv/bin/activate && python3 manage.py check
 source ../.venv/bin/activate && python3 manage.py makemigrations --check --dry-run
+source ../.venv/bin/activate && python3 manage.py showmigrations
 source ../.venv/bin/activate && python3 manage.py test tests.api.test_reversal_control_blockers tests.billing.test_reversal_service tests.api.test_reversal_center_api
 
 # frontend
@@ -55,6 +59,9 @@ cd ../frontend
 npm run typecheck
 npm run build:smoke
 npm run lint
+npm run playwright:check
+npx playwright install chromium
+npx playwright test --list
 npx playwright test tests/e2e/ux_polish_smoke.spec.ts --project=chromium-smoke
 npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_smoke.spec.ts --project=chromium-smoke
 ```
@@ -81,3 +88,4 @@ npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_
 ## 8) Known Non-Blockers
 - Vendor smoke may skip locally when `frontend/tests/e2e/.auth/vendor.json` is missing.
 - Expected explicit skip message: `vendor auth state missing; run auth setup or provide vendor.json`.
+- `backend/playwright-smoke-meta.json` may appear during smoke runs; it is generated and git-ignored.

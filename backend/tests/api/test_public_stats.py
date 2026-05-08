@@ -143,3 +143,20 @@ class PublicStatsApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["total_subscriptions"], 1)
         self.assertEqual(response.data["active_subscriptions"], 0)
+
+    def test_public_latest_winner_response_excludes_private_customer_fields(self):
+        response = self.client.get("/api/v1/public/latest-winner/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        winner = response.data.get("winner") or {}
+        forbidden_keys = {
+            "customer_phone",
+            "customer_email",
+            "kyc",
+            "aadhaar",
+            "ledger_balance",
+            "subscription_id",
+            "winner_subscription_id",
+            "winner_lucky_id",
+        }
+        for key in forbidden_keys:
+            self.assertNotIn(key, winner)

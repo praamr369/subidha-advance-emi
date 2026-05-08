@@ -116,7 +116,7 @@ export async function searchAdminBillingProducts(params: {
   if (params.page) qs.set("page", String(params.page));
   if (params.page_size) qs.set("page_size", String(params.page_size));
   return apiFetch<BillingProductSearchResponse>(
-    `/admin/billing/product-search/${qs.toString() ? `?${qs}` : ""}`
+    `/admin/billing/products/search/${qs.toString() ? `?${qs}` : ""}`
   );
 }
 

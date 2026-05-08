@@ -13,7 +13,8 @@ const smokeMetaPath =
   process.env.PLAYWRIGHT_SMOKE_META_PATH ||
   path.resolve(__dirname, "../backend/playwright-smoke-meta.json");
 const smokeDbPath =
-  process.env.PLAYWRIGHT_DB_PATH || "/tmp/subidha-playwright-smoke.sqlite3";
+  process.env.PLAYWRIGHT_DB_PATH ||
+  `/tmp/subidha-playwright-smoke-${process.pid}.sqlite3`;
 const smokeManifestPath = path.resolve(
   __dirname,
   "tests/e2e/.generated/smoke-manifest.json"

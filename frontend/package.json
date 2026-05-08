@@ -18,6 +18,8 @@
     "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
     "test:e2e:auth-smoke:headed": "playwright test --project=chromium-auth-smoke --headed",
     "test:e2e:install": "playwright install chromium",
+    "playwright:install": "playwright install chromium",
+    "playwright:check": "node scripts/check-playwright-env.mjs",
     "test:dashboard-presets": "node scripts/run-dashboard-widget-board-tests.mjs"
   },
   "dependencies": {
