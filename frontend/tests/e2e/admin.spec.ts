@@ -776,6 +776,159 @@ test("admin customer detail shows OTP access handoff for existing customer", asy
   ).toBeVisible();
 });
 
+test("admin customer detail separates active and historical finance after cancellation/reversal/return", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/customers/57/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 57,
+        name: "CRM Visibility Customer",
+        phone: "01777777777",
+        email: "crm-visibility@example.com",
+        user: 457,
+        user_username: "crm57",
+        status: "ACTIVE",
+        kyc_status: "VERIFIED",
+        created_at: "2026-04-04T06:00:00Z",
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/subscriptions/?customer=57", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: [
+          {
+            id: 701,
+            subscription_number: "SUB-701",
+            status: "CANCELLED",
+            total_amount: "67500.00",
+            monthly_amount: "4500.00",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/payments/?customer=57", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: [
+          {
+            id: 9001,
+            amount: "4500.00",
+            payment_date: "2026-04-10",
+            subscription_id: 701,
+            subscription_number: "SUB-701",
+            is_reversed: true,
+            is_active_collection: false,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route("**/api/v1/admin/customers/57/operational-profile/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        customer: { id: 57, name: "CRM Visibility Customer", phone: "01777777777", user_is_active: true },
+        overview: {
+          subscription_count: 1,
+          active_subscriptions: 0,
+          historical_subscriptions: 1,
+          active_contract_value: "0.00",
+          historical_contract_value: "67500.00",
+          direct_sale_count: 1,
+          active_direct_sale_count: 0,
+          returned_direct_sale_count: 1,
+          direct_sale_outstanding_count: 0,
+          direct_sale_outstanding_total: "0.00",
+          receipt_count: 0,
+          receipt_total: "0.00",
+          invoice_count: 1,
+          active_invoice_count: 0,
+          historical_invoice_count: 1,
+          invoice_outstanding_total: "0.00",
+          lead_count: 0,
+          lead_open_count: 0,
+          quotation_estimate_count: 0,
+        },
+        direct_sales: {
+          summary: {
+            total_count: 1,
+            active_count: 0,
+            history_count: 1,
+            outstanding_count: 0,
+            gross_total: "21000.00",
+            received_total: "0.00",
+            outstanding_total: "0.00",
+            historical_total: "21000.00",
+          },
+          rows: [
+            {
+              id: 301,
+              sale_no: "DS-301",
+              status: "RETURNED",
+              grand_total: "21000.00",
+              received_total: "0.00",
+              balance_total: "21000.00",
+              active_outstanding_total: "0.00",
+              is_history_only: true,
+            },
+          ],
+        },
+        contract_references: { summary: {}, rows: [] },
+        subscriptions: { summary: {}, rows: [] },
+        payments: { summary: { total_count: 1, active_count: 0, reversed_count: 1 } },
+        ledger_summary: {
+          entry_count: 1,
+          total_credits: "4500.00",
+          total_debits: "4500.00",
+          active_ledger_credits: "0.00",
+          active_ledger_debits: "0.00",
+          net_subscription_collections: "0.00",
+          direct_sale_receivable_total: "0.00",
+        },
+        receipts_documents: {
+          summary: {
+            receipt_count: 0,
+            receipt_total: "0.00",
+            active_receipt_count: 0,
+            active_receipt_total: "0.00",
+            document_count: 0,
+            invoice_count: 1,
+            invoice_posted_count: 0,
+            invoice_total: "21000.00",
+            invoice_outstanding_total: "0.00",
+          },
+          receipts: [],
+          invoices: [],
+          documents: [],
+        },
+        leads: { summary: {}, rows: [] },
+        quotation_estimates: { summary: {}, rows: [] },
+        partner_linkages: { count: 0, rows: [] },
+      }),
+    });
+  });
+
+  await page.goto("/admin/customers/57");
+  await expect(page.locator("body")).toContainText("Active contract value");
+  await expect(page.locator("body")).toContainText("Historical contract value");
+  await expect(page.locator("body")).toContainText("Subscription History");
+  await expect(page.locator("body")).toContainText("History only");
+  await expect(page.locator("body")).not.toContainText("Collect Direct-Sale Balance");
+});
+
 test("admin customer edit uses the real JSON contract and audit timeline", async ({
   page,
 }) => {
@@ -1244,6 +1397,116 @@ test("dead batch lucky-id generation route redirects to canonical batch detail",
 }) => {
   await page.goto("/admin/batches/999999/generate-lucky-ids");
   await expect(page).toHaveURL(/\/admin\/batches\/999999$/);
+});
+
+test("batch detail keeps cancelled subscriptions in history-only surfaces", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/batches/42/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 42,
+        batch_code: "BATCH-42",
+        total_slots: 100,
+        duration_months: 12,
+        draw_day: 5,
+        start_date: "2026-04-01",
+        status: "OPEN",
+        created_at: "2026-04-01T08:30:00Z",
+      }),
+    });
+  });
+  await page.route("**/api/v1/admin/batches/42/summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 42,
+        batch_code: "BATCH-42",
+        status: "OPEN",
+        duration_months: 12,
+        total_slots: 100,
+        draw_day: 5,
+        start_date: "2026-04-01",
+        subscription_count: 1,
+        active_subscription_count: 0,
+        won_subscription_count: 0,
+        available_lucky_ids: 99,
+        assigned_lucky_ids: 0,
+        won_lucky_ids: 0,
+        monthly_booked_value: "0.00",
+        active_monthly_booked_value: "0.00",
+        active_contract_value: "0.00",
+        draw_eligible_count: 0,
+        historical_subscription_count: 1,
+        cancelled_subscription_count: 1,
+        archived_subscription_count: 0,
+        historical_monthly_booked_value: "4500.00",
+        draw_count: 0,
+      }),
+    });
+  });
+  await page.route("**/api/v1/admin/lucky-ids/?batch_id=42*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        next: null,
+        previous: null,
+        results: [
+          {
+            id: 2,
+            lucky_number: 2,
+            status: "AVAILABLE",
+            current_customer_name: null,
+            current_subscription_id: null,
+            current_subscription_code: null,
+            is_currently_assigned: false,
+            is_available: true,
+            has_historical_assignment: true,
+            historical_subscription_status: "CANCELLED",
+            historical_subscription_code: "SUB-1",
+            history_label: "Previously linked to SUB-1 (CANCELLED)",
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/admin/subscriptions/?batch_id=42*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 1,
+        next: null,
+        previous: null,
+        results: [
+          {
+            id: 1,
+            subscription_number: "SUB-1",
+            customer_name: "Indrajit Chawrasia",
+            product_name: "Lucky Plan Product",
+            lucky_number: 2,
+            total_amount: "45000.00",
+            monthly_amount: "4500.00",
+            status: "CANCELLED",
+            start_date: "2026-04-01",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/admin/batches/42");
+  await expect(page.locator("body")).toContainText("Active Subscriptions");
+  await expect(page.locator("body")).toContainText("No active subscriptions are linked to this batch.");
+  await expect(page.locator("body")).toContainText("₹0.00");
+  await expect(page.locator("body")).toContainText("Previously linked to SUB-1 (CANCELLED)");
+  await expect(page.locator("body")).toContainText("Archived / cancelled subscription history");
+  await expect(page.locator("body")).toContainText("SUB-1");
 });
 
 test("admin batch edit only exposes canonical lifecycle targets", async ({

@@ -24,6 +24,12 @@ from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
 from subscriptions.services.winner_state_service import get_subscription_winner_evidence
+from core.services.operational_visibility import (
+    direct_sale_active_q,
+    invoice_active_q,
+    is_payment_active_collection,
+    receipt_active_q,
+)
 
 
 def _money(value) -> str:
@@ -122,12 +128,22 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         .order_by("-created_at", "-id")
     )
     subscription_summary = build_customer_dashboard_summary(subscriptions)
+    active_subscriptions = [
+        sub
+        for sub in subscriptions
+        if sub.status in {"ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"}
+    ]
+    historical_subscriptions = [sub for sub in subscriptions if sub.status not in {"ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"}]
+    active_contract_value = sum((sub.total_amount or Decimal("0.00")) for sub in active_subscriptions)
+    historical_contract_value = sum((sub.total_amount or Decimal("0.00")) for sub in historical_subscriptions)
 
     direct_sales_qs = (
         DirectSale.objects.select_related("branch", "cash_counter", "finance_account")
         .filter(customer=customer)
         .order_by("-sale_date", "-id")
     )
+    active_direct_sales_qs = direct_sales_qs.filter(direct_sale_active_q())
+    history_direct_sales_qs = direct_sales_qs.exclude(direct_sale_active_q())
     direct_sales_totals = direct_sales_qs.aggregate(
         total_count=Count("id"),
         invoiced_count=Count("id", filter=Q(status="INVOICED")),
@@ -136,15 +152,25 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         received_total=Sum("received_total"),
         outstanding_total=Sum("balance_total"),
     )
+    direct_sales_active_totals = active_direct_sales_qs.aggregate(
+        total_count=Count("id"),
+        outstanding_count=Count("id", filter=Q(balance_total__gt=Decimal("0.00"))),
+        gross_total=Sum("grand_total"),
+        received_total=Sum("received_total"),
+        outstanding_total=Sum("balance_total"),
+    )
+    direct_sales_history_totals = history_direct_sales_qs.aggregate(
+        total_count=Count("id"),
+        gross_total=Sum("grand_total"),
+    )
 
     payment_qs = (
         Payment.objects.select_related("subscription", "subscription__partner")
         .filter(customer=customer)
         .order_by("-payment_date", "-id")
     )
-    active_payment_qs = payment_qs.exclude(
-        allocation_metadata__reversal__is_reversed=True
-    )
+    active_payment_qs = [payment for payment in payment_qs if is_payment_active_collection(payment)]
+    reversed_payment_qs = [payment for payment in payment_qs if not is_payment_active_collection(payment)]
     payment_totals = payment_qs.aggregate(
         total_count=Count("id"),
         reversed_count=Count(
@@ -153,13 +179,20 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         ),
         total_amount=Sum("amount"),
     )
+    active_payment_amount = sum((payment.amount or Decimal("0.00")) for payment in active_payment_qs)
+    reversed_payment_amount = sum((payment.amount or Decimal("0.00")) for payment in reversed_payment_qs)
 
     receipt_qs = (
         ReceiptDocument.objects.select_related("finance_account", "billing_invoice")
         .filter(customer=customer)
         .order_by("-receipt_date", "-id")
     )
+    active_receipt_qs = receipt_qs.filter(receipt_active_q())
     receipt_totals = receipt_qs.aggregate(
+        total_count=Count("id"),
+        total_amount=Sum("amount"),
+    )
+    active_receipt_totals = active_receipt_qs.aggregate(
         total_count=Count("id"),
         total_amount=Sum("amount"),
     )
@@ -168,11 +201,21 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         .filter(customer=customer)
         .order_by("-invoice_date", "-id")
     )
+    active_invoice_qs = invoice_qs.filter(invoice_active_q())
+    history_invoice_qs = invoice_qs.exclude(invoice_active_q())
     invoice_totals = invoice_qs.aggregate(
         total_count=Count("id"),
         posted_count=Count("id", filter=Q(status="POSTED")),
         grand_total=Sum("grand_total"),
         outstanding_total=Sum("balance_total"),
+    )
+    active_invoice_totals = active_invoice_qs.aggregate(
+        total_count=Count("id"),
+        outstanding_total=Sum("balance_total"),
+    )
+    history_invoice_totals = history_invoice_qs.aggregate(
+        total_count=Count("id"),
+        grand_total=Sum("grand_total"),
     )
 
     lead_filters = Q(converted_customer=customer)
@@ -226,8 +269,18 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         .filter(subscription__customer=customer)
         .order_by("-created_at", "-id")
     )
+    active_subscription_ids = [sub.id for sub in active_subscriptions]
     ledger_qs = FinancialLedger.objects.filter(emi__subscription__customer=customer)
+    active_ledger_qs = FinancialLedger.objects.filter(
+        emi__subscription__customer=customer,
+        emi__subscription_id__in=active_subscription_ids,
+    )
     ledger_summary = ledger_qs.aggregate(
+        entry_count=Count("id"),
+        total_credits=Sum("amount", filter=Q(entry_direction="CREDIT")),
+        total_debits=Sum("amount", filter=Q(entry_direction="DEBIT")),
+    )
+    active_ledger_summary = active_ledger_qs.aggregate(
         entry_count=Count("id"),
         total_credits=Sum("amount", filter=Q(entry_direction="CREDIT")),
         total_debits=Sum("amount", filter=Q(entry_direction="DEBIT")),
@@ -254,6 +307,17 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "sale_no": sale.sale_no,
             "sale_date": sale.sale_date,
             "status": sale.status,
+            "is_history_only": sale.status
+            in {
+                "CANCELLED",
+                "CANCELLED_PRE_INVOICE",
+                "CANCELLED_AFTER_DELIVERY",
+                "REVERSED_POST_INVOICE",
+                "RETURNED",
+                "EXCHANGED_CLOSED",
+                "ARCHIVED",
+            },
+            "active_outstanding_total": _money(sale.balance_total if sale.status not in {"CANCELLED", "CANCELLED_PRE_INVOICE", "CANCELLED_AFTER_DELIVERY", "REVERSED_POST_INVOICE", "RETURNED", "EXCHANGED_CLOSED", "ARCHIVED"} else Decimal("0.00")),
             "branch_id": sale.branch_id,
             "branch_code": getattr(sale.branch, "code", None),
             "branch_name": getattr(sale.branch, "name", None),
@@ -278,6 +342,8 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "id": subscription.id,
             "subscription_number": f"SUB-{subscription.id}",
             "status": subscription.status,
+            "is_history_only": subscription.status not in {"ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"},
+            "is_collectible": subscription.status in {"ACTIVE", "DEFAULTED", "PAYMENT_PENDING", "DELIVERY_PENDING"},
             "plan_type": subscription.plan_type,
             "product_name": getattr(subscription.product, "name", "") if getattr(subscription, "product", None) else "",
             "batch_code": getattr(subscription.batch, "batch_code", None),
@@ -314,6 +380,7 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
                 .get("reversal", {})
                 .get("is_reversed")
             ),
+            "is_active_collection": is_payment_active_collection(payment),
             "partner_name": getattr(getattr(payment.subscription, "partner", None), "name", None),
         }
         for payment in payment_qs[:15]
@@ -431,18 +498,33 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         },
         "overview": {
             "subscription_count": subscription_summary["subscription_count"],
-            "active_subscriptions": subscription_summary["active_subscriptions"],
+            "active_subscriptions": len(active_subscriptions),
+            "historical_subscriptions": len(historical_subscriptions),
             "completed_subscriptions": subscription_summary["completed_subscriptions"],
             "winner_subscriptions": subscription_summary["winner_subscriptions"],
             "total_subscription_paid": subscription_summary["total_paid_amount"],
-            "subscription_outstanding_amount": subscription_summary["outstanding_amount"],
+            "subscription_outstanding_amount": _money(
+                sum(
+                    (emi.amount or Decimal("0.00"))
+                    for sub in active_subscriptions
+                    for emi in sub.emis.all()
+                    if getattr(emi, "status", None) == EmiStatus.PENDING
+                )
+            ),
+            "active_contract_value": _money(active_contract_value),
+            "historical_contract_value": _money(historical_contract_value),
             "direct_sale_count": direct_sales_totals["total_count"] or 0,
-            "direct_sale_outstanding_count": direct_sales_totals["outstanding_count"] or 0,
-            "direct_sale_outstanding_total": _money(direct_sales_totals["outstanding_total"]),
+            "active_direct_sale_count": direct_sales_active_totals["total_count"] or 0,
+            "returned_direct_sale_count": direct_sales_history_totals["total_count"] or 0,
+            "direct_sale_outstanding_count": direct_sales_active_totals["outstanding_count"] or 0,
+            "direct_sale_outstanding_total": _money(direct_sales_active_totals["outstanding_total"]),
+            "historical_direct_sale_total": _money(direct_sales_history_totals["gross_total"]),
             "receipt_count": receipt_totals["total_count"] or 0,
             "receipt_total": _money(receipt_totals["total_amount"]),
             "invoice_count": invoice_totals["total_count"] or 0,
-            "invoice_outstanding_total": _money(invoice_totals["outstanding_total"]),
+            "active_invoice_count": active_invoice_totals["total_count"] or 0,
+            "historical_invoice_count": history_invoice_totals["total_count"] or 0,
+            "invoice_outstanding_total": _money(active_invoice_totals["outstanding_total"]),
             "lead_count": lead_totals["total_count"] or 0,
             "lead_open_count": lead_totals["open_count"] or 0,
             "quotation_estimate_count": (lead_totals["quotation_count"] or 0)
@@ -451,11 +533,14 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         "direct_sales": {
             "summary": {
                 "total_count": direct_sales_totals["total_count"] or 0,
+                "active_count": direct_sales_active_totals["total_count"] or 0,
+                "history_count": direct_sales_history_totals["total_count"] or 0,
                 "invoiced_count": direct_sales_totals["invoiced_count"] or 0,
-                "outstanding_count": direct_sales_totals["outstanding_count"] or 0,
+                "outstanding_count": direct_sales_active_totals["outstanding_count"] or 0,
                 "gross_total": _money(direct_sales_totals["gross_total"]),
                 "received_total": _money(direct_sales_totals["received_total"]),
-                "outstanding_total": _money(direct_sales_totals["outstanding_total"]),
+                "outstanding_total": _money(direct_sales_active_totals["outstanding_total"]),
+                "historical_total": _money(direct_sales_history_totals["gross_total"]),
             },
             "rows": recent_direct_sales,
         },
@@ -488,9 +573,11 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         "payments": {
             "summary": {
                 "total_count": payment_totals["total_count"] or 0,
-                "active_count": active_payment_qs.count(),
+                "active_count": len(active_payment_qs),
                 "reversed_count": payment_totals["reversed_count"] or 0,
                 "total_amount": _money(payment_totals["total_amount"]),
+                "active_collected_amount": _money(active_payment_amount),
+                "reversed_payment_amount": _money(reversed_payment_amount),
             },
             "rows": recent_payments,
         },
@@ -499,20 +586,24 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "total_credits": _money(ledger_summary["total_credits"]),
             "total_debits": _money(ledger_summary["total_debits"]),
             "net_subscription_collections": _money(
-                Decimal(str(ledger_summary["total_credits"] or "0.00"))
-                - Decimal(str(ledger_summary["total_debits"] or "0.00"))
+                Decimal(str(active_ledger_summary["total_credits"] or "0.00"))
+                - Decimal(str(active_ledger_summary["total_debits"] or "0.00"))
             ),
-            "direct_sale_receivable_total": _money(direct_sales_totals["outstanding_total"]),
+            "active_ledger_credits": _money(active_ledger_summary["total_credits"]),
+            "active_ledger_debits": _money(active_ledger_summary["total_debits"]),
+            "direct_sale_receivable_total": _money(direct_sales_active_totals["outstanding_total"]),
         },
         "receipts_documents": {
             "summary": {
                 "receipt_count": receipt_totals["total_count"] or 0,
                 "receipt_total": _money(receipt_totals["total_amount"]),
+                "active_receipt_count": active_receipt_totals["total_count"] or 0,
+                "active_receipt_total": _money(active_receipt_totals["total_amount"]),
                 "document_count": document_qs.count(),
                 "invoice_count": invoice_totals["total_count"] or 0,
                 "invoice_posted_count": invoice_totals["posted_count"] or 0,
                 "invoice_total": _money(invoice_totals["grand_total"]),
-                "invoice_outstanding_total": _money(invoice_totals["outstanding_total"]),
+                "invoice_outstanding_total": _money(active_invoice_totals["outstanding_total"]),
             },
             "receipts": recent_receipts,
             "invoices": recent_invoices,
@@ -605,15 +696,29 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
         },
         "summary": {
             "active_subscriptions": active_subscriptions,
+            "historical_subscriptions": int(overview.get("historical_subscriptions", 0) or 0),
+            "active_contract_value": _money(overview.get("active_contract_value")),
+            "historical_contract_value": _money(overview.get("historical_contract_value")),
             "subscription_outstanding": _money(overview.get("subscription_outstanding_amount")),
             "direct_sale_outstanding": _money(
                 direct_sales.get("summary", {}).get("outstanding_total")
+            ),
+            "returned_direct_sale_count": int(
+                direct_sales.get("summary", {}).get("history_count", 0) or 0
             ),
             "rent_lease_outstanding": "0.00",
             "overdue_emi_count": overdue_emi_count,
             "pending_delivery_count": pending_delivery_count,
             "open_service_count": open_service_count,
             "last_payment_date": last_payment_date,
+            "active_payment_count": int(payments.get("summary", {}).get("active_count", 0) or 0),
+            "reversed_payment_count": int(payments.get("summary", {}).get("reversed_count", 0) or 0),
+            "active_collected_amount": _money(
+                payments.get("summary", {}).get("active_collected_amount")
+            ),
+            "reversed_payment_amount": _money(
+                payments.get("summary", {}).get("reversed_payment_amount")
+            ),
             "risk_status": risk_status,
         },
         "subscriptions": subscriptions.get("rows", []),

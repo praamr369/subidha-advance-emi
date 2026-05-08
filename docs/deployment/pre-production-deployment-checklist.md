@@ -81,6 +81,12 @@ npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_
 - Confirm reversed sale is excluded from active outstanding.
 - Confirm delivery case shows history-only where expected.
 - Confirm dashboard KPI remains operationally correct (no cancelled/reversed pollution).
+- Confirm batch detail shows cancelled subscriptions only in history section.
+- Confirm active monthly booked value excludes cancelled subscriptions.
+- Confirm available Lucky IDs do not display cancelled holders as current assignment.
+- Confirm customer register active contract/due columns stay zero for cancelled-only customers.
+- Confirm customer detail active direct-sale outstanding stays zero for returned/reversed sales.
+- Confirm reversed payments remain in history but not in active payment/collection KPI cards.
 - Confirm documents/history remain visible for audit.
 - Collect Advance EMI and verify receipt.
 - Verify reconciliation surfaces load and operate.

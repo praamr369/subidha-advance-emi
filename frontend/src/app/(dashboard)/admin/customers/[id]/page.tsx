@@ -95,6 +95,7 @@ type PaymentPreviewRow = {
   subscription_id?: number | null;
   subscription_number?: string;
   is_reversed: boolean;
+  is_active_collection?: boolean;
 };
 
 type ContractReferenceSourceType =
@@ -133,6 +134,8 @@ type DirectSaleOperationalRow = {
   grand_total: string;
   received_total: string;
   balance_total: string;
+  active_outstanding_total?: string;
+  is_history_only?: boolean;
 };
 
 type ReceiptOperationalRow = {
@@ -197,12 +200,20 @@ type CustomerOperationalProfile = {
   overview: {
     subscription_count: number;
     active_subscriptions: number;
+    historical_subscriptions?: number;
+    active_contract_value?: string;
+    historical_contract_value?: string;
+    subscription_outstanding_amount?: string;
     direct_sale_count: number;
+    active_direct_sale_count?: number;
+    returned_direct_sale_count?: number;
     direct_sale_outstanding_count: number;
     direct_sale_outstanding_total: string;
     receipt_count: number;
     receipt_total: string;
     invoice_count: number;
+    active_invoice_count?: number;
+    historical_invoice_count?: number;
     invoice_outstanding_total: string;
     lead_count: number;
     lead_open_count: number;
@@ -211,10 +222,13 @@ type CustomerOperationalProfile = {
   direct_sales: {
     summary: {
       total_count: number;
+      active_count?: number;
+      history_count?: number;
       outstanding_count: number;
       gross_total: string;
       received_total: string;
       outstanding_total: string;
+      historical_total?: string;
     };
     rows: DirectSaleOperationalRow[];
   };
@@ -233,12 +247,16 @@ type CustomerOperationalProfile = {
     total_credits: string;
     total_debits: string;
     net_subscription_collections: string;
+    active_ledger_credits?: string;
+    active_ledger_debits?: string;
     direct_sale_receivable_total: string;
   };
   receipts_documents: {
     summary: {
       receipt_count: number;
       receipt_total: string;
+      active_receipt_count?: number;
+      active_receipt_total?: string;
       document_count: number;
       invoice_count: number;
       invoice_posted_count: number;
@@ -484,6 +502,7 @@ function normalizePaymentPreview(
       toStringValue(raw.subscription_number) ||
       (subscriptionId ? `SUB-${subscriptionId}` : undefined),
     is_reversed: isReversed,
+    is_active_collection: raw.is_active_collection === true || !isReversed,
   };
 }
 
@@ -508,7 +527,13 @@ function normalizeCustomerOperationalProfile(
     overview: {
       subscription_count: toNumber(overview.subscription_count),
       active_subscriptions: toNumber(overview.active_subscriptions),
+      historical_subscriptions: toNumber(overview.historical_subscriptions),
+      active_contract_value: toMoneyString(overview.active_contract_value),
+      historical_contract_value: toMoneyString(overview.historical_contract_value),
+      subscription_outstanding_amount: toMoneyString(overview.subscription_outstanding_amount),
       direct_sale_count: toNumber(overview.direct_sale_count),
+      active_direct_sale_count: toNumber(overview.active_direct_sale_count),
+      returned_direct_sale_count: toNumber(overview.returned_direct_sale_count),
       direct_sale_outstanding_count: toNumber(
         overview.direct_sale_outstanding_count
       ),
@@ -518,6 +543,8 @@ function normalizeCustomerOperationalProfile(
       receipt_count: toNumber(overview.receipt_count),
       receipt_total: toMoneyString(overview.receipt_total),
       invoice_count: toNumber(overview.invoice_count),
+      active_invoice_count: toNumber(overview.active_invoice_count),
+      historical_invoice_count: toNumber(overview.historical_invoice_count),
       invoice_outstanding_total: toMoneyString(overview.invoice_outstanding_total),
       lead_count: toNumber(overview.lead_count),
       lead_open_count: toNumber(overview.lead_open_count),
@@ -526,10 +553,13 @@ function normalizeCustomerOperationalProfile(
     direct_sales: {
       summary: {
         total_count: toNumber(directSaleSummary.total_count),
+        active_count: toNumber(directSaleSummary.active_count),
+        history_count: toNumber(directSaleSummary.history_count),
         outstanding_count: toNumber(directSaleSummary.outstanding_count),
         gross_total: toMoneyString(directSaleSummary.gross_total),
         received_total: toMoneyString(directSaleSummary.received_total),
         outstanding_total: toMoneyString(directSaleSummary.outstanding_total),
+        historical_total: toMoneyString(directSaleSummary.historical_total),
       },
       rows: extractNestedArray(directSales, ["rows"]).map((row) => ({
         id: toNumber(row.id),
@@ -542,6 +572,10 @@ function normalizeCustomerOperationalProfile(
         grand_total: toMoneyString(row.grand_total),
         received_total: toMoneyString(row.received_total),
         balance_total: toMoneyString(row.balance_total),
+        active_outstanding_total: toMoneyString(
+          row.active_outstanding_total ?? row.balance_total
+        ),
+        is_history_only: row.is_history_only === true,
       })),
     },
     contract_references: {
@@ -584,6 +618,8 @@ function normalizeCustomerOperationalProfile(
       net_subscription_collections: toMoneyString(
         ledgerSummary.net_subscription_collections
       ),
+      active_ledger_credits: toMoneyString(ledgerSummary.active_ledger_credits),
+      active_ledger_debits: toMoneyString(ledgerSummary.active_ledger_debits),
       direct_sale_receivable_total: toMoneyString(
         ledgerSummary.direct_sale_receivable_total
       ),
@@ -592,6 +628,8 @@ function normalizeCustomerOperationalProfile(
       summary: {
         receipt_count: toNumber(receiptsSummary.receipt_count),
         receipt_total: toMoneyString(receiptsSummary.receipt_total),
+        active_receipt_count: toNumber(receiptsSummary.active_receipt_count),
+        active_receipt_total: toMoneyString(receiptsSummary.active_receipt_total),
         document_count: toNumber(receiptsSummary.document_count),
         invoice_count: toNumber(receiptsSummary.invoice_count),
         invoice_posted_count: toNumber(receiptsSummary.invoice_posted_count),
@@ -985,6 +1023,9 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
           </thead>
           <tbody>
             {sortedRows.map((row) => {
+              const isActiveContract =
+                row.status === "ACTIVE" ||
+                row.status === "PENDING";
               const statusTone =
                 row.status === "ACTIVE"
                   ? "success"
@@ -1041,7 +1082,7 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
                         href={`/admin/payments?subscription=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Payments
+                        {isActiveContract ? "Payments" : "Payment History"}
                       </Link>
                     </div>
                   </td>
@@ -1384,26 +1425,39 @@ export default function AdminCustomerDetailPage() {
   }, [loadPage]);
 
   const activeSubscriptionCount = useMemo(
-    () => subscriptions.filter((row) => row.status === "ACTIVE").length,
-    [subscriptions]
+    () =>
+      operationalProfile?.overview.active_subscriptions ??
+      subscriptions.filter((row) => row.status === "ACTIVE").length,
+    [operationalProfile, subscriptions]
   );
 
   const totalContractValue = useMemo(
-    () =>
-      subscriptions.reduce(
-        (sum, row) => sum + Number(row.total_amount || 0),
-        0
-      ),
-    [subscriptions]
+    () => Number(operationalProfile?.overview.active_contract_value || 0),
+    [operationalProfile]
+  );
+
+  const historicalContractValue = useMemo(
+    () => Number(operationalProfile?.overview.historical_contract_value || 0),
+    [operationalProfile]
   );
 
   const activePayments = useMemo(
-    () => payments.filter((row) => !row.is_reversed),
+    () => payments.filter((row) => row.is_active_collection !== false && !row.is_reversed),
     [payments]
   );
 
   const latestSubscription = useMemo(
-    () => subscriptions[0] ?? null,
+    () => subscriptions.find((row) => row.status === "ACTIVE") ?? null,
+    [subscriptions]
+  );
+
+  const activeLinkedSubscriptions = useMemo(
+    () => subscriptions.filter((row) => row.status === "ACTIVE" || row.status === "PENDING"),
+    [subscriptions]
+  );
+
+  const historicalLinkedSubscriptions = useMemo(
+    () => subscriptions.filter((row) => row.status !== "ACTIVE" && row.status !== "PENDING"),
     [subscriptions]
   );
 
@@ -1416,7 +1470,10 @@ export default function AdminCustomerDetailPage() {
   const receivableDirectSales = useMemo(
     () =>
       operationalProfile?.direct_sales.rows.filter(
-        (row) => row.status === "INVOICED" && Number(row.balance_total || 0) > 0
+        (row) =>
+          row.is_history_only !== true &&
+          row.status === "INVOICED" &&
+          Number(row.active_outstanding_total || 0) > 0
       ) ?? [],
     [operationalProfile]
   );
@@ -1449,7 +1506,10 @@ export default function AdminCustomerDetailPage() {
     [contractReferenceRows]
   );
 
-  const latestPayment = useMemo(() => payments[0] ?? null, [payments]);
+  const latestPayment = useMemo(
+    () => payments.find((row) => row.is_active_collection !== false) ?? null,
+    [payments]
+  );
 
   const passwordResetIdentifier = useMemo(
     () =>
@@ -1607,9 +1667,13 @@ export default function AdminCustomerDetailPage() {
           tone: activeSubscriptionCount > 0 ? "success" : undefined,
         },
         {
-          label: "Contract Value",
+          label: "Active Contract Value",
           value: money(totalContractValue),
           tone: "success",
+        },
+        {
+          label: "Historical Contract Value",
+          value: money(historicalContractValue),
         },
         {
           label: "Active Payments",
@@ -1694,9 +1758,14 @@ export default function AdminCustomerDetailPage() {
                 helper="Subscriptions with status ACTIVE"
               />
               <KpiCard
-                label="Total contract value"
+                label="Active contract value"
                 value={money(totalContractValue)}
-                helper="Sum of total amounts for all subscriptions"
+                helper="Excludes cancelled/history-only subscriptions"
+              />
+              <KpiCard
+                label="Historical contract value"
+                value={money(historicalContractValue)}
+                helper="Cancelled/archived contracts preserved for audit"
               />
               <KpiCard
                 label="Active payments"
@@ -1715,11 +1784,11 @@ export default function AdminCustomerDetailPage() {
                 }
               />
               <KpiCard
-                label="Direct-sale outstanding"
+                label="Active direct-sale outstanding"
                 value={money(
                   operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
                 )}
-                helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0}`}
+                helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0} (active only)`}
               />
               <KpiCard
                 label="Receipts / invoices"
@@ -1960,7 +2029,7 @@ export default function AdminCustomerDetailPage() {
                         Direct Sale
                       </div>
                       <div className="mt-2 text-lg font-semibold text-amber-950">
-                        {operationalProfile.direct_sales.summary.total_count} bill(s)
+                        {operationalProfile.direct_sales.summary.active_count ?? operationalProfile.direct_sales.summary.total_count} active bill(s)
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-amber-900">
                         <div>
@@ -1974,6 +2043,9 @@ export default function AdminCustomerDetailPage() {
                         </div>
                         <div>
                           Open receivables {receivableDirectSales.length}
+                        </div>
+                        <div>
+                          History-only bills {operationalProfile.direct_sales.summary.history_count ?? 0}
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -1997,7 +2069,11 @@ export default function AdminCustomerDetailPage() {
                           >
                             Open direct-sale draft
                           </Link>
-                        ) : null}
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                            No active receivable action
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -2006,11 +2082,14 @@ export default function AdminCustomerDetailPage() {
                         Subscription Sale
                       </div>
                       <div className="mt-2 text-lg font-semibold text-emerald-950">
-                        {operationalProfile.overview.subscription_count} contract(s)
+                        {operationalProfile.overview.active_subscriptions} active contract(s)
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-emerald-900">
                         <div>
                           Active contracts {operationalProfile.overview.active_subscriptions}
+                        </div>
+                        <div>
+                          Historical contracts {operationalProfile.overview.historical_subscriptions ?? 0}
                         </div>
                         <div>
                           Net collections {money(operationalProfile.ledger_summary.net_subscription_collections)}
@@ -2039,7 +2118,11 @@ export default function AdminCustomerDetailPage() {
                           >
                             Collect EMI
                           </Link>
-                        ) : null}
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                            No active EMI collect action
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2051,29 +2134,37 @@ export default function AdminCustomerDetailPage() {
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
-                      label="Subscription contracts"
-                      value={String(operationalProfile.overview.subscription_count)}
+                      label="Active subscription contracts"
+                      value={String(operationalProfile.overview.active_subscriptions)}
                     />
                     <DetailValue
-                      label="Direct sales"
-                      value={String(operationalProfile.overview.direct_sale_count)}
+                      label="Historical subscription contracts"
+                      value={String(operationalProfile.overview.historical_subscriptions ?? 0)}
                     />
                     <DetailValue
-                      label="Direct-sale outstanding"
+                      label="Active direct sales"
+                      value={String(operationalProfile.overview.active_direct_sale_count ?? 0)}
+                    />
+                    <DetailValue
+                      label="Returned/reversed direct sales"
+                      value={String(operationalProfile.overview.returned_direct_sale_count ?? 0)}
+                    />
+                    <DetailValue
+                      label="Active direct-sale outstanding"
                       value={money(
                         operationalProfile.overview.direct_sale_outstanding_total
                       )}
                     />
                     <DetailValue
-                      label="Retail receipts"
-                      value={`${operationalProfile.receipts_documents.summary.receipt_count} receipt(s)`}
+                      label="Active receipts"
+                      value={`${operationalProfile.receipts_documents.summary.active_receipt_count ?? 0} receipt(s)`}
                     />
                     <DetailValue
-                      label="Retail invoices"
-                      value={`${operationalProfile.receipts_documents.summary.invoice_count} invoice(s)`}
+                      label="Historical receipts / invoices"
+                      value={`${operationalProfile.receipts_documents.summary.receipt_count} / ${operationalProfile.receipts_documents.summary.invoice_count}`}
                     />
                     <DetailValue
-                      label="Invoice outstanding"
+                      label="Active invoice outstanding"
                       value={money(
                         operationalProfile.receipts_documents.summary.invoice_outstanding_total
                       )}
@@ -2087,11 +2178,11 @@ export default function AdminCustomerDetailPage() {
                       value={`${operationalProfile.quotation_estimates.summary.quotation_count} / ${operationalProfile.quotation_estimates.summary.estimate_count}`}
                     />
                     <DetailValue
-                      label="Ledger credits"
-                      value={money(operationalProfile.ledger_summary.total_credits)}
+                      label="Active ledger credits"
+                      value={money(operationalProfile.ledger_summary.active_ledger_credits)}
                     />
                     <DetailValue
-                      label="Net subscription collections"
+                      label="Active net collections"
                       value={money(
                         operationalProfile.ledger_summary.net_subscription_collections
                       )}
@@ -2206,12 +2297,21 @@ export default function AdminCustomerDetailPage() {
             ) : null}
 
             <SectionCard
-              title="Linked Subscriptions"
-              description="Contract history and current subscription context for this customer."
+              title="Active Linked Subscriptions"
+              description="Operationally active subscription context for this customer."
               actionHref={`/admin/subscriptions?customer=${customer.id}`}
               actionLabel="View All"
             >
-              <SubscriptionsTable rows={subscriptions} />
+              <SubscriptionsTable rows={activeLinkedSubscriptions} />
+            </SectionCard>
+
+            <SectionCard
+              title="Subscription History"
+              description="Cancelled/archived/completed/defaulted records remain visible for audit history."
+              actionHref={`/admin/subscriptions?customer=${customer.id}`}
+              actionLabel="View All"
+            >
+              <SubscriptionsTable rows={historicalLinkedSubscriptions} />
             </SectionCard>
 
             <SectionCard
@@ -2266,7 +2366,9 @@ export default function AdminCustomerDetailPage() {
                               </div>
                               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
-                                <div className="mt-1 text-sm font-semibold text-amber-900">{money(row.balance_total)}</div>
+                                <div className="mt-1 text-sm font-semibold text-amber-900">
+                                  {row.is_history_only ? "₹0.00" : money(row.active_outstanding_total || row.balance_total)}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2283,7 +2385,11 @@ export default function AdminCustomerDetailPage() {
                             >
                               Receipts
                             </Link>
-                            {row.status === "INVOICED" && Number(row.balance_total || 0) > 0 ? (
+                            {row.is_history_only ? (
+                              <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                                History only
+                              </span>
+                            ) : row.status === "INVOICED" && Number(row.active_outstanding_total || row.balance_total || 0) > 0 ? (
                               <Link
                                 href={`/admin/finance/collect?workflow=direct-sale&sale_id=${row.id}`}
                                 className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"

@@ -24,10 +24,14 @@ import { apiFetch, toArray } from "@/lib/api";
 
 type SubscriptionStatus =
   | "ACTIVE"
+  | "APPROVED"
+  | "PAYMENT_PENDING"
+  | "DELIVERY_PENDING"
   | "PENDING"
   | "WON"
   | "COMPLETED"
   | "CANCELLED"
+  | "CLOSED"
   | "DEFAULTED"
   | "UNKNOWN";
 
@@ -58,6 +62,13 @@ type BatchSummaryRecord = {
   assigned_lucky_ids: number;
   won_lucky_ids: number;
   monthly_booked_value: string;
+  active_monthly_booked_value: string;
+  active_contract_value: string;
+  draw_eligible_count: number;
+  historical_subscription_count: number;
+  cancelled_subscription_count: number;
+  archived_subscription_count: number;
+  historical_monthly_booked_value: string;
   draw_count: number;
 };
 
@@ -79,6 +90,16 @@ type LuckyIdRow = {
   subscription_number?: string;
   assignable?: boolean;
   assignment_note?: string;
+  current_customer_name?: string;
+  current_subscription_id?: number | null;
+  current_subscription_code?: string;
+  current_assignment_status?: string;
+  is_currently_assigned?: boolean;
+  is_available?: boolean;
+  has_historical_assignment?: boolean;
+  historical_subscription_status?: string;
+  historical_subscription_code?: string;
+  history_label?: string;
 };
 
 type SubscriptionRow = {
@@ -141,10 +162,14 @@ function normalizeSubscriptionStatus(value: unknown): SubscriptionStatus {
   const status = String(value ?? "").toUpperCase();
   if (
     status === "ACTIVE" ||
+    status === "APPROVED" ||
+    status === "PAYMENT_PENDING" ||
+    status === "DELIVERY_PENDING" ||
     status === "PENDING" ||
     status === "WON" ||
     status === "COMPLETED" ||
     status === "CANCELLED" ||
+    status === "CLOSED" ||
     status === "DEFAULTED"
   ) {
     return status;
@@ -212,6 +237,15 @@ function normalizeBatchSummary(raw: Record<string, unknown>): BatchSummaryRecord
     assigned_lucky_ids: toNumber(raw.assigned_lucky_ids),
     won_lucky_ids: toNumber(raw.won_lucky_ids),
     monthly_booked_value: toMoneyString(raw.monthly_booked_value),
+    active_monthly_booked_value: toMoneyString(
+      raw.active_monthly_booked_value ?? raw.monthly_booked_value
+    ),
+    active_contract_value: toMoneyString(raw.active_contract_value),
+    draw_eligible_count: toNumber(raw.draw_eligible_count),
+    historical_subscription_count: toNumber(raw.historical_subscription_count),
+    cancelled_subscription_count: toNumber(raw.cancelled_subscription_count),
+    archived_subscription_count: toNumber(raw.archived_subscription_count),
+    historical_monthly_booked_value: toMoneyString(raw.historical_monthly_booked_value),
     draw_count: toNumber(raw.draw_count),
   };
 }
@@ -236,6 +270,23 @@ function normalizeLuckyIdRow(raw: Record<string, unknown>): LuckyIdRow {
       undefined,
     assignable: typeof raw.assignable === "boolean" ? raw.assignable : undefined,
     assignment_note: toStringValue(raw.assignment_note).trim() || undefined,
+    current_customer_name: toStringValue(raw.current_customer_name).trim() || undefined,
+    current_subscription_id: toNullableNumber(raw.current_subscription_id),
+    current_subscription_code: toStringValue(raw.current_subscription_code).trim() || undefined,
+    current_assignment_status:
+      toStringValue(raw.current_assignment_status).trim() || undefined,
+    is_currently_assigned:
+      typeof raw.is_currently_assigned === "boolean" ? raw.is_currently_assigned : undefined,
+    is_available: typeof raw.is_available === "boolean" ? raw.is_available : undefined,
+    has_historical_assignment:
+      typeof raw.has_historical_assignment === "boolean"
+        ? raw.has_historical_assignment
+        : undefined,
+    historical_subscription_status:
+      toStringValue(raw.historical_subscription_status).trim() || undefined,
+    historical_subscription_code:
+      toStringValue(raw.historical_subscription_code).trim() || undefined,
+    history_label: toStringValue(raw.history_label).trim() || undefined,
   };
 }
 
@@ -378,6 +429,13 @@ export default function AdminBatchDetailPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const activeSubscriptions = subscriptions.filter((row) =>
+    ["ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"].includes(row.status)
+  );
+  const historicalSubscriptions = subscriptions.filter(
+    (row) => !["ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"].includes(row.status)
+  );
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -560,15 +618,21 @@ export default function AdminBatchDetailPage() {
                 <QuickActionGrid className="md:grid-cols-2 xl:grid-cols-4">
                   <KpiCard label="Subscriptions" value={String(summary.subscription_count)} />
                   <KpiCard label="Active Subscriptions" value={String(summary.active_subscription_count)} />
+                  <KpiCard
+                    label="Historical Subscriptions"
+                    value={String(summary.historical_subscription_count)}
+                  />
                   <KpiCard label="Won Subscriptions" value={String(summary.won_subscription_count)} />
                   <KpiCard
-                    label="Monthly Booked Value"
-                    value={money(summary.monthly_booked_value)}
-                    helper="From batch summary API."
+                    label="Active Monthly Booked Value"
+                    value={money(summary.active_monthly_booked_value)}
+                    helper="Excludes cancelled/archived subscriptions."
                   />
+                  <KpiCard label="Active Contract Value" value={money(summary.active_contract_value)} />
                   <KpiCard label="Available Lucky IDs" value={String(summary.available_lucky_ids)} />
                   <KpiCard label="Assigned Lucky IDs" value={String(summary.assigned_lucky_ids)} />
                   <KpiCard label="Won Lucky IDs" value={String(summary.won_lucky_ids)} />
+                  <KpiCard label="Draw Eligible" value={String(summary.draw_eligible_count)} />
                   <KpiCard label="Draw Records" value={String(summary.draw_count)} />
                 </QuickActionGrid>
 
@@ -647,18 +711,18 @@ export default function AdminBatchDetailPage() {
 
                             <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                               <div>
-                                {row.customer_name
-                                  ? row.customer_name
-                                  : row.status === "AVAILABLE"
+                                {row.current_customer_name || row.customer_name
+                                  ? row.current_customer_name || row.customer_name
+                                  : row.is_available || row.status === "AVAILABLE"
                                     ? "Unassigned"
                                     : row.status === "WON"
                                       ? "Winner without customer link"
                                       : "Assigned without customer link"}
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
-                                {row.subscription_number
-                                  ? row.subscription_number
-                                  : row.status === "AVAILABLE"
+                                {row.current_subscription_code || row.subscription_number
+                                  ? row.current_subscription_code || row.subscription_number
+                                  : row.is_available || row.status === "AVAILABLE"
                                     ? "No subscription"
                                     : row.status === "RELEASED"
                                       ? "Released from cancelled contract"
@@ -668,6 +732,12 @@ export default function AdminBatchDetailPage() {
                               </div>
                               {row.assignment_note ? (
                                 <div className="mt-1 text-xs text-muted-foreground">{row.assignment_note}</div>
+                              ) : null}
+                              {row.has_historical_assignment ? (
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {row.history_label ||
+                                    `History: ${row.historical_subscription_code || "subscription"} (${row.historical_subscription_status || "historical"})`}
+                                </div>
                               ) : null}
                             </td>
 
@@ -685,13 +755,13 @@ export default function AdminBatchDetailPage() {
             </DetailPanel>
 
             <DetailPanel
-              title="Linked subscriptions"
-              description="All subscriptions filtered to this batch, with real product, customer, and contract value visibility."
+              title="Active linked subscriptions"
+              description="Operationally active subscriptions only. Cancelled/archived records are shown separately in history."
             >
-              {subscriptions.length === 0 ? (
+              {activeSubscriptions.length === 0 ? (
                 <EmptyState
-                  title="No subscriptions"
-                  description="No subscriptions were returned for this batch."
+                  title="No active subscriptions are linked to this batch."
+                  description="Cancelled subscriptions are preserved below for audit history."
                 />
               ) : (
                 <DataTableShell>
@@ -718,7 +788,7 @@ export default function AdminBatchDetailPage() {
                     </thead>
 
                     <tbody>
-                      {subscriptions.map((row) => (
+                      {activeSubscriptions.map((row) => (
                         <tr key={row.id} className="align-top">
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                             <div className="font-medium">{row.subscription_number}</div>
@@ -764,6 +834,89 @@ export default function AdminBatchDetailPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                </DataTableShell>
+              )}
+            </DetailPanel>
+
+            <DetailPanel
+              title="Archived / cancelled subscription history"
+              description="History-only records retained for auditability. These do not contribute to active KPIs, draw eligibility, or collection queues."
+            >
+              {historicalSubscriptions.length === 0 ? (
+                <EmptyState
+                  title="No archived/cancelled subscription history."
+                  description="No historical subscriptions were returned for this batch."
+                />
+              ) : (
+                <DataTableShell>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0">
+                      <thead>
+                        <tr className="text-left">
+                          <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Subscription
+                          </th>
+                          <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Customer / Product
+                          </th>
+                          <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                            Financials
+                          </th>
+                          <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Status
+                          </th>
+                          <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historicalSubscriptions.map((row) => (
+                          <tr key={row.id} className="align-top">
+                            <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                              <div className="font-medium">{row.subscription_number}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Start {formatDate(row.start_date)}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {row.lucky_number != null
+                                  ? `Lucky #${String(row.lucky_number).padStart(2, "0")}`
+                                  : "No Lucky ID"}
+                              </div>
+                            </td>
+                            <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                              <div className="font-medium">
+                                {row.customer_name || "Unknown customer"}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {row.product_name || "Unknown product"}
+                              </div>
+                            </td>
+                            <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
+                              <div className="font-semibold">{money(row.total_amount)}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                EMI {money(row.monthly_amount)}
+                              </div>
+                            </td>
+                            <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                              <StatusBadge status={row.status} hideIcon />
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                History only
+                              </div>
+                            </td>
+                            <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                              <Link
+                                href={`/admin/subscriptions/${row.id}`}
+                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                              >
+                                Open Subscription
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </DataTableShell>
               )}

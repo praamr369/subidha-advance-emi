@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from billing.models import BillingInvoice
+from billing.models import DirectSale
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from inventory.models import InventoryItem
@@ -177,3 +178,43 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
         self.assertEqual(len(response.data["subscriptions"]["rows"]), 1)
         self.assertGreaterEqual(response.data["leads"]["summary"]["total_count"], 1)
         self.assertEqual(response.data["quotation_estimates"]["summary"]["quotation_count"], 1)
+
+    def test_cancelled_subscription_moves_to_history_only_metrics(self):
+        type(self.subscription).objects.filter(pk=self.subscription.pk).update(status="CANCELLED")
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["overview"]["active_subscriptions"], 0)
+        self.assertEqual(response.data["overview"]["active_contract_value"], "0.00")
+        self.assertEqual(response.data["overview"]["historical_subscriptions"], 1)
+        self.assertEqual(response.data["overview"]["historical_contract_value"], "1500.00")
+
+    def test_returned_direct_sale_excluded_from_active_outstanding(self):
+        DirectSale.objects.filter(pk=self.direct_sale.pk).update(
+            status="RETURNED",
+            balance_total=Decimal("200.00"),
+        )
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["overview"]["direct_sale_outstanding_total"], "0.00")
+        self.assertEqual(response.data["direct_sales"]["summary"]["outstanding_total"], "0.00")
+        self.assertEqual(response.data["direct_sales"]["summary"]["history_count"], 1)
+
+    def test_reversed_payment_excluded_from_active_count_and_collected_amount(self):
+        payment = self.subscription.payments.order_by("-id").first()
+        metadata = dict(payment.allocation_metadata or {})
+        metadata["reversal"] = {"is_reversed": True}
+        type(payment).objects.filter(pk=payment.pk).update(allocation_metadata=metadata)
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["payments"]["summary"]["active_count"], 0)
+        self.assertEqual(response.data["payments"]["summary"]["reversed_count"], 1)
+        self.assertEqual(response.data["payments"]["summary"]["active_collected_amount"], "0.00")

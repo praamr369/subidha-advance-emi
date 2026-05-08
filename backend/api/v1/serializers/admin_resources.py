@@ -54,6 +54,7 @@ from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
 from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from core.services.operational_visibility import subscription_batch_active_q
 
 
 def q2(value: Decimal) -> Decimal:
@@ -181,6 +182,12 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     total_subscription_value = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
+    historical_subscription_count = serializers.IntegerField(read_only=True)
+    cancelled_subscription_count = serializers.IntegerField(read_only=True)
+    active_contract_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    active_subscription_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    active_direct_sale_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    active_invoice_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     address = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
     user_is_active = serializers.BooleanField(source="user.is_active", read_only=True)
@@ -212,7 +219,13 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "email",
             "status",
             "active_subscription_count",
+            "historical_subscription_count",
+            "cancelled_subscription_count",
             "total_subscription_value",
+            "active_contract_value",
+            "active_subscription_due",
+            "active_direct_sale_outstanding",
+            "active_invoice_outstanding",
             "customer_source",
             "customer_code",
             "profile_photo_url",
@@ -226,7 +239,13 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "kyc_reviewed_at",
             "kyc_rejection_reason",
             "active_subscription_count",
+            "historical_subscription_count",
+            "cancelled_subscription_count",
             "total_subscription_value",
+            "active_contract_value",
+            "active_subscription_due",
+            "active_direct_sale_outstanding",
+            "active_invoice_outstanding",
             "customer_source",
             "customer_code",
             "profile_photo_url",
@@ -764,6 +783,16 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     subscription_id = serializers.SerializerMethodField()
     subscription_number = serializers.SerializerMethodField()
+    current_customer_name = serializers.SerializerMethodField()
+    current_subscription_id = serializers.SerializerMethodField()
+    current_subscription_code = serializers.SerializerMethodField()
+    current_assignment_status = serializers.SerializerMethodField()
+    is_currently_assigned = serializers.SerializerMethodField()
+    is_available = serializers.SerializerMethodField()
+    has_historical_assignment = serializers.SerializerMethodField()
+    historical_subscription_status = serializers.SerializerMethodField()
+    historical_subscription_code = serializers.SerializerMethodField()
+    history_label = serializers.SerializerMethodField()
     assignable = serializers.SerializerMethodField()
     assignment_state = serializers.SerializerMethodField()
     assignment_note = serializers.SerializerMethodField()
@@ -779,6 +808,16 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             "customer_name",
             "subscription_id",
             "subscription_number",
+            "current_customer_name",
+            "current_subscription_id",
+            "current_subscription_code",
+            "current_assignment_status",
+            "is_currently_assigned",
+            "is_available",
+            "has_historical_assignment",
+            "historical_subscription_status",
+            "historical_subscription_code",
+            "history_label",
             "assignable",
             "assignment_state",
             "assignment_note",
@@ -790,17 +829,44 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             "customer_name",
             "subscription_id",
             "subscription_number",
+            "current_customer_name",
+            "current_subscription_id",
+            "current_subscription_code",
+            "current_assignment_status",
+            "is_currently_assigned",
+            "is_available",
+            "has_historical_assignment",
+            "historical_subscription_status",
+            "historical_subscription_code",
+            "history_label",
             "assignable",
             "assignment_state",
             "assignment_note",
             "created_at",
         ]
 
-    def _linked_subscription(self, obj):
-        cache = getattr(self, "_linked_subscription_cache", None)
+    def _active_linked_subscription(self, obj):
+        cache = getattr(self, "_active_linked_subscription_cache", None)
         if cache is None:
             cache = {}
-            self._linked_subscription_cache = cache
+            self._active_linked_subscription_cache = cache
+
+        if obj.pk not in cache:
+            cache[obj.pk] = (
+                Subscription.objects.select_related("customer")
+                .filter(lucky_id=obj)
+                .filter(subscription_batch_active_q())
+                .order_by("-created_at", "-id")
+                .first()
+            )
+
+        return cache[obj.pk]
+
+    def _latest_linked_subscription(self, obj):
+        cache = getattr(self, "_latest_linked_subscription_cache", None)
+        if cache is None:
+            cache = {}
+            self._latest_linked_subscription_cache = cache
 
         if obj.pk not in cache:
             cache[obj.pk] = (
@@ -813,17 +879,17 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         return cache[obj.pk]
 
     def get_customer_name(self, obj):
-        subscription = self._linked_subscription(obj)
+        subscription = self._active_linked_subscription(obj)
         if subscription and getattr(subscription, "customer_id", None):
             return getattr(subscription.customer, "name", None)
         return None
 
     def get_subscription_id(self, obj):
-        subscription = self._linked_subscription(obj)
+        subscription = self._active_linked_subscription(obj)
         return subscription.id if subscription else None
 
     def get_subscription_number(self, obj):
-        subscription = self._linked_subscription(obj)
+        subscription = self._active_linked_subscription(obj)
         if not subscription:
             return None
 
@@ -832,6 +898,68 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             or getattr(subscription, "subscription_code", None)
             or f"SUB-{subscription.id}"
         )
+
+    def get_current_customer_name(self, obj):
+        return self.get_customer_name(obj)
+
+    def get_current_subscription_id(self, obj):
+        return self.get_subscription_id(obj)
+
+    def get_current_subscription_code(self, obj):
+        return self.get_subscription_number(obj)
+
+    def get_current_assignment_status(self, obj):
+        if self.get_is_currently_assigned(obj):
+            return "ASSIGNED"
+        if obj.status == LuckyIdStatus.WON:
+            return "WON"
+        return "AVAILABLE"
+
+    def get_is_currently_assigned(self, obj):
+        return self._active_linked_subscription(obj) is not None
+
+    def get_is_available(self, obj):
+        return obj.status == LuckyIdStatus.AVAILABLE and not self.get_is_currently_assigned(obj)
+
+    def get_has_historical_assignment(self, obj):
+        latest = self._latest_linked_subscription(obj)
+        current = self._active_linked_subscription(obj)
+        if latest is not None and (current is None or latest.id != current.id):
+            return True
+        return self._latest_release_audit(obj) is not None
+
+    def get_historical_subscription_status(self, obj):
+        if not self.get_has_historical_assignment(obj):
+            return None
+        latest = self._latest_linked_subscription(obj)
+        if latest:
+            return getattr(latest, "status", None)
+        if self._latest_release_audit(obj):
+            return SubscriptionStatus.CANCELLED
+        return None
+
+    def get_historical_subscription_code(self, obj):
+        if not self.get_has_historical_assignment(obj):
+            return None
+        latest = self._latest_linked_subscription(obj)
+        if not latest:
+            audit = self._latest_release_audit(obj)
+            old_subscription_id = None
+            if audit and isinstance(audit.metadata, dict):
+                old_subscription_id = audit.metadata.get("old_subscription_id")
+            return f"SUB-{old_subscription_id}" if old_subscription_id else None
+        return (
+            getattr(latest, "subscription_number", None)
+            or getattr(latest, "subscription_code", None)
+            or f"SUB-{latest.id}"
+        )
+
+    def get_history_label(self, obj):
+        if not self.get_has_historical_assignment(obj):
+            return ""
+        code = self.get_historical_subscription_code(obj) or "contract"
+        status_value = (self.get_historical_subscription_status(obj) or "historical").upper()
+        return f"Previously linked to {code} ({status_value})"
 
     def _has_release_audit(self, obj) -> bool:
         cache = getattr(self, "_release_audit_cache", None)
@@ -844,6 +972,23 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
                 metadata__event="LUCKY_ID_RELEASED_FROM_CANCELLED_SUBSCRIPTION",
                 metadata__lucky_id=obj.pk,
             ).exists()
+        return cache[obj.pk]
+
+    def _latest_release_audit(self, obj):
+        cache = getattr(self, "_latest_release_audit_cache", None)
+        if cache is None:
+            cache = {}
+            self._latest_release_audit_cache = cache
+        if obj.pk not in cache:
+            cache[obj.pk] = (
+                AuditLog.objects.filter(
+                    model_name="Subscription",
+                    metadata__event="LUCKY_ID_RELEASED_FROM_CANCELLED_SUBSCRIPTION",
+                    metadata__lucky_id=obj.pk,
+                )
+                .order_by("-created_at", "-id")
+                .first()
+            )
         return cache[obj.pk]
 
     def get_assignable(self, obj):
@@ -859,9 +1004,17 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             if self._has_release_audit(obj):
                 return "RELEASED"
             return "AVAILABLE"
-        linked = self._linked_subscription(obj)
-        if linked and linked.status == SubscriptionStatus.CANCELLED:
+        linked = self._active_linked_subscription(obj)
+        latest_linked = self._latest_linked_subscription(obj)
+        if (
+            obj.status == LuckyIdStatus.ASSIGNED
+            and latest_linked is not None
+            and latest_linked.status == SubscriptionStatus.CANCELLED
+            and linked is None
+        ):
             return "FROZEN_CANCELLED_HOLDER"
+        if not linked and self.get_has_historical_assignment(obj) and obj.status == LuckyIdStatus.AVAILABLE:
+            return "RELEASED"
         if obj.status == LuckyIdStatus.ASSIGNED:
             return "ASSIGNED"
         return "FROZEN"

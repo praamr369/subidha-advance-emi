@@ -17,13 +17,21 @@ export type CustomerOperationalSummaryResponse = {
   };
   summary: {
     active_subscriptions: number;
+    historical_subscriptions?: number;
+    active_contract_value?: string;
+    historical_contract_value?: string;
     subscription_outstanding: string;
     direct_sale_outstanding: string;
+    returned_direct_sale_count?: number;
     rent_lease_outstanding: string;
     overdue_emi_count: number;
     pending_delivery_count: number;
     open_service_count: number;
     last_payment_date: string | null;
+    active_payment_count?: number;
+    reversed_payment_count?: number;
+    active_collected_amount?: string;
+    reversed_payment_amount?: string;
     risk_status: CustomerRiskStatus;
   };
   subscriptions: Record<string, unknown>[];

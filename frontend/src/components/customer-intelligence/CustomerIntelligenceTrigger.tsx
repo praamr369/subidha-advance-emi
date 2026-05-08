@@ -109,6 +109,7 @@ function CustomerIntelligenceDrawer({
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>Active subs: {data.summary.active_subscriptions}</div>
+            <div>Historical subs: {data.summary.historical_subscriptions ?? 0}</div>
             <div>Overdue EMI: {data.summary.overdue_emi_count}</div>
             <div>Pending deliveries: {data.summary.pending_delivery_count}</div>
             <div>Open service: {data.summary.open_service_count}</div>
@@ -118,8 +119,20 @@ function CustomerIntelligenceDrawer({
             <div>Direct-sale due: {money(data.summary.direct_sale_outstanding)}</div>
             <div>Last payment: {data.summary.last_payment_date || "—"}</div>
           </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div>Active contract: {money(data.summary.active_contract_value || "0.00")}</div>
+            <div>Historical contract: {money(data.summary.historical_contract_value || "0.00")}</div>
+            <div>Active payments: {data.summary.active_payment_count ?? 0}</div>
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={collectHref} className="rounded border px-3 py-1.5 text-xs">Collect payment</Link>
+            {(Number(data.summary.subscription_outstanding || 0) > 0 ||
+              Number(data.summary.direct_sale_outstanding || 0) > 0) ? (
+              <Link href={collectHref} className="rounded border px-3 py-1.5 text-xs">Collect payment</Link>
+            ) : (
+              <span className="rounded border bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+                No active receivable to collect
+              </span>
+            )}
             <Link href={profileHref} className="rounded border px-3 py-1.5 text-xs">View customer profile</Link>
             <Link href={`/admin/subscriptions/create?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">Create subscription</Link>
             <Link href={`/admin/deliveries?customer=${customerId}`} className="rounded border px-3 py-1.5 text-xs">View deliveries</Link>

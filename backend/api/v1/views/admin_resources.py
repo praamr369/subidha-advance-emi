@@ -114,6 +114,12 @@ from subscriptions.services.winner_state_service import (
     winner_history_q,
 )
 from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from core.services.operational_visibility import (
+    subscription_batch_active_q,
+    subscription_draw_eligible_q,
+    direct_sale_active_q,
+    invoice_active_q,
+)
 
 # ... rest of the file
 
@@ -419,25 +425,40 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
     def summary(self, request, pk=None):
         batch = self.get_object()
 
-        subscription_count = Subscription.objects.filter(batch=batch).count()
-        active_subscription_count = Subscription.objects.filter(
-            batch=batch,
-            status=SubscriptionStatus.ACTIVE,
-        ).count()
+        subscriptions_qs = Subscription.objects.filter(batch=batch)
+        active_subscriptions_qs = subscriptions_qs.filter(subscription_batch_active_q())
+        historical_subscriptions_qs = subscriptions_qs.exclude(subscription_batch_active_q())
+
+        subscription_count = subscriptions_qs.count()
+        active_subscription_count = active_subscriptions_qs.count()
         won_subscription_count = Subscription.objects.filter(
             batch=batch,
         ).filter(winner_history_q()).distinct().count()
 
         lucky_qs = LuckyId.objects.filter(batch=batch)
         available_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.AVAILABLE).count()
-        assigned_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.ASSIGNED).count()
+        cancelled_holder_lucky_ids = list(
+            subscriptions_qs.filter(status=SubscriptionStatus.CANCELLED, lucky_id__isnull=False).values_list(
+                "lucky_id_id", flat=True
+            )
+        )
+        assigned_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.ASSIGNED).exclude(
+            id__in=cancelled_holder_lucky_ids
+        ).count()
         won_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.WON).count()
+        draw_eligible_count = subscriptions_qs.filter(subscription_draw_eligible_q()).count()
 
-        monthly_booked_value = (
-            Subscription.objects.filter(batch=batch).aggregate(
-                total=Sum("monthly_amount")
-            )["total"]
-            or MONEY_ZERO
+        monthly_booked_value = active_subscriptions_qs.aggregate(total=Sum("monthly_amount"))["total"] or MONEY_ZERO
+        active_contract_value = active_subscriptions_qs.aggregate(total=Sum("total_amount"))["total"] or MONEY_ZERO
+        historical_subscription_count = historical_subscriptions_qs.count()
+        cancelled_subscription_count = historical_subscriptions_qs.filter(
+            status=SubscriptionStatus.CANCELLED
+        ).count()
+        archived_subscription_count = historical_subscriptions_qs.filter(
+            status__in=[SubscriptionStatus.CLOSED, SubscriptionStatus.COMPLETED]
+        ).count()
+        historical_monthly_booked_value = (
+            historical_subscriptions_qs.aggregate(total=Sum("monthly_amount"))["total"] or MONEY_ZERO
         )
 
         return Response(
@@ -456,6 +477,13 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
                 "assigned_lucky_ids": assigned_lucky_ids,
                 "won_lucky_ids": won_lucky_ids,
                 "monthly_booked_value": str(monthly_booked_value),
+                "active_monthly_booked_value": str(monthly_booked_value),
+                "active_contract_value": str(active_contract_value),
+                "draw_eligible_count": draw_eligible_count,
+                "historical_subscription_count": historical_subscription_count,
+                "cancelled_subscription_count": cancelled_subscription_count,
+                "archived_subscription_count": archived_subscription_count,
+                "historical_monthly_booked_value": str(historical_monthly_booked_value),
                 "draw_count": batch.lucky_draws.count(),
             }
         )
@@ -554,13 +582,52 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         queryset = super().get_queryset().annotate(
             active_subscription_count=Count(
                 'subscriptions',
-                filter=Q(subscriptions__status=SubscriptionStatus.ACTIVE),
+                filter=subscription_batch_active_q("subscriptions__"),
                 distinct=True
+            ),
+            historical_subscription_count=Count(
+                "subscriptions",
+                filter=~subscription_batch_active_q("subscriptions__"),
+                distinct=True,
+            ),
+            cancelled_subscription_count=Count(
+                "subscriptions",
+                filter=Q(subscriptions__status=SubscriptionStatus.CANCELLED),
+                distinct=True,
             ),
             total_subscription_value=Coalesce(
                 Sum('subscriptions__total_amount'),
                 Value(Decimal('0.00'), output_field=DecimalField(max_digits=12, decimal_places=2))
-            )
+            ),
+            active_contract_value=Coalesce(
+                Sum(
+                    "subscriptions__total_amount",
+                    filter=subscription_batch_active_q("subscriptions__"),
+                ),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+            ),
+            active_subscription_due=Coalesce(
+                Sum(
+                    "subscriptions__emis__amount",
+                    filter=subscription_batch_active_q("subscriptions__")
+                    & Q(subscriptions__emis__status=EmiStatus.PENDING),
+                ),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+            ),
+            active_direct_sale_outstanding=Coalesce(
+                Sum(
+                    "direct_sales__balance_total",
+                    filter=direct_sale_active_q("direct_sales__"),
+                ),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+            ),
+            active_invoice_outstanding=Coalesce(
+                Sum(
+                    "billing_invoices__balance_total",
+                    filter=invoice_active_q("billing_invoices__"),
+                ),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+            ),
         )
 
         search = (

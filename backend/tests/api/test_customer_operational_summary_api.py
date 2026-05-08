@@ -82,6 +82,17 @@ class CustomerOperationalSummaryApiTests(APITestCase):
         self.assertEqual(response.data["summary"]["overdue_emi_count"], 1)
         self.assertEqual(response.data["summary"]["risk_status"], "OVERDUE")
 
+    def test_operational_summary_exposes_active_vs_historical_finance_fields(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-summary/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn("active_contract_value", response.data["summary"])
+        self.assertIn("historical_contract_value", response.data["summary"])
+        self.assertIn("active_payment_count", response.data["summary"])
+        self.assertIn("reversed_payment_count", response.data["summary"])
+
     def test_cashier_can_read_operational_summary(self):
         self.client.force_authenticate(user=self.cashier)
         response = self.client.get(

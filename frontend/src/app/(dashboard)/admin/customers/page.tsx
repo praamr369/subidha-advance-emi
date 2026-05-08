@@ -63,7 +63,13 @@ type CustomerRow = {
   user_id?: number | null;
   created_at?: string | null;
   active_subscription_count?: number;
+  historical_subscription_count?: number;
+  cancelled_subscription_count?: number;
   total_subscription_value?: string;
+  active_contract_value?: string;
+  active_subscription_due?: string;
+  active_direct_sale_outstanding?: string;
+  active_invoice_outstanding?: string;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -176,9 +182,15 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
       toOptionalNumber(raw.active_subscription_count) ??
       toOptionalNumber(raw.subscription_count) ??
       0,
+    historical_subscription_count: toOptionalNumber(raw.historical_subscription_count) ?? 0,
+    cancelled_subscription_count: toOptionalNumber(raw.cancelled_subscription_count) ?? 0,
     total_subscription_value: toMoneyString(
       raw.total_subscription_value ?? raw.total_contract_value
     ),
+    active_contract_value: toMoneyString(raw.active_contract_value),
+    active_subscription_due: toMoneyString(raw.active_subscription_due),
+    active_direct_sale_outstanding: toMoneyString(raw.active_direct_sale_outstanding),
+    active_invoice_outstanding: toMoneyString(raw.active_invoice_outstanding),
   };
 }
 
@@ -410,7 +422,7 @@ export default function AdminCustomersPage() {
   const totalContractValue = useMemo(
     () =>
       rows.reduce(
-        (sum, row) => sum + Number(row.total_subscription_value || 0),
+        (sum, row) => sum + Number(row.active_contract_value || 0),
         0
       ),
     [rows]
@@ -443,6 +455,12 @@ export default function AdminCustomersPage() {
         kyc_status: row.kyc_status,
         status: row.status,
         active_subscription_count: row.active_subscription_count ?? 0,
+        active_contract_value: row.active_contract_value ?? "0.00",
+        active_subscription_due: row.active_subscription_due ?? "0.00",
+        active_direct_sale_outstanding: row.active_direct_sale_outstanding ?? "0.00",
+        active_invoice_outstanding: row.active_invoice_outstanding ?? "0.00",
+        historical_subscription_count: row.historical_subscription_count ?? 0,
+        cancelled_subscription_count: row.cancelled_subscription_count ?? 0,
         total_subscription_value: row.total_subscription_value ?? "0.00",
         created_at: row.created_at ?? "",
       })),
@@ -503,7 +521,26 @@ export default function AdminCustomersPage() {
               {row.active_subscription_count ?? 0} active
             </div>
             <div className="text-xs text-muted-foreground">
-              {money(row.total_subscription_value)}
+              Active contract {money(row.active_contract_value)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Active due {money(row.active_subscription_due)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Direct due {money(row.active_direct_sale_outstanding)} · Invoice due {money(row.active_invoice_outstanding)}
+            </div>
+            {(row.cancelled_subscription_count || 0) > 0 ? (
+              <div className="text-xs text-amber-700">
+                {row.cancelled_subscription_count} cancelled contract(s) in history
+              </div>
+            ) : null}
+            {(row.historical_subscription_count || 0) > 0 && (row.cancelled_subscription_count || 0) === 0 ? (
+              <div className="text-xs text-muted-foreground">
+                {row.historical_subscription_count} historical contract(s)
+              </div>
+            ) : null}
+            <div className="text-xs text-muted-foreground">
+              Historical contract {money(row.total_subscription_value)}
             </div>
           </div>
         ),
@@ -653,6 +690,12 @@ export default function AdminCustomersPage() {
                     { key: "kyc_status", header: "kyc_status" },
                     { key: "status", header: "status" },
                     { key: "active_subscription_count", header: "active_subscription_count" },
+                    { key: "active_contract_value", header: "active_contract_value" },
+                    { key: "active_subscription_due", header: "active_subscription_due" },
+                    { key: "active_direct_sale_outstanding", header: "active_direct_sale_outstanding" },
+                    { key: "active_invoice_outstanding", header: "active_invoice_outstanding" },
+                    { key: "historical_subscription_count", header: "historical_subscription_count" },
+                    { key: "cancelled_subscription_count", header: "cancelled_subscription_count" },
                     { key: "total_subscription_value", header: "total_subscription_value" },
                     { key: "created_at", header: "created_at" },
                   ],
