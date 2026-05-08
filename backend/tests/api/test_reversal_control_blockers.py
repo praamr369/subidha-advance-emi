@@ -10,6 +10,7 @@ from billing.services.billing_service import approve_billing_invoice, create_dir
 from subscriptions.models import Emi, LuckyDraw, OperationalCancellation, Payment
 from inventory.models import InventoryItem
 from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import create_customer_user
 
 
 class ReversalControlBlockerTests(APITestCase):
@@ -135,3 +136,56 @@ class ReversalControlBlockerTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_case_detail_sync_and_reconcile_endpoints_work(self):
+        response = self.client.post(
+            "/api/v1/admin/finance/reversal-cases/",
+            {
+                "source_type": "OTHER",
+                "source_reference": "MANUAL-SYNC-CASE",
+                "reversal_type": "MANUAL_SETTLEMENT",
+                "amount_snapshot": "10.00",
+                "reason": "Open case for sync/reconcile",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        case_id = response.data["id"]
+
+        sync_response = self.client.post(f"/api/v1/admin/finance/reversal-cases/{case_id}/sync/", {}, format="json")
+        self.assertEqual(sync_response.status_code, status.HTTP_200_OK, sync_response.data)
+        self.assertIn("reconciliation_checklist", sync_response.data)
+
+        reconcile_response = self.client.post(
+            f"/api/v1/admin/finance/reversal-cases/{case_id}/reconcile/",
+            {"reason": "Queue reconciliation review"},
+            format="json",
+        )
+        self.assertEqual(reconcile_response.status_code, status.HTTP_200_OK, reconcile_response.data)
+        self.assertIn("reconciliation_checklist", reconcile_response.data)
+
+    def test_blocked_case_cannot_close_without_override(self):
+        response = self.client.post(
+            "/api/v1/admin/finance/reversal-cases/",
+            {
+                "source_type": "DIRECT_SALE",
+                "source_id": 999999,
+                "reason": "Invalid source for blocker",
+                "stock_return_required": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        case_id = response.data["id"]
+        close_response = self.client.post(
+            f"/api/v1/admin/finance/reversal-cases/{case_id}/close/",
+            {"reason": "Attempt close without override"},
+            format="json",
+        )
+        self.assertEqual(close_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_admin_cannot_access_reversal_case_api(self):
+        user = create_customer_user(username="rev_case_non_admin", phone="9386333019")
+        self.client.force_authenticate(user=user)
+        response = self.client.get("/api/v1/admin/finance/reversal-cases/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

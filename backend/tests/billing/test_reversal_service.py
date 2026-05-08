@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, Vendor as AccountingVendor
-from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSale, DirectSaleReturnStatus, PurchaseReturn
+from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSale, DirectSaleReturnKind, DirectSaleReturnStatus, PurchaseReturn
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.reversal_service import (
     cancel_direct_sale_before_invoice,
@@ -242,6 +242,69 @@ class ReversalServiceTests(TestCase):
         self.assertEqual(eligibility["return_lines"][0]["sale_out_quantity"], "2.000")
         self.assertEqual(eligibility["return_lines"][0]["already_returned_quantity"], "0.000")
         self.assertEqual(eligibility["return_lines"][0]["returnable_quantity"], "2.000")
+
+    def test_delivered_return_allows_void_invoice_when_sale_out_exists(self):
+        payload = self._sale_payload()
+        payload["received_total"] = Decimal("2000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+        receipt = invoice.receipts.first()
+        void_receipt_with_reason(receipt_id=receipt.id, reason="Void for delivered return", performed_by=self.admin)
+        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Void invoice")
+
+        ret = create_direct_sale_return(
+            direct_sale_id=sale.id,
+            reason="Delivered return after invoice void",
+            return_kind=DirectSaleReturnKind.DELIVERED_RETURN,
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            performed_by=self.admin,
+        )
+        self.assertEqual(ret.metadata.get("financial_mode"), "NO_ACTIVE_CUSTOMER_VALUE")
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+        self.assertEqual(ret.status, DirectSaleReturnStatus.POSTED)
+        self.assertIsNone(ret.credit_note_id)
+        self.assertTrue(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.SALE_RETURN_IN,
+                reference_model="DirectSaleReturnLine",
+                reference_id=f"{ret.id}:{ret.lines.first().id}",
+            ).exists()
+        )
+
+    def test_returnable_quantity_becomes_zero_after_full_void_invoice_return(self):
+        payload = self._sale_payload()
+        payload["received_total"] = Decimal("2000.00")
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+        receipt = invoice.receipts.first()
+        void_receipt_with_reason(receipt_id=receipt.id, reason="Void for delivered return", performed_by=self.admin)
+        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Void invoice")
+        ret = create_direct_sale_return(
+            direct_sale_id=sale.id,
+            reason="Full delivered return",
+            return_kind=DirectSaleReturnKind.DELIVERED_RETURN,
+            stock_destination="INSPECTION",
+            stock_location_id=self.inspection_location.id,
+            lines=[{"direct_sale_line_id": sale.lines.first().id, "quantity": "2.000"}],
+            performed_by=self.admin,
+        )
+        ret.status = DirectSaleReturnStatus.APPROVED
+        ret.save(update_fields=["status", "updated_at"])
+        post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=sale.id)
+        self.assertEqual(eligibility["return_lines"][0]["returnable_quantity"], "0.000")
 
     def test_return_rejects_line_not_belonging_to_sale(self):
         sale = create_direct_sale(payload=self._sale_payload(), created_by=self.admin)

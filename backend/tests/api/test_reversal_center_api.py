@@ -170,3 +170,52 @@ class ReversalCenterApiTests(APITestCase):
         self.assertIn("product_name", first)
         self.assertIn("sku", first)
         self.assertIn("available_by_location", first)
+
+    def test_create_delivered_return_works_after_void_invoice(self):
+        sale = create_direct_sale(
+            payload={
+                "sale_date": date(2026, 4, 15),
+                "customer": self.customer,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account,
+                "delivery_required": False,
+                "received_total": Decimal("1000.00"),
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [{"product": self.product, "inventory_item": self.inventory_item, "description": "Line", "quantity": Decimal("1.000"), "unit_price": Decimal("1000.00"), "discount_amount": Decimal("0.00"), "taxable_value": Decimal("1000.00"), "gst_rate": None, "cgst_amount": Decimal("0.00"), "sgst_amount": Decimal("0.00"), "igst_amount": Decimal("0.00"), "line_total": Decimal("1000.00"), "hsn_sac_code": ""}],
+            },
+            created_by=self.admin,
+        )
+        invoice = sale.billing_invoices.first()
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
+        self.client.force_authenticate(user=self.admin)
+        receipt = invoice.receipts.first()
+        void_response = self.client.post(
+            f"/api/v1/admin/billing/receipts/{receipt.id}/void/",
+            {"reason": "Void before delivered return"},
+            format="json",
+        )
+        self.assertEqual(void_response.status_code, status.HTTP_200_OK, void_response.data)
+        cancel_invoice = self.client.post(
+            f"/api/v1/billing/invoices/{invoice.id}/cancel/",
+            {"reason": "Cancel invoice", "confirm": True},
+            format="json",
+        )
+        self.assertEqual(cancel_invoice.status_code, status.HTTP_200_OK, cancel_invoice.data)
+        eligibility = self.client.get(f"/api/v1/admin/billing/direct-sales/{sale.id}/return-eligibility/")
+        self.assertEqual(eligibility.status_code, status.HTTP_200_OK, eligibility.data)
+        self.assertEqual(eligibility.data["return_lines"][0]["returnable_quantity"], "1.000")
+        create_response = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale.id}/returns/",
+            {
+                "reason": "Delivered return",
+                "return_kind": "DELIVERED_RETURN",
+                "stock_destination": "INSPECTION",
+                "stock_location_id": self.inspection_location.id,
+                "lines": [{"sale_line_id": sale.lines.first().id, "quantity": "1.000"}],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
