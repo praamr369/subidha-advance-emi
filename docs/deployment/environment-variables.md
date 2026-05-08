@@ -1,68 +1,65 @@
-# Environment Variables (Production Matrix)
+# Environment Variables (Pre-Production + Production)
 
-All production secrets must be stored outside git (systemd env file, secret manager, or vault).
+Store live values outside git (vault, secret manager, or server environment files).
 
-## Backend Required
-
+## Backend Core
 - `DJANGO_ENV=production`
 - `DJANGO_DEBUG=false`
-- `DJANGO_SECRET_KEY` (>=50 chars, non-placeholder)
-- `JWT_SIGNING_KEY` (>=32 chars, non-placeholder; separate from Django key recommended)
-- `DJANGO_ALLOWED_HOSTS` (comma-separated bare hosts, no ports/paths)
-- Database (choose one strategy):
+- `DJANGO_SECRET_KEY=<secure-random>`
+- `DJANGO_ALLOWED_HOSTS=app.example.com,api.example.com`
+- `JWT_SIGNING_KEY=<secure-random>`
+- Database strategy:
   - `DATABASE_URL=postgresql://...`
-  - OR `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+  - or `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
 
-## Backend Security and Proxy Recommended
-
+## Backend Security / Session / CORS
 - `CORS_ALLOWED_ORIGINS=https://app.example.com`
 - `CSRF_TRUSTED_ORIGINS=https://app.example.com`
-- `TRUST_X_FORWARDED_PROTO=true`
-- `USE_X_FORWARDED_HOST=true`
-- `SECURE_SSL_REDIRECT=true`
 - `SESSION_COOKIE_SECURE=true`
 - `CSRF_COOKIE_SECURE=true`
 - `SESSION_COOKIE_SAMESITE=Lax`
 - `CSRF_COOKIE_SAMESITE=Lax`
-- `DJANGO_LOG_LEVEL=INFO`
-- `DB_CONN_MAX_AGE=60`
+- `SECURE_SSL_REDIRECT=true`
+- `TRUST_X_FORWARDED_PROTO=true`
+- `USE_X_FORWARDED_HOST=true`
 
-## Static/Media
-
+## Static / Media / File Storage
 - `STATIC_URL=/static/`
 - `STATIC_ROOT=/srv/subidha-core/staticfiles`
 - `MEDIA_URL=/media/`
 - `MEDIA_ROOT=/srv/subidha-core/media`
 
-## Health/Readiness Controls
-
+## Logging / Monitoring / Backups
+- `DJANGO_LOG_LEVEL=INFO`
+- `BACKUP_ROOT=/var/backups/subidha`
 - `HEALTHCHECK_DB_ALIAS=default`
-- `HEALTHCHECK_CHECK_MIGRATIONS=true`
-- `HEALTHCHECK_INCLUDE_DETAILS=false`
 
-## Email/OTP (required if password reset + OTP flows are active)
-
-- `OTP_DELIVERY_BACKEND` (`auto`/`sms`/`email`)
-- `OTP_ALLOW_EMAIL_FALLBACK=true|false`
+## Email / SMS / OTP (if enabled)
 - `EMAIL_BACKEND`
 - `EMAIL_HOST`
 - `EMAIL_PORT`
-- `EMAIL_USE_TLS`
-- `EMAIL_USE_SSL`
 - `EMAIL_HOST_USER`
 - `EMAIL_HOST_PASSWORD`
 - `DEFAULT_FROM_EMAIL`
+- `OTP_DELIVERY_BACKEND`
+- `OTP_ALLOW_EMAIL_FALLBACK`
+
+## Payment Gateway (if enabled)
+- `PAYMENT_GATEWAY_PROVIDER`
+- `PAYMENT_GATEWAY_PUBLIC_KEY`
+- `PAYMENT_GATEWAY_SECRET_KEY`
+- `PAYMENT_GATEWAY_WEBHOOK_SECRET`
 
 ## Frontend Required
-
 - `NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1`
+- `NEXT_PUBLIC_SITE_URL=https://app.example.com`
 
-## Frontend Optional
+## Critical Warning
+- `NEXT_PUBLIC_API_BASE_URL` **must include `/api/v1`**.
+- Correct: `https://api.example.com/api/v1`
+- Incorrect: `https://api.example.com`
 
-- `NEXT_PUBLIC_APP_NAME=SUBIDHA CORE`
-
-## Secrets Handling Rules
-
-- Never commit `.env` files with live credentials.
-- Never expose backend-only secrets as `NEXT_PUBLIC_*`.
-- Rotate secrets on handover cutover and after any incident.
+## Security Rules
+- Never commit real secrets in `.env` files.
+- Never commit Playwright auth storage states with tokens.
+- Never expose backend-only secrets under `NEXT_PUBLIC_*`.

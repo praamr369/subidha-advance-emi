@@ -13,8 +13,8 @@ Final release hardening for dashboard UX, reversal/read-only behavior, role-safe
 ## Known Lint State
 - Run:
   - `cd frontend && npm run lint`
-- Lint remains strict (`max-warnings=0`).
-- Remaining findings are tracked in `docs/operations/frontend-lint-debt.md`.
+- Lint is strict (`max-warnings=0`) and currently passing.
+- Status details are tracked in `docs/operations/frontend-lint-debt.md`.
 
 ## Vendor Auth-State Behavior
 - Storage states live in `frontend/tests/e2e/.auth/`.

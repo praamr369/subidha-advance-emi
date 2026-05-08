@@ -85,6 +85,7 @@ set -a
 . /etc/subidha-core/backend.env
 set +a
 python manage.py check --deploy --settings core.settings.production
+python manage.py makemigrations --check --dry-run --settings core.settings.production
 python manage.py migrate --settings core.settings.production
 python manage.py collectstatic --noinput --settings core.settings.production
 ```
@@ -108,9 +109,15 @@ set -a
 . /etc/subidha-core/frontend.env
 set +a
 npm ci
+npm run typecheck
 npm run build
 npm run start -- --hostname 127.0.0.1 --port 3000
 ```
+
+Critical frontend config:
+- `NEXT_PUBLIC_API_BASE_URL` must include `/api/v1`.
+- Example: `https://api.example.com/api/v1`
+- Do not use `https://api.example.com` alone.
 
 ## 7) systemd Template (Backend)
 
@@ -279,6 +286,10 @@ Then verify:
 - customer/partner scoped access still works
 - one recent receipt/invoice/delivery PDF renders
 
+Production safety:
+- Never run reset scripts on production.
+- `reset_business_data` is local/staging-only and requires explicit operator confirmation.
+
 ## 13) Health Checks
 
 Public endpoints:
@@ -332,3 +343,7 @@ bash scripts/run-release-candidate.sh
 ```
 
 If the release script is not available on the host, run the equivalent backend and frontend commands from `docs/operations/go-live-dry-run.md`.
+
+Playwright known non-blocker:
+- vendor smoke may skip in local/dev when `frontend/tests/e2e/.auth/vendor.json` is missing.
+- expected message: `vendor auth state missing; run auth setup or provide vendor.json`.

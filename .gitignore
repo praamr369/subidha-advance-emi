@@ -78,6 +78,10 @@ coverage/
 jest-results/
 playwright-report/
 test-results/
+storage-state/*.json
+auth-state/*.json
+frontend/tests/e2e/.auth/*.json
+frontend/tests/e2e/.generated/*.json
 
 # ------------------------------
 # Archives / local exports
@@ -101,6 +105,7 @@ temp/
 *.pid
 *.seed
 *.pid.lock
+*.out
 
 # ------------------------------
 # Mac / Linux misc
