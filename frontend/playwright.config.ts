@@ -91,7 +91,8 @@ export default defineConfig({
       command: "bash ../backend/scripts/start_playwright_backend.sh",
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      // Backend bootstrap may create/install a dedicated playwright venv on first run.
+      timeout: 420_000,
       cwd: ".",
       env: {
         ...process.env,

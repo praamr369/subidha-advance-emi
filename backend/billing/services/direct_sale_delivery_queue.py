@@ -229,6 +229,9 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "blocking_reasons": op["blocking_reasons"],
         "status_label": phase_label,
         "stock_state": op.get("inventory_state"),
+        "stock_return_status": (
+            "SALE_RETURN_IN_POSTED" if return_pickup_completed else "PENDING_RETURN_PICKUP" if return_pickup_required else None
+        ),
         "delivery_state": snap.get("phase_code"),
         "action_endpoints": action_endpoints,
         "links": {

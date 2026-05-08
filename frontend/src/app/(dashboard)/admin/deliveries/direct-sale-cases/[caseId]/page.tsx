@@ -58,8 +58,8 @@ function statusTone(status?: string | null): string {
 }
 
 function actionLabel(key: string): string {
-  if (key === "SCHEDULE") return "Schedule";
-  if (key === "DISPATCH") return "Dispatch / Start Delivery";
+  if (key === "SCHEDULE") return "Assign Delivery / Reschedule Delivery";
+  if (key === "DISPATCH") return "Create Delivery Action";
   if (key === "MARK_DELIVERED") return "Mark Delivered";
   if (key === "CANCEL") return "Cancel Delivery";
   if (key === "ADD_NOTE") return "Add Note";
@@ -154,6 +154,10 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
   async function handleSaveMetadata() {
     if (!caseId) return;
+    if (isHistoryOnly) {
+      setError("This direct-sale delivery is history-only. Active delivery edits are disabled.");
+      return;
+    }
     try {
       setActionLoading("metadata");
       setMessage(null);
@@ -177,6 +181,10 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
   async function runAction(action: "SCHEDULE" | "DISPATCH" | "MARK_DELIVERED" | "CANCEL" | "ADD_NOTE") {
     if (!caseId || !delivery) return;
+    if (isHistoryOnly) {
+      setError("This direct-sale delivery is history-only. Active delivery actions are disabled.");
+      return;
+    }
     try {
       setActionLoading(action);
       setMessage(null);
@@ -231,12 +239,39 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
   const blockingReasons = delivery?.blocking_reasons || [];
   const nextActions = delivery?.next_actions || [];
-  const actionDisabledReason = blockingReasons.length ? blockingReasons.join(" ") : "";
-  const showSchedule = nextActions.includes("SCHEDULE_DELIVERY") || delivery?.status === "PENDING";
+  const historyOnlyStatusSet = useMemo(
+    () =>
+      new Set([
+        "REVERSED_POST_INVOICE",
+        "RETURNED",
+        "ARCHIVED",
+        "CANCELLED_AFTER_DELIVERY",
+        "CANCELLED_PRE_INVOICE",
+      ]),
+    []
+  );
+  const stockReturnPosted = String(delivery?.stock_return_status || "").toUpperCase().includes("SALE_RETURN_IN");
+  const isHistoryOnly = Boolean(
+    (delivery?.history_only || delivery?.source_reversed) &&
+      historyOnlyStatusSet.has(String(delivery?.source_status || "").toUpperCase()) &&
+      (delivery?.source_archived || delivery?.source_reversed) &&
+      (delivery?.return_pickup_completed || stockReturnPosted)
+  );
+
+  const actionDisabledReason = isHistoryOnly
+    ? "History-only: the source sale has been reversed/returned and archived from active delivery operations."
+    : blockingReasons.length
+      ? blockingReasons.join(" ")
+      : "";
+
+  const showSchedule = !isHistoryOnly && (nextActions.includes("SCHEDULE_DELIVERY") || delivery?.status === "PENDING");
   const showDispatch =
-    delivery?.status === "SCHEDULED" || delivery?.status === "PENDING" || nextActions.includes("SCHEDULE_DELIVERY");
-  const showMarkDelivered = nextActions.includes("MARK_DELIVERED") || delivery?.status === "OUT_FOR_DELIVERY" || delivery?.status === "SCHEDULED";
-  const showCancel = delivery?.status !== "DELIVERED" && delivery?.status !== "CANCELLED";
+    !isHistoryOnly &&
+    (delivery?.status === "SCHEDULED" || delivery?.status === "PENDING" || nextActions.includes("SCHEDULE_DELIVERY"));
+  const showMarkDelivered =
+    !isHistoryOnly &&
+    (nextActions.includes("MARK_DELIVERED") || delivery?.status === "OUT_FOR_DELIVERY" || delivery?.status === "SCHEDULED");
+  const showCancel = !isHistoryOnly && delivery?.status !== "DELIVERED" && delivery?.status !== "CANCELLED";
 
   return (
     <PortalPage
@@ -254,6 +289,25 @@ export default function AdminDirectSaleDeliveryDetailPage() {
           : []),
         ...(delivery?.links?.open_invoice
           ? [{ href: delivery.links.open_invoice, label: "Open Invoice", variant: "secondary" as const }]
+          : []),
+        ...(delivery?.direct_sale_id
+          ? [
+              {
+                href: `/admin/billing/reversals?direct_sale=${delivery.direct_sale_id}`,
+                label: "View Reversal",
+                variant: "secondary" as const,
+              },
+              {
+                href: `/admin/inventory/ledger?direct_sale=${delivery.direct_sale_id}`,
+                label: "View Stock Ledger",
+                variant: "secondary" as const,
+              },
+              {
+                href: `/admin/billing/documents?direct_sale=${delivery.direct_sale_id}`,
+                label: "View Documents",
+                variant: "secondary" as const,
+              },
+            ]
           : []),
       ]}
       stats={[
@@ -307,6 +361,76 @@ export default function AdminDirectSaleDeliveryDetailPage() {
               title="Source Summary"
               description="Direct-sale, invoice, and customer source facts for delivery operations."
             >
+              {delivery.source_reversed ? (
+                <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                  <div className="font-semibold">Source reversed</div>
+                  <div className="mt-1 text-violet-900/80">
+                    Original delivery is preserved for history. The source sale has been reversed.
+                  </div>
+                  {stockReturnPosted || delivery.return_pickup_completed ? (
+                    <div className="mt-1 text-violet-900/80">Product return is already posted to stock.</div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="inline-flex rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-800">
+                      {delivery.source_status || "HISTORY"}
+                    </span>
+                    {delivery.return_pickup_required ? (
+                      <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                        Return pickup required
+                      </span>
+                    ) : null}
+                    {delivery.return_pickup_completed ? (
+                      <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                        Returned to stock
+                      </span>
+                    ) : null}
+                    {delivery.history_only ? (
+                      <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground">
+                        History only
+                      </span>
+                    ) : null}
+                    {isHistoryOnly ? (
+                      <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                        No action required
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                    {delivery.direct_sale_id ? (
+                      <Link
+                        href={`/admin/billing/reversals?direct_sale=${delivery.direct_sale_id}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        View Reversal Case
+                      </Link>
+                    ) : null}
+                    {delivery.direct_sale_id ? (
+                      <Link
+                        href={`/admin/inventory/ledger?direct_sale=${delivery.direct_sale_id}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        View Stock Ledger
+                      </Link>
+                    ) : null}
+                    {delivery.direct_sale_id ? (
+                      <Link
+                        href={`/admin/billing/documents?direct_sale=${delivery.direct_sale_id}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        View Documents
+                      </Link>
+                    ) : null}
+                    {delivery.direct_sale_id ? (
+                      <Link
+                        href={`/admin/billing/direct-sale?highlight_sale=${delivery.direct_sale_id}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        View Direct Sale
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
                   <div className="text-xs font-semibold uppercase text-slate-600">Sale</div>
@@ -358,46 +482,52 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   type="date"
                   value={scheduledDate}
                   onChange={(event) => setScheduledDate(event.target.value)}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  disabled={isHistoryOnly}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={receiverName}
                   onChange={(event) => setReceiverName(event.target.value)}
                   placeholder="Receiver name"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  disabled={isHistoryOnly}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={receiverPhone}
                   onChange={(event) => setReceiverPhone(event.target.value)}
                   placeholder="Receiver phone"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  disabled={isHistoryOnly}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={failureReason}
                   onChange={(event) => setFailureReason(event.target.value)}
                   placeholder="Failure/cancellation reason"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  disabled={isHistoryOnly}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <textarea
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   placeholder="Delivery address snapshot"
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 lg:col-span-2"
+                  disabled={isHistoryOnly}
+                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
                 />
                 <textarea
                   value={operationalNotes}
                   onChange={(event) => setOperationalNotes(event.target.value)}
                   placeholder="Operational notes"
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 lg:col-span-2"
+                  disabled={isHistoryOnly}
+                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
                 />
                 <div className="lg:col-span-2">
                   <button
                     type="button"
                     onClick={() => void handleSaveMetadata()}
-                    disabled={actionLoading === "metadata"}
+                    disabled={isHistoryOnly || actionLoading === "metadata"}
                     className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {actionLoading === "metadata" ? "Saving..." : "Save Metadata"}
+                    {isHistoryOnly ? "History only" : actionLoading === "metadata" ? "Saving..." : "Save Metadata"}
                   </button>
                 </div>
               </div>
@@ -407,6 +537,15 @@ export default function AdminDirectSaleDeliveryDetailPage() {
               title="Transition Actions"
               description="Only operationally valid actions are shown; blocked actions stay disabled with reasons."
             >
+              {isHistoryOnly ? (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  <div className="font-semibold">No action required</div>
+                  <div className="mt-1">
+                    This is a history-only delivery record. Active actions such as assign/reschedule, delivery processing, and
+                    mutation workflows are disabled.
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-3">
                 {showSchedule ? (
                   <button
@@ -416,7 +555,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     title={actionDisabledReason || "Schedule this delivery"}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {actionLoading === "SCHEDULE" ? "Working..." : "Schedule"}
+                    {actionLoading === "SCHEDULE" ? "Working..." : "Assign / Reschedule Delivery"}
                   </button>
                 ) : null}
                 {showDispatch ? (
@@ -427,7 +566,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     title={actionDisabledReason || "Dispatch this delivery"}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {actionLoading === "DISPATCH" ? "Working..." : "Dispatch / Start Delivery"}
+                    {actionLoading === "DISPATCH" ? "Working..." : "Create Delivery Action"}
                   </button>
                 ) : null}
                 {showMarkDelivered ? (
@@ -457,15 +596,16 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
                   placeholder="Add operation note"
-                  className="h-10 min-w-[260px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
+                  disabled={isHistoryOnly}
+                  className="h-10 min-w-[260px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <button
                   type="button"
                   onClick={() => void runAction("ADD_NOTE")}
-                  disabled={actionLoading === "ADD_NOTE"}
+                  disabled={isHistoryOnly || actionLoading === "ADD_NOTE"}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {actionLoading === "ADD_NOTE" ? "Working..." : "Add Note"}
+                  {actionLoading === "ADD_NOTE" ? "Working..." : "Create Delivery Action Note"}
                 </button>
               </div>
             </SectionCard>

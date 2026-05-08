@@ -16,6 +16,10 @@ Notifications must be role-scoped, readable, and operationally actionable withou
 - Show unread count, latest items, and created time
 - Prefer business language over raw model/ID terminology
 - Keep mark-read optional based on available endpoint support
+- Show loading, empty, and error states explicitly.
+- Show actionable links only when provided by payload/API.
+- On mobile, use a viewport-safe dropdown/sheet with touch-friendly targets.
+- Unread badge must remain visible and not clipped by shell chrome.
 
 ## Exclusion Rules
 
@@ -30,3 +34,5 @@ Notifications must be role-scoped, readable, and operationally actionable withou
   - `/api/v1/partner/notifications/`
   - `/api/v1/vendor/notifications/`
 - Summary routes are available under each role namespace.
+- Bell/dropdown and full notification pages must consume the same role-scoped APIs.
+- If a mark-read endpoint is unavailable for a role/surface, hide mark-read action instead of simulating success.

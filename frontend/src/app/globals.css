@@ -190,6 +190,7 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
 }
 
 .public-app {
@@ -618,7 +619,7 @@ button {
 
 .subidha-popup-root {
   position: relative;
-  z-index: 140;
+  z-index: 260;
   isolation: isolate;
   pointer-events: none;
 }
@@ -933,7 +934,7 @@ button {
 }
 
 .table-surface-frame {
-  overflow: hidden;
+  overflow: visible;
   border-radius: 1.3rem;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 84%, white 16%);
   background: linear-gradient(
@@ -1036,6 +1037,9 @@ button {
 }
 
 .dashboard-app .portal-page-content .overflow-x-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   border-radius: 1.1rem;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 82%, white 18%);
   background: linear-gradient(
@@ -1091,6 +1095,18 @@ button {
 
   .dashboard-app .portal-page {
     padding-inline: 0.25rem;
+  }
+
+  .dashboard-app .popup-action-bar {
+    position: sticky;
+    bottom: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-app .popup-action-bar > * {
+    width: 100%;
+    justify-content: center;
   }
 
   .dashboard-app table thead th {

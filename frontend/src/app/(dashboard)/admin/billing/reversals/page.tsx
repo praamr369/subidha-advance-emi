@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -132,15 +132,15 @@ export default function AdminBillingReversalsPage() {
           initial[line.sale_line_id] = line.default_return_quantity || line.returnable_quantity || "0";
         });
         setReturnQuantities(initial);
-        if (!returnReason.trim()) {
-          setReturnReason("Full cancellation after delivered product returned");
-        }
+        setReturnReason((previous) =>
+          previous.trim() ? previous : "Full cancellation after delivered product returned"
+        );
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load return eligibility."))
       .finally(() => setLoadingEligibility(false));
   }, [eligibilitySaleId]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const payload = await listAdminReversals({ type, status, customer, vendor, reference });
@@ -151,11 +151,11 @@ export default function AdminBillingReversalsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [customer, reference, status, type, vendor]);
 
   useEffect(() => {
     void load();
-  }, [type, status, customer, vendor, reference]);
+  }, [load]);
 
   const grouped = useMemo(() => {
     return {

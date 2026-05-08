@@ -215,9 +215,20 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       icon: "support",
       items: [
         {
-          label: "Notifications",
+          label: "Support",
           href: ROUTES.partner.notifications,
-          icon: "reminders",
+          icon: "support",
+        },
+      ],
+    },
+    {
+      title: "Profile",
+      icon: "profile",
+      items: [
+        {
+          label: "Profile",
+          href: ROUTES.partner.dashboard,
+          icon: "profile",
         },
       ],
     },
@@ -309,7 +320,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
 
   CASHIER: [
     {
-      title: "Dashboard",
+      title: "Cashier Dashboard",
       icon: "dashboard",
       items: [
         {
@@ -317,21 +328,42 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.cashier.dashboard,
           icon: "dashboard",
         },
+      ],
+    },
+    {
+      title: "Customer Search",
+      icon: "cashCounter",
+      items: [
         {
-          label: "Notifications",
-          href: ROUTES.cashier.notifications,
-          icon: "reminders",
+          label: "Customer Search",
+          href: ROUTES.cashier.collect,
+          icon: "customers",
         },
       ],
     },
     {
-      title: "Collection Workflows",
-      icon: "cashCounter",
+      title: "Collections",
+      icon: "collections",
       items: [
         {
-          label: "Collect Subscription / Direct Sale",
+          label: "Collections",
           href: `${ROUTES.cashier.collect}?workflow=unified`,
           icon: "collectPayment",
+        },
+        {
+          label: "Direct-Sale Collection",
+          href: `${ROUTES.cashier.collect}?workflow=direct-sale`,
+          icon: "billing",
+        },
+        {
+          label: "EMI Collection",
+          href: `${ROUTES.cashier.collect}?workflow=emi`,
+          icon: "emis",
+        },
+        {
+          label: "Rent / Lease Collection",
+          href: `${ROUTES.cashier.collect}?workflow=rent-lease`,
+          icon: "collections",
         },
       ],
     },
@@ -344,23 +376,68 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.cashier.payments,
           icon: "payments",
         },
+        {
+          label: "Cash Closing",
+          href: ROUTES.cashier.payments,
+          icon: "cashCounter",
+        },
+      ],
+    },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
+        {
+          label: "Notifications",
+          href: ROUTES.cashier.notifications,
+          icon: "reminders",
+        },
       ],
     },
   ],
   VENDOR: [
     {
-      title: "Vendor Portal",
+      title: "Dashboard",
+      items: [{ label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." }],
+    },
+    {
+      title: "Quote Requests",
+      items: [{ label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." }],
+    },
+    {
+      title: "Purchase Orders",
+      items: [{ label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." }],
+    },
+    {
+      title: "Ledger",
+      items: [{ label: "Ledger", href: "/vendor/ledger", icon: "accounting", description: "Vendor ledger entries." }],
+    },
+    {
+      title: "Outstanding",
+      items: [{ label: "Outstanding", href: "/vendor/outstanding", icon: "finance", description: "Vendor outstanding balance." }],
+    },
+    {
+      title: "Purchase Returns",
+      items: [{ label: "Purchase Returns", href: "/vendor/purchase-returns", icon: "serviceDesk", description: "Purchase return visibility." }],
+    },
+    {
+      title: "Products",
+      items: [{ label: "Products", href: "/vendor/products", icon: "inventory", description: "Vendor product catalog." }],
+    },
+    {
+      title: "Documents",
+      items: [{ label: "Documents", href: "/vendor/documents", icon: "reports", description: "Vendor documents and uploads." }],
+    },
+    {
+      title: "Support",
       items: [
-        { label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." },
         { label: "Notifications", href: "/vendor/notifications", icon: "reminders", description: "Role-safe vendor alerts." },
+      ],
+    },
+    {
+      title: "Profile",
+      items: [
         { label: "Profile", href: "/vendor/profile", icon: "crm", description: "Vendor profile and service areas." },
-        { label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." },
-        { label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." },
-        { label: "Ledger", href: "/vendor/ledger", icon: "accounting", description: "Vendor ledger entries." },
-        { label: "Outstanding", href: "/vendor/outstanding", icon: "finance", description: "Vendor outstanding balance." },
-        { label: "Purchase Returns", href: "/vendor/purchase-returns", icon: "serviceDesk", description: "Purchase return visibility." },
-        { label: "Products", href: "/vendor/products", icon: "inventory", description: "Vendor product catalog." },
-        { label: "Documents", href: "/vendor/documents", icon: "reports", description: "Vendor documents and uploads." },
       ],
     },
   ],

@@ -27,7 +27,9 @@ export default function AdminOnlineEnquiriesPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    void Promise.resolve().then(() => {
+      if (active) setLoading(true);
+    });
     void listOnlineEnquiries({ status: statusFilter || undefined })
       .then((payload) => {
         if (!active) return;

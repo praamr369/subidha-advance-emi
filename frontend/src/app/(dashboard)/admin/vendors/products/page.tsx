@@ -18,6 +18,8 @@ export default function AdminVendorProductsHubPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedVendorId = vendorId === "" || Number.isNaN(Number(vendorId)) ? null : Number(vendorId);
+  const visibleRows = selectedVendorId == null ? [] : rows;
 
   useEffect(() => {
     let active = true;
@@ -41,13 +43,14 @@ export default function AdminVendorProductsHubPage() {
   }, []);
 
   useEffect(() => {
-    if (vendorId === "" || Number.isNaN(Number(vendorId))) {
-      setRows([]);
+    if (selectedVendorId == null) {
       return;
     }
     let active = true;
-    setLoadingProducts(true);
-    void listAdminVendorProducts(Number(vendorId))
+    void Promise.resolve().then(() => {
+      if (active) setLoadingProducts(true);
+    });
+    void listAdminVendorProducts(selectedVendorId)
       .then((payload) => {
         if (!active) return;
         const parsed = payload as { results?: Record<string, unknown>[] };
@@ -63,7 +66,7 @@ export default function AdminVendorProductsHubPage() {
     return () => {
       active = false;
     };
-  }, [vendorId]);
+  }, [selectedVendorId]);
 
   return (
     <PortalPage
@@ -104,11 +107,11 @@ export default function AdminVendorProductsHubPage() {
         ) : null}
       </div>
 
-      {vendorId === "" ? (
+      {selectedVendorId == null ? (
         <div className="text-sm text-muted-foreground">Select a vendor to show catalog rows.</div>
       ) : loadingProducts ? (
         <div className="text-sm">Loading products…</div>
-      ) : rows.length === 0 ? (
+      ) : visibleRows.length === 0 ? (
         <div className="text-sm text-muted-foreground">No catalog lines recorded for this vendor.</div>
       ) : (
         <div className="overflow-auto rounded border text-sm">
@@ -124,7 +127,7 @@ export default function AdminVendorProductsHubPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr key={String(row.id)} className="border-t border-border">
                   <td className="p-2">{String(row.product_name ?? "—")}</td>
                   <td className="p-2">{String(row.vendor_sku ?? "—")}</td>

@@ -275,8 +275,8 @@ test("direct sale query hides raw id fields and allows return when eligible", as
   });
   await page.goto("/admin/billing/reversals?direct_sale=1");
   await expect(page.getByPlaceholder("Direct Sale ID")).toHaveCount(1); // only eligibility viewer field
-  await expect(page.getByText("Cancel Sale")).toBeVisible();
-  await expect(page.getByText("This sale is already invoiced/delivered/returned")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("Cancel Sale");
+  await expect(page.locator("body")).toContainText("Allowed actions: RETURN_PRODUCT, EXCHANGE_PRODUCT");
   await expect(page.getByRole("button", { name: "Create Return" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Finalize Full Cancellation / Archive Sale" })).toBeDisabled();
 });
@@ -322,7 +322,7 @@ test("finalize reversal uses route direct_sale id and calls finalize endpoint", 
     });
   });
 
-  let finalizePayload: any = null;
+  let finalizePayload: { confirm?: boolean; reason?: string } | null = null;
   await page.route("**/api/v1/admin/billing/direct-sales/1/finalize-reversal/", async (route) => {
     finalizePayload = route.request().postDataJSON();
     await route.fulfill({

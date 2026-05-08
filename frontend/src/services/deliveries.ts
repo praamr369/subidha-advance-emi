@@ -87,6 +87,7 @@ export type DeliveryRecord = {
   invoice_state?: string | null;
   payment_state?: string | null;
   stock_state?: string | null;
+  stock_return_status?: string | null;
   delivery_state?: string | null;
   status_label?: string | null;
   case_id?: number | null;
@@ -326,6 +327,15 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     fulfillment_status: toStringOrNull(row.fulfillment_status),
     is_terminal: toBoolean(row.is_terminal),
     is_active_delivery: toBoolean(row.is_active_delivery),
+    normal_delivery_pending: toBoolean(row.normal_delivery_pending),
+    normal_delivery_completed: toBoolean(row.normal_delivery_completed),
+    return_pickup_required: toBoolean(row.return_pickup_required),
+    return_pickup_completed: toBoolean(row.return_pickup_completed),
+    history_only: toBoolean(row.history_only),
+    source_status: toStringOrNull(row.source_status),
+    source_reversed: toBoolean(row.source_reversed),
+    source_archived: toBoolean(row.source_archived),
+    is_actionable: toBoolean(row.is_actionable),
     history_count: toNumber(row.history_count, 0) || undefined,
     inventory_stock_status: toStringOrNull(row.inventory_stock_status) || undefined,
     inventory_available_qty: toStringOrNull(row.inventory_available_qty),
@@ -349,6 +359,7 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     invoice_state: toStringOrNull(row.invoice_state),
     payment_state: toStringOrNull(row.payment_state),
     stock_state: toStringOrNull(row.stock_state),
+    stock_return_status: toStringOrNull(row.stock_return_status),
     delivery_state: toStringOrNull(row.delivery_state),
     status_label: toStringOrNull(row.status_label),
     case_id: toNullableNumber(row.case_id),

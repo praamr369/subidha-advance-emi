@@ -1394,7 +1394,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   return (
     <DashboardShellContext.Provider value={true}>
       <WorkflowProvider role={role}>
-        <div className="relative" style={workspaceShellStyle}>
+        <div className="relative overflow-x-clip" style={workspaceShellStyle}>
           <PortalShell
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>

@@ -7,6 +7,7 @@ This document defines role-safe dashboard behavior for SUBIDHA CORE.
 - Operates as command center for collections, outstandings, delivery, returns, support, and reconciliation.
 - Can expose reversal, reconciliation, inventory control, and admin workflows.
 - Uses queue and summary cards sourced from real endpoints only.
+- Active KPI cards must exclude cancelled/reversed/void/archived rows where endpoint filtering supports it.
 
 ## Cashier Dashboard
 
@@ -15,6 +16,7 @@ This document defines role-safe dashboard behavior for SUBIDHA CORE.
   - collect direct sale balance
   - payment history
 - Must not expose admin reversal control, system setup, or draw governance actions.
+- Reversed/returned direct-sale rows must display not-collectible copy and hide payment-gateway actions.
 
 ## Customer Dashboard
 
@@ -50,3 +52,5 @@ This document defines role-safe dashboard behavior for SUBIDHA CORE.
 - Role-specific notification endpoints should be used for bell and notification center.
 - Sidebar groups and quick actions must remain role-scoped.
 - Any unavailable module should render a safe empty/help state, not mock operational data.
+- Do not expose admin-only routes to cashier/customer/partner/vendor via sidebar, dashboard cards, or quick actions.
+- Vendor dashboard may show a safe shell if modules are not yet implemented; no fabricated operational metrics.

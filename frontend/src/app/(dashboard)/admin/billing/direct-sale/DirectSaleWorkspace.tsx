@@ -523,6 +523,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       key: "id",
       header: "Action",
       render: (row) => {
+        const rowFlags = row as DirectSale & { is_archived?: boolean; is_history_only?: boolean };
         const nextActions = row.next_actions || [];
         const isFinalize = nextActions.includes("FINALIZE_INVOICE") || nextActions.includes("POST_INVOICE");
         const isCollect = nextActions.includes("COLLECT_DIRECT_SALE_BALANCE");
@@ -539,8 +540,8 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           row.delivery_status === "DELIVERED" ||
           row.delivery_status === "COUNTER_SALE_COMPLETE";
         const isReturnedOrCancelled =
-          Boolean((row as any).is_archived) ||
-          Boolean((row as any).is_history_only) ||
+          Boolean(rowFlags.is_archived) ||
+          Boolean(rowFlags.is_history_only) ||
           ["CANCELLED", "CANCELLED_PRE_INVOICE", "CANCELLED_AFTER_DELIVERY", "REVERSED_POST_INVOICE", "RETURNED", "ARCHIVED", "EXCHANGED_CLOSED"].includes(
             String(row.status || "").toUpperCase()
           );

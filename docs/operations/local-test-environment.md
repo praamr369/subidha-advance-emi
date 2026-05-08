@@ -1,0 +1,84 @@
+# Local Test Environment
+
+## Backend Setup (Python 3 + venv)
+Run from repo root:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+```
+
+Quick verification script:
+
+```bash
+cd backend
+./scripts/check-local-env.sh
+```
+
+## Backend Safety Checks
+
+```bash
+cd backend
+source .venv/bin/activate
+python3 manage.py check
+python3 manage.py makemigrations --check --dry-run
+python3 manage.py test tests.api.test_reversal_control_blockers tests.billing.test_reversal_service tests.api.test_reversal_center_api
+```
+
+## Frontend Checks
+
+```bash
+cd frontend
+npm run typecheck
+npm run build:smoke
+# Optional (repo currently has existing lint debt outside smoke scope)
+npm run lint
+```
+
+## Playwright Smoke (Chromium)
+
+```bash
+cd frontend
+npx playwright test tests/e2e/ux_polish_smoke.spec.ts --project=chromium-smoke
+npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_smoke.spec.ts --project=chromium-smoke
+```
+
+`playwright.config.ts` starts:
+- backend via `../backend/scripts/start_playwright_backend.sh`
+- frontend via `npm run start:smoke` (`http://127.0.0.1:3100`)
+
+Auth state expectation:
+- smoke setup creates role storage states in `frontend/tests/e2e/.auth/`.
+- vendor-only tests skip with explicit reason when `vendor.json` is missing.
+- do not commit auth-state JSON files from `.auth/`.
+
+## If Django Is Missing
+- Symptom: `ModuleNotFoundError: No module named 'django'`.
+- Fix:
+  1. Activate backend venv (`source backend/.venv/bin/activate`)
+  2. Install backend requirements (`python3 -m pip install -r backend/requirements.txt`)
+  3. Re-run checks with `python3 manage.py ...`
+
+## If Playwright webServer Times Out
+- Confirm backend health endpoint:
+  - `http://127.0.0.1:8100/healthz/`
+- Confirm frontend smoke endpoint:
+  - `http://127.0.0.1:3100/login`
+- Inspect backend script output:
+  - `backend/scripts/start_playwright_backend.sh`
+- Common causes:
+  - first-run backend venv bootstrap takes longer
+  - missing Python deps in venv
+  - port already occupied
+- Useful overrides:
+  - `PLAYWRIGHT_PYTHON=/path/to/venv/bin/python`
+  - `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100`
+  - `PLAYWRIGHT_BACKEND_ROOT=http://127.0.0.1:8100`
+
+## No Fake Data Policy for Local Smoke
+- Do not add fake dashboard or notification runtime data in app code.
+- Do not add fake vendor runtime data in app code.
+- Test mocks are allowed only inside Playwright specs and must remain test-scoped.

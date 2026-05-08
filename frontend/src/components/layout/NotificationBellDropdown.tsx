@@ -94,6 +94,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   const queryClient = useQueryClient();
   const queryKey = notificationKeys.bell(role);
   const [open, setOpen] = useState(false);
+  const [mobileSheet, setMobileSheet] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const bellQuery = useQuery({
@@ -104,8 +105,18 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 640px)");
+    const apply = () => setMobileSheet(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
     function onDocMouseDown(ev: MouseEvent) {
       if (!open) return;
+      if (mobileSheet) return;
       const el = rootRef.current;
       if (el && !el.contains(ev.target as Node)) {
         setOpen(false);
@@ -113,7 +124,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     }
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [open]);
+  }, [mobileSheet, open]);
 
   async function onToggle() {
     const next = !open;
@@ -153,7 +164,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
   }
 
   async function onMarkAllRead() {
-    if (role !== "CUSTOMER" && role !== "PARTNER") return;
+    if (role !== "CUSTOMER" && role !== "PARTNER" && role !== "VENDOR") return;
     const previous = queryClient.getQueryData<NotificationBellSnapshot>(queryKey);
     queryClient.setQueryData<NotificationBellSnapshot>(queryKey, {
       unread: 0,
@@ -194,6 +205,98 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
       </button>
 
       {open ? (
+        mobileSheet ? (
+          <div className="fixed inset-0 z-[220] sm:hidden">
+            <button
+              type="button"
+              aria-label="Close notifications"
+              className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 max-h-[78dvh] rounded-t-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-[var(--popup-shadow-xl)]"
+              role="dialog"
+              aria-label="Notifications menu"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+                <span className="text-sm font-semibold text-foreground">Notifications</span>
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-3 text-xs font-medium text-foreground"
+                  onClick={() => setOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border py-2">
+                {showMarkAll ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline"
+                    onClick={() => void onMarkAllRead()}
+                  >
+                    Mark all read
+                  </button>
+                ) : null}
+                <Link href={href} className="text-xs font-medium text-primary hover:underline" onClick={() => setOpen(false)}>
+                  Open center
+                </Link>
+              </div>
+              <div className="max-h-[58dvh] overflow-y-auto py-2" aria-busy={dropdownBusy || bellQuery.isPending}>
+                {bellQuery.isError ? (
+                  <ErrorState
+                    title="Notifications unavailable"
+                    message={bellQuery.error instanceof Error ? bellQuery.error.message : "Try again."}
+                    onRetry={() => void bellQuery.refetch()}
+                  />
+                ) : dropdownBusy || (bellQuery.isPending && !bellQuery.data) ? (
+                  <NotificationListSkeleton rows={4} />
+                ) : items.length === 0 ? (
+                  <p className="px-1 py-3 text-xs text-muted-foreground">You are caught up.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {items.map((n) => (
+                      <li
+                        key={n.id}
+                        className="motion-safe:transition-colors rounded-xl border border-border bg-background px-3 py-2 text-sm duration-150"
+                      >
+                        <div className="font-medium text-foreground">{n.title}</div>
+                        {n.body ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{n.body}</p> : null}
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {n.category}
+                            {!n.is_read ? " · unread" : ""}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {typeof n.payload?.action_url === "string" && n.payload.action_url.trim() ? (
+                              <Link
+                                href={n.payload.action_url}
+                                onClick={() => setOpen(false)}
+                                className="text-xs font-medium text-primary hover:underline"
+                              >
+                                Open
+                              </Link>
+                            ) : null}
+                            {!n.is_read ? (
+                              <button
+                                type="button"
+                                className="motion-safe:transition-opacity text-xs font-medium text-primary duration-150 hover:underline hover:opacity-90"
+                                aria-label={`Mark notification ${n.title} as read`}
+                                onClick={() => void onMarkRead(n.id)}
+                              >
+                                Mark read
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
         <div
           className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"
           role="dialog"
@@ -250,16 +353,27 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                         {n.category}
                         {!n.is_read ? " · unread" : ""}
                       </span>
-                      {!n.is_read ? (
-                        <button
-                          type="button"
-                          className="motion-safe:transition-opacity text-xs font-medium text-primary duration-150 hover:underline hover:opacity-90"
-                          aria-label={`Mark notification ${n.title} as read`}
-                          onClick={() => void onMarkRead(n.id)}
-                        >
-                          Mark read
-                        </button>
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        {typeof n.payload?.action_url === "string" && n.payload.action_url.trim() ? (
+                          <Link
+                            href={n.payload.action_url}
+                            onClick={() => setOpen(false)}
+                            className="text-xs font-medium text-primary hover:underline"
+                          >
+                            Open
+                          </Link>
+                        ) : null}
+                        {!n.is_read ? (
+                          <button
+                            type="button"
+                            className="motion-safe:transition-opacity text-xs font-medium text-primary duration-150 hover:underline hover:opacity-90"
+                            aria-label={`Mark notification ${n.title} as read`}
+                            onClick={() => void onMarkRead(n.id)}
+                          >
+                            Mark read
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -267,6 +381,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
             )}
           </div>
         </div>
+        )
       ) : null}
     </div>
   );
