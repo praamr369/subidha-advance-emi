@@ -22,6 +22,7 @@ from api.v1.views.admin_commissions import (
     AdminCommissionSummaryView,
 )
 from api.v1.views.admin_dashboard import AdminDashboardView
+from api.v1.views.admin_navigation import AdminNavigationBadgesView
 from api.v1.views.contract_references import (
     AdminContractReferenceListView,
     AdminContractReferenceResolveView,
@@ -368,11 +369,16 @@ from api.v1.views.admin_brand_data import (
 )
 from api.v1.views.reversal_control import (
     AdminReversalCaseApproveView,
+    AdminReversalCaseArchiveView,
+    AdminReversalCaseAssignView,
+    AdminReversalCaseCloseView,
     AdminReversalCaseDetailView,
     AdminReversalCaseListCreateView,
+    AdminReversalCaseNoteView,
     AdminReversalCasePostView,
     AdminReversalCaseReconcileView,
     AdminReversalCaseRejectView,
+    AdminReversalCaseSyncView,
     AdminReversalControlDashboardView,
     AdminReversalReconciliationQueueView,
 )
@@ -393,6 +399,36 @@ from api.v1.views.reversal_center import (
     AdminReturnListView,
     AdminReturnPostView,
 )
+from api.v1.views.account_links import (
+    AdminCustomerAccountLinkView,
+    AdminPartnerAccountLinkView,
+    AdminPartyAccountLinkView,
+)
+from api.v1.views.online_enquiries import (
+    AdminOnlineEnquiryCreatePurchaseDraftView,
+    AdminOnlineEnquiryDetailView,
+    AdminOnlineEnquiryListView,
+    AdminOnlineEnquiryRequestVendorQuotesView,
+    AdminOnlineEnquirySelectVendorQuoteView,
+    AdminOnlineEnquirySuggestVendorsView,
+)
+from api.v1.views.vendor_ops import (
+    AdminVendorAccountLinkView,
+    AdminVendorCategoryViewSet,
+    AdminVendorCategoryListCreateView,
+    AdminVendorLedgerView,
+    AdminVendorOutstandingView,
+    AdminVendorPurchaseReturnsView,
+    AdminVendorPurchasesView,
+    AdminVendorProductsView,
+    AdminVendorQuoteAcceptView,
+    AdminVendorQuoteRejectView,
+    AdminVendorQuoteRequestDetailView,
+    AdminVendorQuoteRequestListCreateView,
+    AdminVendorSourcingRequestQuotesView,
+    AdminVendorSourcingSuggestView,
+    AdminVendorViewSet,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -406,6 +442,8 @@ router.register(r"products", ProductAdminViewSet, basename="admin-products")
 router.register(r"product-categories", ProductCategoryMasterViewSet, basename="admin-product-categories")
 router.register(r"product-subcategories", ProductSubcategoryMasterViewSet, basename="admin-product-subcategories")
 router.register(r"product-units", ProductUnitOfMeasureMasterViewSet, basename="admin-product-units")
+router.register(r"vendors", AdminVendorViewSet, basename="admin-vendors")
+router.register(r"vendors/categories", AdminVendorCategoryViewSet, basename="admin-vendor-categories")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")
 router.register(
     r"inventory/opening-stock",
@@ -459,6 +497,7 @@ urlpatterns = [
     path("system/otp-delivery-readiness/", AdminOtpDeliveryReadinessView.as_view()),
     path("ai/", include("ai_assistant.urls")),
     path("dashboard/", AdminDashboardView.as_view()),
+    path("dashboard/navigation-badges/", AdminNavigationBadgesView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
     path("deliveries/sources/subscriptions/", AdminDeliverySourceSubscriptionsView.as_view()),
@@ -737,8 +776,16 @@ urlpatterns = [
     path("finance/reversal-cases/<int:pk>/approve/", AdminReversalCaseApproveView.as_view()),
     path("finance/reversal-cases/<int:pk>/post/", AdminReversalCasePostView.as_view()),
     path("finance/reversal-cases/<int:pk>/reject/", AdminReversalCaseRejectView.as_view()),
+    path("finance/reversal-cases/<int:pk>/sync/", AdminReversalCaseSyncView.as_view()),
     path("finance/reversal-cases/<int:pk>/reconcile/", AdminReversalCaseReconcileView.as_view()),
+    path("finance/reversal-cases/<int:pk>/assign/", AdminReversalCaseAssignView.as_view()),
+    path("finance/reversal-cases/<int:pk>/note/", AdminReversalCaseNoteView.as_view()),
+    path("finance/reversal-cases/<int:pk>/close/", AdminReversalCaseCloseView.as_view()),
+    path("finance/reversal-cases/<int:pk>/archive/", AdminReversalCaseArchiveView.as_view()),
     path("finance/reversal-reconciliation/", AdminReversalReconciliationQueueView.as_view()),
+    path("customers/<int:pk>/account-link/", AdminCustomerAccountLinkView.as_view()),
+    path("partners/<int:pk>/account-link/", AdminPartnerAccountLinkView.as_view()),
+    path("parties/<int:pk>/account-link/", AdminPartyAccountLinkView.as_view()),
     path("billing/direct-sales/<int:pk>/cancel/", AdminDirectSaleCancelView.as_view()),
     path("billing/direct-sales/<int:pk>/returns/", AdminDirectSaleReturnCreateView.as_view()),
     path("billing/direct-sales/<int:pk>/exchange/", AdminDirectSaleExchangeCreateView.as_view()),
@@ -754,5 +801,24 @@ urlpatterns = [
     path("customers/refunds/<int:pk>/pay/", AdminCustomerRefundPayView.as_view()),
     path("purchases/<int:pk>/returns/", AdminPurchaseReturnCreateView.as_view()),
     path("purchases/returns/<int:pk>/post/", AdminPurchaseReturnPostView.as_view()),
+    path("vendors/<int:pk>/ledger/", AdminVendorLedgerView.as_view()),
+    path("vendors/<int:pk>/outstanding/", AdminVendorOutstandingView.as_view()),
+    path("vendors/<int:pk>/products/", AdminVendorProductsView.as_view()),
+    path("vendors/<int:pk>/purchases/", AdminVendorPurchasesView.as_view()),
+    path("vendors/<int:pk>/purchase-returns/", AdminVendorPurchaseReturnsView.as_view()),
+    path("vendors/categories/", AdminVendorCategoryListCreateView.as_view()),
+    path("vendor-sourcing/suggest/", AdminVendorSourcingSuggestView.as_view()),
+    path("vendor-sourcing/request-quotes/", AdminVendorSourcingRequestQuotesView.as_view()),
+    path("online-enquiries/", AdminOnlineEnquiryListView.as_view()),
+    path("online-enquiries/<int:pk>/", AdminOnlineEnquiryDetailView.as_view()),
+    path("online-enquiries/<int:pk>/suggest-vendors/", AdminOnlineEnquirySuggestVendorsView.as_view()),
+    path("online-enquiries/<int:pk>/request-vendor-quotes/", AdminOnlineEnquiryRequestVendorQuotesView.as_view()),
+    path("online-enquiries/<int:pk>/select-vendor-quote/", AdminOnlineEnquirySelectVendorQuoteView.as_view()),
+    path("online-enquiries/<int:pk>/create-purchase-draft/", AdminOnlineEnquiryCreatePurchaseDraftView.as_view()),
+    path("vendor-quotes/requests/", AdminVendorQuoteRequestListCreateView.as_view()),
+    path("vendor-quotes/requests/<int:pk>/", AdminVendorQuoteRequestDetailView.as_view()),
+    path("vendor-quotes/<int:pk>/accept/", AdminVendorQuoteAcceptView.as_view()),
+    path("vendor-quotes/<int:pk>/reject/", AdminVendorQuoteRejectView.as_view()),
+    path("vendors/<int:pk>/account-link/", AdminVendorAccountLinkView.as_view()),
     path("", include(router.urls)),
 ]

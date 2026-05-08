@@ -235,3 +235,46 @@ test("create return disabled when stock setup missing", async ({ page }) => {
   await expect(page.getByText("Create INSPECTION, DAMAGED, and SERVICE stock locations before processing returns.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create Return" })).toBeDisabled();
 });
+
+test("direct sale query hides raw id fields and allows return when eligible", async ({ page }) => {
+  await page.route("**/api/v1/admin/billing/returns/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, results: [] }) });
+  });
+  await page.route("**/api/v1/admin/billing/direct-sales/1/return-eligibility/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        direct_sale_id: 1,
+        sale_no: "SALE-2026-27-00001",
+        customer_name: "Amrita Roy",
+        sale_status: "INVOICED",
+        invoice_status: "VOID",
+        delivery_status: "DELIVERED",
+        active_receipt_total: "0.00",
+        void_receipt_total: "21000.00",
+        outstanding_balance: "21000.00",
+        receipt_summary: { posted_receipt_count: 0, posted_receipt_total: "0.00", received_total: "0.00", balance_total: "21000.00", active_receipt_count: 0, void_receipt_count: 1 },
+        allowed_actions: ["RETURN_PRODUCT", "EXCHANGE_PRODUCT"],
+        can_create_return: true,
+        can_create_exchange: true,
+        can_finalize_reversal: false,
+        finalize_blocking_reasons: ["Delivered lines still have returnable quantity. Post SALE_RETURN_IN first."],
+        return_lines: [{ sale_line_id: 77, product_id: 8, product_name: "Chair", sku: "CHAIR-01", inventory_item_id: 9, sold_quantity: "1.000", already_returned_quantity: "0.000", returnable_quantity: "1.000", default_return_quantity: "1.000", unit_price: "1000.00", line_total: "1000.00" }],
+        stock_destinations: [{ id: 5, name: "Inspection", code: "INSP", type: "INSPECTION", is_sellable: false, requires_condition_confirmation: false }],
+        default_stock_destination_id: 5,
+        workflow_steps: [
+          { key: "RECEIPT_VOIDED", label: "Receipt voided", status: "DONE" },
+          { key: "INVOICE_REVERSED_OR_VOIDED", label: "Invoice reversed/voided", status: "DONE" },
+          { key: "PRODUCT_RETURNED_TO_STOCK", label: "Product returned to stock", status: "REQUIRED" },
+          { key: "FINALIZE_ARCHIVE", label: "Finalize/archive sale", status: "BLOCKED" },
+        ],
+        sold_lines: [],
+      }),
+    });
+  });
+  await page.goto("/admin/billing/reversals?direct_sale=1");
+  await expect(page.getByPlaceholder("Direct Sale ID")).toHaveCount(1); // only eligibility viewer field
+  await expect(page.getByRole("button", { name: "Create Return" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Finalize Full Cancellation / Archive Sale" })).toBeDisabled();
+});

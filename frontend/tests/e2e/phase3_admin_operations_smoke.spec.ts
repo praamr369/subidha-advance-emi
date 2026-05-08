@@ -49,6 +49,9 @@ test("phase-3 books and bridge controls load with active buttons", async ({ page
 test("phase-3 admin operational surfaces share the control-center framework", async ({
   page,
 }) => {
+  await page.goto("/admin/vendors/quotes");
+  await expect(page.getByRole("heading", { name: /Vendor quote requests/i }).first()).toBeVisible();
+
   await page.goto("/admin/operations");
   await expect(page.getByRole("heading", { name: "Operations Working Screen" }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Action-first queues");

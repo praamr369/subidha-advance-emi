@@ -65,7 +65,8 @@ def _normalize_source(value: str | None, *, default: str) -> str:
 
 
 def _normalize_intent(value: str | None) -> str:
-    candidate = (value or PublicLeadIntent.GENERAL).strip().upper()
+    raw = value.value if hasattr(value, "value") else value
+    candidate = (raw or PublicLeadIntent.GENERAL.value).strip().upper()
     if candidate not in PublicLeadIntent.values:
         raise ValueError("Unsupported lead intent.")
     return candidate
@@ -109,7 +110,10 @@ def create_public_lead(
     preferred_emi_amount=None,
     notes: str = "",
     product: Product | None = None,
+    intent: str | None = None,
+    create_procurement_enquiry: bool = False,
 ):
+    resolved_intent = _normalize_intent(intent)
     lead = PublicLead.objects.create(
         name=(name or "").strip(),
         phone=(phone or "").strip(),
@@ -121,7 +125,7 @@ def create_public_lead(
         notes=_normalize_notes(notes),
         status=PublicLeadStatus.NEW,
         source="PUBLIC_SITE",
-        intent=PublicLeadIntent.GENERAL,
+        intent=resolved_intent,
         follow_up_required=False,
         follow_up_on=None,
         follow_up_note="",
@@ -135,9 +139,25 @@ def create_public_lead(
             "source": lead.source,
             "product_id": lead.product_id,
             "interested_product": lead.interested_product,
+            "intent": resolved_intent,
         },
     )
     sync_party_for_lead(lead)
+
+    if create_procurement_enquiry:
+        if resolved_intent not in {
+            PublicLeadIntent.QUOTATION,
+            PublicLeadIntent.ESTIMATE,
+            PublicLeadIntent.DIRECT_SALE,
+        }:
+            raise ValueError(
+                "create_procurement_enquiry requires intent DIRECT_SALE, QUOTATION, or ESTIMATE."
+            )
+        from accounting.services.online_purchase_enquiry_service import (
+            create_customer_purchase_enquiry_from_public_lead,
+        )
+
+        create_customer_purchase_enquiry_from_public_lead(lead=lead)
 
     return lead
 

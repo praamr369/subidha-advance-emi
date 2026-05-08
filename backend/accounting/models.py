@@ -1014,13 +1014,46 @@ class JournalEntryGroup(AccountingTimeStampedModel):
 
 class Vendor(AccountingTimeStampedModel):
     name = models.CharField(max_length=120)
+    vendor_code = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    display_name = models.CharField(max_length=160, blank=True, default="")
+    legal_name = models.CharField(max_length=180, blank=True, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
+    whatsapp = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     address = models.TextField(blank=True, default="")
     gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    pan = models.CharField(max_length=20, blank=True, default="")
     state_code = models.CharField(max_length=5, null=True, blank=True)
     state_name = models.CharField(max_length=100, null=True, blank=True)
+    contact_person = models.CharField(max_length=120, blank=True, default="")
+    payment_terms = models.CharField(max_length=120, blank=True, default="")
+    credit_period_days = models.PositiveIntegerField(default=0)
+    quality_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    delivery_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    warranty_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    price_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    rating = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    notes = models.TextField(blank=True, default="")
+    linked_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_vendors",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("ACTIVE", "Active"),
+            ("ON_HOLD", "On Hold"),
+            ("BLOCKED", "Blocked"),
+            ("ARCHIVED", "Archived"),
+        ],
+        default="ACTIVE",
+        db_index=True,
+    )
     is_active = models.BooleanField(default=True, db_index=True)
+    categories = models.ManyToManyField("accounting.VendorCategory", blank=True, related_name="vendors")
 
     class Meta:
         db_table = "accounting_vendors"
@@ -1028,16 +1061,318 @@ class Vendor(AccountingTimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.name = (self.name or "").strip()
+        self.vendor_code = (self.vendor_code or "").strip().upper()
+        self.display_name = (self.display_name or "").strip()
+        self.legal_name = (self.legal_name or "").strip()
         self.phone = (self.phone or "").strip()
+        self.whatsapp = (self.whatsapp or "").strip()
         self.address = (self.address or "").strip()
         self.gstin = (self.gstin or "").strip().upper() or None
+        self.pan = (self.pan or "").strip().upper()
         self.state_code = (self.state_code or "").strip().upper() or None
         self.state_name = (self.state_name or "").strip() or None
+        self.contact_person = (self.contact_person or "").strip()
+        self.payment_terms = (self.payment_terms or "").strip()
+        self.notes = (self.notes or "").strip()
+        if not self.display_name:
+            self.display_name = self.name
+        if not self.vendor_code:
+            base = f"VND-{timezone.now().strftime('%Y%m%d')}-{(self.pk or 0):06d}"
+            self.vendor_code = base.upper()
+        self.is_active = self.status in {"ACTIVE", "ON_HOLD"} and bool(self.is_active)
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
+
+
+class VendorCategory(AccountingTimeStampedModel):
+    name = models.CharField(max_length=120, unique=True, db_index=True)
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    description = models.TextField(blank=True, default="")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="children")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_categories"
+        ordering = ["name", "id"]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.code = (self.code or "").strip().upper()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class VendorAddress(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="addresses")
+    address_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("OFFICE", "Office"),
+            ("MANUFACTURING_UNIT", "Manufacturing Unit"),
+            ("WAREHOUSE", "Warehouse"),
+            ("SERVICE_CENTER", "Service Center"),
+        ],
+        default="OFFICE",
+        db_index=True,
+    )
+    address_line1 = models.CharField(max_length=255)
+    address_line2 = models.CharField(max_length=255, blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
+    district = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    is_primary = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_addresses"
+        ordering = ["vendor_id", "-is_primary", "id"]
+
+
+class VendorServiceArea(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="service_areas")
+    state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    radius_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_service_areas"
+        ordering = ["vendor_id", "state", "district", "city", "id"]
+
+
+class VendorProduct(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="products")
+    internal_product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_products")
+    vendor_sku = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    product_name = models.CharField(max_length=180)
+    category_text = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    material = models.CharField(max_length=120, blank=True, default="")
+    size_description = models.CharField(max_length=160, blank=True, default="")
+    warranty_months = models.PositiveIntegerField(default=0)
+    base_quote_price = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    min_order_qty = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    lead_time_days = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_vendor_products"
+        ordering = ["vendor_id", "product_name", "id"]
+
+
+class VendorLedgerEntry(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="ledger_entries")
+    entry_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("OPENING_BALANCE", "Opening Balance"),
+            ("PURCHASE_BILL", "Purchase Bill"),
+            ("PAYMENT_TO_VENDOR", "Payment To Vendor"),
+            ("PURCHASE_RETURN", "Purchase Return"),
+            ("DEBIT_NOTE", "Debit Note"),
+            ("CREDIT_ADJUSTMENT", "Credit Adjustment"),
+            ("MANUAL_ADJUSTMENT", "Manual Adjustment"),
+        ],
+        db_index=True,
+    )
+    source_type = models.CharField(max_length=60, blank=True, default="", db_index=True)
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    debit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    credit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    posted_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="created_vendor_ledger_entries")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_vendor_ledger_entries"
+        ordering = ["vendor_id", "-posted_at", "-id"]
+
+
+class VendorQuoteRequest(AccountingTimeStampedModel):
+    request_no = models.CharField(max_length=60, unique=True, db_index=True)
+    source_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("CUSTOMER_ENQUIRY", "Customer Enquiry"),
+            ("DIRECT_SALE_ORDER", "Direct Sale Order"),
+            ("ONLINE_ORDER", "Online Order"),
+            ("MANUAL", "Manual"),
+        ],
+        default="MANUAL",
+        db_index=True,
+    )
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    customer = models.ForeignKey("subscriptions.Customer", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    customer_pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    customer_city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    customer_district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    customer_state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    product_name = models.CharField(max_length=180, blank=True, default="")
+    category_text = models.CharField(max_length=120, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    required_by = models.DateField(null=True, blank=True)
+    budget_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status = models.CharField(
+        max_length=24,
+        choices=[
+            ("DRAFT", "Draft"),
+            ("SENT", "Sent"),
+            ("QUOTING", "Quoting"),
+            ("PARTIALLY_QUOTED", "Partially Quoted"),
+            ("CLOSED", "Closed"),
+            ("CANCELLED", "Cancelled"),
+        ],
+        default="DRAFT",
+        db_index=True,
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="created_vendor_quote_requests")
+
+    class Meta:
+        db_table = "accounting_vendor_quote_requests"
+        ordering = ["-created_at", "-id"]
+
+
+class VendorQuote(AccountingTimeStampedModel):
+    quote_request = models.ForeignKey(VendorQuoteRequest, on_delete=models.CASCADE, related_name="quotes")
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="quotes")
+    quoted_price = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    available_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("0.000"))
+    lead_time_days = models.PositiveIntegerField(default=0)
+    warranty_months = models.PositiveIntegerField(default=0)
+    delivery_available = models.BooleanField(default=False)
+    delivery_charge = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    quality_note = models.TextField(blank=True, default="")
+    valid_until = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("REQUESTED", "Requested"),
+            ("QUOTED", "Quoted"),
+            ("ACCEPTED", "Accepted"),
+            ("REJECTED", "Rejected"),
+            ("EXPIRED", "Expired"),
+        ],
+        default="REQUESTED",
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="submitted_vendor_quotes")
+    submitted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_quotes"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["quote_request", "vendor"], name="vendor_quote_unique_request_vendor"),
+        ]
+
+
+class CustomerPurchaseEnquiryStatus(models.TextChoices):
+    NEW = "NEW", "New"
+    SOURCING = "SOURCING", "Sourcing"
+    QUOTE_REQUESTED = "QUOTE_REQUESTED", "Quote requested"
+    VENDOR_SELECTED = "VENDOR_SELECTED", "Vendor selected"
+    CONVERTED = "CONVERTED", "Converted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class CustomerPurchaseEnquiry(AccountingTimeStampedModel):
+    """
+    Online / walk-in purchase intent for sourcing via Phase 4 vendor ranking + Phase 3 RFQs.
+    Does not trigger EMI, payments, stock, purchase bills, or automatic PO placement.
+    """
+
+    enquiry_no = models.CharField(max_length=60, unique=True, db_index=True)
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    customer_name = models.CharField(max_length=160)
+    phone = models.CharField(max_length=20, db_index=True)
+    email = models.EmailField(blank=True, default="")
+    product = models.ForeignKey(
+        "subscriptions.Product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    product_name = models.CharField(max_length=255, blank=True, default="")
+    category_text = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    material = models.CharField(max_length=120, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    budget_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    delivery_address = models.TextField(blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    status = models.CharField(
+        max_length=24,
+        choices=CustomerPurchaseEnquiryStatus.choices,
+        default=CustomerPurchaseEnquiryStatus.NEW,
+        db_index=True,
+    )
+    public_lead = models.ForeignKey(
+        "subscriptions.PublicLead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    selected_vendor_quote = models.ForeignKey(
+        VendorQuote,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="selected_for_customer_enquiries",
+    )
+    draft_purchase_order = models.ForeignKey(
+        "inventory.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiry_sources",
+    )
+
+    class Meta:
+        db_table = "accounting_customer_purchase_enquiries"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="acct_cpe_stat_crt_idx"),
+            models.Index(fields=["pincode", "status"], name="acct_cpe_pc_stat_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        from accounting.services.customer_purchase_enquiry_numbering import allocate_customer_purchase_enquiry_number
+
+        self.customer_name = (self.customer_name or "").strip()
+        self.phone = (self.phone or "").strip()
+        self.email = (self.email or "").strip().lower()
+        self.product_name = (self.product_name or "").strip()
+        self.category_text = (self.category_text or "").strip()
+        self.material = (self.material or "").strip()
+        self.delivery_address = (self.delivery_address or "").strip()
+        self.city = (self.city or "").strip()
+        self.district = (self.district or "").strip()
+        self.state = (self.state or "").strip()
+        self.pincode = (self.pincode or "").strip()
+        if not (self.enquiry_no or "").strip():
+            self.enquiry_no = allocate_customer_purchase_enquiry_number()
+        super().save(*args, **kwargs)
 
 
 class AssetCategory(AccountingTimeStampedModel):

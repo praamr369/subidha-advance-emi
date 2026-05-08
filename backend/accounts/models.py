@@ -12,6 +12,7 @@ class UserRole(models.TextChoices):
     PARTNER = "PARTNER", "Partner"
     CUSTOMER = "CUSTOMER", "Customer"
     CASHIER = "CASHIER", "Cashier"
+    VENDOR = "VENDOR", "Vendor"
 
 
 class User(AbstractUser):

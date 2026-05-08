@@ -36,6 +36,10 @@ class IsCashier(HasRole):
     allowed_roles = ("CASHIER",)
 
 
+class IsVendor(HasRole):
+    allowed_roles = ("VENDOR",)
+
+
 class IsCashierOrAdmin(BasePermission):
     """
     Backward-compatible permission for cashier/admin flows.

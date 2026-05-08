@@ -714,27 +714,43 @@ def create_direct_sale_return(
         raise ValueError(
             f"{stock_destination.title()} stock setup is missing. Create a matching stock location first."
         )
-    invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
-    if invoice is None:
-        raise ValueError("Posted original invoice is required for direct sale return.")
+    latest_invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
+    posted_invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-invoice_date", "-id").first()
+    if latest_invoice is None:
+        raise DjangoValidationError({"detail": ["Original invoice context is required for direct sale return."]})
+    if return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL and posted_invoice is None:
+        raise DjangoValidationError({"detail": ["Posted original invoice is required for post-invoice cancellation flow."]})
 
     if sale.status not in {DirectSaleStatus.INVOICED, DirectSaleStatus.DELIVERED}:
         raise ValueError("Return is allowed only for delivered/invoiced direct sales.")
     if return_kind != DirectSaleReturnKind.POST_INVOICE_CANCEL and stock_destination != ReturnStockDestination.SELLABLE:
         _stock_location_for_destination(destination=stock_destination, stock_location_id=stock_location_id)
 
+    invoice_status = (getattr(latest_invoice, "status", "") or "").strip().upper()
+    if return_kind in {
+        DirectSaleReturnKind.DELIVERED_RETURN,
+        DirectSaleReturnKind.DELIVERED_EXCHANGE,
+        DirectSaleReturnKind.DAMAGED_RETURN,
+        DirectSaleReturnKind.PARTIAL_RETURN,
+    } and not (bool(sale.delivered_at) or sale.status == DirectSaleStatus.DELIVERED):
+        raise DjangoValidationError({"detail": ["Delivered return/exchange requires delivered sale evidence."]})
+
     by_line = {line.id: line for line in sale.lines.all()}
     seq = _fy_sequence("BILL_RET", "RET", timezone.localdate())
     ds_return = DirectSaleReturn.objects.create(
         return_no=_issue_series_number(seq, prefix_fallback=f"RET-{sale.id}"),
         direct_sale=sale,
-        original_invoice=invoice,
+        original_invoice=posted_invoice or latest_invoice,
         customer=sale.customer,
         return_kind=return_kind,
         stock_destination=stock_destination,
         stock_location_id=stock_location_id,
         reason=reason,
         stock_effect=True,
+        metadata={
+            "invoice_status_at_return": invoice_status,
+            "financial_mode": "STANDARD_REVERSAL",
+        },
     )
 
     subtotal = Decimal("0.00")
@@ -756,6 +772,15 @@ def create_direct_sale_return(
         allowed_qty = get_returnable_quantity(sale_line)
         if return_kind == DirectSaleReturnKind.POST_INVOICE_CANCEL and sale_out_qty <= Decimal("0.000"):
             allowed_qty = max(Decimal("0.000"), sold_qty - returned_qty)
+        if return_kind in {
+            DirectSaleReturnKind.DELIVERED_RETURN,
+            DirectSaleReturnKind.DELIVERED_EXCHANGE,
+            DirectSaleReturnKind.DAMAGED_RETURN,
+            DirectSaleReturnKind.PARTIAL_RETURN,
+        } and sale_out_qty <= Decimal("0.000"):
+            raise DjangoValidationError(
+                {"lines": [f"Delivered return requires SALE_OUT evidence for line {sale_line.id}."]}
+            )
         if quantity > allowed_qty:
             raise DjangoValidationError(
                 {"lines": [f"Return quantity exceeds returnable quantity for line {sale_line.id}. Remaining: {allowed_qty}."]}
@@ -785,7 +810,24 @@ def create_direct_sale_return(
     ds_return.subtotal = _money(subtotal)
     ds_return.tax_total = _money(tax_total)
     ds_return.grand_total = _money(grand_total)
-    ds_return.save(update_fields=["subtotal", "tax_total", "grand_total", "updated_at"])
+    active_receipt_total = _money(
+        sale.receipts.filter(status=BillingDocumentStatus.POSTED).aggregate(total=Sum("amount")).get("total")
+    )
+    if (
+        return_kind
+        in {
+            DirectSaleReturnKind.DELIVERED_RETURN,
+            DirectSaleReturnKind.DELIVERED_EXCHANGE,
+            DirectSaleReturnKind.DAMAGED_RETURN,
+            DirectSaleReturnKind.PARTIAL_RETURN,
+        }
+        and active_receipt_total <= Decimal("0.00")
+        and invoice_status in {BillingDocumentStatus.VOID, BillingDocumentStatus.CANCELLED}
+    ):
+        metadata = dict(ds_return.metadata or {})
+        metadata["financial_mode"] = "NO_ACTIVE_CUSTOMER_VALUE"
+        ds_return.metadata = metadata
+    ds_return.save(update_fields=["subtotal", "tax_total", "grand_total", "metadata", "updated_at"])
 
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
@@ -823,30 +865,33 @@ def post_direct_sale_return(*, return_id: int, posted_by):
     if ret.status != DirectSaleReturnStatus.APPROVED:
         raise ValueError("Only approved return can be posted.")
 
-    note = BillingCreditNote.objects.create(
-        note_no=None,
-        note_date=timezone.localdate(),
-        doc_series=_ensure_credit_sequence(timezone.localdate()),
-        original_invoice=ret.original_invoice,
-        reason=ret.reason,
-        status=BillingDocumentStatus.APPROVED,
-        taxable_adjustment=ret.subtotal,
-        tax_adjustment=ret.tax_total,
-        total_adjustment=ret.grand_total,
-        stock_effect=False,
-    )
-    for line in ret.lines.all():
-        BillingCreditNoteLine.objects.create(
-            credit_note=note,
-            inventory_item=line.inventory_item,
-            description=line.description,
-            quantity=line.quantity,
-            taxable_value=line.taxable_value,
-            tax_amount=line.tax_amount,
-            line_total=line.line_total,
+    metadata = dict(ret.metadata or {})
+    financial_mode = str(metadata.get("financial_mode") or "STANDARD_REVERSAL").strip().upper()
+    note = None
+    if financial_mode != "NO_ACTIVE_CUSTOMER_VALUE":
+        note = BillingCreditNote.objects.create(
+            note_no=None,
+            note_date=timezone.localdate(),
+            doc_series=_ensure_credit_sequence(timezone.localdate()),
+            original_invoice=ret.original_invoice,
+            reason=ret.reason,
+            status=BillingDocumentStatus.APPROVED,
+            taxable_adjustment=ret.subtotal,
+            tax_adjustment=ret.tax_total,
+            total_adjustment=ret.grand_total,
+            stock_effect=False,
         )
-
-    note, _ = post_billing_credit_note(credit_note_id=note.id, posted_by=posted_by)
+        for line in ret.lines.all():
+            BillingCreditNoteLine.objects.create(
+                credit_note=note,
+                inventory_item=line.inventory_item,
+                description=line.description,
+                quantity=line.quantity,
+                taxable_value=line.taxable_value,
+                tax_amount=line.tax_amount,
+                line_total=line.line_total,
+            )
+        note, _ = post_billing_credit_note(credit_note_id=note.id, posted_by=posted_by)
     stock_result = _post_direct_sale_return_stock(ret=ret, posted_by=posted_by) if ret.stock_effect else {"created_count": 0, "existing_count": 0, "skipped_count": 0}
     exchange_stock_result = (
         post_exchange_replacement_stock_movement(ret=ret, posted_by=posted_by)
@@ -857,7 +902,6 @@ def post_direct_sale_return(*, return_id: int, posted_by):
     ret.status = DirectSaleReturnStatus.POSTED
     ret.posted_by = posted_by
     ret.posted_at = timezone.now()
-    metadata = dict(ret.metadata or {})
     metadata["stock_created_count"] = stock_result["created_count"]
     metadata["stock_existing_count"] = stock_result["existing_count"]
     metadata["stock_skipped_count"] = stock_result.get("skipped_count", 0)
@@ -867,7 +911,7 @@ def post_direct_sale_return(*, return_id: int, posted_by):
     ret.save(update_fields=["credit_note", "status", "posted_by", "posted_at", "metadata", "updated_at"])
 
     credit_amount = ret.exchange_customer_credit if ret.return_kind == DirectSaleReturnKind.DELIVERED_EXCHANGE else ret.grand_total
-    if _money(credit_amount) > Decimal("0.00"):
+    if note and _money(credit_amount) > Decimal("0.00"):
         create_customer_credit_from_credit_note(
             customer_id=ret.customer_id,
             credit_note_id=note.id,

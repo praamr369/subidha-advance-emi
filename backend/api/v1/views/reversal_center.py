@@ -77,7 +77,19 @@ class AdminDirectSaleReturnCreateView(_AdminBase):
             )
         except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
             raise _as_drf_validation_error(exc) from exc
-        return Response({"direct_sale_return_id": ret.id, "return_no": ret.return_no, "status": ret.status}, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "direct_sale_return_id": ret.id,
+                "return_id": ret.id,
+                "return_no": ret.return_no,
+                "status": ret.status,
+                "stock_movement_refs": [],
+                "eligibility": get_direct_sale_return_eligibility(direct_sale_id=pk),
+                "updated_returned_quantity": {},
+                "updated_returnable_quantity": {},
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class AdminDirectSaleExchangeCreateView(_AdminBase):
@@ -232,7 +244,23 @@ class AdminReturnPostView(_AdminBase):
             ret, updated = post_direct_sale_return(return_id=pk, posted_by=request.user)
         except (ValueError, ObjectDoesNotExist, DjangoValidationError) as exc:
             raise _as_drf_validation_error(exc) from exc
-        return Response({"updated": updated, "id": ret.id, "status": ret.status, "credit_note_id": ret.credit_note_id})
+        stock_refs = list(
+            ret.lines.values_list("id", flat=True)
+        )
+        eligibility = get_direct_sale_return_eligibility(direct_sale_id=ret.direct_sale_id)
+        return Response(
+            {
+                "updated": updated,
+                "id": ret.id,
+                "return_id": ret.id,
+                "status": ret.status,
+                "credit_note_id": ret.credit_note_id,
+                "stock_movement_refs": [f"{ret.id}:{line_id}" for line_id in stock_refs],
+                "eligibility": eligibility,
+                "updated_returned_quantity": eligibility.get("already_returned_quantities", {}),
+                "updated_returnable_quantity": eligibility.get("returnable_quantities", {}),
+            }
+        )
 
 
 class AdminReceiptVoidReasonView(_AdminBase):

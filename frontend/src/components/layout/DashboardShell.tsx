@@ -59,6 +59,7 @@ import NotificationBellDropdown from "@/components/layout/NotificationBellDropdo
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import RoleSidebar from "@/components/layout/RoleSidebar";
+import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
@@ -78,10 +79,10 @@ import {
   type NavIconKey,
   type NavigationRole,
 } from "@/config/navigation";
-import { pushRecent, readFavorites, toggleFavorite } from "@/lib/workspace-prefs";
+import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { initialsFromDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
-import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
+import { getAdminNavigationBadges } from "@/services/navigation-badges";
 
 const DashboardShellContext = createContext(false);
 
@@ -276,7 +277,8 @@ function isActivePath(pathname: string, currentUrl: string, href: string) {
     cleanHref === ROUTES.admin.dashboard ||
     cleanHref === ROUTES.partner.dashboard ||
     cleanHref === ROUTES.customer.dashboard ||
-    cleanHref === ROUTES.cashier.dashboard
+    cleanHref === ROUTES.cashier.dashboard ||
+    cleanHref === ROUTES.vendor.dashboard
   ) {
     return false;
   }
@@ -293,6 +295,8 @@ function getRoleBasePath(role: NavigationRole) {
       return ROUTES.customer.root;
     case "CASHIER":
       return ROUTES.cashier.root;
+    case "VENDOR":
+      return ROUTES.vendor.root;
     default:
       return ROUTES.public.home;
   }
@@ -342,6 +346,7 @@ function formatRoleLabel(role: NavigationRole) {
   if (role === "PARTNER") return "Partner";
   if (role === "CUSTOMER") return "Customer";
   if (role === "CASHIER") return "Cashier";
+  if (role === "VENDOR") return "Vendor";
   return "Workspace";
 }
 
@@ -351,6 +356,8 @@ function getProfileHref(role: NavigationRole) {
       return ROUTES.customer.profile;
     case "ADMIN":
       return ROUTES.admin.settings;
+    case "VENDOR":
+      return ROUTES.vendor.profile;
     default:
       return getRoleBasePath(role);
   }
@@ -365,6 +372,35 @@ function getSettingsHref(role: NavigationRole) {
     default:
       return getRoleBasePath(role);
   }
+}
+
+function countsForGroup(groupTitle: string, badges: Record<string, number>): Array<{ label: string; value: number }> {
+  const byGroup: Record<string, Array<{ label: string; key: string }>> = {
+    "Command Center": [
+      { label: "Outstanding", key: "admin.badges.outstanding_count" },
+      { label: "Overdue", key: "admin.badges.overdue_count" },
+    ],
+    "Billing & Finance": [
+      { label: "Overdue", key: "admin.badges.overdue_count" },
+      { label: "Unreconciled", key: "admin.badges.unreconciled_count" },
+    ],
+    "Returns & Reversals": [
+      { label: "Returns", key: "admin.badges.pending_return_count" },
+      { label: "Refunds", key: "admin.badges.pending_refund_count" },
+    ],
+    "Delivery & Service": [
+      { label: "Delivery", key: "admin.badges.pending_delivery_count" },
+      { label: "Support", key: "admin.badges.open_support_ticket_count" },
+    ],
+    Inventory: [
+      { label: "Low Stock", key: "admin.badges.low_stock_count" },
+      { label: "Inspection", key: "admin.badges.inspection_stock_count" },
+    ],
+    "Lucky Plan": [{ label: "Pending Draw", key: "admin.badges.pending_draw_count" }],
+  };
+  return (byGroup[groupTitle] ?? [])
+    .map((row) => ({ label: row.label, value: Number(badges[row.key] ?? 0) }))
+    .filter((row) => row.value > 0);
 }
 
 function RailTooltip({ label }: { label: string }) {
@@ -529,6 +565,17 @@ function SidebarContent({
       .filter((item): item is ShellNavItem => Boolean(item))
       .slice(0, 6);
   }, [favorites, navGroups]);
+  const recentLinks = useMemo(() => {
+    if (!sessionId) return [];
+    const recentHrefs = readRecents(sessionId, role).slice(0, 4);
+    const allItems = navGroups.flatMap((group) => flattenShellItems(group.items));
+    return recentHrefs
+      .map((href) => {
+        const match = allItems.find((item) => item.href === href);
+        return match ? { href, label: match.label } : null;
+      })
+      .filter((item): item is { href: string; label: string } => Boolean(item));
+  }, [navGroups, role, sessionId]);
 
   const modeFilteredGroups = useMemo(() => {
     if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
@@ -583,17 +630,14 @@ function SidebarContent({
     let cancelled = false;
     const loadBadges = async () => {
       try {
-        const payload = (await getAdminOperationsQueueSummary()) as {
-          results?: { key: string; badge_source?: string; count: number }[];
-        };
+        const payload = await getAdminNavigationBadges();
         if (cancelled) return;
-        const next: Record<string, number> = {};
-        (payload.results ?? []).forEach((row) => {
-          if (row.badge_source) {
-            next[row.badge_source] = Number(row.count || 0);
-          }
-        });
-        setQueueBadges(next);
+        setQueueBadges(
+          Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
+            acc[`admin.badges.${key}`] = Number(value || 0);
+            return acc;
+          }, {})
+        );
       } catch {
         if (!cancelled) setQueueBadges({});
       }
@@ -1049,17 +1093,16 @@ function SidebarContent({
                 </button>
 
                 {collapsed && flyoutOpen ? (
-                  <div
-                    role="menu"
-                    aria-label={`${group.title} navigation`}
-                    className="absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
-                  >
-                    <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">{group.title}</div>
-                      <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">Select a module</div>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {group.items.map((item) => renderFlyoutItem(group.title, item))}
+                  <div role="menu" aria-label={`${group.title} navigation`}>
+                    <SidebarHoverCard
+                      title={group.title}
+                      counts={countsForGroup(group.title, queueBadges)}
+                      quickActions={group.items.slice(0, 3).map((item) => ({ label: item.label, href: item.href }))}
+                      recentRoutes={recentLinks}
+                      primaryAction={group.items[0] ? { label: `Open ${group.items[0].label}`, href: group.items[0].href } : undefined}
+                    />
+                    <div className="absolute left-full top-[14.5rem] z-50 ml-3 w-72 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]">
+                      <div className="space-y-1">{group.items.map((item) => renderFlyoutItem(group.title, item))}</div>
                     </div>
                   </div>
                 ) : null}

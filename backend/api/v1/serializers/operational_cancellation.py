@@ -50,3 +50,23 @@ class ReversalCaseCreateSerializer(serializers.Serializer):
 
 class ReversalCaseTransitionSerializer(serializers.Serializer):
     reason = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True, max_length=1000)
+
+
+class ReversalCasePatchSerializer(serializers.Serializer):
+    status = serializers.CharField(required=False, allow_blank=False)
+    reason = serializers.CharField(required=False, allow_blank=False, trim_whitespace=True, max_length=1000)
+    internal_note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=2000)
+
+
+class ReversalCaseAssignSerializer(serializers.Serializer):
+    assignee_id = serializers.IntegerField(required=True, min_value=1)
+    reason = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True, max_length=1000)
+
+
+class ReversalCaseNoteSerializer(serializers.Serializer):
+    note = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True, max_length=2000)
+
+
+class ReversalCaseCloseSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True, max_length=1000)
+    override_reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=1000)

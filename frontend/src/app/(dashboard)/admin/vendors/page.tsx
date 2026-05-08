@@ -8,7 +8,20 @@ import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import { listVendorsLite, type VendorLite } from "@/services/inventory";
+import Link from "next/link";
+
+import { listVendors } from "@/services/vendors";
+
+type VendorLite = {
+  id: number;
+  display_name?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
+  status?: string;
+  is_active?: boolean;
+};
 
 export default function AdminVendorsPage() {
   const [vendors, setVendors] = useState<VendorLite[]>([]);
@@ -20,9 +33,9 @@ export default function AdminVendorsPage() {
     async function load() {
       setLoading(true);
       try {
-        const payload = await listVendorsLite();
+        const payload = (await listVendors()) as { results?: VendorLite[] } | VendorLite[];
         if (!active) return;
-        setVendors(payload.results);
+        setVendors(Array.isArray(payload) ? payload : payload.results || []);
         setError(null);
       } catch (err) {
         if (!active) return;
@@ -38,12 +51,11 @@ export default function AdminVendorsPage() {
   }, []);
 
   const columns: EnterpriseColumnDef<VendorLite>[] = [
-    { key: "name", header: "Vendor" },
+    { key: "name", header: "Vendor", render: (row) => <Link href={`${ROUTES.admin.vendors}/${row.id}`}>{row.display_name || row.name}</Link> },
     { key: "phone", header: "Phone" },
     { key: "email", header: "Email" },
     { key: "gstin", header: "GSTIN" },
-    { key: "state_name", header: "State" },
-    { key: "is_active", header: "Active", render: (row) => (row.is_active ? "Yes" : "No") },
+    { key: "status", header: "Status", render: (row) => row.status || (row.is_active ? "ACTIVE" : "INACTIVE") },
   ];
 
   return (

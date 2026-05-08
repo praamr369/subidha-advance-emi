@@ -39,6 +39,9 @@ ROLE_CAPABILITY_FALLBACKS: dict[str, set[str]] = {
         "crm.manage",
     },
     UserRole.CUSTOMER: set(),
+    UserRole.VENDOR: {
+        "vendor.manage",
+    },
 }
 security_logger = logging.getLogger("security.events")
 

@@ -1,7 +1,7 @@
 import { ROUTES } from "@/lib/routes";
 import { ADMIN_ROUTE_TREE, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
-export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER";
+export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | "VENDOR";
 
 export type NavIconKey =
   | "operations"
@@ -84,6 +84,37 @@ function iconForGroup(group: string): NavIconKey {
   return "operations";
 }
 
+function normalizeAdminGroupTitle(title: string): string {
+  const key = title.toLowerCase();
+  if (key.includes("command")) return "Command Center";
+  if (key.includes("sales")) return "Sales & Contracts";
+  if (key.includes("subscription")) return "Sales & Contracts";
+  if (key.includes("finance")) return "Billing & Finance";
+  if (key.includes("delivery")) return "Delivery & Service";
+  if (key.includes("return") || key.includes("reversal")) return "Returns & Reversals";
+  if (key.includes("inventory") || key.includes("product")) return "Inventory";
+  if (key.includes("lucky")) return "Lucky Plan";
+  if (key.includes("crm") || key.includes("partner")) return "CRM & Partners";
+  if (key.includes("report") || key.includes("audit")) return "Reports & Audit";
+  if (key.includes("setup") || key.includes("staff")) return "Setup";
+  return title;
+}
+
+function inferAdminBadgeSource(item: AdminRouteRegistryItem): string | undefined {
+  const href = item.href.toLowerCase();
+  const label = item.label.toLowerCase();
+  if (href.includes("/outstandings")) return "admin.badges.outstanding_count";
+  if (href.includes("/overdue")) return "admin.badges.overdue_count";
+  if (href.includes("/deliver")) return "admin.badges.pending_delivery_count";
+  if (label.includes("return") || label.includes("reversal")) return "admin.badges.pending_reversal_count";
+  if (label.includes("refund")) return "admin.badges.pending_refund_count";
+  if (href.includes("/support") || href.includes("/service-desk")) return "admin.badges.open_support_ticket_count";
+  if (label.includes("low stock")) return "admin.badges.low_stock_count";
+  if (href.includes("/draw") || href.includes("/batch")) return "admin.badges.pending_draw_count";
+  if (href.includes("/reconciliation")) return "admin.badges.unreconciled_count";
+  return item.badgeSource;
+}
+
 function buildAdminNavigationGroups(): NavGroup[] {
   const grouped = new Map<string, NavItem[]>();
   const toNavItem = (row: AdminRouteRegistryItem): NavItem => ({
@@ -92,13 +123,15 @@ function buildAdminNavigationGroups(): NavGroup[] {
     icon: iconForGroup(row.group),
     disabled: row.status === "deferred",
     description: row.description,
-    badgeSource: row.badgeSource,
+    badgeSource: inferAdminBadgeSource(row),
     children: row.children?.map(toNavItem),
   });
 
   ADMIN_ROUTE_TREE.forEach((row) => {
-    if (!grouped.has(row.group)) grouped.set(row.group, []);
-    grouped.get(row.group)!.push(toNavItem(row));
+    if (/^create\s/i.test(row.label)) return;
+    const groupTitle = normalizeAdminGroupTitle(row.group);
+    if (!grouped.has(groupTitle)) grouped.set(groupTitle, []);
+    grouped.get(groupTitle)!.push(toNavItem(row));
   });
   return Array.from(grouped.entries()).map(([title, items]) => ({
     title,
@@ -328,6 +361,22 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
   ],
+  VENDOR: [
+    {
+      title: "Vendor Portal",
+      items: [
+        { label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." },
+        { label: "Profile", href: "/vendor/profile", icon: "crm", description: "Vendor profile and service areas." },
+        { label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." },
+        { label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." },
+        { label: "Ledger", href: "/vendor/ledger", icon: "accounting", description: "Vendor ledger entries." },
+        { label: "Outstanding", href: "/vendor/outstanding", icon: "finance", description: "Vendor outstanding balance." },
+        { label: "Purchase Returns", href: "/vendor/purchase-returns", icon: "serviceDesk", description: "Purchase return visibility." },
+        { label: "Products", href: "/vendor/products", icon: "inventory", description: "Vendor product catalog." },
+        { label: "Documents", href: "/vendor/documents", icon: "reports", description: "Vendor documents and uploads." },
+      ],
+    },
+  ],
 };
 
 export const navigationByRole: Record<NavigationRole, NavItem[]> = {
@@ -335,6 +384,7 @@ export const navigationByRole: Record<NavigationRole, NavItem[]> = {
   PARTNER: flattenGroups(groupedNavigationByRole.PARTNER),
   CUSTOMER: flattenGroups(groupedNavigationByRole.CUSTOMER),
   CASHIER: flattenGroups(groupedNavigationByRole.CASHIER),
+  VENDOR: flattenGroups(groupedNavigationByRole.VENDOR),
 };
 
 export function normalizeRole(role: string | null | undefined): NavigationRole {
@@ -349,6 +399,8 @@ export function normalizeRole(role: string | null | undefined): NavigationRole {
       return "CUSTOMER";
     case "CASHIER":
       return "CASHIER";
+    case "VENDOR":
+      return "VENDOR";
     default:
       return "CUSTOMER";
   }

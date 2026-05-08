@@ -38,6 +38,7 @@ const types: ReversalType[] = ["sale_return", "receipt_void", "customer_refund",
 export default function AdminBillingReversalsPage() {
   const searchParams = useSearchParams();
   const debugMode = searchParams.get("debug") === "1";
+  const hasDirectSaleContext = Boolean(searchParams.get("direct_sale"));
   const [rows, setRows] = useState<ReversalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +123,9 @@ export default function AdminBillingReversalsPage() {
           initial[line.sale_line_id] = line.default_return_quantity || line.returnable_quantity || "0";
         });
         setReturnQuantities(initial);
+        if (!returnReason.trim()) {
+          setReturnReason("Full cancellation after delivered product returned");
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load return eligibility."))
       .finally(() => setLoadingEligibility(false));
@@ -214,7 +218,7 @@ export default function AdminBillingReversalsPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Cancel Sale</div>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={cancelSaleId} onChange={(e) => setCancelSaleId(e.target.value)} placeholder="Direct Sale ID" />
+            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={cancelSaleId} onChange={(e) => setCancelSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <input className="mb-2 h-10 w-full rounded border px-2" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason (required)" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!cancelReason.trim()) { setError("Cancel reason is required."); return; }
@@ -224,7 +228,7 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Void Receipt</div>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={voidReceiptId} onChange={(e) => setVoidReceiptId(e.target.value)} placeholder="Receipt ID" />
+            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={voidReceiptId} onChange={(e) => setVoidReceiptId(e.target.value)} placeholder="Receipt ID" /> : null}
             <input className="mb-2 h-10 w-full rounded border px-2" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Reason (required)" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!voidReason.trim()) { setError("Void reason is required."); return; }
@@ -239,7 +243,7 @@ export default function AdminBillingReversalsPage() {
               Sale: {eligibility?.sale_no || "N/A"} | Customer: {eligibility?.customer_name || "N/A"} {eligibility?.customer_phone_masked ? `(${eligibility.customer_phone_masked})` : ""}
             </div>
             {stockSetupError ? <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">{stockSetupError}</div> : null}
-            {debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
+            {(!hasDirectSaleContext || debugMode) ? <input className="mb-2 h-10 w-full rounded border px-2" value={returnSaleId} onChange={(e) => setReturnSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <select className="h-10 rounded border px-2" value={returnKind} onChange={(e) => setReturnKind(e.target.value as DirectSaleReturnKind)} aria-label="Return Kind">
                 <option value="POST_INVOICE_CANCEL">POST_INVOICE_CANCEL</option>
@@ -333,20 +337,36 @@ export default function AdminBillingReversalsPage() {
             ) : null}
             <input className="mt-2 mb-2 h-10 w-full rounded border px-2" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={Boolean(eligibility?.stock_setup_required) || !(eligibility?.can_create_return ?? true)} onClick={() => {
-              if (!returnReason.trim()) { setError("Return reason is required."); return; }
+              if (!returnReason.trim()) { setReturnFormError("Return reason is required."); return; }
               if (eligibility?.stock_setup_required) { setStockSetupError(eligibility.stock_setup_message || "Create missing return locations first."); return; }
               const lines = (eligibility?.return_lines || [])
                 .map((line) => ({ direct_sale_line_id: line.sale_line_id, quantity: returnQuantities[line.sale_line_id] || "0" }))
                 .filter((line) => Number(line.quantity) > 0);
               if (!lines.length) { setReturnFormError("At least one return line is required."); return; }
-              void runAction(() => createAdminDirectSaleReturn(Number(returnSaleId), { reason: returnReason, return_kind: returnKind, stock_destination: stockDestination, stock_location_id: stockLocationId ? Number(stockLocationId) : undefined, confirm_sellable_destination: stockDestination === "SELLABLE", lines }), "Return created.");
+              void (async () => {
+                try {
+                  await createAdminDirectSaleReturn(Number(returnSaleId), {
+                    reason: returnReason,
+                    return_kind: returnKind,
+                    stock_destination: stockDestination,
+                    stock_location_id: stockLocationId ? Number(stockLocationId) : undefined,
+                    confirm_sellable_destination: stockDestination === "SELLABLE",
+                    lines,
+                  });
+                  await runAction(async () => Promise.resolve(), "Return created.");
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : "Return submission failed.";
+                  setReturnFormError(message);
+                  setActionError(null);
+                }
+              })();
             }}>Create Return</button>
           </div>
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Exchange Product</div>
             <p className="mb-2 text-xs text-muted-foreground">Original invoice, receipt, and stock ledger rows will remain unchanged. The system will create reversal documents, credit notes, and stock ledger movements.</p>
-            {debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
+            {(!hasDirectSaleContext || debugMode) ? <input className="mb-2 h-10 w-full rounded border px-2" value={exchangeSaleId} onChange={(e) => setExchangeSaleId(e.target.value)} placeholder="Direct Sale ID" /> : null}
             <input className="h-10 w-full rounded border px-2" value={inventoryQuery} onChange={(e) => setInventoryQuery(e.target.value)} placeholder="Search replacement by product/SKU" />
             <button className="mt-2 rounded border px-3 py-2 text-sm" onClick={() => {
               void searchAdminInventoryItems(inventoryQuery).then((payload) => setInventorySearchRows(payload.results)).catch((err) => setError(err instanceof Error ? err.message : "Inventory search failed."));
@@ -414,19 +434,19 @@ export default function AdminBillingReversalsPage() {
                   ))}
                 </div>
                 {!eligibility.can_finalize_reversal ? <div>Finalize blockers: {(eligibility.finalize_blocking_reasons || []).join(" | ")}</div> : null}
-                {eligibility.can_finalize_reversal ? (
-                  <button
-                    className="rounded border px-3 py-2 text-xs"
-                    onClick={() => {
-                      void runAction(
-                        () => cancelAdminDirectSale(eligibility.direct_sale_id, "Finalize full cancellation/archive after reversal controls satisfied."),
-                        "Sale finalized and archived.",
-                      );
-                    }}
-                  >
-                    Finalize Full Cancellation / Archive Sale
-                  </button>
-                ) : null}
+                <button
+                  className="rounded border px-3 py-2 text-xs disabled:opacity-50"
+                  disabled={!eligibility.can_finalize_reversal}
+                  onClick={() => {
+                    if (!eligibility.can_finalize_reversal) return;
+                    void runAction(
+                      () => cancelAdminDirectSale(eligibility.direct_sale_id, "Finalize full cancellation/archive after reversal controls satisfied."),
+                      "Sale finalized and archived.",
+                    );
+                  }}
+                >
+                  Finalize Full Cancellation / Archive Sale
+                </button>
                 {eligibility.sold_lines.length === 0 ? <div>No sale lines found.</div> : eligibility.sold_lines.map((line) => (
                   <div key={line.direct_sale_line_id} className="rounded border p-2">
                     Line {line.direct_sale_line_id}: sold {line.sold_quantity} · returned {line.already_returned_quantity} · returnable {line.returnable_quantity || line.max_returnable_quantity}
@@ -438,14 +458,14 @@ export default function AdminBillingReversalsPage() {
 
           <div className="rounded border p-3">
             <div className="mb-2 text-sm font-semibold">Create Refund</div>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={refundCustomerId} onChange={(e) => setRefundCustomerId(e.target.value)} placeholder="Customer ID" />
+            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={refundCustomerId} onChange={(e) => setRefundCustomerId(e.target.value)} placeholder="Customer ID" /> : null}
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} placeholder="Amount" />
             <select className="mb-2 h-10 w-full rounded border px-2" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as typeof refundMethod)} aria-label="Refund Method">
               <option value="CASH_REFUND">CASH_REFUND</option>
               <option value="UPI_REFUND">UPI_REFUND</option>
               <option value="BANK_REFUND">BANK_REFUND</option>
             </select>
-            <input className="mb-2 h-10 w-full rounded border px-2" value={refundFinanceId} onChange={(e) => setRefundFinanceId(e.target.value)} placeholder="Finance Account ID" />
+            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={refundFinanceId} onChange={(e) => setRefundFinanceId(e.target.value)} placeholder="Finance Account ID" /> : null}
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
               if (!refundMethod || !refundFinanceId) { setError("Refund method and finance account are required."); return; }

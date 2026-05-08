@@ -18,6 +18,7 @@ from subscriptions.models import (
     DrawEligibilitySnapshot,
     LuckyDraw,
     Product,
+    PublicLeadIntent,
     Subscription,
 )
 from subscriptions.services.audit_service import log_audit
@@ -34,6 +35,8 @@ class PublicLeadSerializer(serializers.Serializer):
     interested_product = serializers.CharField(max_length=255, required=False, allow_blank=True)
     preferred_emi_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
+    intent = serializers.ChoiceField(choices=PublicLeadIntent.choices, required=False, default="GENERAL")
+    create_procurement_enquiry = serializers.BooleanField(required=False, default=False)
 
 
 def _mask_public_name(raw):
@@ -405,6 +408,8 @@ class PublicLeadView(APIView):
         serializer.is_valid(raise_exception=True)
 
         validated = serializer.validated_data.copy()
+        create_pe = validated.pop("create_procurement_enquiry", False)
+        intent_val = validated.pop("intent", "GENERAL")
         product = None
         product_id = validated.pop("product_id", None)
 
@@ -416,30 +421,47 @@ class PublicLeadView(APIView):
                     {"product_id": "Selected product is not available."}
                 )
 
-        lead = create_public_lead(product=product, **validated)
+        try:
+            lead = create_public_lead(
+                product=product,
+                intent=intent_val,
+                create_procurement_enquiry=create_pe,
+                **validated,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
 
-        return Response(
-            {
-                "message": "Lead submitted successfully",
-                "lead_id": lead.id,
-                "created_at": lead.created_at,
-                "data": {
-                    "name": lead.name,
-                    "phone": lead.phone,
-                    "email": lead.email,
-                    "city": lead.city,
-                    "product_id": lead.product_id,
-                    "interested_product": lead.interested_product,
-                    "preferred_emi_amount": (
-                        str(lead.preferred_emi_amount)
-                        if lead.preferred_emi_amount is not None
-                        else None
-                    ),
-                    "notes": lead.notes,
-                },
+        procurement_enquiry_id = None
+        if create_pe:
+            from accounting.models import CustomerPurchaseEnquiry
+
+            row = CustomerPurchaseEnquiry.objects.filter(public_lead_id=lead.pk).order_by("-id").first()
+            procurement_enquiry_id = row.id if row else None
+
+        payload = {
+            "message": "Lead submitted successfully",
+            "lead_id": lead.id,
+            "created_at": lead.created_at,
+            "data": {
+                "name": lead.name,
+                "phone": lead.phone,
+                "email": lead.email,
+                "city": lead.city,
+                "product_id": lead.product_id,
+                "interested_product": lead.interested_product,
+                "preferred_emi_amount": (
+                    str(lead.preferred_emi_amount)
+                    if lead.preferred_emi_amount is not None
+                    else None
+                ),
+                "notes": lead.notes,
+                "intent": lead.intent,
             },
-            status=status.HTTP_201_CREATED,
-        )
+        }
+        if procurement_enquiry_id is not None:
+            payload["procurement_enquiry_id"] = procurement_enquiry_id
+
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class LatestWinnerView(APIView):
