@@ -3,25 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  Download,
-  Image as ImageIcon,
-  Layers,
-  Package,
-  RefreshCw,
-  Search,
-  Tag,
-} from "lucide-react";
+import { Download, RefreshCw, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -505,7 +496,7 @@ export default function AdminProductsPage() {
         { href: "/admin/products/create", label: "Create Product", variant: "primary" },
         { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
         {
-          href: "/admin/subscriptions/create",
+          href: "/admin/subscriptions/advance-emi/create",
           label: "Create Subscription",
           variant: "secondary",
         },
@@ -520,85 +511,73 @@ export default function AdminProductsPage() {
       statusBadge={{ label: "Product Operations", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Visible Products"
-            value={rows.length}
-            icon={<Package className="h-4 w-4" />}
-          />
-          <StatCard
+        <QuickActionGrid>
+          <KpiCard label="Visible Products" value={rows.length} />
+          <KpiCard
             label="Visible Contract Value"
             value={money(visibleBaseValue)}
-            icon={<Tag className="h-4 w-4" />}
-            tone="success"
+            helper="Sum of base price for products in the current filter view."
           />
-          <StatCard
+          <KpiCard
             label="Catalog Coverage"
             value={rows.length - uncategorizedCount}
-            subtext={`${uncategorizedCount} need catalog cleanup`}
-            icon={<Layers className="h-4 w-4" />}
-            tone={uncategorizedCount > 0 ? "warning" : "default"}
+            helper={`${uncategorizedCount} need catalog cleanup`}
           />
-          <StatCard
+          <KpiCard
             label="Image Coverage"
             value={`${imageCoverage}%`}
-            progress={imageCoverage}
-            progressLabel={`${imageCount}/${rows.length || 0} products`}
-            icon={<ImageIcon className="h-4 w-4" />}
-            tone={imageCoverage < 60 ? "warning" : "info"}
+            helper={`${imageCount}/${rows.length || 0} products with images`}
           />
-        </div>
+        </QuickActionGrid>
 
-        <WorkspaceSection
+        <DetailPanel
           title="Catalog workflow"
           description="Use server-backed search and catalog filters to keep product lookup fast, export the current view for offline review, manage category/subcategory/unit masters from one workspace, and route directly into product or subscription work."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/admin/products/masters"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Manage Masters
-              </Link>
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={refreshing || loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
-              <button
-                type="button"
-                disabled={exportRows.length === 0 || loading}
-                onClick={() =>
-                  downloadCsv(
-                    "product-register-current-view.csv",
-                    [
-                      { key: "id", header: "id" },
-                      { key: "name", header: "name" },
-                      { key: "product_code", header: "product_code" },
-                      { key: "sku", header: "sku" },
-                      { key: "unit_of_measure", header: "unit_of_measure" },
-                      { key: "category", header: "category" },
-                      { key: "subcategory", header: "subcategory" },
-                      { key: "description", header: "description" },
-                      { key: "base_price", header: "base_price" },
-                      { key: "image_status", header: "image_status" },
-                      { key: "created_at", header: "created_at" },
-                    ],
-                    exportRows
-                  )
-                }
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download className="h-4 w-4" />
-                Export Current View
-              </button>
-            </div>
-          }
         >
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Link
+              href="/admin/products/masters"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+            >
+              Manage Masters
+            </Link>
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              disabled={exportRows.length === 0 || loading}
+              onClick={() =>
+                downloadCsv(
+                  "product-register-current-view.csv",
+                  [
+                    { key: "id", header: "id" },
+                    { key: "name", header: "name" },
+                    { key: "product_code", header: "product_code" },
+                    { key: "sku", header: "sku" },
+                    { key: "unit_of_measure", header: "unit_of_measure" },
+                    { key: "category", header: "category" },
+                    { key: "subcategory", header: "subcategory" },
+                    { key: "description", header: "description" },
+                    { key: "base_price", header: "base_price" },
+                    { key: "image_status", header: "image_status" },
+                    { key: "created_at", header: "created_at" },
+                  ],
+                  exportRows
+                )
+              }
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              Export Current View
+            </button>
+          </div>
           <TableToolbar
             footer={
               query || categoryFilter || subcategoryFilter ? (
@@ -665,10 +644,10 @@ export default function AdminProductsPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {!loading && !error && categoryHighlights.length > 0 ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Catalog shortcuts"
             description="Use the heaviest categories in the current view to narrow the register with fewer clicks."
           >
@@ -717,7 +696,7 @@ export default function AdminProductsPage() {
                 )}
               </div>
             </div>
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
 
         {loading ? <LoadingBlock label="Loading product register..." /> : null}
@@ -731,7 +710,7 @@ export default function AdminProductsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Product rows"
             description="Open the product detail page to review catalog information and downstream usage without breaking existing pricing or subscription dependencies."
           >
@@ -749,35 +728,37 @@ export default function AdminProductsPage() {
                 }
               />
             ) : (
-              <DataTable<ProductRow>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) => router.push(`/admin/products/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/admin/products/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Open
-                    </Link>
-                    <Link
-                      href={`/admin/products/${row.id}/edit`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Edit
-                    </Link>
-                    <Link
-                      href={`/admin/subscriptions/create?product=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Use in Subscription
-                    </Link>
-                  </div>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<ProductRow>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) => router.push(`/admin/products/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/products/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Open
+                      </Link>
+                      <Link
+                        href={`/admin/products/${row.id}/edit`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Edit
+                      </Link>
+                      <Link
+                        href={`/admin/subscriptions/advance-emi/create?product=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Use in Subscription
+                      </Link>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

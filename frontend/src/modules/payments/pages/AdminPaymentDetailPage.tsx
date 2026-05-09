@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import PortalPage from "@/components/ui/PortalPage";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -189,7 +190,12 @@ export default function AdminPaymentDetailPage() {
                 <b>Advance EMI Month:</b> {payment.emi_month_no ?? "-"}
               </p>
               <p>
-                <b>Customer:</b> {payment.customer_name || "-"}
+                <b>Customer:</b>{" "}
+                <CustomerIntelligenceTrigger
+                  customerId={payment.customer}
+                  customerName={payment.customer_name || "-"}
+                  scope="admin"
+                />
               </p>
               <p>
                 <b>Phone:</b> {payment.customer_phone || "-"}

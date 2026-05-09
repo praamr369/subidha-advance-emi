@@ -10,9 +10,14 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
+import {
+  DataTableShell,
+  DetailPanel,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import StatusBadge from "@/components/ui/status-badge";
 import { downloadCsv } from "@/lib/export/csv";
 import {
   buildAdminPaymentRoute,
@@ -166,20 +171,13 @@ function ModeButton({
   );
 }
 
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <WorkspaceSection title={title} description={description}>
-      {children}
-    </WorkspaceSection>
-  );
+function kpiToneClass(
+  tone?: "default" | "warning" | "success" | "danger"
+): string | undefined {
+  if (tone === "danger") return "border-destructive/25 bg-destructive/5";
+  if (tone === "warning") return "border-[color-mix(in_oklab,var(--warning)_35%,var(--border)_65%)]";
+  if (tone === "success") return "border-[color-mix(in_oklab,var(--success)_35%,var(--border)_65%)]";
+  return undefined;
 }
 
 export default function AdminReconciliationPage() {
@@ -457,8 +455,8 @@ export default function AdminReconciliationPage() {
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.financeReconciliation,
-          label: "Commission Reconciliation",
+          href: ROUTES.admin.financeCommissions,
+          label: "Commission Register",
           variant: "ghost",
         },
       ]}
@@ -513,81 +511,80 @@ export default function AdminReconciliationPage() {
           groups={RECONCILIATION_DIRECTORY_GROUPS}
         />
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-foreground">
-              Canonical workflow mode
+        <DetailPanel
+          title="Canonical workflow mode"
+          description="Subscription attention and payment reconciliation share one operational route. Switch modes without changing filter context in the URL."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <ModeButton href={subscriptionsViewHref} active={activeView === "subscriptions"}>
+                Subscription Attention
+              </ModeButton>
+              <ModeButton href={paymentsViewHref} active={activeView === "payments"}>
+                Payment Queue
+              </ModeButton>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Subscription attention and payment reconciliation now share one operational route.
-            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing || loading}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                type="button"
+                disabled={
+                  loading ||
+                  (activeView === "payments"
+                    ? paymentExportRows.length === 0
+                    : snapshotExportRows.length === 0)
+                }
+                onClick={() =>
+                  downloadCsv<ReconciliationExportRow>(
+                    activeView === "payments"
+                      ? "admin-reconciliation-payments.csv"
+                      : "admin-reconciliation-subscriptions.csv",
+                    activeView === "payments"
+                      ? [
+                          { key: "id", header: "id" },
+                          { key: "payment_id", header: "payment_id" },
+                          { key: "subscription_number", header: "subscription_number" },
+                          { key: "customer_name", header: "customer_name" },
+                          { key: "reference_no", header: "reference_no" },
+                          { key: "status", header: "status" },
+                          { key: "flagged", header: "flagged" },
+                          { key: "locked", header: "locked" },
+                          { key: "payment_amount", header: "payment_amount" },
+                          { key: "expected_amount", header: "expected_amount" },
+                          { key: "paid_amount", header: "paid_amount" },
+                          { key: "variance_amount", header: "variance_amount" },
+                          { key: "payment_date", header: "payment_date" },
+                          { key: "reconciled_at", header: "reconciled_at" },
+                          { key: "notes", header: "notes" },
+                        ]
+                      : [
+                          { key: "subscription_id", header: "subscription_id" },
+                          { key: "subscription_number", header: "subscription_number" },
+                          { key: "customer_name", header: "customer_name" },
+                          { key: "total_amount", header: "total_amount" },
+                          { key: "paid_amount", header: "paid_amount" },
+                          { key: "waived_amount", header: "waived_amount" },
+                          { key: "pending_outstanding", header: "pending_outstanding" },
+                          { key: "computed_outstanding", header: "computed_outstanding" },
+                          { key: "delta", header: "delta" },
+                        ],
+                    activeView === "payments" ? paymentExportRows : snapshotExportRows
+                  )
+                }
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Export Current View
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <ModeButton href={subscriptionsViewHref} active={activeView === "subscriptions"}>
-              Subscription Attention
-            </ModeButton>
-            <ModeButton href={paymentsViewHref} active={activeView === "payments"}>
-              Payment Queue
-            </ModeButton>
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              type="button"
-              disabled={
-                loading ||
-                (activeView === "payments"
-                  ? paymentExportRows.length === 0
-                  : snapshotExportRows.length === 0)
-              }
-              onClick={() =>
-                downloadCsv<ReconciliationExportRow>(
-                  activeView === "payments"
-                    ? "admin-reconciliation-payments.csv"
-                    : "admin-reconciliation-subscriptions.csv",
-                  activeView === "payments"
-                    ? [
-                        { key: "id", header: "id" },
-                        { key: "payment_id", header: "payment_id" },
-                        { key: "subscription_number", header: "subscription_number" },
-                        { key: "customer_name", header: "customer_name" },
-                        { key: "reference_no", header: "reference_no" },
-                        { key: "status", header: "status" },
-                        { key: "flagged", header: "flagged" },
-                        { key: "locked", header: "locked" },
-                        { key: "payment_amount", header: "payment_amount" },
-                        { key: "expected_amount", header: "expected_amount" },
-                        { key: "paid_amount", header: "paid_amount" },
-                        { key: "variance_amount", header: "variance_amount" },
-                        { key: "payment_date", header: "payment_date" },
-                        { key: "reconciled_at", header: "reconciled_at" },
-                        { key: "notes", header: "notes" },
-                      ]
-                    : [
-                        { key: "subscription_id", header: "subscription_id" },
-                        { key: "subscription_number", header: "subscription_number" },
-                        { key: "customer_name", header: "customer_name" },
-                        { key: "total_amount", header: "total_amount" },
-                        { key: "paid_amount", header: "paid_amount" },
-                        { key: "waived_amount", header: "waived_amount" },
-                        { key: "pending_outstanding", header: "pending_outstanding" },
-                        { key: "computed_outstanding", header: "computed_outstanding" },
-                        { key: "delta", header: "delta" },
-                      ],
-                  activeView === "payments" ? paymentExportRows : snapshotExportRows
-                )
-              }
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Export Current View
-            </button>
-          </div>
-        </section>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading reconciliation workspace..." /> : null}
 
@@ -601,32 +598,32 @@ export default function AdminReconciliationPage() {
 
         {!loading && !error && activeView === "subscriptions" ? (
           <>
-            <SectionCard
+            <DetailPanel
               title="Subscription attention"
               description="This view shows only subscription rows where pending outstanding and contract-derived remaining exposure do not align."
             >
-              <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+              <QuickActionGrid className="md:grid-cols-3">
+                <KpiCard
                   label="Checked rows"
                   value={String(checkedCount)}
-                  subtext="Subscriptions inspected in the canonical attention snapshot"
+                  helper="Subscriptions inspected in the canonical attention snapshot"
                 />
-                <StatCard
+                <KpiCard
+                  className={kpiToneClass(flaggedCount > 0 ? "warning" : "success")}
                   label="Flagged mismatches"
                   value={String(flaggedCount)}
-                  subtext="Rows requiring reconciliation follow-up"
-                  tone={flaggedCount > 0 ? "warning" : "success"}
+                  helper="Rows requiring reconciliation follow-up"
                 />
-                <StatCard
+                <KpiCard
+                  className={kpiToneClass(totalDelta > 0 ? "danger" : "success")}
                   label="Delta exposure"
                   value={money(totalDelta)}
-                  subtext="Absolute mismatch between pending and computed outstanding"
-                  tone={totalDelta > 0 ? "danger" : "success"}
+                  helper="Absolute mismatch between pending and computed outstanding"
                 />
-              </div>
-            </SectionCard>
+              </QuickActionGrid>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Flagged subscription rows"
               description="Open subscription detail to inspect canonical financial truth, or jump into payment reconciliation filtered to the affected contract."
             >
@@ -636,10 +633,11 @@ export default function AdminReconciliationPage() {
                   description="No subscription-level mismatches are currently flagged."
                 />
               ) : (
-                <DataTable<SnapshotRow>
-                  rows={filteredSnapshotRows}
-                  emptyText="No flagged subscription rows."
-                  columns={[
+                <DataTableShell>
+                  <DataTable<SnapshotRow>
+                    rows={filteredSnapshotRows}
+                    emptyText="No flagged subscription rows."
+                    columns={[
                     {
                       key: "subscription_number",
                       title: "Subscription",
@@ -715,49 +713,50 @@ export default function AdminReconciliationPage() {
                         </div>
                       ),
                     },
-                  ]}
-                />
+                    ]}
+                  />
+                </DataTableShell>
               )}
-            </SectionCard>
+            </DetailPanel>
           </>
         ) : null}
 
         {!loading && !error && activeView === "payments" ? (
           <>
-            <SectionCard
+            <DetailPanel
               title="Payment reconciliation queue"
               description="This is the canonical payment-level follow-up workspace. Older `/admin/payments/reconciliation` links now redirect here."
             >
-              <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+              <QuickActionGrid className="md:grid-cols-3">
+                <KpiCard
                   label="Payment rows"
                   value={String(paymentRows.length)}
-                  subtext="Reconciliation records in the current filter context"
+                  helper="Reconciliation records in the current filter context"
                 />
-                <StatCard
+                <KpiCard
+                  className={kpiToneClass(
+                    paymentRows.some((row) => row.is_flagged) ? "warning" : "success"
+                  )}
                   label="Flagged payments"
                   value={String(paymentRows.filter((row) => row.is_flagged).length)}
-                  subtext="Payment rows already marked for follow-up"
-                  tone={
-                    paymentRows.some((row) => row.is_flagged) ? "warning" : "success"
-                  }
+                  helper="Payment rows already marked for follow-up"
                 />
-                <StatCard
+                <KpiCard
                   label="Context"
                   value={
                     selectedSubscriptionId > 0
                       ? `SUB-${selectedSubscriptionId}`
                       : selectedPaymentId > 0
-                      ? `PAY-${selectedPaymentId}`
-                      : "Portfolio"
+                        ? `PAY-${selectedPaymentId}`
+                        : "Portfolio"
                   }
-                  subtext={paymentContextTitle}
+                  helper={paymentContextTitle}
                 />
-              </div>
-            </SectionCard>
+              </QuickActionGrid>
+            </DetailPanel>
 
             {selectedSubscriptionId > 0 && filteredSnapshotRows.length > 0 ? (
-              <SectionCard
+              <DetailPanel
                 title="Subscription attention in current context"
                 description="This payment view stays anchored to the same subscription-level attention truth."
               >
@@ -805,7 +804,7 @@ export default function AdminReconciliationPage() {
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
             {paymentRows.length === 0 ? (
@@ -818,10 +817,11 @@ export default function AdminReconciliationPage() {
                 }
               />
             ) : (
-              <DataTable<ReconciliationRecord>
-                rows={paymentRows}
-                emptyText="No payment reconciliation rows."
-                columns={[
+              <DataTableShell>
+                <DataTable<ReconciliationRecord>
+                  rows={paymentRows}
+                  emptyText="No payment reconciliation rows."
+                  columns={[
                   {
                     key: "record",
                     title: "Record",
@@ -875,9 +875,7 @@ export default function AdminReconciliationPage() {
                     title: "State",
                     render: (row) => (
                       <div className="space-y-1">
-                        <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-                          {row.status}
-                        </span>
+                        <StatusBadge status={row.status} label={row.status} />
                         <div className="text-xs text-muted-foreground">
                           {row.is_flagged ? "Flagged" : "Not flagged"} ·{" "}
                           {row.is_locked ? "Locked" : "Unlocked"}
@@ -923,8 +921,9 @@ export default function AdminReconciliationPage() {
                       </div>
                     ),
                   },
-                ]}
-              />
+                  ]}
+                />
+              </DataTableShell>
             )}
           </>
         ) : null}

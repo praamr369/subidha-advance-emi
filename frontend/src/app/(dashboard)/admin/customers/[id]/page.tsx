@@ -10,23 +10,16 @@ import {
   useState,
 } from "react";
 import {
-  ArrowUpRight,
-  ArrowDownRight,
-  CheckCircle2,
-  Clock,
+  Check,
   Search,
   X,
   RefreshCw,
-  Info,
-  CreditCard,
-  Wallet,
-  Building2,
-  Check,
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
@@ -36,6 +29,7 @@ import {
 } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import type { CollectionPrimaryAction } from "@/services/receivables";
 
 // =====================================================
 // TYPES
@@ -101,6 +95,33 @@ type PaymentPreviewRow = {
   subscription_id?: number | null;
   subscription_number?: string;
   is_reversed: boolean;
+  is_active_collection?: boolean;
+};
+
+type ContractReferenceSourceType =
+  | "ADVANCE_EMI"
+  | "RENT"
+  | "LEASE"
+  | "DIRECT_SALE";
+
+type ContractReferenceOperationalRow = {
+  contract_reference_id: number | null;
+  source_type: ContractReferenceSourceType;
+  source_id: number | null;
+  reference_no: string;
+  display_reference: string;
+  customer_id: number | null;
+  customer_name: string;
+  phone_masked: string;
+  product_summary: string;
+  due_amount: string;
+  overdue_amount: string;
+  next_due_date?: string | null;
+  status: string;
+  primary_action: CollectionPrimaryAction;
+  allowed_actions: string[];
+  disabled_reason?: string | null;
+  collection_route: string;
 };
 
 type DirectSaleOperationalRow = {
@@ -113,6 +134,8 @@ type DirectSaleOperationalRow = {
   grand_total: string;
   received_total: string;
   balance_total: string;
+  active_outstanding_total?: string;
+  is_history_only?: boolean;
 };
 
 type ReceiptOperationalRow = {
@@ -177,12 +200,20 @@ type CustomerOperationalProfile = {
   overview: {
     subscription_count: number;
     active_subscriptions: number;
+    historical_subscriptions?: number;
+    active_contract_value?: string;
+    historical_contract_value?: string;
+    subscription_outstanding_amount?: string;
     direct_sale_count: number;
+    active_direct_sale_count?: number;
+    returned_direct_sale_count?: number;
     direct_sale_outstanding_count: number;
     direct_sale_outstanding_total: string;
     receipt_count: number;
     receipt_total: string;
     invoice_count: number;
+    active_invoice_count?: number;
+    historical_invoice_count?: number;
     invoice_outstanding_total: string;
     lead_count: number;
     lead_open_count: number;
@@ -191,24 +222,41 @@ type CustomerOperationalProfile = {
   direct_sales: {
     summary: {
       total_count: number;
+      active_count?: number;
+      history_count?: number;
       outstanding_count: number;
       gross_total: string;
       received_total: string;
       outstanding_total: string;
+      historical_total?: string;
     };
     rows: DirectSaleOperationalRow[];
+  };
+  contract_references: {
+    summary: {
+      total_count: number;
+      advance_emi_count: number;
+      rent_count: number;
+      lease_count: number;
+      direct_sale_count: number;
+    };
+    rows: ContractReferenceOperationalRow[];
   };
   ledger_summary: {
     entry_count: number;
     total_credits: string;
     total_debits: string;
     net_subscription_collections: string;
+    active_ledger_credits?: string;
+    active_ledger_debits?: string;
     direct_sale_receivable_total: string;
   };
   receipts_documents: {
     summary: {
       receipt_count: number;
       receipt_total: string;
+      active_receipt_count?: number;
+      active_receipt_total?: string;
       document_count: number;
       invoice_count: number;
       invoice_posted_count: number;
@@ -346,6 +394,26 @@ function normalizeSubscriptionStatus(
   return "UNKNOWN";
 }
 
+function normalizeContractReferenceSourceType(
+  value: unknown
+): ContractReferenceSourceType {
+  const sourceType = String(value || "").toUpperCase();
+  if (sourceType === "RENT") return "RENT";
+  if (sourceType === "LEASE") return "LEASE";
+  if (sourceType === "DIRECT_SALE") return "DIRECT_SALE";
+  return "ADVANCE_EMI";
+}
+
+function normalizeContractReferencePrimaryAction(
+  value: unknown
+): CollectionPrimaryAction {
+  const v = String(value || "").toUpperCase();
+  if (v === "COLLECT_DIRECT_SALE") return "COLLECT_DIRECT_SALE";
+  if (v === "VIEW_ONLY") return "VIEW_ONLY";
+  if (v === "DISABLED") return "DISABLED";
+  return "COLLECT_EMI";
+}
+
 function normalizeCustomerDetail(
   raw: Record<string, unknown>
 ): CustomerDetailRecord {
@@ -434,6 +502,7 @@ function normalizePaymentPreview(
       toStringValue(raw.subscription_number) ||
       (subscriptionId ? `SUB-${subscriptionId}` : undefined),
     is_reversed: isReversed,
+    is_active_collection: raw.is_active_collection === true || !isReversed,
   };
 }
 
@@ -443,6 +512,8 @@ function normalizeCustomerOperationalProfile(
   const overview = toObject(raw.overview) ?? {};
   const directSales = toObject(raw.direct_sales) ?? {};
   const directSaleSummary = toObject(directSales.summary) ?? {};
+  const contractReferences = toObject(raw.contract_references) ?? {};
+  const contractReferenceSummary = toObject(contractReferences.summary) ?? {};
   const ledgerSummary = toObject(raw.ledger_summary) ?? {};
   const receiptsDocuments = toObject(raw.receipts_documents) ?? {};
   const receiptsSummary = toObject(receiptsDocuments.summary) ?? {};
@@ -456,7 +527,13 @@ function normalizeCustomerOperationalProfile(
     overview: {
       subscription_count: toNumber(overview.subscription_count),
       active_subscriptions: toNumber(overview.active_subscriptions),
+      historical_subscriptions: toNumber(overview.historical_subscriptions),
+      active_contract_value: toMoneyString(overview.active_contract_value),
+      historical_contract_value: toMoneyString(overview.historical_contract_value),
+      subscription_outstanding_amount: toMoneyString(overview.subscription_outstanding_amount),
       direct_sale_count: toNumber(overview.direct_sale_count),
+      active_direct_sale_count: toNumber(overview.active_direct_sale_count),
+      returned_direct_sale_count: toNumber(overview.returned_direct_sale_count),
       direct_sale_outstanding_count: toNumber(
         overview.direct_sale_outstanding_count
       ),
@@ -466,6 +543,8 @@ function normalizeCustomerOperationalProfile(
       receipt_count: toNumber(overview.receipt_count),
       receipt_total: toMoneyString(overview.receipt_total),
       invoice_count: toNumber(overview.invoice_count),
+      active_invoice_count: toNumber(overview.active_invoice_count),
+      historical_invoice_count: toNumber(overview.historical_invoice_count),
       invoice_outstanding_total: toMoneyString(overview.invoice_outstanding_total),
       lead_count: toNumber(overview.lead_count),
       lead_open_count: toNumber(overview.lead_open_count),
@@ -474,10 +553,13 @@ function normalizeCustomerOperationalProfile(
     direct_sales: {
       summary: {
         total_count: toNumber(directSaleSummary.total_count),
+        active_count: toNumber(directSaleSummary.active_count),
+        history_count: toNumber(directSaleSummary.history_count),
         outstanding_count: toNumber(directSaleSummary.outstanding_count),
         gross_total: toMoneyString(directSaleSummary.gross_total),
         received_total: toMoneyString(directSaleSummary.received_total),
         outstanding_total: toMoneyString(directSaleSummary.outstanding_total),
+        historical_total: toMoneyString(directSaleSummary.historical_total),
       },
       rows: extractNestedArray(directSales, ["rows"]).map((row) => ({
         id: toNumber(row.id),
@@ -490,6 +572,43 @@ function normalizeCustomerOperationalProfile(
         grand_total: toMoneyString(row.grand_total),
         received_total: toMoneyString(row.received_total),
         balance_total: toMoneyString(row.balance_total),
+        active_outstanding_total: toMoneyString(
+          row.active_outstanding_total ?? row.balance_total
+        ),
+        is_history_only: row.is_history_only === true,
+      })),
+    },
+    contract_references: {
+      summary: {
+        total_count: toNumber(contractReferenceSummary.total_count),
+        advance_emi_count: toNumber(contractReferenceSummary.advance_emi_count),
+        rent_count: toNumber(contractReferenceSummary.rent_count),
+        lease_count: toNumber(contractReferenceSummary.lease_count),
+        direct_sale_count: toNumber(contractReferenceSummary.direct_sale_count),
+      },
+      rows: extractNestedArray(contractReferences, ["rows"]).map((row) => ({
+        contract_reference_id: toNullableNumber(row.contract_reference_id) ?? null,
+        source_type: normalizeContractReferenceSourceType(row.source_type),
+        source_id: toNullableNumber(row.source_id) ?? null,
+        reference_no: toStringValue(row.reference_no),
+        display_reference:
+          toStringValue(row.display_reference) || toStringValue(row.reference_no),
+        customer_id: toNullableNumber(row.customer_id) ?? null,
+        customer_name: toStringValue(row.customer_name),
+        phone_masked: toStringValue(row.phone_masked),
+        product_summary: toStringValue(row.product_summary),
+        due_amount: toMoneyString(row.due_amount),
+        overdue_amount: toMoneyString(row.overdue_amount),
+        next_due_date: toNullableString(row.next_due_date),
+        status: toStringValue(row.status),
+        primary_action: normalizeContractReferencePrimaryAction(row.primary_action),
+        allowed_actions: Array.isArray(row.allowed_actions)
+          ? row.allowed_actions.filter(
+              (item): item is string => typeof item === "string"
+            )
+          : [],
+        disabled_reason: toNullableString(row.disabled_reason),
+        collection_route: toStringValue(row.collection_route),
       })),
     },
     ledger_summary: {
@@ -499,6 +618,8 @@ function normalizeCustomerOperationalProfile(
       net_subscription_collections: toMoneyString(
         ledgerSummary.net_subscription_collections
       ),
+      active_ledger_credits: toMoneyString(ledgerSummary.active_ledger_credits),
+      active_ledger_debits: toMoneyString(ledgerSummary.active_ledger_debits),
       direct_sale_receivable_total: toMoneyString(
         ledgerSummary.direct_sale_receivable_total
       ),
@@ -507,6 +628,8 @@ function normalizeCustomerOperationalProfile(
       summary: {
         receipt_count: toNumber(receiptsSummary.receipt_count),
         receipt_total: toMoneyString(receiptsSummary.receipt_total),
+        active_receipt_count: toNumber(receiptsSummary.active_receipt_count),
+        active_receipt_total: toMoneyString(receiptsSummary.active_receipt_total),
         document_count: toNumber(receiptsSummary.document_count),
         invoice_count: toNumber(receiptsSummary.invoice_count),
         invoice_posted_count: toNumber(receiptsSummary.invoice_posted_count),
@@ -628,75 +751,6 @@ function extractNestedArray(
 // UI COMPONENTS
 // =====================================================
 
-function StatCard({
-  title,
-  value,
-  icon,
-  trend,
-  trendValue,
-  tone = "default",
-  tooltip,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
-  tone?: "default" | "success" | "warning" | "danger";
-  tooltip?: string;
-}) {
-  const toneColors = {
-    default: "border-border bg-card",
-    success: "border-emerald-200 bg-emerald-50/50",
-    warning: "border-amber-200 bg-amber-50/50",
-    danger: "border-red-200 bg-red-50/50",
-  };
-
-  return (
-    <div className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${toneColors[tone]}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          {tooltip && (
-            <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 hidden w-48 rounded-lg bg-popover px-2 py-1 text-xs text-popover-foreground shadow-lg group-hover:block">
-                {tooltip}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="rounded-xl bg-background/50 p-2 text-muted-foreground">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-2">
-        <p className="text-2xl font-semibold text-foreground">{value}</p>
-      </div>
-      {trend && trendValue && (
-        <div className="mt-3 flex items-center gap-1 text-xs">
-          {trend === "up" ? (
-            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
-          ) : trend === "down" ? (
-            <ArrowDownRight className="h-3 w-3 text-red-600" />
-          ) : null}
-          <span
-            className={
-              trend === "up"
-                ? "text-emerald-600"
-                : trend === "down"
-                  ? "text-red-600"
-                  : "text-muted-foreground"
-            }
-          >
-            {trendValue}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function StatusBadge({
   status,
   tone,
@@ -716,6 +770,139 @@ function StatusBadge({
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]}`}>
       {status}
     </span>
+  );
+}
+
+function contractReferenceLabel(sourceType: ContractReferenceSourceType): string {
+  if (sourceType === "ADVANCE_EMI") return "Advance EMI";
+  if (sourceType === "DIRECT_SALE") return "Direct Sale";
+  return sourceType.charAt(0) + sourceType.slice(1).toLowerCase();
+}
+
+function contractReferenceTone(
+  sourceType: ContractReferenceSourceType
+): "success" | "warning" | "danger" | "info" | "default" {
+  if (sourceType === "ADVANCE_EMI") return "success";
+  if (sourceType === "DIRECT_SALE") return "warning";
+  if (sourceType === "RENT") return "info";
+  return "default";
+}
+
+function ContractReferenceList({
+  rows,
+  emptyTitle,
+  emptyDescription,
+}: {
+  rows: ContractReferenceOperationalRow[];
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  if (rows.length === 0) {
+    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => {
+        const key = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+        const route = row.collection_route?.trim() || "";
+        const canCollectEmi =
+          row.primary_action === "COLLECT_EMI" && Boolean(route);
+        const canCollectDirectSale =
+          row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
+        const disabledReason =
+          row.disabled_reason || "Collection is not available for this contract.";
+
+        return (
+          <div
+            key={key}
+            className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge
+                    status={contractReferenceLabel(row.source_type)}
+                    tone={contractReferenceTone(row.source_type)}
+                  />
+                  <span className="break-all text-sm font-semibold text-foreground">
+                    {row.display_reference || row.reference_no}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {row.product_summary || "No product summary"} · Status {row.status || "—"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {row.customer_name || "Customer"} · {row.phone_masked || "Phone masked"}
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
+                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Due
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">
+                    {money(row.due_amount)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    Overdue
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-amber-900">
+                    {money(row.overdue_amount)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Next Due
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">
+                    {formatDate(row.next_due_date)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {canCollectEmi ? (
+                <Link
+                  href={route}
+                  title="Opens the collection desk using the canonical route from ContractReference."
+                  className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
+                >
+                  Collect EMI
+                </Link>
+              ) : null}
+
+              {canCollectDirectSale ? (
+                <Link
+                  href={route}
+                  title="Opens the collection desk using the canonical route from ContractReference."
+                  className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                >
+                  Collect Direct-Sale Balance
+                </Link>
+              ) : null}
+
+              {!canCollectEmi && !canCollectDirectSale ? (
+                <span
+                  title={disabledReason}
+                  className="inline-flex cursor-not-allowed items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground"
+                >
+                  {row.primary_action === "VIEW_ONLY" ? "View only" : "Collection disabled"}
+                </span>
+              ) : null}
+            </div>
+
+            {!canCollectEmi && !canCollectDirectSale ? (
+              <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -836,6 +1023,9 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
           </thead>
           <tbody>
             {sortedRows.map((row) => {
+              const isActiveContract =
+                row.status === "ACTIVE" ||
+                row.status === "PENDING";
               const statusTone =
                 row.status === "ACTIVE"
                   ? "success"
@@ -892,7 +1082,7 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
                         href={`/admin/payments?subscription=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Payments
+                        {isActiveContract ? "Payments" : "Payment History"}
                       </Link>
                     </div>
                   </td>
@@ -1093,6 +1283,19 @@ async function submitCustomerKycDecision(
   );
 }
 
+async function adminChangeUserUsername(
+  userId: number,
+  payload: { new_username: string; reason: string }
+): Promise<{ username: string; changed: boolean; requires_relogin: boolean }> {
+  return apiFetch<{ username: string; changed: boolean; requires_relogin: boolean }>(
+    `/admin/users/${userId}/username/`,
+    {
+      method: "PATCH",
+      body: payload,
+    }
+  );
+}
+
 // =====================================================
 // MAIN COMPONENT
 // =====================================================
@@ -1113,6 +1316,11 @@ export default function AdminCustomerDetailPage() {
   const [kycError, setKycError] = useState<string | null>(null);
   const [kycSuccess, setKycSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [usernameReason, setUsernameReason] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -1235,43 +1443,91 @@ export default function AdminCustomerDetailPage() {
   }, [loadPage]);
 
   const activeSubscriptionCount = useMemo(
-    () => subscriptions.filter((row) => row.status === "ACTIVE").length,
-    [subscriptions]
+    () =>
+      operationalProfile?.overview.active_subscriptions ??
+      subscriptions.filter((row) => row.status === "ACTIVE").length,
+    [operationalProfile, subscriptions]
   );
 
   const totalContractValue = useMemo(
-    () =>
-      subscriptions.reduce(
-        (sum, row) => sum + Number(row.total_amount || 0),
-        0
-      ),
-    [subscriptions]
+    () => Number(operationalProfile?.overview.active_contract_value || 0),
+    [operationalProfile]
+  );
+
+  const historicalContractValue = useMemo(
+    () => Number(operationalProfile?.overview.historical_contract_value || 0),
+    [operationalProfile]
   );
 
   const activePayments = useMemo(
-    () => payments.filter((row) => !row.is_reversed),
+    () => payments.filter((row) => row.is_active_collection !== false && !row.is_reversed),
     [payments]
   );
 
   const latestSubscription = useMemo(
-    () => subscriptions[0] ?? null,
+    () => subscriptions.find((row) => row.status === "ACTIVE") ?? null,
     [subscriptions]
   );
 
-  const outstandingDirectSales = useMemo(
+  const activeLinkedSubscriptions = useMemo(
+    () => subscriptions.filter((row) => row.status === "ACTIVE" || row.status === "PENDING"),
+    [subscriptions]
+  );
+
+  const historicalLinkedSubscriptions = useMemo(
+    () => subscriptions.filter((row) => row.status !== "ACTIVE" && row.status !== "PENDING"),
+    [subscriptions]
+  );
+
+  const draftDirectSales = useMemo(
+    () =>
+      operationalProfile?.direct_sales.rows.filter((row) => row.status === "DRAFT") ?? [],
+    [operationalProfile]
+  );
+
+  const receivableDirectSales = useMemo(
     () =>
       operationalProfile?.direct_sales.rows.filter(
-        (row) => Number(row.balance_total || 0) > 0
+        (row) =>
+          row.is_history_only !== true &&
+          row.status === "INVOICED" &&
+          Number(row.active_outstanding_total || 0) > 0
       ) ?? [],
     [operationalProfile]
   );
 
   const firstOutstandingDirectSale = useMemo(
-    () => outstandingDirectSales[0] ?? null,
-    [outstandingDirectSales]
+    () => receivableDirectSales[0] ?? null,
+    [receivableDirectSales]
   );
 
-  const latestPayment = useMemo(() => payments[0] ?? null, [payments]);
+  const contractReferenceRows = useMemo(
+    () => operationalProfile?.contract_references.rows ?? [],
+    [operationalProfile]
+  );
+  const advanceEmiReferenceRows = useMemo(
+    () => contractReferenceRows.filter((row) => row.source_type === "ADVANCE_EMI"),
+    [contractReferenceRows]
+  );
+  const rentLeaseReferenceRows = useMemo(
+    () =>
+      contractReferenceRows.filter(
+        (row) => row.source_type === "RENT" || row.source_type === "LEASE"
+      ),
+    [contractReferenceRows]
+  );
+  const dueReferenceRows = useMemo(
+    () =>
+      contractReferenceRows.filter(
+        (row) => Number(row.due_amount || 0) > 0 || Number(row.overdue_amount || 0) > 0
+      ),
+    [contractReferenceRows]
+  );
+
+  const latestPayment = useMemo(
+    () => payments.find((row) => row.is_active_collection !== false) ?? null,
+    [payments]
+  );
 
   const passwordResetIdentifier = useMemo(
     () =>
@@ -1306,7 +1562,7 @@ export default function AdminCustomerDetailPage() {
 
     if (customer) {
       nextActions.push({
-        href: `/admin/subscriptions/create?customer=${customer.id}`,
+        href: `/admin/subscriptions/advance-emi/create?customer=${customer.id}`,
         label: "Create Subscription",
         variant: "secondary",
       });
@@ -1324,7 +1580,7 @@ export default function AdminCustomerDetailPage() {
 
     if (firstOutstandingDirectSale) {
       nextActions.push({
-        href: `/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`,
+        href: `/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`,
         label: "Collect Direct Sale",
         variant: "primary",
       });
@@ -1332,7 +1588,7 @@ export default function AdminCustomerDetailPage() {
 
     if (latestSubscription) {
       nextActions.push({
-        href: `/admin/payments/create?subscription=${latestSubscription.id}`,
+        href: `/admin/finance/collect?subscription=${latestSubscription.id}`,
         label: "Collect Subscription",
         variant: "secondary",
       });
@@ -1394,6 +1650,32 @@ export default function AdminCustomerDetailPage() {
     }
   }
 
+  async function handleAdminUsernameChange() {
+    if (!customer?.user_id) {
+      setUsernameError("No linked login user found.");
+      return;
+    }
+    setUsernameSaving(true);
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    try {
+      const response = await adminChangeUserUsername(customer.user_id, {
+        new_username: newUsername.trim(),
+        reason: usernameReason.trim(),
+      });
+      setUsernameSuccess(
+        response.changed ? "Username updated. User must sign in again." : "Username unchanged."
+      );
+      setNewUsername("");
+      setUsernameReason("");
+      await loadPage("refresh");
+    } catch (err) {
+      setUsernameError(toErrorMessage(err));
+    } finally {
+      setUsernameSaving(false);
+    }
+  }
+
   const kycTone: "success" | "warning" | "danger" | "default" =
     customer?.kyc_status === "VERIFIED" || customer?.kyc_status === "APPROVED"
       ? "success"
@@ -1429,9 +1711,13 @@ export default function AdminCustomerDetailPage() {
           tone: activeSubscriptionCount > 0 ? "success" : undefined,
         },
         {
-          label: "Contract Value",
+          label: "Active Contract Value",
           value: money(totalContractValue),
           tone: "success",
+        },
+        {
+          label: "Historical Contract Value",
+          value: money(historicalContractValue),
         },
         {
           label: "Active Payments",
@@ -1454,17 +1740,22 @@ export default function AdminCustomerDetailPage() {
       }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+        <DetailPanel
+          title="Workspace controls"
+          description="Refresh customer truth from the server without leaving this profile."
+        >
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading customer detail..." /> : null}
 
@@ -1504,62 +1795,51 @@ export default function AdminCustomerDetailPage() {
             )}
 
             {/* Advanced Stats Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-              <StatCard
-                title="Active Subscriptions"
+            <QuickActionGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiCard
+                label="Active subscriptions"
                 value={String(activeSubscriptionCount)}
-                icon={<Building2 className="h-4 w-4" />}
-                tone={activeSubscriptionCount > 0 ? "success" : "default"}
-                tooltip="Subscriptions with status 'ACTIVE'"
+                helper="Subscriptions with status ACTIVE"
               />
-              <StatCard
-                title="Total Contract Value"
+              <KpiCard
+                label="Active contract value"
                 value={money(totalContractValue)}
-                icon={<Wallet className="h-4 w-4" />}
-                tone="success"
-                tooltip="Sum of total amounts for all subscriptions"
+                helper="Excludes cancelled/history-only subscriptions"
               />
-              <StatCard
-                title="Active Payments"
+              <KpiCard
+                label="Historical contract value"
+                value={money(historicalContractValue)}
+                helper="Cancelled/archived contracts preserved for audit"
+              />
+              <KpiCard
+                label="Active payments"
                 value={String(activePayments.length)}
-                icon={<CreditCard className="h-4 w-4" />}
-                tone="default"
-                tooltip="Non-reversed payments"
+                helper="Non-reversed payments in preview"
               />
-              <StatCard
-                title="KYC Status"
+              <KpiCard
+                label="KYC status"
                 value={customer.kyc_status}
-                icon={
-                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED" ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : customer.kyc_status === "REJECTED" ? (
-                    <X className="h-4 w-4" />
-                  ) : (
-                    <Clock className="h-4 w-4" />
-                  )
+                helper={
+                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED"
+                    ? "Verified or approved"
+                    : customer.kyc_status === "REJECTED"
+                      ? "Rejected — review required"
+                      : "Compliance posture"
                 }
-                tone={kycTone}
               />
-              <StatCard
-                title="Direct-Sale Outstanding"
+              <KpiCard
+                label="Active direct-sale outstanding"
                 value={money(
                   operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
                 )}
-                icon={<Wallet className="h-4 w-4" />}
-                tone={
-                  operationalProfile?.direct_sales.summary.outstanding_count
-                    ? "warning"
-                    : "default"
-                }
+                helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0} (active only)`}
               />
-              <StatCard
-                title="Receipts / Invoices"
+              <KpiCard
+                label="Receipts / invoices"
                 value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.invoice_count ?? 0}`}
-                icon={<CreditCard className="h-4 w-4" />}
-                tone="default"
-                tooltip="Receipts and invoices linked to this customer profile."
+                helper="Retail receipts and invoices linked to this profile"
               />
-            </div>
+            </QuickActionGrid>
 
             <div className="grid gap-6 xl:grid-cols-2">
               <SectionCard
@@ -1625,6 +1905,47 @@ export default function AdminCustomerDetailPage() {
                 </div>
 
                 <OtpDeliveryReadinessCard operatorContext="detail" className="mt-4" />
+
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This changes login username only. Customer/partner IDs and financial history remain unchanged.
+                </div>
+                {usernameError ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {usernameError}
+                  </div>
+                ) : null}
+                {usernameSuccess ? (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {usernameSuccess}
+                  </div>
+                ) : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <input
+                    value={newUsername}
+                    onChange={(event) => setNewUsername(event.target.value)}
+                    placeholder="New username"
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                  <input
+                    value={usernameReason}
+                    onChange={(event) => setUsernameReason(event.target.value)}
+                    placeholder="Reason (required)"
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleAdminUsernameChange()}
+                    disabled={
+                      usernameSaving ||
+                      !customer.user_id ||
+                      !newUsername.trim() ||
+                      !usernameReason.trim()
+                    }
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {usernameSaving ? "Changing username..." : "Change Username"}
+                  </button>
+                </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
@@ -1758,7 +2079,7 @@ export default function AdminCustomerDetailPage() {
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
-                    href={`/admin/subscriptions/create?customer=${customer.id}`}
+                    href={`/admin/subscriptions/advance-emi/create?customer=${customer.id}`}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
                     Create Subscription
@@ -1793,7 +2114,7 @@ export default function AdminCustomerDetailPage() {
                         Direct Sale
                       </div>
                       <div className="mt-2 text-lg font-semibold text-amber-950">
-                        {operationalProfile.direct_sales.summary.total_count} bill(s)
+                        {operationalProfile.direct_sales.summary.active_count ?? operationalProfile.direct_sales.summary.total_count} active bill(s)
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-amber-900">
                         <div>
@@ -1803,7 +2124,13 @@ export default function AdminCustomerDetailPage() {
                           Collected {money(operationalProfile.direct_sales.summary.received_total)}
                         </div>
                         <div>
-                          Open receivables {operationalProfile.direct_sales.summary.outstanding_count}
+                          Draft sales {draftDirectSales.length}
+                        </div>
+                        <div>
+                          Open receivables {receivableDirectSales.length}
+                        </div>
+                        <div>
+                          History-only bills {operationalProfile.direct_sales.summary.history_count ?? 0}
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -1815,12 +2142,23 @@ export default function AdminCustomerDetailPage() {
                         </Link>
                         {firstOutstandingDirectSale ? (
                           <Link
-                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${firstOutstandingDirectSale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`}
                             className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                           >
-                            Collect Balance
+                            Collect Direct-Sale Balance
                           </Link>
-                        ) : null}
+                        ) : draftDirectSales.length > 0 ? (
+                          <Link
+                            href={`/admin/billing/direct-sales?focus_sale=${draftDirectSales[0].id}`}
+                            className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                          >
+                            Open direct-sale draft
+                          </Link>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                            No active receivable action
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1829,11 +2167,14 @@ export default function AdminCustomerDetailPage() {
                         Subscription Sale
                       </div>
                       <div className="mt-2 text-lg font-semibold text-emerald-950">
-                        {operationalProfile.overview.subscription_count} contract(s)
+                        {operationalProfile.overview.active_subscriptions} active contract(s)
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-emerald-900">
                         <div>
                           Active contracts {operationalProfile.overview.active_subscriptions}
+                        </div>
+                        <div>
+                          Historical contracts {operationalProfile.overview.historical_subscriptions ?? 0}
                         </div>
                         <div>
                           Net collections {money(operationalProfile.ledger_summary.net_subscription_collections)}
@@ -1850,19 +2191,23 @@ export default function AdminCustomerDetailPage() {
                           Open Subscriptions
                         </Link>
                         <Link
-                          href={`/admin/subscriptions/create?customer=${customer.id}`}
+                          href={`/admin/subscriptions/advance-emi/create?customer=${customer.id}`}
                           className="inline-flex items-center rounded-md border border-emerald-900 bg-emerald-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-800"
                         >
                           Create Subscription
                         </Link>
                         {latestSubscription ? (
                           <Link
-                            href={`/admin/payments/create?subscription=${latestSubscription.id}`}
+                            href={`/admin/finance/collect?subscription=${latestSubscription.id}`}
                             className="inline-flex items-center rounded-md border border-emerald-900 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
                           >
                             Collect EMI
                           </Link>
-                        ) : null}
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                            No active EMI collect action
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1874,29 +2219,37 @@ export default function AdminCustomerDetailPage() {
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
-                      label="Subscription contracts"
-                      value={String(operationalProfile.overview.subscription_count)}
+                      label="Active subscription contracts"
+                      value={String(operationalProfile.overview.active_subscriptions)}
                     />
                     <DetailValue
-                      label="Direct sales"
-                      value={String(operationalProfile.overview.direct_sale_count)}
+                      label="Historical subscription contracts"
+                      value={String(operationalProfile.overview.historical_subscriptions ?? 0)}
                     />
                     <DetailValue
-                      label="Direct-sale outstanding"
+                      label="Active direct sales"
+                      value={String(operationalProfile.overview.active_direct_sale_count ?? 0)}
+                    />
+                    <DetailValue
+                      label="Returned/reversed direct sales"
+                      value={String(operationalProfile.overview.returned_direct_sale_count ?? 0)}
+                    />
+                    <DetailValue
+                      label="Active direct-sale outstanding"
                       value={money(
                         operationalProfile.overview.direct_sale_outstanding_total
                       )}
                     />
                     <DetailValue
-                      label="Retail receipts"
-                      value={`${operationalProfile.receipts_documents.summary.receipt_count} receipt(s)`}
+                      label="Active receipts"
+                      value={`${operationalProfile.receipts_documents.summary.active_receipt_count ?? 0} receipt(s)`}
                     />
                     <DetailValue
-                      label="Retail invoices"
-                      value={`${operationalProfile.receipts_documents.summary.invoice_count} invoice(s)`}
+                      label="Historical receipts / invoices"
+                      value={`${operationalProfile.receipts_documents.summary.receipt_count} / ${operationalProfile.receipts_documents.summary.invoice_count}`}
                     />
                     <DetailValue
-                      label="Invoice outstanding"
+                      label="Active invoice outstanding"
                       value={money(
                         operationalProfile.receipts_documents.summary.invoice_outstanding_total
                       )}
@@ -1910,11 +2263,11 @@ export default function AdminCustomerDetailPage() {
                       value={`${operationalProfile.quotation_estimates.summary.quotation_count} / ${operationalProfile.quotation_estimates.summary.estimate_count}`}
                     />
                     <DetailValue
-                      label="Ledger credits"
-                      value={money(operationalProfile.ledger_summary.total_credits)}
+                      label="Active ledger credits"
+                      value={money(operationalProfile.ledger_summary.active_ledger_credits)}
                     />
                     <DetailValue
-                      label="Net subscription collections"
+                      label="Active net collections"
                       value={money(
                         operationalProfile.ledger_summary.net_subscription_collections
                       )}
@@ -1956,13 +2309,94 @@ export default function AdminCustomerDetailPage() {
               </div>
             ) : null}
 
+            {operationalProfile ? (
+              <>
+                <SectionCard
+                  title="Contracts"
+                  description="Search/display references across Advance EMI, rent, lease, and direct sale. These rows are index records only; financial truth remains in the source ledgers."
+                >
+                  <div className="mb-4 grid gap-3 sm:grid-cols-5">
+                    <DetailValue
+                      label="Total"
+                      value={String(operationalProfile.contract_references.summary.total_count)}
+                    />
+                    <DetailValue
+                      label="Advance EMI"
+                      value={String(operationalProfile.contract_references.summary.advance_emi_count)}
+                    />
+                    <DetailValue
+                      label="Rent"
+                      value={String(operationalProfile.contract_references.summary.rent_count)}
+                    />
+                    <DetailValue
+                      label="Lease"
+                      value={String(operationalProfile.contract_references.summary.lease_count)}
+                    />
+                    <DetailValue
+                      label="Direct Sale"
+                      value={String(operationalProfile.contract_references.summary.direct_sale_count)}
+                    />
+                  </div>
+                  <ContractReferenceList
+                    rows={contractReferenceRows}
+                    emptyTitle="No contract references"
+                    emptyDescription="No ContractReference rows were returned for this customer. Run the backfill command if historical contracts have not been indexed yet."
+                  />
+                </SectionCard>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <SectionCard
+                    title="Advance EMI / Lucky IDs"
+                    description="Advance EMI references include batch and Lucky ID snapshots for quick counter lookup."
+                  >
+                    <ContractReferenceList
+                      rows={advanceEmiReferenceRows}
+                      emptyTitle="No Advance EMI references"
+                      emptyDescription="No Advance EMI ContractReference rows were returned for this customer."
+                    />
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Rent / Lease"
+                    description="Rent and lease references are indexed for search. Collection remains disabled here until a production-safe posting service is available."
+                  >
+                    <ContractReferenceList
+                      rows={rentLeaseReferenceRows}
+                      emptyTitle="No rent or lease references"
+                      emptyDescription="No rent or lease ContractReference rows were returned for this customer."
+                    />
+                  </SectionCard>
+                </div>
+
+                <SectionCard
+                  title="Dues / Overdue"
+                  description="Due and overdue values are read from EMI, rent/lease demand, or direct-sale billing truth; ContractReference does not calculate balances."
+                >
+                  <ContractReferenceList
+                    rows={dueReferenceRows}
+                    emptyTitle="No current dues"
+                    emptyDescription="No indexed contract returned a positive due or overdue amount."
+                  />
+                </SectionCard>
+              </>
+            ) : null}
+
             <SectionCard
-              title="Linked Subscriptions"
-              description="Contract history and current subscription context for this customer."
+              title="Active Linked Subscriptions"
+              description="Operationally active subscription context for this customer."
               actionHref={`/admin/subscriptions?customer=${customer.id}`}
               actionLabel="View All"
             >
-              <SubscriptionsTable rows={subscriptions} />
+              <SubscriptionsTable rows={activeLinkedSubscriptions} />
+            </SectionCard>
+
+            <SectionCard
+              title="Subscription History"
+              description="Cancelled/archived/completed/defaulted records remain visible for audit history."
+              actionHref={`/admin/subscriptions?customer=${customer.id}`}
+              actionLabel="View All"
+            >
+              <SubscriptionsTable rows={historicalLinkedSubscriptions} />
             </SectionCard>
 
             <SectionCard
@@ -2017,7 +2451,9 @@ export default function AdminCustomerDetailPage() {
                               </div>
                               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
-                                <div className="mt-1 text-sm font-semibold text-amber-900">{money(row.balance_total)}</div>
+                                <div className="mt-1 text-sm font-semibold text-amber-900">
+                                  {row.is_history_only ? "₹0.00" : money(row.active_outstanding_total || row.balance_total)}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2034,12 +2470,23 @@ export default function AdminCustomerDetailPage() {
                             >
                               Receipts
                             </Link>
-                            {Number(row.balance_total || 0) > 0 ? (
+                            {row.is_history_only ? (
+                              <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
+                                History only
+                              </span>
+                            ) : row.status === "INVOICED" && Number(row.active_outstanding_total || row.balance_total || 0) > 0 ? (
                               <Link
-                                href={`/admin/payments/create?workflow=direct-sale&direct_sale=${row.id}`}
+                                href={`/admin/finance/collect?workflow=direct-sale&sale_id=${row.id}`}
                                 className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
                               >
-                                Collect Balance
+                                Collect Direct-Sale Balance
+                              </Link>
+                            ) : row.status === "DRAFT" ? (
+                              <Link
+                                href={`/admin/billing/direct-sales?focus_sale=${row.id}`}
+                                className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                              >
+                                Open draft
                               </Link>
                             ) : null}
                           </div>

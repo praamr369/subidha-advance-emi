@@ -181,6 +181,29 @@ export default function AccountingChartOfAccountsPage() {
     });
   }, [chartAccounts, chartStatusFilter, chartTypeFilter]);
 
+  const chartRowsForStatus = useMemo(() => {
+    return chartAccounts.filter((account) => {
+      const matchesStatus =
+        chartStatusFilter === "ALL" ||
+        (chartStatusFilter === "ACTIVE" ? account.is_active : !account.is_active);
+      return matchesStatus;
+    });
+  }, [chartAccounts, chartStatusFilter]);
+
+  const chartHiddenByTypeFilterCount = chartRowsForStatus.length - filteredChartAccounts.length;
+
+  const chartRegisterScopeLabel = useMemo(() => {
+    const typeLabel =
+      chartTypeFilter === "ALL" ? "All account types" : `${chartTypeFilter} accounts only`;
+    const statusLabel =
+      chartStatusFilter === "ALL"
+        ? "All statuses"
+        : chartStatusFilter === "ACTIVE"
+          ? "Active only"
+          : "Inactive only";
+    return `${typeLabel} · ${statusLabel} · Root and child rows (this page)`;
+  }, [chartStatusFilter, chartTypeFilter]);
+
   const filteredFinanceAccounts = useMemo(() => {
     return financeAccounts.filter((account) => {
       const matchesKind = financeKindFilter === "ALL" || account.kind === financeKindFilter;
@@ -606,6 +629,20 @@ export default function AccountingChartOfAccountsPage() {
                 </form>
               </WorkspaceSection>
             </div>
+
+            <p className="text-sm text-muted-foreground">
+              Current register view: {chartRegisterScopeLabel}. Showing{" "}
+              <span className="font-semibold text-foreground">{filteredChartAccounts.length}</span> row(s) of{" "}
+              <span className="font-semibold text-foreground">{chartRowsForStatus.length}</span> matching the status filter
+              before type filter.
+              {chartHiddenByTypeFilterCount > 0 ? (
+                <>
+                  {" "}
+                  <span className="font-semibold text-foreground">{chartHiddenByTypeFilterCount}</span> additional accounts
+                  are not shown in this filtered view.
+                </>
+              ) : null}
+            </p>
 
             <EnterpriseDataTable
               title="Chart account register"

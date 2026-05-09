@@ -3,6 +3,7 @@
 import csv
 import io
 import os
+import re
 from decimal import Decimal, InvalidOperation
 from urllib import request
 
@@ -17,13 +18,15 @@ from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, throttle_classes
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
 from accounts.models import User, UserRole
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
+from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
     AdminPaymentCollectSerializer,
     AdminPaymentReverseSerializer,
@@ -41,6 +44,7 @@ from api.v1.serializers.admin_resources import (
     ProductUnitOfMeasureMasterSerializer,
     CustomerKycDecisionSerializer,
 )
+from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
 from api.v1.serializers.admin_resources import (
     SubscriptionAdminSerializer,
     SubscriptionAdminDetailSerializer,
@@ -93,6 +97,12 @@ from subscriptions.services.payment_service import (
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
 from subscriptions.services.customer_account_service import build_customer_operational_profile
+from subscriptions.services.batch_draw_coordination_service import (
+    build_control_center,
+    commit_batch_draw,
+    execute_batch_draw,
+    lock_batch_for_draw,
+)
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
@@ -102,6 +112,14 @@ from subscriptions.services.winner_state_service import (
     get_subscription_winner_evidence,
     sync_winner_state,
     winner_history_q,
+)
+from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from core.services.operational_visibility import (
+    subscription_batch_active_q,
+    subscription_collectible_q,
+    subscription_draw_eligible_q,
+    direct_sale_active_q,
+    invoice_active_q,
 )
 
 # ... rest of the file
@@ -351,6 +369,20 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         next_status = serializer.validated_data.get("status", batch.status)
 
         if next_status != batch.status:
+            guarded = {
+                BatchStatus.LOCKED,
+                BatchStatus.DRAW_COMMITTED,
+                BatchStatus.DRAW_COMPLETED,
+            }
+            if next_status in guarded:
+                raise DRFValidationError(
+                    {
+                        "status": (
+                            "This status is managed only through coordination endpoints: "
+                            "lock/, commit-draw/, execute-draw/."
+                        )
+                    }
+                )
             self._validate_status_transition(batch, next_status)
 
         serializer.save()
@@ -363,6 +395,20 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         if not next_status:
             return Response(
                 {"status": ["Target status is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if next_status in {
+            BatchStatus.LOCKED,
+            BatchStatus.DRAW_COMMITTED,
+            BatchStatus.DRAW_COMPLETED,
+        }:
+            return Response(
+                {
+                    "status": [
+                        "Use POST …/lock/, commit-draw/, or execute-draw/ instead of transition-status."
+                    ]
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -380,25 +426,40 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
     def summary(self, request, pk=None):
         batch = self.get_object()
 
-        subscription_count = Subscription.objects.filter(batch=batch).count()
-        active_subscription_count = Subscription.objects.filter(
-            batch=batch,
-            status=SubscriptionStatus.ACTIVE,
-        ).count()
+        subscriptions_qs = Subscription.objects.filter(batch=batch)
+        active_subscriptions_qs = subscriptions_qs.filter(subscription_batch_active_q())
+        historical_subscriptions_qs = subscriptions_qs.exclude(subscription_batch_active_q())
+
+        subscription_count = subscriptions_qs.count()
+        active_subscription_count = active_subscriptions_qs.count()
         won_subscription_count = Subscription.objects.filter(
             batch=batch,
         ).filter(winner_history_q()).distinct().count()
 
         lucky_qs = LuckyId.objects.filter(batch=batch)
         available_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.AVAILABLE).count()
-        assigned_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.ASSIGNED).count()
+        cancelled_holder_lucky_ids = list(
+            subscriptions_qs.filter(status=SubscriptionStatus.CANCELLED, lucky_id__isnull=False).values_list(
+                "lucky_id_id", flat=True
+            )
+        )
+        assigned_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.ASSIGNED).exclude(
+            id__in=cancelled_holder_lucky_ids
+        ).count()
         won_lucky_ids = lucky_qs.filter(status=LuckyIdStatus.WON).count()
+        draw_eligible_count = subscriptions_qs.filter(subscription_draw_eligible_q()).count()
 
-        monthly_booked_value = (
-            Subscription.objects.filter(batch=batch).aggregate(
-                total=Sum("monthly_amount")
-            )["total"]
-            or MONEY_ZERO
+        monthly_booked_value = active_subscriptions_qs.aggregate(total=Sum("monthly_amount"))["total"] or MONEY_ZERO
+        active_contract_value = active_subscriptions_qs.aggregate(total=Sum("total_amount"))["total"] or MONEY_ZERO
+        historical_subscription_count = historical_subscriptions_qs.count()
+        cancelled_subscription_count = historical_subscriptions_qs.filter(
+            status=SubscriptionStatus.CANCELLED
+        ).count()
+        archived_subscription_count = historical_subscriptions_qs.filter(
+            status__in=[SubscriptionStatus.CLOSED, SubscriptionStatus.COMPLETED]
+        ).count()
+        historical_monthly_booked_value = (
+            historical_subscriptions_qs.aggregate(total=Sum("monthly_amount"))["total"] or MONEY_ZERO
         )
 
         return Response(
@@ -417,11 +478,19 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
                 "assigned_lucky_ids": assigned_lucky_ids,
                 "won_lucky_ids": won_lucky_ids,
                 "monthly_booked_value": str(monthly_booked_value),
+                "active_monthly_booked_value": str(monthly_booked_value),
+                "active_contract_value": str(active_contract_value),
+                "draw_eligible_count": draw_eligible_count,
+                "historical_subscription_count": historical_subscription_count,
+                "cancelled_subscription_count": cancelled_subscription_count,
+                "archived_subscription_count": archived_subscription_count,
+                "historical_monthly_booked_value": str(historical_monthly_booked_value),
                 "draw_count": batch.lucky_draws.count(),
             }
         )
 
     @action(detail=True, methods=["post"], url_path="create-commit")
+    @require_capability("draw.commit")
     def create_commit(self, request, pk=None):
         batch = self.get_object()
 
@@ -443,6 +512,61 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=["post"], url_path="lock")
+    @require_capability("batch.lock")
+    def lock_batch(self, request, pk=None):
+        batch = self.get_object()
+        minimum_active = request.data.get("minimum_active")
+        try:
+            min_int = int(minimum_active) if minimum_active is not None else None
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "minimum_active must be an integer when provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = lock_batch_for_draw(
+                batch=batch,
+                user=request.user,
+                minimum_active=min_int,
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="commit-draw")
+    @require_capability("draw.commit")
+    def commit_draw(self, request, pk=None):
+        batch = self.get_object()
+        try:
+            payload = commit_batch_draw(batch=batch, user=request.user)
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="execute-draw")
+    @require_capability("draw.complete")
+    def execute_draw(self, request, pk=None):
+        batch = self.get_object()
+        revealed_seed = (request.data.get("revealed_seed") or "").strip()
+        try:
+            payload = execute_batch_draw(
+                batch=batch,
+                revealed_seed=revealed_seed or request.data.get("seed") or "",
+                performed_by=request.user,
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="control-center")
+    def control_center(self, request, pk=None):
+        batch = self.get_object()
+        return Response(build_control_center(batch))
+
 # =====================================================
 # CUSTOMER
 # =====================================================
@@ -456,16 +580,112 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     serializer_class = CustomerAdminSerializer
 
     def get_queryset(self):
+        zero_money = Value(
+            Decimal("0.00"),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        zero_count = Value(0, output_field=IntegerField())
+
+        subscription_base = Subscription.objects.filter(customer_id=OuterRef("pk"))
+        active_subscription_base = subscription_base.filter(subscription_batch_active_q())
+        historical_subscription_base = subscription_base.exclude(
+            subscription_batch_active_q()
+        )
+        cancelled_subscription_base = subscription_base.filter(
+            status=SubscriptionStatus.CANCELLED
+        )
+
+        active_due_base = (
+            Emi.objects.filter(subscription__customer_id=OuterRef("pk"))
+            .filter(subscription_collectible_q("subscription__"))
+            .filter(status=EmiStatus.PENDING)
+        )
+
+        # Use per-domain subqueries to avoid cross-join multiplication between
+        # subscriptions, EMIs, invoices, and direct-sales aggregates.
         queryset = super().get_queryset().annotate(
-            active_subscription_count=Count(
-                'subscriptions',
-                filter=Q(subscriptions__status=SubscriptionStatus.ACTIVE),
-                distinct=True
+            active_subscription_count=Coalesce(
+                Subquery(
+                    active_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
+            ),
+            historical_subscription_count=Coalesce(
+                Subquery(
+                    historical_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
+            ),
+            cancelled_subscription_count=Coalesce(
+                Subquery(
+                    cancelled_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
             ),
             total_subscription_value=Coalesce(
-                Sum('subscriptions__total_amount'),
-                Value(Decimal('0.00'), output_field=DecimalField(max_digits=12, decimal_places=2))
-            )
+                Subquery(
+                    subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            historical_contract_value=Coalesce(
+                Subquery(
+                    historical_subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            active_contract_value=Coalesce(
+                Subquery(
+                    active_subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            active_subscription_due=Coalesce(
+                Subquery(
+                    active_due_base.values("subscription__customer_id")
+                    .annotate(total=Sum("amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            active_direct_sale_outstanding=Coalesce(
+                Subquery(
+                    Customer.objects.filter(pk=OuterRef("pk"))
+                    .annotate(
+                        total=Sum(
+                            "direct_sales__balance_total",
+                            filter=direct_sale_active_q("direct_sales__"),
+                        )
+                    )
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            active_invoice_outstanding=Coalesce(
+                Subquery(
+                    Customer.objects.filter(pk=OuterRef("pk"))
+                    .annotate(
+                        total=Sum(
+                            "billing_invoices__balance_total",
+                            filter=invoice_active_q("billing_invoices__"),
+                        )
+                    )
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
         )
 
         search = (
@@ -489,9 +709,33 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 | Q(phone__icontains=search)
                 | Q(user__email__icontains=search)
                 | Q(user__username__icontains=search)
+                | Q(customer_code__icontains=search)
+                | Q(direct_sales__customer_gstin__icontains=search.upper())
+                | Q(billing_invoices__customer_gstin__icontains=search.upper())
             )
             if search.isdigit():
                 search_filter = search_filter | Q(id=int(search))
+            token_filter = None
+            for token in [item.strip() for item in search.split() if item.strip()]:
+                token_digits = re.sub(r"\D", "", token)
+                per_token = (
+                    Q(name__icontains=token)
+                    | Q(user__email__icontains=token)
+                    | Q(user__username__icontains=token)
+                    | Q(customer_code__icontains=token)
+                    | Q(direct_sales__customer_gstin__icontains=token.upper())
+                    | Q(billing_invoices__customer_gstin__icontains=token.upper())
+                )
+                if token_digits:
+                    per_token = per_token | Q(phone__icontains=token_digits)
+                    if token_digits.isdigit():
+                        per_token = per_token | Q(id=int(token_digits))
+                elif token.isdigit():
+                    per_token = per_token | Q(id=int(token))
+                token_filter = per_token if token_filter is None else (token_filter & per_token)
+
+            if token_filter is not None:
+                search_filter = search_filter | token_filter
             queryset = queryset.filter(search_filter).distinct()
 
         return queryset
@@ -867,6 +1111,7 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
     queryset = (
         LuckyDraw.objects.select_related(
             "batch",
+            "draw_commit",
             "winner_lucky_id",
             "winner_subscription",
             "winner_subscription__customer",
@@ -976,6 +1221,11 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
                 revealed_seed=revealed_seed,
                 performed_by=request.user,
             )
+        except LuckyDraw.DoesNotExist:
+            return Response(
+                {"detail": "Lucky draw not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except ValidationError as exc:
             message = (
                 exc.messages[0]
@@ -1026,7 +1276,10 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="available")
     def available(self, request):
-        queryset = self.get_queryset().filter(status=LuckyIdStatus.AVAILABLE)[:100]
+        queryset = self.get_queryset().filter(
+            status=LuckyIdStatus.AVAILABLE,
+            batch__status__in=PRE_LOCK_BATCH_STATUSES,
+        )[:100]
         serializer = self.get_serializer(queryset, many=True)
         return Response(
             {
@@ -1276,6 +1529,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=False, methods=["post"], url_path="collect")
+    @require_capability("billing.collect")
+    @throttle_classes([PaymentMutationThrottle])
     def collect(self, request):
         serializer = AdminPaymentCollectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1527,6 +1782,8 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
         )
 
     @action(detail=True, methods=["post"], url_path="reverse")
+    @require_capability("billing.override_allocation")
+    @throttle_classes([PaymentMutationThrottle])
     def reverse(self, request, pk=None):
         payment_obj = self.get_object()
 
@@ -2229,6 +2486,8 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     serializer_class = SubscriptionAdminSerializer
 
     def get_serializer_class(self):
+        if self.action == "cancel_subscription":
+            return OperationalCancellationActionSerializer
         if self.action == "retrieve":
             return SubscriptionAdminDetailSerializer
         return SubscriptionAdminSerializer
@@ -2273,6 +2532,41 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_subscription(self, request, pk=None):
+        subscription = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from subscriptions.services.operational_cancellation_service import cancel_subscription
+
+        try:
+            result = cancel_subscription(
+                subscription_id=subscription.id,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                internal_note=serializer.validated_data.get("internal_note", ""),
+                force_after_activation=serializer.validated_data.get("force_after_activation", False),
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except (ValidationError, ValueError) as exc:
+            return Response(
+                {"detail": getattr(exc, "message_dict", None) or getattr(exc, "detail", None) or str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
+        return Response(
+            {
+                "updated": True,
+                "result": result,
+                "subscription": SubscriptionAdminDetailSerializer(
+                    refreshed,
+                    context={"request": request},
+                ).data,
+            }
+        )
 
     def get_queryset(self):
         if self.action == "retrieve":

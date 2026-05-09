@@ -14,6 +14,17 @@ export type PartnerCustomer = {
   created_at?: string;
 };
 
+export type SelfUsernameChangePayload = {
+  new_username: string;
+  current_password: string;
+};
+
+export type UsernameChangeResponse = {
+  username: string;
+  changed: boolean;
+  requires_relogin: boolean;
+};
+
 export type PartnerSubscription = {
   id: number;
   subscription_number?: string;
@@ -123,11 +134,29 @@ export type PartnerCommission = {
   subscription?: number | null;
   emi?: number | null;
   partner?: number | null;
+  payment?: number | null;
+  commission_rate?: string | number | null;
   commission_amount: string | number;
   status?: string;
+  settlement_date?: string | null;
+  reversal_reason?: string | null;
+  metadata?: Record<string, unknown>;
   approved_at?: string | null;
   paid_at?: string | null;
   created_at?: string;
+  updated_at?: string | null;
+};
+
+export type PartnerCommissionListSummary = {
+  total_commission: string;
+  pending_commission: string;
+  settled_commission: string;
+};
+
+export type PartnerCommissionListResponse = {
+  count: number;
+  summary: PartnerCommissionListSummary;
+  results: PartnerCommission[];
 };
 
 export type PartnerCollectedPayment = {
@@ -864,6 +893,15 @@ export async function getPartnerDashboard(): Promise<PartnerDashboardResponse> {
   return normalizeDashboardResponse(payload);
 }
 
+export async function changePartnerUsername(
+  payload: SelfUsernameChangePayload
+): Promise<UsernameChangeResponse> {
+  return apiFetch<UsernameChangeResponse>("/partner/profile/username/", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export async function listPartnerCustomers(params?: { q?: string }) {
   const search = new URLSearchParams();
 
@@ -973,9 +1011,63 @@ export async function collectPartnerPayment(payload: {
   });
 }
 
-export async function listPartnerCommissions(): Promise<PartnerCommission[]> {
-  const payload = await apiFetch<unknown>("/partner/commissions/");
-  return toArray<PartnerCommission>(payload);
+function normalizePartnerCommissionRow(row: Record<string, unknown>): PartnerCommission {
+  const settlement = toStringOrUndefined(row.settlement_date) ?? null;
+  return {
+    id: toNumber(row.id, 0),
+    subscription:
+      row.subscription === undefined || row.subscription === null
+        ? null
+        : toNumber(row.subscription, 0),
+    emi: row.emi === undefined || row.emi === null ? null : toNumber(row.emi, 0),
+    partner: row.partner === undefined || row.partner === null ? null : toNumber(row.partner, 0),
+    payment: row.payment === undefined || row.payment === null ? null : toNumber(row.payment, 0),
+    commission_rate:
+      row.commission_rate === undefined || row.commission_rate === null
+        ? undefined
+        : String(row.commission_rate),
+    commission_amount: toMoneyString(row.commission_amount),
+    status: toStringOrUndefined(row.status),
+    settlement_date: settlement,
+    reversal_reason: toStringOrUndefined(row.reversal_reason) ?? "",
+    metadata:
+      typeof row.metadata === "object" && row.metadata !== null
+        ? (row.metadata as Record<string, unknown>)
+        : {},
+    approved_at: settlement,
+    paid_at: settlement,
+    created_at: toStringOrUndefined(row.created_at),
+    updated_at: toStringOrUndefined(row.updated_at) ?? null,
+  };
+}
+
+export async function listPartnerCommissions(params?: {
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  q?: string;
+}): Promise<PartnerCommissionListResponse> {
+  const payload = await apiFetch<unknown>(
+    `/partner/commissions/${buildQuery({
+      status: params?.status,
+      date_from: params?.date_from,
+      date_to: params?.date_to,
+      q: params?.q,
+    })}`
+  );
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const summaryRaw = (root.summary ?? {}) as Record<string, unknown>;
+  return {
+    count: toNumber(root.count, 0),
+    summary: {
+      total_commission: toMoneyString(summaryRaw.total_commission ?? "0"),
+      pending_commission: toMoneyString(summaryRaw.pending_commission ?? "0"),
+      settled_commission: toMoneyString(summaryRaw.settled_commission ?? "0"),
+    },
+    results: toArray(root.results).map((item) =>
+      normalizePartnerCommissionRow((item ?? {}) as Record<string, unknown>)
+    ),
+  };
 }
 
 export async function listPartnerPayments(params?: {
@@ -1094,4 +1186,31 @@ export async function getPartnerCollectionRequestDetail(
 ): Promise<PartnerCollectionRequestDetail> {
   const payload = await apiFetch<unknown>(`/partner/collection-requests/${id}/`);
   return normalizeCollectionRequestDetail(payload);
+}
+
+export type PartnerCollectionRequestListResponse = {
+  count: number;
+  results: PartnerCollectionRequest[];
+};
+
+export async function listPartnerCollectionRequests(params?: {
+  subscription?: number | string;
+  status?: string;
+}): Promise<PartnerCollectionRequestListResponse> {
+  const search = new URLSearchParams();
+  if (params?.subscription !== undefined && params.subscription !== "") {
+    search.set("subscription", String(params.subscription));
+  }
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+  const query = search.toString();
+  const payload = await apiFetch<unknown>(
+    `/partner/collection-requests/${query ? `?${query}` : ""}`
+  );
+  const root = (payload ?? {}) as Record<string, unknown>;
+  return {
+    count: toNumber(root.count, 0),
+    results: toArray(root.results).map(normalizeCollectionRequest),
+  };
 }

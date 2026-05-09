@@ -15,8 +15,10 @@ from subscriptions.models import (
 )
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.batch_service import transition_batch_status
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.emi_engine import generate_emi_schedule
 from subscriptions.services.emi_reconciliation import reconcile_subscription_emis
+from subscriptions.models import BusinessEventType
 
 
 @transaction.atomic
@@ -90,6 +92,10 @@ def create_emi_subscription(
     # Assign immutable ADV-EMI contract number
     from subscriptions.services.contract_number_service import assign_subscription_number
     assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
 
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,
@@ -102,6 +108,34 @@ def create_emi_subscription(
             "total_amount": str(total_amount),
             "monthly_amount": str(monthly_amount),
             "tenure_months": tenure_months,
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.CONTRACT_CREATED,
+        source_module="subscriptions.services.subscription_service.create_emi_subscription",
+        actor_user=performed_by,
+        customer=customer,
+        subscription=subscription,
+        batch=batch,
+        lucky_id=lucky,
+        payload={
+            "subscription_id": subscription.id,
+            "tenure_months": tenure_months,
+            "monthly_amount": str(monthly_amount),
+            "total_amount": str(total_amount),
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.EMI_CREATED,
+        source_module="subscriptions.services.subscription_service.create_emi_subscription",
+        actor_user=performed_by,
+        customer=customer,
+        subscription=subscription,
+        batch=batch,
+        lucky_id=lucky,
+        payload={
+            "subscription_id": subscription.id,
+            "emi_count": subscription.emis.count(),
         },
     )
 

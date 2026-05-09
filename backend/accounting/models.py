@@ -12,6 +12,10 @@ from django.utils import timezone
 from subscriptions.models import PaymentMethod
 
 MONEY_ZERO = Decimal("0.00")
+SYSTEM_LEDGER_POSTING_PROFILE_NAME = "ledger posting profiles (system)"
+DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
+DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "DEFAULT_ASSET_BANK_ACCOUNT"
+DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "DEFAULT_ASSET_UPI_GATEWAY"
 
 
 def _default_branch():
@@ -34,6 +38,10 @@ def generate_chart_code() -> str:
 
 def generate_entry_no() -> str:
     return _generate_reference("JE")
+
+
+def generate_journal_group_id() -> str:
+    return _generate_reference("JG")
 
 
 def generate_voucher_no() -> str:
@@ -70,6 +78,14 @@ def generate_expense_claim_no() -> str:
 
 def _transition_allowed(previous_status: str | None, next_status: str | None, allowed: set[tuple[str, str]]) -> bool:
     return (previous_status or "", next_status or "") in allowed
+
+
+def _is_cash_in_hand_chart(chart: "ChartOfAccount" | None) -> bool:
+    if chart is None:
+        return False
+    if (chart.system_code or "").strip().upper() == DEFAULT_CASH_IN_HAND_SYSTEM_CODE:
+        return True
+    return (chart.name or "").strip().lower() == "cash in hand"
 
 
 def _immutable_status_guard(
@@ -134,6 +150,28 @@ class FinanceAccountKind(models.TextChoices):
     UPI = "UPI", "UPI"
 
 
+class FinanceAccountMappingPurpose(models.TextChoices):
+    CASH_COLLECTION = "CASH_COLLECTION", "Cash Collection"
+    UPI_COLLECTION = "UPI_COLLECTION", "UPI Collection"
+    BANK_COLLECTION = "BANK_COLLECTION", "Bank Collection"
+    PAYMENT_GATEWAY_COLLECTION = "PAYMENT_GATEWAY_COLLECTION", "Payment Gateway Settlement Collection"
+    CUSTOMER_RECEIVABLE = "CUSTOMER_RECEIVABLE", "Customer Receivable"
+    SECURITY_DEPOSIT_LIABILITY = "SECURITY_DEPOSIT_LIABILITY", "Security Deposit Liability"
+    CUSTOMER_ADVANCE_UNEARNED_REVENUE = "CUSTOMER_ADVANCE_UNEARNED_REVENUE", "Customer Advance / Unearned Revenue"
+    EMI_INCOME = "EMI_INCOME", "Advance EMI Income"
+    RENT_INCOME = "RENT_INCOME", "Rent Income"
+    LEASE_INCOME = "LEASE_INCOME", "Lease Income"
+    DIRECT_SALE_INCOME = "DIRECT_SALE_INCOME", "Direct Sale Income"
+    DELIVERY_CHARGES_INCOME = "DELIVERY_CHARGES_INCOME", "Delivery Charges Income"
+    WAIVER_LOSS = "WAIVER_LOSS", "Waiver/Loss"
+    COMMISSION_PAYABLE = "COMMISSION_PAYABLE", "Commission Payable"
+    COMMISSION_EXPENSE = "COMMISSION_EXPENSE", "Commission Expense"
+    DAMAGE_RECOVERY = "DAMAGE_RECOVERY", "Damage Recovery"
+    DELIVERY_EXPENSE = "DELIVERY_EXPENSE", "Delivery Expense"
+    SALARY_EXPENSE = "SALARY_EXPENSE", "Salary Expense"
+    INVENTORY_ASSET = "INVENTORY_ASSET", "Inventory Asset"
+
+
 class JournalEntryType(models.TextChoices):
     MANUAL = "MANUAL", "Manual"
     EXPENSE = "EXPENSE", "Expense"
@@ -173,6 +211,29 @@ class AttendanceStatus(models.TextChoices):
     HALF_DAY = "HALF_DAY", "Half Day"
     ABSENT = "ABSENT", "Absent"
     LEAVE = "LEAVE", "Leave"
+
+
+class EmploymentType(models.TextChoices):
+    PERMANENT_MONTHLY = "PERMANENT_MONTHLY", "Permanent Monthly Staff"
+    TEMPORARY = "TEMPORARY", "Temporary Staff"
+    DAILY_WAGE = "DAILY_WAGE", "Daily Wage Worker"
+    HOURLY = "HOURLY", "Hourly Worker"
+    PIECE_RATE = "PIECE_RATE", "Piece-rate Worker"
+    MANUFACTURING = "MANUFACTURING", "Manufacturing Worker"
+    SERVICE = "SERVICE", "Service Worker"
+
+
+class EmployeeDocumentType(models.TextChoices):
+    ID_PROOF = "ID_PROOF", "ID Proof"
+    ADDRESS_PROOF = "ADDRESS_PROOF", "Address Proof"
+    SALARY_AGREEMENT = "SALARY_AGREEMENT", "Salary Agreement"
+    APPOINTMENT_LETTER = "APPOINTMENT_LETTER", "Appointment Letter"
+    OTHER = "OTHER", "Other"
+
+
+class EmployeeDocumentStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    INACTIVE = "INACTIVE", "Inactive"
 
 
 class CompensationComponentType(models.TextChoices):
@@ -450,6 +511,8 @@ class FinanceAccount(AccountingTimeStampedModel):
         default=MONEY_ZERO,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    # Settlement desks (cash/bank/UPI/gateway) use True; ledger-profile anchor rows use False.
+    is_real_settlement_account = models.BooleanField(default=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     bank_last4 = models.CharField(max_length=4, blank=True, default="")
     upi_handle = models.CharField(max_length=255, blank=True, default="")
@@ -467,6 +530,28 @@ class FinanceAccount(AccountingTimeStampedModel):
         errors = {}
         if self.chart_account_id and self.chart_account.account_type != ChartOfAccountType.ASSET:
             errors["chart_account"] = "Finance accounts must map to ASSET chart accounts."
+        if self.chart_account_id:
+            kind = (self.kind or "").strip().upper()
+            bank_chart = ChartOfAccount.objects.filter(
+                system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE,
+                is_active=True,
+            ).first()
+            upi_chart = ChartOfAccount.objects.filter(
+                system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE,
+                is_active=True,
+            ).first()
+            if kind == FinanceAccountKind.BANK and _is_cash_in_hand_chart(self.chart_account):
+                if bank_chart and self.chart_account_id != bank_chart.pk:
+                    errors["chart_account"] = (
+                        "Bank finance accounts cannot use Cash in Hand as primary chart account "
+                        "when a Bank Account chart exists."
+                    )
+            if kind == FinanceAccountKind.UPI and _is_cash_in_hand_chart(self.chart_account):
+                if upi_chart and self.chart_account_id != upi_chart.pk:
+                    errors["chart_account"] = (
+                        "UPI finance accounts cannot use Cash in Hand as primary chart account "
+                        "when a UPI/Payment Gateway chart exists."
+                    )
         if self.bank_last4 and len(self.bank_last4) != 4:
             errors["bank_last4"] = "bank_last4 must contain exactly 4 characters."
         if errors:
@@ -484,6 +569,140 @@ class FinanceAccount(AccountingTimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class FinanceAccountCoaMapping(AccountingTimeStampedModel):
+    finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        related_name="coa_mappings",
+    )
+    chart_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="finance_account_mappings",
+    )
+    purpose = models.CharField(
+        max_length=50,
+        choices=FinanceAccountMappingPurpose.choices,
+        db_index=True,
+    )
+    is_default = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_finance_coa_mappings",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="updated_finance_coa_mappings",
+    )
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_finance_account_coa_mappings"
+        ordering = ["purpose", "-is_default", "-is_active", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["finance_account", "purpose"],
+                condition=Q(is_active=True),
+                name="uq_active_finance_account_purpose_mapping",
+            ),
+            models.UniqueConstraint(
+                fields=["purpose"],
+                condition=Q(is_default=True, is_active=True),
+                name="uq_default_mapping_per_purpose",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["purpose", "is_active"]),
+            models.Index(fields=["is_default", "is_active"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        account_type = self.chart_account.account_type if self.chart_account_id else None
+        if self.purpose in {
+            FinanceAccountMappingPurpose.CASH_COLLECTION,
+            FinanceAccountMappingPurpose.UPI_COLLECTION,
+            FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
+            FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,
+            FinanceAccountMappingPurpose.INVENTORY_ASSET,
+        } and account_type != ChartOfAccountType.ASSET:
+            errors["chart_account"] = "This purpose must map to an ASSET chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,
+            FinanceAccountMappingPurpose.COMMISSION_PAYABLE,
+            FinanceAccountMappingPurpose.CUSTOMER_ADVANCE_UNEARNED_REVENUE,
+        } and account_type != ChartOfAccountType.LIABILITY:
+            errors["chart_account"] = "This purpose must map to a LIABILITY chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.EMI_INCOME,
+            FinanceAccountMappingPurpose.RENT_INCOME,
+            FinanceAccountMappingPurpose.LEASE_INCOME,
+            FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,
+            FinanceAccountMappingPurpose.DAMAGE_RECOVERY,
+            FinanceAccountMappingPurpose.DELIVERY_CHARGES_INCOME,
+        } and account_type != ChartOfAccountType.INCOME:
+            errors["chart_account"] = "This purpose must map to an INCOME chart account."
+        if self.purpose in {
+            FinanceAccountMappingPurpose.COMMISSION_EXPENSE,
+            FinanceAccountMappingPurpose.DELIVERY_EXPENSE,
+            FinanceAccountMappingPurpose.SALARY_EXPENSE,
+        } and account_type != ChartOfAccountType.EXPENSE:
+            errors["chart_account"] = "This purpose must map to an EXPENSE chart account."
+        if self.purpose == FinanceAccountMappingPurpose.WAIVER_LOSS and account_type != ChartOfAccountType.EXPENSE:
+            errors["chart_account"] = "Waiver/Loss must map to an EXPENSE chart account."
+        if self.finance_account_id and self.chart_account_id:
+            finance_kind = (self.finance_account.kind or "").strip().upper()
+            if finance_kind == FinanceAccountKind.CASH and self.chart_account.account_type in {
+                ChartOfAccountType.INCOME,
+                ChartOfAccountType.LIABILITY,
+                ChartOfAccountType.EXPENSE,
+            }:
+                errors["chart_account"] = (
+                    "CASH finance accounts cannot map to INCOME/LIABILITY/EXPENSE chart accounts."
+                )
+            bank_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE, is_active=True).first()
+            upi_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE, is_active=True).first()
+            if (
+                self.purpose == FinanceAccountMappingPurpose.BANK_COLLECTION
+                and _is_cash_in_hand_chart(self.chart_account)
+                and bank_chart
+                and self.chart_account_id != bank_chart.pk
+            ):
+                errors["chart_account"] = "BANK_COLLECTION must map to Bank Account when Bank Account chart exists."
+            if (
+                self.purpose == FinanceAccountMappingPurpose.UPI_COLLECTION
+                and _is_cash_in_hand_chart(self.chart_account)
+                and upi_chart
+                and self.chart_account_id != upi_chart.pk
+            ):
+                errors["chart_account"] = "UPI_COLLECTION must map to UPI/Payment Gateway when that chart exists."
+            if self.purpose in {
+                FinanceAccountMappingPurpose.CASH_COLLECTION,
+                FinanceAccountMappingPurpose.BANK_COLLECTION,
+                FinanceAccountMappingPurpose.UPI_COLLECTION,
+            }:
+                is_system_only = not bool(self.finance_account.is_real_settlement_account)
+                if is_system_only or (self.finance_account.name or "").strip().lower() == SYSTEM_LEDGER_POSTING_PROFILE_NAME:
+                    errors["finance_account"] = (
+                        "System-only finance accounts cannot be used for manual collection mappings."
+                    )
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class RentLeaseAccountingAccountMapping(AccountingTimeStampedModel):
@@ -598,6 +817,14 @@ class JournalEntry(AccountingTimeStampedModel):
     )
     posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     void_reason = models.TextField(blank=True, default="")
+    journal_group = models.ForeignKey(
+        "JournalEntryGroup",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="journal_entries",
+        db_index=True,
+    )
 
     class Meta:
         db_table = "accounting_journal_entries"
@@ -710,15 +937,123 @@ class JournalEntryLine(AccountingTimeStampedModel):
         return f"{self.journal_entry.entry_no} - {self.chart_account.code}"
 
 
+class JournalEntryGroup(AccountingTimeStampedModel):
+    journal_group_id = models.CharField(
+        max_length=48,
+        unique=True,
+        db_index=True,
+        default=generate_journal_group_id,
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    transaction_date = models.DateField(db_index=True)
+    narration = models.TextField(blank=True, default="")
+    total_debit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    total_credit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    is_balanced = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_journal_groups",
+    )
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_journal_groups",
+    )
+    reversal_of = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversal_groups",
+    )
+
+    class Meta:
+        db_table = "accounting_journal_entry_groups"
+        ordering = ["-transaction_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["source_module", "source_object_id"]),
+            models.Index(fields=["transaction_date", "is_balanced"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not (self.source_module or "").strip():
+            errors["source_module"] = "source_module is required."
+        if not (self.source_object_id or "").strip():
+            errors["source_object_id"] = "source_object_id is required."
+        if self.total_debit != self.total_credit and self.is_balanced:
+            errors["is_balanced"] = "is_balanced cannot be true when totals differ."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.journal_group_id = (self.journal_group_id or generate_journal_group_id()).strip().upper()
+        self.source_module = (self.source_module or "").strip()
+        self.source_object_id = (self.source_object_id or "").strip()
+        self.narration = (self.narration or "").strip()
+        self.is_balanced = self.total_debit == self.total_credit
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class Vendor(AccountingTimeStampedModel):
     name = models.CharField(max_length=120)
+    vendor_code = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    display_name = models.CharField(max_length=160, blank=True, default="")
+    legal_name = models.CharField(max_length=180, blank=True, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
+    whatsapp = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     address = models.TextField(blank=True, default="")
     gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    pan = models.CharField(max_length=20, blank=True, default="")
     state_code = models.CharField(max_length=5, null=True, blank=True)
     state_name = models.CharField(max_length=100, null=True, blank=True)
+    contact_person = models.CharField(max_length=120, blank=True, default="")
+    payment_terms = models.CharField(max_length=120, blank=True, default="")
+    credit_period_days = models.PositiveIntegerField(default=0)
+    quality_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    delivery_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    warranty_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    price_score = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    rating = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    notes = models.TextField(blank=True, default="")
+    linked_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_vendors",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("ACTIVE", "Active"),
+            ("ON_HOLD", "On Hold"),
+            ("BLOCKED", "Blocked"),
+            ("ARCHIVED", "Archived"),
+        ],
+        default="ACTIVE",
+        db_index=True,
+    )
     is_active = models.BooleanField(default=True, db_index=True)
+    categories = models.ManyToManyField("accounting.VendorCategory", blank=True, related_name="vendors")
 
     class Meta:
         db_table = "accounting_vendors"
@@ -726,16 +1061,318 @@ class Vendor(AccountingTimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.name = (self.name or "").strip()
+        self.vendor_code = (self.vendor_code or "").strip().upper()
+        self.display_name = (self.display_name or "").strip()
+        self.legal_name = (self.legal_name or "").strip()
         self.phone = (self.phone or "").strip()
+        self.whatsapp = (self.whatsapp or "").strip()
         self.address = (self.address or "").strip()
         self.gstin = (self.gstin or "").strip().upper() or None
+        self.pan = (self.pan or "").strip().upper()
         self.state_code = (self.state_code or "").strip().upper() or None
         self.state_name = (self.state_name or "").strip() or None
+        self.contact_person = (self.contact_person or "").strip()
+        self.payment_terms = (self.payment_terms or "").strip()
+        self.notes = (self.notes or "").strip()
+        if not self.display_name:
+            self.display_name = self.name
+        if not self.vendor_code:
+            base = f"VND-{timezone.now().strftime('%Y%m%d')}-{(self.pk or 0):06d}"
+            self.vendor_code = base.upper()
+        self.is_active = self.status in {"ACTIVE", "ON_HOLD"} and bool(self.is_active)
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
+
+
+class VendorCategory(AccountingTimeStampedModel):
+    name = models.CharField(max_length=120, unique=True, db_index=True)
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    description = models.TextField(blank=True, default="")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="children")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_categories"
+        ordering = ["name", "id"]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.code = (self.code or "").strip().upper()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class VendorAddress(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="addresses")
+    address_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("OFFICE", "Office"),
+            ("MANUFACTURING_UNIT", "Manufacturing Unit"),
+            ("WAREHOUSE", "Warehouse"),
+            ("SERVICE_CENTER", "Service Center"),
+        ],
+        default="OFFICE",
+        db_index=True,
+    )
+    address_line1 = models.CharField(max_length=255)
+    address_line2 = models.CharField(max_length=255, blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
+    district = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    is_primary = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_addresses"
+        ordering = ["vendor_id", "-is_primary", "id"]
+
+
+class VendorServiceArea(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="service_areas")
+    state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    radius_km = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_service_areas"
+        ordering = ["vendor_id", "state", "district", "city", "id"]
+
+
+class VendorProduct(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="products")
+    internal_product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_products")
+    vendor_sku = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    product_name = models.CharField(max_length=180)
+    category_text = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    material = models.CharField(max_length=120, blank=True, default="")
+    size_description = models.CharField(max_length=160, blank=True, default="")
+    warranty_months = models.PositiveIntegerField(default=0)
+    base_quote_price = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    min_order_qty = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    lead_time_days = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_vendor_products"
+        ordering = ["vendor_id", "product_name", "id"]
+
+
+class VendorLedgerEntry(AccountingTimeStampedModel):
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="ledger_entries")
+    entry_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("OPENING_BALANCE", "Opening Balance"),
+            ("PURCHASE_BILL", "Purchase Bill"),
+            ("PAYMENT_TO_VENDOR", "Payment To Vendor"),
+            ("PURCHASE_RETURN", "Purchase Return"),
+            ("DEBIT_NOTE", "Debit Note"),
+            ("CREDIT_ADJUSTMENT", "Credit Adjustment"),
+            ("MANUAL_ADJUSTMENT", "Manual Adjustment"),
+        ],
+        db_index=True,
+    )
+    source_type = models.CharField(max_length=60, blank=True, default="", db_index=True)
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    debit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    credit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    posted_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="created_vendor_ledger_entries")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_vendor_ledger_entries"
+        ordering = ["vendor_id", "-posted_at", "-id"]
+
+
+class VendorQuoteRequest(AccountingTimeStampedModel):
+    request_no = models.CharField(max_length=60, unique=True, db_index=True)
+    source_type = models.CharField(
+        max_length=30,
+        choices=[
+            ("CUSTOMER_ENQUIRY", "Customer Enquiry"),
+            ("DIRECT_SALE_ORDER", "Direct Sale Order"),
+            ("ONLINE_ORDER", "Online Order"),
+            ("MANUAL", "Manual"),
+        ],
+        default="MANUAL",
+        db_index=True,
+    )
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    customer = models.ForeignKey("subscriptions.Customer", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    customer_pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    customer_city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    customer_district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    customer_state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    product_name = models.CharField(max_length=180, blank=True, default="")
+    category_text = models.CharField(max_length=120, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    required_by = models.DateField(null=True, blank=True)
+    budget_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status = models.CharField(
+        max_length=24,
+        choices=[
+            ("DRAFT", "Draft"),
+            ("SENT", "Sent"),
+            ("QUOTING", "Quoting"),
+            ("PARTIALLY_QUOTED", "Partially Quoted"),
+            ("CLOSED", "Closed"),
+            ("CANCELLED", "Cancelled"),
+        ],
+        default="DRAFT",
+        db_index=True,
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="created_vendor_quote_requests")
+
+    class Meta:
+        db_table = "accounting_vendor_quote_requests"
+        ordering = ["-created_at", "-id"]
+
+
+class VendorQuote(AccountingTimeStampedModel):
+    quote_request = models.ForeignKey(VendorQuoteRequest, on_delete=models.CASCADE, related_name="quotes")
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="quotes")
+    quoted_price = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    available_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("0.000"))
+    lead_time_days = models.PositiveIntegerField(default=0)
+    warranty_months = models.PositiveIntegerField(default=0)
+    delivery_available = models.BooleanField(default=False)
+    delivery_charge = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    quality_note = models.TextField(blank=True, default="")
+    valid_until = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("REQUESTED", "Requested"),
+            ("QUOTED", "Quoted"),
+            ("ACCEPTED", "Accepted"),
+            ("REJECTED", "Rejected"),
+            ("EXPIRED", "Expired"),
+        ],
+        default="REQUESTED",
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="submitted_vendor_quotes")
+    submitted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "accounting_vendor_quotes"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["quote_request", "vendor"], name="vendor_quote_unique_request_vendor"),
+        ]
+
+
+class CustomerPurchaseEnquiryStatus(models.TextChoices):
+    NEW = "NEW", "New"
+    SOURCING = "SOURCING", "Sourcing"
+    QUOTE_REQUESTED = "QUOTE_REQUESTED", "Quote requested"
+    VENDOR_SELECTED = "VENDOR_SELECTED", "Vendor selected"
+    CONVERTED = "CONVERTED", "Converted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class CustomerPurchaseEnquiry(AccountingTimeStampedModel):
+    """
+    Online / walk-in purchase intent for sourcing via Phase 4 vendor ranking + Phase 3 RFQs.
+    Does not trigger EMI, payments, stock, purchase bills, or automatic PO placement.
+    """
+
+    enquiry_no = models.CharField(max_length=60, unique=True, db_index=True)
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    customer_name = models.CharField(max_length=160)
+    phone = models.CharField(max_length=20, db_index=True)
+    email = models.EmailField(blank=True, default="")
+    product = models.ForeignKey(
+        "subscriptions.Product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    product_name = models.CharField(max_length=255, blank=True, default="")
+    category_text = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    material = models.CharField(max_length=120, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    budget_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    delivery_address = models.TextField(blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    district = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    state = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    status = models.CharField(
+        max_length=24,
+        choices=CustomerPurchaseEnquiryStatus.choices,
+        default=CustomerPurchaseEnquiryStatus.NEW,
+        db_index=True,
+    )
+    public_lead = models.ForeignKey(
+        "subscriptions.PublicLead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiries",
+    )
+    selected_vendor_quote = models.ForeignKey(
+        VendorQuote,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="selected_for_customer_enquiries",
+    )
+    draft_purchase_order = models.ForeignKey(
+        "inventory.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_purchase_enquiry_sources",
+    )
+
+    class Meta:
+        db_table = "accounting_customer_purchase_enquiries"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="acct_cpe_stat_crt_idx"),
+            models.Index(fields=["pincode", "status"], name="acct_cpe_pc_stat_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        from accounting.services.customer_purchase_enquiry_numbering import allocate_customer_purchase_enquiry_number
+
+        self.customer_name = (self.customer_name or "").strip()
+        self.phone = (self.phone or "").strip()
+        self.email = (self.email or "").strip().lower()
+        self.product_name = (self.product_name or "").strip()
+        self.category_text = (self.category_text or "").strip()
+        self.material = (self.material or "").strip()
+        self.delivery_address = (self.delivery_address or "").strip()
+        self.city = (self.city or "").strip()
+        self.district = (self.district or "").strip()
+        self.state = (self.state or "").strip()
+        self.pincode = (self.pincode or "").strip()
+        if not (self.enquiry_no or "").strip():
+            self.enquiry_no = allocate_customer_purchase_enquiry_number()
+        super().save(*args, **kwargs)
 
 
 class AssetCategory(AccountingTimeStampedModel):
@@ -1123,6 +1760,50 @@ class EmployeeProfile(AccountingTimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     is_active = models.BooleanField(default=True, db_index=True)
+    employment_type = models.CharField(
+        max_length=30,
+        choices=EmploymentType.choices,
+        default=EmploymentType.PERMANENT_MONTHLY,
+        db_index=True,
+    )
+    salary_effective_from = models.DateField(null=True, blank=True)
+    temporary_contract_end_date = models.DateField(null=True, blank=True)
+    daily_wage_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    hourly_wage_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    piece_rate_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    piece_rate_unit_label = models.CharField(max_length=60, blank=True, default="")
+    kyc_id_type = models.CharField(max_length=40, blank=True, default="")
+    kyc_id_number = models.CharField(max_length=80, blank=True, default="")
+    kyc_verified = models.BooleanField(default=False, db_index=True)
+    address = models.TextField(blank=True, default="")
+    emergency_contact_name = models.CharField(max_length=120, blank=True, default="")
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, default="")
+    cost_center_code = models.CharField(max_length=60, blank=True, default="")
+    payroll_expense_account = models.ForeignKey(
+        "ChartOfAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_profiles_payroll_expense",
+    )
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -1141,6 +1822,13 @@ class EmployeeProfile(AccountingTimeStampedModel):
         self.phone = (self.phone or "").strip()
         self.designation = (self.designation or "").strip()
         self.department = (self.department or "").strip()
+        self.piece_rate_unit_label = (self.piece_rate_unit_label or "").strip()
+        self.kyc_id_type = (self.kyc_id_type or "").strip().upper()
+        self.kyc_id_number = (self.kyc_id_number or "").strip()
+        self.address = (self.address or "").strip()
+        self.emergency_contact_name = (self.emergency_contact_name or "").strip()
+        self.emergency_contact_phone = (self.emergency_contact_phone or "").strip()
+        self.cost_center_code = (self.cost_center_code or "").strip().upper()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = _default_branch()
@@ -1149,6 +1837,59 @@ class EmployeeProfile(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"{self.employee_code} - {self.name}"
+
+
+def employee_document_upload_to(instance: "EmployeeDocument", filename: str) -> str:
+    ext = (filename or "").split(".")[-1].lower() if "." in (filename or "") else "bin"
+    return f"employee-documents/emp-{instance.employee_id}/{timezone.now().strftime('%Y%m%d%H%M%S%f')}.{ext}"
+
+
+class EmployeeDocument(AccountingTimeStampedModel):
+    employee = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name="documents",
+    )
+    document_type = models.CharField(
+        max_length=30,
+        choices=EmployeeDocumentType.choices,
+        default=EmployeeDocumentType.OTHER,
+        db_index=True,
+    )
+    title = models.CharField(max_length=160)
+    document_no = models.CharField(max_length=80, blank=True, default="")
+    file = models.FileField(upload_to=employee_document_upload_to)
+    status = models.CharField(
+        max_length=12,
+        choices=EmployeeDocumentStatus.choices,
+        default=EmployeeDocumentStatus.ACTIVE,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="uploaded_employee_documents",
+    )
+
+    class Meta:
+        db_table = "accounting_employee_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["employee", "status", "document_type"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.title = (self.title or "").strip()
+        self.document_no = (self.document_no or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.employee_code} - {self.title}"
 
 
 class PayrollPeriod(AccountingTimeStampedModel):

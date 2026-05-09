@@ -25,6 +25,14 @@
 
   --accent: oklch(0.907 0.03 84);
   --accent-foreground: oklch(0.28 0.02 74);
+  --success: oklch(0.67 0.14 156);
+  --success-foreground: oklch(0.2 0.02 158);
+  --warning: oklch(0.77 0.14 86);
+  --warning-foreground: oklch(0.25 0.03 84);
+  --danger: oklch(0.61 0.22 28);
+  --danger-foreground: oklch(0.985 0 0);
+  --info: oklch(0.69 0.11 230);
+  --info-foreground: oklch(0.23 0.03 232);
 
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.985 0 0);
@@ -116,6 +124,14 @@
   --muted-foreground: oklch(0.77 0.012 255);
   --accent: oklch(0.37 0.03 88);
   --accent-foreground: oklch(0.97 0.006 250);
+  --success: oklch(0.71 0.11 156);
+  --success-foreground: oklch(0.19 0.02 158);
+  --warning: oklch(0.78 0.13 86);
+  --warning-foreground: oklch(0.22 0.03 84);
+  --danger: oklch(0.68 0.2 28);
+  --danger-foreground: oklch(0.985 0 0);
+  --info: oklch(0.75 0.09 230);
+  --info-foreground: oklch(0.2 0.03 232);
   --destructive: oklch(0.64 0.2 27);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.35 0.018 258);
@@ -174,19 +190,24 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
 }
 
 .public-app {
   min-height: 100vh;
+  /* Warm retail brown primary for marketing + auth only (dashboard uses .dashboard-app). */
+  --primary: oklch(0.44 0.072 58);
+  --primary-foreground: oklch(0.985 0.004 95);
+  --ring: oklch(0.5 0.085 56);
   background:
     radial-gradient(
       circle at 10% 0%,
-      color-mix(in oklab, var(--accent) 18%, transparent),
+      color-mix(in oklab, var(--accent) 22%, transparent),
       transparent 42%
     ),
     radial-gradient(
       circle at 92% 6%,
-      color-mix(in oklab, oklch(0.28 0.02 258) 14%, transparent),
+      color-mix(in oklab, oklch(0.38 0.045 58) 12%, transparent),
       transparent 46%
     ),
     repeating-linear-gradient(
@@ -203,7 +224,20 @@ body {
       transparent 1px,
       transparent 84px
     ),
-    linear-gradient(180deg, #fbfaf7 0%, #edf2f8 62%, #e8eef6 100%);
+    linear-gradient(180deg, #fbfaf7 0%, #f4f0eb 55%, #ebe6df 100%);
+}
+
+/* Shared focus treatment for public marketing + lead forms */
+.public-app .public-control-focus {
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.public-app .public-control-focus:focus-visible {
+  border-color: color-mix(in oklab, var(--ring) 55%, var(--border) 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent);
 }
 
 .public-nav {
@@ -320,6 +354,22 @@ body {
   transform: translateY(-1px);
 }
 
+.public-action-primary:focus-visible,
+.public-action-secondary:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ring) 32%, transparent),
+    0 22px 48px -34px rgba(15, 23, 42, 0.78);
+}
+
+.public-action-secondary:focus-visible {
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 18px 42px -34px rgba(15, 23, 42, 0.46);
+}
+
 input::placeholder,
 textarea::placeholder {
   color: color-mix(in oklab, var(--muted-foreground) 88%, var(--foreground) 12%);
@@ -425,6 +475,73 @@ a, button, input, select, textarea {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 46%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes caret-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-caret-blink {
+    animation: none;
+    opacity: 1;
+  }
+
+  .animate-skeleton-pulse {
+    animation: none;
+    opacity: 0.88;
+  }
+
+  .skeleton-shimmer::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .animate-in,
+  .fade-in-0,
+  .slide-in-from-right,
+  .zoom-in-95 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 button {
   cursor: pointer;
 }
@@ -476,6 +593,36 @@ button {
   }
 }
 
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation-name: accordion-down;
+  animation-duration: 0.2s;
+  animation-timing-function: cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.animate-accordion-up {
+  animation-name: accordion-up;
+  animation-duration: 0.2s;
+  animation-timing-function: cubic-bezier(0.87, 0, 0.13, 1);
+}
+
 .dashboard-app {
   min-height: 100vh;
   background:
@@ -505,7 +652,7 @@ button {
 
 .subidha-popup-root {
   position: relative;
-  z-index: 140;
+  z-index: 260;
   isolation: isolate;
   pointer-events: none;
 }
@@ -820,7 +967,7 @@ button {
 }
 
 .table-surface-frame {
-  overflow: hidden;
+  overflow: visible;
   border-radius: 1.3rem;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 84%, white 16%);
   background: linear-gradient(
@@ -923,6 +1070,9 @@ button {
 }
 
 .dashboard-app .portal-page-content .overflow-x-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   border-radius: 1.1rem;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 82%, white 18%);
   background: linear-gradient(
@@ -978,6 +1128,18 @@ button {
 
   .dashboard-app .portal-page {
     padding-inline: 0.25rem;
+  }
+
+  .dashboard-app .popup-action-bar {
+    position: sticky;
+    bottom: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-app .popup-action-bar > * {
+    width: 100%;
+    justify-content: center;
   }
 
   .dashboard-app table thead th {

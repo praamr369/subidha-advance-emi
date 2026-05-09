@@ -5,6 +5,7 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from subscriptions.services.phase5_export_service import build_csv_export_response
 from subscriptions.services.phase5_filter_service import parse_admin_report_filters
@@ -400,6 +401,7 @@ class AdminReportExportView(_AdminBase):
         "customer_id", "branch_id", "overdue_only", "unreconciled_only",
     }
 
+    @require_capability("reports.export")
     def get(self, request):
         export_type = (request.query_params.get("type") or "").strip().lower()
         mutable = request.query_params.copy()

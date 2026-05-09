@@ -35,6 +35,7 @@ import {
   type MoneyMovement,
   type SalarySheet,
 } from "@/services/accounting";
+import { getAdminAccountingControlCenter } from "@/services/phase5-control";
 
 function money(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -68,6 +69,7 @@ export default function AdminAccountingPage() {
   const [expenses, setExpenses] = useState<ExpenseVoucher[]>([]);
   const [salarySheets, setSalarySheets] = useState<SalarySheet[]>([]);
   const [moneyMovements, setMoneyMovements] = useState<MoneyMovement[]>([]);
+  const [controlKpis, setControlKpis] = useState<Record<string, string> | null>(null);
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
@@ -81,6 +83,7 @@ export default function AdminAccountingPage() {
         expensesPayload,
         salaryPayload,
         moneyPayload,
+        controlPayload,
       ] = await Promise.all([
         listChartOfAccounts(),
         listFinanceAccounts(),
@@ -88,6 +91,7 @@ export default function AdminAccountingPage() {
         listExpenses(),
         listSalarySheets(),
         listMoneyMovements(),
+        getAdminAccountingControlCenter(),
       ]);
 
       setChartCount(chartAccountsPayload.count);
@@ -96,6 +100,11 @@ export default function AdminAccountingPage() {
       setExpenses(expensesPayload.results);
       setSalarySheets(salaryPayload.results);
       setMoneyMovements(moneyPayload.results);
+      setControlKpis(
+        controlPayload && typeof controlPayload === "object" && "kpis" in controlPayload
+          ? ((controlPayload as { kpis: Record<string, string> }).kpis ?? null)
+          : null
+      );
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -123,6 +132,15 @@ export default function AdminAccountingPage() {
   const latestExpense = expenses[0];
   const latestSalary = salarySheets[0];
   const latestMovement = moneyMovements[0];
+  const kpiTodayCollection = controlKpis?.today_collection ?? "0.00";
+  const kpiMonthlyCollection = controlKpis?.month_to_date_collection ?? "0.00";
+  const kpiEmiReceivable = controlKpis?.total_receivables ?? "0.00";
+  const kpiOverdue = controlKpis?.overdue_receivables ?? "0";
+  const kpiDepositLiability = controlKpis?.rent_lease_deposit_liability ?? "0.00";
+  const kpiWaiverLoss = controlKpis?.waiver_loss_exposure ?? "0.00";
+  const kpiDirectSale = controlKpis?.direct_sale_revenue ?? "0.00";
+  const kpiUnbalancedWarnings = controlKpis?.unbalanced_journal_warnings ?? "0";
+  const kpiUnmappedWarnings = controlKpis?.unmapped_account_warnings ?? "0";
 
   return (
     <PortalPage
@@ -249,6 +267,19 @@ export default function AdminAccountingPage() {
               ]}
             />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Today Collection" value={money(kpiTodayCollection)} subtext="Cashier/admin posted collections today" tone="success" />
+              <StatCard label="Monthly Collection" value={money(kpiMonthlyCollection)} subtext="Month-to-date posted collections" tone="info" />
+              <StatCard label="EMI Receivable" value={money(kpiEmiReceivable)} subtext="Open EMI receivable position" tone="warning" />
+              <StatCard label="Overdue Receivable" value={String(kpiOverdue)} subtext="Overdue EMI rows requiring follow-up" tone="warning" />
+              <StatCard label="Rent Deposit Liability" value={money(kpiDepositLiability)} subtext="Held customer deposits outstanding" tone="default" />
+              <StatCard label="Waiver Loss Exposure" value={money(kpiWaiverLoss)} subtext="Waived/loss exposure on contracts" tone="warning" />
+              <StatCard label="Direct Sale Revenue" value={money(kpiDirectSale)} subtext="Direct-sale recognized revenue" tone="success" />
+              <StatCard
+                label="Unbalanced/Unmapped Warnings"
+                value={`${kpiUnbalancedWarnings}/${kpiUnmappedWarnings}`}
+                subtext="journal warnings / account mapping warnings"
+                tone={Number(kpiUnbalancedWarnings) > 0 || Number(kpiUnmappedWarnings) > 0 ? "danger" : "success"}
+              />
               <StatCard
                 label="Expense Approvals"
                 value={String(approvedExpenseCount)}

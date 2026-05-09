@@ -315,7 +315,7 @@ export default function AdminSubscriptionsPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(`/admin/payments/create?subscription=${successSubscription.id}`)}
+                onClick={() => router.push(`/admin/finance/collect?subscription=${successSubscription.id}`)}
               >
                 Create Payment
               </button>

@@ -5,6 +5,7 @@ from django.db.models import Count, Sum
 from django.core.cache import cache
 from django.utils import timezone
 
+from core.services.operational_visibility import subscription_dashboard_visible_q
 from subscriptions.models import (
     BatchStatus,
     Commission,
@@ -67,7 +68,7 @@ def build_admin_dashboard(*, actor_user=None):
     # ------------------------------
     risk_stats = evaluate_all_active_subscriptions()
 
-    total_active = Subscription.objects.filter(
+    total_active = Subscription.objects.filter(subscription_dashboard_visible_q()).filter(
         status=SubscriptionStatus.ACTIVE
     ).count()
 
@@ -220,7 +221,7 @@ def build_admin_dashboard(*, actor_user=None):
     # 8️⃣ Assemble Final Response
     # ------------------------------
     portfolio_mix_rows = (
-        Subscription.objects.values("plan_type")
+        Subscription.objects.filter(subscription_dashboard_visible_q()).values("plan_type")
         .annotate(count=Count("id"))
         .order_by("plan_type")
     )

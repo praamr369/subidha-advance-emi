@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     LuckyId,
     EmiStatus,
     FinancialLedger,
@@ -19,10 +21,13 @@ from subscriptions.models import (
     SubscriptionStatus,
     q2,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
+
+finance_logger = logging.getLogger("finance.events")
 
 
 WAIVER_SCOPE_FUTURE_ONLY = "FUTURE_EMI_ONLY"
@@ -197,6 +202,23 @@ def apply_winner_state(
     subscription = _lock_subscription_only(subscription.pk)
     lucky_id = _lock_lucky_id_if_present(subscription)
 
+    if (
+        draw
+        and draw.is_revealed
+        and draw.winner_subscription_id
+        and draw.winner_subscription_id == subscription.id
+    ):
+        emis = list(subscription.emis.order_by("month_no", "id"))
+        computed_waived_amount = q2(subscription.total_waived_emi_amount())
+        return {
+            "subscription": subscription,
+            "winner_month": subscription.winner_month or winner_month,
+            "waived_emi_count": draw.waived_emi_count or 0,
+            "waived_amount": computed_waived_amount,
+            "newly_waived_amount": MONEY_ZERO,
+            "lucky_id": lucky_id or subscription.lucky_id,
+        }
+
     if subscription.plan_type != PlanType.EMI:
         raise ValidationError("Winner state is only supported for EMI subscriptions.")
 
@@ -297,6 +319,34 @@ def apply_winner_state(
                 "winner_lucky_number": getattr(subscription.lucky_id, "lucky_number", None),
             },
         )
+    append_business_event(
+        event_type=BusinessEventType.WAIVER_APPLIED,
+        source_module="subscriptions.services.winner_state_service.apply_winner_state",
+        actor_user=performed_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "source": source,
+            "draw_id": getattr(draw, "id", None),
+            "winner_month": winner_month,
+            "waived_emi_count": len(future_pending_emis),
+            "waived_amount": str(q2(computed_waived_amount)),
+            "newly_waived_amount": str(q2(newly_waived_amount)),
+        },
+    )
+    finance_logger.info(
+        "finance.waiver_applied",
+        extra={
+            "subscription_id": subscription.id,
+            "winner_month": winner_month,
+            "draw_id": getattr(draw, "id", None),
+            "waived_emi_count": len(future_pending_emis),
+            "waived_amount": str(q2(computed_waived_amount)),
+            "performed_by_user_id": getattr(performed_by, "id", None),
+        },
+    )
 
     return {
         "subscription": subscription,

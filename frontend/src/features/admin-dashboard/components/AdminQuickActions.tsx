@@ -7,7 +7,7 @@ import { ROUTES } from "@/lib/routes";
 
 export default function AdminQuickActions() {
   const actions = [
-    { label: "Subscription Sale", href: ROUTES.admin.subscriptionsCreate },
+    { label: "Subscription Sale", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
     { label: "Direct Sale Desk", href: ROUTES.admin.billingDirectSales },
     { label: "Collections", href: ROUTES.admin.collections },
     { label: "Supplier Payables", href: ROUTES.admin.accountingVendors },

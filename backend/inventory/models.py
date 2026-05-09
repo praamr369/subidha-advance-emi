@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from decimal import Decimal
 
 from django.conf import settings
@@ -295,6 +296,10 @@ class InventoryItem(InventoryTimeStampedModel):
         """
         return max(QUANTITY_ZERO, self.current_stock_quantity() - self.reserved_qty())
 
+    def available_to_commit_qty(self) -> Decimal:
+        """Operational alias used by ERP/workspace summaries (same as available_qty)."""
+        return self.available_qty()
+
     @property
     def low_stock_threshold(self) -> Decimal:
         """Alias for reorder_level_qty — used in Phase 2 purchase suggestion logic."""
@@ -501,6 +506,22 @@ class StockAdjustmentLine(InventoryTimeStampedModel):
     )
     quantity_delta = models.DecimalField(max_digits=12, decimal_places=3)
     notes = models.CharField(max_length=255, blank=True, default="")
+    # Frozen unit economic cost used for valuation / bridge posting (not selling price).
+    unit_cost_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    # abs(quantity_delta) * unit_cost_snapshot at successful post time (audit trail).
+    valuation_amount_snapshot = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
 
     class Meta:
         db_table = "inventory_stock_adjustment_lines"
@@ -514,6 +535,143 @@ class StockAdjustmentLine(InventoryTimeStampedModel):
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class OpeningStockBatch(InventoryTimeStampedModel):
+    """CSV import identity / audit envelope (additive; duplicate-safe imports)."""
+
+    batch_key = models.CharField(max_length=64, unique=True, db_index=True)
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opening_stock_batches",
+    )
+    last_preview_payload = models.JSONField(null=True, blank=True)
+    last_apply_summary = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "inventory_opening_stock_batches"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.batch_key
+
+
+class OpeningStockEntryStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class OpeningStockEntrySource(models.TextChoices):
+    MANUAL = "MANUAL", "Manual"
+    CSV_IMPORT = "CSV_IMPORT", "CSV Import"
+
+
+class OpeningStockEntry(InventoryTimeStampedModel):
+    """
+    Auditable opening-stock workflow row (draft → posted ledger movement).
+    Posted rows are immutable; corrections use StockAdjustment drafts.
+    """
+
+    batch = models.ForeignKey(
+        OpeningStockBatch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="entries",
+    )
+    csv_row_number = models.PositiveIntegerField(null=True, blank=True)
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="opening_stock_entries",
+    )
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="opening_stock_entries",
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(QUANTITY_ZERO)],
+    )
+    unit_cost_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    valuation_amount_snapshot = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    effective_date = models.DateField(db_index=True)
+    note = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=12,
+        choices=OpeningStockEntryStatus.choices,
+        default=OpeningStockEntryStatus.DRAFT,
+        db_index=True,
+    )
+    source = models.CharField(
+        max_length=16,
+        choices=OpeningStockEntrySource.choices,
+        default=OpeningStockEntrySource.MANUAL,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_opening_stock_entries",
+    )
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="posted_opening_stock_entries",
+    )
+    posted_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    correction_adjustment = models.ForeignKey(
+        StockAdjustment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opening_stock_correction_for_entries",
+    )
+
+    class Meta:
+        db_table = "inventory_opening_stock_entries"
+        ordering = ["-effective_date", "-id"]
+        indexes = [
+            models.Index(fields=["status", "effective_date"]),
+            models.Index(fields=["inventory_item", "stock_location", "effective_date"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("batch", "csv_row_number"),
+                condition=models.Q(batch__isnull=False) & models.Q(csv_row_number__isnull=False),
+                name="opening_stock_entry_batch_csv_row_uniq",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"OSE-{self.pk}:{self.inventory_item_id}:{self.status}"
 
 
 class PurchaseBill(InventoryTimeStampedModel):
@@ -649,6 +807,193 @@ class PurchaseBillLine(InventoryTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class PurchaseOrderStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    SENT = "SENT", "Sent"
+    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED", "Partially Received"
+    RECEIVED = "RECEIVED", "Received"
+    BILLED = "BILLED", "Billed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class GoodsReceiptStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    RECEIVED = "RECEIVED", "Received"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorBillStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorPaymentStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorContact(InventoryTimeStampedModel):
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="inventory_contacts",
+    )
+    name = models.CharField(max_length=120)
+    designation = models.CharField(max_length=80, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    is_primary = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "inventory_vendor_contacts"
+        ordering = ["vendor_id", "-is_primary", "name", "id"]
+        indexes = [models.Index(fields=["vendor", "is_primary", "is_active"])]
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.designation = (self.designation or "").strip()
+        self.phone = (self.phone or "").strip()
+        if self.is_primary:
+            self.__class__.objects.filter(vendor=self.vendor, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseOrder(InventoryTimeStampedModel):
+    po_no = models.CharField(max_length=60, unique=True, db_index=True)
+    po_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="purchase_orders")
+    status = models.CharField(max_length=20, choices=PurchaseOrderStatus.choices, default=PurchaseOrderStatus.DRAFT, db_index=True)
+    expected_date = models.DateField(null=True, blank=True)
+    branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_orders")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_orders")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_purchase_orders"
+        ordering = ["-po_date", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            existing = PurchaseOrder.objects.filter(pk=self.pk).only("status").first()
+            if existing and existing.status == PurchaseOrderStatus.CANCELLED and self.status != PurchaseOrderStatus.CANCELLED:
+                raise ValidationError({"status": "Cancelled purchase orders cannot be changed."})
+        self.po_no = (self.po_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.stock_location, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseOrderLine(InventoryTimeStampedModel):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="purchase_order_lines")
+    description = models.CharField(max_length=255, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "inventory_purchase_order_lines"
+        ordering = ["id"]
+
+    def save(self, *args, **kwargs):
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class GoodsReceipt(InventoryTimeStampedModel):
+    receipt_no = models.CharField(max_length=60, unique=True, db_index=True)
+    receipt_date = models.DateField(db_index=True)
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name="receipts")
+    status = models.CharField(max_length=12, choices=GoodsReceiptStatus.choices, default=GoodsReceiptStatus.DRAFT, db_index=True)
+    branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
+    notes = models.TextField(blank=True, default="")
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_goods_receipts")
+
+    class Meta:
+        db_table = "inventory_goods_receipts"
+        ordering = ["-receipt_date", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.receipt_no = (self.receipt_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.stock_location, "branch", None) or getattr(self.purchase_order, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class GoodsReceiptLine(InventoryTimeStampedModel):
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.CASCADE, related_name="lines")
+    purchase_order_line = models.ForeignKey(PurchaseOrderLine, on_delete=models.PROTECT, related_name="receipt_lines", null=True, blank=True)
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="goods_receipt_lines")
+    quantity_received = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_goods_receipt_lines"
+        ordering = ["id"]
+
+
+class VendorBill(InventoryTimeStampedModel):
+    bill_no = models.CharField(max_length=60, unique=True, db_index=True)
+    bill_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_bills")
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_bills")
+    status = models.CharField(max_length=12, choices=VendorBillStatus.choices, default=VendorBillStatus.DRAFT, db_index=True)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_bill")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_vendor_bills"
+        ordering = ["-bill_date", "-created_at", "-id"]
+
+
+class VendorBillLine(InventoryTimeStampedModel):
+    vendor_bill = models.ForeignKey(VendorBill, on_delete=models.CASCADE, related_name="lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="vendor_bill_lines")
+    description = models.CharField(max_length=255, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    taxable_value = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "inventory_vendor_bill_lines"
+        ordering = ["id"]
+
+
+class VendorPayment(InventoryTimeStampedModel):
+    payment_no = models.CharField(max_length=60, unique=True, db_index=True)
+    payment_date = models.DateField(db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_payments")
+    vendor_bill = models.ForeignKey(VendorBill, on_delete=models.PROTECT, related_name="payments", null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, related_name="vendor_payments")
+    status = models.CharField(max_length=12, choices=VendorPaymentStatus.choices, default=VendorPaymentStatus.DRAFT, db_index=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_payment")
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_vendor_payments"
+        ordering = ["-payment_date", "-created_at", "-id"]
+
 class InventoryValuation(InventoryTimeStampedModel):
     as_of_date = models.DateField(db_index=True)
     method = models.CharField(
@@ -678,3 +1023,274 @@ class InventoryValuation(InventoryTimeStampedModel):
             self.totals_json = {}
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class InternalStockMovementType(models.TextChoices):
+    IN = "IN", "In"
+    OUT = "OUT", "Out"
+    RESERVED = "RESERVED", "Reserved"
+    RELEASED = "RELEASED", "Released"
+    ADJUSTMENT = "ADJUSTMENT", "Adjustment"
+
+
+class StockReservationStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    RELEASED = "RELEASED", "Released"
+
+
+class PurchaseNeedStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    IN_REVIEW = "IN_REVIEW", "In Review"
+    ORDERED = "ORDERED", "Ordered"
+    PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED", "Partially Fulfilled"
+    RECEIVED = "RECEIVED", "Received"
+    FULFILLED = "FULFILLED", "Fulfilled"
+    CANCELLED = "CANCELLED", "Cancelled"
+    CLOSED = "CLOSED", "Closed"
+
+
+class Warehouse(InventoryTimeStampedModel):
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    stock_location = models.OneToOneField(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="warehouse_profile",
+        null=True,
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_warehouses"
+        ordering = ["name", "id"]
+        indexes = [models.Index(fields=["is_active", "code"])]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StockLedgerEntry(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_stock_ledger_entries",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="stock_ledger_entries",
+    )
+    movement_type = models.CharField(
+        max_length=20,
+        choices=InternalStockMovementType.choices,
+        db_index=True,
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_stock_ledger_entries",
+    )
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_stock_ledger_entries"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["product", "warehouse", "movement_type"]),
+            models.Index(fields=["source_module", "source_object_id"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.source_module = (self.source_module or "").strip()
+        self.source_object_id = (self.source_object_id or "").strip()
+        self.note = (self.note or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StockReservation(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="stock_reservations",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="stock_reservations",
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=StockReservationStatus.choices,
+        default=StockReservationStatus.ACTIVE,
+        db_index=True,
+    )
+    source_module = models.CharField(max_length=160, db_index=True)
+    source_object_id = models.CharField(max_length=120, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_stock_reservations",
+    )
+    released_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_stock_reservations"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["product", "warehouse", "status"]),
+            models.Index(fields=["source_module", "source_object_id"]),
+        ]
+
+
+class ReorderRule(InventoryTimeStampedModel):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_reorder_rules",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="inventory_reorder_rules",
+    )
+    min_stock_level = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    reorder_qty = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "inventory_reorder_rules"
+        ordering = ["product_id", "warehouse_id", "id"]
+        unique_together = (("product", "warehouse"),)
+
+
+class PurchaseNeed(InventoryTimeStampedModel):
+    class SourceModule(models.TextChoices):
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+        WINNER_DELIVERY = "WINNER_DELIVERY", "Winner Delivery"
+        SUBSCRIPTION_DEMAND = "SUBSCRIPTION_DEMAND", "Subscription Demand"
+        GENERAL = "GENERAL", "General"
+
+    class Priority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+        URGENT = "URGENT", "Urgent"
+
+    need_no = models.CharField(max_length=48, unique=True, editable=False, db_index=True)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+    )
+    product_name_snapshot = models.CharField(max_length=255, blank=True, default="")
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="purchase_needs",
+    )
+    required_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    available_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    shortage_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=QUANTITY_ZERO)
+    status = models.CharField(
+        max_length=30,
+        choices=PurchaseNeedStatus.choices,
+        default=PurchaseNeedStatus.OPEN,
+        db_index=True,
+    )
+    source_module = models.CharField(
+        max_length=32,
+        choices=SourceModule.choices,
+        default=SourceModule.GENERAL,
+        db_index=True,
+    )
+    source_object_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+        null=True,
+        blank=True,
+    )
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.PROTECT,
+        related_name="inventory_purchase_needs",
+        null=True,
+        blank=True,
+    )
+    priority = models.CharField(
+        max_length=12,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+    )
+    demand_snapshot = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_purchase_needs",
+    )
+    note = models.TextField(blank=True, default="")
+    fulfilled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if self.product_id and not (self.product_name_snapshot or "").strip():
+            name = Product.objects.filter(pk=self.product_id).values_list("name", flat=True).first()
+            self.product_name_snapshot = (name or "")[:255]
+        if not self.need_no:
+            self.need_no = f"SN-{secrets.token_hex(5).upper()}"
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = "inventory_purchase_needs"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["source_module", "status", "priority"]),
+        ]
+
+
+class InventoryAdjustment(InventoryTimeStampedModel):
+    stock_adjustment = models.OneToOneField(
+        StockAdjustment,
+        on_delete=models.PROTECT,
+        related_name="inventory_adjustment_audit",
+    )
+    audit_reason = models.TextField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_adjustment_audits",
+    )
+
+    class Meta:
+        db_table = "inventory_adjustments"
+        ordering = ["-created_at", "-id"]

@@ -18,12 +18,17 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import {
+  DataTableShell,
+  DetailPanel,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import TableToolbar from "@/components/ui/TableToolbar";
 import ActionButton from "@/components/ui/ActionButton";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
   importCustomers,
@@ -58,7 +63,14 @@ type CustomerRow = {
   user_id?: number | null;
   created_at?: string | null;
   active_subscription_count?: number;
+  historical_subscription_count?: number;
+  cancelled_subscription_count?: number;
   total_subscription_value?: string;
+  historical_contract_value?: string;
+  active_contract_value?: string;
+  active_subscription_due?: string;
+  active_direct_sale_outstanding?: string;
+  active_invoice_outstanding?: string;
 };
 
 function money(value: string | number | null | undefined): string {
@@ -171,9 +183,18 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
       toOptionalNumber(raw.active_subscription_count) ??
       toOptionalNumber(raw.subscription_count) ??
       0,
+    historical_subscription_count: toOptionalNumber(raw.historical_subscription_count) ?? 0,
+    cancelled_subscription_count: toOptionalNumber(raw.cancelled_subscription_count) ?? 0,
     total_subscription_value: toMoneyString(
       raw.total_subscription_value ?? raw.total_contract_value
     ),
+    historical_contract_value: toMoneyString(
+      raw.historical_contract_value ?? raw.total_subscription_value ?? raw.total_contract_value
+    ),
+    active_contract_value: toMoneyString(raw.active_contract_value),
+    active_subscription_due: toMoneyString(raw.active_subscription_due),
+    active_direct_sale_outstanding: toMoneyString(raw.active_direct_sale_outstanding),
+    active_invoice_outstanding: toMoneyString(raw.active_invoice_outstanding),
   };
 }
 
@@ -405,7 +426,7 @@ export default function AdminCustomersPage() {
   const totalContractValue = useMemo(
     () =>
       rows.reduce(
-        (sum, row) => sum + Number(row.total_subscription_value || 0),
+        (sum, row) => sum + Number(row.active_contract_value || 0),
         0
       ),
     [rows]
@@ -438,6 +459,12 @@ export default function AdminCustomersPage() {
         kyc_status: row.kyc_status,
         status: row.status,
         active_subscription_count: row.active_subscription_count ?? 0,
+        active_contract_value: row.active_contract_value ?? "0.00",
+        active_subscription_due: row.active_subscription_due ?? "0.00",
+        active_direct_sale_outstanding: row.active_direct_sale_outstanding ?? "0.00",
+        active_invoice_outstanding: row.active_invoice_outstanding ?? "0.00",
+        historical_subscription_count: row.historical_subscription_count ?? 0,
+        cancelled_subscription_count: row.cancelled_subscription_count ?? 0,
         total_subscription_value: row.total_subscription_value ?? "0.00",
         created_at: row.created_at ?? "",
       })),
@@ -452,7 +479,13 @@ export default function AdminCustomersPage() {
         sortable: true,
         render: (row) => (
           <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.name}</div>
+            <div className="font-medium text-foreground">
+              <CustomerIntelligenceTrigger
+                customerId={row.id}
+                customerName={row.name}
+                scope="admin"
+              />
+            </div>
             <div className="text-xs text-muted-foreground">Customer #{row.id}</div>
           </div>
         ),
@@ -492,7 +525,26 @@ export default function AdminCustomersPage() {
               {row.active_subscription_count ?? 0} active
             </div>
             <div className="text-xs text-muted-foreground">
-              {money(row.total_subscription_value)}
+              Active contract {money(row.active_contract_value)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Active due {money(row.active_subscription_due)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Direct due {money(row.active_direct_sale_outstanding)} · Invoice due {money(row.active_invoice_outstanding)}
+            </div>
+            {(row.cancelled_subscription_count || 0) > 0 ? (
+              <div className="text-xs text-amber-700">
+                {row.cancelled_subscription_count} cancelled contract(s) in history
+              </div>
+            ) : null}
+            {(row.historical_subscription_count || 0) > 0 && (row.cancelled_subscription_count || 0) === 0 ? (
+              <div className="text-xs text-muted-foreground">
+                {row.historical_subscription_count} historical contract(s)
+              </div>
+            ) : null}
+            <div className="text-xs text-muted-foreground">
+              Historical contract (deduped) {money(row.historical_contract_value ?? "0.00")}
             </div>
           </div>
         ),
@@ -521,8 +573,8 @@ export default function AdminCustomersPage() {
       ]}
       actions={[
         { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
-        { href: ROUTES.admin.subscriptionsCreate, label: "Create Subscription", variant: "secondary" },
-        { href: ROUTES.admin.paymentsCreate, label: "Collect Payment", variant: "secondary" },
+        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create Subscription", variant: "secondary" },
+        { href: ROUTES.admin.financeCollect, label: "Collect Payment", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
       ]}
@@ -549,14 +601,14 @@ export default function AdminCustomersPage() {
             {
               title: "Create subscription",
               description: "Route a verified customer into the canonical subscription-sale workflow.",
-              href: ROUTES.admin.subscriptionsCreate,
+              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
               icon: <RefreshCw className="h-4 w-4" />,
               badge: "Sale",
             },
             {
               title: "Collect payment",
               description: "Open the admin payment workflow without blending collection into profile edits.",
-              href: ROUTES.admin.paymentsCreate,
+              href: ROUTES.admin.financeCollect,
               icon: <RefreshCw className="h-4 w-4" />,
               badge: "Payment",
             },
@@ -583,81 +635,82 @@ export default function AdminCustomersPage() {
             },
           ]}
         />
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Visible Customers"
+        <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            label="Visible customers"
             value={rows.length}
-            icon={<Users className="h-4 w-4" />}
+            helper="Rows matching the current filter set"
           />
-          <StatCard
-            label="Active Customers"
+          <KpiCard
+            label="Active customers"
             value={activeCustomers}
-            icon={<Users className="h-4 w-4" />}
-            tone="success"
+            helper="Account status ACTIVE in this view"
           />
-          <StatCard
+          <KpiCard
             label="Pending KYC"
             value={pendingKyc}
-            icon={<ShieldCheck className="h-4 w-4" />}
-            tone={pendingKyc > 0 ? "warning" : "default"}
+            helper={pendingKyc > 0 ? "Needs compliance follow-up" : "No pending KYC in view"}
           />
-          <StatCard
-            label="Visible Contract Value"
+          <KpiCard
+            label="Visible contract value"
             value={money(totalContractValue)}
-            icon={<Users className="h-4 w-4" />}
-            tone="info"
+            helper="Sum of total_subscription_value for visible rows"
           />
-        </div>
+        </QuickActionGrid>
 
-        <WorkspaceSection
+        <DetailPanel
           title="Customer workflow"
           description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <ActionButton
-                variant="outline"
-                onClick={() => void loadPage("refresh")}
-                disabled={refreshing || loading}
-                leftIcon={<RefreshCw className="h-4 w-4" />}
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                onClick={() => openWorkflow("admin.createCustomer")}
-                leftIcon={<UserPlus className="h-4 w-4" />}
-              >
-                Quick Create Customer
-              </ActionButton>
-              <ActionButton
-                variant="primary"
-                disabled={exportRows.length === 0 || loading}
-                onClick={() =>
-                  downloadCsv(
-                    "customer-register-current-view.csv",
-                    [
-                      { key: "id", header: "id" },
-                      { key: "name", header: "name" },
-                      { key: "phone", header: "phone" },
-                      { key: "email", header: "email" },
-                      { key: "city", header: "city" },
-                      { key: "address", header: "address" },
-                      { key: "kyc_status", header: "kyc_status" },
-                      { key: "status", header: "status" },
-                      { key: "active_subscription_count", header: "active_subscription_count" },
-                      { key: "total_subscription_value", header: "total_subscription_value" },
-                      { key: "created_at", header: "created_at" },
-                    ],
-                    exportRows
-                  )
-                }
-                leftIcon={<Download className="h-4 w-4" />}
-              >
-                Export Current View
-              </ActionButton>
-            </div>
-          }
         >
+          <div className="mb-4 flex flex-wrap gap-2">
+            <ActionButton
+              variant="outline"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              leftIcon={<RefreshCw className="h-4 w-4" />}
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
+              onClick={() => openWorkflow("admin.createCustomer")}
+              leftIcon={<UserPlus className="h-4 w-4" />}
+            >
+              Quick Create Customer
+            </ActionButton>
+            <ActionButton
+              variant="primary"
+              disabled={exportRows.length === 0 || loading}
+              onClick={() =>
+                downloadCsv(
+                  "customer-register-current-view.csv",
+                  [
+                    { key: "id", header: "id" },
+                    { key: "name", header: "name" },
+                    { key: "phone", header: "phone" },
+                    { key: "email", header: "email" },
+                    { key: "city", header: "city" },
+                    { key: "address", header: "address" },
+                    { key: "kyc_status", header: "kyc_status" },
+                    { key: "status", header: "status" },
+                    { key: "active_subscription_count", header: "active_subscription_count" },
+                    { key: "active_contract_value", header: "active_contract_value" },
+                    { key: "active_subscription_due", header: "active_subscription_due" },
+                    { key: "active_direct_sale_outstanding", header: "active_direct_sale_outstanding" },
+                    { key: "active_invoice_outstanding", header: "active_invoice_outstanding" },
+                    { key: "historical_subscription_count", header: "historical_subscription_count" },
+                    { key: "cancelled_subscription_count", header: "cancelled_subscription_count" },
+                    { key: "total_subscription_value", header: "total_subscription_value" },
+                    { key: "created_at", header: "created_at" },
+                  ],
+                  exportRows
+                )
+              }
+              leftIcon={<Download className="h-4 w-4" />}
+            >
+              Export Current View
+            </ActionButton>
+          </div>
           <TableToolbar
             title="Search and filter"
             description="Use query, KYC, and account-state filters to narrow high-volume customer rows for collection and onboarding operations."
@@ -733,9 +786,9 @@ export default function AdminCustomersPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
-        <WorkspaceSection
+        <DetailPanel
           title="Customer CSV onboarding"
           description="Preview and confirm the existing backend customer import flow from the admin workspace. Confirm import is intentionally gated behind a clean preview."
         >
@@ -841,41 +894,37 @@ export default function AdminCustomersPage() {
 
               {customerImportPreviewState ? (
                 <div className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
+                  <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
+                    <KpiCard
                       label="Columns"
                       value={customerImportPreviewState.columns.length}
+                      helper="Detected from CSV header"
                     />
-                    <StatCard
-                      label="Valid Rows"
+                    <KpiCard
+                      label="Valid rows"
                       value={customerImportPreviewState.valid_count}
-                      tone="success"
+                      helper="Rows passing preview validation"
                     />
-                    <StatCard
-                      label="Invalid Rows"
+                    <KpiCard
+                      label="Invalid rows"
                       value={customerImportPreviewState.invalid_count}
-                      tone={
+                      helper={
                         customerImportPreviewState.invalid_count > 0
-                          ? "warning"
-                          : "default"
+                          ? "Fix before confirm import"
+                          : "None"
                       }
                     />
-                    <StatCard
-                      label="Confirm Ready"
+                    <KpiCard
+                      label="Confirm ready"
                       value={
                         customerImportPreviewState.invalid_count === 0 &&
                         customerImportPreviewState.valid_count > 0
                           ? "Yes"
                           : "No"
                       }
-                      tone={
-                        customerImportPreviewState.invalid_count === 0 &&
-                        customerImportPreviewState.valid_count > 0
-                          ? "success"
-                          : "warning"
-                      }
+                      helper="Requires valid rows and zero invalid"
                     />
-                  </div>
+                  </QuickActionGrid>
 
                   <div className="text-xs text-muted-foreground">
                     Detected columns:{" "}
@@ -1028,7 +1077,7 @@ export default function AdminCustomersPage() {
               ) : null}
             </div>
           </div>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading customer register..." /> : null}
 
@@ -1041,7 +1090,7 @@ export default function AdminCustomersPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Customer rows"
             description="Open the customer detail page for KYC decisions, subscription context, and recent payment visibility."
           >
@@ -1060,41 +1109,48 @@ export default function AdminCustomersPage() {
                 }
               />
             ) : (
-              <DataTable<CustomerRow>
-                rows={rows}
-                columns={columns}
-                pageSize={12}
-                rowActions={(row) => (
-                  <div className="flex flex-col items-end gap-2">
-                    <Link
-                      href={`/admin/customers/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
-                    >
-                      Open Customer
-                    </Link>
-                    <Link
-                      href={`/admin/customers/${row.id}/edit`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Edit
-                    </Link>
-                    <Link
-                      href={`/admin/subscriptions?customer=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Subscriptions
-                    </Link>
-                    <Link
-                      href={`/admin/payments?customer=${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Payments
-                    </Link>
-                  </div>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<CustomerRow>
+                  rows={rows}
+                  columns={columns}
+                  pageSize={12}
+                  rowActions={(row) => (
+                    <div className="flex flex-col items-end gap-2">
+                      <Link
+                        href={`/admin/customers/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
+                      >
+                        Open Customer
+                      </Link>
+                      <Link
+                        href={`/admin/customers/${row.id}/edit`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Edit
+                      </Link>
+                      <Link
+                        href={`/admin/subscriptions?customer=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Subscriptions
+                      </Link>
+                      <Link
+                        href={`/admin/payments?customer=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        {(Number(row.active_subscription_count || 0) > 0 ||
+                          Number(row.active_subscription_due || 0) > 0 ||
+                          Number(row.active_direct_sale_outstanding || 0) > 0 ||
+                          Number(row.active_invoice_outstanding || 0) > 0)
+                          ? "Payments"
+                          : "Payment History"}
+                      </Link>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { normalizeApiError } from "@/services/api/errors";
 import {
   collectDirectSalePayment,
   getDirectSale,
-  listDirectSales,
   type DirectSale,
   type DirectSaleCollectionResponse,
 } from "@/services/billing";
@@ -27,6 +28,8 @@ import {
   listFinanceAccounts,
   type FinanceAccount,
 } from "@/services/accounting";
+import { invalidateAfterDirectSaleCollect } from "@/lib/operational-query-invalidation";
+import { searchAdminReceivables, type UnifiedReceivableResult } from "@/services/receivables";
 
 const FIELD_CLASS_NAME =
   "w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2.5 text-sm text-foreground outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35";
@@ -35,12 +38,16 @@ const READ_ONLY_FIELD_CLASS_NAME =
 
 type FormState = {
   amount: string;
+  receipt_date: string;
+  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
   branch_id: string;
   cash_counter_id: string;
   finance_account_id: string;
   reference_no: string;
   notes: string;
 };
+
+const PAYMENT_METHOD_OPTIONS: FormState["payment_method"][] = ["CASH", "UPI", "BANK", "CARD"];
 
 function formatMoney(value?: string | number | null): string {
   const numeric = Number(value ?? 0);
@@ -66,6 +73,8 @@ function formatDateLabel(value?: string | null): string {
 function buildDefaultForm(sale: DirectSale | null): FormState {
   return {
     amount: sale?.balance_total || "",
+    receipt_date: new Date().toISOString().slice(0, 10),
+    payment_method: "CASH",
     branch_id: sale?.branch ? String(sale.branch) : "",
     cash_counter_id: sale?.cash_counter ? String(sale.cash_counter) : "",
     finance_account_id: sale?.finance_account ? String(sale.finance_account) : "",
@@ -78,13 +87,16 @@ export default function AdminDirectSaleCollectForm({
   variant = "page",
   canonicalSelfHref,
   prefillDirectSaleId,
+  onCollected,
 }: {
   variant?: "page" | "drawer";
   canonicalSelfHref: string;
   prefillDirectSaleId?: number | null;
+  onCollected?: () => void | Promise<void>;
 }) {
+  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
-  const [searchResults, setSearchResults] = useState<DirectSale[]>([]);
+  const [searchResults, setSearchResults] = useState<UnifiedReceivableResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedSale, setSelectedSale] = useState<DirectSale | null>(null);
@@ -106,7 +118,7 @@ export default function AdminDirectSaleCollectForm({
         const [branchPayload, counterPayload, financePayload] = await Promise.all([
           listBranches({ status: "ACTIVE" }),
           listCashCounters({ is_active: "true" }),
-          listFinanceAccounts({ is_active: "true" }),
+          listFinanceAccounts({ is_active: "true", for_payment_collection: "true" }),
         ]);
         if (!active) return;
         setBranches(branchPayload.results);
@@ -148,18 +160,17 @@ export default function AdminDirectSaleCollectForm({
       try {
         setSearching(true);
         setSearchError(null);
-        const payload = await listDirectSales({
-          search: trimmed,
-          outstanding_only: "true",
-        });
+        const payload = await searchAdminReceivables(trimmed);
         if (!active) return;
-        setSearchResults(payload.results);
+        setSearchResults(
+          payload.results.filter((row) => row.source_type === "DIRECT_SALE")
+        );
       } catch (error) {
         if (!active) return;
         setSearchResults([]);
         setSearchError(
           normalizeApiError(error).message ||
-            "Unable to search outstanding direct sales."
+            "Unable to search direct-sale receivables."
         );
       } finally {
         if (active) {
@@ -186,12 +197,61 @@ export default function AdminDirectSaleCollectForm({
   }, [counters, form.branch_id]);
 
   const availableFinanceAccounts = useMemo(() => {
-    if (!form.branch_id) return financeAccounts;
-    return financeAccounts.filter((account) => {
+    const methodFiltered = financeAccounts.filter((account) => {
+      if (form.payment_method === "CARD") return account.kind === "BANK";
+      return account.kind === form.payment_method;
+    });
+    if (!form.branch_id) return methodFiltered;
+    return methodFiltered.filter((account) => {
       if (account.branch == null) return true;
       return String(account.branch) === form.branch_id;
     });
-  }, [financeAccounts, form.branch_id]);
+  }, [financeAccounts, form.branch_id, form.payment_method]);
+
+  useEffect(() => {
+    if (
+      form.finance_account_id &&
+      availableFinanceAccounts.some((account) => String(account.id) === form.finance_account_id)
+    ) {
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      finance_account_id: availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "",
+    }));
+  }, [availableFinanceAccounts, form.finance_account_id]);
+
+  const selectedSaleState = useMemo(() => {
+    if (!selectedSale) {
+      return {
+        isDraft: false,
+        isPaid: false,
+        isCollectible: false,
+        reason: "",
+      };
+    }
+    const balance = Number(selectedSale.balance_total || 0);
+    const invoiceStatus = String(selectedSale.billing_invoice_status || "").toUpperCase();
+    const status = String(selectedSale.status || "").toUpperCase();
+    const isDraft = status === "DRAFT" || !selectedSale.billing_invoice_id;
+    const isPaid = balance <= 0;
+    const isCollectible =
+      !isDraft &&
+      !isPaid &&
+      status === "INVOICED" &&
+      invoiceStatus === "POSTED";
+    let reason = "";
+    if (isDraft) {
+      reason = "Invoice/post this sale before collecting receivable.";
+    } else if (isPaid) {
+      reason = "Direct sale is fully paid.";
+    } else if (status !== "INVOICED") {
+      reason = "Only invoiced direct sales can accept later collections.";
+    } else if (invoiceStatus !== "POSTED") {
+      reason = "Direct-sale collections require a posted retail invoice.";
+    }
+    return { isDraft, isPaid, isCollectible, reason };
+  }, [selectedSale]);
 
   const handleSalePick = useCallback(async (saleId: number) => {
     setLoadingSale(true);
@@ -245,11 +305,20 @@ export default function AdminDirectSaleCollectForm({
     if (!Number.isFinite(amount) || amount <= 0) {
       return "Collection amount must be greater than zero.";
     }
+    if (!selectedSaleState.isCollectible) {
+      return selectedSaleState.reason || "This direct sale is not currently collectible.";
+    }
     if (amount > Number(selectedSale.balance_total || 0)) {
       return "Collection amount cannot exceed the outstanding direct-sale balance.";
     }
+    if (!form.receipt_date.trim()) {
+      return "Receipt date is required.";
+    }
     if (!form.finance_account_id) {
       return "Select a finance account or cash counter before posting collection.";
+    }
+    if (form.payment_method !== "CASH" && !form.reference_no.trim()) {
+      return "Reference number is required for UPI, bank, or card direct-sale collections.";
     }
     if (form.reference_no.trim().length > 100) {
       return "Reference number must be within 100 characters.";
@@ -258,6 +327,7 @@ export default function AdminDirectSaleCollectForm({
   }
 
   async function submitCollection() {
+    if (submitting) return;
     setErrorMessage(null);
     setSuccess(null);
 
@@ -272,6 +342,7 @@ export default function AdminDirectSaleCollectForm({
     try {
       const response = await collectDirectSalePayment(selectedSale.id, {
         amount: Number(form.amount).toFixed(2),
+        receipt_date: form.receipt_date,
         branch_id: form.branch_id ? Number(form.branch_id) : undefined,
         cash_counter_id: form.cash_counter_id ? Number(form.cash_counter_id) : undefined,
         finance_account_id: form.finance_account_id
@@ -281,6 +352,10 @@ export default function AdminDirectSaleCollectForm({
         notes: form.notes.trim() || undefined,
       });
       setSuccess(response);
+      await invalidateAfterDirectSaleCollect(queryClient);
+      if (onCollected) {
+        await onCollected();
+      }
       setSelectedSale(response.direct_sale);
       setForm((current) => ({
         ...current,
@@ -317,7 +392,8 @@ export default function AdminDirectSaleCollectForm({
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               className={FIELD_CLASS_NAME}
-              placeholder="Search by sale no, customer name, or phone"
+              placeholder="Sale number, customer name, phone, or invoice reference"
+              aria-describedby="admin-direct-sale-search-hint"
             />
           </div>
 
@@ -338,8 +414,11 @@ export default function AdminDirectSaleCollectForm({
           </ActionButton>
         </div>
 
-        <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
-          Use direct-sale collection only for invoiced retail bills with outstanding balance. Subscription EMI, rent, and lease collections stay in the subscription workflow.
+        <div
+          id="admin-direct-sale-search-hint"
+          className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground"
+        >
+          Search accepts sale number, customer name, phone, or invoice reference. Use direct-sale collection only for invoiced retail bills with outstanding balance. Subscription EMI, rent, and lease collections stay in the subscription workflow.
         </div>
 
         {searching ? <div className="mt-4 text-sm text-muted-foreground">Searching outstanding direct sales...</div> : null}
@@ -353,47 +432,90 @@ export default function AdminDirectSaleCollectForm({
           <div className="mt-4 space-y-3">
             {searchResults.length === 0 ? (
               <EmptyState
-                title="No outstanding direct sales"
-                description={`No invoiced direct-sale receivables matched "${searchInput.trim()}".`}
+                title="No direct-sale results"
+                description={`No direct-sale references matched "${searchInput.trim()}".`}
               />
             ) : (
-              searchResults.map((sale) => (
-                <button
-                  key={sale.id}
-                  type="button"
-                  onClick={() => void handleSalePick(sale.id)}
-                  className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left shadow-sm transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              ([
+                ["Collectible receivables", searchResults.filter((row) => row.primary_action === "COLLECT_DIRECT_SALE")],
+                ["Draft sales requiring invoice", searchResults.filter((row) => row.primary_action === "OPEN_SALE")],
+                ["Paid/closed sales", searchResults.filter((row) => row.primary_action === "VIEW_RECEIPTS")],
+              ] as const).map(([groupLabel, groupRows]) =>
+                groupRows.length ? (
+                  <div key={groupLabel} className="space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground">{groupLabel}</h3>
+                    {groupRows.map((row) => (
+                <div
+                  key={`${row.source_type}-${row.source_id ?? row.reference_no}`}
+                  className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left shadow-sm"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-foreground">
-                        {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                        {row.display_reference || row.reference_no} ·{" "}
+                        <CustomerIntelligenceTrigger
+                          customerId={
+                            typeof row.customer_id === "number" ? row.customer_id : null
+                          }
+                          customerName={row.customer_name || "Walk-in customer"}
+                          scope="admin"
+                        />
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
-                        {sale.customer_phone_snapshot || "No phone"} · Invoice {sale.billing_invoice_no || "draft mirror"}
+                        {row.phone_masked || "No phone"} · Status {row.status || "UNKNOWN"}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Sale date {formatDateLabel(sale.sale_date)} · {sale.branch_name || sale.branch_code || "Primary branch"}
+                        {row.reason_if_not_collectible || row.disabled_reason || "Direct-sale receivable"}
                       </div>
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-3">
                       <div className="rounded-xl border border-border bg-background px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grand Total</div>
-                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(sale.grand_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(row.total_amount)}</div>
                       </div>
                       <div className="rounded-xl border border-border bg-background px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
-                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(sale.received_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">{formatMoney(row.paid_amount)}</div>
                       </div>
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
-                        <div className="mt-1 text-sm font-semibold text-amber-900">{formatMoney(sale.balance_total)}</div>
+                        <div className="mt-1 text-sm font-semibold text-amber-900">{formatMoney(row.due_amount)}</div>
                       </div>
                     </div>
                   </div>
-                </button>
-              ))
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {row.primary_action === "COLLECT_DIRECT_SALE" && row.source_id ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleSalePick(row.source_id as number)}
+                        className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                      >
+                        Collect direct-sale balance
+                      </button>
+                    ) : null}
+                    {row.primary_action === "OPEN_SALE" && row.collection_route ? (
+                      <Link
+                        href={row.collection_route}
+                        className="inline-flex items-center rounded-md border border-orange-700 bg-orange-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+                      >
+                        Open sale
+                      </Link>
+                    ) : null}
+                    {row.primary_action === "VIEW_RECEIPTS" && row.collection_route ? (
+                      <Link
+                        href={row.collection_route}
+                        className="inline-flex items-center rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-600"
+                      >
+                        View receipts
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+                    ))}
+                  </div>
+                ) : null
+              )
             )}
           </div>
         ) : null}
@@ -413,7 +535,13 @@ export default function AdminDirectSaleCollectForm({
             </div>
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</div>
-              <div className="mt-1 text-base font-semibold text-foreground">{selectedSale.customer_name || selectedSale.customer_name_snapshot || "Walk-in customer"}</div>
+              <div className="mt-1 text-base font-semibold text-foreground">
+                <CustomerIntelligenceTrigger
+                  customerId={selectedSale.customer ?? null}
+                  customerName={selectedSale.customer_name || selectedSale.customer_name_snapshot || "Walk-in customer"}
+                  scope="admin"
+                />
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invoice</div>
@@ -425,6 +553,32 @@ export default function AdminDirectSaleCollectForm({
             </div>
           </div>
 
+          {!selectedSaleState.isCollectible ? (
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <div className="font-semibold">
+                {selectedSaleState.isPaid ? "Direct sale is fully paid." : selectedSaleState.reason}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedSaleState.isDraft ? (
+                  <Link
+                    href={`/admin/billing/direct-sales?focus_sale=${selectedSale.id}`}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-700 px-4 text-sm font-semibold text-white transition hover:bg-orange-800"
+                  >
+                    Open sale / finalize invoice
+                  </Link>
+                ) : null}
+                {selectedSaleState.isPaid ? (
+                  <Link
+                    href={`/admin/billing/receipts?direct_sale=${selectedSale.id}`}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-700 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    View receipt / invoice
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+          <>
           <form
             className="mt-6 grid gap-4 md:grid-cols-2"
             onSubmit={(event) => {
@@ -442,6 +596,33 @@ export default function AdminDirectSaleCollectForm({
                 onChange={(event) => updateField("amount", event.target.value)}
                 className={FIELD_CLASS_NAME}
               />
+            </label>
+
+            <label className="text-sm text-muted-foreground">
+              Receipt date
+              <input
+                name="receipt_date"
+                type="date"
+                value={form.receipt_date}
+                onChange={(event) => updateField("receipt_date", event.target.value)}
+                className={FIELD_CLASS_NAME}
+              />
+            </label>
+
+            <label className="text-sm text-muted-foreground">
+              Payment method
+              <select
+                name="payment_method"
+                value={form.payment_method}
+                onChange={(event) => updateField("payment_method", event.target.value as FormState["payment_method"])}
+                className={FIELD_CLASS_NAME}
+              >
+                {PAYMENT_METHOD_OPTIONS.map((method) => (
+                  <option key={method} value={method}>
+                    {method === "BANK" ? "Bank Transfer" : method}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="text-sm text-muted-foreground">
@@ -500,7 +681,7 @@ export default function AdminDirectSaleCollectForm({
             </label>
 
             <label className="text-sm text-muted-foreground">
-              Reference no.
+              Reference no.{form.payment_method !== "CASH" ? " *" : ""}
               <input
                 name="reference_no"
                 value={form.reference_no}
@@ -540,6 +721,8 @@ export default function AdminDirectSaleCollectForm({
               />
             </label>
           </form>
+          </>
+          )}
 
           {errorMessage ? (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -590,14 +773,16 @@ export default function AdminDirectSaleCollectForm({
           ) : null}
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <ConfirmActionButton
-              label={submitting ? "Posting..." : "Post Direct-Sale Collection"}
-              title={`Post collection for ${selectedSale.sale_no || `SALE-${selectedSale.id}`}?`}
-              description="This creates a retail receipt and updates the posted direct-sale receivable using the existing accounting-safe receipt workflow."
-              onConfirm={() => void submitCollection()}
-              variant="primary"
-              disabled={submitting}
-            />
+            {selectedSaleState.isCollectible ? (
+              <ConfirmActionButton
+                label={submitting ? "Posting..." : "Post Direct-Sale Collection"}
+                title={`Post collection for ${selectedSale.sale_no || `SALE-${selectedSale.id}`}?`}
+                description="This creates a retail receipt and updates the posted direct-sale receivable using the existing accounting-safe receipt workflow."
+                onConfirm={() => void submitCollection()}
+                variant="primary"
+                disabled={submitting}
+              />
+            ) : null}
             <Link
               href={`/admin/billing/direct-sales?focus_sale=${selectedSale.id}`}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted"

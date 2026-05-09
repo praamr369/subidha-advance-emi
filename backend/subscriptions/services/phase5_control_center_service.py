@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from accounting.models import FinanceAccount, FinanceAccountCoaMapping
+from accounting.services.control_validation_service import validate_financial_period_balance
 
 from subscriptions.models import (
     Commission,
@@ -22,6 +24,7 @@ from subscriptions.models import (
     RentLeaseReturnInspection,
     Subscription,
     SubscriptionStatus,
+    OperationalCancellation,
 )
 from subscriptions.services.phase5_chart_service import build_chart_payload
 from subscriptions.services.phase5_filter_service import AdminReportFilter
@@ -102,6 +105,8 @@ def _apply_common_payment_filters(qs, flt: AdminReportFilter):
         qs = qs.filter(subscription__product_id=flt.product_id)
     if flt.branch_id:
         qs = qs.filter(branch_id=flt.branch_id)
+    if flt.collected_by_id:
+        qs = qs.filter(collected_by_id=flt.collected_by_id)
     return qs
 
 
@@ -164,6 +169,31 @@ def build_admin_accounting_control_center(*, flt: Phase5Filter) -> dict:
         deposit_refund_approved=False,
         deposit_refund_amount__gt=Decimal("0.00"),
     ).count()
+    reversal_rows = OperationalCancellation.objects.filter(source_type__in=[
+        OperationalCancellation.SourceType.DIRECT_SALE,
+        OperationalCancellation.SourceType.BILLING_INVOICE,
+        OperationalCancellation.SourceType.BILLING_RECEIPT,
+        OperationalCancellation.SourceType.SUBSCRIPTION,
+        OperationalCancellation.SourceType.EMI_PAYMENT,
+        OperationalCancellation.SourceType.DELIVERY,
+    ])
+    open_reversal_cases = sum(
+        1
+        for row in reversal_rows
+        if str((row.metadata or {}).get("workflow_status") or "").upper() in {"DRAFT", "NEEDS_REVIEW", "APPROVED"}
+    )
+    customer_credit_open = sum(
+        1
+        for row in reversal_rows
+        if Decimal(str((row.metadata or {}).get("customer_credit_amount") or "0.00")) > Decimal("0.00")
+        and str((row.metadata or {}).get("reconciliation_status") or "").upper() != "FULLY_RECONCILED"
+    )
+    stock_return_pending = sum(
+        1
+        for row in reversal_rows
+        if bool((row.metadata or {}).get("stock_return_required"))
+        and str((row.metadata or {}).get("reconciliation_status") or "").upper() != "FULLY_RECONCILED"
+    )
     kpis = {
         "today_collection": finance["cards"]["today_total_collection"],
         "month_to_date_collection": _money(mtd_total),
@@ -187,13 +217,28 @@ def build_admin_accounting_control_center(*, flt: Phase5Filter) -> dict:
         "partner_payout_pending": _money(
             CommissionPayoutBatch.objects.filter(status=CommissionPayoutBatch.Status.DRAFT).aggregate(total=Sum("total_amount"))["total"]
         ),
+        "reversal_cases_open": str(open_reversal_cases),
+        "customer_credits_open": str(customer_credit_open),
+        "refunds_pending": str(refunds_pending),
+        "product_returns_pending_inspection": str(stock_return_pending),
     }
+    validation = validate_financial_period_balance(date_from=flt.date_from, date_to=flt.date_to)
+    kpis["unbalanced_journal_warnings"] = str(validation["unbalanced_group_count"])
+    kpis["unmapped_account_warnings"] = str(
+        max(
+            FinanceAccount.objects.filter(is_active=True).count()
+            - FinanceAccountCoaMapping.objects.filter(is_active=True).values("finance_account_id").distinct().count(),
+            0,
+        )
+    )
     kpi_cards = [
         _kpi_card(label="Today Collection", value=kpis["today_collection"], source="Payment", detail_url="/admin/reports/collections", flt=flt),
         _kpi_card(label="Overdue Receivables", value=kpis["overdue_receivables"], source="Emi", detail_url="/admin/reports/overdue", flt=flt, severity="HIGH"),
         _kpi_card(label="Unreconciled Payments", value=kpis["unreconciled_payments"], source="PaymentReconciliation", detail_url="/admin/accounting/reconciliation", flt=flt, severity="CRITICAL" if int(kpis["unreconciled_payments"]) > 0 else "INFO"),
         _kpi_card(label="Deposit Liability", value=kpis["rent_lease_deposit_liability"], source="RentLeaseBillingDemand", detail_url="/admin/finance/deposits", flt=flt),
         _kpi_card(label="Waiver/Loss Exposure", value=kpis["waiver_loss_exposure"], source="Emi", detail_url="/admin/reports/waiver-loss", flt=flt),
+        _kpi_card(label="Reversal Cases Open", value=kpis["reversal_cases_open"], source="OperationalCancellation", detail_url="/admin/finance/reversal-control", flt=flt, severity="HIGH" if int(kpis["reversal_cases_open"]) > 0 else "INFO"),
+        _kpi_card(label="Customer Credits Open", value=kpis["customer_credits_open"], source="OperationalCancellation", detail_url="/admin/finance/reversal-control", flt=flt, severity="HIGH" if int(kpis["customer_credits_open"]) > 0 else "INFO"),
     ]
     return {
         "kpis": kpis,

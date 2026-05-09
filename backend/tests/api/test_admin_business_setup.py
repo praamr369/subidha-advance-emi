@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
 from branch_control.models import Branch, BranchStatus, CashCounter
 from subscriptions.models_business_setup import BusinessProfile
 from tests.helpers import create_admin_user, create_product, create_user
@@ -85,6 +85,16 @@ class AdminBusinessSetupApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/business-setup/checklist/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_ready_for_go_live"])
+        counts = response.data["counts"]
+        self.assertIn("total_chart_accounts", counts)
+        self.assertIn("active_chart_accounts", counts)
+        self.assertIn("active_root_chart_accounts", counts)
+        self.assertIn("active_child_chart_accounts", counts)
+        self.assertIn("active_system_chart_accounts", counts)
+        self.assertIn("active_custom_chart_accounts", counts)
+        self.assertIn("visible_register_count", counts)
+        self.assertIn("inactive_chart_accounts", counts)
+        self.assertIn("chart_active_equity", counts)
 
     def test_reset_preview_is_read_only(self):
         self.client.force_authenticate(self.admin)
@@ -95,7 +105,7 @@ class AdminBusinessSetupApiTests(APITestCase):
     def test_reset_execute_requires_preserved_admin_username(self):
         self.client.force_authenticate(self.admin)
         payload = {
-            "confirm": "RESET_SUBIDHA_CORE",
+            "confirm": True,
             "preserve_username": "some_other_admin",
             "delete_non_preserved_users": True,
             "clear_auth_artifacts": True,
@@ -103,3 +113,30 @@ class AdminBusinessSetupApiTests(APITestCase):
         }
         response = self.client.post("/api/v1/admin/business-setup/reset/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_document_numbering_endpoint_returns_readiness_payload(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/admin/business-setup/document-numbering/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("sequences", response.data)
+        keys = {row["key"] for row in response.data["sequences"]}
+        self.assertIn("BILLING_INVOICE", keys)
+        self.assertIn("BILLING_RECEIPT", keys)
+        self.assertIn("DIRECT_SALE_INVOICE", keys)
+
+    def test_document_numbering_patch_rejects_lower_next_number(self):
+        self.client.force_authenticate(self.admin)
+        DocumentSequence.objects.create(
+            series_code="BILL_RCT",
+            financial_year="2026-27",
+            prefix="RCT-2026-27",
+            next_number=9,
+            padding=5,
+            is_active=True,
+        )
+        response = self.client.patch(
+            "/api/v1/admin/business-setup/document-numbering/",
+            {"key": "BILLING_RECEIPT", "next_number": 0},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

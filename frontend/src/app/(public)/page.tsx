@@ -3,14 +3,14 @@ import Link from "next/link";
 
 import BrandLockup from "@/components/public/BrandLockup";
 import CtaBanner from "@/components/public/CtaBanner";
+import HomeFeaturedProductsShowcase from "@/components/public/HomeFeaturedProductsShowcase";
 import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import SectionHeader from "@/components/public/SectionHeader";
 import TrustStrip from "@/components/public/TrustStrip";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
 import { brandConfig } from "@/config/brand";
-import { formatCurrency } from "@/lib/format";
-import { getText, publicContent } from "@/lib/public-i18n";
+import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
@@ -23,15 +23,6 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/",
 });
 
-function buildApplyHref(product: { id: number; name: string; product_code: string; base_price: string }) {
-  const params = new URLSearchParams();
-  params.set("product", String(product.id));
-  params.set("product_name", product.name);
-  params.set("product_code", product.product_code);
-  params.set("price", product.base_price);
-  return `${ROUTES.public.apply}?${params.toString()}`;
-}
-
 export default async function PublicHome() {
   const language = await getPublicLanguage();
   const profile = await getResolvedPublicBusinessProfile();
@@ -43,6 +34,7 @@ export default async function PublicHome() {
 
   const heroTitle = getText(publicContent.homeHero.title, language);
   const heroSubtitle = getText(publicContent.homeHero.subtitle, language);
+  const dictionary = getPublicDictionary(asLocale(language));
 
   return (
     <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
@@ -54,32 +46,43 @@ export default async function PublicHome() {
             <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={`${profile.resolved_tagline} · ${brandConfig.publicBranchLocation}`} />
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.2rem]">{heroTitle}</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{heroSubtitle}</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href={ROUTES.public.apply}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-              >
-                Apply now
+            <div className="mt-6 flex w-full max-w-xl flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap">
+              <Link href={ROUTES.public.apply} className="public-action-primary justify-center sm:min-w-[9.5rem]">
+                Apply / Enquire
               </Link>
-              <Link
-                href={ROUTES.public.products}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
-              >
+              <Link href={ROUTES.public.products} className="public-action-secondary justify-center sm:min-w-[9.5rem]">
                 Explore products
               </Link>
+            </div>
+            <p className="mt-4 max-w-2xl rounded-2xl border border-[color-mix(in_oklab,var(--border)_70%,transparent)] bg-[color-mix(in_oklab,white_88%,var(--surface-muted)_12%)] px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+              Trust note: published winner rows come only from revealed draws. We do not promise inventory, pricing, or draw outcomes until confirmed by branch records.
+            </p>
+            <nav aria-label="Learn more" className="mt-5 flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
               <Link
                 href={ROUTES.public.luckyPlan}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
               >
-                See Lucky Plan
+                Lucky Plan overview
+              </Link>
+              <Link
+                href={ROUTES.public.howItWorks}
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
+              >
+                How it works
               </Link>
               <Link
                 href={ROUTES.public.winners}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
               >
-                Visit winners
+                Winners
               </Link>
-            </div>
+              <Link
+                href={ROUTES.public.policies}
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
+              >
+                Policies
+              </Link>
+            </nav>
           </div>
 
           <PublicMarketingBanner
@@ -105,6 +108,17 @@ export default async function PublicHome() {
           { title: "Clear monthly amount", description: "Know your monthly commitment before enrollment." },
           { title: "Transparent winner process", description: "Published records come from revealed draws only." },
           { title: "Support-first onboarding", description: "Branch team helps with product and document readiness." },
+        ]}
+      />
+
+      <PublicMarketingBanner
+        eyebrow="Customer trust"
+        title="Plan rules, payment safety, and delivery transparency"
+        description="Before joining, every customer can review plan rules, payment safeguards, and the delivery process in plain language."
+        items={[
+          { title: "Plan rules", description: "Clear tenure, monthly amount, and winner benefit scope before enrollment." },
+          { title: "Payment safety", description: "Every payment is receipted and visible in the customer portal." },
+          { title: "Delivery process", description: "Delivery scheduling and status are tracked separately from payment records." },
         ]}
       />
 
@@ -141,29 +155,12 @@ export default async function PublicHome() {
         {products.length === 0 ? (
           <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">No products are currently published in the public catalogue.</div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {products.map((product) => (
-              <article key={product.id} className="public-card p-5">
-                <h3 className="text-base font-semibold text-foreground">{product.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Code: {product.product_code}</p>
-                <p className="mt-2 text-sm font-semibold">Base price: {formatCurrency(product.base_price)}</p>
-                <div className="mt-4 flex gap-2">
-                  <Link
-                    href={`${ROUTES.public.products}/${product.id}`}
-                    className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
-                  >
-                    View
-                  </Link>
-                  <Link
-                    href={buildApplyHref(product)}
-                    className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-                  >
-                    Apply
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+          <HomeFeaturedProductsShowcase
+            products={products}
+            ariaCarouselLabel={dictionary.common.mediaCarousel.featuredLabel}
+            prevLabel={dictionary.common.mediaCarousel.previousSlide}
+            nextLabel={dictionary.common.mediaCarousel.nextSlide}
+          />
         )}
       </section>
 
@@ -172,6 +169,7 @@ export default async function PublicHome() {
         description="Use the language switcher in the header for English, हिन्दी, or বাংলা, then connect with the branch for assisted enrollment."
         actions={[
           { href: ROUTES.public.contact, label: "Contact us", variant: "secondary" },
+          { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "secondary" },
           { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
         ]}
       />

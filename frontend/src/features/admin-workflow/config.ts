@@ -42,7 +42,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
     supportingMetric: "Winner waivers",
     actions: [
       { label: "Open subscriptions", href: "/admin/subscriptions" },
-      { label: "Create subscription", href: "/admin/subscriptions/create" },
+      { label: "Create subscription", href: "/admin/subscriptions/advance-emi/create" },
     ],
   },
   {
@@ -56,7 +56,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
     supportingMetric: "Retail receipts",
     actions: [
       { label: "Open direct sales", href: "/admin/billing/direct-sales" },
-      { label: "Collect direct sale", href: "/admin/payments/create?workflow=direct-sale" },
+      { label: "Collect direct sale", href: "/admin/finance/collect?workflow=direct-sale" },
       { label: "Open retail receipts", href: "/admin/billing/receipts" },
     ],
   },
@@ -71,8 +71,8 @@ export const adminWorkflowModules: WorkflowModule[] = [
     supportingMetric: "Verification lag",
     actions: [
       { label: "Open collections", href: "/admin/collections" },
-      { label: "Collect subscription", href: "/admin/payments/create" },
-      { label: "Collect direct sale", href: "/admin/payments/create?workflow=direct-sale" },
+      { label: "Collect Advance EMI", href: "/admin/finance/collect?workflow=advance-emi" },
+      { label: "Collect direct sale", href: "/admin/finance/collect?workflow=direct-sale" },
     ],
   },
   {

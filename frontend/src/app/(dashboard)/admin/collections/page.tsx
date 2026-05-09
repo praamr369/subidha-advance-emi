@@ -3,26 +3,28 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowUpRight,
-  ArrowDownRight,
-  
-  Clock,
   Download,
   Search,
   TrendingUp,
   TrendingDown,
-  Wallet,
   X,
   RefreshCw,
-  AlertCircle,
-  BarChart3,
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -34,6 +36,12 @@ import {
   type PaymentRegisterSummary,
 } from "@/services/payments";
 import { listDirectSales, type DirectSale } from "@/services/billing";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
+import { normalizeApiError } from "@/services/api/errors";
+import {
+  searchAdminReceivables,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 
 // =====================================================
 // TYPES
@@ -41,6 +49,7 @@ import { listDirectSales, type DirectSale } from "@/services/billing";
 type EmiRow = {
   id: number;
   subscription: number;
+  customer_id?: number | null;
   customer_name?: string;
   customer_phone?: string;
   month_no: number;
@@ -123,6 +132,12 @@ function normalizeEmi(row: Record<string, unknown>): EmiRow {
   return {
     id: Number(row.id ?? 0),
     subscription: Number(row.subscription ?? 0),
+    customer_id:
+      typeof row.customer_id === "number"
+        ? row.customer_id
+        : typeof row.customer === "number"
+          ? row.customer
+          : null,
     customer_name:
       typeof row.customer_name === "string" ? row.customer_name : undefined,
     customer_phone:
@@ -146,134 +161,6 @@ function normalizeEmi(row: Record<string, unknown>): EmiRow {
     lucky_number:
       typeof row.lucky_number === "number" ? row.lucky_number : undefined,
   };
-}
-
-// =====================================================
-// UI COMPONENTS
-// =====================================================
-function KpiCard({
-  title,
-  value,
-  icon,
-  trend,
-  trendValue,
-  tone = "default",
-  progress,
-  progressValue,
-  href,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
-  tone?: "default" | "success" | "warning" | "danger";
-  progress?: number;
-  progressValue?: string;
-  href?: string;
-}) {
-  const toneColors = {
-    default:
-      "border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] hover:border-[var(--surface-border-strong)]",
-    success: "border-emerald-200 bg-emerald-50/65 hover:border-emerald-300",
-    warning: "border-amber-200 bg-amber-50/72 hover:border-amber-300",
-    danger: "border-red-200 bg-red-50/70 hover:border-red-300",
-  };
-
-  const card = (
-    <div
-      className={`rounded-[1.55rem] border p-5 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.34)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_-36px_rgba(15,23,42,0.46)] ${
-        toneColors[tone]
-      }`}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/75 p-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
-          {icon}
-        </div>
-      </div>
-      {progress !== undefined && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">
-              {progressValue || "Progress"}
-            </span>
-            <span className="font-medium text-foreground">{progress}%</span>
-          </div>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-300"
-              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-            />
-          </div>
-        </div>
-      )}
-      {trend && trendValue && (
-        <div className="mt-3 flex items-center gap-1 text-xs">
-          {trend === "up" ? (
-            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
-          ) : trend === "down" ? (
-            <ArrowDownRight className="h-3 w-3 text-red-600" />
-          ) : null}
-          <span
-            className={
-              trend === "up"
-                ? "text-emerald-600"
-                : trend === "down"
-                  ? "text-red-600"
-                  : "text-muted-foreground"
-            }
-          >
-            {trendValue}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{card}</Link>;
-  }
-  return card;
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-  actionHref,
-  actionLabel,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  actionHref?: string;
-  actionLabel?: string;
-}) {
-  return (
-    <section className="workspace-section-shell surface-panel-elevated rounded-[1.55rem] p-5 shadow-sm">
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-        {actionHref && actionLabel && (
-          <Link
-            href={actionHref}
-            className="inline-flex items-center gap-1 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-muted"
-          >
-            {actionLabel}
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        )}
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 // Enhanced Due Today Table (unchanged)
@@ -358,6 +245,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
         )}
       </div>
 
+      <DataTableShell className="p-3">
       <div className="overflow-x-auto">
         <table className="min-w-full border-separate border-spacing-0">
           <thead>
@@ -401,7 +289,11 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                 <tr key={row.id} className="align-top hover:bg-muted/30 transition">
                   <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                     <div className="font-medium">
-                      {row.customer_name || "Unknown customer"}
+                      <CustomerIntelligenceTrigger
+                        customerId={row.customer_id}
+                        customerName={row.customer_name || "Unknown customer"}
+                        scope="admin"
+                      />
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {row.customer_phone || "No phone"}
@@ -446,7 +338,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                       </Link>
 
                       <Link
-                        href={`/admin/payments/create?subscription=${row.subscription}&emi=${row.id}`}
+                        href={`/admin/finance/collect?subscription=${row.subscription}&emi=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Collect
@@ -459,6 +351,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
           </tbody>
         </table>
       </div>
+      </DataTableShell>
     </div>
   );
 }
@@ -545,6 +438,7 @@ function RecentPaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
         )}
       </div>
 
+      <DataTableShell className="p-3">
       <div className="overflow-x-auto">
         <table className="min-w-full border-separate border-spacing-0">
           <thead>
@@ -657,6 +551,7 @@ function RecentPaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
           </tbody>
         </table>
       </div>
+      </DataTableShell>
     </div>
   );
 }
@@ -694,7 +589,12 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="font-medium text-foreground">
-                    {row.customer_name || "Unknown customer"} · SUB-{row.subscription}
+                    <CustomerIntelligenceTrigger
+                      customerId={row.customer_id}
+                      customerName={row.customer_name || "Unknown customer"}
+                      scope="admin"
+                    />{" "}
+                    · SUB-{row.subscription}
                   </div>
                   {daysOverdue > 30 && (
                     <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -741,6 +641,7 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
 // MAIN COMPONENT
 // =====================================================
 export default function AdminCollectionsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [dueTodayRows, setDueTodayRows] = useState<EmiRow[]>([]);
   const [overdueRows, setOverdueRows] = useState<EmiRow[]>([]);
@@ -749,6 +650,14 @@ export default function AdminCollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     const today = localDateISO();
@@ -803,6 +712,41 @@ export default function AdminCollectionsPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        "Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference."
+      );
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await searchAdminReceivables(trimmed);
+      setUnifiedSearchResults(payload.results);
+    } catch (err) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        normalizeApiError(err).message || "Unable to search receivables."
+      );
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    if (!row.source_id) {
+      setUnifiedSearchError("This receivable does not include a subscription id.");
+      return;
+    }
+    router.push(`${ROUTES.admin.financeCollect}?subscription=${row.source_id}`);
+  }
 
   const rawSubscriptionFilter = searchParams.get("subscription");
   const subscriptionFilter = parsePositiveInteger(rawSubscriptionFilter);
@@ -901,8 +845,8 @@ export default function AdminCollectionsPage() {
           variant: "primary",
         },
         {
-          href: `${ROUTES.admin.paymentsCreate}?workflow=direct-sale`,
-          label: "Direct-Sale Collect",
+          href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
+          label: "Direct-Sale Collection",
           variant: "secondary",
         },
         {
@@ -923,7 +867,23 @@ export default function AdminCollectionsPage() {
       }}
     >
       <div className="space-y-6">
-        {/* Top Bar with Actions */}
+        <UnifiedReceivableSearchPanel
+          title="Universal contract search"
+          description="Search ContractReference index across Advance EMI, rent, lease, and direct sale. Collect actions open the finance collection desk and reuse existing posting flows."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+        />
+
+        <FormSection
+          title="Daily operations controls"
+          description="Refresh, export, and handoff actions for same-day collections."
+        >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex gap-2">
             <button
@@ -984,6 +944,7 @@ export default function AdminCollectionsPage() {
             </div>
           </div>
         </div>
+        </FormSection>
 
         {loading ? <LoadingBlock label="Loading collections workspace..." /> : null}
 
@@ -997,52 +958,52 @@ export default function AdminCollectionsPage() {
 
         {!loading && !error && (
           <>
-            {/* Advanced KPI Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <QuickActionGrid className="xl:grid-cols-5">
               <KpiCard
-                title="Due Today"
+                label="Due Today"
                 value={String(visibleDueTodayRows.length)}
-                icon={<Clock className="h-4 w-4" />}
-                tone="warning"
-                href="/admin/collections"
+                helper="Pending installments due today"
               />
               <KpiCard
-                title="Net Collected Today"
+                label="Net Collected Today"
                 value={money(todayCollectedAmount)}
-                icon={<Wallet className="h-4 w-4" />}
-                trend={Number(collectionRate) > 70 ? "up" : "down"}
-                trendValue={Number(collectionRate) > 70 ? "Above target" : "Below target"}
-                tone="success"
-                href="/admin/payments"
+                helper={`Collection rate ${collectionRate}%`}
               />
               <KpiCard
-                title="Active Collections Today"
+                label="Active Collections Today"
                 value={String(visibleRecentPaymentsSummary.active_payments)}
-                icon={<BarChart3 className="h-4 w-4" />}
-                tone="default"
-                href="/admin/payments"
+                helper="Posted and not reversed"
               />
               <KpiCard
-                title="Overdue Preview"
+                label="Overdue Preview"
                 value={String(visibleOverdueRows.length)}
-                icon={<AlertCircle className="h-4 w-4" />}
-                tone={visibleOverdueRows.length > 0 ? "danger" : "warning"}
-                href="/admin/emis/overdue"
+                helper="Follow-up queue size"
               />
               <KpiCard
-                title="Direct-Sale Outstanding"
+                label="Direct-Sale Outstanding"
                 value={money(directSaleOutstandingTotal)}
-                icon={<Wallet className="h-4 w-4" />}
-                tone={directSaleRows.length > 0 ? "warning" : "default"}
-                href={`${ROUTES.admin.paymentsCreate}?workflow=direct-sale`}
+                helper="Uncollected direct-sale balance"
               />
-            </div>
+            </QuickActionGrid>
 
-            <SectionCard
+            <WorkflowCard
+              title="Collections workflow"
+              description="Search receivable -> verify contract/EMI -> collect in admin/cashier flow -> verify in payments/reconciliation."
+              action={
+                <div className="flex flex-wrap gap-2">
+                  <Link href={ROUTES.admin.financeCollect} className="text-xs font-semibold text-primary hover:underline">
+                    Collect Advance EMI
+                  </Link>
+                  <Link href={ROUTES.admin.payments} className="text-xs font-semibold text-primary hover:underline">
+                    Open Payments
+                  </Link>
+                </div>
+              }
+            />
+
+            <DetailPanel
               title="Workspace note"
               description="This page is for today’s collection operations. Use the full overdue page only when you need recovery-focused backlog review."
-              actionHref="/admin/emis/overdue"
-              actionLabel="View Full Overdue"
             >
               {subscriptionFilter ? (
                 <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -1073,28 +1034,26 @@ export default function AdminCollectionsPage() {
                 <Link
                   href={
                     subscriptionFilter
-                      ? `/admin/payments/create?subscription=${subscriptionFilter}`
-                      : "/admin/payments/create"
+                      ? `/admin/finance/collect?subscription=${subscriptionFilter}`
+                      : "/admin/finance/collect"
                   }
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
-                  Open Admin Collection
+                  Collect Advance EMI
                 </Link>
 
                 <Link
-                  href="/admin/payments/create?workflow=direct-sale"
+                  href="/admin/finance/collect?workflow=direct-sale"
                   className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                 >
-                  Open Direct-Sale Collection
+                  Collect Direct Sale
                 </Link>
               </div>
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Direct-sale receivables"
               description="Outstanding invoiced direct sales stay separate from the EMI queue but remain collectible from the same operational control layer."
-              actionHref="/admin/payments/create?workflow=direct-sale"
-              actionLabel="Collect Direct Sale"
             >
               {directSalePreview.length === 0 ? (
                 <EmptyState
@@ -1111,7 +1070,12 @@ export default function AdminCollectionsPage() {
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="text-sm font-semibold text-foreground">
-                            {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                            {sale.sale_no || `SALE-${sale.id}`} ·{" "}
+                            <CustomerIntelligenceTrigger
+                              customerId={sale.customer ?? null}
+                              customerName={sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
+                              scope="admin"
+                            />
                           </div>
                           <div className="mt-1 text-sm text-muted-foreground">
                             Invoice {sale.billing_invoice_no || "—"} · {sale.branch_name || sale.branch_code || "Primary branch"}
@@ -1126,10 +1090,10 @@ export default function AdminCollectionsPage() {
                             Outstanding {money(sale.balance_total)}
                           </div>
                           <Link
-                            href={`/admin/payments/create?workflow=direct-sale&direct_sale=${sale.id}`}
+                            href={`/admin/finance/collect?workflow=direct-sale&sale_id=${sale.id}`}
                             className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                           >
-                            Collect
+                            Collect Direct Sale
                           </Link>
                           <Link
                             href={`/admin/billing/direct-sales?focus_sale=${sale.id}`}
@@ -1143,16 +1107,16 @@ export default function AdminCollectionsPage() {
                   ))}
                 </div>
               )}
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Due Today Queue"
               description="Pending EMI rows due today for same-day follow-up and collection."
             >
               <DueTodayTable rows={visibleDueTodayRows} />
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Recent Collections"
               description="Payments posted today for operational verification and quick review. Net collection excludes reversed payments."
             >
@@ -1186,16 +1150,14 @@ export default function AdminCollectionsPage() {
               </div>
 
               <RecentPaymentsTable rows={visibleRecentPayments} />
-            </SectionCard>
+            </DetailPanel>
 
-            <SectionCard
+            <DetailPanel
               title="Overdue Preview"
               description="Preview of overdue pending EMI rows. Open the full overdue page for the full recovery workspace."
-              actionHref="/admin/emis/overdue"
-              actionLabel="View All Overdue"
             >
               <OverduePreview rows={overduePreview} />
-            </SectionCard>
+            </DetailPanel>
           </>
         )}
       </div>

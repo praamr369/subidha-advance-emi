@@ -6,16 +6,20 @@ test.use({ storageState: authStatePath("admin") });
 
 test("admin split surfaces load with expected role-safe posture", async ({ page }) => {
   await page.goto("/admin");
-  await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("summary-only");
+  await expect(page.getByRole("heading", { name: "Daily Operator Dashboard" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("primary daily dashboard");
 
   await page.goto("/admin/operations");
-  await expect(page.getByRole("heading", { name: "Operations Workspace" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("Action-first workspace");
+  await expect(page.getByRole("heading", { name: "Operations Working Screen" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Action-first queues");
+
+  await page.goto("/admin/bi");
+  await expect(page.getByRole("heading", { name: "Business Intelligence" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Read-only trends");
 
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("Backend-prepared operational analytics");
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("windowed analytics summary");
 
   await page.goto("/admin/finance");
   await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
@@ -24,13 +28,13 @@ test("admin split surfaces load with expected role-safe posture", async ({ page 
 
 test("reports and finance launch cards point to real routes", async ({ page }) => {
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
   const reportLinks: Array<{ label: string; hrefPrefix: string }> = [
     { label: "Revenue Report", hrefPrefix: "/admin/reports/revenue" },
     { label: "Overdue EMI Report", hrefPrefix: "/admin/reports/overdue" },
     { label: "Batch Performance", hrefPrefix: "/admin/reports/batch-performance" },
     { label: "Collections Workspace", hrefPrefix: "/admin/collections" },
-    { label: "Reconciliation Workspace", hrefPrefix: "/admin/reconciliation" },
+    { label: "Reconciliation Workspace", hrefPrefix: "/admin/finance/reconciliation" },
     { label: "Finance Control", hrefPrefix: "/admin/finance" },
   ];
 
@@ -47,7 +51,7 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
     { label: "Payment Register", hrefPrefix: "/admin/payments" },
     { label: "Purchase Bills", hrefPrefix: "/admin/accounting/purchase-bills" },
     { label: "Vendor Ledger View", hrefPrefix: "/admin/accounting/vendors" },
-    { label: "Flagged Queue", hrefPrefix: "/admin/reconciliation" },
+    { label: "Flagged Queue", hrefPrefix: "/admin/finance/reconciliation" },
     { label: "Payout Batches", hrefPrefix: "/admin/finance/payout-batches" },
     { label: "Open Direct Sale", hrefPrefix: "/admin/billing/direct-sales" },
     { label: "Open Subscriptions", hrefPrefix: "/admin/subscriptions" },
@@ -58,7 +62,7 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
   ];
 
   for (const link of financeLaunchpadLinks) {
-    const launch = page.getByRole("link", { name: link.label }).first();
+    const launch = page.getByRole("link", { name: link.label, exact: true }).first();
     await expect(launch).toBeVisible();
     await expect(launch).toHaveAttribute("href", new RegExp(`^${link.hrefPrefix}`));
   }

@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from billing.models import BillingInvoice
+from billing.models import DirectSale
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from inventory.models import InventoryItem
@@ -18,6 +19,7 @@ from tests.helpers import (
     create_admin_user,
     create_batch,
     create_customer_profile,
+    create_customer_user,
     create_emi,
     create_lucky_id,
     create_product,
@@ -177,3 +179,105 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
         self.assertEqual(len(response.data["subscriptions"]["rows"]), 1)
         self.assertGreaterEqual(response.data["leads"]["summary"]["total_count"], 1)
         self.assertEqual(response.data["quotation_estimates"]["summary"]["quotation_count"], 1)
+
+    def test_cancelled_subscription_moves_to_history_only_metrics(self):
+        type(self.subscription).objects.filter(pk=self.subscription.pk).update(status="CANCELLED")
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["overview"]["active_subscriptions"], 0)
+        self.assertEqual(response.data["overview"]["active_contract_value"], "0.00")
+        self.assertEqual(response.data["overview"]["historical_subscriptions"], 1)
+        self.assertEqual(response.data["overview"]["historical_contract_value"], "1500.00")
+
+    def test_returned_direct_sale_excluded_from_active_outstanding(self):
+        DirectSale.objects.filter(pk=self.direct_sale.pk).update(
+            status="RETURNED",
+            balance_total=Decimal("200.00"),
+        )
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["overview"]["direct_sale_outstanding_total"], "0.00")
+        self.assertEqual(response.data["direct_sales"]["summary"]["outstanding_total"], "0.00")
+        self.assertEqual(response.data["direct_sales"]["summary"]["history_count"], 1)
+
+    def test_reversed_payment_excluded_from_active_count_and_collected_amount(self):
+        payment = self.subscription.payments.order_by("-id").first()
+        metadata = dict(payment.allocation_metadata or {})
+        metadata["reversal"] = {"is_reversed": True}
+        type(payment).objects.filter(pk=payment.pk).update(allocation_metadata=metadata)
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{self.customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["payments"]["summary"]["active_count"], 0)
+        self.assertEqual(response.data["payments"]["summary"]["reversed_count"], 1)
+        self.assertEqual(response.data["payments"]["summary"]["active_collected_amount"], "0.00")
+
+    def test_cancelled_contract_history_value_is_counted_once_not_per_emi_row(self):
+        customer = create_customer_profile(
+            user=create_customer_user(
+                username="cancel_hist_once_customer",
+                phone="7389300999",
+            ),
+            name="Cancelled Contract History Once",
+            phone="7389300999",
+        )
+        product = create_product(
+            name="Cancelled History Product",
+            product_code="CUST-OPS-CANCEL-001",
+            base_price=Decimal("67500.00"),
+        )
+        batch = create_batch(
+            batch_code="CUSTOPSCANCEL0426",
+            duration_months=15,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 4, 1),
+        )
+        lucky_id = create_lucky_id(batch=batch, lucky_number=27)
+        subscription = create_subscription(
+            customer=customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky_id,
+            total_amount=Decimal("67500.00"),
+            monthly_amount=Decimal("4500.00"),
+            tenure_months=15,
+            status="CANCELLED",
+        )
+        for month_no in range(1, 16):
+            create_emi(
+                subscription=subscription,
+                month_no=month_no,
+                amount=Decimal("4500.00"),
+                due_date=date(2026, 4, 1),
+            )
+
+        response = self.client.get(
+            f"/api/v1/admin/customers/{customer.id}/operational-profile/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["overview"]["active_subscriptions"], 0)
+        self.assertEqual(response.data["overview"]["active_contract_value"], "0.00")
+        self.assertEqual(response.data["overview"]["historical_subscriptions"], 1)
+        self.assertEqual(response.data["overview"]["historical_contract_value"], "67500.00")
+        self.assertNotEqual(
+            response.data["overview"]["historical_contract_value"], "1012500.00"
+        )
+
+        list_response = self.client.get("/api/v1/admin/customers/")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK, list_response.data)
+        rows = list_response.data.get("results") if isinstance(list_response.data, dict) else list_response.data
+        customer_row = next((row for row in rows if row.get("id") == customer.id), None)
+        self.assertIsNotNone(customer_row)
+        self.assertEqual(customer_row["active_subscription_count"], 0)
+        self.assertEqual(customer_row["active_contract_value"], "0.00")
+        self.assertEqual(customer_row["active_subscription_due"], "0.00")
+        self.assertEqual(customer_row["historical_contract_value"], "67500.00")

@@ -9,15 +9,24 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailPanel, FormSection } from "@/components/ui/operations";
+import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { invalidateAfterProductInventoryMutation } from "@/lib/operational-query-invalidation";
 import { resolveApiMediaUrl } from "@/lib/media";
+import {
+  listStockLocations,
+  updateInventoryItem,
+  type InventoryItem,
+  type StockLocation,
+} from "@/services/inventory";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
 type ProductDetailRecord = {
@@ -32,6 +41,12 @@ type ProductDetailRecord = {
   base_price: string;
   image?: string | null;
   created_at?: string | null;
+  is_active?: boolean;
+  plan_type_default?: "EMI" | "RENT" | "LEASE";
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
+  is_direct_sale_enabled?: boolean;
 };
 
 type UpdateProductResponse = {
@@ -45,6 +60,12 @@ type UpdateProductResponse = {
   description?: string | null;
   base_price?: string;
   image?: string | null;
+  is_active?: boolean;
+  plan_type_default?: "EMI" | "RENT" | "LEASE";
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
+  is_direct_sale_enabled?: boolean;
 };
 
 type FieldErrors = Partial<
@@ -57,7 +78,10 @@ type FieldErrors = Partial<
     | "subcategory"
     | "description"
     | "base_price"
-    | "image",
+    | "image"
+    | "is_active"
+    | "plan_type_default"
+    | "is_emi_enabled",
     string
   >
 >;
@@ -86,6 +110,14 @@ function toNullableString(value: unknown): string | null | undefined {
   return undefined;
 }
 
+function toBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizePlanType(value: unknown): "EMI" | "RENT" | "LEASE" {
+  return value === "RENT" || value === "LEASE" ? value : "EMI";
+}
+
 function normalizeProductDetail(
   raw: Record<string, unknown>
 ): ProductDetailRecord {
@@ -105,6 +137,12 @@ function normalizeProductDetail(
         toNullableString(raw.image) ?? toNullableString(raw.image_url)
       ) ?? null,
     created_at: toNullableString(raw.created_at),
+    is_active: toBoolean(raw.is_active, true),
+    plan_type_default: normalizePlanType(raw.plan_type_default),
+    is_emi_enabled: toBoolean(raw.is_emi_enabled, true),
+    is_rent_enabled: toBoolean(raw.is_rent_enabled, false),
+    is_lease_enabled: toBoolean(raw.is_lease_enabled, false),
+    is_direct_sale_enabled: toBoolean(raw.is_direct_sale_enabled, true),
   };
 }
 
@@ -144,6 +182,8 @@ function parseFieldErrors(error: unknown): FieldErrors {
     pick("description");
     pick("base_price", ["base_price", "price"]);
     pick("image");
+    pick("is_emi_enabled");
+    pick("plan_type_default");
 
     return next;
   } catch {
@@ -196,10 +236,15 @@ function toErrorMessage(error: unknown): string {
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return (
+    <p tabIndex={-1} data-field-error="" className="mt-1 text-xs text-destructive">
+      {message}
+    </p>
+  );
 }
 
 export default function AdminProductEditPage() {
+  const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
   const productId = params?.id;
 
@@ -219,6 +264,12 @@ export default function AdminProductEditPage() {
     unit_of_measure_options: ["PCS"],
   });
   const [basePrice, setBasePrice] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [planTypeDefault, setPlanTypeDefault] = useState<"EMI" | "RENT" | "LEASE">("EMI");
+  const [isEmiEnabled, setIsEmiEnabled] = useState(true);
+  const [isRentEnabled, setIsRentEnabled] = useState(false);
+  const [isLeaseEnabled, setIsLeaseEnabled] = useState(false);
+  const [isDirectSaleEnabled, setIsDirectSaleEnabled] = useState(true);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
     null
@@ -228,10 +279,21 @@ export default function AdminProductEditPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inventorySaving, setInventorySaving] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [inventoryRecord, setInventoryRecord] = useState<InventoryItem | null>(null);
+  const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
+  const [inventoryForm, setInventoryForm] = useState({
+    is_active: true,
+    stock_tracking_enabled: true,
+    delivery_stock_bridge_enabled: true,
+    reorder_level_qty: "0.000",
+    standard_unit_cost: "0.00",
+    default_stock_location: "",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -261,6 +323,26 @@ export default function AdminProductEditPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStockLocations() {
+      try {
+        const payload = await listStockLocations();
+        if (!cancelled) {
+          setStockLocations(payload.results || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setStockLocations([]);
+        }
+      }
+    }
+    void loadStockLocations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
       if (!productId) return;
@@ -283,9 +365,41 @@ export default function AdminProductEditPage() {
         setSubcategory(normalized.subcategory || "");
         setDescription(normalized.description || "");
         setBasePrice(normalized.base_price || "");
+        setIsActive(normalized.is_active !== false);
+        setPlanTypeDefault(normalized.plan_type_default || "EMI");
+        setIsEmiEnabled(normalized.is_emi_enabled !== false);
+        setIsRentEnabled(Boolean(normalized.is_rent_enabled));
+        setIsLeaseEnabled(Boolean(normalized.is_lease_enabled));
+        setIsDirectSaleEnabled(normalized.is_direct_sale_enabled !== false);
         setSelectedImageFile(null);
         setSelectedImagePreview(null);
         setRemoveExistingImage(false);
+        const inventoryProfileId =
+          typeof payload.inventory_profile_id === "number"
+            ? payload.inventory_profile_id
+            : null;
+        if (inventoryProfileId) {
+          const inventoryPayload = await apiFetch<InventoryItem>(
+            `/inventory/items/${inventoryProfileId}/`
+          );
+          setInventoryRecord(inventoryPayload);
+          setInventoryForm({
+            is_active: Boolean(inventoryPayload.is_active),
+            stock_tracking_enabled: Boolean(
+              inventoryPayload.stock_tracking_enabled
+            ),
+            delivery_stock_bridge_enabled: Boolean(
+              inventoryPayload.delivery_stock_bridge_enabled
+            ),
+            reorder_level_qty: inventoryPayload.reorder_level_qty || "0.000",
+            standard_unit_cost: inventoryPayload.standard_unit_cost || "0.00",
+            default_stock_location: inventoryPayload.default_stock_location
+              ? String(inventoryPayload.default_stock_location)
+              : "",
+          });
+        } else {
+          setInventoryRecord(null);
+        }
 
         setError(null);
         setFieldErrors({});
@@ -384,6 +498,12 @@ export default function AdminProductEditPage() {
     setSubcategory(product.subcategory || "");
     setDescription(product.description || "");
     setBasePrice(product.base_price || "");
+    setIsActive(product.is_active !== false);
+    setPlanTypeDefault(product.plan_type_default || "EMI");
+    setIsEmiEnabled(product.is_emi_enabled !== false);
+    setIsRentEnabled(Boolean(product.is_rent_enabled));
+    setIsLeaseEnabled(Boolean(product.is_lease_enabled));
+    setIsDirectSaleEnabled(product.is_direct_sale_enabled !== false);
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
     setRemoveExistingImage(false);
@@ -419,6 +539,22 @@ export default function AdminProductEditPage() {
       next.base_price = "Enter a valid base price greater than zero.";
     }
 
+    if (!isEmiEnabled && !isRentEnabled && !isLeaseEnabled && !isDirectSaleEnabled) {
+      next.is_emi_enabled = "At least one product mode must remain enabled.";
+    }
+
+    if (planTypeDefault === "EMI" && !isEmiEnabled) {
+      next.plan_type_default = "Default plan type EMI requires EMI to be enabled.";
+    }
+
+    if (planTypeDefault === "RENT" && !isRentEnabled) {
+      next.plan_type_default = "Default plan type RENT requires rent to be enabled.";
+    }
+
+    if (planTypeDefault === "LEASE" && !isLeaseEnabled) {
+      next.plan_type_default = "Default plan type LEASE requires lease to be enabled.";
+    }
+
     if (selectedImageFile) {
       const allowedTypes = new Set([
         "image/jpeg",
@@ -442,6 +578,7 @@ export default function AdminProductEditPage() {
 
   async function handleSave() {
     if (!productId) return;
+    if (saving) return;
 
     setError(null);
     setSaveSuccess(null);
@@ -449,7 +586,15 @@ export default function AdminProductEditPage() {
     const nextFieldErrors = validate();
     setFieldErrors(nextFieldErrors);
 
-    if (Object.keys(nextFieldErrors).length > 0) return;
+    if (Object.keys(nextFieldErrors).length > 0) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>("[data-field-error]")?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+      });
+      return;
+    }
 
     setSaving(true);
 
@@ -472,6 +617,12 @@ export default function AdminProductEditPage() {
       formData.append("subcategory", trimmedSubcategory);
       formData.append("description", trimmedDescription);
       formData.append("base_price", trimmedBasePrice);
+      formData.append("is_active", String(isActive));
+      formData.append("plan_type_default", planTypeDefault);
+      formData.append("is_emi_enabled", String(isEmiEnabled));
+      formData.append("is_rent_enabled", String(isRentEnabled));
+      formData.append("is_lease_enabled", String(isLeaseEnabled));
+      formData.append("is_direct_sale_enabled", String(isDirectSaleEnabled));
 
       if (removeExistingImage) {
         formData.append("clear_image", "true");
@@ -504,6 +655,12 @@ export default function AdminProductEditPage() {
             base_price: trimmedBasePrice,
             image: null,
             created_at: null,
+            is_active: isActive,
+            plan_type_default: planTypeDefault,
+            is_emi_enabled: isEmiEnabled,
+            is_rent_enabled: isRentEnabled,
+            is_lease_enabled: isLeaseEnabled,
+            is_direct_sale_enabled: isDirectSaleEnabled,
           } as ProductDetailRecord);
 
         return {
@@ -538,6 +695,12 @@ export default function AdminProductEditPage() {
               : removeExistingImage
                 ? null
                 : base.image,
+          is_active: updated.is_active ?? isActive,
+          plan_type_default: updated.plan_type_default ?? planTypeDefault,
+          is_emi_enabled: updated.is_emi_enabled ?? isEmiEnabled,
+          is_rent_enabled: updated.is_rent_enabled ?? isRentEnabled,
+          is_lease_enabled: updated.is_lease_enabled ?? isLeaseEnabled,
+          is_direct_sale_enabled: updated.is_direct_sale_enabled ?? isDirectSaleEnabled,
         };
       });
 
@@ -546,11 +709,42 @@ export default function AdminProductEditPage() {
       setRemoveExistingImage(false);
       setFieldErrors({});
       setSaveSuccess("Product updated successfully.");
+      await invalidateAfterProductInventoryMutation(queryClient, { productId });
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
       setError(toErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveInventory() {
+    if (!inventoryRecord?.id) return;
+    if (inventorySaving) return;
+    setInventorySaving(true);
+    setError(null);
+    setSaveSuccess(null);
+    try {
+      const updated = await updateInventoryItem(inventoryRecord.id, {
+        is_active: inventoryForm.is_active,
+        stock_tracking_enabled: inventoryForm.stock_tracking_enabled,
+        delivery_stock_bridge_enabled: inventoryForm.delivery_stock_bridge_enabled,
+        reorder_level_qty: inventoryForm.reorder_level_qty,
+        standard_unit_cost: inventoryForm.standard_unit_cost || null,
+        default_stock_location: inventoryForm.default_stock_location
+          ? Number(inventoryForm.default_stock_location)
+          : null,
+      });
+      setInventoryRecord(updated);
+      setSaveSuccess("Inventory profile settings updated.");
+      await invalidateAfterProductInventoryMutation(queryClient, {
+        productId: productId ?? undefined,
+        inventoryItemId: inventoryRecord.id,
+      });
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      setInventorySaving(false);
     }
   }
 
@@ -562,6 +756,7 @@ export default function AdminProductEditPage() {
           : `Edit Product #${productId ?? "—"}`
       }
       subtitle="Update product master data safely. Base price remains the total contract price, and image replacement or removal is handled from this edit workflow."
+      helperNote="Changes affect future onboarding and billing only. Existing contracts keep saved pricing and plan snapshots."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Products", href: "/admin/products" },
@@ -621,7 +816,7 @@ export default function AdminProductEditPage() {
       }}
     >
       <div className="space-y-6">
-        <SectionCard
+        <DetailPanel
           title="Editing rule"
           description="Product base price is the total contract price used by subscription creation. Update carefully to avoid future contract inconsistencies."
         >
@@ -631,7 +826,7 @@ export default function AdminProductEditPage() {
             <DetailValue label="Image Workflow" value="Attach, replace, or remove from this page" />
             <DetailValue label="Mutation Scope" value="Product master only" />
           </div>
-        </SectionCard>
+        </DetailPanel>
 
         <section className="flex justify-end">
           <button
@@ -664,7 +859,7 @@ export default function AdminProductEditPage() {
         {!loading && product ? (
           <>
             <section className="grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <FormSection
                 title="Product fields"
                 description="Update the catalog structure and contract pricing fields used by admin and subscription workflows."
               >
@@ -872,6 +1067,78 @@ export default function AdminProductEditPage() {
                     <FieldError message={fieldErrors.base_price} />
                   </div>
 
+                  <div className="rounded-xl border border-border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Product Capabilities</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Changes affect future onboarding and billing only. Existing contracts keep their saved pricing and plan snapshots.
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={isActive}
+                          onChange={(event) => {
+                            setIsActive(event.target.checked);
+                            setError(null);
+                            setSaveSuccess(null);
+                          }}
+                          disabled={saving}
+                        />
+                        Active
+                      </label>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium text-foreground">Default Plan Type</span>
+                        <select
+                          value={planTypeDefault}
+                          onChange={(event) => {
+                            setPlanTypeDefault(event.target.value as "EMI" | "RENT" | "LEASE");
+                            setError(null);
+                            setSaveSuccess(null);
+                          }}
+                          disabled={saving}
+                          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="EMI">EMI</option>
+                          <option value="RENT">Rent</option>
+                          <option value="LEASE">Lease</option>
+                        </select>
+                        <FieldError message={fieldErrors.plan_type_default} />
+                      </label>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[
+                          ["EMI", isEmiEnabled, setIsEmiEnabled],
+                          ["Rent", isRentEnabled, setIsRentEnabled],
+                          ["Lease", isLeaseEnabled, setIsLeaseEnabled],
+                          ["Direct Sale", isDirectSaleEnabled, setIsDirectSaleEnabled],
+                        ].map(([label, checked, setter]) => (
+                          <label
+                            key={String(label)}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(checked)}
+                              onChange={(event) => {
+                                (setter as (value: boolean) => void)(event.target.checked);
+                                setError(null);
+                                setSaveSuccess(null);
+                              }}
+                              disabled={saving}
+                            />
+                            {String(label)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <FieldError message={fieldErrors.is_emi_enabled} />
+                  </div>
+
                   <div>
                     <label
                       htmlFor="product-description"
@@ -895,9 +1162,9 @@ export default function AdminProductEditPage() {
                     <FieldError message={fieldErrors.description} />
                   </div>
                 </div>
-              </SectionCard>
+              </FormSection>
 
-              <SectionCard
+              <FormSection
                 title="Image attachment"
                 description="Attach a new image, replace the current one, or remove the existing image."
               >
@@ -1006,8 +1273,123 @@ export default function AdminProductEditPage() {
                     </div>
                   </div>
                 </div>
-              </SectionCard>
+              </FormSection>
             </section>
+
+            <FormSection
+              title="Inventory item controls"
+              description="Control stock tracking, bridge behavior, reorder threshold, costing, and default location for future inventory operations. Stock tracking affects operational stock visibility. It does not rewrite historical invoices or receipts."
+            >
+              {!inventoryRecord ? (
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Inventory profile is not ready yet. Prepare inventory profile from product detail page before editing inventory controls.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.is_active}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          is_active: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Inventory item active
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.stock_tracking_enabled}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          stock_tracking_enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Stock tracking enabled
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inventoryForm.delivery_stock_bridge_enabled}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          delivery_stock_bridge_enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                    />
+                    Delivery stock bridge enabled
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Reorder level</span>
+                    <input
+                      value={inventoryForm.reorder_level_qty}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          reorder_level_qty: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Standard unit cost</span>
+                    <input
+                      value={inventoryForm.standard_unit_cost}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          standard_unit_cost: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium text-foreground">Default stock location</span>
+                    <select
+                      value={inventoryForm.default_stock_location}
+                      onChange={(event) =>
+                        setInventoryForm((current) => ({
+                          ...current,
+                          default_stock_location: event.target.value,
+                        }))
+                      }
+                      disabled={inventorySaving}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                    >
+                      <option value="">No default location</option>
+                      {stockLocations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.code} · {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveInventory()}
+                      disabled={inventorySaving}
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {inventorySaving ? "Saving inventory..." : "Save Inventory Settings"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </FormSection>
 
             {error ? (
               <ErrorState
@@ -1017,7 +1399,7 @@ export default function AdminProductEditPage() {
             ) : null}
 
             {saveSuccess ? (
-              <SectionCard
+              <DetailPanel
                 title="Update successful"
                 description="The product master has been updated successfully."
               >
@@ -1040,10 +1422,10 @@ export default function AdminProductEditPage() {
                     Back to Register
                   </Link>
                 </div>
-              </SectionCard>
+              </DetailPanel>
             ) : null}
 
-            <SectionCard
+            <FormSection
               title="Save changes"
               description="Save only after confirming catalog fields, pricing, and image replacement."
             >
@@ -1069,7 +1451,7 @@ export default function AdminProductEditPage() {
                   </button>
                 }
               />
-            </SectionCard>
+            </FormSection>
           </>
         ) : null}
       </div>

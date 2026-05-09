@@ -29,7 +29,7 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     routes: [
       { label: "Dashboard", href: ROUTES.admin.dashboard },
       { label: "Operations", href: ROUTES.admin.operations },
-      { label: "Analytics", href: ROUTES.admin.analytics },
+      { label: "Analytics", href: `${ROUTES.admin.reports}?live=1` },
       { label: "Branch Reporting", href: ROUTES.admin.branchReporting },
       { label: "Reports", href: ROUTES.admin.reports },
       { label: "Support", href: ROUTES.admin.supportRequests },

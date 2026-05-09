@@ -1,20 +1,21 @@
 "use client";
 
-import Phase5ReportSurface from "@/components/admin/Phase5ReportSurface";
-import { getAdminOperationsCommandCenter } from "@/services/phase5-control";
+import PortalPage from "@/components/ui/PortalPage";
+import { OperationsCommandCenterWorkspace } from "@/components/workspace/OperationsCommandCenterWorkspace";
+import { ROUTES } from "@/lib/routes";
 
 export default function AdminOperationsCommandCenterPage() {
   return (
-    <Phase5ReportSurface
+    <PortalPage
       title="Operations Command Center"
-      subtitle="Admin operations queue across contracts, deliveries, returns, KYC, partner payouts, and reconciliation alerts."
+      subtitle="Main operations work center for approvals, financial actions, partner actions, customer actions, inventory alerts, and delivery returns."
       breadcrumbs={[
-        { label: "Admin", href: "/admin" },
-        { label: "Operations", href: "/admin/operations" },
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Operations", href: ROUTES.admin.operations },
         { label: "Command Center" },
       ]}
-      fetcher={(query) => getAdminOperationsCommandCenter(query)}
-    />
+    >
+      <OperationsCommandCenterWorkspace />
+    </PortalPage>
   );
 }
-

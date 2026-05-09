@@ -6,6 +6,11 @@ import { useParams } from "next/navigation";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  DetailPanel,
+  FormSection,
+  Timeline,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { apiFetch } from "@/lib/api";
@@ -295,11 +300,8 @@ export default function AdminCustomerEditPage() {
     >
       <div className="space-y-6">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-4 shadow-sm">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Customer account</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -311,6 +313,10 @@ export default function AdminCustomerEditPage() {
               />
             </div>
 
+            <FormSection
+              title="Identity and contact"
+              description="Core profile fields submitted with the same admin customer update payload as before."
+            >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-foreground">
@@ -360,7 +366,14 @@ export default function AdminCustomerEditPage() {
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
+            </div>
+            </FormSection>
+
+            <FormSection
+              title="Address"
+              description="Stored on the customer record for delivery and verification context."
+            >
+              <div className="space-y-2">
                 <label htmlFor="address" className="text-sm font-medium text-foreground">
                   Address
                 </label>
@@ -371,6 +384,13 @@ export default function AdminCustomerEditPage() {
                   className="min-h-28 w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none focus:border-ring"
                 />
               </div>
+            </FormSection>
+
+            <FormSection
+              title="KYC and portal identity"
+              description="KYC status follows admin review rules; login username is read-only here."
+            >
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="kyc" className="text-sm font-medium text-foreground">
                   KYC status
@@ -396,6 +416,7 @@ export default function AdminCustomerEditPage() {
                 </div>
               </div>
             </div>
+            </FormSection>
 
             {error ? (
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -427,9 +448,8 @@ export default function AdminCustomerEditPage() {
           </form>
 
           <div className="space-y-5">
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground">Account controls</h2>
-              <div className="mt-4 space-y-4">
+            <DetailPanel title="Account controls" description="Login access and password recovery posture for this customer.">
+              <div className="space-y-4">
                 <div className="rounded-xl border border-border bg-background p-4">
                   <div className="text-sm font-medium text-foreground">
                     Account status
@@ -489,11 +509,11 @@ export default function AdminCustomerEditPage() {
                   </div>
                 </div>
               </div>
-            </section>
+            </DetailPanel>
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground">Timeline</h2>
-              <div className="mt-4 space-y-3">
+            <Timeline
+              title="Audit timeline"
+            >
                 {auditEntries.length > 0 ? (
                   auditEntries.slice(0, 8).map((entry) => (
                     <div
@@ -516,8 +536,7 @@ export default function AdminCustomerEditPage() {
                     No customer audit timeline entries were returned yet.
                   </div>
                 )}
-              </div>
-            </section>
+            </Timeline>
           </div>
         </section>
       </div>

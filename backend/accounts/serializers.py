@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -5,6 +7,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from accounts.models import UserRole
 
 User = get_user_model()
+security_logger = logging.getLogger("security.events")
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -57,7 +60,16 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        try:
+            data = super().validate(attrs)
+        except Exception:
+            security_logger.warning(
+                "auth.login_failed",
+                extra={
+                    "username": (attrs.get("username") or "").strip(),
+                },
+            )
+            raise
         user = self.user
 
         data["user"] = {

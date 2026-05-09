@@ -9,9 +9,16 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
+import {
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   collectAdvance,
   collectPayment,
@@ -25,6 +32,10 @@ import {
   type PendingEmiLookupResponse,
   type PendingEmiRecord,
 } from "@/services/cashier";
+import {
+  searchCashierReceivables,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 
 function money(value: string | number | null | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -51,6 +62,26 @@ function formatDateTime(value: string | null | undefined): string {
   return new Date(parsed).toLocaleString();
 }
 
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Request timed out. Please retry.")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function isEmiOverdue(emi: PendingEmiRecord | null | undefined): boolean {
   if (!emi) return false;
   if (typeof emi.is_overdue === "boolean") return emi.is_overdue;
@@ -66,6 +97,12 @@ function overdueLabel(emi: PendingEmiRecord | null | undefined): string {
     return `${overdueDays} day${overdueDays === 1 ? "" : "s"} overdue`;
   }
   return "Due queue";
+}
+
+function isRestrictedSubscriptionStatus(status?: string | null): boolean {
+  if (!status) return false;
+  const token = status.trim().toUpperCase();
+  return ["BLOCKED", "CANCELLED", "DEFAULTED", "VOID", "CLOSED", "INACTIVE"].includes(token);
 }
 
 type PaymentMethod = "CASH" | "UPI" | "BANK";
@@ -119,6 +156,7 @@ const SECONDARY_BUTTON_CLASS_NAME =
 export default function CashierCollectPage() {
   const searchParams = useSearchParams();
   const workflowQueryParam = searchParams.get("workflow");
+  const directSaleQueryParam = searchParams.get("direct_sale");
   const [collectionWorkflow, setCollectionWorkflow] =
     useState<CollectionWorkflow>("subscription");
   const [searchMode, setSearchMode] = useState<CashierSearchMode>("phone");
@@ -158,6 +196,15 @@ export default function CashierCollectPage() {
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [advanceSuccess, setAdvanceSuccess] =
     useState<CashierCollectAdvanceResponse | null>(null);
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
+  const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
+  const [unifiedLastPaymentSummary, setUnifiedLastPaymentSummary] = useState<string | null>(null);
 
   const selectedEmi = useMemo<PendingEmiRecord | null>(() => {
     if (!lookup || !selectedEmiId) return null;
@@ -177,6 +224,10 @@ export default function CashierCollectPage() {
   const activeSearchConfig = SEARCH_MODE_CONFIG[searchMode];
   const directSaleHref = "/cashier/collect?workflow=direct-sale";
   const subscriptionHref = "/cashier/collect";
+  const prefillDirectSaleId = useMemo(
+    () => parsePositiveInteger(directSaleQueryParam),
+    [directSaleQueryParam]
+  );
   const availableFinanceAccounts = useMemo(
     () => financeAccounts.filter((account) => account.kind === method),
     [financeAccounts, method]
@@ -398,6 +449,74 @@ export default function CashierCollectPage() {
     await loadLookupByPhone(result.customer_phone, result.emi_id);
   }
 
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+    setUnifiedLastPaymentSummary(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        "Enter a phone, customer ID, contract ID, subscription ID, invoice number, or receipt number."
+      );
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await withTimeout(searchCashierReceivables(trimmed));
+      setUnifiedSearchResults(payload.results);
+    } catch (error) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(toErrorMessage(error));
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  async function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    const searchValue = row.reference_no || (row.source_id ? String(row.source_id) : "");
+    if (!searchValue) {
+      setUnifiedSearchError("This Advance EMI receivable does not include a searchable reference.");
+      return;
+    }
+
+    const actionKey = `${row.source_type}-${row.source_id ?? row.reference_no}`;
+    setUnifiedActionLoadingKey(actionKey);
+    setCollectionWorkflow("subscription");
+    setSearchMode("subscription");
+    setSearchInput(searchValue);
+    setSubmittedSearch(searchValue);
+    setLookup(null);
+    setLookupError(null);
+    setSearchResultsError(null);
+    clearSelectionForNewLookup();
+
+    try {
+      const payload = await searchCashierCollectibleEmis(searchValue, "subscription");
+      setSearchResults(payload.results);
+      const match =
+        payload.results.find((result) => result.subscription_id === row.source_id) ??
+        payload.results[0] ??
+        null;
+
+      if (!match) {
+        setSearchResultsError(
+          "No collectible EMI row is available for this contract reference."
+        );
+        return;
+      }
+
+      await handleSearchResultSelect(match);
+    } catch (error) {
+      setSearchResults([]);
+      setSearchResultsError(toErrorMessage(error));
+    } finally {
+      setUnifiedActionLoadingKey(null);
+    }
+  }
+
   function selectEmi(emi: PendingEmiRecord) {
     setSelectedEmiId(emi.id);
     setCollectError(null);
@@ -436,17 +555,23 @@ export default function CashierCollectPage() {
     setSuccess(null);
 
     try {
-      const response = await collectPayment({
+      const response = await withTimeout(collectPayment({
         emi_id: selectedEmi.id,
         amount: parsedAmount,
         method,
         finance_account_id: Number(selectedFinanceAccountId),
         reference_no: referenceNo.trim() || undefined,
         note: note.trim() || undefined,
-      });
+      }));
 
       setSuccess(response);
-      await refreshLookupAfterCollection(selectedEmi.id);
+      const statusNote = response.created
+        ? "Posted successfully."
+        : "Idempotent replay — existing payment returned (no duplicate post).";
+      setUnifiedLastPaymentSummary(
+        `${response.message || "Payment recorded."} Payment #${response.payment.id} · EMI #${response.emi.id}. ${statusNote}`
+      );
+      await withTimeout(refreshLookupAfterCollection(selectedEmi.id));
     } catch (error) {
       setCollectError(toErrorMessage(error));
     } finally {
@@ -614,8 +739,56 @@ export default function CashierCollectPage() {
         tone: "info",
       }}
     >
-      <div className="space-y-6">
-        <SectionCard
+      <div className="space-y-6 pb-24 sm:pb-6">
+        <div id="cashier-unified-search">
+        <UnifiedReceivableSearchPanel
+          title="Universal receivable search"
+          description="Search Advance EMI, rent, lease, and direct-sale contract references before opening the supported collection workflow."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          actionLoadingKey={unifiedActionLoadingKey}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          lastPaymentSummary={unifiedLastPaymentSummary}
+          onRetrySearch={() => void handleUnifiedReceivableSearch(unifiedSearchQuery)}
+        />
+        </div>
+
+        <QuickActionGrid>
+          <KpiCard
+            label="Workflow"
+            value={collectionWorkflow === "direct-sale" ? "Direct Sale" : "Subscription EMI"}
+            helper="Current cashier collection mode"
+          />
+          <KpiCard
+            label={collectionWorkflow === "direct-sale" ? "Queue Context" : "Pending EMI Count"}
+            value={
+              collectionWorkflow === "direct-sale"
+                ? (lookup?.customer_name || "Direct-sale receivables")
+                : String(lookup?.total_pending_emis ?? 0)
+            }
+            helper={collectionWorkflow === "direct-sale" ? "Current customer/queue" : "Pending collectible EMI rows"}
+          />
+          <KpiCard
+            label={collectionWorkflow === "direct-sale" ? "Reference Mode" : "Overdue EMI"}
+            value={
+              collectionWorkflow === "direct-sale"
+                ? "Receipt-safe retail flow"
+                : String(lookup?.overdue_emi_count ?? 0)
+            }
+            helper={collectionWorkflow === "direct-sale" ? "No EMI allocation mutation" : "Overdue rows requiring attention"}
+          />
+          <WorkflowCard
+            title="Counter sequence"
+            description="Search -> verify row -> post once -> open receipt/history."
+          />
+        </QuickActionGrid>
+
+        <FormSection
           title="Workflow selection"
           description="Keep retail direct-sale collections separate from subscription EMI collections so each path stays operationally clear and financially safe."
         >
@@ -663,19 +836,20 @@ export default function CashierCollectPage() {
               );
             })}
           </div>
-        </SectionCard>
+        </FormSection>
 
         {collectionWorkflow === "direct-sale" ? (
-          <CashierDirectSaleCollectPanel />
+          <CashierDirectSaleCollectPanel prefillDirectSaleId={prefillDirectSaleId} />
         ) : (
           <>
-        <SectionCard
+        <div id="cashier-step-search">
+        <FormSection
           title="Step 1 · Search collectible EMI rows"
           description="Phone loads the full customer queue directly. Subscription, lucky, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
         >
           <form
             onSubmit={handleLookup}
-            className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]"
+            className="grid gap-4 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_auto]"
           >
             <div>
               <label
@@ -744,7 +918,8 @@ export default function CashierCollectPage() {
           <div className="mt-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
             {activeSearchConfig.help}
           </div>
-        </SectionCard>
+        </FormSection>
+        </div>
 
         {searchingMatches ? (
           <LoadingBlock label="Searching collectible EMI rows..." />
@@ -763,7 +938,7 @@ export default function CashierCollectPage() {
         !searchResultsError &&
         searchMode !== "phone" &&
         submittedSearch ? (
-          <SectionCard
+          <FormSection
             title="Search matches"
             description="Pick the right collectible EMI row to load the customer queue and continue safely."
           >
@@ -836,7 +1011,7 @@ export default function CashierCollectPage() {
                 ))}
               </div>
             )}
-          </SectionCard>
+          </FormSection>
         ) : null}
 
         {lookupLoading ? <LoadingBlock label="Loading customer pending queue..." /> : null}
@@ -851,7 +1026,7 @@ export default function CashierCollectPage() {
 
         {!lookupLoading && !lookupError && hasLookupResult ? (
           <>
-            <SectionCard
+            <FormSection
               title="Customer summary"
               description="Quick customer context for the current collection candidate."
             >
@@ -861,7 +1036,11 @@ export default function CashierCollectPage() {
                     Customer
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
-                    {lookup?.customer_name || "—"}
+                    <CustomerIntelligenceTrigger
+                      customerId={lookup?.customer_id}
+                      customerName={lookup?.customer_name || "—"}
+                      scope="cashier"
+                    />
                   </div>
                 </div>
                 <div>
@@ -908,12 +1087,18 @@ export default function CashierCollectPage() {
                   </span>
                 </div>
               </div>
-            </SectionCard>
+            </FormSection>
 
-            <SectionCard
+            <FormSection
               title="Step 2 · Select pending EMI"
               description="Choose the exact EMI row you are collecting against."
             >
+              {pendingEmis.some((row) => isRestrictedSubscriptionStatus(row.subscription_status)) ? (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  At least one visible contract shows a restricted subscription status. Confirm with a supervisor before
+                  you describe outcomes to the customer; collection posting rules are still enforced by the server.
+                </div>
+              ) : null}
               {pendingEmis.length === 0 ? (
                 <EmptyState
                   title="No pending Advance EMIs"
@@ -923,6 +1108,9 @@ export default function CashierCollectPage() {
                 <div className="space-y-3">
                   {pendingEmis.map((emi) => {
                     const isSelected = selectedEmiId === emi.id;
+                    const subscriptionRestricted = isRestrictedSubscriptionStatus(
+                      emi.subscription_status
+                    );
 
                     return (
                       <button
@@ -934,6 +1122,9 @@ export default function CashierCollectPage() {
                           isSelected
                             ? "border-primary bg-primary/5"
                             : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                          subscriptionRestricted
+                            ? "border-amber-300/80 bg-amber-50/40 opacity-90"
+                            : "",
                         ].join(" ")}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -946,6 +1137,13 @@ export default function CashierCollectPage() {
                                 status={emi.status}
                                 isOverdue={isEmiOverdue(emi)}
                               />
+                              {subscriptionRestricted ? (
+                                <StatusBadge
+                                  status="BLOCKED"
+                                  label={`Contract ${emi.subscription_status || "restricted"}`}
+                                  hideIcon
+                                />
+                              ) : null}
                               <span className="text-sm text-slate-600">
                                 Due {formatDate(emi.due_date)} · {overdueLabel(emi)}
                               </span>
@@ -993,9 +1191,10 @@ export default function CashierCollectPage() {
                   })}
                 </div>
               )}
-            </SectionCard>
+            </FormSection>
 
-            <SectionCard
+            <div id="cashier-step-collect">
+            <FormSection
               title="Step 3 · Post collection"
               description="Collect only against the selected EMI row. UPI and bank entries require a reference number."
             >
@@ -1257,9 +1456,10 @@ export default function CashierCollectPage() {
                   </div>
                 </form>
               )}
-            </SectionCard>
+            </FormSection>
+            </div>
 
-            <SectionCard
+            <FormSection
               title="Step 4 · Collect unapplied customer advance"
               description="Use this when the customer is paying now but the amount should remain unapplied until a later EMI or receivable allocation."
             >
@@ -1382,11 +1582,45 @@ export default function CashierCollectPage() {
                   </div>
                 </form>
               )}
-            </SectionCard>
+            </FormSection>
           </>
         ) : null}
           </>
         )}
+
+        {collectionWorkflow === "subscription" ? (
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 sm:hidden">
+            <div className="pointer-events-auto border-t border-border bg-background/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-18px_rgba(15,23,42,0.45)]">
+              <div className="mx-auto flex max-w-lg gap-2">
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() =>
+                    document
+                      .getElementById("cashier-step-search")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  Search
+                </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!selectedEmi || collecting}
+                  onClick={() =>
+                    document
+                      .getElementById("cashier-step-collect")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  Collect
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </PortalPage>
   );

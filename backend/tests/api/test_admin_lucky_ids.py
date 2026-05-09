@@ -10,6 +10,7 @@ from subscriptions.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
+from subscriptions.services.operational_cancellation_service import cancel_subscription
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -115,6 +116,32 @@ class AdminLuckyIdReportingTests(APITestCase):
         self.assertEqual(summary_response.data["assigned_lucky_ids"], 1)
         self.assertEqual(summary_response.data["won_lucky_ids"], 1)
         self.assertEqual(summary_response.data["won_subscription_count"], 1)
+        self.assertEqual(summary_response.data["active_monthly_booked_value"], "0.00")
+
+    def test_batch_summary_excludes_cancelled_subscriptions_from_active_metrics(self):
+        cancelled_lucky = create_lucky_id(batch=self.batch, lucky_number=21, status="AVAILABLE")
+        cancelled_sub = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_id=cancelled_lucky,
+            total_amount=Decimal("3600.00"),
+            monthly_amount=Decimal("1200.00"),
+            tenure_months=3,
+        )
+        cancel_subscription(
+            subscription_id=cancelled_sub.id,
+            actor=self.admin,
+            reason="Cancelled for visibility test",
+        )
+
+        summary_response = self.client.get(f"/api/v1/admin/batches/{self.batch.id}/summary/")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(summary_response.data["active_subscription_count"], 0)
+        self.assertGreaterEqual(summary_response.data["historical_subscription_count"], 2)
+        self.assertEqual(summary_response.data["cancelled_subscription_count"], 1)
+        self.assertEqual(summary_response.data["active_monthly_booked_value"], "0.00")
+        self.assertEqual(summary_response.data["draw_eligible_count"], 0)
 
     def test_stale_winner_rows_are_visible_as_won_after_repair(self):
         self.winner_subscription.status = "COMPLETED"
@@ -138,3 +165,104 @@ class AdminLuckyIdReportingTests(APITestCase):
         rows = lucky_response.data.get("results", lucky_response.data)
         winner_row = rows[0]
         self.assertEqual(winner_row["status"], "WON")
+
+    def test_available_endpoint_excludes_frozen_cancelled_holder(self):
+        frozen_batch = create_batch(
+            batch_code="LREL-LOCK-API",
+            duration_months=3,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 4, 1),
+            status="LOCKED",
+        )
+        frozen_lucky = create_lucky_id(batch=frozen_batch, lucky_number=17, status="AVAILABLE")
+        frozen_sub = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=frozen_batch,
+            lucky_id=frozen_lucky,
+            total_amount=Decimal("3000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=3,
+        )
+        frozen_lucky.status = "ASSIGNED"
+        frozen_lucky.save(update_fields=["status"])
+        cancel_subscription(
+            subscription_id=frozen_sub.id,
+            actor=self.admin,
+            reason="Cancelled after lock",
+        )
+
+        open_batch = create_batch(
+            batch_code="LREL-OPEN-API",
+            duration_months=3,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 4, 1),
+            status="OPEN",
+        )
+        released_lucky = create_lucky_id(batch=open_batch, lucky_number=18, status="AVAILABLE")
+        released_sub = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=open_batch,
+            lucky_id=released_lucky,
+            total_amount=Decimal("3000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=3,
+        )
+        released_lucky.status = "ASSIGNED"
+        released_lucky.save(update_fields=["status"])
+        cancel_subscription(
+            subscription_id=released_sub.id,
+            actor=self.admin,
+            reason="Cancelled before lock",
+        )
+
+        available_response = self.client.get(
+            f"/api/v1/admin/lucky-ids/available/?batch_id={open_batch.id}"
+        )
+        self.assertEqual(available_response.status_code, status.HTTP_200_OK)
+        available_ids = {row["id"] for row in available_response.data.get("results", [])}
+        self.assertIn(released_lucky.id, available_ids)
+        self.assertNotIn(frozen_lucky.id, available_ids)
+
+        frozen_row_response = self.client.get(f"/api/v1/admin/lucky-ids/{frozen_lucky.id}/")
+        self.assertEqual(frozen_row_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(frozen_row_response.data["assignable"])
+        self.assertEqual(frozen_row_response.data["assignment_state"], "FROZEN_CANCELLED_HOLDER")
+
+    def test_released_lucky_id_exposes_history_without_current_assignment(self):
+        open_batch = create_batch(
+            batch_code="LREL-OPEN-HISTORY",
+            duration_months=3,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 4, 1),
+            status="OPEN",
+        )
+        released_lucky = create_lucky_id(batch=open_batch, lucky_number=23, status="AVAILABLE")
+        released_sub = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=open_batch,
+            lucky_id=released_lucky,
+            total_amount=Decimal("3000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=3,
+        )
+        released_lucky.status = "ASSIGNED"
+        released_lucky.save(update_fields=["status"])
+        cancel_subscription(
+            subscription_id=released_sub.id,
+            actor=self.admin,
+            reason="Cancelled before lock",
+        )
+
+        row_response = self.client.get(f"/api/v1/admin/lucky-ids/{released_lucky.id}/")
+        self.assertEqual(row_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(row_response.data["is_available"])
+        self.assertFalse(row_response.data["is_currently_assigned"])
+        self.assertIsNone(row_response.data["current_subscription_id"])
+        self.assertTrue(row_response.data["has_historical_assignment"])
+        self.assertEqual(row_response.data["historical_subscription_status"], "CANCELLED")

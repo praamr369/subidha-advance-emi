@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import logging
 
 from accounting.models import FinanceAccount
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.models import JournalEntryGroup
+from accounting.models import JournalEntry
+from subscriptions.models import BusinessEventType
+from subscriptions.models import FinancialLedger
+from subscriptions.services.business_event_service import append_business_event
 
+finance_logger = logging.getLogger("finance.events")
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
@@ -43,7 +50,7 @@ class FinancePostingService:
         purpose: str = "PAYMENT_COLLECTION",
     ):
         accounts = ensure_phase3_system_accounts()
-        return post_bridge_entry(
+        entry, _created = post_bridge_entry(
             source_instance=payment,
             purpose=purpose,
             entry_date=payment.payment_date,
@@ -74,6 +81,50 @@ class FinancePostingService:
             },
             posted_by=performed_by,
         )
+        append_business_event(
+            event_type=BusinessEventType.LEDGER_POSTED,
+            source_module="accounting.services.finance_posting_service.post_subscription_collection",
+            actor_user=performed_by,
+            customer=getattr(payment, "customer", None),
+            subscription=getattr(payment, "subscription", None),
+            payment=payment,
+            batch=getattr(getattr(payment, "subscription", None), "batch", None),
+            lucky_id=getattr(getattr(payment, "subscription", None), "lucky_id", None),
+            ledger_reference=str(getattr(entry, "id", "") or ""),
+            payload={
+                "purpose": purpose,
+                "payment_id": payment.id,
+                "entry_id": getattr(entry, "id", None),
+            },
+        )
+        total_amount = _money(payment.amount)
+        journal_group = JournalEntryGroup.objects.create(
+            source_module="accounting.services.finance_posting_service.post_subscription_collection",
+            source_object_id=str(payment.id),
+            transaction_date=payment.payment_date,
+            narration=f"Subscription collection {payment.reference_no or payment.id}",
+            total_debit=total_amount,
+            total_credit=total_amount,
+            created_by=performed_by if getattr(performed_by, "pk", None) else None,
+        )
+        posted_journal = entry
+        JournalEntry.objects.filter(pk=posted_journal.id).update(journal_group=journal_group)
+        FinancialLedger.objects.filter(payment_id=payment.id).update(
+            journal_group=journal_group,
+            posting_side="CREDIT",
+            posting_status="POSTED",
+        )
+        finance_logger.info(
+            "finance.ledger_posted",
+            extra={
+                "entry_id": getattr(entry, "id", None),
+                "journal_group_id": journal_group.id,
+                "payment_id": payment.id,
+                "subscription_id": payment.subscription_id,
+                "performed_by_user_id": getattr(performed_by, "id", None),
+            },
+        )
+        return entry
 
     @classmethod
     def post_customer_advance_collection(

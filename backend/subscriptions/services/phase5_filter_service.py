@@ -19,6 +19,7 @@ SUPPORTED_FILTERS = {
     "category_id",
     "customer_id",
     "branch_id",
+    "collected_by_id",
     "overdue_only",
     "unreconciled_only",
 }
@@ -36,6 +37,7 @@ class AdminReportFilter:
     category_id: int | None
     customer_id: int | None
     branch_id: int | None
+    collected_by_id: int | None
     overdue_only: bool
     unreconciled_only: bool
     ignored_filters: list[dict[str, str]]
@@ -52,6 +54,7 @@ class AdminReportFilter:
             "category_id": self.category_id,
             "customer_id": self.customer_id,
             "branch_id": self.branch_id,
+            "collected_by_id": self.collected_by_id,
             "overdue_only": self.overdue_only,
             "unreconciled_only": self.unreconciled_only,
         }
@@ -68,6 +71,7 @@ class _FilterSerializer(serializers.Serializer):
     category_id = serializers.IntegerField(required=False, min_value=1)
     customer_id = serializers.IntegerField(required=False, min_value=1)
     branch_id = serializers.IntegerField(required=False, min_value=1)
+    collected_by_id = serializers.IntegerField(required=False, min_value=1)
     overdue_only = serializers.BooleanField(required=False)
     unreconciled_only = serializers.BooleanField(required=False)
 
@@ -122,6 +126,7 @@ def parse_admin_report_filters(query_params, *, applicable_filters: set[str]) ->
         category_id=include("category_id"),
         customer_id=include("customer_id"),
         branch_id=include("branch_id"),
+        collected_by_id=include("collected_by_id"),
         overdue_only=bool(include("overdue_only", False)),
         unreconciled_only=bool(include("unreconciled_only", False)),
         ignored_filters=ignored_filters,

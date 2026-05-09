@@ -39,6 +39,12 @@ export default function StatusBadge({
   });
   const Icon = presentation.icon;
 
+  const title = presentation.hint
+    ? `${presentation.label} — ${presentation.hint}`
+    : presentation.token
+      ? `${presentation.label} (${presentation.token})`
+      : presentation.label;
+
   return (
     <span
       className={cn(
@@ -47,7 +53,7 @@ export default function StatusBadge({
         toneClassName[presentation.tone],
         className
       )}
-      title={presentation.token}
+      title={title}
     >
       {!hideIcon ? (
         <Icon className={cn(size === "md" ? "h-4 w-4" : "h-3.5 w-3.5")} />

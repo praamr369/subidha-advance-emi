@@ -44,6 +44,17 @@ export default async function ContactPage() {
         ]}
       />
 
+      <PublicMarketingBanner
+        eyebrow="Trust and policy help"
+        title="Need clarity on rules, receipts, warranty, or delivery?"
+        description="Our support team can explain plan rules, payment safety, winner publication, and delivery/return workflow before and after enrollment."
+        items={[
+          { title: "Plan and payment explanation", description: "Understand monthly amount, receipt flow, and customer self-service access." },
+          { title: "Warranty / return policy", description: "Get product-level support guidance and escalation path." },
+          { title: "Delivery process", description: "Confirm scheduling, handover expectations, and post-delivery support." },
+        ]}
+      />
+
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-6">
           <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">

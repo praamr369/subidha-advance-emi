@@ -16,8 +16,12 @@ export default function PortalShell({ sidebar, header, children, className }: Po
         {sidebar ? <div className="hidden md:block">{sidebar}</div> : null}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {header}
-          <main id="main-content" tabIndex={-1} className="portal-scroll-area flex-1 overflow-y-auto">
-            <div className="workspace-shell-stage mx-auto w-full max-w-[var(--workspace-max-width)] px-4 py-4 sm:px-6 sm:py-6 lg:px-7 lg:py-7 xl:px-8">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-clip overscroll-behavior-x-contain"
+          >
+            <div className="workspace-shell-stage mx-auto w-full min-w-0 max-w-[var(--workspace-max-width)] px-4 py-4 sm:px-6 sm:py-6 lg:px-7 lg:py-7 xl:px-8">
               <div className="route-content-fade relative z-[1]">{children}</div>
             </div>
           </main>

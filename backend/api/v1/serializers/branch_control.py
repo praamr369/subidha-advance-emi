@@ -28,6 +28,27 @@ class CashCounterSerializer(serializers.ModelSerializer):
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     assigned_user_username = serializers.CharField(source="assigned_user.username", read_only=True)
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        branch = attrs.get("branch")
+        finance_account = attrs.get("finance_account")
+        if branch is None and self.instance is not None:
+            branch = self.instance.branch
+        if finance_account is None and self.instance is not None:
+            finance_account = self.instance.finance_account
+        if branch is None or finance_account is None:
+            return attrs
+        from accounting.services.finance_account_collection_guard import validate_finance_account_for_cash_counter
+
+        try:
+            validate_finance_account_for_cash_counter(
+                finance_account=finance_account,
+                branch_id=branch.pk,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"finance_account": str(exc)}) from exc
+        return attrs
+
     class Meta:
         model = CashCounter
         fields = [

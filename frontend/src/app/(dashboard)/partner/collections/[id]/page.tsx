@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -70,7 +70,9 @@ function toErrorMessage(error: unknown): string {
 
 export default function PartnerCollectionDetailPage() {
   const params = useParams<{ id: string }>();
-  const requestId = params?.id;
+  const pathname = usePathname();
+  const pathRequestId = pathname?.split("/").pop();
+  const requestId = params?.id || pathRequestId;
 
   const [request, setRequest] = useState<PartnerCollectionRequestDetail | null>(
     null
@@ -176,7 +178,13 @@ export default function PartnerCollectionDetailPage() {
   return (
     <PortalPage
       eyebrow="Partner Collections"
-      title={request ? `Collection Request #${request.id}` : "Collection Request Detail"}
+      title={
+        request
+          ? `Collection Request #${request.id}`
+          : requestId
+            ? `Collection Request #${requestId}`
+            : "Collection Request Detail"
+      }
       subtitle="Track partner-submitted collection request status, review outcome, and any verified payment linkage from the partner workspace."
       helperNote="This record explains request progression only. Final payment truth becomes partner-visible after approval and does not bypass admin verification controls."
       helperTone="info"

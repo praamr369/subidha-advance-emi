@@ -1,15 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
+import {
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  QuickActionGrid,
+  WorkflowCard,
+} from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import { normalizeApiError } from "@/services/api/errors";
 import AdminDirectSaleCollectForm from "@/features/direct-sale/components/AdminDirectSaleCollectForm";
+import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   listBranches,
@@ -27,8 +37,15 @@ import {
   type PaymentCollectionResult,
   type PaymentMethod,
 } from "@/services/payments";
+import {
+  previewAdminReceivableAllocation,
+  searchAdminReceivables,
+  type UnifiedReceivableResult,
+  type UnifiedReceivablePreviewResponse,
+} from "@/services/receivables";
 
 type AdminPaymentCollectVariant = "page" | "drawer";
+type CollectionWorkflow = "advance-emi" | "direct-sale" | "unified";
 
 type FormState = {
   subscription_id: string;
@@ -71,6 +88,18 @@ function parsePositiveInteger(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Request timed out. Please retry.")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function buildDefaultForm(): FormState {
   return {
     subscription_id: "",
@@ -108,6 +137,59 @@ function formatDateLabel(value?: string | null): string {
     month: "short",
     year: "numeric",
   }).format(date);
+}
+
+const WORKFLOW_TABS: Array<{
+  key: CollectionWorkflow;
+  label: string;
+  href: string;
+  helper: string;
+}> = [
+  {
+    key: "advance-emi",
+    label: "Advance EMI Collection",
+    href: `${ROUTES.admin.financeCollect}?workflow=advance-emi`,
+    helper: "Posts against EMI schedules and subscription ledger.",
+  },
+  {
+    key: "direct-sale",
+    label: "Direct-Sale Collection",
+    href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`,
+    helper: "Posts retail receipts against invoiced direct-sale receivables.",
+  },
+  {
+    key: "unified",
+    label: "Unified Search",
+    href: `${ROUTES.admin.financeCollect}?workflow=unified`,
+    helper: "Find a customer, contract, invoice, sale, or receipt and route to the correct workflow.",
+  },
+];
+
+function WorkflowTabs({ active }: { active: CollectionWorkflow }) {
+  const current = WORKFLOW_TABS.find((tab) => tab.key === active) ?? WORKFLOW_TABS[2];
+  return (
+    <div className="space-y-3">
+      <div className="inline-flex flex-wrap rounded-xl border border-border bg-[var(--surface-muted)] p-1">
+        {WORKFLOW_TABS.map((tab) => (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            className={[
+              "inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition",
+              active === tab.key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+            ].join(" ")}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </div>
+      <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm text-muted-foreground">
+        {current.helper}
+      </div>
+    </div>
+  );
 }
 
 function normalizeOutstandingAmount(
@@ -153,26 +235,6 @@ function getEmiLabel(emi: AdminEmiCollectionCandidate): string {
   }`;
 }
 
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.3)]">
-      <div className="enterprise-eyebrow">
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold text-foreground">{value}</div>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
-}
-
 export default function AdminPaymentCollectPage({
   variant = "page",
   queryString,
@@ -189,17 +251,22 @@ export default function AdminPaymentCollectPage({
     return runtimeSearchParams.toString();
   }, [queryString, runtimeSearchParams]);
   const canonicalSelfHref = useMemo(() => {
-    return searchParamKey ? `/admin/payments/create?${searchParamKey}` : "/admin/payments/create";
+    return searchParamKey ? `${ROUTES.admin.financeCollect}?${searchParamKey}` : ROUTES.admin.financeCollect;
   }, [searchParamKey]);
-  const collectionWorkflow = useMemo(
-    () =>
-      new URLSearchParams(searchParamKey).get("workflow") === "direct-sale"
-        ? "direct-sale"
-        : "subscription",
-    [searchParamKey]
-  );
+  const collectionWorkflow = useMemo<CollectionWorkflow>(() => {
+    const params = new URLSearchParams(searchParamKey);
+    const workflow = (params.get("workflow") || "").trim().toLowerCase();
+    if (workflow === "direct-sale") return "direct-sale";
+    if (workflow === "advance-emi") return "advance-emi";
+    if (workflow === "unified") return "unified";
+    if (params.get("subscription") || params.get("subscription_id") || params.get("emi") || params.get("emi_id")) {
+      return "advance-emi";
+    }
+    return "advance-emi";
+  }, [searchParamKey]);
   const prefillDirectSaleId = useMemo(() => {
-    const raw = new URLSearchParams(searchParamKey).get("direct_sale");
+    const params = new URLSearchParams(searchParamKey);
+    const raw = params.get("sale_id") ?? params.get("direct_sale");
     return parsePositiveInteger(raw);
   }, [searchParamKey]);
   const [form, setForm] = useState<FormState>(() => buildDefaultForm());
@@ -230,6 +297,18 @@ export default function AdminPaymentCollectPage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [prefillMessages, setPrefillMessages] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
+  const [unifiedSearchResults, setUnifiedSearchResults] = useState<
+    UnifiedReceivableResult[]
+  >([]);
+  const [unifiedSearchLoading, setUnifiedSearchLoading] = useState(false);
+  const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
+  const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
+  const [unifiedActionLoadingKey, setUnifiedActionLoadingKey] = useState<string | null>(null);
+  const [unifiedLastPaymentSummary, setUnifiedLastPaymentSummary] = useState<string | null>(null);
+  const [allocationPreview, setAllocationPreview] =
+    useState<UnifiedReceivablePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const selectedMethodLabel =
     PAYMENT_METHOD_OPTIONS.find(
@@ -355,6 +434,48 @@ export default function AdminPaymentCollectPage({
     }
   }, [resetMessages, updateField]);
 
+  async function handleUnifiedReceivableSearch(query: string) {
+    const trimmed = query.trim();
+    setUnifiedSearchSubmitted(true);
+    setUnifiedSearchError(null);
+    setUnifiedLastPaymentSummary(null);
+
+    if (!trimmed) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError("Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference.");
+      return;
+    }
+
+    setUnifiedSearchLoading(true);
+    try {
+      const payload = await withTimeout(searchAdminReceivables(trimmed));
+      setUnifiedSearchResults(payload.results);
+    } catch (error) {
+      setUnifiedSearchResults([]);
+      setUnifiedSearchError(
+        normalizeApiError(error).message || "Unable to search receivables."
+      );
+    } finally {
+      setUnifiedSearchLoading(false);
+    }
+  }
+
+  async function handleUnifiedAdvanceEmiSelect(row: UnifiedReceivableResult) {
+    if (!row.source_id) {
+      setUnifiedSearchError("This receivable does not include a subscription id.");
+      return;
+    }
+    const actionKey = `${row.source_type}-${row.source_id}`;
+    setUnifiedActionLoadingKey(actionKey);
+    try {
+      await loadSubscription(row.source_id);
+      setSuccessMessage(null);
+      setErrorMessage(null);
+    } finally {
+      setUnifiedActionLoadingKey(null);
+    }
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -363,7 +484,7 @@ export default function AdminPaymentCollectPage({
         const [branchPayload, counterPayload, financeAccountPayload] = await Promise.all([
           listBranches({ status: "ACTIVE" }),
           listCashCounters({ is_active: "true" }),
-          listFinanceAccounts({ is_active: 1, page_size: 100 }),
+          listFinanceAccounts({ is_active: 1, page_size: 100, for_payment_collection: "true" }),
         ]);
         if (!active) return;
         setBranches(branchPayload.results);
@@ -626,7 +747,7 @@ export default function AdminPaymentCollectPage({
     setIsSubmitting(true);
 
     try {
-      const result = await collectPayment({
+      const result = await withTimeout(collectPayment({
         emi: Number(form.emi_id),
         amount: form.amount,
         payment_method: form.payment_method,
@@ -638,11 +759,14 @@ export default function AdminPaymentCollectPage({
           : undefined,
         reference_no: form.reference_no.trim() || undefined,
         notes: form.notes.trim() || undefined,
-      });
+      }));
 
       setSubmitResult(result);
       setSuccessMessage(
         `Payment #${result.payment.id} recorded successfully for EMI #${result.emi.id}.`
+      );
+      setUnifiedLastPaymentSummary(
+        `Last payment status: success — payment #${result.payment.id} for EMI #${result.emi.id} (${formatCurrency(result.payment.amount)} · ${String(result.payment.method ?? result.payment.payment_method ?? form.payment_method).toUpperCase()}).`
       );
       onCreated?.(result.payment.id);
 
@@ -659,11 +783,29 @@ export default function AdminPaymentCollectPage({
     }
   }
 
+  async function handlePreviewAllocation() {
+    if (!form.subscription_id || !form.amount) return;
+    setPreviewLoading(true);
+    setAllocationPreview(null);
+    try {
+      const payload = await previewAdminReceivableAllocation({
+        source_type: "ADVANCE_EMI",
+        source_id: Number(form.subscription_id),
+        amount: form.amount,
+      });
+      setAllocationPreview(payload);
+    } catch {
+      setAllocationPreview(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   if (collectionWorkflow === "direct-sale") {
     return (
       <PortalPage
         title={variant === "drawer" ? "Collect direct-sale balance" : "Admin Direct-Sale Collection"}
-        subtitle="Retail receivable collection workflow for invoiced direct sales with outstanding balance."
+        subtitle="Direct-sale receivable collection workflow for invoiced direct sales with outstanding balance."
         helperNote="This path creates a retail receipt against an existing direct-sale receivable. It stays separate from EMI allocation, winner waivers, and subscription reconciliation."
         helperTone="info"
         breadcrumbs={
@@ -690,6 +832,7 @@ export default function AdminPaymentCollectPage({
         presentation={variant === "drawer" ? "popup" : "page"}
         maxWidth={variant === "drawer" ? "100%" : undefined}
       >
+        {variant === "page" ? <WorkflowTabs active="direct-sale" /> : null}
         <AdminDirectSaleCollectForm
           variant={variant}
           canonicalSelfHref={canonicalSelfHref}
@@ -699,11 +842,49 @@ export default function AdminPaymentCollectPage({
     );
   }
 
+  if (collectionWorkflow === "unified") {
+    return (
+      <PortalPage
+        title="Payment Collection"
+        subtitle="Choose the collection workflow or search across live receivables, then route to the correct posting path."
+        helperNote="Unified search does not post money directly. It routes Advance EMI and direct-sale receivables into their separate backend-safe collection workflows."
+        helperTone="info"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin" },
+          { label: "Finance", href: ROUTES.admin.finance },
+          { label: "Payment Collection" },
+        ]}
+        actions={[
+          { label: "Collections Workspace", href: ROUTES.admin.collections, variant: "secondary" },
+          { label: "Advance EMI Collection", href: `${ROUTES.admin.financeCollect}?workflow=advance-emi`, variant: "secondary" },
+          { label: "Direct-Sale Collection", href: `${ROUTES.admin.financeCollect}?workflow=direct-sale`, variant: "secondary" },
+        ]}
+      >
+        <div className="space-y-6">
+          <WorkflowTabs active="unified" />
+          <UnifiedReceivableSearchPanel
+            title="Unified collection search"
+            description="Find a customer, contract, invoice, sale, or receipt and route to Advance EMI collection, direct-sale collection, sale finalization, or receipt review."
+            query={unifiedSearchQuery}
+            results={unifiedSearchResults}
+            loading={unifiedSearchLoading}
+            error={unifiedSearchError}
+            searched={unifiedSearchSubmitted}
+            actionLoadingKey={unifiedActionLoadingKey}
+            lastPaymentSummary={unifiedLastPaymentSummary}
+            onQueryChange={setUnifiedSearchQuery}
+            onSearch={handleUnifiedReceivableSearch}
+          />
+        </div>
+      </PortalPage>
+    );
+  }
+
   return (
     <PortalPage
-      title={variant === "drawer" ? "Collect payment" : "Admin Collection Entry"}
+      title={variant === "drawer" ? "Admin Collection Entry" : "Admin Collection Entry"}
       subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
-      helperNote="This screen posts into the existing payment service path; no ledger, waiver, or reconciliation semantics are altered by UI input."
+      helperNote="Advance EMI collections post against EMI schedules. Direct-sale receivable collections use the separate direct-sale retail receipt workflow."
       helperTone="info"
       breadcrumbs={
         variant === "drawer"
@@ -754,16 +935,52 @@ export default function AdminPaymentCollectPage({
       presentation={variant === "drawer" ? "popup" : "page"}
       maxWidth={variant === "drawer" ? "100%" : undefined}
     >
+      <div className="space-y-6">
+        {variant === "page" ? <WorkflowTabs active="advance-emi" /> : null}
+        <QuickActionGrid>
+          <KpiCard
+            label="Selected subscription"
+            value={selectedSubscription?.subscription_number || "—"}
+            helper={selectedSubscription?.status || "No subscription selected"}
+          />
+          <KpiCard
+            label="Selected EMI"
+            value={selectedEmi ? `#${selectedEmi.id}` : "—"}
+            helper={selectedEmi?.status || "No EMI selected"}
+          />
+          <KpiCard
+            label="Auto amount"
+            value={form.amount ? formatCurrency(form.amount) : "—"}
+            helper="Derived from outstanding amount"
+          />
+          <WorkflowCard
+            title="Safe posting path"
+            description="Search subscription -> select EMI -> verify amount/method -> confirm posting."
+          />
+        </QuickActionGrid>
+        <UnifiedReceivableSearchPanel
+          title="Universal contract search"
+          description="Search across Advance EMI, rent, lease, and direct-sale references. Active actions route back into the existing posting workflows."
+          query={unifiedSearchQuery}
+          results={unifiedSearchResults}
+          loading={unifiedSearchLoading}
+          error={unifiedSearchError}
+          searched={unifiedSearchSubmitted}
+          actionLoadingKey={unifiedActionLoadingKey}
+          lastPaymentSummary={unifiedLastPaymentSummary}
+          onQueryChange={setUnifiedSearchQuery}
+          onSearch={handleUnifiedReceivableSearch}
+          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+        />
+
       <div className={showAside ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-6"}>
-        <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <FormSection
+          title="Collection workflow"
+          description="Counter staff should first select the subscription, then choose the EMI. Amount auto-fills from outstanding value so payment entry remains controlled and operationally fast."
+        >
           <div className="mb-6">
-            <h2 className="enterprise-section-title text-lg">
-              Collection workflow
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Counter staff should first select the subscription, then choose the EMI.
-              Amount auto-fills from outstanding value so payment entry remains controlled
-              and operationally fast.
+            <p className="text-sm leading-6 text-muted-foreground">
+              Use existing payment services only. No direct ledger mutation or custom posting path is introduced here.
             </p>
           </div>
 
@@ -1088,6 +1305,16 @@ export default function AdminPaymentCollectPage({
                 type="button"
                 variant="outline"
                 size="lg"
+                onClick={handlePreviewAllocation}
+                disabled={isSubmitting || !form.subscription_id || !form.amount}
+              >
+                {previewLoading ? "Previewing..." : "Preview Allocation"}
+              </ActionButton>
+
+              <ActionButton
+                type="button"
+                variant="outline"
+                size="lg"
                 onClick={resetForm}
                 disabled={isSubmitting}
               >
@@ -1103,75 +1330,81 @@ export default function AdminPaymentCollectPage({
               </ActionButton>
             </div>
           </form>
-        </section>
+        </FormSection>
 
         {showAside ? (
           <aside className="space-y-4">
-            <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h3 className="enterprise-eyebrow text-sm">
-                Selected subscription
-              </h3>
-
-              <div className="mt-4 grid gap-3">
-                <StatCard
+            <DetailPanel title="Selected subscription">
+              <div className="grid gap-3">
+                <KpiCard
                   label="Subscription"
                   value={selectedSubscription?.subscription_number || "—"}
-                  hint={selectedSubscription?.status || "No subscription selected"}
+                  helper={selectedSubscription?.status || "No subscription selected"}
                 />
-                <StatCard
+                <KpiCard
                   label="Customer"
                   value={selectedSubscription?.customer_name || "—"}
-                  hint={selectedSubscription?.customer_phone || "Customer not loaded"}
+                  helper={selectedSubscription?.customer_phone || "Customer not loaded"}
                 />
-                <StatCard
+                <KpiCard
                   label="Product"
                   value={selectedSubscription?.product_name || "—"}
-                  hint={
+                  helper={
                     selectedSubscription?.batch_code
                       ? `Batch ${selectedSubscription.batch_code}`
                       : "Batch not loaded"
                   }
                 />
-                <StatCard
+                <KpiCard
                   label="Monthly EMI"
                   value={formatCurrency(selectedSubscription?.monthly_amount)}
-                  hint={
+                  helper={
                     selectedSubscription?.tenure_months
                       ? `${selectedSubscription.tenure_months} months`
                       : "Tenure not loaded"
                   }
                 />
               </div>
-            </div>
+            </DetailPanel>
 
-            <div className="surface-panel-elevated rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <h3 className="enterprise-eyebrow text-sm">
-                Selected EMI
-              </h3>
-
-              <div className="mt-4 grid gap-3">
-                <StatCard
+            <DetailPanel title="Selected EMI">
+              <div className="grid gap-3">
+                <KpiCard
                   label="EMI ID"
                   value={selectedEmi ? `#${selectedEmi.id}` : "—"}
-                  hint={selectedEmi?.status || "No EMI selected"}
+                  helper={selectedEmi?.status || "No EMI selected"}
                 />
-                <StatCard
+                <KpiCard
                   label="Due date"
                   value={formatDateLabel(selectedEmi?.due_date)}
-                  hint="Scheduled due date"
+                  helper="Scheduled due date"
                 />
-                <StatCard
+                <KpiCard
                   label="EMI amount"
                   value={formatCurrency(selectedEmi?.amount)}
-                  hint="Nominal installment amount"
+                  helper="Nominal installment amount"
                 />
-                <StatCard
+                <KpiCard
                   label="Outstanding"
                   value={form.amount ? formatCurrency(form.amount) : "—"}
-                  hint="Auto-filled collection amount"
+                  helper="Auto-filled collection amount"
                 />
               </div>
-            </div>
+            </DetailPanel>
+
+            {allocationPreview ? (
+              <DetailPanel title="Allocation preview">
+                <div className="text-sm text-muted-foreground">
+                  Requested {formatCurrency(allocationPreview.requested_amount)} · Unallocated{" "}
+                  {formatCurrency(allocationPreview.unallocated_amount)}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {allocationPreview.overpayment_warning
+                    ? "Warning: requested amount exceeds current collectible dues."
+                    : "Allocation is fully covered by current pending dues."}
+                </div>
+              </DetailPanel>
+            ) : null}
 
             {submitResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
@@ -1214,8 +1447,9 @@ export default function AdminPaymentCollectPage({
                 creation.
               </p>
             </div>
-          </aside>
-        ) : null}
+        </aside>
+      ) : null}
+      </div>
       </div>
     </PortalPage>
   );

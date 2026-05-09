@@ -1,11 +1,22 @@
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
+from billing.services.direct_sale_delivery_queue import (
+    DIRECT_SALE_SUCCESS_TERMINAL_STATUSES,
+    apply_direct_sale_case_filters,
+    direct_sale_delivery_cases_queryset,
+    merge_delivery_summaries,
+    serialize_direct_sale_delivery_case,
+)
+from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
 from api.v1.serializers.delivery import (
+    AdminDeliveryDirectSaleSourceSerializer,
+    AdminDeliveryDirectSaleSourcesQuerySerializer,
     AdminDeliverySourceSubscriptionsQuerySerializer,
     AdminDeliverySourceSubscriptionSerializer,
     AdminSubscriptionDeliveryCreateSerializer,
@@ -15,8 +26,19 @@ from api.v1.serializers.delivery import (
     AdminSubscriptionDeliveryTransitionSerializer,
     AdminSubscriptionDeliveryUpdateSerializer,
 )
-from subscriptions.models import DeliveryStatus, Subscription
+from billing.models import DirectSale, DirectSaleStatus
+from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+from billing.services.direct_sale_delivery_actions import (
+    add_direct_sale_delivery_note,
+    cancel_direct_sale_delivery,
+    dispatch_direct_sale_delivery,
+    mark_direct_sale_delivered,
+    schedule_direct_sale_delivery,
+    update_direct_sale_delivery_metadata,
+)
+from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
+from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
 from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     cancel_subscription_delivery,
@@ -29,6 +51,7 @@ from subscriptions.services.delivery_service import (
     transition_subscription_delivery_status,
     update_subscription_delivery_metadata,
 )
+from subscriptions.services.operational_cancellation_service import record_delivery_cancellation_audit
 
 
 def _apply_delivery_filters(queryset, request):
@@ -64,6 +87,8 @@ def _apply_delivery_filters(queryset, request):
 
     if bucket == "DELIVERED":
         queryset = queryset.filter(status=DeliveryStatus.DELIVERED)
+    elif bucket == "READY_DISPATCH":
+        queryset = queryset.filter(status=DeliveryStatus.SCHEDULED)
     elif bucket == "PENDING":
         queryset = queryset.filter(
             status__in=[
@@ -105,34 +130,169 @@ class AdminDeliveryListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        queryset = _apply_delivery_filters(get_delivery_queryset(), request)
-        serializer = AdminSubscriptionDeliveryReadSerializer(queryset[:200], many=True)
+        source_type = (request.query_params.get("source_type") or "ALL").strip().upper()
+        include_sub = source_type in ("ALL", "SUBSCRIPTION")
+        include_ds = source_type in ("ALL", "DIRECT_SALE")
+
+        bucket_upper = (request.query_params.get("bucket") or "").strip().upper()
+        ds_active_only = bucket_upper != "DELIVERED"
+
+        subscription_rows: list[dict] = []
+        sub_count = 0
+        sub_summary = build_delivery_report_summary(SubscriptionDelivery.objects.none())
+
+        if include_sub:
+            queryset = _apply_delivery_filters(get_delivery_queryset(), request)
+            serializer = AdminSubscriptionDeliveryReadSerializer(queryset[:200], many=True)
+            subscription_rows = list(serializer.data)
+            sub_summary = build_delivery_report_summary(queryset)
+            sub_count = queryset.count()
+
+        include_direct_sale_cases_flag = (
+            request.query_params.get("include_direct_sale_cases") or "true"
+        ).strip().lower() not in {
+            "false",
+            "0",
+            "no",
+        }
+        include_ds_merge = include_ds and include_direct_sale_cases_flag
+
+        ds_payloads: list[dict] = []
+        if include_ds_merge:
+            ds_qs = apply_direct_sale_case_filters(
+                direct_sale_delivery_cases_queryset(active_only=ds_active_only),
+                request,
+            )
+            ds_cases = list(ds_qs[:400])
+            ds_payloads = [serialize_direct_sale_delivery_case(c) for c in ds_cases]
+            pending_ds = sum(
+                1
+                for c in ds_cases
+                if c.status in (ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW)
+            )
+            scheduled_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.AUTHORIZED)
+            ofd_ds = sum(1 for c in ds_cases if c.status == ServiceDeskCaseStatus.IN_SERVICE)
+            delivered_ds = sum(1 for c in ds_cases if c.status in DIRECT_SALE_SUCCESS_TERMINAL_STATUSES)
+            sub_summary = merge_delivery_summaries(
+                subscription_summary=sub_summary,
+                direct_sale_cases_count=len(ds_cases),
+                pending_ds=pending_ds,
+                scheduled_ds=scheduled_ds,
+                ofd_ds=ofd_ds,
+                delivered_ds=delivered_ds,
+            )
+
+        if not include_sub and not include_ds_merge:
+            return Response(
+                {
+                    "count": 0,
+                    "subscription_delivery_count": 0,
+                    "direct_sale_delivery_count": 0,
+                    "summary": sub_summary,
+                    "results": [],
+                }
+            )
+
+        if include_sub and not include_ds_merge:
+            return Response(
+                {
+                    "count": sub_count,
+                    "subscription_delivery_count": sub_count,
+                    "direct_sale_delivery_count": 0,
+                    "summary": sub_summary,
+                    "results": subscription_rows,
+                }
+            )
+
+        if include_ds_merge and not include_sub:
+            total_count = len(ds_payloads)
+            return Response(
+                {
+                    "count": total_count,
+                    "subscription_delivery_count": 0,
+                    "direct_sale_delivery_count": len(ds_payloads),
+                    "summary": sub_summary,
+                    "results": ds_payloads[:200],
+                }
+            )
+
+        merged: list[dict] = []
+        i_sub = 0
+        i_ds = 0
+        while len(merged) < 200 and (i_sub < len(subscription_rows) or i_ds < len(ds_payloads)):
+            ts_sub = subscription_rows[i_sub].get("created_at") if i_sub < len(subscription_rows) else None
+            ts_ds = ds_payloads[i_ds].get("created_at") if i_ds < len(ds_payloads) else None
+            pick_sub = False
+            if ts_sub and ts_ds:
+                pick_sub = ts_sub >= ts_ds
+            elif ts_sub:
+                pick_sub = True
+            elif ts_ds:
+                pick_sub = False
+            else:
+                pick_sub = i_sub < len(subscription_rows)
+
+            if pick_sub and i_sub < len(subscription_rows):
+                row = dict(subscription_rows[i_sub])
+                row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                row.setdefault("source_type", "SUBSCRIPTION")
+                merged.append(row)
+                i_sub += 1
+            elif i_ds < len(ds_payloads):
+                merged.append(ds_payloads[i_ds])
+                i_ds += 1
+            elif i_sub < len(subscription_rows):
+                row = dict(subscription_rows[i_sub])
+                row.setdefault("record_kind", "SUBSCRIPTION_DELIVERY")
+                row.setdefault("source_type", "SUBSCRIPTION")
+                merged.append(row)
+                i_sub += 1
+            else:
+                break
+
+        total_count = sub_count + len(ds_payloads)
+
         return Response(
             {
-                "count": queryset.count(),
-                "summary": build_delivery_report_summary(queryset),
-                "results": serializer.data,
+                "count": total_count,
+                "subscription_delivery_count": sub_count,
+                "direct_sale_delivery_count": len(ds_payloads),
+                "summary": sub_summary,
+                "results": merged,
             }
         )
 
     def post(self, request):
         serializer = AdminSubscriptionDeliveryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        direct_sale = validated.get("direct_sale")
+
+        if direct_sale is not None:
+            case = sync_direct_sale_delivery_case(sale=direct_sale, actor=request.user)
+            if case is None:
+                raise serializers.ValidationError(
+                    {"detail": "Unable to open delivery tracking for this sale (delivery may be disabled)."}
+                )
+            return Response(
+                serialize_direct_sale_delivery_case(case),
+                status=status.HTTP_201_CREATED,
+            )
 
         try:
             delivery = create_subscription_delivery(
-                subscription=serializer.validated_data["subscription"],
+                subscription=validated["subscription"],
                 performed_by=request.user,
-                status=serializer.validated_data.get("status", DeliveryStatus.PENDING),
-                delivery_reference=serializer.validated_data.get("delivery_reference"),
-                scheduled_date=serializer.validated_data.get("scheduled_date"),
-                receiver_name=serializer.validated_data.get("receiver_name", ""),
-                receiver_phone=serializer.validated_data.get("receiver_phone", ""),
-                delivery_address_snapshot=serializer.validated_data.get(
+                status=validated.get("status", DeliveryStatus.PENDING),
+                delivery_reference=validated.get("delivery_reference"),
+                scheduled_date=validated.get("scheduled_date"),
+                receiver_name=validated.get("receiver_name", ""),
+                receiver_phone=validated.get("receiver_phone", ""),
+                delivery_address_snapshot=validated.get(
                     "delivery_address_snapshot",
                     "",
                 ),
-                notes=serializer.validated_data.get("notes", ""),
+                notes=validated.get("notes", ""),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -242,8 +402,36 @@ class AdminDeliveryDetailView(APIView):
         return get_object_or_404(get_delivery_queryset(), pk=pk)
 
     def get(self, request, pk):
+        source_type = (request.query_params.get("source_type") or "").strip().upper()
+        if source_type in {"DIRECT_SALE", "DIRECT-SALE", "DIRECT_SALE_DELIVERY"}:
+            case = get_object_or_404(
+                ServiceDeskCase.objects.select_related(
+                    "direct_sale",
+                    "direct_sale__customer",
+                    "billing_invoice",
+                    "product",
+                ),
+                pk=pk,
+                case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+            )
+            return Response(serialize_direct_sale_delivery_case(case))
         delivery = self.get_object(pk)
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class AdminDeliveryPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        delivery = get_delivery_queryset().filter(pk=pk).first()
+        if delivery is None:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_delivery_handover_pdf(delivery=delivery)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="delivery-{delivery.delivery_reference or delivery.id}.pdf"'
+        )
+        return response
 
     def patch(self, request, pk):
         delivery = self.get_object(pk)
@@ -346,7 +534,16 @@ class AdminDeliveryCancelView(APIView):
                 reason=serializer.validated_data["reason"],
                 notes=serializer.validated_data.get("notes"),
             )
+            record_delivery_cancellation_audit(
+                delivery=delivery,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+            )
         except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
@@ -390,3 +587,216 @@ class AdminDeliveryMarkReturnedView(APIView):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class AdminDeliverySourceDirectSalesView(APIView):
+    """Search direct-sale sources eligible for delivery desk tracking."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        query_serializer = AdminDeliveryDirectSaleSourcesQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+
+        q = (query_serializer.validated_data.get("q") or "").strip()
+        limit = query_serializer.validated_data.get("limit") or 20
+
+        queryset = (
+            DirectSale.objects.select_related("customer")
+            .prefetch_related("billing_invoices")
+            .filter(delivery_required=True)
+            .exclude(status=DirectSaleStatus.CANCELLED)
+            .order_by("-created_at", "-id")
+        )
+
+        if q:
+            filters = (
+                Q(sale_no__icontains=q)
+                | Q(customer_name_snapshot__icontains=q)
+                | Q(customer_phone_snapshot__icontains=q)
+                | Q(billing_invoices__document_no__icontains=q)
+            )
+            if q.isdigit():
+                filters = filters | Q(id=int(q)) | Q(billing_invoices__id=int(q))
+            queryset = queryset.filter(filters).distinct()
+
+        total = queryset.count()
+        serializer = AdminDeliveryDirectSaleSourceSerializer(queryset[:limit], many=True)
+        return Response({"count": total, "results": serializer.data})
+
+
+class AdminDeliverySourceDirectSalePrefillView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, direct_sale_id: int):
+        sale = get_object_or_404(
+            DirectSale.objects.select_related("customer").prefetch_related("billing_invoices"),
+            pk=direct_sale_id,
+        )
+        snapshot_lines = "\n".join(
+            [
+                line
+                for line in [
+                    (sale.delivery_snapshot_address_line1 or "").strip(),
+                    (sale.delivery_snapshot_address_line2 or "").strip(),
+                    " ".join(
+                        [
+                            (sale.delivery_snapshot_city or "").strip(),
+                            (sale.delivery_snapshot_state or "").strip(),
+                            (sale.delivery_snapshot_pincode or "").strip(),
+                        ]
+                    ).strip(),
+                ]
+                if line
+            ]
+        )
+        cust = sale.customer
+        receiver_name = (sale.customer_name_snapshot or "").strip() or (
+            getattr(cust, "name", "") if cust else ""
+        ).strip()
+        receiver_phone = (sale.customer_phone_snapshot or "").strip() or (
+            getattr(cust, "phone", "") if cust else ""
+        ).strip()
+        payload = AdminDeliveryDirectSaleSourceSerializer(sale).data
+        return Response(
+            {
+                "source": payload,
+                "defaults": {
+                    "receiver_name": receiver_name,
+                    "receiver_phone": receiver_phone,
+                    "delivery_address_snapshot": snapshot_lines,
+                    "notes": "",
+                },
+            }
+        )
+
+
+class _DirectSaleScheduleSerializer(serializers.Serializer):
+    scheduled_date = serializers.DateField(required=False, allow_null=True)
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class _DirectSaleDispatchSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class _DirectSaleDeliveredSerializer(serializers.Serializer):
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_note = serializers.CharField(required=False, allow_blank=True)
+    delivered_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class _DirectSaleMetadataSerializer(serializers.Serializer):
+    scheduled_date = serializers.DateField(required=False, allow_null=True)
+    receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
+    failure_or_cancellation_reason = serializers.CharField(required=False, allow_blank=True)
+    operational_notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminDirectSaleDeliveryScheduleView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleScheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = schedule_direct_sale_delivery(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryDispatchView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleDispatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = dispatch_direct_sale_delivery(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryMarkDeliveredView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSaleDeliveredSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = mark_direct_sale_delivered(case_id=case_id, actor=request.user, **serializer.validated_data)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = AdminSubscriptionDeliveryReasonSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = cancel_direct_sale_delivery(
+                case_id=case_id,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                notes=serializer.validated_data.get("notes", ""),
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        note = (request.data.get("note") or "").strip()
+        try:
+            case = add_direct_sale_delivery_note(case_id=case_id, actor=request.user, note=note)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDirectSaleDeliveryDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, case_id: int):
+        case = get_object_or_404(
+            ServiceDeskCase.objects.select_related(
+                "direct_sale",
+                "direct_sale__customer",
+                "billing_invoice",
+                "product",
+            ),
+            pk=case_id,
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        )
+        return Response(serialize_direct_sale_delivery_case(case))
+
+
+class AdminDirectSaleDeliveryMetadataView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request, case_id: int):
+        serializer = _DirectSaleMetadataSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = update_direct_sale_delivery_metadata(
+                case_id=case_id,
+                actor=request.user,
+                **serializer.validated_data,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})

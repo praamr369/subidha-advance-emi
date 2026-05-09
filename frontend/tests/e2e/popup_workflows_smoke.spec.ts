@@ -3,7 +3,9 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { authStatePath } from "./helpers/smoke-data";
 
 async function openQuickActions(page: Page) {
-  await page.getByRole("button", { name: "Open quick actions" }).click();
+  const trigger = page.getByRole("button", { name: "Open quick actions" });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
   await expect(page.getByRole("dialog", { name: "Quick actions" })).toBeVisible();
   await expect(page.locator(".workflow-modal-panel")).toBeVisible();
 }

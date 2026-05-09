@@ -21,6 +21,9 @@ type Counts = {
   chartAccountsActive: number;
   accountingPeriods: number;
   documentSequencesActive: number;
+  invoiceNumberingConfigured: boolean;
+  receiptNumberingConfigured: boolean;
+  directSaleInvoiceNumberingConfigured: boolean;
   products: number;
   batches: number;
 };
@@ -67,6 +70,12 @@ const cards = [
     countKey: "accountingPeriods" as const,
   },
   {
+    title: "Document Numbering",
+    description: "Invoice, receipt, and direct-sale invoice sequence readiness and controls.",
+    href: "/admin/settings/business-setup/document-numbering",
+    countKey: "invoiceNumberingConfigured" as const,
+  },
+  {
     title: "Products",
     description: "Add at least one product before onboarding customers.",
     href: "/admin/products",
@@ -80,6 +89,14 @@ const cards = [
   },
 ];
 
+const BOOLEAN_COUNT_KEYS = new Set([
+  "businessProfileConfigured",
+  "publicSiteConfigured",
+  "invoiceNumberingConfigured",
+  "receiptNumberingConfigured",
+  "directSaleInvoiceNumberingConfigured",
+]);
+
 export default function BusinessSetupOverviewPage() {
   const [counts, setCounts] = useState<Counts>({
     businessProfileConfigured: false,
@@ -91,6 +108,9 @@ export default function BusinessSetupOverviewPage() {
     chartAccountsActive: 0,
     accountingPeriods: 0,
     documentSequencesActive: 0,
+    invoiceNumberingConfigured: false,
+    receiptNumberingConfigured: false,
+    directSaleInvoiceNumberingConfigured: false,
     products: 0,
     batches: 0,
   });
@@ -116,6 +136,9 @@ export default function BusinessSetupOverviewPage() {
         chartAccountsActive: Number(readiness.counts?.chart_of_accounts_active || 0),
         accountingPeriods: Number(readiness.counts?.accounting_periods || 0),
         documentSequencesActive: Number(readiness.counts?.document_sequences_active || 0),
+        invoiceNumberingConfigured: Boolean(readiness.counts?.invoice_numbering_configured),
+        receiptNumberingConfigured: Boolean(readiness.counts?.receipt_numbering_configured),
+        directSaleInvoiceNumberingConfigured: Boolean(readiness.counts?.direct_sale_invoice_numbering_configured),
         products: Number(readiness.counts?.products || 0),
         batches: Number(readiness.counts?.batches || 0),
       });
@@ -200,7 +223,7 @@ export default function BusinessSetupOverviewPage() {
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {loading
                 ? "…"
-                : card.countKey === "businessProfileConfigured" || card.countKey === "publicSiteConfigured"
+                : BOOLEAN_COUNT_KEYS.has(card.countKey)
                   ? counts[card.countKey]
                     ? "Configured"
                     : "Missing"

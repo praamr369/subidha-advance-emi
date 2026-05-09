@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounting.models import (
+    JournalEntryGroup,
     MONEY_ZERO,
     ChartOfAccount,
     JournalEntry,
@@ -242,3 +243,78 @@ def void_journal_entry(*, journal_entry_id: int, performed_by, reason: str) -> t
         },
     )
     return journal_entry, True
+
+
+@transaction.atomic
+def reverse_journal_group(*, journal_group_id: int, reason: str, performed_by):
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("Reversal reason is required.")
+
+    group = (
+        JournalEntryGroup.objects.select_for_update()
+        .prefetch_related("journal_entries", "journal_entries__lines")
+        .get(pk=journal_group_id)
+    )
+    if group.reversal_of_id:
+        raise ValueError("Cannot reverse a reversal journal group.")
+    if group.reversal_groups.exists():
+        return group.reversal_groups.order_by("-id").first(), False
+
+    assert_accounting_period_open(
+        reference_date=group.transaction_date,
+        performed_by=performed_by,
+        instance=group,
+        event="ACCOUNTING_JOURNAL_GROUP_REVERSE_BLOCKED",
+    )
+
+    reversal_group = JournalEntryGroup.objects.create(
+        source_module=group.source_module,
+        source_object_id=group.source_object_id,
+        transaction_date=group.transaction_date,
+        narration=f"REVERSAL: {reason}",
+        total_debit=group.total_credit,
+        total_credit=group.total_debit,
+        created_by=performed_by if getattr(performed_by, "pk", None) else None,
+        reversed_by=performed_by if getattr(performed_by, "pk", None) else None,
+        reversal_of=group,
+    )
+
+    for journal in group.journal_entries.all():
+        reversed_lines = [
+            {
+                "chart_account": line.chart_account,
+                "description": f"Reversal of {journal.entry_no}",
+                "debit_amount": line.credit_amount,
+                "credit_amount": line.debit_amount,
+            }
+            for line in journal.lines.all()
+        ]
+        reversed_journal = create_journal_entry(
+            entry_date=journal.entry_date,
+            entry_type=journal.entry_type,
+            memo=f"Reversal of {journal.entry_no}: {reason}",
+            source_model=journal.source_model,
+            source_id=journal.source_id,
+            voucher_type=journal.voucher_type,
+            source_type=journal.source_type,
+            source_reference=f"REV-{journal.source_reference or journal.entry_no}",
+            lines=reversed_lines,
+        )
+        reversed_journal.journal_group = reversal_group
+        reversed_journal.save(update_fields=["journal_group", "updated_at"])
+        post_journal_entry(journal_entry_id=reversed_journal.id, posted_by=performed_by)
+
+    group.reversed_by = performed_by if getattr(performed_by, "pk", None) else None
+    group.save(update_fields=["reversed_by", "updated_at"])
+    _log_accounting_event(
+        event="ACCOUNTING_JOURNAL_GROUP_REVERSED",
+        instance=reversal_group,
+        performed_by=performed_by,
+        metadata={
+            "reason": reason,
+            "reversal_of": group.journal_group_id,
+            "journal_group_id": reversal_group.journal_group_id,
+        },
+    )
+    return reversal_group, True

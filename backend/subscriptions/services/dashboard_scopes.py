@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from branch_control.services.branch_service import scope_queryset_to_user_branches
+from core.services.operational_visibility import filter_dashboard_visible_subscriptions
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
@@ -30,7 +31,7 @@ class AdminScope(DashboardScope):
     label: str = "Admin"
 
     def get_subscription_queryset(self, actor_user):
-        return get_subscription_detail_queryset()
+        return filter_dashboard_visible_subscriptions(get_subscription_detail_queryset())
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,9 @@ class PartnerScope(DashboardScope):
     label: str = "Partner"
 
     def get_subscription_queryset(self, actor_user):
-        return get_subscription_detail_queryset().filter(partner=actor_user)
+        return filter_dashboard_visible_subscriptions(
+            get_subscription_detail_queryset().filter(partner=actor_user)
+        )
 
     def get_identity_payload(self, actor_user) -> dict[str, object]:
         return {
@@ -59,11 +62,11 @@ class CashierScope(DashboardScope):
     label: str = "Cashier"
 
     def get_subscription_queryset(self, actor_user):
-        return scope_queryset_to_user_branches(
+        return filter_dashboard_visible_subscriptions(scope_queryset_to_user_branches(
             get_subscription_detail_queryset(),
             user=actor_user,
             field_name="branch_id",
-        )
+        ))
 
 
 @dataclass(frozen=True)
@@ -75,7 +78,9 @@ class CustomerScope(DashboardScope):
         customer = getattr(actor_user, "customer_profile", None)
         if customer is None:
             raise DashboardScopeError("customer profile missing")
-        return get_subscription_detail_queryset().filter(customer=customer)
+        return filter_dashboard_visible_subscriptions(
+            get_subscription_detail_queryset().filter(customer=customer)
+        )
 
     def get_identity_payload(self, actor_user) -> dict[str, object]:
         customer = getattr(actor_user, "customer_profile", None)

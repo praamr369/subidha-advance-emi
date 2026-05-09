@@ -988,7 +988,7 @@ export default function AdminOperationsDashboard() {
         ]}
         actions={[
           {
-            href: ROUTES.admin.paymentsCreate,
+            href: ROUTES.admin.financeCollect,
             label: "Collect Payment",
             variant: "primary",
           },
@@ -1027,7 +1027,7 @@ export default function AdminOperationsDashboard() {
           variant: "secondary",
         },
         {
-          href: ROUTES.admin.paymentsCreate,
+          href: ROUTES.admin.financeCollect,
           label: "Collect Payment",
           variant: "primary",
         },
@@ -1397,7 +1397,7 @@ export default function AdminOperationsDashboard() {
                 <div className="grid gap-3 md:grid-cols-3">
                   <ActionButton href={ROUTES.admin.finance} variant="outline">Finance control</ActionButton>
                   <ActionButton href={ROUTES.admin.accounting} variant="outline">Accounting lanes</ActionButton>
-                  <ActionButton href={ROUTES.admin.reports} variant="outline">Reports center</ActionButton>
+                  <ActionButton href={ROUTES.admin.reports} variant="outline">Reports hub</ActionButton>
                 </div>
               ),
             },

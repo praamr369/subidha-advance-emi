@@ -2,6 +2,8 @@ from django.contrib import admin
 
 from inventory.models import (
     InventoryItem,
+    OpeningStockBatch,
+    OpeningStockEntry,
     PurchaseBill,
     PurchaseBillLine,
     StockAdjustment,
@@ -28,6 +30,19 @@ class StockLocationAdmin(admin.ModelAdmin):
 class StockAdjustmentLineInline(admin.TabularInline):
     model = StockAdjustmentLine
     extra = 0
+
+
+@admin.register(OpeningStockBatch)
+class OpeningStockBatchAdmin(admin.ModelAdmin):
+    list_display = ("batch_key", "original_filename", "created_at", "created_by")
+    search_fields = ("batch_key", "original_filename")
+
+
+@admin.register(OpeningStockEntry)
+class OpeningStockEntryAdmin(admin.ModelAdmin):
+    list_display = ("id", "inventory_item", "stock_location", "effective_date", "quantity", "status", "source")
+    list_filter = ("status", "source")
+    search_fields = ("inventory_item__sku", "inventory_item__product__product_code")
 
 
 @admin.register(StockAdjustment)

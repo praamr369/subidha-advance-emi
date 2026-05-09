@@ -5,6 +5,8 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
+from corsheaders.defaults import default_headers
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 LOCAL_DEV_SECRET_KEY = "local-development-only-secret-key"
@@ -380,6 +382,27 @@ HEALTHCHECK_INCLUDE_DETAILS = _parse_bool(
     os.getenv("HEALTHCHECK_INCLUDE_DETAILS"),
     default=_is_local_dev_mode(),
 )
+HEALTHCHECK_WORKER_HEARTBEAT_SECONDS = _parse_int(
+    os.getenv("HEALTHCHECK_WORKER_HEARTBEAT_SECONDS"),
+    900,
+    minimum=30,
+    name="HEALTHCHECK_WORKER_HEARTBEAT_SECONDS",
+)
+AI_ASSISTANT_ENABLED = _parse_bool(
+    os.getenv("AI_ASSISTANT_ENABLED"),
+    default=False,
+)
+AI_EMBEDDINGS_ENABLED = _parse_bool(
+    os.getenv("AI_EMBEDDINGS_ENABLED"),
+    default=False,
+)
+AI_EMBEDDING_PROVIDER = (os.getenv("AI_EMBEDDING_PROVIDER") or "").strip()
+AI_EMBEDDING_MODEL = (os.getenv("AI_EMBEDDING_MODEL") or "").strip()
+AI_EMBEDDING_DIMENSIONS = int(os.getenv("AI_EMBEDDING_DIMENSIONS") or "1536")
+AI_VECTOR_SEARCH_ENABLED = _parse_bool(
+    os.getenv("AI_VECTOR_SEARCH_ENABLED"),
+    default=False,
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -394,6 +417,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "api",
+    "ai_assistant",
     "branch_control",
     "crm",
     "service_desk",
@@ -402,6 +426,7 @@ INSTALLED_APPS = [
     "manufacturing",
     "billing",
     "reminders",
+    "system_jobs",
     "subscriptions",
     "django_extensions",
 ]
@@ -456,6 +481,7 @@ STATIC_URL = _get_url_setting("STATIC_URL", "/static/")
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT") or (BASE_DIR / "staticfiles"))
 MEDIA_URL = _get_url_setting("MEDIA_URL", "/media/")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or (BASE_DIR / "media"))
+BACKUP_ROOT = (os.getenv("BACKUP_ROOT") or (str(BASE_DIR / "backups") if _is_local_dev_mode() else "")).strip()
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STORAGES = {
@@ -486,9 +512,12 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_THROTTLE_RATES": {
+        "auth_login": "20/minute",
         "forgot_password": "10/hour",
         "resend_password_reset_otp": "10/hour",
         "reset_password": "20/hour",
+        "payment_mutation": "60/minute",
+        "username_change_self": "5/hour",
     },
 }
 
@@ -578,6 +607,10 @@ DEFAULT_FROM_EMAIL = (
 CORS_ALLOW_CREDENTIALS = _parse_bool(
     os.getenv("CORS_ALLOW_CREDENTIALS"), default=bool(CORS_ALLOWED_ORIGINS)
 )
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "idempotency-key",
+    "x-idempotency-key",
+]
 if CORS_ALLOW_CREDENTIALS and not CORS_ALLOWED_ORIGINS and not _is_local_dev_mode():
     raise RuntimeError(
         "CORS_ALLOWED_ORIGINS must be configured outside local development when CORS_ALLOW_CREDENTIALS is enabled."
@@ -649,6 +682,16 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "security.events": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "finance.events": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -658,3 +701,57 @@ CACHES = {
         "LOCATION": "subidha-core-cache",
     }
 }
+
+# ---------------------------------------------------------------------------
+# Celery (additive background jobs). Core finance DB transactions must not
+# depend on workers; tasks may notify, recompute summaries, or sync status.
+# ---------------------------------------------------------------------------
+CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL") or "").strip() or (
+    "redis://127.0.0.1:6379/0" if _is_local_dev_mode() else ""
+)
+CELERY_RESULT_BACKEND = (os.getenv("CELERY_RESULT_BACKEND") or "").strip() or CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT") or "3600")
+
+try:
+    from celery.schedules import crontab
+except Exception:  # pragma: no cover
+    crontab = None  # type: ignore[misc, assignment]
+
+if crontab is not None:
+    CELERY_BEAT_SCHEDULE = {
+        "daily-emi-due-reminders": {
+            "task": "system_jobs.tasks.daily_emi_due_reminders",
+            "schedule": crontab(hour=6, minute=5),
+        },
+        "daily-emi-overdue-reminders": {
+            "task": "system_jobs.tasks.daily_emi_overdue_reminders",
+            "schedule": crontab(hour=6, minute=20),
+        },
+        "daily-rent-due-reminders": {
+            "task": "system_jobs.tasks.daily_rent_due_reminders",
+            "schedule": crontab(hour=6, minute=35),
+        },
+        "daily-accounting-health-check": {
+            "task": "system_jobs.tasks.daily_accounting_health_check",
+            "schedule": crontab(hour=7, minute=0),
+        },
+        "daily-inventory-reorder-check": {
+            "task": "system_jobs.tasks.daily_inventory_reorder_check",
+            "schedule": crontab(hour=7, minute=30),
+        },
+        "daily-report-snapshot": {
+            "task": "system_jobs.tasks.daily_report_snapshot",
+            "schedule": crontab(hour=8, minute=0),
+        },
+        "nightly-failed-pdf-regeneration-scan": {
+            "task": "system_jobs.tasks.nightly_failed_pdf_regeneration_scan",
+            "schedule": crontab(hour=1, minute=15),
+        },
+    }
+else:
+    CELERY_BEAT_SCHEDULE = {}

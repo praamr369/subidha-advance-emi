@@ -1,13 +1,40 @@
 from datetime import date
 from decimal import Decimal
 
+from accounting.models import DocumentSequence, FinanceAccountKind
+from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
+from accounting.models import EmployeeAttendance, EmployeeDocument, EmployeeProfile
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from services.subscriptions.create_subscription import create_subscription
-from subscriptions.models import Batch, Customer, Emi, Product, Subscription, SubscriptionDocument
+from subscriptions.models import (
+    Batch,
+    BatchStatus,
+    ContractReference,
+    ContractReferenceType,
+    Customer,
+    Emi,
+    PlanType,
+    Product,
+    RentLeaseBillingDemand,
+    RentLeaseDemandType,
+    RentLeaseDepositTransaction,
+    RentLeaseDepositTransactionType,
+    RentLeaseReturnInspection,
+    Subscription,
+    SubscriptionDelivery,
+    SubscriptionDocument,
+    SubscriptionStatus,
+)
+from subscriptions.services.contract_reference_service import (
+    ensure_contract_reference_for_direct_sale,
+    ensure_contract_reference_for_subscription,
+)
+from tests.helpers import ensure_default_payment_collection_accounts
 
 
 class PermissionTests(TestCase):
@@ -25,10 +52,415 @@ class PermissionTests(TestCase):
         response = self.client.get("/api/public/stats/")
         self.assertIn(response.status_code, [200, 401, 403, 404])
 
-    def test_authenticated_user_can_access(self):
-        self.client.force_authenticate(self.customer_user)
-        response = self.client.get("/api/public/stats/")
-        self.assertIn(response.status_code, [200, 401, 403, 404])
+
+class FinalPreDeployHrStaffHardeningTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="hrh_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9811111001",
+            is_staff=True,
+        )
+        self.cashier = User.objects.create_user(
+            username="hrh_cashier",
+            password="pass1234",
+            role="CASHIER",
+            phone="9811111002",
+            is_staff=True,
+        )
+        self.client.force_authenticate(self.admin)
+
+    def test_admin_can_create_and_edit_staff_full_fields(self):
+        created = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Staff Hardening",
+                "phone": "9811111099",
+                "designation": "Supervisor",
+                "department": "Service",
+                "employment_type": "SERVICE",
+                "base_salary": "25000.00",
+                "daily_wage_rate": "900.00",
+                "hourly_wage_rate": "150.00",
+                "piece_rate_amount": "100.00",
+                "piece_rate_unit_label": "repair-job",
+                "kyc_id_type": "NID",
+                "kyc_id_number": "ABC123",
+                "address": "Main Road",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 200, created.data)
+        staff_id = created.data["employee"]["id"]
+
+        edited = self.client.patch(
+            f"/api/v1/admin/hr/staff/{staff_id}/",
+            {
+                "phone": "9811111010",
+                "address": "Updated Address",
+                "kyc_verified": True,
+                "base_salary": "27000.00",
+                "cost_center_code": "SERVICE-OPS",
+            },
+            format="json",
+        )
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(edited.data["phone"], "9811111010")
+        self.assertTrue(edited.data["kyc_verified"])
+
+        detail = self.client.get(f"/api/v1/admin/hr/staff/{staff_id}/")
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertEqual(detail.data["id"], staff_id)
+
+        filtered = self.client.get("/api/v1/admin/hr/staff/?employment_type=SERVICE&kyc_verified=true&department=Service")
+        self.assertEqual(filtered.status_code, 200, filtered.data)
+        self.assertEqual(filtered.data["count"], 1)
+
+    def test_duplicate_phone_blocked(self):
+        EmployeeProfile.objects.create(name="Staff A", phone="9811111222", joining_date=date(2026, 1, 1))
+        dup = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {"name": "Staff B", "phone": "9811111222"},
+            format="json",
+        )
+        self.assertEqual(dup.status_code, 400)
+
+    def test_deactivate_preserves_attendance_history(self):
+        employee = EmployeeProfile.objects.create(name="Staff Hist", phone="9811111333", joining_date=date(2026, 1, 1))
+        EmployeeAttendance.objects.create(
+            employee=employee,
+            attendance_date=date(2026, 1, 10),
+            status="PRESENT",
+            worked_hours="8.00",
+        )
+        response = self.client.post(
+            f"/api/v1/admin/hr/staff/{employee.id}/status/",
+            {"action": "DEACTIVATE"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(EmployeeProfile.objects.get(pk=employee.id).is_active)
+        self.assertEqual(EmployeeAttendance.objects.filter(employee=employee).count(), 1)
+
+    def test_staff_document_metadata_and_pdf_endpoints(self):
+        employee = EmployeeProfile.objects.create(name="Staff Doc", phone="9811111444", joining_date=date(2026, 1, 1))
+        upload = self.client.post(
+            "/api/v1/admin/hr/staff-documents/",
+            {
+                "employee": employee.id,
+                "document_type": "ID_PROOF",
+                "title": "National ID",
+                "document_no": "NID-001",
+                "notes": "Verified copy",
+                "file": SimpleUploadedFile("id-proof.txt", b"id proof content", content_type="text/plain"),
+            },
+        )
+        self.assertEqual(upload.status_code, 200, upload.data)
+        self.assertTrue(EmployeeDocument.objects.filter(employee=employee).exists())
+        document_id = upload.data["id"]
+
+        filtered = self.client.get(f"/api/v1/admin/hr/staff-documents/?employee={employee.id}&document_type=ID_PROOF&status=ACTIVE")
+        self.assertEqual(filtered.status_code, 200, filtered.data)
+        self.assertEqual(filtered.data["count"], 1)
+
+        inactive = self.client.patch(
+            f"/api/v1/admin/hr/staff-documents/{document_id}/",
+            {"status": "INACTIVE"},
+            format="json",
+        )
+        self.assertEqual(inactive.status_code, 200, inactive.data)
+        self.assertEqual(inactive.data["status"], "INACTIVE")
+
+        profile_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/profile-pdf/")
+        salary_pdf = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/salary-agreement-pdf/")
+        self.assertEqual(profile_pdf.status_code, 200)
+        self.assertEqual(salary_pdf.status_code, 200)
+        self.assertIn("application/pdf", profile_pdf["Content-Type"])
+        self.assertIn("application/pdf", salary_pdf["Content-Type"])
+
+    def test_non_admin_blocked_and_no_accounting_posting_side_effect(self):
+        employee = EmployeeProfile.objects.create(name="Staff Block", phone="9811111555", joining_date=date(2026, 1, 1))
+        self.client.force_authenticate(self.cashier)
+        blocked = self.client.get("/api/v1/admin/hr/staff/")
+        self.assertEqual(blocked.status_code, 403)
+        blocked_detail = self.client.get(f"/api/v1/admin/hr/staff/{employee.id}/")
+        self.assertEqual(blocked_detail.status_code, 403)
+        # Payroll setup updates must not create salary/accounting postings directly.
+        self.client.force_authenticate(self.admin)
+        pre_salary_sheet_count = employee.salary_sheets.count()
+        patch = self.client.patch(
+            f"/api/v1/admin/hr/staff/{employee.id}/",
+            {"base_salary": "32000.00", "employment_type": "PERMANENT_MONTHLY"},
+            format="json",
+        )
+        self.assertEqual(patch.status_code, 200, patch.data)
+        self.assertEqual(employee.salary_sheets.count(), pre_salary_sheet_count)
+
+class Phase9FOperationalReadinessTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.accounts = ensure_default_payment_collection_accounts()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="phase9f_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800090001",
+            is_staff=True,
+        )
+        self.other_admin = User.objects.create_user(
+            username="phase9f_other_admin",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800090002",
+            is_staff=True,
+        )
+        self.cashier = User.objects.create_user(
+            username="phase9f_cashier",
+            password="pass1234",
+            role="CASHIER",
+            phone="9800090003",
+            is_staff=True,
+        )
+        self.customer_user = User.objects.create_user(
+            username="phase9f_customer",
+            password="pass1234",
+            role="CUSTOMER",
+            phone="9800090004",
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase 9F Customer",
+            phone="9800090004",
+            customer_code="KYC-PHASE9F-001",
+        )
+        self.product = Product.objects.create(
+            product_code="P9F-PROD",
+            name="Phase 9F Sofa",
+            base_price=Decimal("1200.00"),
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_lease_enabled=True,
+        )
+        self.batch = Batch.objects.create(
+            batch_code="P9F-BATCH",
+            total_slots=100,
+            duration_months=12,
+            draw_day=5,
+            start_date=date(2026, 1, 1),
+            status=BatchStatus.OPEN,
+        )
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=1,
+            tenure_months=12,
+            start_date=date(2026, 1, 1),
+            performed_by=self.admin,
+        )
+        self.reference = ContractReference.objects.get(subscription=self.subscription)
+
+    def test_business_reset_requires_json_boolean_and_preserves_one_admin(self):
+        self.client.force_authenticate(self.admin)
+
+        preview = self.client.get(
+            "/api/v1/admin/business-setup/reset-preview/?preserve_username=phase9f_admin"
+        )
+        self.assertEqual(preview.status_code, 200, preview.data)
+        self.assertEqual(preview.data["mode"], "read_only_preview")
+        self.assertGreater(preview.data["reset_plan"]["targets"]["total_rows"], 0)
+        self.assertEqual(len(preview.data["reset_plan"]["preserved_users"]), 1)
+
+        string_confirm = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": "true",
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(string_confirm.status_code, 400)
+        self.assertIn("confirm", string_confirm.data)
+
+        false_confirm = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": False,
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(false_confirm.status_code, 400)
+
+        executed = self.client.post(
+            "/api/v1/admin/business-setup/reset/",
+            {
+                "confirm": True,
+                "preserve_username": "phase9f_admin",
+                "delete_non_preserved_users": True,
+                "clear_auth_artifacts": True,
+                "dry_run": False,
+            },
+            format="json",
+        )
+        self.assertEqual(executed.status_code, 200, executed.data)
+        self.assertEqual(executed.data["mode"], "executed")
+
+        User = get_user_model()
+        self.assertEqual(User.objects.filter(role="ADMIN").count(), 1)
+        self.assertTrue(User.objects.filter(username="phase9f_admin").exists())
+        self.assertFalse(User.objects.filter(username="phase9f_other_admin").exists())
+        self.assertEqual(Product.objects.count(), 0)
+        self.assertEqual(Customer.objects.count(), 0)
+        self.assertEqual(Subscription.objects.count(), 0)
+        self.assertFalse(executed.data["post_reset_checklist"]["is_ready_for_go_live"])
+
+    def test_bi_summary_is_admin_only_and_empty_safe(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/admin/bi/summary/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("finance", response.data)
+        self.assertIn("subscriptions", response.data)
+        self.assertIn("operations", response.data)
+
+        self.client.force_authenticate(self.cashier)
+        forbidden = self.client.get("/api/v1/admin/bi/summary/")
+        self.assertEqual(forbidden.status_code, 403)
+
+    def test_unified_receivable_search_supports_staff_queries_and_blocks_rent_lease_collection(self):
+        self.client.force_authenticate(self.admin)
+
+        for query in [
+            self.customer.phone,
+            self.reference.reference_no,
+            self.batch.batch_code,
+            "01",
+        ]:
+            response = self.client.get(f"/api/v1/admin/receivables/search/?q={query}")
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertGreaterEqual(response.data["count"], 1)
+
+        self.client.force_authenticate(self.cashier)
+        cashier_phone = self.client.get(
+            f"/api/v1/cashier/receivables/search/?q={self.customer.phone}"
+        )
+        self.assertEqual(cashier_phone.status_code, 200, cashier_phone.data)
+        self.assertGreaterEqual(cashier_phone.data["count"], 1)
+        emi_rows = [
+            row
+            for row in cashier_phone.data["results"]
+            if row.get("source_type") == ContractReferenceType.ADVANCE_EMI
+        ]
+        self.assertTrue(emi_rows)
+        self.assertEqual(emi_rows[0]["result_type"], "EMI")
+        self.assertEqual(emi_rows[0]["action_type"], emi_rows[0]["primary_action"])
+
+        rent_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=12,
+            start_date=date(2026, 1, 1),
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+        )
+        rent_reference = ensure_contract_reference_for_subscription(rent_subscription)
+
+        self.client.force_authenticate(self.admin)
+        rent_search = self.client.get(
+            f"/api/v1/admin/receivables/search/?q={rent_reference.reference_no}"
+        )
+        self.assertEqual(rent_search.status_code, 200, rent_search.data)
+        rent_row = rent_search.data["results"][0]
+        self.assertEqual(rent_row["source_type"], ContractReferenceType.RENT)
+        self.assertEqual(rent_row["result_type"], "RENT")
+        self.assertEqual(rent_row["allowed_actions"], [])
+        self.assertEqual(rent_row["primary_action"], "VIEW_ONLY")
+        self.assertEqual(rent_row["action_type"], "VIEW_ONLY")
+        self.assertIn("production-safe", rent_row["disabled_reason"])
+
+        blocked_collect = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": ContractReferenceType.RENT,
+                "source_id": rent_subscription.id,
+                "amount": "100.00",
+                "payment_method": "CASH",
+                "finance_account_id": self.accounts[FinanceAccountKind.CASH].id,
+                "contract_reference_id": rent_reference.id,
+            },
+            format="json",
+        )
+        self.assertEqual(blocked_collect.status_code, 400)
+        self.assertIn("source_type", str(blocked_collect.data))
+
+    def test_unified_receivable_search_returns_direct_sale_result_type_for_cashier(self):
+        fy = financial_year_for(date(2026, 5, 1))
+        ds_series = DocumentSequence.objects.create(
+            series_code="DIRECT_SALE_INVOICE_RC",
+            financial_year=fy,
+            prefix=f"DSI-RC-{fy}",
+            next_number=50,
+            padding=5,
+            is_active=True,
+        )
+        sale = DirectSale.objects.create(
+            sale_no=f"DSI-RC-{fy}-00050",
+            sale_date=date(2026, 5, 2),
+            financial_year=fy,
+            doc_series=ds_series,
+            customer=self.customer,
+            status="INVOICED",
+            tax_mode="NON_GST",
+            tax_calculation_mode="NON_GST",
+            customer_gst_type="UNREGISTERED_CONSUMER",
+            subtotal=Decimal("800.00"),
+            discount_total=Decimal("0.00"),
+            taxable_total=Decimal("800.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("800.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("800.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        DirectSaleLine.objects.create(
+            direct_sale=sale,
+            product=self.product,
+            description="RC direct sale line",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("800.00"),
+            discount_amount=Decimal("0.00"),
+            taxable_value=Decimal("800.00"),
+            gst_rate=Decimal("0.00"),
+            cgst_amount=Decimal("0.00"),
+            sgst_amount=Decimal("0.00"),
+            igst_amount=Decimal("0.00"),
+            line_total=Decimal("800.00"),
+        )
+        ds_reference = ensure_contract_reference_for_direct_sale(sale)
+
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(
+            f"/api/v1/cashier/receivables/search/?q={ds_reference.reference_no}"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertGreaterEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["result_type"], "DIRECT_SALE")
+        self.assertEqual(row["source_type"], ContractReferenceType.DIRECT_SALE)
 
 
 class PaymentFlowIntegrationTests(TestCase):
@@ -610,3 +1042,855 @@ class RentLeaseContractWorkflowTests(TestCase):
         self.assertEqual(assessment.status_code, 200)
         self.assertIn("rent_profile", assessment.data)
         self.assertEqual(assessment.data["rent_profile"]["return_condition_status"], "DAMAGED")
+
+
+class Phase9AContractReferenceApiTests(TestCase):
+    def setUp(self):
+        ensure_default_payment_collection_accounts()
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="admin_phase9a",
+            password="pass1234",
+            role="ADMIN",
+            phone="9800091000",
+            is_staff=True,
+        )
+        self.cashier = User.objects.create_user(
+            username="cashier_phase9a",
+            password="pass1234",
+            role="CASHIER",
+            phone="9800091001",
+            is_staff=True,
+        )
+        self.partner = User.objects.create_user(
+            username="partner_phase9a",
+            password="pass1234",
+            role="PARTNER",
+            phone="9800091002",
+        )
+        self.customer_user = User.objects.create_user(
+            username="customer_phase9a",
+            password="pass1234",
+            role="CUSTOMER",
+            phone="9800091003",
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase Nine Customer",
+            phone="9800091003",
+            customer_code="KYC-P9A-001",
+        )
+        self.product = Product.objects.create(
+            product_code="P9A-PRD",
+            name="Phase Nine Sofa",
+            base_price=Decimal("1200.00"),
+        )
+        self.batch = Batch.objects.create(
+            batch_code="P9A-BATCH",
+            total_slots=100,
+            duration_months=12,
+            draw_day=10,
+            start_date=date(2099, 1, 1),
+            status="OPEN",
+        )
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=9,
+            tenure_months=12,
+            partner=self.partner,
+            start_date=date(2099, 1, 1),
+            performed_by=self.admin,
+        )
+        self.reference = ContractReference.objects.get(subscription=self.subscription)
+
+    def _create_direct_sale_reference(
+        self,
+        *,
+        received_total: str = "0.00",
+        grand_total: str = "100.00",
+        sale_status: str = "INVOICED",
+        invoice_status: str = BillingDocumentStatus.DRAFT,
+    ):
+        fy = financial_year_for(date(2099, 1, 1))
+        sequence = ensure_document_sequence(
+            series_code="DIRSALE",
+            financial_year=fy,
+            prefix=f"SALE-{fy}",
+            padding=5,
+        )
+        sale = DirectSale.objects.create(
+            sale_no=f"SALE-P9C-{DirectSale.objects.count()+1:04d}",
+            sale_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=sequence,
+            customer=self.customer,
+            status=sale_status,
+            grand_total=Decimal(grand_total),
+            received_total=Decimal(received_total),
+            balance_total=Decimal(grand_total) - Decimal(received_total),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        BillingInvoice.objects.create(
+            document_no=f"INV-P9C-{BillingInvoice.objects.count()+1:04d}",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=sequence,
+            customer=self.customer,
+            direct_sale=sale,
+            billing_channel="RETAIL",
+            source_type="DIRECT_SALE",
+            status=invoice_status,
+            grand_total=Decimal(grand_total),
+            received_total=Decimal(received_total),
+            balance_total=Decimal(grand_total) - Decimal(received_total),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        reference = ContractReference.objects.create(
+            reference_no=f"SAL/RET/{self.batch.batch_code}/L00/2099/{ContractReference.objects.count()+1:05d}",
+            display_reference=f"Direct Sale {sale.id}",
+            contract_type="DIRECT_SALE",
+            customer=self.customer,
+            direct_sale=sale,
+            phone_snapshot=self.customer.phone,
+            customer_name_snapshot=self.customer.name,
+            product_summary_snapshot="Retail Direct Sale",
+        )
+        return sale, reference
+
+    def _assert_reference_in_admin_search(self, query):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/contract-references/",
+            {"q": query},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            self.reference.reference_no,
+            {row["reference_no"] for row in response.data["results"]},
+        )
+
+    def test_admin_contract_reference_search_supports_operational_identifiers(self):
+        for query in [
+            self.customer.phone,
+            self.reference.reference_no,
+            self.customer.name,
+            str(self.customer.id),
+            self.customer.customer_code,
+            self.batch.batch_code,
+            "09",
+            str(self.partner.id),
+        ]:
+            with self.subTest(query=query):
+                self._assert_reference_in_admin_search(query)
+
+    def test_admin_receivables_search_returns_normalized_financial_response(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": self.reference.reference_no},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["source_type"], "ADVANCE_EMI")
+        self.assertEqual(row["source_id"], self.subscription.id)
+        self.assertEqual(row["reference_no"], self.reference.reference_no)
+        self.assertEqual(row["customer_id"], self.customer.id)
+        self.assertEqual(row["phone_masked"], "******1003")
+        self.assertEqual(row["due_amount"], "100.00")
+        self.assertEqual(row["overdue_amount"], "0.00")
+        self.assertEqual(row["allowed_actions"], ["COLLECT_EMI"])
+        self.assertEqual(row["primary_action"], "COLLECT_EMI")
+        self.assertEqual(row["contract_reference_id"], self.reference.id)
+        self.assertIn("/admin/finance/collect", row["collection_route"])
+
+    def test_cashier_receivables_search_is_role_scoped_and_masks_admin_fields(self):
+        self.client.force_authenticate(self.cashier)
+
+        forbidden = self.client.get(
+            "/api/v1/admin/contract-references/",
+            {"q": self.reference.reference_no},
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        response = self.client.get(
+            "/api/v1/cashier/receivables/search/",
+            {"q": self.reference.reference_no},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["reference_no"], self.reference.reference_no)
+        self.assertEqual(row["phone_masked"], "******1003")
+        self.assertNotIn("phone_snapshot", row)
+        self.assertNotIn("partner_snapshot", row)
+        self.assertNotIn("kyc_reference_snapshot", row)
+
+    def test_cashier_receivables_search_by_phone_returns_contract_reference(self):
+        self.client.force_authenticate(self.cashier)
+
+        response = self.client.get(
+            "/api/v1/cashier/receivables/search/",
+            {"q": self.customer.phone},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            self.reference.reference_no,
+            {row["reference_no"] for row in response.data["results"]},
+        )
+
+    def test_admin_receivables_search_supports_batch_and_lucky_queries(self):
+        self.client.force_authenticate(self.admin)
+        for query in [self.batch.batch_code, "09", self.reference.reference_no]:
+            with self.subTest(query=query):
+                response = self.client.get("/api/v1/admin/receivables/search/", {"q": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(
+                    self.reference.reference_no,
+                    {row["reference_no"] for row in response.data["results"]},
+                )
+
+    def test_admin_receivables_collect_advances_emi_via_payment_service(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": "ADVANCE_EMI",
+                "source_id": self.subscription.id,
+                "amount": "25.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+                "reference": "P9A-UNIFIED-1",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data.get("source_type"), "ADVANCE_EMI")
+        self.assertIn("payment_id", response.data)
+
+    def test_admin_receivables_collect_rejects_rent_source(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        rent_sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=6,
+            start_date=date(2099, 2, 1),
+            total_amount=Decimal("600.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": "RENT",
+                "source_id": rent_sub.id,
+                "amount": "100.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+
+    def test_admin_contract_reference_resolve_returns_route_and_primary_action(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            f"/api/v1/admin/contract-references/{self.reference.id}/resolve/",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["contract_reference_id"], self.reference.id)
+        self.assertEqual(response.data["source_type"], "ADVANCE_EMI")
+        self.assertEqual(response.data["source_id"], self.subscription.id)
+        self.assertEqual(response.data["primary_action"], "COLLECT_EMI")
+        self.assertEqual(response.data["allowed_actions"], ["COLLECT_EMI"])
+        self.assertIn("/admin/finance/collect", response.data["route"])
+
+    def test_cashier_cannot_access_admin_contract_reference_resolve(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(
+            f"/api/v1/admin/contract-references/{self.reference.id}/resolve/",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_direct_sale_result_uses_direct_sale_source_id(self):
+        sale, ds_reference = self._create_direct_sale_reference(received_total="25.00")
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["source_type"], "DIRECT_SALE")
+        self.assertEqual(row["source_id"], sale.id)
+        self.assertEqual(row["paid_amount"], "25.00")
+        self.assertEqual(row["payment_state"], "PARTIALLY_PAID")
+        self.assertIn(row["result_type"], {"DIRECT_SALE_DRAFT", "DIRECT_SALE_RECEIVABLE", "DIRECT_SALE_PAID"})
+        self.assertIn("collection_workflow", row)
+
+    def test_full_paid_direct_sale_disables_collect_action(self):
+        _, ds_reference = self._create_direct_sale_reference(received_total="100.00")
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertEqual(row["primary_action"], "VIEW_RECEIPTS")
+        self.assertEqual(row["allowed_actions"], [])
+        self.assertEqual(row["due_amount"], "0.00")
+        self.assertEqual(row["payment_state"], "FULLY_PAID")
+        self.assertIn("no outstanding balance", (row.get("disabled_reason") or "").lower())
+
+    def test_draft_direct_sale_is_not_collectible_and_routes_to_open_sale(self):
+        _, ds_reference = self._create_direct_sale_reference(
+            received_total="0.00",
+            sale_status="DRAFT",
+            invoice_status=BillingDocumentStatus.DRAFT,
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(
+            "/api/v1/admin/receivables/search/",
+            {"q": ds_reference.reference_no},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertEqual(row["result_type"], "DIRECT_SALE_DRAFT")
+        self.assertFalse(row["collectible"])
+        self.assertEqual(row["action_type"], "OPEN_SALE")
+        self.assertIn("/admin/billing/direct-sales", row["collection_route"])
+
+    def test_unified_collect_idempotency_replays_identical_request(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        body = {
+            "source_type": "ADVANCE_EMI",
+            "source_id": self.subscription.id,
+            "amount": "15.00",
+            "payment_method": "CASH",
+            "finance_account": cash_id,
+            "reference": "P9B-IDEM-1",
+            "idempotency_key": "idem-phase-9b-001",
+            "contract_reference_id": self.reference.id,
+        }
+        first = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            body,
+            format="json",
+        )
+        second = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            body,
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.data.get("payment_id"), second.data.get("payment_id"))
+
+    def test_unified_collect_idempotency_rejects_conflicting_payload(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        base = {
+            "source_type": "ADVANCE_EMI",
+            "source_id": self.subscription.id,
+            "payment_method": "CASH",
+            "finance_account": cash_id,
+            "idempotency_key": "idem-phase-9b-conflict",
+        }
+        first = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {**base, "amount": "10.00", "reference": "P9B-A"},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {**base, "amount": "11.00", "reference": "P9B-B"},
+            format="json",
+        )
+        self.assertEqual(second.status_code, 400)
+
+    def test_unified_collect_rejects_mismatched_source_type_for_subscription(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": "LEASE",
+                "source_id": self.subscription.id,
+                "amount": "10.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_cashier_unified_collect_rejects_unsupported_source_type(self):
+        accounts = ensure_default_payment_collection_accounts()
+        cash_id = accounts[FinanceAccountKind.CASH].id
+        self.client.force_authenticate(self.cashier)
+        response = self.client.post(
+            "/api/v1/cashier/receivables/collect/",
+            {
+                "source_type": "LEASE",
+                "source_id": self.subscription.id,
+                "amount": "10.00",
+                "payment_method": "CASH",
+                "finance_account": cash_id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class Phase9DPdfDocumentSafetyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="admin_phase9d", password="pass1234", role="ADMIN", phone="9800092000", is_staff=True
+        )
+        self.cashier = User.objects.create_user(
+            username="cashier_phase9d", password="pass1234", role="CASHIER", phone="9800092001", is_staff=True
+        )
+        self.customer_user = User.objects.create_user(
+            username="customer_phase9d", password="pass1234", role="CUSTOMER", phone="9800092002"
+        )
+        self.other_customer_user = User.objects.create_user(
+            username="customer_phase9d_other", password="pass1234", role="CUSTOMER", phone="9800092003"
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase9D Customer",
+            phone="9800092002",
+            customer_code="KYC-P9D-001",
+        )
+        self.other_customer = Customer.objects.create(
+            user=self.other_customer_user,
+            name="Phase9D Other Customer",
+            phone="9800092003",
+            customer_code="KYC-P9D-002",
+        )
+        self.product = Product.objects.create(
+            product_code="P9D-PRD",
+            name="Phase9D Sofa",
+            base_price=Decimal("800.00"),
+        )
+        self.batch = Batch.objects.create(
+            batch_code="P9D-BATCH",
+            total_slots=100,
+            duration_months=10,
+            draw_day=5,
+            start_date=date(2099, 1, 1),
+            status="OPEN",
+        )
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=1,
+            tenure_months=10,
+            partner=self.admin,
+            start_date=date(2099, 1, 1),
+            performed_by=self.admin,
+        )
+        self.other_subscription = create_subscription(
+            customer=self.other_customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_number=2,
+            tenure_months=10,
+            partner=self.admin,
+            start_date=date(2099, 1, 1),
+            performed_by=self.admin,
+        )
+        fy = financial_year_for(date(2099, 1, 1))
+        seq = ensure_document_sequence(
+            series_code="DIRSALE",
+            financial_year=fy,
+            prefix=f"SALE-{fy}",
+            padding=5,
+        )
+        self.sale = DirectSale.objects.create(
+            sale_no="SALE-P9D-0001",
+            sale_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.customer,
+            status="INVOICED",
+            grand_total=Decimal("200.00"),
+            received_total=Decimal("50.00"),
+            balance_total=Decimal("150.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.invoice = BillingInvoice.objects.create(
+            document_no="INV-P9D-0001",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.customer,
+            direct_sale=self.sale,
+            billing_channel="RETAIL",
+            source_type="DIRECT_SALE",
+            status=BillingDocumentStatus.DRAFT,
+            source_reference="CR-P9D-REF-0001",
+            grand_total=Decimal("200.00"),
+            received_total=Decimal("50.00"),
+            balance_total=Decimal("150.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.other_invoice = BillingInvoice.objects.create(
+            document_no="INV-P9D-0002",
+            invoice_date=date(2099, 1, 1),
+            financial_year=fy,
+            doc_series=seq,
+            customer=self.other_customer,
+            billing_channel="RETAIL",
+            source_type="MANUAL",
+            status=BillingDocumentStatus.DRAFT,
+            grand_total=Decimal("120.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("120.00"),
+            customer_name_snapshot=self.other_customer.name,
+            customer_phone_snapshot=self.other_customer.phone,
+        )
+        self.receipt = ReceiptDocument.objects.create(
+            receipt_no="RCT-P9D-0001",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.DRAFT,
+            receipt_date=date(2099, 1, 2),
+            customer=self.customer,
+            billing_invoice=self.invoice,
+            direct_sale=self.sale,
+            source_type="DIRECT_SALE",
+            source_reference="CR-P9D-REF-0001",
+            amount=Decimal("50.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.other_receipt = ReceiptDocument.objects.create(
+            receipt_no="RCT-P9D-0002",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.DRAFT,
+            receipt_date=date(2099, 1, 2),
+            customer=self.other_customer,
+            source_type="MANUAL",
+            source_reference="CR-P9D-REF-0002",
+            amount=Decimal("20.00"),
+            customer_name_snapshot=self.other_customer.name,
+            customer_phone_snapshot=self.other_customer.phone,
+        )
+        self.delivery = SubscriptionDelivery.objects.create(
+            subscription=self.subscription,
+            delivery_reference="DLV-P9D-0001",
+            status="PENDING",
+            receiver_name=self.customer.name,
+            receiver_phone=self.customer.phone,
+            delivery_address_snapshot="Dhaka, Test Address",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+        self.other_delivery = SubscriptionDelivery.objects.create(
+            subscription=self.other_subscription,
+            delivery_reference="DLV-P9D-0002",
+            status="PENDING",
+            receiver_name=self.other_customer.name,
+            receiver_phone=self.other_customer.phone,
+            delivery_address_snapshot="Other Address",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+
+    def test_admin_invoice_pdf_contains_document_number(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/invoices/{self.invoice.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.invoice.document_no.encode(), response.content)
+
+    def test_admin_receipt_pdf_contains_receipt_number(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/receipts/{self.receipt.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.receipt.receipt_no.encode(), response.content)
+
+    def test_admin_delivery_pdf_contains_delivery_reference(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/deliveries/{self.delivery.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(self.delivery.delivery_reference.encode(), response.content)
+
+    def test_customer_can_download_own_invoice_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/invoices/{self.invoice.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/invoices/{self.other_invoice.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_customer_can_download_own_receipt_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/receipts/{self.receipt.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/receipts/{self.other_receipt.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_customer_can_download_own_delivery_but_not_others(self):
+        self.client.force_authenticate(self.customer_user)
+        own = self.client.get(f"/api/v1/customer/deliveries/{self.delivery.id}/pdf/")
+        other = self.client.get(f"/api/v1/customer/deliveries/{self.other_delivery.id}/pdf/")
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(other.status_code, 404)
+
+    def test_cashier_cannot_access_admin_pdf_routes(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(f"/api/v1/admin/invoices/{self.invoice.id}/pdf/")
+        self.assertEqual(response.status_code, 403)
+
+
+class Phase9EPdfParityTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="admin_phase9e", password="pass1234", role="ADMIN", phone="9800093000", is_staff=True
+        )
+        self.cashier = User.objects.create_user(
+            username="cashier_phase9e", password="pass1234", role="CASHIER", phone="9800093001", is_staff=True
+        )
+        self.customer_user = User.objects.create_user(
+            username="customer_phase9e", password="pass1234", role="CUSTOMER", phone="9800093002"
+        )
+        self.other_customer_user = User.objects.create_user(
+            username="customer_phase9e_other", password="pass1234", role="CUSTOMER", phone="9800093003"
+        )
+        self.customer = Customer.objects.create(
+            user=self.customer_user,
+            name="Phase9E Customer",
+            phone="9800093002",
+            customer_code="KYC-P9E-001",
+            address="Rent Street 1",
+        )
+        self.other_customer = Customer.objects.create(
+            user=self.other_customer_user,
+            name="Phase9E Other Customer",
+            phone="9800093003",
+            customer_code="KYC-P9E-002",
+        )
+        self.product = Product.objects.create(
+            product_code="P9E-PRD",
+            name="Phase9E Wardrobe",
+            base_price=Decimal("1500.00"),
+        )
+        self.rent_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=12,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("1200.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="RC-P9E-001",
+            subscription_number="SUB-P9E-R-001",
+        )
+        self.lease_subscription = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.LEASE,
+            tenure_months=10,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("2000.00"),
+            monthly_amount=Decimal("200.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="LC-P9E-001",
+            subscription_number="SUB-P9E-L-001",
+        )
+        self.other_rent_subscription = Subscription.objects.create(
+            customer=self.other_customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            tenure_months=6,
+            start_date=date(2099, 1, 1),
+            total_amount=Decimal("600.00"),
+            monthly_amount=Decimal("100.00"),
+            status=SubscriptionStatus.ACTIVE,
+            contract_reference="RC-P9E-002",
+            subscription_number="SUB-P9E-R-002",
+        )
+        from subscriptions.models import RentSubscriptionProfile, LeaseSubscriptionProfile
+
+        self.rent_profile = RentSubscriptionProfile.objects.create(
+            subscription=self.rent_subscription,
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("240.00"),
+            refundable_security_deposit=Decimal("200.00"),
+            deduction_amount=Decimal("40.00"),
+            refund_amount=Decimal("160.00"),
+            return_inspection_notes="Inspect for scratches",
+            handover_notes="Handle with care",
+            contract_terms_snapshot="Return policy applies",
+        )
+        self.lease_profile = LeaseSubscriptionProfile.objects.create(
+            subscription=self.lease_subscription,
+            security_deposit_percent=Decimal("25.00"),
+            security_deposit_amount=Decimal("500.00"),
+            refundable_security_deposit=Decimal("450.00"),
+            deduction_amount=Decimal("50.00"),
+            refund_amount=Decimal("400.00"),
+            contract_terms_snapshot="Renewal available",
+        )
+        self.deposit_demand = RentLeaseBillingDemand.objects.create(
+            subscription=self.rent_subscription,
+            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+            status="PAID",
+            due_date=date(2099, 1, 1),
+            amount=Decimal("240.00"),
+            collected_amount=Decimal("240.00"),
+            held_amount=Decimal("240.00"),
+            refundable_amount=Decimal("180.00"),
+            deducted_amount=Decimal("60.00"),
+            reference_key="RL-P9E-DEP-001",
+            metadata={"payment_method": "CASH"},
+        )
+        self.other_deposit_demand = RentLeaseBillingDemand.objects.create(
+            subscription=self.other_rent_subscription,
+            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+            status="PAID",
+            due_date=date(2099, 1, 1),
+            amount=Decimal("200.00"),
+            collected_amount=Decimal("200.00"),
+            held_amount=Decimal("200.00"),
+            refundable_amount=Decimal("200.00"),
+            deducted_amount=Decimal("0.00"),
+            reference_key="RL-P9E-DEP-002",
+            metadata={},
+        )
+        self.refund_tx = RentLeaseDepositTransaction.objects.create(
+            subscription=self.rent_subscription,
+            demand=self.deposit_demand,
+            transaction_type=RentLeaseDepositTransactionType.REFUND_APPROVED,
+            amount=Decimal("180.00"),
+            approved_by=self.admin,
+            performed_by=self.admin,
+            metadata={},
+        )
+        RentLeaseDepositTransaction.objects.create(
+            subscription=self.rent_subscription,
+            demand=self.deposit_demand,
+            transaction_type=RentLeaseDepositTransactionType.DEDUCTION,
+            amount=Decimal("60.00"),
+            reason="Damage on panel",
+            approved_by=self.admin,
+            performed_by=self.admin,
+            metadata={},
+        )
+        self.inspection = RentLeaseReturnInspection.objects.create(
+            subscription=self.rent_subscription,
+            status="APPROVED",
+            outcome="DAMAGED",
+            inspection_date=date(2099, 2, 1),
+            condition_recorded="DAMAGED",
+            damage_notes="Panel scratch",
+            damage_deduction_amount=Decimal("60.00"),
+            deposit_refund_amount=Decimal("180.00"),
+            deposit_refund_approved=True,
+            inspected_by=self.admin,
+            approved_by=self.admin,
+            stock_routing_notes="Missing hinge",
+        )
+        self.other_inspection = RentLeaseReturnInspection.objects.create(
+            subscription=self.other_rent_subscription,
+            status="COMPLETED",
+            outcome="GOOD",
+            inspection_date=date(2099, 2, 1),
+            condition_recorded="GOOD",
+        )
+
+    def test_admin_rent_contract_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/rent-contracts/{self.rent_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"RC-P9E-001", response.content)
+
+    def test_admin_lease_contract_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/lease-contracts/{self.lease_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"LC-P9E-001", response.content)
+
+    def test_admin_deposit_pdf_and_refund_deduction_pdfs_return_pdf(self):
+        self.client.force_authenticate(self.admin)
+        dep = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/pdf/")
+        refund = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/refund-pdf/")
+        deduction = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/deduction-pdf/")
+        self.assertEqual(dep.status_code, 200)
+        self.assertEqual(refund.status_code, 200)
+        self.assertEqual(deduction.status_code, 200)
+        self.assertIn(b"RL-P9E-DEP-001", dep.content)
+        self.assertIn(b"RL-P9E-DEP-001", refund.content)
+        self.assertIn(b"RL-P9E-DEP-001", deduction.content)
+
+    def test_admin_return_inspection_pdf_returns_pdf(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/returns/{self.inspection.id}/inspection-pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn(b"INSPECT-", response.content)
+
+    def test_customer_document_access_enforces_ownership(self):
+        self.client.force_authenticate(self.customer_user)
+        rent_own = self.client.get(f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/")
+        lease_own = self.client.get(f"/api/v1/customer/lease-contracts/{self.lease_subscription.id}/pdf/")
+        dep_own = self.client.get(f"/api/v1/customer/deposits/{self.deposit_demand.id}/pdf/")
+        insp_own = self.client.get(f"/api/v1/customer/returns/{self.inspection.id}/inspection-pdf/")
+        dep_other = self.client.get(f"/api/v1/customer/deposits/{self.other_deposit_demand.id}/pdf/")
+        insp_other = self.client.get(f"/api/v1/customer/returns/{self.other_inspection.id}/inspection-pdf/")
+        self.assertEqual(rent_own.status_code, 200)
+        self.assertEqual(lease_own.status_code, 200)
+        self.assertEqual(dep_own.status_code, 200)
+        self.assertEqual(insp_own.status_code, 200)
+        self.assertEqual(dep_other.status_code, 404)
+        self.assertEqual(insp_other.status_code, 404)
+
+    def test_cashier_blocked_from_admin_phase9e_pdf_routes(self):
+        self.client.force_authenticate(self.cashier)
+        response = self.client.get(f"/api/v1/admin/rent-contracts/{self.rent_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_deposit_pdf_uses_authoritative_values(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(f"/api/v1/admin/finance/deposits/{self.deposit_demand.id}/pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"240.00", response.content)
+        self.assertIn(b"180.00", response.content)

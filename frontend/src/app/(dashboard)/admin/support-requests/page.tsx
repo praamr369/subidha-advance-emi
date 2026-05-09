@@ -6,9 +6,11 @@ import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes"
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
 import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -152,7 +154,11 @@ export default function AdminSupportRequestsPage() {
         render: (row: AdminSupportRequest) => (
           <div>
             <div className="font-medium text-foreground">
-              {row.customer_name || "—"}
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "—"}
+                scope="admin"
+              />
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {row.customer_phone || "—"}
@@ -187,9 +193,7 @@ export default function AdminSupportRequestsPage() {
         key: "status",
         title: "Status",
         render: (row: AdminSupportRequest) => (
-          <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-            {row.status}
-          </span>
+          <StatusBadge status={row.status} hideIcon />
         ),
       },
       {

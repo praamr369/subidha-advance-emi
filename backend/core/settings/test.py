@@ -18,6 +18,10 @@ os.environ.setdefault(
 
 from .base import *  # noqa
 
+# Celery: run tasks synchronously in tests; finance flows must never depend on workers.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
 DEBUG = True
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False

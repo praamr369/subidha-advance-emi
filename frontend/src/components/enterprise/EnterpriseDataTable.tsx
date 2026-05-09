@@ -3,9 +3,9 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
+import { TableSkeleton } from "@/components/feedback/Skeleton";
 import type { EnterpriseColumnDef, GenericRecord } from "@/components/enterprise/columns";
 
 type Props<T extends GenericRecord> = {
@@ -120,8 +120,8 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
       </div>
 
       {loading ? (
-        <div className="p-6">
-          <LoadingBlock label="Loading records..." />
+        <div className="p-4" aria-busy="true" aria-label="Loading table">
+          <TableSkeleton rows={Math.min(pageSize, 8)} columns={columns.length} />
         </div>
       ) : null}
 
@@ -167,7 +167,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                       key={resolvedKey}
                       onClick={clickableRows ? () => onRowClick(row) : undefined}
                       className={[
-                        "border-b border-border/80 align-top transition",
+                        "border-b border-border/80 align-top motion-safe:transition-colors motion-safe:duration-150",
                         clickableRows
                           ? "cursor-pointer hover:bg-[color-mix(in_oklab,var(--surface-muted)_78%,transparent)]"
                           : "hover:bg-[color-mix(in_oklab,var(--surface-muted)_58%,transparent)]",

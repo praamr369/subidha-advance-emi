@@ -7,6 +7,7 @@ import { AlertTriangle, Clock3, RefreshCw, Wallet } from "lucide-react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
@@ -96,8 +97,8 @@ export default function OverdueReportPage() {
           variant: "secondary",
         },
         {
-          href: "/admin/emis/overdue",
-          label: "Open Overdue Workspace",
+          href: "/admin/outstandings?operation=advance_emi&state=overdue",
+          label: "Open Unified Outstanding Ledger",
           variant: "secondary",
         },
       ]}
@@ -225,7 +226,7 @@ export default function OverdueReportPage() {
                 value={rows.length > 0 ? "Open" : "Clear"}
                 subtext="Operational follow-up workspace"
                 tone={rows.length > 0 ? "warning" : "success"}
-                href="/admin/emis/overdue"
+                href="/admin/outstandings?operation=advance_emi&state=overdue"
               />
             </div>
 
@@ -236,7 +237,7 @@ export default function OverdueReportPage() {
               {rows.length === 0 ? (
                 <EmptyState
                   title="No overdue EMI records found"
-                  description="There are no overdue EMI records in the current report view."
+                  description="No active overdue records. Cancelled and reversed records are available in history/reversal center."
                 />
               ) : (
                 <DataTable<EmiRecord>
@@ -262,7 +263,11 @@ export default function OverdueReportPage() {
                       render: (row) => (
                         <div className="space-y-1">
                           <div className="font-medium text-foreground">
-                            {row.customer_name || "Unknown customer"}
+                            <CustomerIntelligenceTrigger
+                              customerId={row.customer}
+                              customerName={row.customer_name || "Unknown customer"}
+                              scope="admin"
+                            />
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {row.subscription ? `SUB-${row.subscription}` : "No subscription"}

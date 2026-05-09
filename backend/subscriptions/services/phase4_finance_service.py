@@ -8,6 +8,7 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
+from core.services.operational_visibility import direct_sale_active_q, invoice_active_q, receipt_active_q
 from subscriptions.models import (
     Emi,
     EmiStatus,
@@ -154,7 +155,11 @@ def build_admin_finance_dashboard(*, flt: FinanceFilter) -> dict:
     if flt.plan_type:
         unreconciled = unreconciled.filter(payment__subscription__plan_type=flt.plan_type)
 
-    direct_sale_invoices = invoices.filter(direct_sale__isnull=False)
+    direct_sale_invoices = (
+        invoices.filter(direct_sale__isnull=False)
+        .filter(invoice_active_q())
+        .filter(direct_sale_active_q(prefix="direct_sale__"))
+    )
     direct_sale_paid = direct_sale_invoices.aggregate(total=Sum("received_total"))["total"]
     direct_sale_outstanding = direct_sale_invoices.aggregate(total=Sum("balance_total"))["total"]
 
@@ -244,7 +249,7 @@ def build_admin_finance_dashboard(*, flt: FinanceFilter) -> dict:
         "direct_sale_revenue": _money(direct_sale_paid),
         "direct_sale_outstanding": _money(direct_sale_outstanding),
         "unreconciled_transactions": unreconciled.count(),
-        "receipts_generated_today": receipts.filter(receipt_date=today).count(),
+        "receipts_generated_today": receipts.filter(receipt_active_q()).filter(receipt_date=today).count(),
         "invoices_pending": invoices.filter(status=BillingDocumentStatus.DRAFT).count(),
     }
 
@@ -504,7 +509,13 @@ def customer_invoice_list(*, customer, limit: int = 200) -> dict:
 def customer_receipt_list(*, customer, limit: int = 200) -> dict:
     rows = list(
         ReceiptDocument.objects.filter(customer=customer)
-        .select_related("subscription", "billing_invoice", "payment")
+        .select_related(
+            "subscription",
+            "subscription__product",
+            "billing_invoice",
+            "payment",
+            "direct_sale",
+        )
         .order_by("-receipt_date", "-id")[:limit]
     )
     return {
@@ -514,11 +525,21 @@ def customer_receipt_list(*, customer, limit: int = 200) -> dict:
                 "id": row.id,
                 "receipt_no": row.receipt_no,
                 "receipt_date": row.receipt_date,
+                "receipt_type": row.receipt_type,
                 "status": row.status,
                 "amount": _money(row.amount),
                 "payment_method": getattr(row.payment, "method", None) if row.payment_id else None,
                 "invoice_no": getattr(row.billing_invoice, "document_no", None) if row.billing_invoice_id else None,
-                "subscription_number": getattr(row.subscription, "subscription_number", None) if row.subscription_id else None,
+                "invoice_id": row.billing_invoice_id,
+                "subscription_id": row.subscription_id,
+                "subscription_number": getattr(row.subscription, "subscription_number", None)
+                if row.subscription_id
+                else None,
+                "plan_type": getattr(row.subscription, "plan_type", None) if row.subscription_id else None,
+                "direct_sale_id": row.direct_sale_id,
+                "direct_sale_no": getattr(row.direct_sale, "sale_no", None) if row.direct_sale_id else None,
+                "payment_id": row.payment_id,
+                "reference_no": (row.source_reference or "").strip(),
             }
             for row in rows
         ],

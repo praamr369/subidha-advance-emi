@@ -49,20 +49,29 @@ test("phase-3 books and bridge controls load with active buttons", async ({ page
 test("phase-3 admin operational surfaces share the control-center framework", async ({
   page,
 }) => {
+  await page.goto("/admin/vendors/quotes");
+  await expect(page.getByRole("heading", { name: /Vendor quote requests/i }).first()).toBeVisible();
+
   await page.goto("/admin/operations");
-  await expect(page.getByRole("heading", { name: "Operations Workspace" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Operational launch map");
+  await expect(page.getByRole("heading", { name: "Operations Working Screen" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Action-first queues");
+  await expect(page.locator("body")).toContainText("HR Actions");
+  await expect(page.getByRole("link", { name: "Mark Attendance" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Approve Leave" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Approve Expense" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Payroll" })).toBeVisible();
 
   await page.goto("/admin/branch-reporting");
   await expect(page.getByRole("heading", { name: "Branch Reporting" }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Branch operating lenses");
 
   await page.goto("/admin/analytics");
-  await expect(page.getByRole("heading", { name: "Analytics" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Analysis route map");
+  await expect(page).toHaveURL(/\/admin\/reports\?live=1/);
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("Live dashboard posture");
 
   await page.goto("/admin/reports");
-  await expect(page.getByRole("heading", { name: "Reports Overview" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reports & analysis/i }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Report directory");
 
   await page.goto("/admin/customers");
@@ -70,8 +79,8 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   await expect(page.locator(".portal-page-actions").getByRole("link", { name: "Create Subscription" })).toBeVisible();
 
   await page.goto("/admin/crm");
-  await expect(page.getByRole("heading", { name: "CRM Control Center" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("CRM route map");
+  await expect(page.getByRole("heading", { name: "CRM Workspace" }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("CRM Pipeline");
 
   await page.goto("/admin/crm/leads");
   await expect(page.getByRole("heading", { name: "CRM Lead Register" }).first()).toBeVisible();
@@ -84,6 +93,7 @@ test("phase-3 admin operational surfaces share the control-center framework", as
   await page.goto("/admin/crm/parties");
   await expect(page.getByRole("heading", { name: "Party Directory" }).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Directory filters");
+  await expect(page.locator("body")).toContainText("customers, partners, vendors, and staff");
 
   await page.goto("/admin/support-requests");
   await expect(page.getByRole("heading", { name: "Support Requests" }).first()).toBeVisible();

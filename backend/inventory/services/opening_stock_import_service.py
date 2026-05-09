@@ -11,6 +11,9 @@ from django.db import transaction
 
 from inventory.models import StockLocation, StockLocationType, StockMovementType
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.purchase_need_reconciliation_service import (
+    reconcile_direct_sale_needs_after_inventory_in,
+)
 from inventory.services.stock_service import create_stock_ledger_entry
 from subscriptions.models import AuditLog
 
@@ -229,6 +232,7 @@ def post_opening_stock_import(*, file_or_text: Any, movement_date, posted_by=Non
     created_count = 0
     existing_count = 0
     processed_rows = 0
+    product_ids_seen: set[int] = set()
 
     for index, row in enumerate(rows, start=2):
         product_code = _pick_first(row, MATCH_PRODUCT_HEADERS).upper()
@@ -242,6 +246,7 @@ def post_opening_stock_import(*, file_or_text: Any, movement_date, posted_by=Non
         inventory_item = _resolve_inventory_item(product_code=product_code, sku=sku)
         if inventory_item is None:
             continue
+        product_ids_seen.add(inventory_item.product_id)
         if location is None:
             location = inventory_item.default_stock_location
 
@@ -275,6 +280,9 @@ def post_opening_stock_import(*, file_or_text: Any, movement_date, posted_by=Non
                 "row": index,
             },
         )
+
+    if product_ids_seen:
+        reconcile_direct_sale_needs_after_inventory_in(product_ids=product_ids_seen, actor=posted_by)
 
     return {
         "processed_rows": processed_rows,

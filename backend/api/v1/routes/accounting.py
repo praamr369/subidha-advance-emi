@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from api.v1.views.accounting import (
+    AccountingValidationView,
     AttendanceCalendarView,
     ChartOfAccountViewSet,
     EmployeeExpenseClaimPaymentViewSet,
@@ -11,6 +12,8 @@ from api.v1.views.accounting import (
     ExpenseVoucherViewSet,
     FinanceAccountViewSet,
     JournalEntryViewSet,
+    JournalGroupBalanceView,
+    JournalGroupReverseView,
     LeaveRequestViewSet,
     LeaveTypeViewSet,
     MoneyMovementViewSet,
@@ -93,6 +96,9 @@ router.register(r"purchase-bills", AccountingPurchaseBillViewSet, basename="acco
 router.register(r"vendor-settlements", VendorSettlementViewSet, basename="accounting-vendor-settlements")
 
 urlpatterns = [
+    path("controls/validation/", AccountingValidationView.as_view()),
+    path("controls/journal-groups/<int:pk>/balance/", JournalGroupBalanceView.as_view()),
+    path("controls/journal-groups/<int:pk>/reverse/", JournalGroupReverseView.as_view()),
     path("reports/attendance-calendar/", AttendanceCalendarView.as_view()),
     path("reports/staff-ledger/", StaffLedgerView.as_view()),
     path("reports/trial-balance/", TrialBalanceReportView.as_view()),

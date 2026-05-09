@@ -195,6 +195,149 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
         return self.display_name or "Public Business Profile"
 
 
+class BrandDataSource(BusinessSetupTimeStampedModel):
+    class Provider(models.TextChoices):
+        MANUAL = "MANUAL", "Manual"
+        GOOGLE_BUSINESS = "GOOGLE_BUSINESS", "Google Business Profile"
+        YOUTUBE = "YOUTUBE", "YouTube"
+        FACEBOOK = "FACEBOOK", "Facebook"
+        JUSTDIAL = "JUSTDIAL", "Justdial"
+        OTHER = "OTHER", "Other"
+
+    provider = models.CharField(max_length=40, choices=Provider.choices, db_index=True)
+    name = models.CharField(max_length=120)
+    is_configured = models.BooleanField(default=False, db_index=True)
+    configuration_hint = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "brand_data_sources"
+        ordering = ["provider", "id"]
+
+
+class BrandImportBatch(BusinessSetupTimeStampedModel):
+    class Status(models.TextChoices):
+        PREVIEW = "PREVIEW", "Preview"
+        REVIEWED = "REVIEWED", "Reviewed"
+        APPLIED = "APPLIED", "Applied"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    source = models.ForeignKey(BrandDataSource, on_delete=models.PROTECT, related_name="import_batches")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PREVIEW, db_index=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="brand_import_batches")
+    payload_snapshot = models.JSONField(default=dict, blank=True)
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "brand_import_batches"
+        ordering = ["-created_at", "-id"]
+
+
+class BrandImportedItem(BusinessSetupTimeStampedModel):
+    class ItemType(models.TextChoices):
+        BRAND_IDENTITY = "BRAND_IDENTITY", "Brand Identity"
+        CONTACT_LOCATION = "CONTACT_LOCATION", "Contact & Location"
+        SOCIAL_LINK = "SOCIAL_LINK", "Social Link"
+        MEDIA_ASSET = "MEDIA_ASSET", "Media Asset"
+        PUBLIC_CONTENT = "PUBLIC_CONTENT", "Public Content"
+
+    class ApprovalStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+        APPLIED = "APPLIED", "Applied"
+
+    batch = models.ForeignKey(BrandImportBatch, on_delete=models.PROTECT, related_name="items")
+    item_type = models.CharField(max_length=30, choices=ItemType.choices, db_index=True)
+    field_key = models.CharField(max_length=80, db_index=True)
+    value = models.JSONField(default=dict, blank=True)
+    approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.PENDING, db_index=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_brand_import_items",
+        null=True,
+        blank=True,
+    )
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="rejected_brand_import_items",
+        null=True,
+        blank=True,
+    )
+    review_note = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "brand_imported_items"
+        ordering = ["-created_at", "-id"]
+
+
+class BrandProfileSnapshot(BusinessSetupTimeStampedModel):
+    source_batch = models.ForeignKey(BrandImportBatch, on_delete=models.PROTECT, related_name="snapshots", null=True, blank=True)
+    profile_payload = models.JSONField(default=dict, blank=True)
+    applied_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="brand_profile_snapshots")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "brand_profile_snapshots"
+        ordering = ["-created_at", "-id"]
+
+
+class SocialLink(BusinessSetupTimeStampedModel):
+    class Platform(models.TextChoices):
+        FACEBOOK = "FACEBOOK", "Facebook"
+        YOUTUBE = "YOUTUBE", "YouTube"
+        INSTAGRAM = "INSTAGRAM", "Instagram"
+        WHATSAPP = "WHATSAPP", "WhatsApp"
+        JUSTDIAL = "JUSTDIAL", "Justdial"
+        WEBSITE = "WEBSITE", "Website"
+        OTHER = "OTHER", "Other"
+
+    platform = models.CharField(max_length=30, choices=Platform.choices, db_index=True)
+    label = models.CharField(max_length=120, blank=True, default="")
+    url = models.URLField()
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_public = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "brand_social_links"
+        ordering = ["platform", "id"]
+
+
+class BusinessMediaAsset(BusinessSetupTimeStampedModel):
+    class AssetType(models.TextChoices):
+        LOGO = "LOGO", "Logo"
+        STOREFRONT = "STOREFRONT", "Storefront"
+        GALLERY = "GALLERY", "Gallery"
+        VIDEO = "VIDEO", "Video"
+        OTHER = "OTHER", "Other"
+
+    asset_type = models.CharField(max_length=30, choices=AssetType.choices, db_index=True)
+    title = models.CharField(max_length=255, blank=True, default="")
+    media_url = models.URLField()
+    source_url = models.URLField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_public = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "business_media_assets"
+        ordering = ["-created_at", "-id"]
+
+
+class PublicContentBlock(BusinessSetupTimeStampedModel):
+    key = models.CharField(max_length=120, unique=True)
+    title = models.CharField(max_length=255, blank=True, default="")
+    content = models.TextField(blank=True, default="")
+    source_batch = models.ForeignKey(BrandImportBatch, on_delete=models.PROTECT, related_name="content_blocks", null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_public = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "public_content_blocks"
+        ordering = ["key", "id"]
+
+
 class Branch(BusinessSetupTimeStampedModel):
     code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)

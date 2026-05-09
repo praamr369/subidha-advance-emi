@@ -217,7 +217,7 @@ class FinanceAccountEditPolicyService:
     @classmethod
     def get_editability(cls, account: FinanceAccount) -> EditabilityPolicy:
         usage = cls.usage_summary(account)
-        editable_fields = ["name", "bank_last4", "upi_handle", "notes"]
+        editable_fields = ["name", "bank_last4", "upi_handle", "notes", "is_real_settlement_account"]
         locked_fields: dict[str, str] = {}
 
         if usage["has_cash_counters"]:

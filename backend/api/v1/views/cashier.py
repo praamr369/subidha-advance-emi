@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounting.models import FinanceAccount
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.accounting import FinanceAccountSerializer
 from api.v1.serializers.finance_operations import (
@@ -14,6 +15,7 @@ from api.v1.serializers.finance_operations import (
     CashierPaymentCollectionSerializer,
 )
 from billing.models import DirectSale
+from core.services.operational_visibility import invoice_active_q
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from branch_control.services.branch_service import scope_queryset_to_user_branches
 from subscriptions.services.customer_advance_service import CustomerAdvanceService
@@ -51,6 +53,9 @@ def _outstanding_direct_sale_queryset(*, user):
         )
         .prefetch_related("billing_invoices")
         .filter(status="INVOICED", balance_total__gt=Decimal("0.00"))
+        .filter(invoice_active_q(prefix="billing_invoices__"))
+        .filter(billing_invoices__status="POSTED")
+        .distinct()
         .order_by("sale_date", "id")
     )
     return scope_queryset_to_user_branches(
@@ -91,7 +96,12 @@ class CashierFinanceAccountListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
     def get(self, request, *args, **kwargs):
+        from accounting.services.finance_account_collection_guard import (
+            filter_finance_accounts_for_payment_collection,
+        )
+
         queryset = FinanceAccount.objects.select_related("chart_account", "branch")
+        queryset = filter_finance_accounts_for_payment_collection(queryset)
         queryset = scope_queryset_to_user_branches(
             queryset,
             user=request.user,
@@ -143,6 +153,7 @@ class CashierCollectPayment(APIView):
 
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
+    @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
         serializer = CashierPaymentCollectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -374,6 +385,7 @@ class CashierSearchDirectSaleView(APIView):
 class CashierCollectDirectSalePayment(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
+    @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
         data = request.data or {}
         direct_sale_id = data.get("direct_sale_id")

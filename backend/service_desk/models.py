@@ -53,6 +53,7 @@ class ServiceDeskCaseType(models.TextChoices):
     DELIVERY_RETURN = "DELIVERY_RETURN", "Delivery Return"
     EXCHANGE = "EXCHANGE", "Exchange"
     SERVICE = "SERVICE", "Service"
+    DIRECT_SALE_DELIVERY = "DIRECT_SALE_DELIVERY", "Direct Sale Delivery"
 
 
 class ServiceDeskCaseStatus(models.TextChoices):
@@ -408,3 +409,17 @@ class ServiceDeskCaseLine(ServiceDeskTimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+
+from service_desk.support_ticket_models import (  # noqa: E402,F401
+    SupportTicket,
+    SupportTicketAttachment,
+    SupportTicketCategory,
+    SupportTicketComment,
+    SupportTicketEvent,
+    SupportTicketEventType,
+    SupportTicketLink,
+    SupportTicketLinkType,
+    SupportTicketPriority,
+    SupportTicketSource,
+    SupportTicketStatus,
+)

@@ -1,4 +1,5 @@
 from django.db.models import Count, Prefetch, Q, Sum
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -55,6 +56,7 @@ from subscriptions.services.delivery_service import (
     build_delivery_report_summary,
     get_subscription_delivery_prefetch,
 )
+from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
@@ -381,6 +383,24 @@ class CustomerDeliveryDetailView(APIView):
             )
 
         return Response(CustomerSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class CustomerDeliveryPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk):
+        customer, error_response = _get_customer_or_404_response(request)
+        if error_response is not None:
+            return error_response
+        delivery = _customer_delivery_queryset(customer).filter(pk=pk).first()
+        if delivery is None:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_delivery_handover_pdf(delivery=delivery)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="delivery-{delivery.delivery_reference or delivery.id}.pdf"'
+        )
+        return response
 
 
 class CustomerSupportRequestListCreateView(APIView):

@@ -218,6 +218,14 @@ export default function AdminSettingsImportsPage() {
       <div className="space-y-6">
         {error ? <ErrorState title="Import action failed" description={error} /> : null}
 
+        <div className="rounded-[1.35rem] border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          Before wide exports or selective resets, run validation in the{" "}
+          <Link href={ROUTES.admin.settingsBusinessSetupDryRuns} className="font-semibold text-primary hover:underline">
+            Dry Run Control Center
+          </Link>{" "}
+          (read-only; no packages stored there).
+        </div>
+
         <WorkspaceSection
           title="Existing import flows"
           description="These routes already exist in the repo and remain the canonical operator flows for product master and opening stock imports."

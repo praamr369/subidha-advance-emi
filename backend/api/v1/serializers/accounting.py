@@ -12,10 +12,13 @@ from accounting.models import (
     EmployeeExpenseClaim,
     EmployeeExpenseClaimPayment,
     EmployeeProfile,
+    EmployeeDocument,
     ExpenseVoucher,
     ExpenseClaimStatus,
     ExpenseVoucherStatus,
     FinanceAccount,
+    FinanceAccountCoaMapping,
+    FinanceAccountMappingPurpose,
     JournalEntry,
     JournalEntryLine,
     JournalEntryStatus,
@@ -73,6 +76,14 @@ class JournalEntryPostSerializer(serializers.Serializer):
 class JournalEntryVoidSerializer(serializers.Serializer):
     reason = serializers.CharField()
 
+
+class JournalGroupReverseSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+
+
+class AccountingValidationQuerySerializer(serializers.Serializer):
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
 
 class ChartOfAccountSerializer(serializers.ModelSerializer):
     parent_code = serializers.CharField(source="parent.code", read_only=True)
@@ -203,6 +214,7 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
             "chart_account_code",
             "chart_account_name",
             "opening_balance",
+            "is_real_settlement_account",
             "is_active",
             "bank_last4",
             "upi_handle",
@@ -236,6 +248,7 @@ class FinanceAccountUpdateSerializer(serializers.ModelSerializer):
             "kind",
             "chart_account",
             "opening_balance",
+            "is_real_settlement_account",
             "is_active",
             "bank_last4",
             "upi_handle",
@@ -280,6 +293,59 @@ class FinanceAccountUpdateSerializer(serializers.ModelSerializer):
         updated.refresh_from_db()
         return updated
 
+
+class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
+    chart_account_type = serializers.CharField(source="chart_account.account_type", read_only=True)
+
+    class Meta:
+        model = FinanceAccountCoaMapping
+        fields = [
+            "id",
+            "finance_account",
+            "finance_account_name",
+            "chart_account",
+            "chart_account_name",
+            "chart_account_type",
+            "purpose",
+            "is_default",
+            "is_active",
+            "notes",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_by", "updated_by", "created_at", "updated_at"]
+
+    def validate_purpose(self, value):
+        if value not in FinanceAccountMappingPurpose.values:
+            raise serializers.ValidationError("Invalid mapping purpose.")
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        payload = {
+            "finance_account": attrs.get("finance_account", getattr(instance, "finance_account", None)),
+            "chart_account": attrs.get("chart_account", getattr(instance, "chart_account", None)),
+            "purpose": attrs.get("purpose", getattr(instance, "purpose", None)),
+            "is_default": attrs.get("is_default", getattr(instance, "is_default", False)),
+            "is_active": attrs.get("is_active", getattr(instance, "is_active", True)),
+            "notes": attrs.get("notes", getattr(instance, "notes", "")),
+            "created_by": getattr(instance, "created_by", None),
+            "updated_by": attrs.get("updated_by", getattr(instance, "updated_by", None)),
+        }
+        candidate = instance or FinanceAccountCoaMapping(**payload)
+        if instance is not None:
+            for field, value in payload.items():
+                setattr(candidate, field, value)
+        try:
+            candidate.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs
 
 class JournalEntryLineSerializer(serializers.ModelSerializer):
     chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
@@ -532,6 +598,21 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "base_salary",
             "standard_daily_hours",
             "overtime_rate_per_hour",
+            "employment_type",
+            "salary_effective_from",
+            "temporary_contract_end_date",
+            "daily_wage_rate",
+            "hourly_wage_rate",
+            "piece_rate_amount",
+            "piece_rate_unit_label",
+            "kyc_id_type",
+            "kyc_id_number",
+            "kyc_verified",
+            "address",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "cost_center_code",
+            "payroll_expense_account",
             "is_active",
             "notes",
             "compensation_components",
@@ -539,6 +620,50 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "employee_code", "created_at", "updated_at"]
+
+
+class EmployeeDocumentSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeDocument
+        fields = [
+            "id",
+            "employee",
+            "employee_name",
+            "employee_code",
+            "document_type",
+            "title",
+            "document_no",
+            "file",
+            "file_url",
+            "status",
+            "notes",
+            "uploaded_by",
+            "uploaded_by_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "uploaded_by",
+            "uploaded_by_username",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if not obj.file:
+            return None
+        try:
+            url = obj.file.url
+        except Exception:
+            return None
+        return request.build_absolute_uri(url) if request else url
 
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):

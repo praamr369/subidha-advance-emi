@@ -16,11 +16,15 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
+import {
+  DetailPanel,
+  FormSection,
+  Timeline,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import {
   DetailItem as DetailValue,
-  WorkspaceSection as SectionCard,
 } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import {
@@ -676,7 +680,7 @@ export default function AdminPaymentDetailRoutePage() {
             />
 
             <section className="receipt-print-hide grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Payment Overview"
                 description="Primary payment facts used for finance review and audit confirmation."
               >
@@ -720,9 +724,9 @@ export default function AdminPaymentDetailRoutePage() {
                     value={resolvedPayment.verified_by_username || "—"}
                   />
                 </div>
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Contract Context"
                 description="Linked customer, subscription, batch, lucky, and EMI context for this payment."
               >
@@ -810,10 +814,10 @@ export default function AdminPaymentDetailRoutePage() {
                     </Link>
                   ) : null}
                 </div>
-              </SectionCard>
+              </DetailPanel>
             </section>
 
-            <SectionCard
+            <FormSection
               className="receipt-print-hide"
               title="Reversal Control"
               description="Payments are immutable financial records. Reversal is explicit, audited, and requires a reason."
@@ -886,10 +890,10 @@ export default function AdminPaymentDetailRoutePage() {
                   </button>
                 </form>
               )}
-            </SectionCard>
+            </FormSection>
 
             <section className="receipt-print-hide grid gap-6 xl:grid-cols-2">
-              <SectionCard
+              <DetailPanel
                 title="Ledger Entries"
                 description="Direct ledger entries linked to this payment."
               >
@@ -899,7 +903,7 @@ export default function AdminPaymentDetailRoutePage() {
                     description="No direct payment-linked ledger rows were returned."
                   />
                 ) : (
-                  <div className="space-y-3">
+                  <Timeline title="Payment Ledger Events">
                     {timelineData?.ledger_entries?.map((entry) => (
                       <div
                         key={`ledger-${entry.id}`}
@@ -921,11 +925,11 @@ export default function AdminPaymentDetailRoutePage() {
                         </div>
                       </div>
                     ))}
-                  </div>
+                  </Timeline>
                 )}
-              </SectionCard>
+              </DetailPanel>
 
-              <SectionCard
+              <DetailPanel
                 title="Reversal Ledger Entries"
                 description="Ledger rows created as part of reversal processing."
               >
@@ -935,7 +939,7 @@ export default function AdminPaymentDetailRoutePage() {
                     description="No reversal ledger rows are present for this payment."
                   />
                 ) : (
-                  <div className="space-y-3">
+                  <Timeline title="Reversal Ledger Events">
                     {timelineData?.reversal_ledger_entries?.map((entry) => (
                       <div
                         key={`reversal-ledger-${entry.id}`}
@@ -957,12 +961,12 @@ export default function AdminPaymentDetailRoutePage() {
                         </div>
                       </div>
                     ))}
-                  </div>
+                  </Timeline>
                 )}
-              </SectionCard>
+              </DetailPanel>
             </section>
 
-            <SectionCard
+            <DetailPanel
               className="receipt-print-hide"
               title="Audit & Timeline"
               description="Chronological audit and finance event trail for this payment."
@@ -974,7 +978,7 @@ export default function AdminPaymentDetailRoutePage() {
                   description="No audit or timeline events were returned for this payment."
                 />
               ) : (
-                <div className="space-y-3">
+                <Timeline title="Chronological Timeline">
                   {timelineData?.timeline?.map((entry, index) => (
                     <div
                       key={`timeline-${index}-${entry.kind}`}
@@ -1029,9 +1033,9 @@ export default function AdminPaymentDetailRoutePage() {
                         </div>
                       </div>
                     ))}
-                </div>
+                </Timeline>
               )}
-            </SectionCard>
+            </DetailPanel>
 
             <DetailSection
               className="receipt-print-hide"

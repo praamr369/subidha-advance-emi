@@ -44,7 +44,8 @@ export default function WinnerHistoryTableClient({
         winner.batch_code,
         String(winner.draw_month),
         winner.lucky_id || "",
-        winner.customer_name || "",
+        winner.public_commit_hash || winner.committed_hash || "",
+        winner.verification_status || "",
         winner.product_name || "",
       ]
         .join(" ")
@@ -66,8 +67,8 @@ export default function WinnerHistoryTableClient({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Batch, month, Lucky ID, winner name, product"
-              className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              placeholder="Batch, draw month, Lucky ID, product, or hash fragment"
+              className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground"
             />
           </div>
         </label>
@@ -106,7 +107,9 @@ export default function WinnerHistoryTableClient({
                 "Batch",
                 "Draw month",
                 "Lucky ID",
-                "Winner",
+                "Public label",
+                "Verification",
+                "Public commit hash",
                 "Product",
                 "Waived EMI",
                 "Waived amount",
@@ -133,8 +136,16 @@ export default function WinnerHistoryTableClient({
                 <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-foreground">
                   {winner.lucky_id || "—"}
                 </td>
+                <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-muted-foreground">
+                  {winner.winner_name_masked || "Masked for privacy"}
+                </td>
                 <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-foreground">
-                  {winner.customer_name || "Published"}
+                  {winner.verification_status || "unavailable"}
+                </td>
+                <td className="border-b border-slate-200/70 px-4 py-3 text-xs text-muted-foreground">
+                  <span className="font-mono">
+                    {winner.public_commit_hash || winner.committed_hash || "—"}
+                  </span>
                 </td>
                 <td className="border-b border-slate-200/70 px-4 py-3 text-sm text-foreground">
                   {winner.product_name || "—"}
@@ -166,14 +177,21 @@ export default function WinnerHistoryTableClient({
               Batch {winner.batch_code} · Month {winner.draw_month}
             </div>
             <div className="mt-3 text-xl font-semibold text-foreground">
-              {winner.customer_name || "Winner published"}
+              Lucky ID {winner.lucky_id || "—"}
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Lucky ID {winner.lucky_id || "—"} · {formatDrawDate(winner.draw_date)}
+              {formatDrawDate(winner.draw_date)} · Verification{" "}
+              {winner.verification_status || "unavailable"}
             </p>
             <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
               <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
+                Public label: {winner.winner_name_masked || "Not published"}
+              </div>
+              <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
                 Product: {winner.product_name || "—"}
+              </div>
+              <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 text-xs break-all">
+                Public commit hash: {winner.public_commit_hash || winner.committed_hash || "—"}
               </div>
               <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
                 Waived EMI: {winner.waived_emi_count ?? 0} · Waived amount:{" "}

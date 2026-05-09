@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { getSubscription, type SubscriptionRecord } from "@/services/subscriptions";
 import {
   approveContract,
@@ -56,30 +57,7 @@ function toErrorMessage(err: unknown): string {
   return "Action failed.";
 }
 
-function statusTone(status: string): string {
-  const s = (status || "").toUpperCase();
-  if (["ACTIVE", "COMPLETED", "CLOSED"].includes(s))
-    return "bg-emerald-100 text-emerald-800 border-emerald-200";
-  if (["APPROVED", "HANDED_OVER", "DELIVERED"].includes(s))
-    return "bg-blue-100 text-blue-800 border-blue-200";
-  if (["CANCELLED", "DEFAULTED"].includes(s))
-    return "bg-red-100 text-red-800 border-red-200";
-  if (["DRAFT", "REQUESTED", "PENDING_APPROVAL"].includes(s))
-    return "bg-amber-100 text-amber-800 border-amber-200";
-  return "bg-slate-100 text-slate-700 border-slate-200";
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusTone(status)}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
+function FieldRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-2 py-1.5">
       <div className="w-40 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -411,6 +389,12 @@ export default function ContractLifecyclePage() {
   const canActivate = status === "APPROVED";
   const canCancel = !["CANCELLED", "CLOSED", "COMPLETED"].includes(status);
   const canClose = ["COMPLETED", "RETURNED"].includes(status);
+  const contractPdfHref =
+    sub?.plan_type === "RENT"
+      ? `/api/v1/admin/rent-contracts/${subscriptionId}/pdf/`
+      : sub?.plan_type === "LEASE"
+        ? `/api/v1/admin/lease-contracts/${subscriptionId}/pdf/`
+        : null;
 
   return (
     <PortalPage
@@ -435,6 +419,31 @@ export default function ContractLifecyclePage() {
       statusBadge={{ label: "Contract Lifecycle", tone: "info" }}
     >
       <div className="space-y-6">
+        {(contractPdfHref || inspection?.id) && (
+          <div className="flex flex-wrap gap-2">
+            {contractPdfHref ? (
+              <a
+                href={contractPdfHref}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                Download Contract PDF
+              </a>
+            ) : null}
+            {inspection?.id ? (
+              <a
+                href={`/api/v1/admin/returns/${inspection.id}/inspection-pdf/`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                Download Inspection PDF
+              </a>
+            ) : null}
+          </div>
+        )}
+
         {/* Feedback banners */}
         {actionSuccess && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
@@ -448,7 +457,7 @@ export default function ContractLifecyclePage() {
         )}
 
         {/* Contract summary */}
-        <WorkspaceSection
+        <DetailPanel
           title="Contract Overview"
           description="Core contract identity and current lifecycle state."
         >
@@ -462,10 +471,10 @@ export default function ContractLifecyclePage() {
             <FieldRow label="Monthly Amount" value={money(sub?.monthly_amount)} />
             <FieldRow label="Tenure" value={sub?.tenure_months ? `${sub.tenure_months} months` : "—"} />
           </div>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {/* Lifecycle actions */}
-        <WorkspaceSection
+        <FormSection
           title="Lifecycle Actions"
           description="Controlled transitions. Approve → Activate → (operational states) → Close. Cancellation preserves historical payments."
         >
@@ -532,10 +541,10 @@ export default function ContractLifecyclePage() {
               </div>
             </div>
           )}
-        </WorkspaceSection>
+        </FormSection>
 
         {/* Amendments */}
-        <WorkspaceSection
+        <FormSection
           title="Contract Amendments"
           description="Track and manage tenure extensions, product upgrades, address changes, and other controlled corrections. Original terms are never silently overwritten."
         >
@@ -712,11 +721,11 @@ export default function ContractLifecyclePage() {
               ))
             )}
           </div>
-        </WorkspaceSection>
+        </FormSection>
 
         {/* Possession — only for RENT/LEASE */}
         {isRentOrLease && (
-          <WorkspaceSection
+          <FormSection
             title="Product Possession Tracking"
             description="Track physical product location, handover, and return for rent/lease contracts."
           >
@@ -859,12 +868,12 @@ export default function ContractLifecyclePage() {
                 )}
               </div>
             )}
-          </WorkspaceSection>
+          </FormSection>
         )}
 
         {/* Return Inspection — only for RENT/LEASE */}
         {isRentOrLease && (
-          <WorkspaceSection
+          <FormSection
             title="Return Inspection"
             description="Inspect returned product, record condition, calculate damage deduction, approve deposit refund, and route stock. Product only becomes sellable after SELLABLE inspection pass."
           >
@@ -987,7 +996,7 @@ export default function ContractLifecyclePage() {
                 )}
               </div>
             )}
-          </WorkspaceSection>
+          </FormSection>
         )}
 
         {/* Navigation */}

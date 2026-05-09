@@ -95,6 +95,13 @@ class PlanType(models.TextChoices):
     LEASE = "LEASE", "Lease"
 
 
+class ContractReferenceType(models.TextChoices):
+    ADVANCE_EMI = "ADVANCE_EMI", "Advance EMI"
+    RENT = "RENT", "Rent"
+    LEASE = "LEASE", "Lease"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+
+
 class PublicLeadStatus(models.TextChoices):
     NEW = "NEW", "New"
     IN_PROGRESS = "IN_PROGRESS", "In Progress"
@@ -185,6 +192,7 @@ class EmiStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     PAID = "PAID", "Paid"
     WAIVED = "WAIVED", "Waived"
+    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class PaymentMethod(models.TextChoices):
@@ -213,9 +221,15 @@ class BatchStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
     OPEN = "OPEN", "Open"
     FULL = "FULL", "Full"
+    # Pass-7 coordination: preparatory gate before cryptographic lock + snapshot freeze.
+    READY_TO_LOCK = "READY_TO_LOCK", "Ready To Lock"
+    LOCKED = "LOCKED", "Locked"
     DRAW_IN_PROGRESS = "DRAW_IN_PROGRESS", "Draw In Progress"
+    DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
+    DRAW_COMPLETED = "DRAW_COMPLETED", "Draw Completed"
     COMPLETED = "COMPLETED", "Completed"
     CLOSED = "CLOSED", "Closed"
+    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class LedgerEntryType(models.TextChoices):
@@ -559,7 +573,14 @@ class Product(TimeStampedModel):
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
-        if not any([self.is_emi_enabled, self.is_rent_enabled, self.is_lease_enabled]):
+        if not any(
+            [
+                self.is_emi_enabled,
+                self.is_rent_enabled,
+                self.is_lease_enabled,
+                self.is_direct_sale_enabled,
+            ]
+        ):
             errors["is_emi_enabled"] = "At least one product mode must be enabled."
         if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
             errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
@@ -1010,6 +1031,12 @@ class Batch(TimeStampedModel):
         default=BatchStatus.DRAFT,
         db_index=True,
     )
+    locked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Set when batch draw eligibility is frozen (LOCKED or beyond).",
+    )
 
     class Meta:
         db_table = "batches"
@@ -1241,7 +1268,17 @@ class Subscription(TimeStampedModel):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    Q(plan_type=PlanType.EMI, batch__isnull=False, lucky_id__isnull=False)
+                    Q(
+                        plan_type=PlanType.EMI,
+                        status=SubscriptionStatus.CANCELLED,
+                        batch__isnull=False,
+                    )
+                    | Q(
+                        plan_type=PlanType.EMI,
+                        batch__isnull=False,
+                        lucky_id__isnull=False,
+                    )
+                    & ~Q(status=SubscriptionStatus.CANCELLED)
                     | ~Q(plan_type=PlanType.EMI)
                 ),
                 name="chk_batch_and_lucky_required_for_emi",
@@ -1287,7 +1324,9 @@ class Subscription(TimeStampedModel):
                 raise ValidationError({"batch": "EMI subscription requires a batch."})
 
             if not self.lucky_id:
-                raise ValidationError({"lucky_id": "EMI subscription requires a lucky ID."})
+                if self.status != SubscriptionStatus.CANCELLED:
+                    raise ValidationError({"lucky_id": "EMI subscription requires a lucky ID."})
+                return
 
             if self.lucky_id.batch_id != self.batch_id:
                 raise ValidationError({"lucky_id": "Lucky ID must belong to the selected batch."})
@@ -1640,6 +1679,201 @@ class LeaseSubscriptionProfile(TimeStampedModel):
 
     def __str__(self):
         return f"LeaseProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+class ContractReferenceSequence(TimeStampedModel):
+    scope_key = models.CharField(max_length=120, unique=True, db_index=True)
+    next_number = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "contract_reference_sequences"
+        ordering = ["scope_key"]
+
+    def clean(self):
+        if not self.scope_key or not self.scope_key.strip():
+            raise ValidationError({"scope_key": "Sequence scope key is required."})
+
+    def save(self, *args, **kwargs):
+        self.scope_key = (self.scope_key or "").strip().upper()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.scope_key
+
+
+class ContractReference(TimeStampedModel):
+    reference_no = models.CharField(max_length=140, unique=True, db_index=True)
+    display_reference = models.CharField(max_length=180, db_index=True)
+    contract_type = models.CharField(
+        max_length=20,
+        choices=ContractReferenceType.choices,
+        db_index=True,
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    rent_contract = models.ForeignKey(
+        RentSubscriptionProfile,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    lease_contract = models.ForeignKey(
+        LeaseSubscriptionProfile,
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    direct_sale = models.ForeignKey(
+        "billing.DirectSale",
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    invoice = models.ForeignKey(
+        "billing.BillingInvoice",
+        on_delete=models.PROTECT,
+        related_name="contract_references",
+        null=True,
+        blank=True,
+    )
+    phone_snapshot = models.CharField(max_length=24, blank=True, default="", db_index=True)
+    customer_name_snapshot = models.CharField(
+        max_length=180,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    kyc_reference_snapshot = models.CharField(
+        max_length=120,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Masked-safe KYC/customer reference snapshot only; never store raw KYC document values here.",
+    )
+    product_summary_snapshot = models.CharField(max_length=255, blank=True, default="")
+    batch_snapshot = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    lucky_id_snapshot = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    partner_snapshot = models.CharField(max_length=180, blank=True, default="")
+    source_created_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "contract_references"
+        ordering = ["-source_created_at", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["contract_type"]),
+            models.Index(fields=["customer"]),
+            models.Index(fields=["phone_snapshot"]),
+            models.Index(fields=["customer_name_snapshot"]),
+            models.Index(fields=["kyc_reference_snapshot"]),
+            models.Index(fields=["batch_snapshot"]),
+            models.Index(fields=["lucky_id_snapshot"]),
+            models.Index(fields=["source_created_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.reference_no or not self.reference_no.strip():
+            errors["reference_no"] = "Contract reference number is required."
+        if not self.display_reference or not self.display_reference.strip():
+            errors["display_reference"] = "Display reference is required."
+        if self.contract_type not in ContractReferenceType.values:
+            errors["contract_type"] = "Unsupported contract reference type."
+        if not any(
+            [
+                self.subscription_id,
+                self.rent_contract_id,
+                self.lease_contract_id,
+                self.direct_sale_id,
+                self.invoice_id,
+            ]
+        ):
+            errors["source"] = "ContractReference must point to at least one source record."
+        if self.pk:
+            existing = ContractReference.objects.only("reference_no").filter(pk=self.pk).first()
+            if existing and existing.reference_no != (self.reference_no or "").strip().upper():
+                errors["reference_no"] = "Contract reference number is immutable."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip().upper()
+        self.display_reference = (self.display_reference or "").strip().upper()
+        self.phone_snapshot = (self.phone_snapshot or "").strip()
+        self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
+        self.kyc_reference_snapshot = (
+            (self.kyc_reference_snapshot or "").strip() or None
+        )
+        self.product_summary_snapshot = (self.product_summary_snapshot or "").strip()
+        self.batch_snapshot = (self.batch_snapshot or "").strip().upper()
+        self.lucky_id_snapshot = (self.lucky_id_snapshot or "").strip().upper()
+        self.partner_snapshot = (self.partner_snapshot or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.reference_no
+
+
+class UnifiedCollectionIdempotencyStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    COMPLETED = "COMPLETED", "Completed"
+
+
+class UnifiedCollectionIdempotency(TimeStampedModel):
+    """
+    Binds an optional client idempotency key to at most one successful unified collection
+    response per user (Phase 9B).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="unified_collection_idempotency_keys",
+    )
+    key = models.CharField(max_length=160)
+    fingerprint = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=16,
+        choices=UnifiedCollectionIdempotencyStatus.choices,
+        default=UnifiedCollectionIdempotencyStatus.PENDING,
+        db_index=True,
+    )
+    response_body = models.JSONField(default=dict, blank=True)
+    response_status = models.PositiveSmallIntegerField(default=200)
+
+    class Meta:
+        db_table = "unified_collection_idempotency"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "key"],
+                name="uniq_unified_collection_idem_user_key",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.key[:24]}"
 
 
 class RentLeaseDemandType(models.TextChoices):
@@ -2838,6 +3072,108 @@ class PartnerCollectionRequest(models.Model):
 
 
 
+# =====================================================
+# DRAW COORDINATION (Pass 7 — immutable eligibility + commit)
+# =====================================================
+
+
+class DrawEligibilitySnapshot(TimeStampedModel):
+    """
+    Immutable rows frozen at batch lock. Draw winner selection must use these rows,
+    not live subscription queries, when snapshots exist for the batch.
+    """
+
+    batch = models.ForeignKey(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    snapshot_version = models.PositiveIntegerField(db_index=True)
+    sort_order = models.PositiveIntegerField()
+    subscription = models.ForeignKey(
+        "Subscription",
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    lucky_id = models.ForeignKey(
+        LuckyId,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="draw_eligibility_snapshots",
+    )
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="draw_eligibility_snapshots",
+    )
+    contract_reference = models.CharField(max_length=64, blank=True, default="")
+    emi_schedule_summary = models.JSONField(default=dict)
+    row_hash = models.CharField(max_length=128)
+
+    class Meta:
+        db_table = "draw_eligibility_snapshots"
+        ordering = ["snapshot_version", "sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "snapshot_version", "subscription"],
+                name="uq_draw_eligibility_batch_version_subscription",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["batch", "snapshot_version"]),
+        ]
+
+    def __str__(self):
+        return f"DrawEligibilitySnapshot batch={self.batch_id} v={self.snapshot_version} sub={self.subscription_id}"
+
+
+class DrawCommit(TimeStampedModel):
+    """One published commit per batch for verifiable draw execution."""
+
+    class DrawCommitStatus(models.TextChoices):
+        COMMITTED = "COMMITTED", "Committed"
+
+    batch = models.OneToOneField(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="draw_commit",
+    )
+    snapshot_version = models.PositiveIntegerField()
+    snapshot_hash = models.CharField(max_length=64)
+    public_commit_hash = models.CharField(max_length=64)
+    seed_commitment = models.CharField(max_length=64)
+    committed_at = models.DateTimeField(db_index=True)
+    committed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="batch_draw_commits",
+    )
+    algorithm_version = models.CharField(max_length=32, default="pass7-v1")
+    status = models.CharField(
+        max_length=20,
+        choices=DrawCommitStatus.choices,
+        default=DrawCommitStatus.COMMITTED,
+    )
+
+    class Meta:
+        db_table = "draw_commits"
+
+    def __str__(self):
+        return f"DrawCommit batch={self.batch_id} hash={self.public_commit_hash[:12]}…"
+
 
 # =====================================================
 # LUCKY DRAW
@@ -2847,6 +3183,13 @@ class LuckyDraw(TimeStampedModel):
     batch = models.ForeignKey(
         Batch,
         on_delete=models.CASCADE,
+        related_name="lucky_draws",
+    )
+    draw_commit = models.ForeignKey(
+        DrawCommit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name="lucky_draws",
     )
     committed_hash = models.CharField(max_length=64)
@@ -3052,6 +3395,9 @@ class AuditLog(models.Model):
         DRAW_EXECUTED = "DRAW_EXECUTED", "Draw Executed"
         DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
         DRAW_REVEALED = "DRAW_REVEALED", "Draw Revealed"
+        DRAW_CERTIFICATE_PUBLISHED = "DRAW_CERTIFICATE_PUBLISHED", "Draw Certificate Published"
+        DRAW_PUBLIC_VERIFIED = "DRAW_PUBLIC_VERIFIED", "Public Draw Verification Generated"
+        DRAW_PUBLIC_RESULT_PUBLISHED = "DRAW_PUBLIC_RESULT_PUBLISHED", "Public Draw Result Published"
         WINNER_WAIVER_APPLIED = "WINNER_WAIVER_APPLIED", "Winner Waiver Applied"
         WINNER_STATE_SYNCED = "WINNER_STATE_SYNCED", "Winner State Synced"
         COMMISSION_CREATED = "COMMISSION_CREATED", "Commission Created"
@@ -3082,6 +3428,16 @@ class AuditLog(models.Model):
         STOCK_ADJUSTMENT_UPDATED = "STOCK_ADJUSTMENT_UPDATED", "Stock Adjustment Updated"
         STOCK_ADJUSTMENT_APPROVED = "STOCK_ADJUSTMENT_APPROVED", "Stock Adjustment Approved"
         STOCK_ADJUSTMENT_POSTED = "STOCK_ADJUSTMENT_POSTED", "Stock Adjustment Posted"
+        VENDOR_CONTACT_CREATED = "VENDOR_CONTACT_CREATED", "Vendor Contact Created"
+        PURCHASE_ORDER_CREATED = "PURCHASE_ORDER_CREATED", "Purchase Order Created"
+        PURCHASE_ORDER_UPDATED = "PURCHASE_ORDER_UPDATED", "Purchase Order Updated"
+        PURCHASE_ORDER_CANCELLED = "PURCHASE_ORDER_CANCELLED", "Purchase Order Cancelled"
+        GOODS_RECEIPT_CREATED = "GOODS_RECEIPT_CREATED", "Goods Receipt Created"
+        GOODS_RECEIPT_POSTED = "GOODS_RECEIPT_POSTED", "Goods Receipt Posted"
+        VENDOR_BILL_CREATED = "VENDOR_BILL_CREATED", "Vendor Bill Created"
+        VENDOR_BILL_POSTED = "VENDOR_BILL_POSTED", "Vendor Bill Posted"
+        VENDOR_PAYMENT_CREATED = "VENDOR_PAYMENT_CREATED", "Vendor Payment Created"
+        VENDOR_PAYMENT_POSTED = "VENDOR_PAYMENT_POSTED", "Vendor Payment Posted"
         OPENING_STOCK_IMPORTED = "OPENING_STOCK_IMPORTED", "Opening Stock Imported"
         DELIVERY_INVENTORY_BRIDGE_SYNCED = (
             "DELIVERY_INVENTORY_BRIDGE_SYNCED",
@@ -3187,6 +3543,215 @@ class AuditLog(models.Model):
         return f"{self.action_type} - {self.model_name}#{self.object_id}"
 
 
+class OperationalCancellation(models.Model):
+    class SourceType(models.TextChoices):
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+        BILLING_INVOICE = "BILLING_INVOICE", "Billing Invoice"
+        BILLING_RECEIPT = "BILLING_RECEIPT", "Billing Receipt"
+        SUBSCRIPTION = "SUBSCRIPTION", "Subscription"
+        EMI_PAYMENT = "EMI_PAYMENT", "EMI Payment"
+        DELIVERY = "DELIVERY", "Delivery"
+        STOCK_REQUIREMENT = "STOCK_REQUIREMENT", "Stock Requirement"
+        PURCHASE_INVOICE = "PURCHASE_INVOICE", "Purchase Invoice"
+        RENT_CONTRACT = "RENT_CONTRACT", "Rent Contract"
+        LEASE_CONTRACT = "LEASE_CONTRACT", "Lease Contract"
+        RENT_LEASE_INVOICE = "RENT_LEASE_INVOICE", "Rent/Lease Invoice"
+        PAYOUT_BATCH = "PAYOUT_BATCH", "Payout Batch"
+        OTHER = "OTHER", "Other"
+
+    class CancellationType(models.TextChoices):
+        CANCEL_DRAFT = "CANCEL_DRAFT", "Cancel Draft"
+        VOID_UNPOSTED = "VOID_UNPOSTED", "Void Unposted"
+        CANCEL_WITH_REVERSAL = "CANCEL_WITH_REVERSAL", "Cancel With Reversal"
+        MANUAL_SETTLEMENT = "MANUAL_SETTLEMENT", "Manual Settlement"
+        PAYMENT_REVERSAL = "PAYMENT_REVERSAL", "Payment Reversal"
+        DELIVERY_CANCEL = "DELIVERY_CANCEL", "Delivery Cancel"
+        STOCK_REQUIREMENT_CANCEL = "STOCK_REQUIREMENT_CANCEL", "Stock Requirement Cancel"
+        CONTRACT_TERMINATION = "CONTRACT_TERMINATION", "Contract Termination"
+
+    source_type = models.CharField(max_length=40, choices=SourceType.choices, db_index=True)
+    source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    source_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="operational_cancellations",
+    )
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="partner_operational_cancellations",
+    )
+    amount_snapshot = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status_before = models.CharField(max_length=40, blank=True, default="")
+    status_after = models.CharField(max_length=40, blank=True, default="")
+    cancellation_type = models.CharField(max_length=40, choices=CancellationType.choices, db_index=True)
+    reason = models.TextField()
+    internal_note = models.TextField(blank=True, default="")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="requested_operational_cancellations",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_operational_cancellations",
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="cancelled_operational_records",
+    )
+    cancelled_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    reversal_reference = models.CharField(max_length=120, null=True, blank=True, db_index=True)
+    audit_log_reference = models.CharField(max_length=120, null=True, blank=True)
+
+    class Meta:
+        db_table = "operational_cancellations"
+        ordering = ["-cancelled_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_type", "source_id"],
+                name="uq_operational_cancellation_source",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["source_type", "cancelled_at"]),
+            models.Index(fields=["customer", "cancelled_at"]),
+            models.Index(fields=["cancelled_by", "cancelled_at"]),
+        ]
+
+    def clean(self):
+        if not (self.reason or "").strip():
+            raise ValidationError({"reason": "Cancellation reason is required."})
+        if not self.cancelled_by_id:
+            raise ValidationError({"cancelled_by": "Cancelled by is required."})
+
+    def save(self, *args, **kwargs):
+        self.source_reference = (self.source_reference or "").strip()
+        self.status_before = (self.status_before or "").strip().upper()
+        self.status_after = (self.status_after or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.internal_note = (self.internal_note or "").strip()
+        self.reversal_reference = (self.reversal_reference or "").strip() or None
+        self.audit_log_reference = (self.audit_log_reference or "").strip() or None
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+# =====================================================
+# BUSINESS EVENT LOG (APPEND-ONLY)
+# =====================================================
+
+
+class BusinessEventType(models.TextChoices):
+    CUSTOMER_CREATED = "CUSTOMER_CREATED", "Customer Created"
+    CONTRACT_CREATED = "CONTRACT_CREATED", "Contract Created"
+    EMI_CREATED = "EMI_CREATED", "EMI Created"
+    PAYMENT_PREVIEWED = "PAYMENT_PREVIEWED", "Payment Previewed"
+    PAYMENT_RECEIVED = "PAYMENT_RECEIVED", "Payment Received"
+    EMI_PAID = "EMI_PAID", "EMI Paid"
+    RENT_PAYMENT_RECEIVED = "RENT_PAYMENT_RECEIVED", "Rent Payment Received"
+    DIRECT_SALE_PAYMENT_RECEIVED = "DIRECT_SALE_PAYMENT_RECEIVED", "Direct Sale Payment Received"
+    DRAW_SNAPSHOT_FROZEN = "DRAW_SNAPSHOT_FROZEN", "Draw Snapshot Frozen"
+    DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
+    WINNER_SELECTED = "WINNER_SELECTED", "Winner Selected"
+    WAIVER_APPLIED = "WAIVER_APPLIED", "Waiver Applied"
+    DELIVERY_CREATED = "DELIVERY_CREATED", "Delivery Created"
+    DELIVERY_COMPLETED = "DELIVERY_COMPLETED", "Delivery Completed"
+    LEDGER_POSTED = "LEDGER_POSTED", "Ledger Posted"
+    REVERSAL_CREATED = "REVERSAL_CREATED", "Reversal Created"
+
+
+class BusinessEventLog(models.Model):
+    event_type = models.CharField(max_length=64, choices=BusinessEventType.choices, db_index=True)
+    actor_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    contract_reference = models.ForeignKey(
+        ContractReference,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    batch = models.ForeignKey(
+        Batch,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    lucky_id = models.ForeignKey(
+        LuckyId,
+        on_delete=models.PROTECT,
+        related_name="business_events",
+        null=True,
+        blank=True,
+    )
+    ledger_reference = models.CharField(max_length=128, blank=True, default="")
+    source_module = models.CharField(max_length=160, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    request_id = models.CharField(max_length=128, null=True, blank=True, db_index=True)
+    idempotency_key = models.CharField(max_length=160, null=True, blank=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, null=True, blank=True)
+
+    class Meta:
+        db_table = "business_event_logs"
+        ordering = ["-occurred_at", "-id"]
+        indexes = [
+            models.Index(fields=["event_type", "occurred_at"]),
+            models.Index(fields=["customer", "occurred_at"]),
+            models.Index(fields=["subscription", "occurred_at"]),
+            models.Index(fields=["payment", "occurred_at"]),
+            models.Index(fields=["contract_reference", "occurred_at"]),
+            models.Index(fields=["batch", "occurred_at"]),
+            models.Index(fields=["lucky_id", "occurred_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("BusinessEventLog is append-only and cannot be updated.")
+        super().save(*args, **kwargs)
+
 # =====================================================
 # FINANCIAL LEDGER
 # =====================================================
@@ -3224,6 +3789,16 @@ class FinancialLedger(TimeStampedModel):
         db_index=True,
     )
     allocation_context = models.JSONField(default=dict, blank=True)
+    journal_group = models.ForeignKey(
+        "accounting.JournalEntryGroup",
+        on_delete=models.PROTECT,
+        related_name="financial_ledger_entries",
+        null=True,
+        blank=True,
+    )
+    posting_side = models.CharField(max_length=6, blank=True, default="")
+    posting_status = models.CharField(max_length=16, default="POSTED", db_index=True)
+    posted_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         db_table = "financial_ledger"
@@ -3255,6 +3830,13 @@ class FinancialLedger(TimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            existing = FinancialLedger.objects.filter(pk=self.pk).only("posted_at").first()
+            if existing and existing.posted_at != self.posted_at:
+                raise ValidationError({"posted_at": "posted_at is immutable once set."})
+        if not self.posting_side:
+            self.posting_side = (self.entry_direction or "").upper()
+        self.posting_status = (self.posting_status or "POSTED").strip().upper()
         if not self.plan_type_hint and self.emi_id:
             self.plan_type_hint = self.emi.subscription.plan_type
         self.full_clean()
@@ -3876,3 +4458,36 @@ class RentLeaseReturnInspection(models.Model):
 
     def __str__(self):
         return f"ReturnInspection for Sub#{self.subscription_id} [{self.status}]"
+
+
+class DryRunValidationJob(models.Model):
+    """
+    Stores metadata and results of admin Dry Run Control Center executions only.
+    Never stores uploaded import/export payloads or personal data files.
+    """
+
+    class Status(models.TextChoices):
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    run_id = models.UUIDField(default=uuid4, unique=True, editable=False, db_index=True)
+    checks = models.JSONField(default=list)
+    options = models.JSONField(default=dict)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.COMPLETED, db_index=True)
+    summary = models.JSONField(default=dict)
+    results = models.JSONField(default=list)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dry_run_validation_jobs",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "subscriptions_dry_run_validation_jobs"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"DryRunJob {self.run_id} [{self.status}]"

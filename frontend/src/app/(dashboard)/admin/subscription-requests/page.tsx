@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import TableToolbar from "@/components/ui/TableToolbar";
 import { ROUTES } from "@/lib/routes";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
@@ -146,7 +147,7 @@ export default function AdminSubscriptionRequestsPage() {
       ]}
       actions={[
         {
-          href: ROUTES.admin.subscriptionsCreate,
+          href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
           label: "Direct Subscription Create",
           variant: "secondary",
         },
@@ -165,11 +166,11 @@ export default function AdminSubscriptionRequestsPage() {
       ]}
     >
       <div className="space-y-6">
-        <form
-          onSubmit={applyFilters}
-          className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+        <TableToolbar
+          title="Review filters"
+          description="Search and narrow intake queue by requester role and request status before taking approval or rejection action."
         >
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+          <form onSubmit={applyFilters} className="flex flex-col gap-4 xl:flex-row xl:items-end">
             <label className="space-y-2 text-sm text-foreground xl:flex-1">
               <span className="font-medium">Search</span>
               <input
@@ -226,8 +227,8 @@ export default function AdminSubscriptionRequestsPage() {
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
             </div>
-          </div>
-        </form>
+          </form>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading admin request register..." /> : null}
 

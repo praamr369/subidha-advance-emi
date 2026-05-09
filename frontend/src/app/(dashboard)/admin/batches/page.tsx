@@ -3,17 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Download, Layers, RefreshCw, Search, Trophy, Users } from "lucide-react";
+import { Download, RefreshCw, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import {
   type BatchStatus,
   type CanonicalBatchStatus,
@@ -395,7 +394,7 @@ export default function AdminBatchesPage() {
       actions={[
         { href: "/admin/batches/create", label: "Create Batch", variant: "primary" },
         {
-          href: "/admin/subscriptions/create",
+          href: "/admin/subscriptions/advance-emi/create",
           label: "Create Subscription",
           variant: "secondary",
         },
@@ -409,77 +408,68 @@ export default function AdminBatchesPage() {
       statusBadge={{ label: "Batch Operations", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Visible Batches"
-            value={rows.length}
-            icon={<Layers className="h-4 w-4" />}
-          />
-          <StatCard
+        <QuickActionGrid>
+          <KpiCard label="Visible Batches" value={rows.length} />
+          <KpiCard
             label="Live Batches"
             value={liveCount}
-            icon={<Users className="h-4 w-4" />}
-            tone={liveCount > 0 ? "success" : "default"}
+            helper="Batches in an operable lifecycle state for the current filter view."
           />
-          <StatCard
+          <KpiCard
             label="Lucky IDs"
             value={totalLuckyIds}
-            icon={<Users className="h-4 w-4" />}
+            helper="Total Lucky ID rows summed across visible batches."
           />
-          <StatCard
+          <KpiCard
             label="Slot Pressure"
             value={fullOrTightCount}
-            subtext="Batches with 5 or fewer open slots"
-            icon={<Trophy className="h-4 w-4" />}
-            tone={fullOrTightCount > 0 ? "warning" : "info"}
+            helper="Batches with five or fewer open slots."
           />
-        </div>
+        </QuickActionGrid>
 
-        <WorkspaceSection
+        <DetailPanel
           title="Batch workflow"
           description="Use backend-backed search and status filters to keep the register focused, then route directly into batch detail, edit, and subscription workflows."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void loadPage("refresh")}
-                disabled={refreshing || loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
-              <button
-                type="button"
-                disabled={exportRows.length === 0 || loading}
-                onClick={() =>
-                  downloadCsv(
-                    "batch-register-current-view.csv",
-                    [
-                      { key: "id", header: "id" },
-                      { key: "batch_code", header: "batch_code" },
-                      { key: "total_slots", header: "total_slots" },
-                      { key: "duration_months", header: "duration_months" },
-                      { key: "start_date", header: "start_date" },
-                      { key: "draw_day", header: "draw_day" },
-                      { key: "status", header: "status" },
-                      { key: "subscription_count", header: "subscription_count" },
-                      { key: "lucky_id_count", header: "lucky_id_count" },
-                      { key: "available_slots", header: "available_slots" },
-                      { key: "winner_count", header: "winner_count" },
-                      { key: "created_at", header: "created_at" },
-                    ],
-                    exportRows
-                  )
-                }
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download className="h-4 w-4" />
-                Export Current View
-              </button>
-            </div>
-          }
         >
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              disabled={exportRows.length === 0 || loading}
+              onClick={() =>
+                downloadCsv(
+                  "batch-register-current-view.csv",
+                  [
+                    { key: "id", header: "id" },
+                    { key: "batch_code", header: "batch_code" },
+                    { key: "total_slots", header: "total_slots" },
+                    { key: "duration_months", header: "duration_months" },
+                    { key: "start_date", header: "start_date" },
+                    { key: "draw_day", header: "draw_day" },
+                    { key: "status", header: "status" },
+                    { key: "subscription_count", header: "subscription_count" },
+                    { key: "lucky_id_count", header: "lucky_id_count" },
+                    { key: "available_slots", header: "available_slots" },
+                    { key: "winner_count", header: "winner_count" },
+                    { key: "created_at", header: "created_at" },
+                  ],
+                  exportRows
+                )
+              }
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              Export Current View
+            </button>
+          </div>
           <TableToolbar
             footer={
               query || statusFilter ? (
@@ -543,7 +533,7 @@ export default function AdminBatchesPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </DetailPanel>
 
         {loading ? <LoadingBlock label="Loading batch register..." /> : null}
 
@@ -556,7 +546,7 @@ export default function AdminBatchesPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Batch rows"
             description="Open a batch to review Lucky IDs, draw readiness, and linked subscriptions without leaving the operational register."
           >
@@ -574,35 +564,43 @@ export default function AdminBatchesPage() {
                 }
               />
             ) : (
-              <DataTable<BatchRow>
-                rows={rows}
-                columns={columns}
-                onRowClick={(row) => router.push(`/admin/batches/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/admin/batches/${row.id}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Open
-                    </Link>
-                    <Link
-                      href={`/admin/batches/${row.id}/edit`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Edit
-                    </Link>
-                    <Link
-                      href="/admin/subscriptions/create"
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      Create Subscription
-                    </Link>
-                  </div>
-                )}
-              />
+              <DataTableShell>
+                <DataTable<BatchRow>
+                  rows={rows}
+                  columns={columns}
+                  onRowClick={(row) => router.push(`/admin/batches/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/batches/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Open
+                      </Link>
+                      <Link
+                        href={`/admin/batches/${row.id}/edit`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Edit
+                      </Link>
+                      <Link
+                        href={`/admin/batches/${row.id}/control-center`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Control Center
+                      </Link>
+                      <Link
+                        href="/admin/subscriptions/advance-emi/create"
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Create Subscription
+                      </Link>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

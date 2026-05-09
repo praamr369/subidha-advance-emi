@@ -2,12 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from accounting.models import AccountingPeriod, ChartOfAccount, DocumentSequence, FinanceAccount
+from django.db.models import Q
+
+from accounting.models import (
+    AccountingPeriod,
+    ChartOfAccount,
+    ChartOfAccountType,
+    DocumentSequence,
+    FinanceAccount,
+)
 from accounts.models import User, UserRole
 from branch_control.models import Branch, BranchStatus, CashCounter
 from inventory.models import InventoryItem, StockLocation
 from subscriptions.models import Batch, Product
 from subscriptions.models_business_setup import BusinessProfile
+from subscriptions.services.document_numbering_service import (
+    get_document_numbering_state,
+    required_numbering_keys_for_checklist,
+)
 
 
 @dataclass(frozen=True)
@@ -46,9 +58,40 @@ def compute_setup_checklist():
 
     # Accounting (existing models)
     active_chart_accounts = ChartOfAccount.objects.filter(is_active=True)
+    chart_accounts_total = ChartOfAccount.objects.count()
+    chart_accounts_inactive = ChartOfAccount.objects.filter(is_active=False).count()
+    chart_active_root_accounts = active_chart_accounts.filter(parent__isnull=True).count()
+    chart_active_child_accounts = active_chart_accounts.exclude(parent__isnull=True).count()
+    chart_active_system_accounts = (
+        active_chart_accounts.exclude(system_code__isnull=True).exclude(system_code="").count()
+    )
+    chart_active_custom_accounts = active_chart_accounts.filter(
+        Q(system_code__isnull=True) | Q(system_code="")
+    ).count()
+    visible_register_count = active_chart_accounts.filter(
+        parent__isnull=True,
+        account_type__in=(
+            ChartOfAccountType.ASSET,
+            ChartOfAccountType.LIABILITY,
+            ChartOfAccountType.INCOME,
+            ChartOfAccountType.EXPENSE,
+        ),
+    ).count()
+    non_statement_accounts = max(active_chart_accounts.count() - visible_register_count, 0)
+    chart_type_counts = {
+        choice.value: active_chart_accounts.filter(account_type=choice.value).count()
+        for choice in ChartOfAccountType
+    }
+
     active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
     active_periods = AccountingPeriod.objects.all()
     active_sequences = DocumentSequence.objects.filter(is_active=True)
+    numbering_state = get_document_numbering_state()
+    checklist_numbering_keys = set(required_numbering_keys_for_checklist())
+    numbering_rows = [row for row in numbering_state["sequences"] if row["key"] in checklist_numbering_keys]
+    numbering_ready = all(row["configured"] for row in numbering_rows)
+    numbering_preview_ready = all((row.get("next_number_preview") or "").strip() for row in numbering_rows if row["configured"])
+    no_duplicate_numbers = bool(numbering_state["checks"]["no_duplicate_issued_numbers"])
 
     has_cash_finance = active_finance_accounts.filter(kind="CASH").exists()
     has_bank_finance = active_finance_accounts.filter(kind="BANK").exists()
@@ -66,6 +109,7 @@ def compute_setup_checklist():
     # Staff/users (existing accounts model)
     cashier_users = User.objects.filter(is_active=True, role=UserRole.CASHIER)
     partner_users = User.objects.filter(is_active=True, role=UserRole.PARTNER)
+    customer_users = User.objects.filter(is_active=True, role=UserRole.CUSTOMER)
 
     items = [
         _item(
@@ -97,7 +141,19 @@ def compute_setup_checklist():
             label="Chart of accounts configured",
             level="required",
             is_complete=active_chart_accounts.exists(),
-            detail=f"{active_chart_accounts.count()} active chart account(s) configured." if active_chart_accounts.exists() else "Set up the chart of accounts to enable finance posting without touching the EMI ledger.",
+            detail=(
+                (
+                    f"{active_chart_accounts.count()} active chart account(s) total — "
+                    f"{chart_active_root_accounts} root account(s), {chart_active_child_accounts} child account(s); "
+                    f"{visible_register_count} active roots in ASSET/LIABILITY/INCOME/EXPENSE "
+                    f"(statement-style register tally); equity accounts add "
+                    f"{chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0)} active row(s). "
+                    f"Non-statement operational/control accounts: {non_statement_accounts}. "
+                    "Filtered accounting screens only show rows matching current filters."
+                )
+                if active_chart_accounts.exists()
+                else "Set up the chart of accounts to enable finance posting without touching the EMI ledger."
+            ),
             route="/admin/accounting/chart-of-accounts",
         ),
         _item(
@@ -122,13 +178,17 @@ def compute_setup_checklist():
             is_warning=not active_periods.exists(),
         ),
         _item(
-            key="document_sequences",
-            label="Invoice/receipt number series configured",
+            key="document_numbering",
+            label="Document numbering configured (invoice/receipt/direct-sale invoice)",
             level="recommended",
-            is_complete=active_sequences.exists(),
-            detail=f"{active_sequences.count()} active series configured." if active_sequences.exists() else "Configure at least one document series for invoice/receipt numbering.",
-            route="/admin/accounting/periods",
-            is_warning=not active_sequences.exists(),
+            is_complete=numbering_ready and no_duplicate_numbers and numbering_preview_ready,
+            detail=(
+                "Invoice, receipt, and direct-sale numbering are configured with duplicate-safe previews."
+                if numbering_ready and no_duplicate_numbers and numbering_preview_ready
+                else "Open Document Numbering and configure invoice, receipt, and direct-sale sequence settings."
+            ),
+            route="/admin/settings/business-setup/document-numbering",
+            is_warning=not (numbering_ready and no_duplicate_numbers and numbering_preview_ready),
         ),
         _item(
             key="products",
@@ -165,6 +225,16 @@ def compute_setup_checklist():
             route="/admin/partners",
         ),
         _item(
+            key="customer_portal_users",
+            label="Customer portal logins available",
+            level="optional",
+            is_complete=customer_users.exists(),
+            detail=f"{customer_users.count()} active customer user(s) available."
+            if customer_users.exists()
+            else "Create at least one CUSTOMER user so self-service portal (subscriptions, payments, direct sales) can be exercised.",
+            route="/admin/settings/users",
+        ),
+        _item(
             key="inventory_readiness",
             label="Inventory locations and items configured",
             level="optional",
@@ -192,18 +262,43 @@ def compute_setup_checklist():
         "branches_primary_configured": bool(primary_branch_exists),
         "cash_counters_active": active_counters.count(),
         "chart_of_accounts_active": active_chart_accounts.count(),
+        "total_chart_accounts": chart_accounts_total,
+        "active_chart_accounts": active_chart_accounts.count(),
+        "inactive_chart_accounts": chart_accounts_inactive,
+        "active_root_chart_accounts": chart_active_root_accounts,
+        "active_child_chart_accounts": chart_active_child_accounts,
+        "active_system_chart_accounts": chart_active_system_accounts,
+        "active_custom_chart_accounts": chart_active_custom_accounts,
+        "visible_register_count": visible_register_count,
+        "active_chart_accounts_total": active_chart_accounts.count(),
+        "statement_root_accounts": visible_register_count,
+        "child_sub_accounts": chart_active_child_accounts,
+        "non_statement_accounts": non_statement_accounts,
+        "chart_active_asset": chart_type_counts.get(ChartOfAccountType.ASSET.value, 0),
+        "chart_active_liability": chart_type_counts.get(ChartOfAccountType.LIABILITY.value, 0),
+        "chart_active_equity": chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0),
+        "chart_active_income": chart_type_counts.get(ChartOfAccountType.INCOME.value, 0),
+        "chart_active_expense": chart_type_counts.get(ChartOfAccountType.EXPENSE.value, 0),
         "finance_accounts_active": active_finance_accounts.count(),
         "finance_accounts_cash": int(has_cash_finance),
         "finance_accounts_bank": int(has_bank_finance),
         "finance_accounts_upi": int(has_upi_finance),
         "accounting_periods": active_periods.count(),
         "document_sequences_active": active_sequences.count(),
+        "invoice_numbering_configured": int(numbering_state["checks"]["invoice_numbering_configured"]),
+        "receipt_numbering_configured": int(numbering_state["checks"]["receipt_numbering_configured"]),
+        "direct_sale_invoice_numbering_configured": int(
+            numbering_state["checks"]["direct_sale_invoice_numbering_configured"]
+        ),
+        "document_numbering_no_duplicates": int(numbering_state["checks"]["no_duplicate_issued_numbers"]),
+        "document_numbering_preview_available": int(numbering_state["checks"]["next_number_preview_available"]),
         "products": products.count(),
         "batches": batches.count(),
         "stock_locations_active": stock_locations.count(),
         "inventory_items_active": inventory_items.count(),
         "cashier_users_active": cashier_users.count(),
         "partner_users_active": partner_users.count(),
+        "customer_users_active": customer_users.count(),
         "required_items_total": len(required_items),
         "required_items_complete": completed_required,
     }

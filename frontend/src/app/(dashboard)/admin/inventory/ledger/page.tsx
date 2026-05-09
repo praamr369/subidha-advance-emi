@@ -20,11 +20,18 @@ import type { StockLedgerRow } from "@/services/inventory";
 import { listStockLedger } from "@/services/inventory";
 
 function buildBillingLedgerHref(row: StockLedgerRow): string | null {
-  if (row.reference_model !== "BillingInvoiceLine") {
-    return null;
+  if (row.reference_model === "BillingInvoiceLine") {
+    const [invoiceId] = String(row.reference_id || "").split(":");
+    return invoiceId ? buildAdminBillingDocumentRoute(invoiceId) : null;
   }
-  const [invoiceId] = String(row.reference_id || "").split(":");
-  return invoiceId ? buildAdminBillingDocumentRoute(invoiceId) : null;
+  if (
+    row.reference_model === "DirectSaleReturnLine" ||
+    row.reference_model === "DirectSaleExchangeReplacement" ||
+    row.reference_model === "PurchaseReturnLine"
+  ) {
+    return `${ROUTES.admin.billingReversals}?reference=${encodeURIComponent(row.reference_id.split(":")[0] || row.reference_id)}`;
+  }
+  return null;
 }
 
 const columns: EnterpriseColumnDef<StockLedgerRow>[] = [
@@ -58,6 +65,8 @@ export default function InventoryLedgerPage() {
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [sourceId, setSourceId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +76,7 @@ export default function InventoryLedgerPage() {
         const payload = await listStockLedger({
           start_date: startDate || undefined,
           end_date: endDate || undefined,
+          ...(sourceFilter && sourceId ? { [sourceFilter]: sourceId } : {}),
         });
         if (cancelled) return;
         setRows(payload.results);
@@ -83,7 +93,7 @@ export default function InventoryLedgerPage() {
     return () => {
       cancelled = true;
     };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, sourceFilter, sourceId]);
 
   return (
     <PortalPage
@@ -114,6 +124,26 @@ export default function InventoryLedgerPage() {
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
         />
+        <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr]">
+          <select
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+            value={sourceFilter}
+            onChange={(event) => setSourceFilter(event.target.value)}
+          >
+            <option value="">All sources</option>
+            <option value="direct_sale">Direct Sale</option>
+            <option value="direct_sale_return">Direct Sale Return</option>
+            <option value="exchange">Exchange</option>
+            <option value="purchase_return">Purchase Return</option>
+            <option value="credit_note">Credit Note</option>
+          </select>
+          <input
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+            value={sourceId}
+            onChange={(event) => setSourceId(event.target.value)}
+            placeholder="Source document ID"
+          />
+        </div>
       </WorkspaceSection>
 
       <div className="mb-4 flex flex-wrap gap-3">

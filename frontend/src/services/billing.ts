@@ -25,6 +25,10 @@ export type BillingInvoiceLine = {
   product_code?: string;
   inventory_item?: number | null;
   inventory_item_sku?: string;
+  /** Resolved SKU / product code for display (additive API field). */
+  display_sku?: string;
+  /** Inventory tracking state separate from SKU (additive API field). */
+  stock_tracking_label?: string;
   description: string;
   quantity: string;
   unit_price: string;
@@ -58,6 +62,9 @@ export type DirectSaleLine = {
   sku_snapshot?: string;
   unit_of_measure_snapshot?: string;
   hsn_sac_code?: string;
+  create_purchase_requirement?: boolean;
+  requirement_quantity?: string | null;
+  requirement_note?: string;
 };
 
 export type DirectSale = {
@@ -73,8 +80,22 @@ export type DirectSale = {
   cash_counter?: number | null;
   cash_counter_code?: string | null;
   cash_counter_name?: string | null;
-  status: "DRAFT" | "CONFIRMED" | "DELIVERED" | "INVOICED" | "CANCELLED";
+  status:
+    | "DRAFT"
+    | "CONFIRMED"
+    | "DELIVERED"
+    | "INVOICED"
+    | "CANCELLED"
+    | "CANCELLED_PRE_INVOICE"
+    | "CANCELLED_AFTER_DELIVERY"
+    | "REVERSED_POST_INVOICE"
+    | "RETURNED"
+    | "EXCHANGED_CLOSED"
+    | "ARCHIVED"
+    | string;
   tax_mode: "GST" | "NON_GST";
+  tax_calculation_mode?: "NON_GST" | "GST_INCLUSIVE" | "GST_EXCLUSIVE";
+  customer_gst_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
   finance_account?: number | null;
   finance_account_name?: string | null;
   delivery_required: boolean;
@@ -91,13 +112,51 @@ export type DirectSale = {
   grand_total: string;
   received_total: string;
   balance_total: string;
+  is_operationally_active?: boolean;
+  is_collectible?: boolean;
+  is_outstanding_visible?: boolean;
+  is_dashboard_visible?: boolean;
+  is_archived?: boolean;
+  active_outstanding_amount?: string;
+  historical_amount?: string;
+  is_actionable?: boolean;
+  is_history_only?: boolean;
+  blocking_reason?: string | null;
+  action_label?: string;
   customer_name_snapshot?: string;
   customer_phone_snapshot?: string;
+  customer_snapshot_email?: string;
+  customer_snapshot_billing_address_line1?: string;
+  customer_snapshot_billing_address_line2?: string;
+  customer_snapshot_city?: string;
+  customer_snapshot_district?: string;
+  customer_snapshot_state?: string;
+  customer_snapshot_pincode?: string;
   customer_gstin?: string | null;
+  customer_snapshot_place_of_supply?: string;
+  delivery_snapshot_address_line1?: string;
+  delivery_snapshot_address_line2?: string;
+  delivery_snapshot_city?: string;
+  delivery_snapshot_district?: string;
+  delivery_snapshot_state?: string;
+  delivery_snapshot_pincode?: string;
   notes?: string;
   billing_invoice_id?: number | null;
   billing_invoice_no?: string | null;
   billing_invoice_status?: string | null;
+  delivery_status?: string;
+  delivery_display?: string;
+  delivery_request_id?: number | null;
+  requirement_count?: number;
+  operational_state?: string;
+  next_actions?: string[];
+  blocking_reasons?: string[];
+  payment_state?: string;
+  inventory_state?: string;
+  collection_state?: string;
+  active_receipt_total?: string;
+  void_receipt_total?: string;
+  receipt_status?: string;
   lines: DirectSaleLine[];
 };
 
@@ -107,6 +166,8 @@ export type DirectSalePayload = {
   branch?: number | null;
   cash_counter?: number | null;
   tax_mode?: "GST" | "NON_GST";
+  tax_calculation_mode?: "NON_GST" | "GST_INCLUSIVE" | "GST_EXCLUSIVE";
+  customer_gst_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
   finance_account?: number | null;
   delivery_required?: boolean;
   delivery_reference?: string;
@@ -119,8 +180,36 @@ export type DirectSalePayload = {
   balance_total: string;
   customer_name_snapshot?: string;
   customer_phone_snapshot?: string;
+  customer_snapshot_email?: string;
+  customer_snapshot_billing_address_line1?: string;
+  customer_snapshot_billing_address_line2?: string;
+  customer_snapshot_city?: string;
+  customer_snapshot_district?: string;
+  customer_snapshot_state?: string;
+  customer_snapshot_pincode?: string;
   customer_gstin?: string | null;
+  customer_snapshot_place_of_supply?: string;
+  delivery_snapshot_address_line1?: string;
+  delivery_snapshot_address_line2?: string;
+  delivery_snapshot_city?: string;
+  delivery_snapshot_district?: string;
+  delivery_snapshot_state?: string;
+  delivery_snapshot_pincode?: string;
+  customer_mode?: "EXISTING" | "NEW" | "WALK_IN";
+  walkin_create_customer_profile?: boolean;
+  new_customer_name?: string;
+  new_customer_phone?: string;
+  new_customer_email?: string;
+  new_customer_billing_address_line1?: string;
+  new_customer_billing_address_line2?: string;
+  new_customer_city?: string;
+  new_customer_district?: string;
+  new_customer_state?: string;
+  new_customer_pincode?: string;
+  new_customer_gstin?: string;
+  new_customer_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
   notes?: string;
+  terms?: string;
   lines: DirectSaleLine[];
 };
 
@@ -143,6 +232,28 @@ export type DirectSaleCollectionResponse = {
   outstanding_after: string;
 };
 
+export type OperationalCancellationPayload = {
+  reason: string;
+  internal_note?: string;
+  confirm: boolean;
+  reversal_policy?: "NONE" | "REVERSE_RECEIPTS" | "CREATE_CREDIT_NOTE" | "MANUAL_SETTLEMENT";
+  force_after_activation?: boolean;
+};
+
+export type OperationalCancellationResponse<T> = {
+  updated: boolean;
+  result: {
+    source_type: string;
+    source_id: number;
+    previous_status: string;
+    new_status: string;
+    cancellation_id?: number | null;
+    reversal_reference?: string | null;
+    blocked_reason?: string;
+    next_required_action?: string;
+  };
+} & T;
+
 export type BillingInvoice = {
   id: number;
   document_no?: string | null;
@@ -161,7 +272,7 @@ export type BillingInvoice = {
   source_type?: string;
   source_reference?: string;
   tax_mode: string;
-  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID";
+  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED" | "VOID" | "REVERSED" | "CREDITED_FULLY" | string;
   finance_account?: number | null;
   finance_account_name?: string | null;
   subtotal: string;
@@ -178,6 +289,11 @@ export type BillingInvoice = {
   terms?: string;
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
+  operational_state?: string | null;
+  next_actions?: string[];
+  blocking_reasons?: string[];
+  active_receipt_total?: string;
+  void_receipt_total?: string;
   lines: BillingInvoiceLine[];
 };
 
@@ -364,9 +480,12 @@ export function getDirectSale(id: number | string) {
   return apiFetch<DirectSale>(`/billing/direct-sales/${id}/`);
 }
 
-export function createDirectSale(payload: DirectSalePayload) {
+export function createDirectSale(payload: DirectSalePayload, options: { idempotencyKey?: string } = {}) {
   return apiFetch<DirectSale>("/billing/direct-sales/", {
     method: "POST",
+    headers: options.idempotencyKey
+      ? { "Idempotency-Key": options.idempotencyKey }
+      : undefined,
     body: JSON.stringify(payload),
   });
 }
@@ -398,6 +517,37 @@ export function markDirectSaleDelivered(id: number, delivery_reference = "") {
   );
 }
 
+export function finalizeDirectSaleInvoice(id: number) {
+  return apiFetch<{ updated: boolean; direct_sale: DirectSale }>(`/billing/direct-sales/${id}/finalize-invoice/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function adminFinalizeDirectSaleInvoice(id: number) {
+  return apiFetch<{
+    updated: boolean;
+    sale_id: number;
+    sale_number?: string | null;
+    invoice_id?: number | null;
+    invoice_number?: string | null;
+    status?: string;
+    balance_total?: string;
+    operational_state?: string;
+    next_actions?: string[];
+    blocking_reasons?: string[];
+    delivery_display?: string;
+    requirement_count?: number;
+    direct_sale: DirectSale;
+  }>(
+    `/admin/billing/direct-sales/${id}/finalize-invoice/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
 export function collectDirectSalePayment(
   id: number,
   payload: DirectSaleCollectionPayload
@@ -406,6 +556,16 @@ export function collectDirectSalePayment(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function cancelDirectSale(id: number, payload: OperationalCancellationPayload) {
+  return apiFetch<OperationalCancellationResponse<{ direct_sale: DirectSale }>>(
+    `/billing/direct-sales/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function approveBillingInvoice(id: number) {
@@ -424,6 +584,16 @@ export function postBillingInvoice(id: number) {
     {
       method: "POST",
       body: JSON.stringify({}),
+    }
+  );
+}
+
+export function cancelBillingInvoice(id: number, payload: OperationalCancellationPayload) {
+  return apiFetch<OperationalCancellationResponse<{ invoice: BillingInvoice }>>(
+    `/billing/invoices/${id}/cancel/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     }
   );
 }
@@ -535,6 +705,13 @@ export function voidReceiptDocument(id: number, reason: string) {
   return apiFetch<{ updated: boolean; receipt: ReceiptDocument }>(`/billing/receipts/${id}/void/`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export function reverseReceiptDocument(id: number, payload: { reason: string }) {
+  return apiFetch<{ updated: boolean; receipt: ReceiptDocument }>(`/billing/receipts/${id}/reverse/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

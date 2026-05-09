@@ -4,6 +4,7 @@ export type CustomerRecord = {
   id: number;
   name: string;
   phone: string;
+  gstin?: string;
   kyc_status?: string;
   status?: string;
   address?: string;
@@ -67,6 +68,7 @@ function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
     address: typeof row.address === "string" ? row.address : undefined,
     city: typeof row.city === "string" ? row.city : undefined,
     email: typeof row.email === "string" ? row.email : undefined,
+    gstin: typeof row.gstin === "string" ? row.gstin : undefined,
     user_username:
       typeof row.user_username === "string" ? row.user_username : undefined,
     active_subscription_count:
@@ -85,6 +87,8 @@ function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
         : row.user === null
           ? null
           : undefined,
+    customer_code:
+      typeof row.customer_code === "string" ? row.customer_code : undefined,
   };
 }
 
@@ -131,13 +135,24 @@ export async function searchCustomers(q: string): Promise<CustomerRecord[]> {
   const trimmed = q.trim();
   if (!trimmed) return [];
 
-  const payload = await request<
+  const adminPayload = await request<
     Record<string, unknown>[] | PaginatedResponse<Record<string, unknown>>
   >(`/admin/customers/search/?q=${encodeURIComponent(trimmed)}`, {
     method: "GET",
   } as RequestInit);
 
-  return toArray(payload).map(normalizeCustomer);
+  const adminResults = toArray(adminPayload).map(normalizeCustomer);
+  if (adminResults.length) return adminResults;
+
+  const sharedPayload = await request<{
+    exact_match?: boolean;
+    count?: number;
+    results?: Record<string, unknown>[];
+  }>(`/customers/search/?q=${encodeURIComponent(trimmed)}`, {
+    method: "GET",
+  } as RequestInit);
+
+  return (sharedPayload?.results ?? []).map(normalizeCustomer);
 }
 
 export async function getCustomer(

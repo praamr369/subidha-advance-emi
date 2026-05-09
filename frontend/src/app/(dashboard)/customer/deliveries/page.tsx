@@ -9,6 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import { MobileSafeTable } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -389,30 +390,34 @@ export default function CustomerDeliveriesPage() {
                 }
               />
             ) : (
-              <DataTable<DeliveryRecord>
-                rows={rows}
-                columns={columns}
-                pageSize={20}
-                onRowClick={(row) => router.push(`/customer/deliveries/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <ActionButton
-                      href={`/customer/deliveries/${row.id}`}
-                      variant="outline"
-                    >
-                      View detail
-                    </ActionButton>
-                    {row.subscription_id ? (
+              <MobileSafeTable className="border-none bg-transparent">
+                <DataTable<DeliveryRecord>
+                  rows={rows}
+                  columns={columns}
+                  pageSize={20}
+                  onRowClick={(row) => router.push(`/customer/deliveries/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
                       <ActionButton
-                        href={`/customer/subscriptions/${row.subscription_id}`}
-                        variant="ghost"
+                        href={`/customer/deliveries/${row.id}`}
+                        variant="outline"
+                        className="min-h-11"
                       >
-                        Subscription
+                        View detail
                       </ActionButton>
-                    ) : null}
-                  </div>
-                )}
-              />
+                      {row.subscription_id ? (
+                        <ActionButton
+                          href={`/customer/subscriptions/${row.subscription_id}`}
+                          variant="ghost"
+                          className="min-h-11"
+                        >
+                          Subscription
+                        </ActionButton>
+                      ) : null}
+                    </div>
+                  )}
+                />
+              </MobileSafeTable>
             )}
 
             <div className="mt-5 grid gap-4 xl:grid-cols-2">

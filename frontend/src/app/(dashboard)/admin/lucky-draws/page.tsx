@@ -7,6 +7,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
+import TableToolbar from "@/components/ui/TableToolbar";
 import { apiFetch, toArray } from "@/lib/api";
 
 type BatchOption = {
@@ -258,12 +261,6 @@ function normalizeLuckyDrawRow(raw: Record<string, unknown>): LuckyDrawRow {
       toNullableString(raw.created_at) ??
       toNullableString(raw.created_date),
   };
-}
-
-function revealToneClass(isRevealed: boolean): string {
-  return isRevealed
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 function SectionCard({
@@ -563,7 +560,7 @@ export default function AdminLuckyDrawsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <TableToolbar
           title="Filter register"
           description="Filter by batch, reveal state, draw month, batch code, winner Lucky ID, or linked winner details."
         >
@@ -681,7 +678,7 @@ export default function AdminLuckyDrawsPage() {
               Export Current View
             </button>
           </div>
-        </SectionCard>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading Lucky Draw register..." /> : null}
 
@@ -704,8 +701,9 @@ export default function AdminLuckyDrawsPage() {
                 description="No draw records match the current filter set."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0">
+              <DataTableShell>
+                <MobileSafeTable className="border-none bg-transparent">
+                  <table className="min-w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-left">
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -749,14 +747,7 @@ export default function AdminLuckyDrawsPage() {
                         </td>
 
                         <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <span
-                            className={[
-                              "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                              revealToneClass(row.is_revealed),
-                            ].join(" ")}
-                          >
-                            {row.is_revealed ? "Revealed" : "Unrevealed"}
-                          </span>
+                          <StatusBadge status={row.is_revealed ? "COMPLETED" : "PENDING"} />
                         </td>
 
                         <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -799,8 +790,9 @@ export default function AdminLuckyDrawsPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </MobileSafeTable>
+              </DataTableShell>
             )}
           </SectionCard>
         ) : null}

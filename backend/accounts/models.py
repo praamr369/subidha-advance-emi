@@ -12,6 +12,7 @@ class UserRole(models.TextChoices):
     PARTNER = "PARTNER", "Partner"
     CUSTOMER = "CUSTOMER", "Customer"
     CASHIER = "CASHIER", "Cashier"
+    VENDOR = "VENDOR", "Vendor"
 
 
 class User(AbstractUser):
@@ -94,6 +95,150 @@ class PasswordResetStatus(models.TextChoices):
     EXPIRED = "EXPIRED", "Expired"
     CANCELLED = "CANCELLED", "Cancelled"
     LOCKED = "LOCKED", "Locked"
+
+
+DEFAULT_CAPABILITY_CODES = (
+    "billing.view",
+    "billing.collect",
+    "billing.override_allocation",
+    "accounting.view",
+    "accounting.reverse_entry",
+    "batch.lock",
+    "draw.commit",
+    "draw.complete",
+    "inventory.adjust",
+    "inventory.opening_stock",
+    "vendor.manage",
+    "crm.manage",
+    "reports.export",
+    "business_setup.reset",
+)
+
+
+class Capability(models.Model):
+    code = models.CharField(max_length=120, unique=True, db_index=True)
+    label = models.CharField(max_length=160)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "capabilities"
+        ordering = ["code", "id"]
+
+    def clean(self):
+        super().clean()
+        self.code = (self.code or "").strip().lower()
+        self.label = (self.label or "").strip()
+        self.description = (self.description or "").strip()
+        errors = {}
+        if not self.code:
+            errors["code"] = "Capability code is required."
+        if not self.label:
+            errors["label"] = "Capability label is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().lower()
+        self.label = (self.label or "").strip()
+        self.description = (self.description or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.code
+
+
+class RoleCapability(models.Model):
+    role = models.CharField(
+        max_length=20,
+        choices=UserRole.choices,
+        db_index=True,
+    )
+    capability = models.ForeignKey(
+        Capability,
+        on_delete=models.CASCADE,
+        related_name="role_assignments",
+    )
+    is_allowed = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "role_capabilities"
+        ordering = ["role", "capability__code", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "capability"],
+                name="unique_role_capability_assignment",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["role", "is_allowed"]),
+            models.Index(fields=["capability", "is_allowed"]),
+        ]
+
+    def __str__(self):
+        return f"{self.role}:{self.capability.code}={self.is_allowed}"
+
+
+class UserCapabilityOverride(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="capability_overrides",
+    )
+    capability = models.ForeignKey(
+        Capability,
+        on_delete=models.CASCADE,
+        related_name="user_overrides",
+    )
+    is_allowed = models.BooleanField(default=False)
+    note = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_capability_overrides",
+        null=True,
+        blank=True,
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="updated_capability_overrides",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_capability_overrides"
+        ordering = ["user_id", "capability__code", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "capability"],
+                name="unique_user_capability_override",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "is_allowed"]),
+            models.Index(fields=["capability", "is_allowed"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        self.note = (self.note or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.note = (self.note or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"user={self.user_id}:{self.capability.code}={self.is_allowed}"
 
 
 class PasswordResetRequest(models.Model):
@@ -272,3 +417,107 @@ class PasswordResetRequest(models.Model):
 
     def __str__(self):
         return f"PasswordResetRequest#{self.pk} user={self.user_id} status={self.status}"
+
+
+class UsernameChangeSource(models.TextChoices):
+    SELF = "SELF", "Self"
+    ADMIN = "ADMIN", "Admin"
+
+
+class ReservedUsername(models.Model):
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+    reserved_from_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="reserved_usernames",
+        null=True,
+        blank=True,
+    )
+    reserved_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    reason = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "reserved_usernames"
+        ordering = ["-reserved_at", "-id"]
+        indexes = [
+            models.Index(fields=["reserved_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        self.username = (self.username or "").strip().lower()
+        self.reason = (self.reason or "").strip()
+        if not self.username:
+            raise ValidationError({"username": "Reserved username is required."})
+
+    def save(self, *args, **kwargs):
+        self.username = (self.username or "").strip().lower()
+        self.reason = (self.reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.username
+
+
+class UsernameChangeAudit(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="username_change_audits",
+    )
+    old_username = models.CharField(max_length=150)
+    new_username = models.CharField(max_length=150)
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="performed_username_changes",
+        null=True,
+        blank=True,
+    )
+    changed_by_role = models.CharField(max_length=20, blank=True, default="")
+    source = models.CharField(
+        max_length=20,
+        choices=UsernameChangeSource.choices,
+        default=UsernameChangeSource.SELF,
+        db_index=True,
+    )
+    reason = models.TextField(blank=True, default="")
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "username_change_audits"
+        ordering = ["-changed_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "changed_at"]),
+            models.Index(fields=["source", "changed_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        self.old_username = (self.old_username or "").strip()
+        self.new_username = (self.new_username or "").strip()
+        self.changed_by_role = (self.changed_by_role or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.user_agent = (self.user_agent or "").strip()
+
+        if not self.old_username:
+            errors["old_username"] = "Old username is required."
+        if not self.new_username:
+            errors["new_username"] = "New username is required."
+        if self.source == UsernameChangeSource.ADMIN and not self.reason:
+            errors["reason"] = "Reason is required for admin username changes."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.old_username = (self.old_username or "").strip()
+        self.new_username = (self.new_username or "").strip()
+        self.changed_by_role = (self.changed_by_role or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.user_agent = (self.user_agent or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)

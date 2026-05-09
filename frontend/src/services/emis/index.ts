@@ -5,6 +5,7 @@ import type { ApiPaginatedResponse } from "@/services/api/types";
 export type EmiRecord = {
   id: number;
   subscription: number;
+  customer?: number | null;
   customer_name?: string;
   customer_phone?: string;
   subscription_status?: string;

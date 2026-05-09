@@ -20,8 +20,17 @@ function WinnerCard({ winner }: { winner: PublicWinner }) {
   return (
     <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Batch {winner.batch_code} · Month {winner.draw_month}</div>
-      <div className="mt-3 text-xl font-semibold text-foreground">{winner.customer_name || "Winner published"}</div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">Lucky ID {winner.lucky_id || "—"}</p>
+      <div className="mt-3 text-xl font-semibold text-foreground">Lucky ID {winner.lucky_id || "—"}</div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">Public display label:</span>{" "}
+        {winner.winner_name_masked || "Not published"}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Draw: {winner.draw_datetime || winner.draw_date || "—"} · Verification {winner.verification_status || "unavailable"}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground break-all">
+        Public commit hash: {winner.public_commit_hash || winner.committed_hash || "—"}
+      </p>
     </div>
   );
 }
@@ -44,7 +53,7 @@ export default async function WinnersPage() {
   return (
     <PublicPageShell
       title={dictionary.common.winners}
-      subtitle="Real winner records only."
+      subtitle="Only rows returned by the public draw API are shown. Names appear in a privacy-safe masked form; internal customer identifiers are never listed here."
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winners }]}
       actions={[
         { label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" },
@@ -59,6 +68,7 @@ export default async function WinnersPage() {
         description="Published entries are sourced from revealed events and shown with clear rule context."
         items={[
           { title: "Public evidence", description: "Commitment references are shown when available." },
+          { title: "Masked identity", description: "Winner names are masked to protect customer privacy." },
           { title: "No fake records", description: "If nothing is published, page shows empty state." },
           { title: "Future-EMI waiver only", description: "Past settled payments remain unchanged." },
         ]}

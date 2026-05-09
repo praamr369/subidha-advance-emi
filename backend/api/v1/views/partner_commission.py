@@ -1,7 +1,9 @@
+from datetime import datetime, time
 from decimal import Decimal
 
+from django.db.models import Q, Sum
 from django.http import HttpResponse
-from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -42,18 +44,68 @@ class PartnerCommissionStatementExportQuerySerializer(serializers.Serializer):
         return attrs
 
 
+class PartnerCommissionListQuerySerializer(serializers.Serializer):
+    status = serializers.ChoiceField(required=False, choices=CommissionStatus.choices)
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+    q = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError(
+                {"date_to": "date_to must be on or after date_from."}
+            )
+        return attrs
+
+
 class PartnerCommissionView(APIView):
     permission_classes = [IsAuthenticated, IsPartner]
 
     def get(self, request):
         partner = request.user
 
+        query_serializer = PartnerCommissionListQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+        filters = query_serializer.validated_data
+
         commissions = (
-            Commission.objects
-            .filter(partner=partner)
-            .select_related("subscription", "payment", "emi")
+            Commission.objects.filter(partner=partner)
+            .select_related("subscription", "subscription__customer", "payment", "emi")
             .order_by("-created_at", "-id")
         )
+
+        status_filter = filters.get("status")
+        if status_filter:
+            commissions = commissions.filter(status=status_filter)
+
+        date_from = filters.get("date_from")
+        date_to = filters.get("date_to")
+        if date_from:
+            start = timezone.make_aware(datetime.combine(date_from, time.min))
+            commissions = commissions.filter(created_at__gte=start)
+        if date_to:
+            end = timezone.make_aware(datetime.combine(date_to, time.max))
+            commissions = commissions.filter(created_at__lte=end)
+
+        q_raw = (filters.get("q") or "").strip()
+        if q_raw:
+            if q_raw.isdigit():
+                nid = int(q_raw)
+                commissions = commissions.filter(
+                    Q(pk=nid)
+                    | Q(subscription_id=nid)
+                    | Q(payment_id=nid)
+                    | Q(emi_id=nid)
+                )
+            else:
+                commissions = commissions.filter(
+                    Q(subscription__subscription_number__icontains=q_raw)
+                    | Q(subscription__customer__name__icontains=q_raw)
+                    | Q(subscription__customer__phone__icontains=q_raw)
+                )
 
         total_commission = (
             commissions.exclude(status=CommissionStatus.REVERSED)

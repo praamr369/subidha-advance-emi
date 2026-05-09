@@ -3,11 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, ShoppingCart } from "lucide-react";
 
-import PublicProductMedia from "@/components/public/PublicProductMedia";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import PublicProductDetailMedia from "@/components/public/PublicProductDetailMedia";
 import { formatCurrency } from "@/lib/format";
-import { ROUTES } from "@/lib/routes";
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
+import { ROUTES } from "@/lib/routes";
 
 type ProductDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -65,6 +67,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     notFound();
   }
 
+  const locale = await getPublicLocale();
+  const dictionary = getPublicDictionary(locale);
+
   const applyHref = buildApplyHref(product);
   const mediaState = product.image ? "Uploaded product media" : "Media pending";
   const factRows = [
@@ -93,7 +98,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     >
       <Link
         href={ROUTES.public.products}
-        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to catalogue
@@ -103,15 +108,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="space-y-4">
-            <PublicProductMedia
-              src={product.image}
-              alt={product.name}
-              badge={product.category || "Public catalogue"}
-              sizes="(max-width: 1024px) 100vw, 54vw"
-              priority
-              className="aspect-[5/4]"
-              imageClassName="transition duration-500 hover:scale-[1.02]"
-              fallbackLabel="Product media pending"
+            <PublicProductDetailMedia
+              product={product}
+              carouselAriaLabel={dictionary.common.mediaCarousel.productGalleryLabel}
+              prevLabel={dictionary.common.mediaCarousel.previousSlide}
+              nextLabel={dictionary.common.mediaCarousel.nextSlide}
             />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {factRows.map((fact) => (
@@ -139,20 +140,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 {formatCurrency(product.base_price)}
               </div>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                This is the base price from the live master. The enquiry form carries the product context so branch follow-up stays aligned.
+                This is the catalogue base price from live product records. Taxes, offers, bundle terms, and EMI mapping are finalized with branch documentation—not inferred from this screen.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href={applyHref}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_20px_42px_-30px_rgba(15,23,42,0.88)] transition hover:-translate-y-0.5"
-                >
+                <Link href={applyHref} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
                   <ShoppingCart className="h-4 w-4" />
                   Enquire Now
                 </Link>
                 <Link
                   href={ROUTES.public.contact}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/85 px-6 text-sm font-semibold text-foreground shadow-[0_20px_42px_-30px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white"
+                  className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6 shadow-[0_20px_42px_-30px_rgba(15,23,42,0.72)]"
                 >
                   Contact branch
                   <ArrowUpRight className="h-4 w-4" />

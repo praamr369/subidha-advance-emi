@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -21,6 +22,9 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { FormSection, MetricStrip, MobileSafeTable } from "@/components/ui/operations";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   buildReconciliationPosture,
@@ -29,7 +33,7 @@ import {
   formatDate,
   money,
 } from "@/lib/dashboard-summary";
-import { getCashierDashboard } from "@/services/cashier";
+import { getCashierDashboard, type CashierTransaction } from "@/services/cashier";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -61,6 +65,91 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function CashierDashboardPaymentTable({
+  rows,
+}: {
+  rows: CashierTransaction[];
+}) {
+  return (
+    <MobileSafeTable>
+      <table className="min-w-full border-separate border-spacing-0">
+        <thead>
+          <tr className="text-left">
+            <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Payment
+            </th>
+            <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Customer
+            </th>
+            <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Subscription
+            </th>
+            <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Amount
+            </th>
+            <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Time
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((payment) => (
+            <tr
+              key={payment.id}
+              className={`align-top ${payment.is_reversed ? "opacity-60" : ""}`}
+            >
+              <td className="border-b border-slate-200 px-4 py-3">
+                <Link
+                  href={`/cashier/payments/${payment.id}`}
+                  className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+                >
+                  #{payment.id}
+                </Link>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  {payment.method ? (
+                    <StatusBadge status={payment.method} hideIcon />
+                  ) : (
+                    <span className="text-xs text-slate-600">—</span>
+                  )}
+                  <span className="text-xs text-slate-600">· {payment.reference_no || "No ref"}</span>
+                </div>
+                {payment.is_reversed ? (
+                  <div className="mt-1">
+                    <StatusBadge status="REVERSED" hideIcon />
+                  </div>
+                ) : null}
+              </td>
+              <td className="border-b border-slate-200 px-4 py-3">
+                <div className="text-sm font-medium text-foreground">
+                  {payment.customer_name || "Unknown customer"}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">{payment.customer_phone || "—"}</div>
+              </td>
+              <td className="border-b border-slate-200 px-4 py-3">
+                <div className="text-sm font-medium text-foreground">
+                  {payment.subscription_number || `SUB-${payment.subscription ?? "—"}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">
+                  Batch {payment.batch_code || "—"} · Lucky {payment.lucky_number ?? "—"}
+                </div>
+              </td>
+              <td className="border-b border-slate-200 px-4 py-3">
+                <div className="text-sm font-semibold text-foreground">{money(payment.amount)}</div>
+              </td>
+              <td className="border-b border-slate-200 px-4 py-3">
+                <div className="text-sm text-foreground">
+                  {formatDateTime(payment.created_at)}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">{formatDate(payment.payment_date)}</div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </MobileSafeTable>
+  );
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -85,6 +174,8 @@ export default function CashierDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const router = useRouter();
+  const [receiptLookup, setReceiptLookup] = useState("");
   const dashboardQuery = useMemo(
     () =>
       windowPreset === "CUSTOM"
@@ -160,6 +251,7 @@ export default function CashierDashboardPage() {
     reconciliationSurface
   );
   const paymentRows = recentPayments?.results ?? [];
+  const todayTransactionRows = legacy?.today_transactions ?? [];
   const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
     0,
     8
@@ -175,7 +267,7 @@ export default function CashierDashboardPage() {
       eyebrow="Counter Operations"
       title="Cashier Dashboard"
       subtitle="Daily counter workspace with canonical financial scope visibility on top, while keeping collection posting and receipt lookup fast for shop operations."
-      helperNote="Counter actions here remain branch-safe and traceable; collection posting and receipt generation continue using the existing audited payment flow."
+      helperNote="Counter actions here remain branch-safe and traceable; collection posting and receipt generation continue using the existing audited payment flow. Digital totals include UPI, bank, and other non-cash postings returned by the cashier dashboard API."
       helperTone="info"
       breadcrumbs={[{ label: "Cashier" }]}
       actions={[
@@ -204,7 +296,7 @@ export default function CashierDashboardPage() {
                 tone: "success",
               },
               {
-                label: "Today Transactions",
+                label: "Receipts Today",
                 value: String(legacy.today_transaction_count),
               },
               {
@@ -222,6 +314,84 @@ export default function CashierDashboardPage() {
       statusBadge={{ label: "Cashier Operations", tone: "info" }}
     >
       <div className="space-y-6">
+        <FormSection
+          title="Start at the counter"
+          description="Collection-first: post payments from the collect flow. Search receipts when the customer needs proof or a reference lookup."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <ActionButton href="/cashier/collect" variant="primary" size="lg" className="w-full sm:w-auto sm:min-w-[200px]">
+              Collect payment
+            </ActionButton>
+            <ActionButton
+              href="/cashier/collect?workflow=direct-sale"
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              Collect direct sale
+            </ActionButton>
+            <ActionButton href="/cashier/payments" variant="outline" size="lg" className="w-full sm:w-auto">
+              Payment history
+            </ActionButton>
+          </div>
+
+          <form
+            className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const q = receiptLookup.trim();
+              router.push(q ? `/cashier/payments?q=${encodeURIComponent(q)}` : "/cashier/payments");
+            }}
+          >
+            <label className="grid gap-2 text-sm">
+              <span className="font-medium text-foreground">Find a receipt</span>
+              <input
+                type="search"
+                value={receiptLookup}
+                onChange={(event) => setReceiptLookup(event.target.value)}
+                placeholder="Payment #, reference, phone, SUB-…"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                enterKeyHint="search"
+                autoComplete="off"
+              />
+            </label>
+            <div className="flex items-end">
+              <ActionButton type="submit" variant="secondary" className="w-full sm:w-auto">
+                Search receipts
+              </ActionButton>
+            </div>
+          </form>
+
+          {legacy ? (
+            <div className="mt-4">
+              <MetricStrip
+                items={[
+                  {
+                    label: "Pending EMIs",
+                    value: String(legacy.total_pending_emis),
+                    helper: `${money(legacy.total_pending_amount)} outstanding in cashier scope`,
+                    href: "/cashier/collect",
+                  },
+                  {
+                    label: "Collected today",
+                    value: money(legacy.today_total_collected),
+                    helper: `${legacy.today_transaction_count} receipt(s)`,
+                  },
+                  {
+                    label: "Cash today",
+                    value: money(legacy.today_cash_total),
+                  },
+                  {
+                    label: "Digital today",
+                    value: money(legacy.today_digital_total),
+                    helper: "UPI, bank & non-cash (API bucket)",
+                  },
+                ]}
+              />
+            </div>
+          ) : null}
+        </FormSection>
+
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
@@ -326,6 +496,14 @@ export default function CashierDashboardPage() {
 
         {!loading && !error && legacy && summary ? (
           <>
+            {(reconciliationSurface?.flagged_count ?? 0) > 0 ? (
+              <WorkspaceNotice tone="warning" title="Reconciliation flags in cashier scope">
+                {reconciliationSurface?.flagged_count} subscription(s) are flagged for finance review.
+                Counter collection rules are unchanged; if a customer disputes balances, coordinate with admin finance
+                before promising outcomes.
+              </WorkspaceNotice>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Paid"
@@ -605,8 +783,27 @@ export default function CashierDashboardPage() {
             </WorkspaceSection>
 
             <WorkspaceSection
-              title="Today's transactions"
-              description="Counter-posted payment rows surfaced through the shared canonical recent-payments endpoint."
+              title="Posted today"
+              description="Same-day counter postings from the cashier dashboard payload (branch/counter scope per API)."
+              action={
+                <ActionButton href="/cashier/payments" variant="secondary" className="h-9 px-3 text-xs">
+                  Open payment history
+                </ActionButton>
+              }
+            >
+              {todayTransactionRows.length > 0 ? (
+                <CashierDashboardPaymentTable rows={todayTransactionRows} />
+              ) : (
+                <EmptyState
+                  title="No same-day postings in this payload"
+                  description="After you collect, refresh the dashboard. The time-window list below may still show earlier receipts."
+                />
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Recent payments (selected window)"
+              description="Rows from the shared recent-payments surface for the dashboard time filter."
               action={
                 <>
                   <ActionButton
@@ -629,7 +826,7 @@ export default function CashierDashboardPage() {
               }
             >
               {paymentRows.length > 0 ? (
-                <div className="overflow-x-auto">
+                <MobileSafeTable>
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
@@ -652,14 +849,32 @@ export default function CashierDashboardPage() {
                     </thead>
                     <tbody>
                       {paymentRows.map((payment) => (
-                        <tr key={payment.payment_id} className="align-top">
+                        <tr
+                          key={payment.payment_id}
+                          className={`align-top ${payment.is_reversed ? "opacity-60" : ""}`}
+                        >
                           <td className="border-b border-slate-200 px-4 py-3">
-                            <div className="text-sm font-semibold text-foreground">
+                            <Link
+                              href={`/cashier/payments/${payment.payment_id}`}
+                              className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+                            >
                               #{payment.payment_id}
+                            </Link>
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              {payment.method ? (
+                                <StatusBadge status={payment.method} hideIcon />
+                              ) : (
+                                <span className="text-xs text-slate-600">—</span>
+                              )}
+                              <span className="text-xs text-slate-600">
+                                · {payment.reference_no || "No ref"}
+                              </span>
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
-                              {payment.method || "—"} · {payment.reference_no || "No ref"}
-                            </div>
+                            {payment.is_reversed ? (
+                              <div className="mt-1">
+                                <StatusBadge status="REVERSED" hideIcon />
+                              </div>
+                            ) : null}
                           </td>
                           <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm font-medium text-foreground">
@@ -683,9 +898,6 @@ export default function CashierDashboardPage() {
                             <div className="text-sm font-semibold text-foreground">
                               {money(payment.amount)}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
-                              {payment.is_reversed ? "Reversed" : "Recorded"}
-                            </div>
                           </td>
                           <td className="border-b border-slate-200 px-4 py-3">
                             <div className="text-sm text-foreground">
@@ -699,11 +911,11 @@ export default function CashierDashboardPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </MobileSafeTable>
               ) : (
                 <EmptyState
-                  title="No transactions recorded in this window"
-                  description="After posting a payment, use Refresh to reload the dashboard totals and transaction list."
+                  title="No transactions in this window"
+                  description="Adjust the dashboard time filter or refresh after posting. Use payment history for deeper search."
                 />
               )}
             </WorkspaceSection>

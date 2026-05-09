@@ -142,109 +142,126 @@ export default function ApplyPageClient() {
       ) : null}
 
       <section className="public-surface p-6">
-        <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-2">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">Name</span>
-            <input
-              name="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Enter your full name"
-              required
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+        <form onSubmit={onSubmit} className="grid gap-6">
+          <fieldset className="grid gap-4 rounded-2xl border border-[color-mix(in_oklab,var(--border)_80%,transparent)] bg-[color-mix(in_oklab,white_92%,var(--surface-muted)_8%)] p-4 sm:p-5 lg:grid-cols-2">
+            <legend className="px-1 text-sm font-semibold text-foreground">Your details</legend>
+            <p className="text-xs leading-relaxed text-muted-foreground lg:col-span-2">
+              We use this only to respond to your enquiry. Do not share card PINs or passwords here.
+            </p>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">Phone</span>
-            <input
-              name="phone"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="10-digit phone number"
-              required
-              pattern="[0-9]{10}"
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-foreground">Name</span>
+              <input
+                name="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Enter your full name"
+                required
+                disabled={loading}
+                autoComplete="name"
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">City / Area</span>
-            <input
-              name="city"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-              placeholder="Where should the branch contact you?"
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-foreground">Phone</span>
+              <input
+                name="phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="10-digit phone number"
+                required
+                pattern="[0-9]{10}"
+                disabled={loading}
+                autoComplete="tel"
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">Email (optional)</span>
-            <input
-              name="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="If you prefer email follow-up"
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-foreground">City / Area</span>
+              <input
+                name="city"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                placeholder="Where should the branch contact you?"
+                disabled={loading}
+                autoComplete="address-level2"
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">Interested Product</span>
-            <input
-              name="interested_product"
-              value={interestedProduct}
-              onChange={(event) => setInterestedProduct(event.target.value)}
-              placeholder="Product name, code, or preferred category"
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-foreground">Email (optional)</span>
+              <input
+                name="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="If you prefer email follow-up"
+                disabled={loading}
+                autoComplete="email"
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
+          </fieldset>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-foreground">Preferred EMI Amount</span>
-            <input
-              name="preferred_emi_amount"
-              type="number"
-              min="0"
-              value={preferredEmiAmount}
-              onChange={(event) => setPreferredEmiAmount(event.target.value)}
-              placeholder="Optional monthly comfort range"
-              className="h-11 rounded-xl border border-border bg-white/80 px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+          <fieldset className="grid gap-4 rounded-2xl border border-[color-mix(in_oklab,var(--border)_80%,transparent)] bg-[color-mix(in_oklab,white_92%,var(--surface-muted)_8%)] p-4 sm:p-5 lg:grid-cols-2">
+            <legend className="px-1 text-sm font-semibold text-foreground">Product &amp; plan interest</legend>
 
-          <div className="hidden lg:block" />
+            <label className="grid gap-2 lg:col-span-2">
+              <span className="text-sm font-medium text-foreground">Interested product</span>
+              <input
+                name="interested_product"
+                value={interestedProduct}
+                onChange={(event) => setInterestedProduct(event.target.value)}
+                placeholder="Product name, code, or preferred category"
+                disabled={loading}
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium text-foreground">Notes</span>
-            <textarea
-              name="notes"
-              rows={5}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Tell us what you want to buy, your preferred branch follow-up time, or any product questions."
-              className="rounded-xl border border-border bg-white/80 px-4 py-3 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-foreground">Preferred EMI amount (optional)</span>
+              <input
+                name="preferred_emi_amount"
+                type="number"
+                min="0"
+                value={preferredEmiAmount}
+                onChange={(event) => setPreferredEmiAmount(event.target.value)}
+                placeholder="Monthly comfort hint, not a binding quote"
+                disabled={loading}
+                className="public-control-focus h-11 rounded-xl border border-border bg-white/80 px-4 text-sm"
+              />
+            </label>
 
-          <div className="lg:col-span-2 flex flex-wrap gap-3">
+            <div className="hidden lg:block" />
+
+            <label className="grid gap-2 lg:col-span-2">
+              <span className="text-sm font-medium text-foreground">Notes</span>
+              <textarea
+                name="notes"
+                rows={5}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Tell us what you want to buy, your preferred branch follow-up time, or any product questions."
+                disabled={loading}
+                className="public-control-focus rounded-xl border border-border bg-white/80 px-4 py-3 text-sm"
+              />
+            </label>
+          </fieldset>
+
+          <div className="flex flex-wrap gap-3">
             <ActionButton
               type="submit"
-              variant="secondary"
+              variant="primary"
               loading={loading}
               size="lg"
-              className="border-slate-950/10 bg-slate-950 text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.82)] hover:bg-slate-900 hover:border-slate-950/10"
             >
               {loading ? "Submitting..." : "Submit Application"}
             </ActionButton>
 
-            <ActionButton
-              href={ROUTES.public.products}
-              variant="outline"
-              size="lg"
-            >
+            <ActionButton href={ROUTES.public.products} variant="outline" size="lg" className={loading ? "pointer-events-none opacity-60" : ""}>
               Back to Products
             </ActionButton>
           </div>

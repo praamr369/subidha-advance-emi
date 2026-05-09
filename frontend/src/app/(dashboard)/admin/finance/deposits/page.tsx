@@ -6,6 +6,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   approveAdminDepositRefund,
@@ -151,38 +154,81 @@ export default function AdminFinanceDepositsPage() {
         {rows.length === 0 ? (
           <EmptyState title="No deposit rows" description="No rent/lease security deposit demands are available yet." />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-muted/40 text-left">
-                <tr>
-                  <th className="px-3 py-2">Contract</th>
-                  <th className="px-3 py-2">Customer</th>
-                  <th className="px-3 py-2">Plan</th>
-                  <th className="px-3 py-2">Collected</th>
-                  <th className="px-3 py-2">Held</th>
-                  <th className="px-3 py-2">Refundable</th>
-                  <th className="px-3 py-2">Deducted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.demand_id} className="border-t">
-                    <td className="px-3 py-2">{row.subscription_number || `SUB-${row.subscription_id}`}</td>
-                    <td className="px-3 py-2">{row.customer_name}</td>
-                    <td className="px-3 py-2">{row.plan_type}</td>
-                    <td className="px-3 py-2">{money(row.collected_amount)}</td>
-                    <td className="px-3 py-2">{money(row.held_amount)}</td>
-                    <td className="px-3 py-2">{money(row.refundable_amount)}</td>
-                    <td className="px-3 py-2">{money(row.deducted_amount)}</td>
+          <DataTableShell>
+            <MobileSafeTable className="border-none bg-transparent">
+              <table className="min-w-full text-sm">
+                <thead className="bg-muted/40 text-left">
+                  <tr>
+                    <th className="px-3 py-2">Contract</th>
+                    <th className="px-3 py-2">Customer</th>
+                    <th className="px-3 py-2">Plan</th>
+                    <th className="px-3 py-2 text-right">Collected</th>
+                    <th className="px-3 py-2 text-right">Held</th>
+                    <th className="px-3 py-2 text-right">Refundable</th>
+                    <th className="px-3 py-2 text-right">Deducted</th>
+                    <th className="px-3 py-2">Posture</th>
+                    <th className="px-3 py-2">PDFs</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const refundable = Number(row.refundable_amount ?? 0);
+                    const held = Number(row.held_amount ?? 0);
+                    const posture = refundable <= 0 ? "CLOSED" : held > 0 ? "OPEN" : "PENDING";
+                    return (
+                      <tr key={row.demand_id} className="border-t">
+                        <td className="px-3 py-2">{row.subscription_number || `SUB-${row.subscription_id}`}</td>
+                        <td className="px-3 py-2">{row.customer_name}</td>
+                        <td className="px-3 py-2">{row.plan_type}</td>
+                        <td className="px-3 py-2 text-right font-medium">{money(row.collected_amount)}</td>
+                        <td className="px-3 py-2 text-right">{money(row.held_amount)}</td>
+                        <td className="px-3 py-2 text-right">{money(row.refundable_amount)}</td>
+                        <td className="px-3 py-2 text-right">{money(row.deducted_amount)}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge status={posture} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            <a
+                              href={`/api/v1/admin/finance/deposits/${row.demand_id}/pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border px-2 py-1 text-xs"
+                            >
+                              Deposit PDF
+                            </a>
+                            <a
+                              href={`/api/v1/admin/finance/deposits/${row.demand_id}/refund-pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border px-2 py-1 text-xs"
+                            >
+                              Refund PDF
+                            </a>
+                            <a
+                              href={`/api/v1/admin/finance/deposits/${row.demand_id}/deduction-pdf/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border px-2 py-1 text-xs"
+                            >
+                              Deduction PDF
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </MobileSafeTable>
+          </DataTableShell>
         )}
       </WorkspaceSection>
 
-      <WorkspaceSection title="Deposit Actions" description="Record deduction, approve refund, and post refund records with audit trail.">
+      <TableToolbar
+        title="Deposit Actions"
+        description="Record deduction, approve refund, and post refund records with explicit audit trail boundaries."
+      >
         <div className="grid gap-3 md:grid-cols-2">
           <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Subscription ID" value={form.subscription_id} onChange={(e) => setForm((c) => ({ ...c, subscription_id: e.target.value }))} />
           <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Amount" value={form.amount} onChange={(e) => setForm((c) => ({ ...c, amount: e.target.value }))} />
@@ -200,7 +246,7 @@ export default function AdminFinanceDepositsPage() {
             Record Refund
           </button>
         </div>
-      </WorkspaceSection>
+      </TableToolbar>
 
       <WorkspaceSection title="Accounting Account Mapping" description="Configure account codes used by live rent/lease finance sync boundary.">
         {mapping ? <div className="mb-2 text-xs text-muted-foreground">Active mapping ID: {String(mapping.id)}</div> : null}

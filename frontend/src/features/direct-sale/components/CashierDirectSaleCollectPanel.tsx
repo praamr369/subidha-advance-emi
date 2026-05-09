@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import {
@@ -79,7 +80,11 @@ function toErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
-export default function CashierDirectSaleCollectPanel() {
+export default function CashierDirectSaleCollectPanel({
+  prefillDirectSaleId = null,
+}: {
+  prefillDirectSaleId?: number | null;
+}) {
   const [searchMode, setSearchMode] = useState<CashierDirectSaleSearchMode>("phone");
   const [searchInput, setSearchInput] = useState("");
   const [submittedPhone, setSubmittedPhone] = useState("");
@@ -108,6 +113,100 @@ export default function CashierDirectSaleCollectPanel() {
     if (!selectedDirectSaleId) return null;
     return directSales.find((item) => item.direct_sale_id === selectedDirectSaleId) ?? null;
   }, [directSales, selectedDirectSaleId]);
+
+  useEffect(() => {
+    if (!prefillDirectSaleId) return;
+
+    let active = true;
+
+    async function applyDirectSalePrefill() {
+      const searchValue = String(prefillDirectSaleId);
+      setSearchMode("sale");
+      setSearchInput(searchValue);
+      setSubmittedSearch(searchValue);
+      setLookup(null);
+      setLookupError(null);
+      setSearchResultsError(null);
+      setSelectedDirectSaleId(null);
+      setAmount("");
+      setReferenceNo("");
+      setNote("");
+      setCollectError(null);
+      setSuccess(null);
+      setSearchingMatches(true);
+
+      try {
+        const searchPayload = await searchCashierCollectibleDirectSales(
+          searchValue,
+          "sale"
+        );
+        if (!active) return;
+        setSearchResults(searchPayload.results);
+
+        const match =
+          searchPayload.results.find(
+            (item) => item.direct_sale_id === prefillDirectSaleId
+          ) ??
+          searchPayload.results[0] ??
+          null;
+
+        if (!match) {
+          setSearchResultsError(
+            "No outstanding direct-sale receivable is available for this reference."
+          );
+          return;
+        }
+
+        if (!match.customer_phone) {
+          setSearchResultsError(
+            "This direct-sale candidate does not include a customer phone, so the cashier queue could not be loaded."
+          );
+          return;
+        }
+
+        setSearchingMatches(false);
+        setLookupLoading(true);
+        const lookupPayload = await getPendingDirectSalesByPhone(match.customer_phone);
+        if (!active) return;
+        setLookup(lookupPayload);
+        setSubmittedPhone(match.customer_phone);
+        setSearchResults([]);
+
+        const activeRow =
+          lookupPayload.direct_sales.find(
+            (item) => item.direct_sale_id === prefillDirectSaleId
+          ) ??
+          lookupPayload.direct_sales[0] ??
+          null;
+
+        if (activeRow) {
+          setSelectedDirectSaleId(activeRow.direct_sale_id);
+          setAmount(activeRow.balance_total);
+        } else {
+          setSelectedDirectSaleId(null);
+          setAmount("");
+        }
+      } catch (error) {
+        if (!active) return;
+        setLookup(null);
+        setSearchResults([]);
+        setSelectedDirectSaleId(null);
+        setAmount("");
+        setSearchResultsError(toErrorMessage(error));
+      } finally {
+        if (active) {
+          setSearchingMatches(false);
+          setLookupLoading(false);
+        }
+      }
+    }
+
+    void applyDirectSalePrefill();
+
+    return () => {
+      active = false;
+    };
+  }, [prefillDirectSaleId]);
 
   function resetSelection() {
     setSelectedDirectSaleId(null);
@@ -359,7 +458,12 @@ export default function CashierDirectSaleCollectPanel() {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-1">
                       <div className="text-sm font-semibold text-foreground">
-                        {result.sale_no || `SALE-${result.direct_sale_id}`} · {result.customer_name || "Unknown customer"}
+                        {result.sale_no || `SALE-${result.direct_sale_id}`} ·{" "}
+                        <CustomerIntelligenceTrigger
+                          customerId={result.customer_id}
+                          customerName={result.customer_name || "Unknown customer"}
+                          scope="cashier"
+                        />
                       </div>
                       <div className="text-sm text-slate-600">
                         {result.customer_phone || "No phone"} · Invoice {result.billing_invoice_no || "—"}
@@ -412,7 +516,13 @@ export default function CashierDirectSaleCollectPanel() {
             <div className="grid gap-4 md:grid-cols-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Customer</div>
-                <div className="mt-1 text-base font-semibold text-foreground">{lookup.customer_name || "—"}</div>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  <CustomerIntelligenceTrigger
+                    customerId={lookup.customer_id}
+                    customerName={lookup.customer_name || "—"}
+                    scope="cashier"
+                  />
+                </div>
               </div>
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Phone</div>

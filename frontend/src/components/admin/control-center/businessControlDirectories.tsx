@@ -327,7 +327,7 @@ export const BILLING_CONTROL_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
       {
         title: "Direct Sales",
         description: "Run direct retail sales through the separate operational source record.",
-        href: ROUTES.admin.billingDirectSales,
+        href: ROUTES.admin.billingDirectSaleWorkspace,
         icon: <ScrollText className="h-4 w-4" />,
       },
       {

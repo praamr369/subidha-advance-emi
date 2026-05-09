@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from branch_control.services.branch_service import scope_queryset_to_user_branches
+from core.services.operational_visibility import subscription_collectible_q
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.admin_resources import EmiAdminSerializer as EmiSerializer
 from api.v1.serializers.payment import PaymentSerializer
@@ -27,6 +28,7 @@ def _pending_emi_queryset(*, user):
             "subscription__lucky_id",
         )
         .filter(status=EmiStatus.PENDING)
+        .filter(subscription_collectible_q("subscription__"))
         .order_by("due_date", "month_no", "id")
     )
     return scope_queryset_to_user_branches(
@@ -124,6 +126,8 @@ def _filter_cashier_payment_queryset(queryset, query: str):
         | Q(customer__phone__icontains=query)
         | Q(customer__name__icontains=query)
         | Q(subscription__contract_reference__icontains=query)
+        | Q(subscription__contract_references__reference_no__icontains=query)
+        | Q(subscription__contract_references__display_reference__icontains=query)
     )
 
     if subscription_id is not None:
@@ -275,7 +279,12 @@ class CashierSearchEmiView(APIView):
         if mode == "phone":
             queryset = queryset.filter(subscription__customer__phone__icontains=query)
         elif mode == "subscription":
-            search_filter = Q(subscription__contract_reference__icontains=query)
+            search_filter = (
+                Q(subscription__contract_reference__icontains=query)
+                | Q(subscription__subscription_number__icontains=query)
+                | Q(subscription__contract_references__reference_no__icontains=query)
+                | Q(subscription__contract_references__display_reference__icontains=query)
+            )
             if subscription_id is not None:
                 search_filter |= Q(subscription_id=subscription_id)
             queryset = queryset.filter(search_filter)
@@ -297,6 +306,9 @@ class CashierSearchEmiView(APIView):
                 Q(subscription__customer__phone__icontains=query)
                 | Q(subscription__customer__name__icontains=query)
                 | Q(subscription__contract_reference__icontains=query)
+                | Q(subscription__subscription_number__icontains=query)
+                | Q(subscription__contract_references__reference_no__icontains=query)
+                | Q(subscription__contract_references__display_reference__icontains=query)
             )
 
             if subscription_id is not None:
@@ -311,7 +323,7 @@ class CashierSearchEmiView(APIView):
 
             queryset = queryset.filter(search_filter)
 
-        rows = list(queryset[:30])
+        rows = list(queryset.distinct()[:30])
 
         return Response(
             {

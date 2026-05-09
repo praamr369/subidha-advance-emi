@@ -7,6 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
+import { DataTableShell } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
@@ -68,6 +69,22 @@ function formatDateTime(value?: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function resolveEmiBadge(row: EmiRow): { status: string; label: string } {
+  const raw = row.status.toUpperCase();
+  if (raw === "PAID") return { status: "PAID", label: "Paid" };
+  if (raw === "WAIVED") return { status: "WAIVED", label: "Waived" };
+
+  if (row.outstanding_amount > 0 && row.due_date) {
+    const dueTs = Date.parse(row.due_date);
+    if (!Number.isNaN(dueTs) && dueTs < Date.now()) {
+      return { status: "OVERDUE", label: "Overdue" };
+    }
+  }
+
+  if (raw === "PENDING") return { status: "PENDING", label: "Pending" };
+  return { status: raw || "PENDING", label: raw ? raw.replaceAll("_", " ") : "Pending" };
 }
 
 type EmiRow = {
@@ -346,9 +363,10 @@ export default function CustomerSubscriptionDetailPage() {
       {
         key: "status",
         title: "Status",
-        render: (row: EmiRow) => (
-          <StatusBadge status={row.status} />
-        ),
+        render: (row: EmiRow) => {
+          const badge = resolveEmiBadge(row);
+          return <StatusBadge status={badge.status} label={badge.label} />;
+        },
       },
     ],
     []
@@ -775,9 +793,9 @@ export default function CustomerSubscriptionDetailPage() {
                 description="No advance EMI rows were returned for this subscription."
               />
             ) : (
-              <div className="rounded-2xl border border-border bg-background p-2">
+              <DataTableShell>
                 <DataTable<EmiRow> rows={emiRows} columns={columns} />
-              </div>
+              </DataTableShell>
             )}
           </DetailSectionShell>
         </div>

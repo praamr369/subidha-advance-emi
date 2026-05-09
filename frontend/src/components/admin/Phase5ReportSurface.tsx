@@ -7,7 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import { FormSection } from "@/components/ui/operations";
 import Phase5FilterBar from "@/components/admin/Phase5FilterBar";
 import Phase5ChartBlock from "@/components/admin/Phase5ChartBlock";
 import Phase5KpiCard from "@/components/admin/Phase5KpiCard";
@@ -77,7 +77,7 @@ export default function Phase5ReportSurface({
 
   return (
     <PortalPage title={title} subtitle={subtitle} breadcrumbs={breadcrumbs}>
-      <WorkspaceSection title="Live BI Surface" description="Real-data API response with stable chart payload contract.">
+      <FormSection title="Live BI Surface" description="Real-data API response with stable chart payload contract.">
         <Phase5FilterBar value={filters} onChange={setFilters} />
         <div className="mt-3 flex gap-2">
           <ActionButton variant="outline" onClick={() => void load()}>
@@ -115,7 +115,7 @@ export default function Phase5ReportSurface({
             <Phase5SourceMapPanel rows={sourceMap} />
           </div>
         )}
-      </WorkspaceSection>
+      </FormSection>
     </PortalPage>
   );
 }

@@ -4,38 +4,36 @@ import { authStatePath } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("admin") });
 
-const WIDGET_PREFS_KEY = "subidha:admin-dashboard-widgets:v1";
+const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
 
-test("admin dashboard widget open/collapse persists via localStorage", async ({ page }) => {
-  await page.goto("/admin/operations");
-  await expect(
-    page.getByRole("heading", { name: "Operations Workspace" })
-  ).toBeVisible();
-  await page.evaluate((key) => window.localStorage.removeItem(key), WIDGET_PREFS_KEY);
+test("admin operator mode and quick actions persist via localStorage", async ({ page }) => {
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Daily Operator Dashboard" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("primary daily dashboard");
+  await expect(page.locator("body")).toContainText("Quick actions");
+
+  await expect(page.getByTestId("operator-mode-toggle")).toBeVisible();
+  const toggle = page.getByTestId("operator-mode-toggle");
+  await expect(toggle).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+  const beforeLabel = (await toggle.getAttribute("aria-label")) || "";
+  await page.getByTestId("operator-mode-toggle").click();
+  await expect(toggle).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+  const afterLabel = (await toggle.getAttribute("aria-label")) || "";
+  expect(afterLabel).not.toBe(beforeLabel);
+
+  const storedMode = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    OPERATOR_MODE_KEY
+  );
+  const expectedStoredMode = afterLabel === "Switch Simple" ? "ADVANCED" : "SIMPLE";
+  expect(storedMode).toBe(expectedStoredMode);
+
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Operations Workspace" })
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: /support queue/i }).click();
-  const supportWidgetHeading = page.getByRole("heading", { name: "Support queue" });
-  await expect(supportWidgetHeading).toBeVisible();
-
-  const supportWidget = supportWidgetHeading.locator("xpath=ancestor::section[1]");
-  await expect(supportWidget.getByRole("link", { name: /open module/i })).toBeVisible();
-  await expect(supportWidget.getByRole("link", { name: /open support queue/i })).toBeVisible();
-  await supportWidget.getByRole("button", { name: "Collapse widget" }).click();
-  await expect(supportWidget.getByRole("link", { name: /open support queue/i })).not.toBeVisible();
-
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Operations Workspace" })
-  ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Support queue" })).toBeVisible();
-  await expect(
-    page
-      .getByRole("heading", { name: "Support queue" })
-      .locator("xpath=ancestor::section[1]")
-      .getByRole("link", { name: /open support queue/i })
-  ).not.toBeVisible();
+  await expect(page.getByTestId("operator-mode-toggle")).toBeVisible();
+  await expect(page.getByTestId("operator-mode-toggle")).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
+  if (expectedStoredMode === "ADVANCED") {
+    await expect(page.getByRole("heading", { name: /Executive Dashboard/i })).toBeVisible();
+  } else {
+    await expect(page.getByRole("heading", { name: /Daily Operator Dashboard/i })).toBeVisible();
+  }
 });

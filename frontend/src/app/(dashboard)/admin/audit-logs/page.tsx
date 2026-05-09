@@ -13,6 +13,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
@@ -200,16 +203,6 @@ function SectionCard({
   );
 }
 
-function toneClassName(row: AuditLogRow): string {
-  if (isFinancialRow(row)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-  if (isSystemRow(row)) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-  return "border-border bg-muted text-foreground";
-}
-
 export default function AdminAuditLogsPage() {
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -364,7 +357,7 @@ export default function AdminAuditLogsPage() {
       }}
     >
       <div className="space-y-6">
-        <SectionCard
+        <TableToolbar
           title="Filter Audit Trail"
           description="Search by event content and narrow by model or action for finance, auth, and operational investigation."
         >
@@ -476,7 +469,7 @@ export default function AdminAuditLogsPage() {
               </button>
             </div>
           </form>
-        </SectionCard>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading audit logs..." /> : null}
 
@@ -499,12 +492,16 @@ export default function AdminAuditLogsPage() {
                 description="No audit records match the current filter set."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0">
+              <DataTableShell>
+                <MobileSafeTable className="border-none bg-transparent">
+                  <table className="min-w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-left">
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Event
+                      </th>
+                      <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Class
                       </th>
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Model
@@ -544,16 +541,18 @@ export default function AdminAuditLogsPage() {
                         <tr key={row.id} className="align-top">
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                             <div className="font-medium">#{row.id}</div>
-                            <div className="mt-1">
-                              <span
-                                className={[
-                                  "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                  toneClassName(row),
-                                ].join(" ")}
-                              >
-                                {row.action_type}
-                              </span>
-                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">{row.action_type}</div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <StatusBadge
+                              status={
+                                isFinancialRow(row)
+                                  ? "COMPLETED"
+                                  : isSystemRow(row)
+                                    ? "LOCKED"
+                                    : "OPEN"
+                              }
+                            />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -629,8 +628,9 @@ export default function AdminAuditLogsPage() {
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </MobileSafeTable>
+              </DataTableShell>
             )}
           </SectionCard>
         ) : null}

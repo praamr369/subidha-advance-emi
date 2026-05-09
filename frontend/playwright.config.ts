@@ -13,7 +13,8 @@ const smokeMetaPath =
   process.env.PLAYWRIGHT_SMOKE_META_PATH ||
   path.resolve(__dirname, "../backend/playwright-smoke-meta.json");
 const smokeDbPath =
-  process.env.PLAYWRIGHT_DB_PATH || "/tmp/subidha-playwright-smoke.sqlite3";
+  process.env.PLAYWRIGHT_DB_PATH ||
+  `/tmp/subidha-playwright-smoke-${process.pid}.sqlite3`;
 const smokeManifestPath = path.resolve(
   __dirname,
   "tests/e2e/.generated/smoke-manifest.json"
@@ -91,7 +92,8 @@ export default defineConfig({
       command: "bash ../backend/scripts/start_playwright_backend.sh",
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      // Backend bootstrap may create/install a dedicated playwright venv on first run.
+      timeout: 420_000,
       cwd: ".",
       env: {
         ...process.env,
@@ -108,7 +110,9 @@ export default defineConfig({
     {
       command: "npm run start:smoke",
       url: `${frontendBaseUrl}/login`,
-      reuseExistingServer: !process.env.CI,
+      // Always start a fresh Next server for smoke: a reused process can keep an
+      // outdated in-memory bundle after `npm run build:smoke` rewrote `.next/`.
+      reuseExistingServer: false,
       timeout: 240_000,
       cwd: ".",
       env: {

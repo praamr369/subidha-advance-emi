@@ -9,6 +9,7 @@ import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-cen
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
+import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
@@ -17,7 +18,9 @@ import { accountingDate, accountingErrorMessage, accountingMoney } from "@/compo
 import { toAmountInWordsINR } from "@/lib/print/formatters";
 import type { BillingInvoice } from "@/services/billing";
 import {
+  adminFinalizeDirectSaleInvoice,
   approveBillingInvoice,
+  cancelBillingInvoice,
   listBillingInvoices,
   postBillingInvoice,
 } from "@/services/billing";
@@ -28,6 +31,8 @@ export default function BillingInvoicesPage() {
   const [rows, setRows] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<BillingInvoice | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   const loadPage = useCallback(async () => {
     try {
@@ -60,10 +65,30 @@ export default function BillingInvoicesPage() {
     { key: "status", header: "Status" },
     { key: "grand_total", header: "Grand Total", render: (row) => accountingMoney(row.grand_total) },
     {
+      key: "active_balance",
+      header: "Active Balance",
+      render: (row) =>
+        ["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(row.status || "").toUpperCase())
+          ? "History only"
+          : accountingMoney(row.balance_total),
+    },
+    {
       key: "actions",
       header: "Actions",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
+          {(row.next_actions || []).includes("POST_INVOICE") && row.direct_sale ? (
+            <button
+              type="button"
+              onClick={async () => {
+                await adminFinalizeDirectSaleInvoice(row.direct_sale as number);
+                await loadPage();
+              }}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-orange-700 px-3 text-xs font-semibold text-white transition hover:bg-orange-800"
+            >
+              Finalize Invoice
+            </button>
+          ) : null}
           {row.status === "DRAFT" ? (
             <ConfirmActionButton
               label="Approve"
@@ -88,9 +113,34 @@ export default function BillingInvoicesPage() {
               variant="primary"
             />
           ) : null}
+          {["DRAFT", "APPROVED", "POSTED"].includes(row.status) ? (
+            <button
+              type="button"
+              onClick={() => setCancelTarget(row)}
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-destructive bg-background px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/10"
+            >
+              {row.status === "POSTED" ? "Void invoice" : "Cancel invoice"}
+            </button>
+          ) : null}
           <ActionButton href={buildAdminBillingDocumentRoute(row.id)} variant="outline">
             Open Detail
           </ActionButton>
+          {row.direct_sale &&
+          row.status === "POSTED" &&
+          !["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(row.status || "").toUpperCase()) &&
+          Number(row.balance_total || 0) > 0 ? (
+            <ActionButton
+              href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${row.direct_sale}`}
+              variant="primary"
+            >
+              Collect Direct-Sale Balance
+            </ActionButton>
+          ) : null}
+          {(row.next_actions || []).includes("VIEW_RECEIPTS") && row.direct_sale ? (
+            <ActionButton href={`${ROUTES.admin.billingReceipts}?direct_sale=${row.direct_sale}`} variant="outline">
+              View Receipts
+            </ActionButton>
+          ) : null}
         </div>
       ),
     },
@@ -205,6 +255,40 @@ export default function BillingInvoicesPage() {
           unitPrice: accountingMoney(line.unit_price),
           lineTotal: accountingMoney(line.line_total),
         }))}
+      />
+
+      <AdminCancellationDialog
+        open={cancelTarget !== null}
+        sourceType="BILLING_INVOICE"
+        sourceReference={cancelTarget?.document_no || `INV-${cancelTarget?.id || ""}`}
+        currentStatus={cancelTarget?.status || ""}
+        financialImpactSummary={`Grand total ${accountingMoney(cancelTarget?.grand_total || 0)} · Active receipts ${accountingMoney(cancelTarget?.active_receipt_total || 0)} · Void receipts ${accountingMoney(cancelTarget?.void_receipt_total || 0)} · Balance ${accountingMoney(cancelTarget?.balance_total || 0)}`}
+        requiresReceiptReversal={Number(cancelTarget?.active_receipt_total || 0) > 0}
+        affected={{
+          receipts: Number(cancelTarget?.active_receipt_total || 0) > 0,
+          invoices: true,
+        }}
+        onClose={() => {
+          if (!cancelSubmitting) setCancelTarget(null);
+        }}
+        submitting={cancelSubmitting}
+        confirmLabel={cancelTarget?.status === "POSTED" ? "Confirm invoice void" : "Confirm invoice cancellation"}
+        onConfirm={async (payload) => {
+          if (!cancelTarget) return;
+          setCancelSubmitting(true);
+          try {
+            await cancelBillingInvoice(cancelTarget.id, {
+              ...payload,
+              reversal_policy: cancelTarget.status === "POSTED" ? "CREATE_CREDIT_NOTE" : "NONE",
+            });
+            setCancelTarget(null);
+            await loadPage();
+          } catch (err) {
+            throw new Error(accountingErrorMessage(err, "Invoice cancellation failed."));
+          } finally {
+            setCancelSubmitting(false);
+          }
+        }}
       />
     </PortalPage>
   );

@@ -83,6 +83,26 @@ test.describe("public release smoke", () => {
 test.describe("admin release smoke", () => {
   test.use({ storageState: roleStorageStatePath("admin") });
 
+  test("admin collections page renders unified receivable panel", async ({ page }) => {
+    await page.goto("/admin/collections");
+    await expect(
+      page.getByRole("heading", { name: /universal contract search/i })
+    ).toBeVisible();
+    await expect(page.locator("#unified-receivable-search")).toBeVisible();
+  });
+
+  test("admin deposits page exposes real deposit PDF links", async ({ page }) => {
+    await page.goto("/admin/finance/deposits");
+    await expect(page.getByRole("heading", { name: /rent\/lease deposit operations/i })).toBeVisible();
+    const depositLink = page.getByRole("link", { name: /deposit pdf/i }).first();
+    if ((await depositLink.count()) > 0) {
+      await expect(depositLink).toBeVisible();
+      await expect(depositLink).toHaveAttribute("href", /\/api\/v1\/admin\/finance\/deposits\/\d+\/pdf\//);
+    } else {
+      await expect(page.locator("body")).toContainText(/no deposit rows/i);
+    }
+  });
+
   test("admin batch lifecycle entry flow works", async ({ page }) => {
     const meta = getMeta();
     const batchCode = `SMOKEE2E${Date.now().toString().slice(-6)}`;
@@ -108,7 +128,7 @@ test.describe("admin release smoke", () => {
     const target = meta.entities.admin_collection;
     const referenceNo = `SMOKE-ADMIN-${Date.now()}`;
 
-    await page.goto(`/admin/payments/create?subscription=${target.subscription_id}&emi=${target.emi_id}`);
+    await page.goto(`/admin/finance/collect?subscription=${target.subscription_id}&emi=${target.emi_id}`);
     await expect(page.getByRole("heading", { name: /admin collection entry/i })).toBeVisible();
     await expect(page.locator("#subscription_id")).toHaveValue(String(target.subscription_id));
     await expect(page.locator("#emi_id")).toHaveValue(String(target.emi_id));
@@ -176,7 +196,7 @@ test.describe("admin release smoke", () => {
     );
     await expect(page).toHaveURL(
       new RegExp(
-        `/admin/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
+        `/admin/finance/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
       )
     );
     await expect(
@@ -188,7 +208,19 @@ test.describe("admin release smoke", () => {
 test.describe("cashier release smoke", () => {
   test.use({ storageState: roleStorageStatePath("cashier") });
 
-  test("cashier collection flow works", async ({ page }) => {
+  test("cashier unified search by phone loads role-safe results", async ({ page }) => {
+    const meta = getMeta();
+    await page.goto("/cashier/collect");
+    await page.locator("#unified-receivable-search").fill(meta.entities.cashier_collection.customer_phone);
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#unified-receivable-search") })
+      .getByRole("button", { name: "Search" })
+      .click();
+    await expect(page.locator("body")).toContainText(/advance emi|direct sale|view only/i);
+  });
+
+  test("cashier collection flow works with duplicate-submit guard", async ({ page }) => {
     const meta = getMeta();
     const target = meta.entities.cashier_collection;
 
@@ -211,9 +243,21 @@ test.describe("cashier release smoke", () => {
     if (canCollect) {
       await selectableEmis.first().click();
       await selectFirstRealOption(page, "#collect-finance-account");
-      await page.getByRole("button", { name: /^collect payment$/i }).click();
+      let collectPostCount = 0;
+      page.on("request", (request) => {
+        if (
+          request.method() === "POST" &&
+          request.url().includes("/api/v1/cashier/collect-payment/")
+        ) {
+          collectPostCount += 1;
+        }
+      });
+      const collectButton = page.getByRole("button", { name: /^collect payment$/i });
+      await collectButton.click();
       await expect(page.locator("body")).toContainText(/payment #/i);
       await expect(page.getByRole("link", { name: /open receipt/i })).toBeVisible();
+      await expect(page.locator("body")).toContainText(/payment #\d+ · emi #\d+/i);
+      expect(collectPostCount).toBe(1);
     } else {
       await expect(noPendingState).toBeVisible();
     }
@@ -255,5 +299,17 @@ test.describe("customer release smoke", () => {
     await expect(page.locator("body")).toContainText(/contract lifecycle/i);
     await expect(page.locator("body")).toContainText(/winner benefit/i);
     await expect(page.locator("body")).toContainText(/waiver and settlement impact/i);
+  });
+
+  test("customer contracts page shows rent/lease contract PDF links", async ({ page }) => {
+    await page.goto("/customer/contracts");
+    await expect(page.getByRole("heading", { name: /my contracts/i })).toBeVisible();
+    const contractPdfLink = page.getByRole("link", { name: "Contract PDF" }).first();
+    if ((await contractPdfLink.count()) > 0) {
+      await expect(contractPdfLink).toHaveAttribute(
+        "href",
+        /\/api\/v1\/customer\/(rent-contracts|lease-contracts)\/\d+\/pdf\//
+      );
+    }
   });
 });

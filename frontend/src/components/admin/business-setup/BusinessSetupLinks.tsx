@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ROUTES } from "@/lib/routes";
+
 const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
@@ -9,7 +11,13 @@ const links = [
   { href: "/admin/settings/business-setup/cash-desks", label: "Counters" },
   { href: "/admin/settings/business-setup/staff", label: "Staff & Roles" },
   { href: "/admin/settings/business-setup/chart-accounts", label: "Chart Accounts" },
+  { href: ROUTES.admin.inventoryReadiness, label: "Inventory readiness" },
+  { href: ROUTES.admin.inventoryStockNeeds, label: "Stock needs" },
+  { href: "/admin/accounting/setup", label: "Accounting mappings" },
+  { href: "/admin/settings/business-setup/document-numbering", label: "Document Numbering" },
+  { href: ROUTES.admin.brandData, label: "Brand Data Center" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
+  { href: ROUTES.admin.settingsBusinessSetupDryRuns, label: "Dry runs" },
 ];
 
 export default function BusinessSetupLinks() {

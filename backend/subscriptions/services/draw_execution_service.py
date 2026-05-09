@@ -18,7 +18,7 @@ def execute_monthly_draw(*, draw_id, revealed_seed):
     Orchestrates full draw execution safely.
     """
 
-    draw = LuckyDraw.objects.select_for_update().get(id=draw_id)
+    draw = LuckyDraw.objects.select_for_update(of=("self",)).get(id=draw_id)
 
     if draw.is_revealed:
         raise ValidationError("Draw already executed.")

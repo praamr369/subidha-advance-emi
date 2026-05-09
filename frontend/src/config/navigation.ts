@@ -1,7 +1,7 @@
 import { ROUTES } from "@/lib/routes";
-import { buildAdminReconciliationRoute } from "@/lib/route-builders";
+import { ADMIN_ROUTE_TREE, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
-export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER";
+export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | "VENDOR";
 
 export type NavIconKey =
   | "operations"
@@ -51,6 +51,8 @@ export type NavItem = {
   hidden?: boolean;
   disabled?: boolean;
   description?: string;
+  badgeSource?: string;
+  children?: NavItem[];
 };
 
 export type NavGroup = {
@@ -60,429 +62,105 @@ export type NavGroup = {
 };
 
 function flattenGroups(groups: NavGroup[]): NavItem[] {
-  return groups.flatMap((group) => group.items);
+  const flattenItems = (items: NavItem[]): NavItem[] =>
+    items.flatMap((item) => [item, ...(item.children ? flattenItems(item.children) : [])]);
+  return groups.flatMap((group) => flattenItems(group.items));
+}
+
+function iconForGroup(group: string): NavIconKey {
+  const key = group.toLowerCase();
+  if (key.includes("command")) return "dashboard";
+  if (key.includes("crm") || key.includes("customer")) return "crm";
+  if (key.includes("sales")) return "billing";
+  if (key.includes("subscription") || key.includes("contract")) return "subscriptions";
+  if (key.includes("partner")) return "partners";
+  if (key.includes("billing")) return "finance";
+  if (key.includes("finance")) return "finance";
+  if (key.includes("product") || key.includes("inventory")) return "inventory";
+  if (key.includes("manufacturing") || key.includes("quality") || key.includes("maintenance")) return "manufacturing";
+  if (key.includes("delivery")) return "deliveries";
+  if (key.includes("lucky")) return "luckyDraws";
+  if (key.includes("staff") || key.includes("setup") || key.includes("admin")) return "settings";
+  return "operations";
+}
+
+function normalizeAdminGroupTitle(title: string): string {
+  const key = title.toLowerCase();
+  if (key.includes("command")) return "Command Center";
+  if (key.includes("sales")) return "Sales & Contracts";
+  if (key.includes("subscription")) return "Sales & Contracts";
+  if (key.includes("collection")) return "Collections";
+  if (key.includes("finance")) return "Billing & Finance";
+  if (key.includes("delivery")) return "Delivery & Service";
+  if (key.includes("return") || key.includes("reversal")) return "Returns & Reversals";
+  if (key.includes("inventory") || key.includes("product")) return "Inventory";
+  if (key.includes("lucky")) return "Lucky Plan";
+  if (key.includes("crm") || key.includes("partner")) return "CRM & Partners";
+  if (key.includes("report") || key.includes("audit")) return "Reports & Audit";
+  if (key.includes("setup") || key.includes("staff") || key.includes("setting")) return "Settings";
+  return title;
+}
+
+function inferAdminBadgeSource(item: AdminRouteRegistryItem): string | undefined {
+  const href = item.href.toLowerCase();
+  const label = item.label.toLowerCase();
+  if (href.includes("/outstandings")) return "admin.badges.outstanding_count";
+  if (href.includes("/overdue")) return "admin.badges.overdue_count";
+  if (href.includes("/deliver")) return "admin.badges.pending_delivery_count";
+  if (label.includes("return") || label.includes("reversal")) return "admin.badges.pending_reversal_count";
+  if (label.includes("refund")) return "admin.badges.pending_refund_count";
+  if (href.includes("/support") || href.includes("/service-desk")) return "admin.badges.open_support_ticket_count";
+  if (label.includes("low stock")) return "admin.badges.low_stock_count";
+  if (href.includes("/draw") || href.includes("/batch")) return "admin.badges.pending_draw_count";
+  if (href.includes("/reconciliation")) return "admin.badges.unreconciled_count";
+  return item.badgeSource;
+}
+
+function isSecondaryWorkflowRoute(label: string, href: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const pathname = href.split("?")[0] ?? href;
+  if (/^create\s/.test(normalizedLabel)) return true;
+  if (/^edit\s/.test(normalizedLabel)) return true;
+  if (normalizedLabel.includes(" detail")) return true;
+  if (pathname.includes("/create")) return true;
+  if (pathname.includes("/edit")) return true;
+  if (pathname.includes("/[") || /\/\d+(\/|$)/.test(pathname)) return true;
+  return false;
+}
+
+function buildAdminNavigationGroups(): NavGroup[] {
+  const grouped = new Map<string, NavItem[]>();
+  const toNavItem = (row: AdminRouteRegistryItem): NavItem => ({
+    label: row.label,
+    href: row.href,
+    icon: iconForGroup(row.group),
+    disabled: row.status === "deferred",
+    description: row.description,
+    badgeSource: inferAdminBadgeSource(row),
+    children: row.children
+      ?.filter((child) => !isSecondaryWorkflowRoute(child.label, child.href))
+      .map(toNavItem),
+  });
+
+  ADMIN_ROUTE_TREE.forEach((row) => {
+    if (isSecondaryWorkflowRoute(row.label, row.href)) return;
+    const groupTitle = normalizeAdminGroupTitle(row.group);
+    if (!grouped.has(groupTitle)) grouped.set(groupTitle, []);
+    grouped.get(groupTitle)!.push(toNavItem(row));
+  });
+  return Array.from(grouped.entries()).map(([title, items]) => ({
+    title,
+    icon: iconForGroup(title),
+    items,
+  }));
 }
 
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
-  ADMIN: [
-    {
-      title: "Executive Overview",
-      icon: "dashboard",
-      items: [
-        {
-          label: "Business Control Center",
-          href: ROUTES.admin.dashboard,
-          icon: "dashboard",
-        },
-        {
-          label: "Operations Workspace",
-          href: ROUTES.admin.operations,
-          icon: "operations",
-        },
-        {
-          label: "Branch Dashboard",
-          href: ROUTES.admin.branchReporting,
-          icon: "analytics",
-        },
-        {
-          label: "Analytics",
-          href: ROUTES.admin.analytics,
-          icon: "analytics",
-        },
-        {
-          label: "Operational Reports",
-          href: ROUTES.admin.reports,
-          icon: "reports",
-        },
-      ],
-    },
-    {
-      title: "Customer & CRM",
-      icon: "crm",
-      items: [
-        {
-          label: "Customers",
-          href: ROUTES.admin.customers,
-          icon: "customers",
-        },
-        {
-          label: "CRM Overview",
-          href: ROUTES.admin.crm,
-          icon: "crm",
-        },
-        {
-          label: "Lead Register",
-          href: ROUTES.admin.crmLeads,
-          icon: "leads",
-        },
-        {
-          label: "Leads (Triage)",
-          href: ROUTES.admin.leads,
-          icon: "leads",
-        },
-        {
-          label: "Party Directory",
-          href: ROUTES.admin.crmParties,
-          icon: "customers",
-        },
-        {
-          label: "Support Requests",
-          href: ROUTES.admin.supportRequests,
-          icon: "support",
-        },
-        {
-          label: "Service Desk",
-          href: ROUTES.admin.serviceDesk,
-          icon: "support",
-        },
-      ],
-    },
-    {
-      title: "Direct Sale Workflow",
-      icon: "billing",
-      items: [
-        {
-          label: "Direct Sale Desk",
-          href: ROUTES.admin.billing,
-          icon: "billing",
-        },
-        {
-          label: "Direct Sale Register",
-          href: ROUTES.admin.billingDirectSales,
-          icon: "billing",
-        },
-        {
-          label: "Collect Direct-Sale Balance",
-          href: `${ROUTES.admin.paymentsCreate}?workflow=direct-sale`,
-          icon: "collections",
-        },
-        {
-          label: "Retail Invoices",
-          href: ROUTES.admin.billingInvoices,
-          icon: "billing",
-        },
-        {
-          label: "Retail Receipts",
-          href: ROUTES.admin.billingReceipts,
-          icon: "billing",
-        },
-        {
-          label: "Deliveries",
-          href: ROUTES.admin.deliveries,
-          icon: "deliveries",
-        },
-      ],
-    },
-    {
-      title: "Subscription Sale Workflow",
-      icon: "subscriptions",
-      items: [
-        {
-          label: "Subscription Register",
-          href: ROUTES.admin.subscriptions,
-          icon: "subscriptions",
-        },
-        {
-          label: "Create Subscription Sale",
-          href: ROUTES.admin.subscriptionsCreate,
-          icon: "subscriptions",
-        },
-        {
-          label: "Rent Contracts",
-          href: `${ROUTES.admin.subscriptions}?plan_type=RENT`,
-          icon: "subscriptions",
-        },
-        {
-          label: "Lease Contracts",
-          href: `${ROUTES.admin.subscriptions}?plan_type=LEASE`,
-          icon: "subscriptions",
-        },
-        {
-          label: "EMI Register",
-          href: ROUTES.admin.emis,
-          icon: "emis",
-        },
-        {
-          label: "Subscription Collections",
-          href: ROUTES.admin.collections,
-          icon: "collections",
-        },
-        {
-          label: "Collect Subscription Payment",
-          href: ROUTES.admin.paymentsCreate,
-          icon: "payments",
-        },
-        {
-          label: "Subscription Requests",
-          href: ROUTES.admin.subscriptionRequests,
-          icon: "subscriptions",
-        },
-        {
-          label: "Batches",
-          href: ROUTES.admin.batches,
-          icon: "batches",
-        },
-        {
-          label: "Reminders",
-          href: ROUTES.admin.reminders,
-          icon: "reminders",
-        },
-      ],
-    },
-    {
-      title: "Collections & Cash Desk",
-      icon: "collections",
-      items: [
-        {
-          label: "Collections Workspace",
-          href: ROUTES.admin.collections,
-          icon: "collections",
-        },
-        {
-          label: "Payment Register",
-          href: ROUTES.admin.payments,
-          icon: "payments",
-        },
-        {
-          label: "Overdue Advance EMIs",
-          href: ROUTES.admin.emisOverdue,
-          icon: "emis",
-        },
-        {
-          label: "Payment Reminders",
-          href: ROUTES.admin.remindersPaymentReminders,
-          icon: "reminders",
-        },
-        {
-          label: "Cash Counters",
-          href: ROUTES.admin.counters,
-          icon: "cashCounter",
-        },
-      ],
-    },
-    {
-      title: "Inventory & Supplier Purchases",
-      icon: "inventory",
-      items: [
-        {
-          label: "Inventory Overview",
-          href: ROUTES.admin.inventory,
-          icon: "inventory",
-        },
-        {
-          label: "Inventory Items",
-          href: ROUTES.admin.inventoryItems,
-          icon: "inventory",
-        },
-        {
-          label: "Stock On Hand",
-          href: ROUTES.admin.inventoryStockOnHand,
-          icon: "inventory",
-        },
-        {
-          label: "Stock Ledger",
-          href: ROUTES.admin.inventoryLedger,
-          icon: "reports",
-        },
-        {
-          label: "Purchase Bills",
-          href: ROUTES.admin.accountingPurchaseBills,
-          icon: "procurement",
-        },
-        {
-          label: "Suppliers",
-          href: ROUTES.admin.accountingVendors,
-          icon: "partners",
-        },
-        {
-          label: "Supplier Settlements",
-          href: ROUTES.admin.accountingVendorSettlements,
-          icon: "finance",
-        },
-      ],
-    },
-    {
-      title: "Finance & Ledger Control",
-      icon: "finance",
-      items: [
-        {
-          label: "Finance Control",
-          href: ROUTES.admin.finance,
-          icon: "finance",
-        },
-        {
-          label: "Accounting",
-          href: ROUTES.admin.accounting,
-          icon: "accounting",
-        },
-        {
-          label: "Cash Book",
-          href: ROUTES.admin.accountingBooksCash,
-          icon: "collections",
-        },
-        {
-          label: "Bank Book",
-          href: ROUTES.admin.accountingBooksBank,
-          icon: "payments",
-        },
-        {
-          label: "UPI Book",
-          href: ROUTES.admin.accountingBooksUpi,
-          icon: "payments",
-        },
-        {
-          label: "Reconciliation",
-          href: buildAdminReconciliationRoute(),
-          icon: "reconciliation",
-        },
-        {
-          label: "Commissions",
-          href: ROUTES.admin.financeCommissions,
-          icon: "commissions",
-        },
-        {
-          label: "Payout Batches",
-          href: ROUTES.admin.financePayoutBatches,
-          icon: "payoutBatches",
-        },
-      ],
-    },
-    {
-      title: "Products & Plans",
-      icon: "products",
-      items: [
-        {
-          label: "Product Catalog",
-          href: ROUTES.admin.products,
-          icon: "products",
-        },
-        {
-          label: "Manufacturing",
-          href: ROUTES.admin.manufacturing,
-          icon: "manufacturing",
-        },
-      ],
-    },
-    {
-      title: "Operational Governance",
-      icon: "branches",
-      items: [
-        {
-          label: "Branches",
-          href: ROUTES.admin.branches,
-          icon: "branches",
-        },
-        {
-          label: "Branch Reporting",
-          href: ROUTES.admin.branchReporting,
-          icon: "analytics",
-        },
-      ],
-    },
-    {
-      title: "Staff & Roles",
-      icon: "payroll",
-      items: [
-        {
-          label: "Users & Roles",
-          href: ROUTES.admin.settingsUsers,
-          icon: "settings",
-        },
-        {
-          label: "Staff Register",
-          href: ROUTES.admin.accountingStaff,
-          icon: "customers",
-        },
-        {
-          label: "Attendance",
-          href: ROUTES.admin.accountingAttendance,
-          icon: "reports",
-        },
-        {
-          label: "Payroll Register",
-          href: ROUTES.admin.accountingSalary,
-          icon: "payroll",
-        },
-        {
-          label: "Inventory Movements",
-          href: ROUTES.admin.inventoryMovements,
-          icon: "reports",
-        },
-        {
-          label: "Stock Adjustments",
-          href: ROUTES.admin.inventoryAdjustments,
-          icon: "reconciliation",
-        },
-        {
-          label: "Opening Stock Import",
-          href: ROUTES.admin.inventoryOpeningStock,
-          icon: "products",
-        },
-      ],
-    },
-    {
-      title: "Lucky Draws",
-      icon: "luckyDraws",
-      items: [
-        {
-          label: "Lucky IDs",
-          href: ROUTES.admin.luckyIds,
-          icon: "luckyIds",
-        },
-        {
-          label: "Lucky Draws",
-          href: ROUTES.admin.luckyDraws,
-          icon: "luckyDraws",
-        },
-      ],
-    },
-    {
-      title: "Reports & Analytics",
-      icon: "reports",
-      items: [
-        {
-          label: "Operational Reports",
-          href: ROUTES.admin.reports,
-          icon: "reports",
-        },
-        {
-          label: "Analytics",
-          href: ROUTES.admin.analytics,
-          icon: "analytics",
-        },
-      ],
-    },
-    {
-      title: "Audit & Settings",
-      icon: "governance",
-      items: [
-        {
-          label: "Audit Logs",
-          href: ROUTES.admin.auditLogs,
-          icon: "auditLogs",
-        },
-        {
-          label: "Settings & Controls",
-          href: ROUTES.admin.settings,
-          icon: "settings",
-        },
-        {
-          label: "Imports",
-          href: ROUTES.admin.settingsImports,
-          icon: "products",
-        },
-        {
-          label: "Master Registers",
-          href: ROUTES.admin.settingsMasters,
-          icon: "settings",
-        },
-      ],
-    },
-  ],
+  ADMIN: buildAdminNavigationGroups(),
 
   PARTNER: [
     {
-      title: "Overview",
+      title: "Dashboard",
       icon: "dashboard",
       items: [
         {
@@ -493,46 +171,30 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Customers",
+      title: "My Customers",
       icon: "customers",
       items: [
         {
-          label: "Customers",
+          label: "My Customers",
           href: ROUTES.partner.customers,
           icon: "customers",
         },
       ],
     },
     {
-      title: "Subscriptions",
-      icon: "subscriptions",
+      title: "Leads",
+      icon: "leads",
       items: [
         {
-          label: "Subscriptions",
-          href: ROUTES.partner.subscriptions,
-          icon: "subscriptions",
-        },
-      ],
-    },
-    {
-      title: "Collections",
-      icon: "collections",
-      items: [
-        {
-          label: "Collections",
-          href: ROUTES.partner.collections,
-          icon: "collections",
-        },
-        {
-          label: "Payments",
-          href: ROUTES.partner.payments,
-          icon: "payments",
+          label: "Leads",
+          href: ROUTES.partner.subscriptionRequests,
+          icon: "leads",
         },
       ],
     },
     {
       title: "Commissions",
-      icon: "commissions",
+      icon: "collections",
       items: [
         {
           label: "Commissions",
@@ -542,18 +204,46 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
+      title: "Payouts",
+      icon: "payoutBatches",
+      items: [
+        {
+          label: "Payouts",
+          href: ROUTES.partner.payouts,
+          icon: "payoutBatches",
+        },
+      ],
+    },
+    {
+      title: "Statements",
+      icon: "reports",
+      items: [
+        {
+          label: "Statements",
+          href: ROUTES.partner.reports,
+          icon: "reports",
+        },
+      ],
+    },
+    {
       title: "Support",
       icon: "support",
       items: [
         {
-          label: "Subscription Requests",
-          href: ROUTES.partner.subscriptionRequests,
+          label: "Support",
+          href: ROUTES.partner.notifications,
           icon: "support",
         },
+      ],
+    },
+    {
+      title: "Profile",
+      icon: "profile",
+      items: [
         {
-          label: "Reports",
-          href: ROUTES.partner.reports,
-          icon: "reports",
+          label: "Profile",
+          href: ROUTES.partner.dashboard,
+          icon: "profile",
         },
       ],
     },
@@ -572,35 +262,61 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "My Plan",
+      title: "My Contracts",
       icon: "subscriptions",
       items: [
         {
-          label: "Subscriptions",
+          label: "My Contracts",
           href: ROUTES.customer.subscriptions,
           icon: "subscriptions",
         },
       ],
     },
     {
-      title: "Payments",
+      title: "Payments & Receipts",
       icon: "payments",
       items: [
         {
-          label: "Payments",
+          label: "Payments & Receipts",
           href: ROUTES.customer.payments,
           icon: "payments",
         },
       ],
     },
     {
-      title: "Winner Status",
-      icon: "luckyDraws",
+      title: "Delivery",
+      icon: "deliveries",
       items: [
         {
-          label: "Plan Requests",
-          href: ROUTES.customer.subscriptionRequests,
+          label: "Delivery",
+          href: ROUTES.customer.deliveries,
+          icon: "deliveries",
+        },
+      ],
+    },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
+        {
+          label: "Support",
+          href: ROUTES.customer.support,
+          icon: "support",
+        },
+        {
+          label: "Returns / Service",
+          href: ROUTES.customer.support,
+          icon: "serviceDesk",
+        },
+        {
+          label: "Lucky Draw",
+          href: ROUTES.customer.subscriptions,
           icon: "luckyDraws",
+        },
+        {
+          label: "Notifications",
+          href: ROUTES.customer.notifications,
+          icon: "reminders",
         },
       ],
     },
@@ -615,22 +331,11 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
         },
       ],
     },
-    {
-      title: "Support",
-      icon: "support",
-      items: [
-        {
-          label: "Support",
-          href: ROUTES.customer.support,
-          icon: "support",
-        },
-      ],
-    },
   ],
 
   CASHIER: [
     {
-      title: "Dashboard",
+      title: "Cashier Dashboard",
       icon: "dashboard",
       items: [
         {
@@ -641,13 +346,39 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       ],
     },
     {
-      title: "Collection Workflows",
+      title: "Customer Search",
       icon: "cashCounter",
       items: [
         {
-          label: "Collect Subscription / Direct Sale",
+          label: "Customer Search",
           href: ROUTES.cashier.collect,
+          icon: "customers",
+        },
+      ],
+    },
+    {
+      title: "Collections",
+      icon: "collections",
+      items: [
+        {
+          label: "Collections",
+          href: `${ROUTES.cashier.collect}?workflow=unified`,
           icon: "collectPayment",
+        },
+        {
+          label: "Direct-Sale Collection",
+          href: `${ROUTES.cashier.collect}?workflow=direct-sale`,
+          icon: "billing",
+        },
+        {
+          label: "EMI Collection",
+          href: `${ROUTES.cashier.collect}?workflow=emi`,
+          icon: "emis",
+        },
+        {
+          label: "Rent / Lease Collection",
+          href: `${ROUTES.cashier.collect}?workflow=rent-lease`,
+          icon: "collections",
         },
       ],
     },
@@ -660,6 +391,68 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
           href: ROUTES.cashier.payments,
           icon: "payments",
         },
+        {
+          label: "Cash Closing",
+          href: ROUTES.cashier.payments,
+          icon: "cashCounter",
+        },
+      ],
+    },
+    {
+      title: "Support",
+      icon: "support",
+      items: [
+        {
+          label: "Notifications",
+          href: ROUTES.cashier.notifications,
+          icon: "reminders",
+        },
+      ],
+    },
+  ],
+  VENDOR: [
+    {
+      title: "Dashboard",
+      items: [{ label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." }],
+    },
+    {
+      title: "Quote Requests",
+      items: [{ label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." }],
+    },
+    {
+      title: "Purchase Orders",
+      items: [{ label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." }],
+    },
+    {
+      title: "Ledger",
+      items: [{ label: "Ledger", href: "/vendor/ledger", icon: "accounting", description: "Vendor ledger entries." }],
+    },
+    {
+      title: "Outstanding",
+      items: [{ label: "Outstanding", href: "/vendor/outstanding", icon: "finance", description: "Vendor outstanding balance." }],
+    },
+    {
+      title: "Purchase Returns",
+      items: [{ label: "Purchase Returns", href: "/vendor/purchase-returns", icon: "serviceDesk", description: "Purchase return visibility." }],
+    },
+    {
+      title: "Products",
+      items: [{ label: "Products", href: "/vendor/products", icon: "inventory", description: "Vendor product catalog." }],
+    },
+    {
+      title: "Documents",
+      items: [{ label: "Documents", href: "/vendor/documents", icon: "reports", description: "Vendor documents and uploads." }],
+    },
+    {
+      title: "Support",
+      items: [
+        { label: "Notifications", href: "/vendor/notifications", icon: "reminders", description: "Role-safe vendor alerts." },
+      ],
+    },
+    {
+      title: "Profile",
+      items: [
+        { label: "Profile", href: "/vendor/profile", icon: "crm", description: "Vendor profile and service areas." },
       ],
     },
   ],
@@ -670,6 +463,7 @@ export const navigationByRole: Record<NavigationRole, NavItem[]> = {
   PARTNER: flattenGroups(groupedNavigationByRole.PARTNER),
   CUSTOMER: flattenGroups(groupedNavigationByRole.CUSTOMER),
   CASHIER: flattenGroups(groupedNavigationByRole.CASHIER),
+  VENDOR: flattenGroups(groupedNavigationByRole.VENDOR),
 };
 
 export function normalizeRole(role: string | null | undefined): NavigationRole {
@@ -684,6 +478,8 @@ export function normalizeRole(role: string | null | undefined): NavigationRole {
       return "CUSTOMER";
     case "CASHIER":
       return "CASHIER";
+    case "VENDOR":
+      return "VENDOR";
     default:
       return "CUSTOMER";
   }

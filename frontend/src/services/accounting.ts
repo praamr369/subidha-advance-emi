@@ -35,6 +35,7 @@ export type FinanceAccount = {
   chart_account_name?: string;
   opening_balance: string;
   is_active: boolean;
+  is_real_settlement_account?: boolean;
   bank_last4?: string;
   upi_handle?: string;
   notes?: string;

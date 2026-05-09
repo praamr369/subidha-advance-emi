@@ -13,6 +13,7 @@ from api.v1.serializers.crm import (
     PartyInteractionSerializer,
     PartyInteractionStatusSerializer,
     PartyMasterListSerializer,
+    PartyMasterUpdateSerializer,
 )
 from crm.models import (
     PartyInteraction,
@@ -198,6 +199,19 @@ class PartyDirectoryDetailView(APIView):
             PartyMaster.objects.prefetch_related("links", "interactions"),
             pk=pk,
         )
+        return Response(build_party_detail_payload(party))
+
+    def patch(self, request, pk):
+        party = get_object_or_404(PartyMaster, pk=pk)
+        serializer = PartyMasterUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        updates = serializer.validated_data
+        if not updates:
+            return Response(build_party_detail_payload(party))
+
+        for field, value in updates.items():
+            setattr(party, field, value)
+        party.save(update_fields=[*updates.keys(), "updated_at"])
         return Response(build_party_detail_payload(party))
 
 

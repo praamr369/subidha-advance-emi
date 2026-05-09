@@ -2,11 +2,14 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.business_setup import (
     BusinessProfileSerializer,
     BusinessResetRequestSerializer,
     BusinessResetResponseSerializer,
+    DocumentNumberingStateSerializer,
+    DocumentNumberingUpdateSerializer,
     SetupChecklistSerializer,
 )
 from subscriptions.services.business_setup_service import (
@@ -16,8 +19,14 @@ from subscriptions.services.business_setup_service import (
 )
 from subscriptions.services.business_reset_service import (
     BusinessResetOptions,
+    RESET_CONFIRMATION,
     build_business_reset_plan,
     execute_business_reset,
+)
+from subscriptions.services.document_numbering_service import (
+    NUMBERING_BY_KEY,
+    get_document_numbering_state,
+    upsert_document_numbering,
 )
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
 
@@ -54,26 +63,59 @@ class BusinessSetupChecklistView(APIView):
         return Response(serializer.data)
 
 
+class BusinessSetupDocumentNumberingView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        payload = get_document_numbering_state()
+        serializer = DocumentNumberingStateSerializer(payload)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        serializer = DocumentNumberingUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = serializer.validated_data["key"]
+        current = get_document_numbering_state()
+        sequence_row = next((row for row in current["sequences"] if row["key"] == key), None)
+        if sequence_row is None:
+            return Response({"key": ["Unsupported numbering key."]}, status=status.HTTP_400_BAD_REQUEST)
+        spec = NUMBERING_BY_KEY[key]
+        try:
+            upsert_document_numbering(
+                key=key,
+                prefix=serializer.validated_data.get("prefix", sequence_row["prefix"]),
+                next_number=serializer.validated_data.get("next_number", sequence_row["next_number"]),
+                padding=serializer.validated_data.get("padding", sequence_row["padding"]),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc), "key": key, "series_code": spec.series_code}, status=status.HTTP_400_BAD_REQUEST)
+        payload = get_document_numbering_state()
+        return Response(DocumentNumberingStateSerializer(payload).data, status=status.HTTP_200_OK)
+
+
 class BusinessSetupResetPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
         preserve_username = (request.query_params.get("preserve_username") or "").strip()
-        if preserve_username:
-            options = BusinessResetOptions(
-                preserve_usernames=(preserve_username,),
-                preserve_superusers=False,
-                delete_non_preserved_users=True,
-                clear_auth_artifacts=True,
-            )
-            plan = build_business_reset_plan(options=options)
-        else:
-            plan = None
+        preserved_username = preserve_username or (request.user.username or "").strip()
+        options = BusinessResetOptions(
+            preserve_usernames=(preserved_username,),
+            preserve_superusers=False,
+            delete_non_preserved_users=True,
+            clear_auth_artifacts=True,
+        )
+        plan = build_business_reset_plan(options=options)
         return Response(
             {
                 "mode": "read_only_preview",
                 "business_setup_master_counts": get_reset_preview(),
                 "reset_plan": plan,
+                "warnings": [
+                    "Preview is dry-run only; no data is mutated.",
+                    "Real reset requires confirm=true and preserved admin username.",
+                ],
             }
         )
 
@@ -81,6 +123,7 @@ class BusinessSetupResetPreviewView(APIView):
 class BusinessSetupResetExecuteView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    @require_capability("business_setup.reset")
     def post(self, request):
         serializer = BusinessResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -89,7 +132,7 @@ class BusinessSetupResetExecuteView(APIView):
         delete_non_preserved_users = bool(serializer.validated_data["delete_non_preserved_users"])
         clear_auth_artifacts = bool(serializer.validated_data["clear_auth_artifacts"])
         dry_run = bool(serializer.validated_data["dry_run"])
-        confirm = serializer.validated_data["confirm"]
+        confirm = bool(serializer.validated_data["confirm"])
 
         # Extra safety: only the admin that will be preserved may execute the reset.
         # This prevents an admin from accidentally deleting the login they intend to keep.
@@ -107,10 +150,31 @@ class BusinessSetupResetExecuteView(APIView):
         )
 
         try:
-            payload = execute_business_reset(options=options, confirm=confirm, dry_run=dry_run)
+            payload = execute_business_reset(
+                options=options,
+                confirm=RESET_CONFIRMATION if confirm else "",
+                dry_run=dry_run,
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        response_serializer = BusinessResetResponseSerializer(payload)
-        response_serializer.is_valid(raise_exception=False)
+        payload["deleted_counts"] = {
+            "target_models": payload.get("targets", {}).get("model_count", 0),
+            "target_rows": payload.get("targets", {}).get("total_rows", 0),
+            "auth_artifact_models": payload.get("auth_artifacts", {}).get("model_count", 0),
+            "auth_artifact_rows": payload.get("auth_artifacts", {}).get("total_rows", 0),
+            "deletable_user_count": payload.get("deletable_user_count", 0),
+        }
+        payload["post_reset_checklist"] = compute_setup_checklist()
+        payload["next_setup_steps"] = [
+            "business profile",
+            "branch",
+            "cash desk/counter",
+            "finance accounts",
+            "chart of accounts mapping",
+            "staff",
+            "products",
+            "batch",
+        ]
+        response_serializer = BusinessResetResponseSerializer(instance=payload)
         return Response(response_serializer.data, status=status.HTTP_200_OK)

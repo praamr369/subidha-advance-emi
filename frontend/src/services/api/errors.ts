@@ -2,6 +2,8 @@ export type ApiError = {
   message: string;
   status?: number;
   details?: unknown;
+  fieldErrors?: Record<string, string[]>;
+  rawBodyPreview?: string;
 };
 
 function stripHtml(value: string): string {
@@ -36,6 +38,28 @@ function pickMessage(details: Record<string, unknown>): string | null {
 }
 
 export function normalizeApiError(error: unknown): ApiError {
+  if (
+    error &&
+    typeof error === "object" &&
+    "name" in error &&
+    (error as { name?: string }).name === "ApiError"
+  ) {
+    const typed = error as {
+      message?: string;
+      status?: number;
+      body?: unknown;
+      fieldErrors?: Record<string, string[]>;
+      rawBodyPreview?: string;
+    };
+    return {
+      message: (typed.message || "Request failed").trim() || "Request failed",
+      status: typeof typed.status === "number" ? typed.status : undefined,
+      details: typed.body,
+      fieldErrors: typed.fieldErrors,
+      rawBodyPreview: typed.rawBodyPreview,
+    };
+  }
+
   if (error instanceof Error) {
     const raw = error.message || "Request failed";
 

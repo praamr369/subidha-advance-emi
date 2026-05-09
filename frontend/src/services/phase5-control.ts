@@ -19,6 +19,18 @@ export async function getAdminAccountingControlCenter(query?: Query) {
 export async function getAdminOperationsCommandCenter(query?: Query) {
   return request(`/admin/operations/command-center/${toQuery(query)}`);
 }
+export async function getAdminOperationsQueueSummary() {
+  return request(`/admin/operations/queue-summary/`);
+}
+export async function getAdminOperationsRequestQueues() {
+  return request(`/admin/operations/request-queues/`);
+}
+export async function getAdminPartnerOperationsSummary() {
+  return request(`/admin/partner-operations/summary/`);
+}
+export async function getAdminPartnerPaymentRequests() {
+  return request(`/admin/partner-payment-requests/`);
+}
 export async function getAdminReportExecutiveSummary(query?: Query) {
   return request(`/admin/reports/executive-summary/${toQuery(query)}`);
 }

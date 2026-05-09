@@ -1,5 +1,10 @@
+import hashlib
+import json
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
+from django.http import Http404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,11 +22,13 @@ from billing.models import (
     ReceiptDocument,
 )
 from accounting.services.books_service import build_cash_book, build_daily_billing_book
+from billing.services.direct_sale_finalize_response import build_finalize_invoice_api_response
 from billing.services.billing_service import (
     approve_billing_credit_note,
     approve_billing_debit_note,
     approve_billing_invoice,
     confirm_direct_sale,
+    finalize_direct_sale_invoice,
     generate_emi_payment_receipt,
     mark_direct_sale_delivered,
     post_billing_credit_note,
@@ -30,10 +37,15 @@ from billing.services.billing_service import (
     void_receipt_document,
 )
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
+from subscriptions.services.operational_cancellation_service import (
+    cancel_billing_invoice,
+    cancel_direct_sale,
+)
 from billing.services.billing_sync_service import (
     sync_payment_into_billing,
     sync_subscription_billing_profile,
 )
+from subscriptions.services.document_numbering_service import get_document_numbering_state
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting_phase3 import AccountingBookQuerySerializer
 from api.v1.serializers.billing import (
@@ -53,6 +65,30 @@ from api.v1.serializers.billing import (
     ReceiptDocumentSerializer,
     ReceiptVoidSerializer,
 )
+from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
+
+
+def _raise_direct_sale_finalize_blocked(message: str) -> None:
+    m = (message or "").lower()
+    hints: list[str] = []
+    if any(x in m for x in ("number", "series", "document", "invoice numbering")):
+        hints.append("OPEN_DOCUMENT_NUMBERING_SETTINGS")
+    if "line" in m or "product" in m:
+        hints.append("EDIT_DIRECT_SALE_LINES")
+    if "customer" in m or "snapshot" in m or "gst" in m or "place of supply" in m:
+        hints.append("EDIT_DIRECT_SALE_OR_CUSTOMER")
+    if "finance_account" in m or "chart" in m or "ledger" in m or "journal" in m:
+        hints.append("OPEN_ACCOUNTING_SETUP")
+    if not hints:
+        hints.append("REVIEW_ERROR_DETAIL")
+    raise ValidationError(
+        {
+            "code": "DIRECT_SALE_FINALIZE_BLOCKED",
+            "detail": message,
+            "blocking_reasons": [message],
+            "next_actions": hints,
+        }
+    )
 
 
 class AdminBillingModelViewSet(viewsets.ModelViewSet):
@@ -75,6 +111,79 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
     search_fields = ["sale_no", "customer_name_snapshot", "customer_phone_snapshot", "delivery_reference"]
     ordering_fields = ["sale_date", "created_at", "sale_no"]
     ordering = ["-sale_date", "-created_at", "-id"]
+
+    def _idempotency_key(self, request):
+        key = (
+            request.headers.get("Idempotency-Key")
+            or request.headers.get("X-Idempotency-Key")
+            or ""
+        ).strip()
+        return key
+
+    def _request_payload_hash(self, request):
+        payload = json.dumps(request.data, sort_keys=True, default=str, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _idempotent_response(self, sale):
+        payload = DirectSaleSerializer(sale, context=self.get_serializer_context())
+        return Response(payload.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        numbering = get_document_numbering_state()
+        if not numbering["checks"]["direct_sale_invoice_numbering_configured"]:
+            raise ValidationError(
+                {
+                    "detail": "Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.",
+                    "numbering_key": "DIRECT_SALE_INVOICE",
+                }
+            )
+        idempotency_key = self._idempotency_key(request)
+        payload_hash = self._request_payload_hash(request) if idempotency_key else ""
+        if idempotency_key:
+            sale = DirectSale.objects.filter(idempotency_key=idempotency_key).first()
+            if sale:
+                if sale.idempotency_payload_hash != payload_hash:
+                    return Response(
+                        {"detail": "Idempotency-Key was already used with a different direct-sale payload."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                return self._idempotent_response(sale)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                save_kwargs = (
+                    {
+                        "idempotency_key": idempotency_key,
+                        "idempotency_payload_hash": payload_hash,
+                    }
+                    if idempotency_key
+                    else {}
+                )
+                sale = serializer.save(**save_kwargs)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        except DjangoValidationError as exc:
+            if getattr(exc, "message_dict", None):
+                raise ValidationError(exc.message_dict) from exc
+            if getattr(exc, "messages", None):
+                raise ValidationError({"detail": exc.messages}) from exc
+            raise ValidationError({"detail": str(exc)}) from exc
+        except IntegrityError:
+            if idempotency_key:
+                sale = DirectSale.objects.filter(idempotency_key=idempotency_key).first()
+                if sale and sale.idempotency_payload_hash == payload_hash:
+                    return self._idempotent_response(sale)
+            raise
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            DirectSaleSerializer(sale, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -104,6 +213,10 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             return DirectSaleDeliveredSerializer
         if self.action == "collect_payment":
             return DirectSaleCollectionSerializer
+        if self.action == "finalize_invoice":
+            return EmptyBillingActionSerializer
+        if self.action == "cancel_sale":
+            return OperationalCancellationActionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="confirm")
@@ -137,6 +250,7 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="collect")
     def collect_payment(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -151,6 +265,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                 reference_no=serializer.validated_data.get("reference_no"),
                 notes=serializer.validated_data.get("notes"),
             )
+        except DirectSale.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
 
@@ -173,6 +289,56 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
                 "outstanding_after": str(result["outstanding_after"]),
             },
             status=status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_sale(self, request, pk=None):
+        self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = cancel_direct_sale(
+                direct_sale_id=int(pk),
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                internal_note=serializer.validated_data.get("internal_note", ""),
+                reversal_policy=serializer.validated_data.get("reversal_policy", "NONE"),
+            )
+        except DirectSale.DoesNotExist as exc:
+            raise ValidationError({"direct_sale_id": ["Direct sale not found."]}) from exc
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", None) or {"detail": exc.messages or str(exc)}) from exc
+        sale = DirectSale.objects.get(pk=int(pk))
+        return Response(
+            {
+                "updated": True,
+                "result": result,
+                "direct_sale": DirectSaleSerializer(sale, context=self.get_serializer_context()).data,
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="finalize-invoice")
+    def finalize_invoice(self, request, pk=None):
+        self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            sale, updated = finalize_direct_sale_invoice(
+                direct_sale_id=int(pk),
+                finalized_by=request.user,
+            )
+        except DirectSale.DoesNotExist as exc:
+            raise Http404 from exc
+        except ValueError as exc:
+            _raise_direct_sale_finalize_blocked(str(exc))
+        return Response(
+            build_finalize_invoice_api_response(
+                sale=sale, updated=updated, request=request
+            )
         )
 
 
@@ -222,25 +388,61 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
     def get_serializer_class(self):
         if self.action in {"approve", "post_invoice"}:
             return EmptyBillingActionSerializer
+        if self.action == "cancel_invoice":
+            return OperationalCancellationActionSerializer
         return super().get_serializer_class()
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             invoice, updated = approve_billing_invoice(invoice_id=int(pk), approved_by=request.user)
+        except BillingInvoice.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())
         return Response({"updated": updated, "invoice": payload.data})
 
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_invoice(self, request, pk=None):
+        self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = cancel_billing_invoice(
+                invoice_id=int(pk),
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+                internal_note=serializer.validated_data.get("internal_note", ""),
+                reversal_policy=serializer.validated_data.get("reversal_policy", "NONE"),
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", None) or {"detail": exc.messages or str(exc)}) from exc
+        invoice = BillingInvoice.objects.get(pk=int(pk))
+        return Response(
+            {
+                "updated": True,
+                "result": result,
+                "invoice": BillingInvoiceSerializer(invoice, context=self.get_serializer_context()).data,
+            }
+        )
+
     @action(detail=True, methods=["post"], url_path="post")
     def post_invoice(self, request, pk=None):
+        self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             invoice, updated = post_billing_invoice(invoice_id=int(pk), posted_by=request.user)
+        except BillingInvoice.DoesNotExist as exc:
+            raise Http404 from exc
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())
@@ -394,7 +596,7 @@ class ReceiptDocumentViewSet(AdminBillingModelViewSet):
         return queryset
 
     def get_serializer_class(self):
-        if self.action == "void_document":
+        if self.action in {"void_document", "reverse_document"}:
             return ReceiptVoidSerializer
         return super().get_serializer_class()
 
@@ -412,6 +614,11 @@ class ReceiptDocumentViewSet(AdminBillingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = ReceiptDocumentSerializer(receipt, context=self.get_serializer_context())
         return Response({"updated": updated, "receipt": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="reverse")
+    def reverse_document(self, request, pk=None):
+        """Alias to preserve admin-facing reverse wording for receipt cancellation."""
+        return self.void_document(request, pk=pk)
 
 
 class BillingProfileViewSet(AdminBillingReadOnlyViewSet):
@@ -598,3 +805,21 @@ class BillingCashBookView(APIView):
             **serializer.validated_data,
         )
         return Response(payload)
+
+
+class AdminDirectSaleFinalizeInvoiceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        serializer = EmptyBillingActionSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        try:
+            sale, updated = finalize_direct_sale_invoice(
+                direct_sale_id=int(pk),
+                finalized_by=request.user,
+            )
+        except DirectSale.DoesNotExist as exc:
+            raise Http404 from exc
+        except ValueError as exc:
+            _raise_direct_sale_finalize_blocked(str(exc))
+        return Response(build_finalize_invoice_api_response(sale=sale, updated=updated, request=request))

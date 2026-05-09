@@ -20,7 +20,9 @@ test("phase-3 admin accounting, inventory, billing, and reminders pages load", a
   await expect(page.getByRole("heading", { name: "Stock On Hand" }).last()).toBeVisible();
 
   await page.goto("/admin/inventory/opening-stock");
-  await expect(page.getByRole("heading", { name: "Opening Stock Import" }).last()).toBeVisible();
+  await expect(
+    page.locator("#main-content").getByRole("heading", { name: /^Opening Stock$/ })
+  ).toBeVisible();
 
   await page.goto("/admin/billing/receipts");
   await expect(page.getByRole("heading", { name: "Receipt Register" })).toBeVisible();

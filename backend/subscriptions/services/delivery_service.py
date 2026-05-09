@@ -11,6 +11,7 @@ from django.utils.crypto import get_random_string
 
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     DeliveryStatus,
     FulfillmentStatus,
     MONEY_ZERO,
@@ -18,6 +19,7 @@ from subscriptions.models import (
     SubscriptionDelivery,
     q2,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.audit_service import log_audit
 
 
@@ -348,6 +350,20 @@ def create_subscription_delivery(
             "scheduled_date": _date(delivery.scheduled_date),
         },
     )
+    append_business_event(
+        event_type=BusinessEventType.DELIVERY_CREATED,
+        source_module="subscriptions.services.delivery_service.create_subscription_delivery",
+        actor_user=performed_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "delivery_id": delivery.id,
+            "status": delivery.status,
+            "delivery_reference": delivery.delivery_reference,
+        },
+    )
 
     return delivery
 
@@ -397,6 +413,22 @@ def update_subscription_delivery_metadata(
         performed_by=performed_by,
         metadata={"changed_fields": changed_fields},
     )
+    if next_status == DeliveryStatus.DELIVERED:
+        append_business_event(
+            event_type=BusinessEventType.DELIVERY_COMPLETED,
+            source_module="subscriptions.services.delivery_service.transition_subscription_delivery_status",
+            actor_user=performed_by,
+            customer=delivery.subscription.customer,
+            subscription=delivery.subscription,
+            batch=delivery.subscription.batch,
+            lucky_id=delivery.subscription.lucky_id,
+            payload={
+                "delivery_id": delivery.id,
+                "delivery_reference": delivery.delivery_reference,
+                "old_status": previous_status,
+                "new_status": next_status,
+            },
+        )
 
     return delivery
 

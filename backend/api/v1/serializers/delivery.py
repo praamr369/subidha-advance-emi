@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from billing.models import DirectSale, DirectSaleStatus
+from billing.services.direct_sale_delivery_bridge_service import compute_direct_sale_delivery_snapshot
+from inventory.services.demand_planning_service import stock_status_for_delivery
 from subscriptions.models import DeliveryStatus, PlanType, Subscription, SubscriptionDelivery
 from subscriptions.services.delivery_service import (
     build_subscription_delivery_summary,
@@ -27,6 +30,8 @@ class _BaseSubscriptionDeliveryReadSerializer(serializers.ModelSerializer):
     )
     is_terminal = serializers.SerializerMethodField()
     is_active_delivery = serializers.SerializerMethodField()
+    inventory_stock_status = serializers.SerializerMethodField()
+    inventory_available_qty = serializers.SerializerMethodField()
 
     def get_subscription_number(self, obj):
         return f"SUB-{obj.subscription_id}" if obj.subscription_id else None
@@ -36,6 +41,20 @@ class _BaseSubscriptionDeliveryReadSerializer(serializers.ModelSerializer):
 
     def get_is_active_delivery(self, obj):
         return obj.is_active_delivery
+
+    def get_inventory_stock_status(self, obj):
+        try:
+            payload = stock_status_for_delivery(product_id=obj.subscription.product_id)
+            return payload["status"]
+        except Exception:
+            return "not available"
+
+    def get_inventory_available_qty(self, obj):
+        try:
+            payload = stock_status_for_delivery(product_id=obj.subscription.product_id)
+            return payload["available"]
+        except Exception:
+            return "0.000"
 
 
 class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSerializer):
@@ -87,6 +106,8 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "fulfillment_status",
             "is_terminal",
             "is_active_delivery",
+            "inventory_stock_status",
+            "inventory_available_qty",
         )
         read_only_fields = fields
 
@@ -129,6 +150,8 @@ class CustomerSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSe
             "fulfillment_status",
             "is_terminal",
             "is_active_delivery",
+            "inventory_stock_status",
+            "inventory_available_qty",
         )
         read_only_fields = fields
 
@@ -141,7 +164,14 @@ class AdminSubscriptionDeliveryCreateSerializer(serializers.Serializer):
             "batch",
             "partner",
             "lucky_id",
-        ).all()
+        ).all(),
+        required=False,
+        allow_null=True,
+    )
+    direct_sale = serializers.PrimaryKeyRelatedField(
+        queryset=DirectSale.objects.select_related("customer").prefetch_related("lines").all(),
+        required=False,
+        allow_null=True,
     )
     status = serializers.ChoiceField(
         choices=[
@@ -162,6 +192,24 @@ class AdminSubscriptionDeliveryCreateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
+        subscription = attrs.get("subscription")
+        direct_sale = attrs.get("direct_sale")
+        if bool(subscription) == bool(direct_sale):
+            raise serializers.ValidationError(
+                {"detail": "Provide exactly one of subscription or direct_sale."}
+            )
+
+        if direct_sale is not None:
+            if direct_sale.status == DirectSaleStatus.CANCELLED:
+                raise serializers.ValidationError({"direct_sale": "Cancelled direct sales cannot open delivery tracking."})
+            if not direct_sale.delivery_required:
+                raise serializers.ValidationError(
+                    {
+                        "direct_sale": "Delivery is not enabled on this sale. Turn on delivery_required on the sale before opening service-desk tracking."
+                    }
+                )
+            return attrs
+
         status = attrs.get("status", DeliveryStatus.PENDING)
         scheduled_date = attrs.get("scheduled_date")
         if status == DeliveryStatus.SCHEDULED and not scheduled_date:
@@ -264,3 +312,80 @@ class AdminDeliverySourceSubscriptionsQuerySerializer(serializers.Serializer):
         choices=list(PlanType.values),
     )
     limit = serializers.IntegerField(required=False, min_value=1, max_value=50)
+
+
+class AdminDeliveryDirectSaleSourcesQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=50)
+
+
+class AdminDeliveryDirectSaleSourceSerializer(serializers.ModelSerializer):
+    billing_invoice_id = serializers.SerializerMethodField()
+    invoice_document_no = serializers.SerializerMethodField()
+    invoice_status = serializers.SerializerMethodField()
+    delivery_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DirectSale
+        fields = (
+            "id",
+            "sale_no",
+            "status",
+            "delivery_required",
+            "customer_id",
+            "customer_name_snapshot",
+            "customer_phone_snapshot",
+            "delivery_snapshot_address_line1",
+            "delivery_snapshot_address_line2",
+            "delivery_snapshot_city",
+            "delivery_snapshot_district",
+            "delivery_snapshot_state",
+            "delivery_snapshot_pincode",
+            "grand_total",
+            "received_total",
+            "balance_total",
+            "delivered_at",
+            "billing_invoice_id",
+            "invoice_document_no",
+            "invoice_status",
+            "delivery_preview",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def _latest_invoice(self, obj: DirectSale):
+        if hasattr(obj, "_latest_invoice_cache"):
+            return obj._latest_invoice_cache
+        latest = obj.billing_invoices.order_by("-id").first()
+        obj._latest_invoice_cache = latest
+        return latest
+
+    def get_billing_invoice_id(self, obj):
+        latest = self._latest_invoice(obj)
+        return getattr(latest, "id", None)
+
+    def get_invoice_document_no(self, obj):
+        latest = self._latest_invoice(obj)
+        return getattr(latest, "document_no", None)
+
+    def get_invoice_status(self, obj):
+        latest = self._latest_invoice(obj)
+        return getattr(latest, "status", None)
+
+    def get_delivery_preview(self, obj):
+        snap = compute_direct_sale_delivery_snapshot(sale=obj)
+        return {
+            "phase_code": snap["phase_code"],
+            "phase_label": snap["phase_label"],
+            "payment_state": snap["payment_state"],
+            "invoice_state": snap["invoice_state"],
+            "stock_blocked": snap["stock_blocked"],
+        }
+
+
+class AdminDeliveryDirectSalePrefillPayloadSerializer(serializers.Serializer):
+    source = AdminDeliveryDirectSaleSourceSerializer()
+    defaults = serializers.DictField(child=serializers.CharField(allow_blank=True), required=True)
+
+    def validate_defaults(self, value: dict) -> dict:
+        return dict(value or {})

@@ -14,18 +14,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CardSkeleton } from "@/components/feedback/Skeleton";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
+import {
+  DataTableShell,
+  DetailPanel,
+  KpiCard,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import StatusBadge from "@/components/ui/status-badge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
   getCustomerProfile,
+  changeCustomerUsername,
+  getCustomerDirectSaleSummary,
+  listCustomerPayments,
   updateCustomerProfile,
+  type CustomerPayment,
   type CustomerProfileResponse,
 } from "@/services/customer";
 import { listCustomerSubscriptionsRegister } from "@/services/customer/paginated-subscriptions";
@@ -37,9 +48,18 @@ import {
   type CustomerKycDocumentRecord,
   type CustomerReferralRecord,
 } from "@/services/customer/index";
+import { initialsFromDisplayName } from "@/lib/display-name";
+import { useLogout } from "@/hooks/useLogout";
 
 function money(value: string | number): string {
   return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString();
 }
 
 function toErrorMessage(error: unknown): string {
@@ -80,6 +100,7 @@ function noticeToneForKyc(
 }
 
 export default function CustomerProfilePage() {
+  const { logout, isLoggingOut } = useLogout();
   const [data, setData] = useState<CustomerProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -117,6 +138,16 @@ export default function CustomerProfilePage() {
   const [referrals, setReferrals] = useState<CustomerReferralRecord[]>([]);
   const [referralCount, setReferralCount] = useState(0);
   const [referralError, setReferralError] = useState<string | null>(null);
+  const [directSaleSummary, setDirectSaleSummary] =
+    useState<Awaited<ReturnType<typeof getCustomerDirectSaleSummary>> | null>(null);
+  const [directSaleError, setDirectSaleError] = useState<string | null>(null);
+  const [paymentPreview, setPaymentPreview] = useState<CustomerPayment[]>([]);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
 
   function hydrate(payload: CustomerProfileResponse) {
     setData(payload);
@@ -134,16 +165,48 @@ export default function CustomerProfilePage() {
     }
   }
 
+  const reloadDirectSaleSummary = useCallback(async () => {
+    try {
+      const summary = await getCustomerDirectSaleSummary();
+      setDirectSaleSummary(summary);
+      setDirectSaleError(null);
+    } catch (err) {
+      setDirectSaleSummary(null);
+      setDirectSaleError(toErrorMessage(err));
+    }
+  }, []);
+
+  const reloadPaymentsPreview = useCallback(async () => {
+    try {
+      const payload = await listCustomerPayments();
+      setPaymentPreview((payload.results ?? []).slice(0, 5));
+      setPaymentError(null);
+    } catch (err) {
+      setPaymentPreview([]);
+      setPaymentError(toErrorMessage(err));
+    }
+  }, []);
+
   const loadPage = useCallback(async () => {
     setLoading(true);
+    setPaymentError(null);
+    setDirectSaleError(null);
     try {
-      const [profileResult, subscriptionsResult, kycResult, referralResult] =
-        await Promise.allSettled([
-          getCustomerProfile(),
-          listCustomerSubscriptionsRegister({ page: 1, pageSize: 4 }),
-          listCustomerKycDocuments(),
-          listCustomerReferrals(),
-        ]);
+      const [
+        profileResult,
+        subscriptionsResult,
+        kycResult,
+        referralResult,
+        directSaleResult,
+        paymentsResult,
+      ] = await Promise.allSettled([
+        getCustomerProfile(),
+        listCustomerSubscriptionsRegister({ page: 1, pageSize: 4 }),
+        listCustomerKycDocuments(),
+        listCustomerReferrals(),
+        getCustomerDirectSaleSummary(),
+        listCustomerPayments(),
+      ]);
 
       if (profileResult.status === "rejected") {
         throw profileResult.reason;
@@ -174,11 +237,31 @@ export default function CustomerProfilePage() {
         setReferrals([]);
         setReferralError("Referral data temporarily unavailable.");
       }
+
+      if (directSaleResult.status === "fulfilled") {
+        setDirectSaleSummary(directSaleResult.value);
+        setDirectSaleError(null);
+      } else {
+        setDirectSaleSummary(null);
+        setDirectSaleError(toErrorMessage(directSaleResult.reason));
+      }
+
+      if (paymentsResult.status === "fulfilled") {
+        setPaymentPreview((paymentsResult.value.results ?? []).slice(0, 5));
+        setPaymentError(null);
+      } else {
+        setPaymentPreview([]);
+        setPaymentError(toErrorMessage(paymentsResult.reason));
+      }
     } catch (err) {
       setError(toErrorMessage(err));
       setData(null);
       setProductRows([]);
       setProductError(null);
+      setDirectSaleSummary(null);
+      setDirectSaleError(null);
+      setPaymentPreview([]);
+      setPaymentError(null);
     } finally {
       setLoading(false);
     }
@@ -282,6 +365,34 @@ export default function CustomerProfilePage() {
     }
   }
 
+  async function handleUsernameSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUsernameSaving(true);
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    try {
+      const response = await changeCustomerUsername({
+        new_username: newUsername.trim(),
+        current_password: currentPassword,
+      });
+      if (response.changed && response.requires_relogin) {
+        setUsernameSuccess("Username changed. Please sign in again.");
+        setCurrentPassword("");
+        setTimeout(() => {
+          void logout();
+        }, 1200);
+        return;
+      }
+      setUsernameSuccess("Username updated.");
+      setCurrentPassword("");
+      await loadPage();
+    } catch (err) {
+      setUsernameError(toErrorMessage(err));
+    } finally {
+      setUsernameSaving(false);
+    }
+  }
+
   const selfServiceLanes = [
     {
       title: "Subscriptions",
@@ -348,7 +459,15 @@ export default function CustomerProfilePage() {
         tone: noticeToneForKyc(data?.kyc_status),
       }}
     >
-      {loading ? <LoadingBlock label="Loading profile workspace..." /> : null}
+      {loading ? (
+        <div aria-busy="true" aria-label="Loading profile workspace">
+          <div className="space-y-6" aria-hidden="true">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        </div>
+      ) : null}
 
       {!loading && error && !data ? (
         <ErrorState
@@ -359,17 +478,35 @@ export default function CustomerProfilePage() {
       ) : null}
 
       {!loading && !error && data ? (
-        <div className="space-y-6">
+        <div className="space-y-6" aria-busy="false">
           <ControlLaneGrid
             title="Self-service lanes"
             description="Use the current customer-safe workspace routes without crossing into internal branch or finance controls."
             lanes={selfServiceLanes}
           />
 
-          <WorkspaceSection
+          {headerStats.length > 0 ? (
+            <DetailPanel
+              title="At a glance"
+              description="Figures below come from your live profile summary; they mirror the header stats from the same API response."
+            >
+              <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
+                {headerStats.map((stat) => (
+                  <KpiCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                  />
+                ))}
+              </QuickActionGrid>
+            </DetailPanel>
+          ) : null}
+
+          <DetailPanel
             title="Account identity"
             description="Core customer identity and KYC posture from your live profile record."
-            action={
+          >
+            <div className="mb-4 flex justify-end">
               <ActionButton
                 variant="outline"
                 onClick={() => void loadPage()}
@@ -377,8 +514,7 @@ export default function CustomerProfilePage() {
               >
                 Refresh
               </ActionButton>
-            }
-          >
+            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <DetailItem label="Username" value={data.username} />
               <DetailItem
@@ -390,6 +526,166 @@ export default function CustomerProfilePage() {
               <DetailItem label="City" value={data.city || "—"} />
               <DetailItem label="Address" value={data.address || "No address recorded"} />
             </div>
+          </DetailPanel>
+
+          <WorkspaceSection
+            title="Change username"
+            description="Username is only your login identifier. Your customer ID, subscriptions, invoices, receipts, payments, and audit trail remain unchanged."
+          >
+            {usernameError ? (
+              <WorkspaceNotice tone="danger" title="Unable to change username">
+                {usernameError}
+              </WorkspaceNotice>
+            ) : null}
+            {usernameSuccess ? (
+              <WorkspaceNotice tone="success" title="Username changed">
+                {usernameSuccess}
+              </WorkspaceNotice>
+            ) : null}
+            <form onSubmit={handleUsernameSubmit} className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">New username</label>
+                <input
+                  value={newUsername}
+                  onChange={(event) => setNewUsername(event.target.value)}
+                  placeholder="letters, numbers, dots, underscores, hyphens"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Current password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={usernameSaving || isLoggingOut}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {usernameSaving ? "Updating username..." : "Change Username"}
+                </button>
+              </div>
+            </form>
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="EMI subscriptions & rent/lease contracts"
+            description="Lucky Plan EMI contracts stay distinct from retail invoices and receipts."
+            action={
+              <ActionButton href="/customer/subscriptions" variant="outline">
+                View all subscriptions
+              </ActionButton>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Active EMI subscriptions</div>
+                <div className="mt-1 font-semibold">{data.summary.active_subscriptions ?? 0}</div>
+              </div>
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Rent / lease contracts (recent)</div>
+                <div className="mt-1 font-semibold">
+                  {
+                    productRows.filter((row) =>
+                      ["RENT", "LEASE"].includes((row.plan_type || "").toUpperCase()),
+                    ).length
+                  }
+                </div>
+              </div>
+              <div className="rounded-xl border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground">Linked EMI highlights</div>
+                <div className="mt-1 font-semibold">{productRows.length} shown</div>
+              </div>
+            </div>
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="Direct-sale invoices"
+            description="Counts include only invoiced retail bills linked to your customer profile (walk-in snapshots matched by phone alone never appear here)."
+            action={
+              <ActionButton href="/customer/direct-sales" variant="outline">
+                View all direct sales
+              </ActionButton>
+            }
+          >
+            {directSaleError ? (
+              <div className="space-y-3">
+                <WorkspaceNotice tone="warning" title="Direct-sale summary unavailable">
+                  {directSaleError}
+                </WorkspaceNotice>
+                <ActionButton variant="outline" onClick={() => void reloadDirectSaleSummary()}>
+                  Retry direct-sale summary
+                </ActionButton>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-border p-3 text-sm">
+                  <div className="text-xs text-muted-foreground">Direct-sale invoices</div>
+                  <div className="mt-1 font-semibold">
+                    {directSaleSummary?.total_direct_sale_invoices ?? 0}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border p-3 text-sm">
+                  <div className="text-xs text-muted-foreground">Outstanding dues</div>
+                  <div className="mt-1 font-semibold">
+                    {money(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </WorkspaceSection>
+
+          <WorkspaceSection
+            title="Receipts & EMI payments"
+            description="Recorded Lucky Plan EMI payments and receipts linked to your authenticated profile."
+            action={
+              <ActionButton href="/customer/payments" variant="outline">
+                View all payments
+              </ActionButton>
+            }
+          >
+            {paymentError ? (
+              <div className="space-y-3">
+                <WorkspaceNotice tone="warning" title="Payment history unavailable">
+                  {paymentError}
+                </WorkspaceNotice>
+                <ActionButton variant="outline" onClick={() => void reloadPaymentsPreview()}>
+                  Retry payments
+                </ActionButton>
+              </div>
+            ) : paymentPreview.length === 0 ? (
+              <EmptyState
+                title="No payments shown yet"
+                description="Payments appear once EMI receipts post against your subscriptions."
+              />
+            ) : (
+              <div className="space-y-3">
+                {paymentPreview.map((pay) => (
+                  <div
+                    key={pay.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <div className="font-medium text-foreground">
+                        {pay.subscription_number || `SUB-${pay.subscription ?? ""}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {pay.payment_date || pay.paid_at || "—"} ·{" "}
+                        {pay.subscription_plan_type || "EMI"}
+                      </div>
+                    </div>
+                    <div className="font-semibold tabular-nums">{money(String(pay.amount))}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </WorkspaceSection>
 
           <WorkspaceSection
@@ -528,23 +824,17 @@ export default function CustomerProfilePage() {
                 {photoSuccess}
               </WorkspaceNotice>
             )}
-            {photoUrl ? (
-              <div className="flex items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoUrl}
-                  alt="Profile photo"
-                  className="h-20 w-20 rounded-full border border-border object-cover"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Profile photo is set. You can upload a new one to replace it.
-                </p>
-              </div>
-            ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar className="size-20 rounded-full border-border">
+                {photoUrl ? <AvatarImage src={photoUrl} alt="Profile photo" className="rounded-full object-cover" /> : null}
+                <AvatarFallback className="rounded-full text-lg">{initialsFromDisplayName(name || data?.name || "?")}</AvatarFallback>
+              </Avatar>
               <p className="text-sm text-muted-foreground">
-                No profile photo uploaded. Click &ldquo;Upload photo&rdquo; to add one.
+                {photoUrl
+                  ? "Profile photo is set. You can upload a new one to replace it."
+                  : 'No profile photo uploaded. Click "Upload photo" to add one.'}
               </p>
-            )}
+            </div>
           </WorkspaceSection>
 
           {/* Phase 1 – KYC Documents */}
@@ -714,6 +1004,74 @@ export default function CustomerProfilePage() {
           </WorkspaceSection>
 
           <WorkspaceSection
+            title="Lucky draw verification (your records)"
+            description="Only your own winner/waiver records are shown here from authenticated profile data."
+          >
+            {(data.summary.lucky_plan_draw?.length ?? 0) > 0 ? (
+              <DataTableShell>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Subscription
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Draw
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Verification
+                        </th>
+                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Waiver
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.summary.lucky_plan_draw || []).map((draw) => (
+                        <tr key={`${draw.subscription_id}-${draw.draw_month || 0}`}>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            SUB-{draw.subscription_id}
+                            <div className="text-xs text-muted-foreground">
+                              Batch {draw.batch_code || "—"} · Lucky #
+                              {draw.winner_lucky_number != null
+                                ? String(draw.winner_lucky_number).padStart(2, "0")
+                                : "—"}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            Month {draw.draw_month ?? "—"}
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(draw.revealed_at || draw.draw_date || null)}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            <StatusBadge status={draw.verification_status || "UNKNOWN"} hideIcon />
+                            <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                              {draw.public_commit_hash || "—"}
+                            </div>
+                          </td>
+                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                            {draw.waived_emi_count ?? 0} EMI
+                            <div className="text-xs text-muted-foreground">
+                              {money(draw.waived_amount || 0)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            ) : (
+              <EmptyState
+                title="No winner draw records yet"
+                description="When your own subscription receives winner waiver events, verification and waiver details appear here."
+              />
+            )}
+          </WorkspaceSection>
+
+          <WorkspaceSection
             title="Recent linked products"
             description="Latest subscription-linked product surfaces from your own customer workspace."
             action={
@@ -729,16 +1087,18 @@ export default function CustomerProfilePage() {
             ) : null}
 
             {productRows.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-2">
-                {productRows.map((subscription) => (
-                  <CustomerProductSummaryCard
-                    key={subscription.id}
-                    subscription={subscription}
-                    href={`/customer/subscriptions/${subscription.id}`}
-                    compact
-                  />
-                ))}
-              </div>
+              <DataTableShell>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {productRows.map((subscription) => (
+                    <CustomerProductSummaryCard
+                      key={subscription.id}
+                      subscription={subscription}
+                      href={`/customer/subscriptions/${subscription.id}`}
+                      compact
+                    />
+                  ))}
+                </div>
+              </DataTableShell>
             ) : !productError ? (
               <EmptyState
                 title="No linked subscriptions yet"

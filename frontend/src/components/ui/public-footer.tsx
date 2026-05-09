@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import BrandLockup from "@/components/public/BrandLockup";
+import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import { brandConfig } from "@/config/brand";
+import { PUBLIC_LEGAL_DISCLAIMER_POINTS } from "@/lib/public-content";
 import { getPublicDictionary, getText, publicContent, PUBLIC_LANGUAGE_LABELS } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
@@ -19,6 +21,10 @@ export default async function PublicFooter() {
   const footerLinks = [
     { href: ROUTES.public.products, label: dictionary.common.products },
     { href: ROUTES.public.luckyPlan, label: dictionary.common.luckyPlan },
+    { href: ROUTES.public.rent, label: "Rent policy" },
+    { href: ROUTES.public.lease, label: "Lease policy" },
+    { href: ROUTES.public.directSale, label: "Direct sale policy" },
+    { href: ROUTES.public.policies, label: "Business policies" },
     { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks },
     { href: ROUTES.public.winners, label: dictionary.common.winners },
     { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory },
@@ -27,9 +33,13 @@ export default async function PublicFooter() {
 
   return (
     <footer className="public-footer">
+      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <PublicDisclaimerBox title="Public information notice" points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
+      </div>
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_0.9fr] lg:px-8">
         <div className="public-card max-w-xl p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={profile.resolved_tagline} />
+          <p className="mt-2 text-xs font-medium text-slate-600">Advance EMI • Rent • Lease • Direct Sale</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Trusted local retail support for furniture, electronics, and home appliances in {brandConfig.publicBranchLocation}.
           </p>

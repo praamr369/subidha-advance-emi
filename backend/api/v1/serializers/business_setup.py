@@ -45,8 +45,44 @@ class SetupChecklistSerializer(serializers.Serializer):
     counts = serializers.DictField(required=False)
 
 
+class DocumentNumberingSequenceSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    name = serializers.CharField()
+    series_code = serializers.CharField()
+    financial_year = serializers.CharField()
+    configured = serializers.BooleanField()
+    prefix = serializers.CharField()
+    next_number = serializers.IntegerField()
+    padding = serializers.IntegerField()
+    next_number_preview = serializers.CharField(allow_null=True)
+    last_issued_number = serializers.CharField(allow_null=True)
+    status = serializers.CharField()
+
+
+class DocumentNumberingStateSerializer(serializers.Serializer):
+    financial_year = serializers.CharField()
+    sequences = DocumentNumberingSequenceSerializer(many=True)
+    checks = serializers.DictField()
+    duplicate_issues = serializers.DictField()
+
+
+class DocumentNumberingUpdateSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    prefix = serializers.CharField(required=False, allow_blank=True)
+    next_number = serializers.IntegerField(required=False, min_value=1)
+    padding = serializers.IntegerField(required=False, min_value=1, max_value=12)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not any(field in attrs for field in ("prefix", "next_number", "padding")):
+            raise serializers.ValidationError(
+                {"detail": "At least one field must be provided: prefix, next_number, or padding."}
+            )
+        return attrs
+
+
 class BusinessResetRequestSerializer(serializers.Serializer):
-    confirm = serializers.CharField()
+    confirm = serializers.BooleanField()
     preserve_username = serializers.CharField()
     delete_non_preserved_users = serializers.BooleanField(default=True)
     clear_auth_artifacts = serializers.BooleanField(default=True)
@@ -58,6 +94,15 @@ class BusinessResetRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError("Preserve username is required.")
         return cleaned
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        raw_confirm = getattr(self, "initial_data", {}).get("confirm", serializers.empty)
+        if not isinstance(raw_confirm, bool):
+            raise serializers.ValidationError({"confirm": "confirm must be a JSON boolean true."})
+        if not attrs.get("confirm", False):
+            raise serializers.ValidationError({"confirm": "confirm must be true to execute business reset."})
+        return attrs
+
 
 class BusinessResetResponseSerializer(serializers.Serializer):
     mode = serializers.CharField()
@@ -67,3 +112,6 @@ class BusinessResetResponseSerializer(serializers.Serializer):
     deletable_user_count = serializers.IntegerField()
     targets = serializers.DictField()
     auth_artifacts = serializers.DictField()
+    deleted_counts = serializers.DictField(required=False)
+    post_reset_checklist = serializers.DictField(required=False)
+    next_setup_steps = serializers.ListField(child=serializers.CharField(), required=False)

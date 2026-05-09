@@ -343,6 +343,7 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             "primary_phone": party.primary_phone,
             "primary_email": party.primary_email,
             "city": party.city,
+            "notes_summary": party.notes_summary,
             "is_active": party.is_active,
             "role_types": sorted({link.role_type for link in links}),
             "next_follow_up_at": _dt(next_follow_up_at),

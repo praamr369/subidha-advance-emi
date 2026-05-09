@@ -7,6 +7,12 @@ import { useMemo, useState } from "react";
 
 import BrandLockup from "@/components/public/BrandLockup";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+} from "@/components/ui/navigation-menu";
 import { ROUTES } from "@/lib/routes";
 import { getText, publicContent, type PublicLanguage } from "@/lib/public-i18n";
 import { cn } from "@/lib/utils";
@@ -67,7 +73,7 @@ export default function PublicNavClient({
   const trustBadge = getText(publicContent.nav.trustBadge, language);
 
   return (
-    <nav className="public-nav">
+    <nav className="public-nav" aria-label="Primary navigation">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
           <Link href={ROUTES.public.home} className="min-w-0" onClick={() => setMobileOpen(false)}>
@@ -87,22 +93,25 @@ export default function PublicNavClient({
         </div>
 
         <div className="hidden items-center justify-between gap-6 lg:flex">
-          <div className="flex flex-wrap gap-2 lg:justify-center">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "rounded-full px-3 py-2 text-sm font-medium transition-colors hover:text-slate-950",
-                  isActivePath(pathname, link.href)
-                    ? "bg-white/80 text-slate-950 shadow-[0_12px_28px_-22px_rgba(15,23,42,0.78)]"
-                    : "text-muted-foreground"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+          <NavigationMenu className="flex max-w-none flex-1 justify-center">
+            <NavigationMenuList className="flex-wrap justify-center gap-2">
+              {links.map((link) => {
+                const active = isActivePath(pathname, link.href);
+                return (
+                  <NavigationMenuItem key={link.href}>
+                    <NavigationMenuLink asChild active={active}>
+                      <Link
+                        href={link.href}
+                        className={cn(!active && "text-muted-foreground")}
+                      >
+                        {link.label}
+                      </Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                );
+              })}
+            </NavigationMenuList>
+          </NavigationMenu>
 
           <div className="flex flex-wrap items-center gap-2">
             <LanguageSwitcher value={language} />

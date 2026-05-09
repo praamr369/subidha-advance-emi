@@ -58,6 +58,17 @@ export default async function ProductsPage() {
         ]}
       />
 
+      <PublicMarketingBanner
+        eyebrow="Purchase confidence"
+        title="Warranty, return policy, and payment safety"
+        description="Final terms depend on product and contract type, but policy support and document visibility are available for every customer."
+        items={[
+          { title: "Warranty visibility", description: "Warranty/coverage terms are confirmed at contract and document stage." },
+          { title: "Return support flow", description: "Return/issue handling is routed through customer support with status tracking." },
+          { title: "Receipt traceability", description: "Receipts and contract documents are available in customer self-service." },
+        ]}
+      />
+
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
         <p className="mb-4 text-sm leading-6 text-muted-foreground">
           Browse the live catalogue sourced from production product records.
@@ -80,15 +91,15 @@ export default async function ProductsPage() {
         {error ? <div className="mt-6 rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div> : <div className="mt-6"><ProductGrid products={products} locale={locale} /></div>}
       </section>
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6">
+      <section className="public-surface p-6">
         <p className="text-sm leading-7 text-muted-foreground">
-          Product prices come from live product records. Final monthly plan and batch availability are confirmed by branch staff.
+          Listed amounts come from the same product records shown here. Stock, batch seats, tenure, and monthly EMI are confirmed only after branch review—not from this page alone.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={ROUTES.public.apply} className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white">
+          <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0">
             {dictionary.common.apply}
           </Link>
-          <Link href={ROUTES.public.contact} className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground">
+          <Link href={ROUTES.public.contact} className="public-action-secondary h-10 !min-h-0">
             {dictionary.common.contact}
           </Link>
         </div>

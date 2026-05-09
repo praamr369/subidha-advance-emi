@@ -4,6 +4,7 @@ from api.v1.views.customer import (
     CustomerDashboard,
     CustomerDeliveryDetailView,
     CustomerDeliveryListView,
+    CustomerDeliveryPdfView,
     CustomerKycDocumentListView,
     CustomerKycUpdateRequestView,
     CustomerPaymentDetailView,
@@ -18,11 +19,20 @@ from api.v1.views.customer import (
 )
 from api.v1.views.phase4_finance import (
     CustomerAccountStatementView,
+    CustomerDirectSaleDetailView,
+    CustomerDirectSaleListView,
+    CustomerDirectSaleSummaryView,
+    CustomerDepositPdfView,
     CustomerDocumentListView,
     CustomerFinanceSummaryView,
     CustomerInvoiceListView,
+    CustomerLeaseContractPdfView,
+    CustomerInvoicePdfView,
     CustomerPaymentScheduleView,
+    CustomerRentContractPdfView,
     CustomerReceiptListView,
+    CustomerReceiptPdfView,
+    CustomerReturnInspectionPdfView,
 )
 from api.v1.views.paginated_registers import PaginatedCustomerSubscriptionListView
 from api.v1.views.subscription_requests import (
@@ -31,10 +41,25 @@ from api.v1.views.subscription_requests import (
     CustomerSubscriptionRequestListCreateView,
     CustomerSubscriptionRequestOptionsView,
 )
+from api.v1.views.customer_support_tickets import (
+    CustomerSupportTicketCommentView,
+    CustomerSupportTicketDetailView,
+    CustomerSupportTicketListCreateView,
+    CustomerSupportTicketReopenView,
+)
+from api.v1.views.notifications import (
+    CustomerNotificationListView,
+    CustomerNotificationSummaryView,
+)
+from api.v1.views.username_change import CustomerSelfUsernameChangeView
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
+    path("dashboard/summary/", CustomerDashboard.as_view()),
+    path("notifications/", CustomerNotificationListView.as_view()),
+    path("notifications/summary/", CustomerNotificationSummaryView.as_view()),
     path("profile/", CustomerProfileView.as_view()),
+    path("profile/username/", CustomerSelfUsernameChangeView.as_view()),
     path("profile/photo/", CustomerPhotoUploadView.as_view()),
     path("kyc/documents/", CustomerKycDocumentListView.as_view()),
     path("kyc/request-update/", CustomerKycUpdateRequestView.as_view()),
@@ -48,15 +73,29 @@ urlpatterns = [
     path("subscription-requests/<int:pk>/cancel/", CustomerSubscriptionRequestCancelView.as_view()),
     path("deliveries/", CustomerDeliveryListView.as_view()),
     path("deliveries/<int:pk>/", CustomerDeliveryDetailView.as_view()),
+    path("deliveries/<int:pk>/pdf/", CustomerDeliveryPdfView.as_view()),
     path("payments/", CustomerPaymentListView.as_view()),
     path("payments/<int:pk>/", CustomerPaymentDetailView.as_view()),
+    path("direct-sales/", CustomerDirectSaleListView.as_view()),
+    path("direct-sales/summary/", CustomerDirectSaleSummaryView.as_view()),
+    path("direct-sales/<int:pk>/", CustomerDirectSaleDetailView.as_view()),
     # Phase 4: customer finance + documents
     path("finance/summary/", CustomerFinanceSummaryView.as_view()),
     path("invoices/", CustomerInvoiceListView.as_view()),
+    path("invoices/<int:pk>/pdf/", CustomerInvoicePdfView.as_view()),
+    path("rent-contracts/<int:pk>/pdf/", CustomerRentContractPdfView.as_view()),
+    path("lease-contracts/<int:pk>/pdf/", CustomerLeaseContractPdfView.as_view()),
+    path("deposits/<int:pk>/pdf/", CustomerDepositPdfView.as_view()),
+    path("returns/<int:pk>/inspection-pdf/", CustomerReturnInspectionPdfView.as_view()),
     path("receipts/", CustomerReceiptListView.as_view()),
+    path("receipts/<int:pk>/pdf/", CustomerReceiptPdfView.as_view()),
     path("documents/", CustomerDocumentListView.as_view()),
     path("payment-schedule/", CustomerPaymentScheduleView.as_view()),
     path("account-statement/", CustomerAccountStatementView.as_view()),
+    path("support/tickets/", CustomerSupportTicketListCreateView.as_view()),
+    path("support/tickets/<int:pk>/", CustomerSupportTicketDetailView.as_view()),
+    path("support/tickets/<int:pk>/comment/", CustomerSupportTicketCommentView.as_view()),
+    path("support/tickets/<int:pk>/reopen/", CustomerSupportTicketReopenView.as_view()),
     path("support-requests/", CustomerSupportRequestListCreateView.as_view()),
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
 ]

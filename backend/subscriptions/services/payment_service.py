@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -6,6 +7,9 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.models import FinanceAccount, FinanceAccountKind
+from accounting.services.finance_account_collection_guard import (
+    assert_finance_account_allowed_for_payment_collection,
+)
 from accounting.services.finance_posting_service import FinancePostingService
 from branch_control.models import Branch
 from branch_control.services.branch_service import (
@@ -16,6 +20,7 @@ from branch_control.services.branch_service import (
 )
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     Emi,
     EmiStatus,
     FinancialLedger,
@@ -23,6 +28,7 @@ from subscriptions.models import (
     LuckyIdStatus,
     MONEY_ZERO,
     Payment,
+    OperationalCancellation,
     PaymentReconciliation,
     PaymentReconciliationEvent,
     ReconciliationEventType,
@@ -30,14 +36,20 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
+from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.commission_service import (
     create_commission_for_payment,
     reverse_commission_for_payment,
+)
+from subscriptions.services.operational_notification_service import (
+    schedule_emi_payment_posted_notifications,
 )
 from subscriptions.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
 from services.payments.allocate_payment import allocate_payment
+
+finance_logger = logging.getLogger("finance.events")
 
 
 def _to_decimal(value) -> Decimal:
@@ -407,6 +419,9 @@ def record_emi_payment(
     branch_id: int | None = None,
     cash_counter_id: int | None = None,
     finance_account_id: int | None = None,
+    contract_reference_id: int | None = None,
+    unified_collection_source_type: str | None = None,
+    unified_collection_source_id: int | None = None,
 ):
     """
     Canonical payment collection entrypoint.
@@ -466,6 +481,7 @@ def record_emi_payment(
         finance_account = FinancePostingService.resolve_operational_finance_account(
             finance_account_id=resolved_finance_account_id,
         )
+    assert_finance_account_allowed_for_payment_collection(finance_account)
     finance_branch_id = getattr(finance_account, "branch_id", None)
     if branch and finance_branch_id and branch.id != finance_branch_id:
         raise ValueError("Selected finance account does not belong to the payment branch.")
@@ -522,6 +538,48 @@ def record_emi_payment(
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
+            **(
+                {
+                    "contract_reference_id": contract_reference_id,
+                    "unified_collection_source_type": unified_collection_source_type,
+                    "unified_collection_source_id": unified_collection_source_id,
+                }
+                if contract_reference_id is not None
+                or unified_collection_source_type is not None
+                or unified_collection_source_id is not None
+                else {}
+            ),
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.PAYMENT_RECEIVED,
+        source_module="subscriptions.services.payment_service.record_emi_payment",
+        actor_user=collected_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        payment=payment,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "amount": str(amount),
+            "method": method,
+            "reference_no": reference_no,
+        },
+        idempotency_key=reference_no,
+    )
+    append_business_event(
+        event_type=BusinessEventType.EMI_PAID,
+        source_module="subscriptions.services.payment_service.record_emi_payment",
+        actor_user=collected_by,
+        customer=subscription.customer,
+        subscription=subscription,
+        payment=payment,
+        batch=subscription.batch,
+        lucky_id=subscription.lucky_id,
+        payload={
+            "emi_id": emi.id,
+            "month_no": emi.month_no,
+            "amount": str(amount),
         },
     )
 
@@ -536,6 +594,18 @@ def record_emi_payment(
         finance_account=finance_account,
         performed_by=collected_by,
     )
+    finance_logger.info(
+        "finance.payment_posted",
+        extra={
+            "payment_id": payment.id,
+            "subscription_id": subscription.id,
+            "emi_id": emi.id,
+            "amount": str(amount),
+            "method": method,
+            "finance_account_id": finance_account.id,
+            "collected_by_user_id": getattr(collected_by, "id", None),
+        },
+    )
     reconciliation = _upsert_payment_reconciliation(
         payment=payment,
         expected_amount=outstanding_before,
@@ -548,6 +618,16 @@ def record_emi_payment(
         source_model="Payment",
         source_id=payment.id,
         event_type="PAYMENT_POSTED",
+    )
+
+    subscription_label = (getattr(subscription, "subscription_number", None) or "").strip() or f"SUB-{subscription.id}"
+    schedule_emi_payment_posted_notifications(
+        payment_id=payment.id,
+        customer_user_id=subscription.customer.user_id,
+        partner_user_id=getattr(subscription, "partner_id", None),
+        cashier_user_id=getattr(collected_by, "id", None),
+        subscription_label=subscription_label,
+        amount_str=str(amount),
     )
 
     return {
@@ -732,6 +812,34 @@ def reverse_payment_for_admin(
             "reason": reason,
         },
     )
+    if not reason:
+        raise ValueError("Reversal reason is required.")
+    if OperationalCancellation.objects.filter(
+        source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+        source_id=payment.id,
+    ).exists():
+        raise ValueError("Payment already has an audited reversal.")
+    OperationalCancellation.objects.create(
+        source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+        source_id=payment.id,
+        source_reference=payment.reference_no or f"PAY-{payment.id}",
+        customer=payment.customer,
+        partner=getattr(payment.subscription, "partner", None),
+        amount_snapshot=payment.amount,
+        status_before="POSTED",
+        status_after="REVERSED",
+        cancellation_type=OperationalCancellation.CancellationType.PAYMENT_REVERSAL,
+        reason=reason,
+        requested_by=reversed_by,
+        approved_by=reversed_by,
+        cancelled_by=reversed_by,
+        reversal_reference=f"PAYMENT_REVERSAL:{payment.id}",
+        metadata={
+            "payment_id": payment.id,
+            "subscription_id": payment.subscription_id,
+            "emi_id": payment.emi_id,
+        },
+    )
 
     reverse_commission_for_payment(
         payment=payment,
@@ -746,6 +854,17 @@ def reverse_payment_for_admin(
         source_model="Payment",
         source_id=payment.id,
         event_type="PAYMENT_REVERSED",
+    )
+    finance_logger.info(
+        "finance.payment_reversed",
+        extra={
+            "payment_id": payment.id,
+            "subscription_id": subscription.id,
+            "emi_id": emi.id,
+            "amount": str(payment.amount),
+            "reason": reason or "",
+            "reversed_by_user_id": getattr(reversed_by, "id", None),
+        },
     )
 
     return {

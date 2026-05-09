@@ -60,58 +60,73 @@ export default function ContactLeadForm() {
         Ask about products, batch availability, or the monthly plan structure. Branch follow-up works best with a correct phone number.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-foreground">Full name</span>
-          <input
-            name="name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Enter your full name"
-            required
-            className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-          />
-        </label>
+      <form onSubmit={onSubmit} className="mt-6 grid gap-6">
+        <fieldset className="grid gap-4 lg:grid-cols-2">
+          <legend className="mb-1 px-1 text-sm font-semibold text-foreground lg:col-span-2">How we can reach you</legend>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-foreground">Phone</span>
-          <input
-            name="phone"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            placeholder="10-digit phone number"
-            required
-            pattern="[0-9]{10}"
-            className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-          />
-        </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-foreground">Full name</span>
+            <input
+              name="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Enter your full name"
+              required
+              disabled={loading}
+              autoComplete="name"
+              className="public-control-focus h-11 rounded-xl border border-border bg-background px-4 text-sm"
+            />
+          </label>
 
-        <label className="grid gap-2 lg:col-span-2">
-          <span className="text-sm font-medium text-foreground">Email (optional)</span>
-          <input
-            name="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="If you prefer email follow-up"
-            className="h-11 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-          />
-        </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-foreground">Phone</span>
+            <input
+              name="phone"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="10-digit phone number"
+              required
+              pattern="[0-9]{10}"
+              disabled={loading}
+              autoComplete="tel"
+              className="public-control-focus h-11 rounded-xl border border-border bg-background px-4 text-sm"
+            />
+          </label>
 
-        <label className="grid gap-2 lg:col-span-2">
-          <span className="text-sm font-medium text-foreground">Message</span>
-          <textarea
-            name="message"
-            rows={6}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="Tell us what you want to buy, your preferred EMI comfort, or any Lucky Plan questions."
-            required
-            className="rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring"
-          />
-        </label>
+          <label className="grid gap-2 lg:col-span-2">
+            <span className="text-sm font-medium text-foreground">Email (optional)</span>
+            <input
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="If you prefer email follow-up"
+              disabled={loading}
+              autoComplete="email"
+              className="public-control-focus h-11 rounded-xl border border-border bg-background px-4 text-sm"
+            />
+          </label>
+        </fieldset>
 
-        <div className="lg:col-span-2 flex flex-wrap gap-3">
+        <fieldset>
+          <legend className="mb-2 px-1 text-sm font-semibold text-foreground">Your message</legend>
+          <label className="grid gap-2">
+            <span className="sr-only">Message</span>
+            <textarea
+              name="message"
+              rows={6}
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Tell us what you want to buy, your preferred EMI comfort, or any Lucky Plan questions."
+              required
+              disabled={loading}
+              aria-label="Message for the branch"
+              className="public-control-focus rounded-xl border border-border bg-background px-4 py-3 text-sm"
+            />
+          </label>
+        </fieldset>
+
+        <div className="flex flex-wrap gap-3">
           <ActionButton type="submit" variant="primary" loading={loading} size="lg">
             {loading ? "Submitting..." : "Send message"}
           </ActionButton>

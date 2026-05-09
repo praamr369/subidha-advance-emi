@@ -6,6 +6,9 @@ import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { FormSection } from "@/components/ui/operations";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -158,10 +161,26 @@ export default function AdminServiceDeskTicketsPage() {
           </div>
         ),
       },
-      { key: "status", title: "Case Status" },
-      { key: "warranty_status", title: "Warranty" },
-      { key: "finance_status", title: "Finance" },
-      { key: "stock_status", title: "Stock" },
+      {
+        key: "status",
+        title: "Case Status",
+        render: (row: ServiceDeskCase) => <StatusBadge status={row.status} hideIcon />,
+      },
+      {
+        key: "warranty_status",
+        title: "Warranty",
+        render: (row: ServiceDeskCase) => <StatusBadge status={row.warranty_status} hideIcon />,
+      },
+      {
+        key: "finance_status",
+        title: "Finance",
+        render: (row: ServiceDeskCase) => <StatusBadge status={row.finance_status} hideIcon />,
+      },
+      {
+        key: "stock_status",
+        title: "Stock",
+        render: (row: ServiceDeskCase) => <StatusBadge status={row.stock_status} hideIcon />,
+      },
     ],
     []
   );
@@ -203,7 +222,14 @@ export default function AdminServiceDeskTicketsPage() {
           <ErrorState title="Service ticket register unavailable" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <FormSection
+          title="Create service ticket"
+          description="Capture issue context first, then attach optional source references for delivery, billing, or inventory workflows."
+        >
+          <WorkspaceNotice tone="warning" title="Posting boundary">
+            Creating service tickets does not post billing, stock, or accounting entries. Those remain controlled actions in their dedicated workspaces.
+          </WorkspaceNotice>
+          <div className="mt-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="grid gap-2 text-sm md:col-span-2">
               <span>Issue Summary</span>
@@ -375,7 +401,8 @@ export default function AdminServiceDeskTicketsPage() {
               {saving ? "Creating..." : "Create Service Ticket"}
             </button>
           </div>
-        </section>
+          </div>
+        </FormSection>
 
         {!loading && !error ? (
           <DataTable

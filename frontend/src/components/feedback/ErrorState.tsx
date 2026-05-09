@@ -27,7 +27,7 @@ function ErrorState({
           <p className="mt-1 text-sm leading-6 text-red-800">{resolvedMessage}</p>
           {onRetry ? (
             <button
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,white_10%)] px-3 py-1.5 text-sm font-semibold text-red-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:bg-red-100"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,white_10%)] px-3 py-1.5 text-sm font-semibold text-red-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] motion-safe:transition motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 hover:bg-red-100"
               onClick={onRetry}
               type="button"
             >

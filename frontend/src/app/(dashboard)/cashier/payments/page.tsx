@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw, Search } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -8,10 +9,18 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import {
+  DataTableShell,
+  DetailPanel,
+  FormSection,
+  KpiCard,
+  MobileSafeTable,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   getCashierPaymentHistory,
   type CashierTransaction,
@@ -42,6 +51,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function CashierPaymentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,20 +93,21 @@ export default function CashierPaymentsPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    const qParam = (searchParams.get("q") || "").trim();
+    setSearchInput(qParam);
+    setQuery(qParam);
+    void loadPage("initial", qParam);
+  }, [searchParams, loadPage]);
 
   function handleApplySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextQuery = searchInput.trim();
-    setQuery(nextQuery);
-    void loadPage("refresh", nextQuery);
+    router.replace(nextQuery ? `/cashier/payments?q=${encodeURIComponent(nextQuery)}` : "/cashier/payments");
   }
 
   function handleResetSearch() {
     setSearchInput("");
-    setQuery("");
-    void loadPage("refresh", "");
+    router.replace("/cashier/payments");
   }
 
   const visibleAmount = useMemo(
@@ -116,11 +128,16 @@ export default function CashierPaymentsPage() {
         key: "id",
         title: "Payment",
         render: (row) => (
-          <div className="space-y-1">
+          <div
+            className={`space-y-1 ${row.is_reversed ? "opacity-60" : ""}`}
+          >
             <div className="font-medium text-foreground">#{row.id}</div>
             <div className="text-xs text-muted-foreground">
               Ref {row.reference_no || `AUTO-${row.id}`}
             </div>
+            {row.is_reversed ? (
+              <StatusBadge status="REVERSED" hideIcon />
+            ) : null}
           </div>
         ),
       },
@@ -129,7 +146,13 @@ export default function CashierPaymentsPage() {
         title: "Customer",
         render: (row) => (
           <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
+            <div className="font-medium text-foreground">
+              <CustomerIntelligenceTrigger
+                customerId={row.customer}
+                customerName={row.customer_name || "—"}
+                scope="cashier"
+              />
+            </div>
             <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
           </div>
         ),
@@ -152,7 +175,8 @@ export default function CashierPaymentsPage() {
       {
         key: "method",
         title: "Method",
-        render: (row) => row.method || "—",
+        render: (row) =>
+          row.method ? <StatusBadge status={row.method} hideIcon /> : <span className="text-muted-foreground">—</span>,
       },
       {
         key: "recorded_at",
@@ -232,20 +256,22 @@ export default function CashierPaymentsPage() {
       }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <FormSection
           title="Counter lookup"
           description="Search by payment ID, reference, customer phone, customer name, subscription number, EMI ID, or lucky number."
-          action={
+        >
+          <div className="mb-4 flex justify-end">
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh", query)}
+              onClick={() =>
+                void loadPage("refresh", (searchParams.get("q") || "").trim())
+              }
               disabled={loading || refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-          }
-        >
+          </div>
           <TableToolbar
             footer={
               query ? (
@@ -294,7 +320,26 @@ export default function CashierPaymentsPage() {
               </div>
             </form>
           </TableToolbar>
-        </WorkspaceSection>
+        </FormSection>
+
+        <QuickActionGrid>
+          <KpiCard label="Visible payments" value={String(rows.length)} helper="Current cashier search result set" />
+          <KpiCard label="Visible amount" value={money(visibleAmount)} helper="Total for listed rows" />
+          <KpiCard
+            label="Reversed"
+            value={String(reversedCount)}
+            helper="Rows marked reversed in cashier view"
+          />
+          <KpiCard
+            label="Latest visible"
+            value={
+              latestVisiblePayment
+                ? formatDateTime(latestVisiblePayment.created_at || latestVisiblePayment.payment_date)
+                : "—"
+            }
+            helper="Most recent record in this list"
+          />
+        </QuickActionGrid>
 
         {loading ? <LoadingBlock label="Loading cashier payment history..." /> : null}
 
@@ -307,7 +352,7 @@ export default function CashierPaymentsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <DetailPanel
             title="Posted cashier-visible payments"
             description={
               query
@@ -326,17 +371,21 @@ export default function CashierPaymentsPage() {
                 }
               />
             ) : (
-              <DataTable<CashierTransaction>
-                rows={rows}
-                columns={columns}
-                rowActions={(row) => (
-                  <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
-                    Receipt
-                  </ActionButton>
-                )}
-              />
+              <DataTableShell>
+                <MobileSafeTable className="border-none bg-transparent shadow-none">
+                  <DataTable<CashierTransaction>
+                    rows={rows}
+                    columns={columns}
+                    rowActions={(row) => (
+                      <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
+                        Receipt
+                      </ActionButton>
+                    )}
+                  />
+                </MobileSafeTable>
+              </DataTableShell>
             )}
-          </WorkspaceSection>
+          </DetailPanel>
         ) : null}
       </div>
     </PortalPage>

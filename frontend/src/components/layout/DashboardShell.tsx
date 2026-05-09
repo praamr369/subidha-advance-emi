@@ -11,9 +11,11 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  Fragment,
+  type CSSProperties,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
   BellRing,
@@ -35,6 +37,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Plus,
   Receipt,
   ReceiptText,
   Search,
@@ -52,13 +55,19 @@ import {
   X,
 } from "lucide-react";
 
+import NotificationBellDropdown from "@/components/layout/NotificationBellDropdown";
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import RoleSidebar from "@/components/layout/RoleSidebar";
+import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
+import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
 import CommandPalette from "@/components/workflows/CommandPalette";
 import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/lib/routes";
@@ -70,8 +79,10 @@ import {
   type NavIconKey,
   type NavigationRole,
 } from "@/config/navigation";
-import { pushRecent, readFavorites, toggleFavorite } from "@/lib/workspace-prefs";
+import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
+import { initialsFromDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
+import { getAdminNavigationBadges } from "@/services/navigation-badges";
 
 const DashboardShellContext = createContext(false);
 
@@ -84,6 +95,8 @@ type ShellNavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   disabled?: boolean;
+  badgeSource?: string;
+  children?: ShellNavItem[];
 };
 
 type ShellNavGroup = {
@@ -136,7 +149,13 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
+const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
+/** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
+const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
+const WORKSPACE_WIDTH_CSS_VALUES = ["1380px", "1580px", "1800px"] as const;
+const WORKSPACE_WIDTH_PRESET_LABELS = ["Compact", "Balanced", "Spacious"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
+type OperatorMode = "SIMPLE" | "ADVANCED";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
   if (!sessionId) return SIDEBAR_COLLAPSED_LEGACY_KEY;
@@ -197,11 +216,41 @@ function readExpandedGroups(): Record<string, boolean> {
   }
 }
 
+function readOperatorMode(): OperatorMode {
+  if (typeof window === "undefined") return "SIMPLE";
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_MODE_KEY);
+    return raw === "ADVANCED" ? "ADVANCED" : "SIMPLE";
+  } catch {
+    return "SIMPLE";
+  }
+}
+
+function readWorkspaceWidthPresetSnapshot(): string {
+  if (typeof window === "undefined") return "2";
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_WIDTH_PRESET_KEY);
+    if (raw === null) return "2";
+    const n = Number.parseInt(raw, 10);
+    if (n === 0 || n === 1 || n === 2) return String(n);
+    return "2";
+  } catch {
+    return "2";
+  }
+}
+
+function clampWorkspaceWidthPreset(value: number): 0 | 1 | 2 {
+  if (value === 0 || value === 1 || value === 2) return value;
+  return 2;
+}
+
 function segmentToLabel(segment: string) {
   return segment.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function buildPageTitle(pathname: string) {
+  if (pathname === "/admin/counters") return "Counter & Cash Desk Master";
+  if (pathname === "/admin/inventory/stock-needs") return "Stock needs";
   const cleaned = pathname.replace(/^\/+|\/+$/g, "");
   const segments = cleaned.split("/").filter(Boolean);
   if (segments.length === 0) return "Dashboard";
@@ -213,17 +262,27 @@ function buildPageTitle(pathname: string) {
   return segmentToLabel(last);
 }
 
-function isActivePath(pathname: string, href: string) {
-  if (href === pathname) return true;
+function hrefPathname(href: string) {
+  return href.split("?")[0] || href;
+}
+
+function isActivePath(pathname: string, currentUrl: string, href: string) {
+  const cleanHref = hrefPathname(href);
+  if (href.includes("?")) {
+    if (currentUrl === href || currentUrl.startsWith(`${href}&`)) return true;
+  } else if (cleanHref === pathname) {
+    return true;
+  }
   if (
-    href === ROUTES.admin.dashboard ||
-    href === ROUTES.partner.dashboard ||
-    href === ROUTES.customer.dashboard ||
-    href === ROUTES.cashier.dashboard
+    cleanHref === ROUTES.admin.dashboard ||
+    cleanHref === ROUTES.partner.dashboard ||
+    cleanHref === ROUTES.customer.dashboard ||
+    cleanHref === ROUTES.cashier.dashboard ||
+    cleanHref === ROUTES.vendor.dashboard
   ) {
     return false;
   }
-  return pathname.startsWith(`${href}/`);
+  return pathname.startsWith(`${cleanHref}/`);
 }
 
 function getRoleBasePath(role: NavigationRole) {
@@ -236,26 +295,50 @@ function getRoleBasePath(role: NavigationRole) {
       return ROUTES.customer.root;
     case "CASHIER":
       return ROUTES.cashier.root;
+    case "VENDOR":
+      return ROUTES.vendor.root;
     default:
       return ROUTES.public.home;
   }
 }
 
 function mapNavGroups(groups: NavGroup[]): ShellNavGroup[] {
+  const mapItem = (item: NavGroup["items"][number]): ShellNavItem => ({
+    label: item.label,
+    href: item.href,
+    icon: ICON_MAP[item.icon],
+    disabled: Boolean(item.disabled),
+    badgeSource: item.badgeSource,
+    children: item.children
+      ?.filter((child) => !child.hidden && typeof child.href === "string" && child.href.trim().length > 0)
+      .map(mapItem),
+  });
+
   return groups
     .map((group) => ({
       title: group.title,
       icon: ICON_MAP[group.icon ?? group.items[0]?.icon ?? "dashboard"],
       items: group.items
         .filter((item) => !item.hidden && typeof item.href === "string" && item.href.trim().length > 0)
-        .map((item) => ({
-          label: item.label,
-          href: item.href,
-          icon: ICON_MAP[item.icon],
-          disabled: Boolean(item.disabled),
-        })),
+        .map(mapItem),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+function flattenShellItems(items: ShellNavItem[]): ShellNavItem[] {
+  return items.flatMap((item) => [item, ...(item.children ? flattenShellItems(item.children) : [])]);
+}
+
+function filterShellItems(items: ShellNavItem[], query: string): ShellNavItem[] {
+  const matches: ShellNavItem[] = [];
+  for (const item of items) {
+    const selfMatch = item.label.toLowerCase().includes(query) || item.href.toLowerCase().includes(query);
+    const children = item.children ? filterShellItems(item.children, query) : undefined;
+    if (selfMatch || (children && children.length > 0)) {
+      matches.push({ ...item, children });
+    }
+  }
+  return matches;
 }
 
 function formatRoleLabel(role: NavigationRole) {
@@ -263,6 +346,7 @@ function formatRoleLabel(role: NavigationRole) {
   if (role === "PARTNER") return "Partner";
   if (role === "CUSTOMER") return "Customer";
   if (role === "CASHIER") return "Cashier";
+  if (role === "VENDOR") return "Vendor";
   return "Workspace";
 }
 
@@ -272,6 +356,8 @@ function getProfileHref(role: NavigationRole) {
       return ROUTES.customer.profile;
     case "ADMIN":
       return ROUTES.admin.settings;
+    case "VENDOR":
+      return ROUTES.vendor.profile;
     default:
       return getRoleBasePath(role);
   }
@@ -286,6 +372,35 @@ function getSettingsHref(role: NavigationRole) {
     default:
       return getRoleBasePath(role);
   }
+}
+
+function countsForGroup(groupTitle: string, badges: Record<string, number>): Array<{ label: string; value: number }> {
+  const byGroup: Record<string, Array<{ label: string; key: string }>> = {
+    "Command Center": [
+      { label: "Outstanding", key: "admin.badges.outstanding_count" },
+      { label: "Overdue", key: "admin.badges.overdue_count" },
+    ],
+    "Billing & Finance": [
+      { label: "Overdue", key: "admin.badges.overdue_count" },
+      { label: "Unreconciled", key: "admin.badges.unreconciled_count" },
+    ],
+    "Returns & Reversals": [
+      { label: "Returns", key: "admin.badges.pending_return_count" },
+      { label: "Refunds", key: "admin.badges.pending_refund_count" },
+    ],
+    "Delivery & Service": [
+      { label: "Delivery", key: "admin.badges.pending_delivery_count" },
+      { label: "Support", key: "admin.badges.open_support_ticket_count" },
+    ],
+    Inventory: [
+      { label: "Low Stock", key: "admin.badges.low_stock_count" },
+      { label: "Inspection", key: "admin.badges.inspection_stock_count" },
+    ],
+    "Lucky Plan": [{ label: "Pending Draw", key: "admin.badges.pending_draw_count" }],
+  };
+  return (byGroup[groupTitle] ?? [])
+    .map((row) => ({ label: row.label, value: Number(badges[row.key] ?? 0) }))
+    .filter((row) => row.value > 0);
 }
 
 function RailTooltip({ label }: { label: string }) {
@@ -329,9 +444,9 @@ function UserDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
       >
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-xs font-semibold text-foreground">
-          {displayName.charAt(0).toUpperCase()}
-        </span>
+        <Avatar className="size-8 rounded-lg border-[var(--surface-border-strong)]">
+          <AvatarFallback className="rounded-lg">{initialsFromDisplayName(displayName)}</AvatarFallback>
+        </Avatar>
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">{displayName}</span>
           <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
@@ -341,9 +456,14 @@ function UserDropdown({
 
       {isOpen ? (
         <div className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100">
-          <div className="border-b border-border px-3 py-2">
-            <div className="text-sm font-semibold text-foreground">{displayName}</div>
-            <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
+          <div className="flex items-center gap-3 border-b border-border px-3 py-2">
+            <Avatar className="size-9 shrink-0 rounded-xl border-[var(--surface-border-strong)]">
+              <AvatarFallback className="rounded-xl">{initialsFromDisplayName(displayName)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-foreground">{displayName}</div>
+              <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
+            </div>
           </div>
           <Link
             href={profileHref}
@@ -389,6 +509,8 @@ function SidebarContent({
   collapsed,
   onToggleCollapse,
   onClose,
+  workspaceWidthPreset,
+  onWorkspaceWidthPresetChange,
 }: {
   role: NavigationRole;
   pathname: string;
@@ -399,45 +521,135 @@ function SidebarContent({
   collapsed: boolean;
   onToggleCollapse: () => void;
   onClose?: () => void;
+  workspaceWidthPreset: 0 | 1 | 2;
+  onWorkspaceWidthPresetChange: (preset: 0 | 1 | 2) => void;
 }) {
   const isMobile = typeof onClose === "function";
+  const searchParams = useSearchParams();
   const navGroups = useMemo(() => mapNavGroups(getNavigationGroupsForRole(role)), [role]);
+  const currentUrl = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const activeHref = useMemo(() => {
     const matches = navGroups
-      .flatMap((group) => group.items)
-      .filter((item) => isActivePath(pathname, item.href))
+      .flatMap((group) => flattenShellItems(group.items))
+      .filter((item) => isActivePath(pathname, currentUrl, item.href))
       .sort((left, right) => right.href.length - left.href.length);
     return matches[0]?.href ?? null;
-  }, [navGroups, pathname]);
+  }, [currentUrl, navGroups, pathname]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readExpandedGroups());
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
   const [navQuery, setNavQuery] = useState("");
   const normalizedNavQuery = navQuery.trim().toLowerCase();
   const [favorites, setFavorites] = useState<string[]>(() => (sessionId ? readFavorites(sessionId, role) : []));
+  const [queueBadges, setQueueBadges] = useState<Record<string, number>>({});
+  const [operatorMode, setOperatorMode] = useState<OperatorMode>(() =>
+    role === "ADMIN" ? readOperatorMode() : "ADVANCED"
+  );
+  const persistOperatorMode = useCallback((value: OperatorMode) => {
+    setOperatorMode(value);
+    try {
+      window.localStorage.setItem(OPERATOR_MODE_KEY, value);
+    } catch {
+      // preference-only
+    }
+    notifyDashboardShellChanged();
+  }, []);
 
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
-    const allItems = navGroups.flatMap((group) => group.items);
+    const allItems = navGroups.flatMap((group) => flattenShellItems(group.items));
     return favorites
       .map((href) => allItems.find((item) => item.href === href))
       .filter((item): item is ShellNavItem => Boolean(item))
       .slice(0, 6);
   }, [favorites, navGroups]);
+  const recentLinks = useMemo(() => {
+    if (!sessionId) return [];
+    const recentHrefs = readRecents(sessionId, role).slice(0, 4);
+    const allItems = navGroups.flatMap((group) => flattenShellItems(group.items));
+    return recentHrefs
+      .map((href) => {
+        const match = allItems.find((item) => item.href === href);
+        return match ? { href, label: match.label } : null;
+      })
+      .filter((item): item is { href: string; label: string } => Boolean(item));
+  }, [navGroups, role, sessionId]);
+
+  const modeFilteredGroups = useMemo(() => {
+    if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
+    const allowedGroupTitles = new Set([
+      "Command Center",
+      "Sales & Contracts",
+      "Collections",
+      "Billing & Finance",
+      "Delivery & Service",
+      "Returns & Reversals",
+      "Inventory",
+      "Lucky Plan",
+      "CRM & Partners",
+      "Reports & Audit",
+      "Settings",
+    ]);
+    const simpleFinanceAllowed = new Set([
+      "Finance Workspace",
+      "Collections",
+      "Dues",
+      "Overdue",
+      "Payment Collection",
+      "Reconciliation",
+      "Deposits",
+    ]);
+    return navGroups
+      .filter((group) => allowedGroupTitles.has(group.title))
+      .map((group) => {
+        if (group.title !== "Billing & Finance") return group;
+        return {
+          ...group,
+          items: group.items.filter((item) => simpleFinanceAllowed.has(item.label)),
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [navGroups, operatorMode, role]);
 
   const visibleGroups = useMemo(() => {
-    if (!normalizedNavQuery) return navGroups;
+    if (!normalizedNavQuery) return modeFilteredGroups;
 
-    return navGroups
+    return modeFilteredGroups
       .map((group) => {
         const groupMatch = group.title.toLowerCase().includes(normalizedNavQuery);
         if (groupMatch) return group;
         return {
           ...group,
-          items: group.items.filter((item) => item.label.toLowerCase().includes(normalizedNavQuery)),
+          items: filterShellItems(group.items, normalizedNavQuery),
         };
       })
       .filter((group) => group.items.length > 0);
-  }, [navGroups, normalizedNavQuery]);
+  }, [modeFilteredGroups, normalizedNavQuery]);
+
+  useEffect(() => {
+    if (role !== "ADMIN") return;
+    let cancelled = false;
+    const loadBadges = async () => {
+      try {
+        const payload = await getAdminNavigationBadges();
+        if (cancelled) return;
+        setQueueBadges(
+          Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
+            acc[`admin.badges.${key}`] = Number(value || 0);
+            return acc;
+          }, {})
+        );
+      } catch {
+        if (!cancelled) setQueueBadges({});
+      }
+    };
+    void loadBadges();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   useEffect(() => {
     try {
@@ -460,6 +672,168 @@ function SidebarContent({
     },
     [collapsed, isMobile]
   );
+
+  const toggleNestedItem = useCallback((key: string, defaultOpen: boolean) => {
+    setExpandedGroups((current) => ({
+      ...current,
+      [key]: !(current[key] ?? defaultOpen),
+    }));
+  }, []);
+
+  const renderBadge = useCallback(
+    (item: ShellNavItem) =>
+      item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+          {queueBadges[item.badgeSource]}
+        </span>
+      ) : null,
+    [queueBadges]
+  );
+
+  function renderFlyoutItem(groupTitle: string, item: ShellNavItem, depth = 0): ReactNode {
+      const active = item.href === activeHref;
+      const childActive = item.children?.some((child) =>
+        flattenShellItems([child]).some((candidate) => candidate.href === activeHref)
+      );
+      const Icon = item.icon;
+      const classes = cn(
+        "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
+        depth > 0 ? "ml-3" : "",
+        item.disabled
+          ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
+          : active || childActive
+            ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+            : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+      );
+
+      const key = `${groupTitle}:${item.href}:${item.label}:${depth}`;
+      const row = item.disabled ? (
+        <div key={key} className={classes} aria-disabled="true" title="Not available yet">
+          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+          {renderBadge(item)}
+        </div>
+      ) : (
+        <Link
+          key={key}
+          href={item.href}
+          onClick={isMobile ? onClose : undefined}
+          className={classes}
+          role="menuitem"
+        >
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+            )}
+          />
+          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+          {renderBadge(item)}
+        </Link>
+      );
+
+      return (
+        <div key={key}>
+          {row}
+          {item.children && item.children.length > 0 ? (
+            <div className="mt-1 space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+              {item.children.map((child) => renderFlyoutItem(groupTitle, child, depth + 1))}
+            </div>
+          ) : null}
+        </div>
+      );
+  }
+
+  function renderExpandedItem(groupTitle: string, item: ShellNavItem, depth = 0): ReactNode {
+      const active = item.href === activeHref;
+      const descendants = item.children ? flattenShellItems(item.children) : [];
+      const childActive = descendants.some((child) => child.href === activeHref);
+      const hasChildren = Boolean(item.children?.length);
+      const itemKey = `${groupTitle}:${item.href}:${item.label}`;
+      const defaultOpen = childActive || normalizedNavQuery.length > 0;
+      const itemOpen = hasChildren && (childActive || (expandedGroups[itemKey] ?? defaultOpen));
+      const Icon = item.icon;
+      const rowBase = cn(
+        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
+        depth > 0 ? "ml-3" : "",
+        active || childActive
+          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
+          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+      );
+
+      const rowContent = (
+        <>
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
+            )}
+          />
+          <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
+          {renderBadge(item)}
+        </>
+      );
+
+      const row = item.disabled ? (
+        <div className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
+          {rowContent}
+        </div>
+      ) : (
+        <div className={rowBase} title={collapsed ? item.label : undefined}>
+          <Link
+            href={item.href}
+            onClick={isMobile ? onClose : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2.5"
+            aria-label={item.label}
+          >
+            {rowContent}
+          </Link>
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleNestedItem(itemKey, defaultOpen);
+              }}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] transition hover:bg-black/10 hover:text-white"
+              aria-label={itemOpen ? `Collapse ${item.label}` : `Expand ${item.label}`}
+            >
+              {itemOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+          ) : sessionId && !collapsed ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
+                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
+              )}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const next = toggleFavorite(sessionId, role, item.href);
+                setFavorites(next);
+              }}
+              aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
+              title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
+            >
+              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
+            </button>
+          ) : null}
+        </div>
+      );
+
+      return (
+        <div key={itemKey} className="space-y-1">
+          {row}
+          {itemOpen ? (
+            <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+              {item.children!.map((child) => renderExpandedItem(groupTitle, child, depth + 1))}
+            </div>
+          ) : null}
+        </div>
+      );
+  }
 
   return (
     <div className="flex h-full flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
@@ -572,6 +946,81 @@ function SidebarContent({
               />
             </div>
           </div>
+          {!collapsed ? (
+            <div className="mt-3.5 rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+                    Workspace width
+                  </div>
+                  <div className="mt-0.5 text-xs leading-snug text-[var(--sidebar-item-muted)]">
+                    Display preference only — how wide the main workspace column appears on this browser.
+                  </div>
+                </div>
+                <span className="shrink-0 pt-0.5 text-[11px] font-semibold tracking-wide text-[var(--sidebar-item-muted)]">
+                  {WORKSPACE_WIDTH_PRESET_LABELS[workspaceWidthPreset]}
+                </span>
+              </div>
+              <Slider
+                aria-label="Workspace content width"
+                data-testid="workspace-width-slider"
+                min={0}
+                max={2}
+                step={1}
+                value={[workspaceWidthPreset]}
+                onValueChange={(next) => {
+                  const step = next[0];
+                  if (step === undefined) return;
+                  onWorkspaceWidthPresetChange(clampWorkspaceWidthPreset(step));
+                }}
+                className="mt-3 w-full [&_[data-slot=slider-track]]:bg-white/15 [&_[data-slot=slider-range]]:bg-[var(--sidebar-item-active-border)] [&_[data-slot=slider-thumb]]:border-[var(--sidebar-rail-border)] [&_[data-slot=slider-thumb]]:bg-white"
+              />
+            </div>
+          ) : null}
+          {role === "ADMIN" ? (
+            <div className="mt-3.5 flex items-center justify-between rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-2.5">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+                  Operator Mode
+                </div>
+                <div className="text-xs text-[var(--sidebar-item-muted)]">
+                  {operatorMode === "SIMPLE" ? "Simple workflow view" : "Advanced ERP view"}
+                </div>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={operatorMode}
+                data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
+                aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
+                onValueChange={(value: string) => {
+                  if (value !== "SIMPLE" && value !== "ADVANCED") return;
+                  persistOperatorMode(value as OperatorMode);
+                }}
+                onClick={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
+                }}
+                className="border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-1"
+              >
+                <ToggleGroupItem
+                  value="SIMPLE"
+                  aria-label="Simple workflow view"
+                  onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
+                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  Simple
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="ADVANCED"
+                  aria-label="Advanced ERP view"
+                  onClick={() => persistOperatorMode("ADVANCED")}
+                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  Advanced
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -584,7 +1033,7 @@ function SidebarContent({
           ) : null}
           {visibleGroups.map((group) => {
             const GroupIcon = group.icon;
-            const groupActive = group.items.some((item) => item.href === activeHref);
+            const groupActive = flattenShellItems(group.items).some((item) => item.href === activeHref);
             const defaultOpen = true;
             const groupOpen = !collapsed && (groupActive || (expandedGroups[group.title] ?? defaultOpen));
             const flyoutOpen = collapsed && flyoutGroup === group.title;
@@ -647,118 +1096,23 @@ function SidebarContent({
                 </button>
 
                 {collapsed && flyoutOpen ? (
-                  <div
-                    role="menu"
-                    aria-label={`${group.title} navigation`}
-                    className="absolute left-full top-0 z-50 ml-3 w-64 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]"
-                  >
-                    <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">{group.title}</div>
-                      <div className="mt-1 text-xs text-[var(--sidebar-item-muted)]">Select a module</div>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {group.items.map((item) => {
-                        const active = item.href === activeHref;
-                        const Icon = item.icon;
-                        const classes = cn(
-                          "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
-                          item.disabled
-                            ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
-                            : active
-                              ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                              : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                        );
-
-                        if (item.disabled) {
-                          return (
-                            <div key={`${group.title}:${item.href}:${item.label}`} className={classes} aria-disabled="true" title="Not available yet">
-                              <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                              <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <Link
-                            key={`${group.title}:${item.href}:${item.label}`}
-                            href={item.href}
-                            onClick={isMobile ? onClose : undefined}
-                            className={classes}
-                            role="menuitem"
-                          >
-                            <Icon
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
-                              )}
-                            />
-                            <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                          </Link>
-                        );
-                      })}
+                  <div role="menu" aria-label={`${group.title} navigation`}>
+                    <SidebarHoverCard
+                      title={group.title}
+                      counts={countsForGroup(group.title, queueBadges)}
+                      quickActions={group.items.slice(0, 3).map((item) => ({ label: item.label, href: item.href }))}
+                      recentRoutes={recentLinks}
+                      primaryAction={group.items[0] ? { label: `Open ${group.items[0].label}`, href: group.items[0].href } : undefined}
+                    />
+                    <div className="absolute left-full top-[14.5rem] z-50 ml-3 w-72 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]">
+                      <div className="space-y-1">{group.items.map((item) => renderFlyoutItem(group.title, item))}</div>
                     </div>
                   </div>
                 ) : null}
 
                 {groupOpen ? (
                   <div className="space-y-1.5 border-l border-[var(--sidebar-rail-border)]/80 pl-4">
-                    {group.items.map((item) => {
-                      const active = item.href === activeHref;
-                      const Icon = item.icon;
-                      const rowBase = cn(
-                        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
-                        active
-                          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                      );
-
-                      return item.disabled ? (
-                        <div key={`${group.title}:${item.href}:${item.label}`} className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
-                          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
-                          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
-                        </div>
-                      ) : (
-                        <div
-                          key={`${group.title}:${item.href}:${item.label}`}
-                          className={rowBase}
-                          title={collapsed ? item.label : undefined}
-                        >
-                          <Link
-                            href={item.href}
-                            onClick={isMobile ? onClose : undefined}
-                            className="flex min-w-0 flex-1 items-center gap-2.5"
-                            aria-label={item.label}
-                          >
-                            <Icon
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
-                              )}
-                            />
-                            <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
-                          </Link>
-                          {sessionId && !collapsed ? (
-                            <button
-                              type="button"
-                              className={cn(
-                                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
-                                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
-                              )}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const next = toggleFavorite(sessionId, role, item.href);
-                                setFavorites(next);
-                              }}
-                              aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
-                              title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
-                            >
-                              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
-                            </button>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                    {group.items.map((item) => renderExpandedItem(group.title, item))}
                   </div>
                 ) : null}
               </section>
@@ -860,8 +1214,8 @@ function Topbar({
 }) {
   return (
     <PortalHeader>
-      <div className="flex min-h-[4.8rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-h-[4.8rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 max-w-full flex-[1_1_12rem] items-center gap-3 sm:flex-[1_1_40%]">
           <button
             type="button"
             onClick={onOpenSidebar}
@@ -884,13 +1238,35 @@ function Topbar({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-[0_1_auto]">
+          {role === "ADMIN" ? (
+            <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 2xl:flex">
+              {[
+                { label: "Customer", href: `${ROUTES.admin.customers}/create` },
+                { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
+                { label: "Direct Sale", href: ROUTES.admin.billingDirectSaleCreate },
+                { label: "Payment", href: ROUTES.admin.financeCollect },
+                { label: "Delivery", href: ROUTES.admin.deliveryCreate },
+              ].map((action) => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  title={`Create ${action.label}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={onOpenCommandPalette}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
             aria-label="Open command palette"
             title="Command palette"
+            data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
           </button>
@@ -900,6 +1276,7 @@ function Topbar({
             className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
+            data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
             Command
@@ -910,13 +1287,14 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenQuickActions}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-2.5 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] sm:px-3"
             aria-label="Open quick actions"
             title="Quick actions"
           >
-            <ReceiptText className="h-4 w-4" />
-            Quick Actions
+            <ReceiptText className="h-4 w-4 shrink-0" />
+            <span className="max-[380px]:sr-only">Quick Actions</span>
           </button>
+          <NotificationBellDropdown role={role} />
           <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
         </div>
       </div>
@@ -927,7 +1305,8 @@ function Topbar({
 export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileOpen = mobileMenuOpen;
   const sessionSnapshot = useSyncExternalStore(subscribeDashboardShell, readSessionSnapshot, () => "null");
   const session = useMemo(() => parseSessionSnapshot(sessionSnapshot), [sessionSnapshot]);
   const { logout, isLoggingOut } = useLogout();
@@ -940,6 +1319,29 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     () => "false"
   );
   const sidebarCollapsed = sidebarCollapsedSnapshot === "true";
+  const workspaceWidthPresetSnapshot = useSyncExternalStore(
+    subscribeDashboardShell,
+    readWorkspaceWidthPresetSnapshot,
+    () => "2"
+  );
+  const workspaceWidthPreset = clampWorkspaceWidthPreset(
+    Number.parseInt(workspaceWidthPresetSnapshot, 10)
+  );
+  const workspaceShellStyle = useMemo(
+    () =>
+      ({
+        "--workspace-max-width": WORKSPACE_WIDTH_CSS_VALUES[workspaceWidthPreset],
+      }) as CSSProperties,
+    [workspaceWidthPreset]
+  );
+  const persistWorkspaceWidthPreset = useCallback((next: 0 | 1 | 2) => {
+    try {
+      window.localStorage.setItem(WORKSPACE_WIDTH_PRESET_KEY, String(next));
+    } catch {
+      // preference-only
+    }
+    notifyDashboardShellChanged();
+  }, []);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandEpoch, setCommandEpoch] = useState(0);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -970,6 +1372,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   useEffect(() => {
     if (nested) return;
+    void Promise.resolve().then(() => {
+      setMobileMenuOpen(false);
+    });
+  }, [nested, pathname]);
+
+  useEffect(() => {
+    if (nested) return;
     function shouldIgnore(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (!target) return false;
@@ -989,6 +1398,14 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [nested, openCommandPalette]);
 
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+  }, []);
+
+  const openMobileMenu = useCallback(() => {
+    setMobileMenuOpen(true);
+  }, []);
+
   if (nested) {
     return <>{children}</>;
   }
@@ -996,7 +1413,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   return (
     <DashboardShellContext.Provider value={true}>
       <WorkflowProvider role={role}>
-        <div className="relative">
+        <div className="relative overflow-x-clip" style={workspaceShellStyle}>
           <PortalShell
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>
@@ -1010,21 +1427,30 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   isLoggingOut={isLoggingOut}
                   collapsed={sidebarCollapsed}
                   onToggleCollapse={toggleSidebarCollapse}
+                  workspaceWidthPreset={workspaceWidthPreset}
+                  onWorkspaceWidthPresetChange={persistWorkspaceWidthPreset}
                 />
               </RoleSidebar>
             }
             header={
-              <Topbar
-                title={title}
-                role={role}
-                displayName={displayName}
-                onOpenSidebar={() => setMobileOpen(true)}
-                onOpenCommandPalette={openCommandPalette}
-                onOpenQuickActions={() => setQuickActionsOpen(true)}
-                onLogout={logout}
-                isLoggingOut={isLoggingOut}
-                mobileOpen={mobileOpen}
-              />
+              <Fragment>
+                <Topbar
+                  title={title}
+                  role={role}
+                  displayName={displayName}
+                  onOpenSidebar={openMobileMenu}
+                  onOpenCommandPalette={openCommandPalette}
+                  onOpenQuickActions={() => setQuickActionsOpen(true)}
+                  onLogout={logout}
+                  isLoggingOut={isLoggingOut}
+                  mobileOpen={mobileOpen}
+                />
+                <AdminWorkspaceMenubar
+                  role={role}
+                  onOpenCommandPalette={openCommandPalette}
+                  onOpenQuickActions={() => setQuickActionsOpen(true)}
+                />
+              </Fragment>
             }
           >
             <>
@@ -1033,7 +1459,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             </>
           </PortalShell>
 
-          <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
+          <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={closeMobileMenu}>
             <div id="mobile-sidebar-nav">
             <SidebarContent
               key={`sidebar-mobile:${role}:${sessionId ?? "anon"}`}
@@ -1045,14 +1471,19 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               isLoggingOut={isLoggingOut}
               collapsed={false}
               onToggleCollapse={toggleSidebarCollapse}
-              onClose={() => setMobileOpen(false)}
+              onClose={closeMobileMenu}
+              workspaceWidthPreset={workspaceWidthPreset}
+              onWorkspaceWidthPresetChange={persistWorkspaceWidthPreset}
             />
             </div>
           </RoleSidebar>
 
           <QuickActionLauncher
             open={quickActionsOpen}
-            onClose={() => setQuickActionsOpen(false)}
+            onClose={() => {
+              setQuickActionsOpen(false);
+              closeMobileMenu();
+            }}
             role={role}
             sessionId={sessionId}
             currentPathname={pathname}
@@ -1060,7 +1491,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           <CommandPalette
             key={`command:${role}:${sessionId ?? "anon"}:${commandEpoch}`}
             open={commandOpen}
-            onClose={() => setCommandOpen(false)}
+            onClose={() => {
+              setCommandOpen(false);
+              closeMobileMenu();
+            }}
             role={role}
             sessionId={sessionId}
             currentPathname={pathname}

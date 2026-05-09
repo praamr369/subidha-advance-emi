@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.public_site import PublicBusinessProfileSerializer
+from subscriptions.models_business_setup import PublicBusinessProfile
 from subscriptions.services.public_site_service import (
     get_active_public_business_profile,
     upsert_public_business_profile,
@@ -15,11 +16,10 @@ class AdminPublicBusinessProfileView(APIView):
 
     def get(self, request):
         profile = get_active_public_business_profile()
-        if not profile:
-            return Response(
-                {"detail": "Public business profile is not configured yet."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        if profile is None:
+            # Safe defaults so the admin form never depends on a 404 from this endpoint.
+            placeholder = PublicBusinessProfile(is_active=True)
+            return Response(PublicBusinessProfileSerializer(placeholder).data)
         return Response(PublicBusinessProfileSerializer(profile).data)
 
     def put(self, request):

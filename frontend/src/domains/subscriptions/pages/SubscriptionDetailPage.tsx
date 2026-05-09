@@ -123,7 +123,7 @@ export default function AdminSubscriptionDetailPage() {
             <ActionButton
               type="button"
               variant="primary"
-              onClick={() => router.push(`/admin/payments/create?subscription=${subscription.id}`)}
+              onClick={() => router.push(`/admin/finance/collect?subscription=${subscription.id}`)}
             >
               Collect EMI
             </ActionButton>

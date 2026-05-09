@@ -1,3 +1,4 @@
+import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
 type BannerItem = {
@@ -31,7 +32,7 @@ export default function PublicMarketingBanner({
       <div className="pointer-events-none absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-amber-100/50 blur-2xl" />
       <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</div>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">{description}</p>
+      <Typography className="mt-2 max-w-3xl sm:text-base">{description}</Typography>
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <article key={item.title} className="public-card-sm px-4 py-3">

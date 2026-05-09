@@ -11,6 +11,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import { ROUTES } from "@/lib/routes";
 import CustomerSelector from "@/components/admin/customers/CustomerSelector";
 import type { CustomerRecord } from "@/services/customers";
 
@@ -58,6 +59,9 @@ type LuckyIdOption = {
   lucky_number?: number;
   status?: string;
   batch?: number;
+  assignable?: boolean;
+  assignment_state?: string;
+  assignment_note?: string;
 };
 
 type PartnerOption = {
@@ -186,6 +190,9 @@ function normalizeLuckyId(raw: Record<string, unknown>): LuckyIdOption {
     lucky_number: toOptionalNumber(raw.lucky_number),
     status: toOptionalString(raw.status),
     batch: toOptionalNumber(raw.batch),
+    assignable: typeof raw.assignable === "boolean" ? raw.assignable : undefined,
+    assignment_state: toOptionalString(raw.assignment_state),
+    assignment_note: toOptionalString(raw.assignment_note),
   };
 }
 
@@ -471,8 +478,14 @@ export default function SubscriptionCreatePage({
   }, [leadContext, product?.id, product?.name, product?.product_code]);
 
   const canonicalSelfHref = useMemo(() => {
-    return searchParamKey ? `/admin/subscriptions/create?${searchParamKey}` : "/admin/subscriptions/create";
-  }, [searchParamKey]);
+    const canonicalPath =
+      planType === "RENT"
+        ? ROUTES.admin.subscriptionsRentCreate
+        : planType === "LEASE"
+          ? ROUTES.admin.subscriptionsLeaseCreate
+          : ROUTES.admin.subscriptionsAdvanceEmiCreate;
+    return searchParamKey ? `${canonicalPath}?${searchParamKey}` : canonicalPath;
+  }, [planType, searchParamKey]);
 
   const returnToLeadHref = useMemo(() => {
     if (!success || !leadContext?.lead) return null;
@@ -630,7 +643,9 @@ export default function SubscriptionCreatePage({
     const payload = await apiFetch<Record<string, unknown>>(
       `/admin/lucky-ids/available/?batch_id=${encodeURIComponent(String(batchId))}`
     );
-    const allRows = toArray<Record<string, unknown>>(payload).map(normalizeLuckyId);
+    const allRows = toArray<Record<string, unknown>>(payload)
+      .map(normalizeLuckyId)
+      .filter((item) => item.assignable !== false);
     const trimmedQuery = query.trim();
     const filteredRows = trimmedQuery
       ? allRows.filter((item) =>
@@ -1126,7 +1141,17 @@ export default function SubscriptionCreatePage({
       setSuccess(created);
       onCreated?.(created.id);
     } catch (err) {
-      setError(toErrorMessage(err));
+      const message = toErrorMessage(err);
+      if (
+        message.toLowerCase().includes("lucky id") &&
+        (message.toLowerCase().includes("no longer") ||
+          message.toLowerCase().includes("assigned") ||
+          message.toLowerCase().includes("frozen"))
+      ) {
+        setError("This Lucky ID is no longer available. Refresh and choose another.");
+      } else {
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
       setGlobalLoadingLabel(null);
@@ -1604,7 +1629,7 @@ export default function SubscriptionCreatePage({
                           Lucky {formatLuckyNumber(item)}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {item.status || "AVAILABLE"}
+                          {item.assignment_note || item.assignment_state || item.status || "AVAILABLE"}
                         </div>
                       </div>
                     )}
@@ -1614,7 +1639,7 @@ export default function SubscriptionCreatePage({
                           Lucky {formatLuckyNumber(item)}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {item.status || "AVAILABLE"}
+                          {item.assignment_note || item.assignment_state || item.status || "AVAILABLE"}
                         </div>
                       </div>
                     )}

@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -21,7 +22,13 @@ from subscriptions.models import (
     ContractAmendmentStatus,
     ProductPossession,
     RentLeaseReturnInspection,
+    PlanType,
     Subscription,
+)
+from subscriptions.services.document_pdf_service import (
+    render_lease_contract_pdf,
+    render_rent_contract_pdf,
+    render_return_inspection_pdf,
 )
 
 
@@ -92,6 +99,63 @@ class AdminLeaseContractCreateView(APIView):
         )
 
 
+class AdminRentContractPdfView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        subscription = (
+            Subscription.objects.select_related("customer", "product", "rent_profile")
+            .filter(pk=pk, plan_type=PlanType.RENT)
+            .first()
+        )
+        if subscription is None or not hasattr(subscription, "rent_profile"):
+            return Response({"detail": "Rent contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_rent_contract_pdf(contract=subscription.rent_profile)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="rent-contract-{subscription.id}.pdf"'
+        )
+        return response
+
+
+class AdminLeaseContractPdfView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        subscription = (
+            Subscription.objects.select_related("customer", "product", "lease_profile")
+            .filter(pk=pk, plan_type=PlanType.LEASE)
+            .first()
+        )
+        if subscription is None or not hasattr(subscription, "lease_profile"):
+            return Response({"detail": "Lease contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_lease_contract_pdf(contract=subscription.lease_profile)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="lease-contract-{subscription.id}.pdf"'
+        )
+        return response
+
+
+class AdminReturnInspectionPdfView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        inspection = (
+            RentLeaseReturnInspection.objects.select_related("subscription", "subscription__customer")
+            .filter(pk=pk)
+            .first()
+        )
+        if inspection is None:
+            return Response({"detail": "Return inspection not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_return_inspection_pdf(return_or_inspection_record=inspection)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="return-inspection-{inspection.id}.pdf"'
+        )
+        return response
+
+
 # ─── Contract Lifecycle ───────────────────────────────────────────────────────
 
 class ContractApproveView(APIView):
@@ -148,12 +212,12 @@ class ContractCancelView(APIView):
         reason = (request.data.get("reason") or "").strip()
         force = bool(request.data.get("force_after_activation", False))
 
-        from subscriptions.services.contract_lifecycle_service import cancel_contract
+        from subscriptions.services.operational_cancellation_service import cancel_subscription
         from django.core.exceptions import ValidationError
         try:
-            sub = cancel_contract(
-                subscription=sub,
-                performed_by=request.user,
+            cancel_subscription(
+                subscription_id=sub.id,
+                actor=request.user,
                 reason=reason,
                 force_after_activation=force,
             )

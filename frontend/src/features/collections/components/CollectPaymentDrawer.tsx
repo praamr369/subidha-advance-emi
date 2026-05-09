@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import DrawerShell from "@/components/ui/DrawerShell";
+import { invalidateAfterSubscriptionPaymentMutation } from "@/lib/operational-query-invalidation";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   collectPayment,
@@ -91,7 +92,11 @@ function CollectPaymentDrawerContent({
 
     async function loadFinanceAccountOptions() {
       try {
-        const payload = await listFinanceAccounts({ is_active: 1, page_size: 100 });
+        const payload = await listFinanceAccounts({
+          is_active: 1,
+          page_size: 100,
+          for_payment_collection: "true",
+        });
         if (!active) return;
         setFinanceAccounts(payload.results.filter((account) => account.is_active));
       } catch {
@@ -124,19 +129,7 @@ function CollectPaymentDrawerContent({
     const paymentId = result.payment?.id;
     const resolvedEmiId = result.emi?.id;
 
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["payments"] }),
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
-      queryClient.invalidateQueries({ queryKey: ["dashboard-today-queue"] }),
-      queryClient.invalidateQueries({ queryKey: ["dashboard-priority-alerts"] }),
-      queryClient.invalidateQueries({ queryKey: ["collections-due-today"] }),
-      queryClient.invalidateQueries({ queryKey: ["collections-overdue"] }),
-      queryClient.invalidateQueries({ queryKey: ["collections-recent"] }),
-      queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-      queryClient.invalidateQueries({ queryKey: ["emis"] }),
-      queryClient.invalidateQueries({ queryKey: ["pending-emis"] }),
-      queryClient.invalidateQueries({ queryKey: ["overdue-emis"] }),
-    ]);
+    await invalidateAfterSubscriptionPaymentMutation(queryClient);
 
     if (subscriptionId) {
       await queryClient.invalidateQueries({

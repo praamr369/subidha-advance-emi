@@ -151,8 +151,8 @@ export default function AdminWorkflowDashboard() {
       title="Admin control center"
       subtitle="Enterprise workflow for customer onboarding, subscription control, batch operations, collections, lucky draw governance, and reconciliation."
       actions={[
-        { href: "/admin/subscriptions/create", label: "Create subscription", variant: "primary" },
-        { href: "/admin/payments/create", label: "Collect payment", variant: "secondary" },
+        { href: "/admin/subscriptions/advance-emi/create", label: "Create subscription", variant: "primary" },
+        { href: "/admin/finance/collect", label: "Collect payment", variant: "secondary" },
         { href: "/admin/lucky-draws/create", label: "Run lucky draw", variant: "ghost" },
       ]}
       breadcrumbs={[

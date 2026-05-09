@@ -1,359 +1,172 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardList, FolderKanban, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
-import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatCard from "@/components/ui/StatCard";
-import { WorkspaceSection } from "@/components/ui/workspace";
-import { buildAdminCrmPartyRoute } from "@/lib/route-builders";
+import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import {
+  CrmOperationalWorkspace,
+  type CrmWorkspaceSectionCard,
+} from "@/components/workspace/CrmOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
+import { getAdminCrmWorkspace, type CrmWorkspacePayload } from "@/services/admin-erp";
+import { listCustomers } from "@/services/customers";
 import { getCrmOverview, type CrmOverviewResponse } from "@/services/crm";
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return "—";
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleString("en-IN");
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return "Unable to load CRM overview.";
+function findPipelineCount(payload: CrmWorkspacePayload | null, key: string): number {
+  const row = payload?.crm_pipeline?.find((entry) => entry.key === key);
+  return Number(row?.count || 0);
 }
 
 export default function AdminCrmOverviewPage() {
-  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState<CrmWorkspacePayload | null>(null);
+  const [overview, setOverview] = useState<CrmOverviewResponse | null>(null);
+  const [customerCount, setCustomerCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [payload, setPayload] = useState<CrmOverviewResponse | null>(null);
-
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await getCrmOverview();
-      setPayload(next);
-      setError(null);
-    } catch (err) {
-      setPayload(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
-    void loadPage();
+    let active = true;
+    async function load() {
+      const [workspaceResult, overviewResult, customerResult] = await Promise.allSettled([
+        getAdminCrmWorkspace(),
+        getCrmOverview(),
+        listCustomers({ page: 1 }),
+      ]);
+
+      if (!active) return;
+
+      if (workspaceResult.status === "fulfilled") {
+        setWorkspace(workspaceResult.value);
+      } else {
+        setWorkspace(null);
+        setError("CRM workspace status is unavailable.");
+      }
+
+      if (overviewResult.status === "fulfilled") {
+        setOverview(overviewResult.value);
+      } else {
+        setOverview(null);
+      }
+
+      if (customerResult.status === "fulfilled") {
+        setCustomerCount(Number(customerResult.value.count || 0));
+      } else {
+        setCustomerCount(null);
+      }
+    }
+
+    void load();
+    return () => {
+      active = false;
+    };
   }, []);
 
+  const cards = useMemo<CrmWorkspaceSectionCard[]>(() => {
+    const customersLoaded = customerCount !== null;
+    const partyCount = overview?.summary.party_count;
+    const leadsCount = overview?.summary.lead_count;
+    const followupsCount = overview?.summary.due_follow_up_count;
+    const supportCount = findPipelineCount(workspace, "support_open");
+    const kycCount = findPipelineCount(workspace, "pending_kyc");
+
+    return [
+      {
+        key: "registered-customers",
+        label: "Registered Customers",
+        purpose: "Canonical customer profiles used by direct-sale existing-customer selection.",
+        href: ROUTES.admin.customers,
+        count: customersLoaded ? customerCount : null,
+        status: customersLoaded ? "ready" : "loading",
+        statusMessage: customersLoaded ? `${customerCount} customer profiles.` : "Loading customer register status...",
+      },
+      {
+        key: "crm-parties",
+        label: "CRM Parties",
+        purpose: "Party 360 entries linked across customer, lead, partner, vendor, and staff roles.",
+        href: ROUTES.admin.crmParties,
+        count: typeof partyCount === "number" ? partyCount : null,
+        status: typeof partyCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof partyCount === "number"
+            ? `${partyCount} party records.`
+            : "Loading party directory status...",
+      },
+      {
+        key: "leads",
+        label: "Leads / Enquiries",
+        purpose: "Lead pipeline and enquiry conversion workflow.",
+        href: ROUTES.admin.crmLeads,
+        count: typeof leadsCount === "number" ? leadsCount : null,
+        status: typeof leadsCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof leadsCount === "number"
+            ? `${leadsCount} lead/enquiry records.`
+            : "Loading leads status...",
+      },
+      {
+        key: "followups",
+        label: "Follow-ups",
+        purpose: "Open interaction follow-up queue and due-call reminders.",
+        href: ROUTES.admin.crmFollowUps,
+        count: typeof followupsCount === "number" ? followupsCount : null,
+        status: typeof followupsCount === "number" ? "ready" : "loading",
+        statusMessage:
+          typeof followupsCount === "number"
+            ? `${followupsCount} due follow-ups.`
+            : "Loading follow-up queue status...",
+      },
+      {
+        key: "kyc",
+        label: "KYC",
+        purpose: "Pending customer KYC verification queue for operational controls.",
+        href: ROUTES.admin.crmKyc,
+        count: workspace ? kycCount : null,
+        status: workspace ? "ready" : "loading",
+        statusMessage: workspace
+          ? `${kycCount} KYC records pending review.`
+          : "Loading KYC queue status...",
+      },
+      {
+        key: "support",
+        label: "Support / Service Cases",
+        purpose: "Customer service and support escalation queue.",
+        href: ROUTES.admin.supportRequests,
+        count: workspace ? supportCount : null,
+        status: workspace ? "ready" : "loading",
+        statusMessage: workspace
+          ? `${supportCount} open support/service cases.`
+          : "Loading support queue status...",
+      },
+    ];
+  }, [customerCount, overview, workspace]);
+
   return (
-    <PortalPage
-      eyebrow="CRM Operations"
-      title="CRM Control Center"
-      subtitle="Keep lead, customer, vendor, partner, and staff continuity in one additive party directory without replacing the underlying operational source records."
-      helperNote="CRM is the continuity layer for follow-up and identity linking. Customer, billing, support, and subscription actions still happen in their own canonical modules."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "CRM" },
-      ]}
-      actions={[
-        { href: ROUTES.admin.crmLeads, label: "Lead Register", variant: "secondary" },
-        { href: ROUTES.admin.crmParties, label: "Party Directory", variant: "primary" },
-        { href: ROUTES.admin.leads, label: "Lead Triage", variant: "secondary" },
-      ]}
-      stats={[
-        { label: "Parties", value: String(payload?.summary.party_count ?? 0), tone: "info" },
-        { label: "Leads", value: String(payload?.summary.lead_count ?? 0) },
-        {
-          label: "Due Follow-Ups",
-          value: String(payload?.summary.due_follow_up_count ?? 0),
-          tone: (payload?.summary.due_follow_up_count ?? 0) > 0 ? "warning" : "success",
-        },
-        {
-          label: "Open Interactions",
-          value: String(payload?.summary.open_interaction_count ?? 0),
-          tone: "info",
-        },
-      ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+    <WorkspaceShell
+      title="CRM Workspace"
+      subtitle="Operational CRM hub with explicit separation between registered customers and CRM party records."
     >
-      <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading CRM overview..." /> : null}
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load CRM overview"
-            description={error}
-            onRetry={() => void loadPage()}
-          />
-        ) : null}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : null}
 
-        {!loading && !error && payload ? (
-          <>
-            <ControlLaneGrid
-              title="CRM lanes"
-              description="CRM keeps lead continuity, party identity, and follow-up posture explicit. Conversion into customers, subscriptions, and billing still happens in those dedicated modules."
-              lanes={[
-                {
-                  title: "Lead triage",
-                  description: "Operational inbox for public apply submissions and assignment.",
-                  href: ROUTES.admin.leads,
-                  icon: <ClipboardList className="h-4 w-4" />,
-                  badge: "Queue",
-                },
-                {
-                  title: "CRM lead register",
-                  description: "Party-linked lead register for lifecycle and follow-up review.",
-                  href: ROUTES.admin.crmLeads,
-                  icon: <FolderKanban className="h-4 w-4" />,
-                  badge: "CRM",
-                },
-                {
-                  title: "Party directory",
-                  description: "Shared additive identity layer across customer, partner, vendor, and staff records.",
-                  href: ROUTES.admin.crmParties,
-                  icon: <Users className="h-4 w-4" />,
-                  badge: "Directory",
-                },
-              ]}
-            />
-            <WorkspaceDirectory
-              title="CRM route map"
-              description="Move between intake, continuity, and commercial handoff without mixing CRM review with customer, billing, or support execution."
-              groups={[
-                {
-                  title: "Lead intake",
-                  description: "Operational queues for new enquiries and lead follow-up.",
-                  items: [
-                    {
-                      title: "Lead Triage",
-                      description: "Public enquiry intake, assignment, and conversion handoff queue.",
-                      href: ROUTES.admin.leads,
-                      icon: <ClipboardList className="h-4 w-4" />,
-                      badge: "Queue",
-                    },
-                    {
-                      title: "CRM Lead Register",
-                      description: "Lead continuity view with party links and follow-up posture.",
-                      href: ROUTES.admin.crmLeads,
-                      icon: <FolderKanban className="h-4 w-4" />,
-                      badge: "Register",
-                    },
-                  ],
-                },
-                {
-                  title: "Directory and continuity",
-                  description: "Identity and relationship surfaces across the business.",
-                  items: [
-                    {
-                      title: "Party Directory",
-                      description: "Additive identity graph for customers, partners, vendors, and staff.",
-                      href: ROUTES.admin.crmParties,
-                      icon: <Users className="h-4 w-4" />,
-                      badge: "Directory",
-                    },
-                    {
-                      title: "Customer Register",
-                      description: "Customer profile workflow once CRM continuity is ready for conversion.",
-                      href: ROUTES.admin.customers,
-                      icon: <Users className="h-4 w-4" />,
-                      badge: "Customer",
-                    },
-                  ],
-                },
-                {
-                  title: "Commercial handoff",
-                  description: "Bounded action modules that stay linked to CRM rather than embedded inside it.",
-                  items: [
-                    {
-                      title: "Billing Operations",
-                      description: "Retail billing and direct-sale follow-up outside the CRM lane.",
-                      href: ROUTES.admin.billing,
-                      icon: <FolderKanban className="h-4 w-4" />,
-                      badge: "Billing",
-                    },
-                    {
-                      title: "Support Requests",
-                      description: "Customer issue intake tied back to CRM parties where relevant.",
-                      href: ROUTES.admin.supportRequests,
-                      icon: <ClipboardList className="h-4 w-4" />,
-                      badge: "Support",
-                    },
-                  ],
-                },
-              ]}
-            />
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                label="Customers"
-                value={String(payload.summary.customer_count)}
-                subtext="Parties already linked to real customer records."
-                tone="success"
-              />
-              <StatCard
-                label="Partners"
-                value={String(payload.summary.partner_count)}
-                subtext="Partner identities linked additively into the party directory."
-                tone="info"
-              />
-              <StatCard
-                label="Vendors"
-                value={String(payload.summary.vendor_count)}
-                subtext="Supplier continuity for procurement and expense workflows."
-                tone="default"
-              />
-              <StatCard
-                label="Staff"
-                value={String(payload.summary.staff_count)}
-                subtext="Workforce records linked without changing payroll truth."
-                tone="default"
-              />
-            </div>
+      <section className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <p>
+          Direct-sale existing-customer search uses the registered customer source (`/api/v1/admin/customers/search/`).
+          CRM parties remain a separate model and are not submitted as `customer` IDs in direct-sale payloads.
+        </p>
+        <p className="mt-2">
+          CRM Pipeline visibility is handled through the Leads / Enquiries and Follow-ups sections in this workspace.
+        </p>
+        <p className="mt-2">
+          Create-customer-from-party action path: unavailable (backend endpoint not present). Use{" "}
+          <Link href={`${ROUTES.admin.customers}/create`} className="font-medium text-primary underline-offset-4 hover:underline">
+            customer create
+          </Link>{" "}
+          for now.
+        </p>
+      </section>
 
-            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <WorkspaceSection
-                title="Lead Pipeline"
-                description="The CRM overview mirrors the live lead queue and conversion posture without replacing the existing lead workflow."
-                actionHref={ROUTES.admin.crmLeads}
-                actionLabel="Open Lead Register"
-              >
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                  {[
-                    ["New", payload.lead_pipeline.new],
-                    ["In Progress", payload.lead_pipeline.in_progress],
-                    ["Contacted", payload.lead_pipeline.contacted],
-                    ["Converted", payload.lead_pipeline.converted],
-                    ["Closed", payload.lead_pipeline.closed],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl border border-white/75 bg-white/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
-                    >
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        {label}
-                      </div>
-                      <div className="mt-2 text-2xl font-semibold text-foreground">
-                        {value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {payload.recent_leads.length === 0 ? (
-                    <EmptyState
-                      title="No recent leads"
-                      description="Public or admin-created leads will appear here once they enter the queue."
-                    />
-                  ) : (
-                    payload.recent_leads.map((lead) => (
-                      <Link
-                        key={lead.id}
-                        href={`${ROUTES.admin.leads}/${lead.id}`}
-                        className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
-                      >
-                        <div>
-                          <div className="font-medium text-foreground">{lead.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {lead.phone} · {lead.city || "No city"}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {lead.product_name || "Free-text product context"} · {lead.status}
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDateTime(lead.created_at)}
-                        </div>
-                      </Link>
-                    ))
-                  )}
-                </div>
-              </WorkspaceSection>
-
-              <WorkspaceSection
-                title="Follow-Up Queue"
-                description="Open interactions stay separate from finance and subscription truth, but they are visible alongside the related party."
-                actionHref={ROUTES.admin.crmParties}
-                actionLabel="Open Party Directory"
-              >
-                <div className="space-y-3">
-                  {payload.follow_up_queue.length === 0 ? (
-                    <EmptyState
-                      title="No follow-ups due"
-                      description="Open CRM follow-up items will appear here when the team records them."
-                    />
-                  ) : (
-                    payload.follow_up_queue.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={buildAdminCrmPartyRoute(item.party_id)}
-                        className="block rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="font-medium text-foreground">
-                              {item.party_display_name}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {item.party_no} · {item.subject || item.interaction_type}
-                            </div>
-                          </div>
-                          <div className="text-right text-xs text-muted-foreground">
-                            <div>{item.status}</div>
-                            <div>{formatDateTime(item.next_follow_up_at || item.happened_at)}</div>
-                          </div>
-                        </div>
-                      </Link>
-                    ))
-                  )}
-                </div>
-              </WorkspaceSection>
-            </div>
-
-            <WorkspaceSection
-              title="Recent Parties"
-              description="The directory links source-specific records together without merging or replacing the original customer, vendor, partner, or staff tables."
-              actionHref={ROUTES.admin.crmParties}
-              actionLabel="Open Directory"
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                {payload.recent_parties.length === 0 ? (
-                  <EmptyState
-                    title="No party records yet"
-                    description="CRM party records will appear here once a lead or role profile syncs into the directory."
-                  />
-                ) : (
-                  payload.recent_parties.map((party) => (
-                    <Link
-                      key={party.id}
-                      href={buildAdminCrmPartyRoute(party.id)}
-                      className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="font-medium text-foreground">{party.display_name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {party.party_no} · {party.role_types.join(", ") || "Unlinked"}
-                          </div>
-                        </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          <div>{party.follow_up_state}</div>
-                          <div>{party.open_follow_up_count} open</div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
-            </WorkspaceSection>
-          </>
-        ) : null}
-      </div>
-    </PortalPage>
+      <CrmOperationalWorkspace cards={cards} />
+    </WorkspaceShell>
   );
 }

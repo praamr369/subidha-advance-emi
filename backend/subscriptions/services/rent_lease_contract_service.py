@@ -110,6 +110,10 @@ def create_rent_contract(
     # Assign immutable contract number
     from subscriptions.services.contract_number_service import assign_subscription_number
     assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
 
     # Create possession record
     from subscriptions.services.product_possession_service import create_possession_record
@@ -201,6 +205,10 @@ def create_lease_contract(
     # Assign immutable contract number
     from subscriptions.services.contract_number_service import assign_subscription_number
     assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
 
     # Create possession record
     from subscriptions.services.product_possession_service import create_possession_record
@@ -282,4 +290,3 @@ def assess_return_and_calculate_refund(
         "refund_amount": str(refund_amount),
         "refund_status": profile.refund_status,
     }
-

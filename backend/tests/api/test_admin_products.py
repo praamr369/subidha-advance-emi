@@ -15,7 +15,14 @@ from subscriptions.models import (
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
 )
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_batch,
+    create_customer_profile,
+    create_lucky_id,
+    create_product,
+    create_subscription,
+)
 
 
 def build_png_upload(name: str) -> SimpleUploadedFile:
@@ -305,3 +312,109 @@ class AdminProductsApiTests(APITestCase):
 
         product.refresh_from_db()
         self.assertEqual(product.inventory_profile.id, inventory_profile.id)
+
+    def test_product_capability_patch_persists_flags(self):
+        product = create_product(
+            name="Capability Patch Product",
+            product_code="CAP-PATCH-001",
+            base_price=Decimal("18000.00"),
+        )
+
+        response = self.client.patch(
+            f"/api/v1/admin/products/{product.id}/",
+            {
+                "is_active": True,
+                "is_emi_enabled": False,
+                "is_rent_enabled": True,
+                "is_lease_enabled": True,
+                "is_direct_sale_enabled": False,
+                "plan_type_default": "RENT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        product.refresh_from_db()
+        self.assertTrue(product.is_active)
+        self.assertFalse(product.is_emi_enabled)
+        self.assertTrue(product.is_rent_enabled)
+        self.assertTrue(product.is_lease_enabled)
+        self.assertFalse(product.is_direct_sale_enabled)
+        self.assertEqual(product.plan_type_default, "RENT")
+        self.assertEqual(response.data["plan_type_default"], "RENT")
+
+    def test_product_capability_change_does_not_mutate_subscription_snapshot(self):
+        product = create_product(
+            name="Capability Snapshot Product",
+            product_code="CAP-SNAP-001",
+            base_price=Decimal("15000.00"),
+        )
+        customer = create_customer_profile(
+            name="Capability Snapshot Customer",
+            phone="9304000999",
+        )
+        batch = create_batch(batch_code="CAP-SNAP-BATCH")
+        lucky_id = create_lucky_id(batch=batch, lucky_number=91)
+        subscription = create_subscription(
+            customer=customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky_id,
+            partner=self.admin,
+            total_amount=Decimal("15000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=15,
+        )
+
+        response = self.client.patch(
+            f"/api/v1/admin/products/{product.id}/",
+            {
+                "is_emi_enabled": False,
+                "is_rent_enabled": True,
+                "is_lease_enabled": False,
+                "is_direct_sale_enabled": True,
+                "plan_type_default": "RENT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.total_amount, Decimal("15000.00"))
+        self.assertEqual(subscription.monthly_amount, Decimal("1000.00"))
+
+    def test_inventory_item_patch_toggles_stock_flags_without_base_price_change(self):
+        product = create_product(
+            name="Inventory Toggle Product",
+            product_code="INV-TOGGLE-001",
+            base_price=Decimal("22000.00"),
+        )
+        item = InventoryItem.objects.create(
+            product=product,
+            sku="INV-TOGGLE-001",
+            opening_stock_qty=Decimal("3.000"),
+            reorder_level_qty=Decimal("1.000"),
+            standard_unit_cost=Decimal("12000.00"),
+        )
+
+        response = self.client.patch(
+            f"/api/v1/inventory/items/{item.id}/",
+            {
+                "stock_tracking_enabled": False,
+                "delivery_stock_bridge_enabled": False,
+                "reorder_level_qty": "2.000",
+                "standard_unit_cost": "12500.00",
+                "is_active": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        item.refresh_from_db()
+        product.refresh_from_db()
+        self.assertFalse(item.stock_tracking_enabled)
+        self.assertFalse(item.delivery_stock_bridge_enabled)
+        self.assertEqual(item.reorder_level_qty, Decimal("2.000"))
+        self.assertEqual(item.standard_unit_cost, Decimal("12500.00"))
+        self.assertFalse(item.is_active)
+        self.assertEqual(product.base_price, Decimal("22000.00"))

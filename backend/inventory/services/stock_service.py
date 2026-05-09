@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
@@ -23,6 +23,9 @@ from inventory.models import (
     StockMovementType,
 )
 from inventory.services.audit_service import log_inventory_event
+from inventory.services.purchase_need_reconciliation_service import (
+    reconcile_direct_sale_needs_after_inventory_in,
+)
 from subscriptions.models import AuditLog
 
 
@@ -335,6 +338,11 @@ def approve_stock_adjustment(*, stock_adjustment_id: int, approved_by):
     return adjustment, True
 
 
+UNIT_COST_REQUIRED_BEFORE_POSTING_MSG = (
+    "Unit cost is required before posting this stock adjustment."
+)
+
+
 @transaction.atomic
 def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     adjustment = (
@@ -342,16 +350,43 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=stock_adjustment_id)
     )
-    if adjustment.status == StockAdjustmentStatus.POSTED and adjustment.posted_journal_entry_id:
+    if adjustment.status == StockAdjustmentStatus.POSTED:
         return adjustment, False
-    if adjustment.status not in {StockAdjustmentStatus.APPROVED, StockAdjustmentStatus.POSTED}:
+    if adjustment.status != StockAdjustmentStatus.APPROVED:
         raise ValueError("Only approved stock adjustments can be posted.")
     if not (adjustment.reason or "").strip():
         raise ValueError("Reason is required before posting a stock adjustment.")
 
+    lines_list = list(
+        adjustment.lines.select_related("inventory_item").order_by("id")
+    )
+    if not lines_list:
+        raise ValueError("Stock adjustment lines are required before posting.")
+
+    adjustment_amount = Decimal("0.00")
+    for line in lines_list:
+        if line.unit_cost_snapshot is not None:
+            resolved_unit_cost = _money(line.unit_cost_snapshot)
+        else:
+            std = line.inventory_item.standard_unit_cost
+            if std is None:
+                raise ValueError(UNIT_COST_REQUIRED_BEFORE_POSTING_MSG)
+            resolved_unit_cost = _money(std)
+
+        qty_abs = abs(_quantity(line.quantity_delta))
+        line_valuation = _money(qty_abs * resolved_unit_cost)
+        adjustment_amount += line_valuation
+
+        save_fields = ["valuation_amount_snapshot", "updated_at"]
+        line.valuation_amount_snapshot = line_valuation
+        if line.unit_cost_snapshot is None:
+            line.unit_cost_snapshot = resolved_unit_cost
+            save_fields.insert(0, "unit_cost_snapshot")
+        line.save(update_fields=save_fields)
+
     created_count = 0
     existing_count = 0
-    for line in adjustment.lines.all():
+    for line in lines_list:
         movement_type = (
             StockMovementType.ADJUSTMENT_IN
             if line.quantity_delta > 0
@@ -378,18 +413,11 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     adjustment.status = StockAdjustmentStatus.POSTED
     adjustment.posted_by = posted_by
     adjustment.posted_at = timezone.now()
-    adjustment_amount = sum(
-        (
-            abs(Decimal(str(line.quantity_delta or "0.000")))
-            * Decimal(str(line.unit_cost or "0.00"))
-        )
-        for line in adjustment.lines.all()
-    )
     adjustment_journal = None
     if adjustment_amount > Decimal("0.00"):
         accounts = ensure_phase3_system_accounts()
         movement_side = next(
-            (line.quantity_delta for line in adjustment.lines.all() if line.quantity_delta != 0),
+            (line.quantity_delta for line in lines_list if line.quantity_delta != 0),
             Decimal("0.000"),
         )
         journal_lines = (
@@ -462,6 +490,10 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
             "created_count": created_count,
             "existing_count": existing_count,
         },
+    )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids={line.inventory_item.product_id for line in lines_list},
+        actor=posted_by,
     )
     return adjustment, True
 
@@ -565,6 +597,10 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
             "journal_entry_id": journal_entry.id,
         },
     )
+    reconcile_direct_sale_needs_after_inventory_in(
+        product_ids={line.inventory_item.product_id for line in purchase_bill.lines.all()},
+        actor=posted_by,
+    )
     return purchase_bill, True
 
 
@@ -587,6 +623,11 @@ def build_stock_summary(
     rows = []
     for item in queryset:
         on_hand = item.current_stock_quantity()
+        reserved_qty = item.reserved_qty()
+        available_qty = item.available_qty()
+        from inventory.services.demand_planning_service import calculate_product_demand
+
+        demand = calculate_product_demand(product_id=item.product_id)
         rows.append(
             {
                 "item_id": item.id,
@@ -601,6 +642,13 @@ def build_stock_summary(
                 "opening_stock_qty": f"{item.opening_stock_qty:.3f}",
                 "reorder_level_qty": f"{item.reorder_level_qty:.3f}",
                 "on_hand_qty": f"{on_hand:.3f}",
+                "reserved_qty": f"{reserved_qty:.3f}",
+                "available_qty": f"{available_qty:.3f}",
+                "incoming_qty": "0.000",
+                "required_for_winners": str(demand["winners_pending_delivery"]),
+                "required_for_confirmed_orders": str(
+                    int(demand["direct_sale_orders"]) + int(demand["rent_lease_commitments"])
+                ),
                 "is_below_reorder": on_hand <= item.reorder_level_qty,
                 "default_stock_location_id": item.default_stock_location_id,
                 "default_stock_location_code": getattr(item.default_stock_location, "code", None),
@@ -620,6 +668,11 @@ def build_stock_ledger(
     movement_type: str | None = None,
     reference_model: str | None = None,
     branch_id: int | None = None,
+    direct_sale_id: int | None = None,
+    direct_sale_return_id: int | None = None,
+    exchange_return_id: int | None = None,
+    purchase_return_id: int | None = None,
+    credit_note_id: int | None = None,
 ):
     queryset = StockLedger.objects.select_related(
         "inventory_item",
@@ -643,6 +696,25 @@ def build_stock_ledger(
             queryset = queryset.filter(movement_type__in=movement_types)
     if reference_model:
         queryset = queryset.filter(reference_model__iexact=str(reference_model).strip())
+    if direct_sale_id:
+        from billing.models import BillingInvoice
+
+        invoice_ids = list(BillingInvoice.objects.filter(direct_sale_id=direct_sale_id).values_list("id", flat=True))
+        sale_q = Q()
+        for invoice_id in invoice_ids:
+            sale_q |= Q(reference_model="BillingInvoiceLine", reference_id__startswith=f"{invoice_id}:")
+        queryset = queryset.filter(sale_q) if sale_q else queryset.none()
+    if direct_sale_return_id:
+        queryset = queryset.filter(reference_model="DirectSaleReturnLine", reference_id__startswith=f"{direct_sale_return_id}:")
+    if exchange_return_id:
+        queryset = queryset.filter(
+            Q(reference_model="DirectSaleReturnLine", reference_id__startswith=f"{exchange_return_id}:")
+            | Q(reference_model="DirectSaleExchangeReplacement", reference_id__startswith=f"{exchange_return_id}:")
+        )
+    if purchase_return_id:
+        queryset = queryset.filter(reference_model="PurchaseReturnLine", reference_id__startswith=f"{purchase_return_id}:")
+    if credit_note_id:
+        queryset = queryset.filter(reference_model="BillingCreditNoteLine", reference_id__startswith=f"{credit_note_id}:")
     queryset = queryset.order_by("-movement_date", "-created_at", "-id")
 
     results = [

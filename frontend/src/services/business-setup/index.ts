@@ -43,6 +43,27 @@ export type SetupChecklist = {
   counts?: Record<string, unknown>;
 };
 
+export type DocumentNumberingSequence = {
+  key: string;
+  name: string;
+  series_code: string;
+  financial_year: string;
+  configured: boolean;
+  prefix: string;
+  next_number: number;
+  padding: number;
+  next_number_preview: string | null;
+  last_issued_number: string | null;
+  status: "ready" | "needs_setup" | "duplicate_risk" | string;
+};
+
+export type DocumentNumberingState = {
+  financial_year: string;
+  sequences: DocumentNumberingSequence[];
+  checks: Record<string, boolean>;
+  duplicate_issues: Record<string, number>;
+};
+
 export async function getBusinessProfile(): Promise<BusinessProfile | null> {
   try {
     return await apiFetch<BusinessProfile>("/admin/business-profile/");
@@ -65,13 +86,33 @@ export async function getSetupChecklist(): Promise<SetupChecklist> {
   return apiFetch<SetupChecklist>("/admin/business-setup/checklist/");
 }
 
+export async function getDocumentNumberingState(): Promise<DocumentNumberingState> {
+  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/");
+}
+
+export type DocumentNumberingUpdatePayload = {
+  key: string;
+  prefix?: string;
+  next_number?: number;
+  padding?: number;
+};
+
+export async function updateDocumentNumbering(
+  payload: DocumentNumberingUpdatePayload
+): Promise<DocumentNumberingState> {
+  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export async function getResetPreview(preserveUsername?: string): Promise<Record<string, unknown>> {
   const query = preserveUsername ? `?preserve_username=${encodeURIComponent(preserveUsername)}` : "";
   return apiFetch<Record<string, unknown>>(`/admin/business-setup/reset-preview/${query}`);
 }
 
 export type BusinessResetExecuteRequest = {
-  confirm: string;
+  confirm: boolean;
   preserve_username: string;
   delete_non_preserved_users?: boolean;
   clear_auth_artifacts?: boolean;

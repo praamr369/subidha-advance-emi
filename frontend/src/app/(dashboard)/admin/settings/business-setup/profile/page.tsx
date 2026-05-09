@@ -2,9 +2,16 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import FormActions from "@/components/ui/FormActions";
 import PageHeader from "@/components/ui/PageHeader";
+import { FormSection } from "@/components/ui/operations";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { invalidateAfterBusinessSetupMutation } from "@/lib/operational-query-invalidation";
 import {
   getBusinessProfile,
   saveBusinessProfile,
@@ -43,6 +50,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function BusinessProfilePage() {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<BusinessProfile>(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,6 +100,7 @@ export default function BusinessProfilePage() {
       setForm({ ...initialForm, ...saved });
       setMessage("Business profile saved.");
       setUnauthorized(false);
+      await invalidateAfterBusinessSetupMutation(queryClient);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setUnauthorized(true);
@@ -113,8 +122,17 @@ export default function BusinessProfilePage() {
       />
       <BusinessSetupLinks />
 
+      {loading ? <LoadingBlock label="Loading business profile..." /> : null}
+
+      {unauthorized ? (
+        <ErrorState
+          title="Session authorization required"
+          description="Your session is not authorized to edit business profile setup. Sign in again and retry."
+        />
+      ) : null}
+
       {message ? (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+        <WorkspaceNotice tone={unauthorized ? "danger" : "info"} title="Business profile update">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">{message}</div>
             {unauthorized ? (
@@ -126,12 +144,12 @@ export default function BusinessProfilePage() {
               </Link>
             ) : null}
           </div>
-        </div>
+        </WorkspaceNotice>
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <section className="grid gap-5 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <FormSection title="Identity" description="Legal, trade, and statutory identifiers used across operational documents.">
             <div className="text-base font-semibold text-foreground">Identity</div>
             <div className="mt-4 grid gap-4">
               <input name="legal_name" value={form.legal_name} onChange={handleChange} placeholder="Legal name" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
@@ -140,9 +158,9 @@ export default function BusinessProfilePage() {
               <input name="gstin" value={form.gstin || ""} onChange={handleChange} placeholder="GSTIN" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
               <input name="pan_number" value={form.pan_number || ""} onChange={handleChange} placeholder="PAN number" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
             </div>
-          </div>
+          </FormSection>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <FormSection title="Contact" description="Primary communication channels for operations and customer trust surfaces.">
             <div className="text-base font-semibold text-foreground">Contact</div>
             <div className="mt-4 grid gap-4">
               <input name="primary_email" value={form.primary_email || ""} onChange={handleChange} placeholder="Primary email" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
@@ -151,11 +169,11 @@ export default function BusinessProfilePage() {
               <input name="website_url" value={form.website_url || ""} onChange={handleChange} placeholder="Website URL" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
               <input name="logo_url" value={form.logo_url || ""} onChange={handleChange} placeholder="Logo URL" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
             </div>
-          </div>
+          </FormSection>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <FormSection title="Address" description="Branch and legal address details for billing, receipts, and documentation.">
             <div className="text-base font-semibold text-foreground">Address</div>
             <div className="mt-4 grid gap-4">
               <input name="address_line_1" value={form.address_line_1 || ""} onChange={handleChange} placeholder="Address line 1" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
@@ -169,9 +187,9 @@ export default function BusinessProfilePage() {
               </div>
               <input name="country" value={form.country || "India"} onChange={handleChange} placeholder="Country" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
             </div>
-          </div>
+          </FormSection>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <FormSection title="Document settings" description="Invoice and receipt numbering defaults and profile-level operational configuration.">
             <div className="text-base font-semibold text-foreground">Document settings</div>
             <div className="mt-4 grid gap-4">
               <input name="invoice_prefix" value={form.invoice_prefix || ""} onChange={handleChange} placeholder="Invoice prefix" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={loading || unauthorized} />
@@ -183,18 +201,23 @@ export default function BusinessProfilePage() {
                 Active business profile
               </label>
             </div>
-          </div>
+          </FormSection>
         </section>
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving || loading || unauthorized}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save business profile"}
-          </button>
-        </div>
+        <WorkspaceNotice tone="warning" title="Sensitive setup area">
+          Changing GSTIN, PAN, and document prefix values can affect downstream legal/compliance workflows. Confirm values before saving.
+        </WorkspaceNotice>
+
+        <FormActions
+          submitLabel="Save business profile"
+          submitLoadingLabel="Saving..."
+          submitting={saving}
+          submitDisabled={loading || unauthorized}
+          cancel={{
+            label: "Back to setup",
+            href: "/admin/settings/business-setup",
+          }}
+        />
       </form>
     </div>
   );

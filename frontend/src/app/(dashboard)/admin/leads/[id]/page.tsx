@@ -173,7 +173,7 @@ function buildSubscriptionCreateHref(
   if (lead.product_id) params.set("product", String(lead.product_id));
   if (lead.product_name) params.set("product_name", lead.product_name);
   if (lead.product_code) params.set("product_code", lead.product_code);
-  return `/admin/subscriptions/create?${params.toString()}`;
+  return `/admin/subscriptions/advance-emi/create?${params.toString()}`;
 }
 
 function buildDirectSaleCreateHref(
@@ -301,7 +301,7 @@ export default function AdminLeadDetailPage() {
     [lead]
   );
   const subscriptionCreateHref = useMemo(() => {
-    if (!lead) return "/admin/subscriptions/create";
+    if (!lead) return "/admin/subscriptions/advance-emi/create";
     const candidateCustomerId =
       parsePositiveInteger(searchParams.get("converted_customer") || "") ||
       lead.converted_customer_id ||

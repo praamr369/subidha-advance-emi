@@ -4,6 +4,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { ApiError } from "@/lib/api";
 import {
   getAdminPublicBusinessProfile,
   saveAdminPublicBusinessProfile,
@@ -30,6 +31,15 @@ const initialForm: PublicBusinessProfile = {
 };
 
 function toErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const parts = Object.entries(error.fieldErrors).flatMap(([key, messages]) =>
+      messages.map((msg) => (key === "non_field_errors" ? msg : `${key}: ${msg}`))
+    );
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+    return error.readableMessage || error.message;
+  }
   return error instanceof Error ? error.message : "Failed to save public site settings.";
 }
 
@@ -109,7 +119,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Display name (e.g., Subidha Furniture)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="tagline"
@@ -117,7 +127,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Tagline (short)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="hero_title"
@@ -125,7 +135,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Hero title"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <textarea
                 name="hero_subtitle"
@@ -133,7 +143,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Hero subtitle (1–3 lines)"
                 className="min-h-[96px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="public_logo_url"
@@ -141,7 +151,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Public logo URL (https://...) optional"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
             </div>
           </div>
@@ -159,7 +169,7 @@ export default function PublicSiteSettingsPage() {
                   onChange={handleChange}
                   placeholder="Support phone"
                   className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                  disabled={loading}
+                  disabled={loading || saving}
                 />
                 <input
                   name="support_email"
@@ -167,7 +177,7 @@ export default function PublicSiteSettingsPage() {
                   onChange={handleChange}
                   placeholder="Support email"
                   className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                  disabled={loading}
+                  disabled={loading || saving}
                 />
               </div>
 
@@ -178,7 +188,7 @@ export default function PublicSiteSettingsPage() {
                   onChange={handleChange}
                   placeholder="WhatsApp phone (10 digits)"
                   className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                  disabled={loading}
+                  disabled={loading || saving}
                 />
                 <input
                   name="whatsapp_link"
@@ -186,7 +196,7 @@ export default function PublicSiteSettingsPage() {
                   onChange={handleChange}
                   placeholder="WhatsApp link (https://wa.me/...) optional"
                   className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                  disabled={loading}
+                  disabled={loading || saving}
                 />
               </div>
 
@@ -196,7 +206,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Facebook page URL (https://...)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="instagram_url"
@@ -204,7 +214,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Instagram URL (https://...)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="youtube_url"
@@ -212,7 +222,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="YouTube channel URL (https://...)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
 
               <label className="flex items-center gap-3 rounded-xl border border-input bg-background px-3 py-2 text-sm">
@@ -238,7 +248,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Public address text"
                 className="min-h-[96px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
               <input
                 name="map_url"
@@ -246,7 +256,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Map link (https://...)"
                 className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
             </div>
           </div>
@@ -260,7 +270,7 @@ export default function PublicSiteSettingsPage() {
                 onChange={handleChange}
                 placeholder="Public business hours (e.g., Mon–Sat: 10:00–20:00)"
                 className="min-h-[96px] rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                disabled={loading}
+                disabled={loading || saving}
               />
             </div>
           </div>

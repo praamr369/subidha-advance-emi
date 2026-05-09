@@ -5,6 +5,8 @@ export type WorkflowId =
   | "admin.createCustomer"
   | "admin.createDirectSale"
   | "admin.createSubscription"
+  | "admin.createDelivery"
+  | "admin.verifyKyc"
   | "admin.collectPayment"
   | "admin.openSupplierPayables"
   | "partner.submitCollection"
@@ -35,11 +37,11 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
   },
   {
     id: "admin.createDirectSale",
-    label: "Open direct sale desk",
+    label: "Create Direct Sale Invoice",
     description: "Create or continue a retail direct-sale bill without mixing it into the subscription sale workflow.",
     roles: ["ADMIN"],
     icon: "billing",
-    canonicalHref: ROUTES.admin.billingDirectSales,
+    canonicalHref: ROUTES.admin.billingDirectSaleCreate,
     surface: "route",
   },
   {
@@ -48,7 +50,7 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     description: "Create EMI/Rent/Lease contracts with deterministic schedule generation and partner-safe linkage.",
     roles: ["ADMIN"],
     icon: "subscriptions",
-    canonicalHref: ROUTES.admin.subscriptionsCreate,
+    canonicalHref: ROUTES.admin.subscriptionsAdvanceEmiCreate,
     surface: "drawer",
   },
   {
@@ -57,9 +59,28 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     description: "Post a subscription EMI collection using backend-controlled allocation and reconciliation-safe posting.",
     roles: ["ADMIN"],
     icon: "collectPayment",
-    canonicalHref: ROUTES.admin.paymentsCreate,
+    canonicalHref: `${ROUTES.admin.financeCollect}?workflow=advance-emi`,
     surface: "drawer",
     safetyNote: "Requires explicit confirmation before posting.",
+  },
+  {
+    id: "admin.createDelivery",
+    label: "Create delivery",
+    description: "Open the delivery creation workflow after stock and source record checks.",
+    roles: ["ADMIN"],
+    icon: "billing",
+    canonicalHref: ROUTES.admin.deliveryCreate,
+    surface: "route",
+    safetyNote: "Delivery stock and source validation remain enforced by backend delivery APIs.",
+  },
+  {
+    id: "admin.verifyKyc",
+    label: "Verify KYC",
+    description: "Review customer KYC records from the canonical CRM KYC queue.",
+    roles: ["ADMIN"],
+    icon: "customers",
+    canonicalHref: ROUTES.admin.crmKyc,
+    surface: "route",
   },
   {
     id: "admin.openSupplierPayables",

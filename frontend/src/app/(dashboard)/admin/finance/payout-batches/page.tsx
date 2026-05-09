@@ -9,6 +9,9 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -267,7 +270,7 @@ export default function AdminPayoutBatchesPage() {
           groups={FINANCE_CONTROL_DIRECTORY_GROUPS}
         />
 
-        <SectionCard
+        <TableToolbar
           title="Register controls"
           description="Filter payout batches by status or quick search. Use batch detail for finalize, cancel, and export operations."
         >
@@ -364,7 +367,7 @@ export default function AdminPayoutBatchesPage() {
               Export Current View
             </button>
           </div>
-        </SectionCard>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading payout batch register..." /> : null}
 
@@ -388,8 +391,9 @@ export default function AdminPayoutBatchesPage() {
                   description="No payout batches match the current filter set."
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-0">
+                <DataTableShell>
+                  <MobileSafeTable className="border-none bg-transparent">
+                    <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -424,18 +428,7 @@ export default function AdminPayoutBatchesPage() {
                           </td>
 
                           <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                                row.status === "DRAFT"
-                                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                                  : row.status === "FINALIZED"
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-red-200 bg-red-50 text-red-700",
-                              ].join(" ")}
-                            >
-                              {row.status}
-                            </span>
+                            <StatusBadge status={row.status} />
                           </td>
 
                           <td className="border-b border-slate-200 px-4 py-3 text-right text-sm font-semibold text-foreground">
@@ -482,8 +475,9 @@ export default function AdminPayoutBatchesPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+                  </MobileSafeTable>
+                </DataTableShell>
               )}
             </SectionCard>
 

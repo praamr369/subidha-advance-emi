@@ -1,17 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { NotificationSummaryResponse } from "@/services/notifications";
+import { getCustomerNotificationSummary } from "@/services/notifications";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
-  BadgeCheck,
-  CalendarClock,
-  CreditCard,
-  Layers3,
   RefreshCw,
   Sparkles,
-  Wallet,
 } from "lucide-react";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
@@ -22,7 +18,11 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PageHeader from "@/components/ui/PageHeader";
-import StatCard from "@/components/ui/StatCard";
+import {
+  KpiCard,
+  MetricStrip,
+  QuickActionGrid,
+} from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
@@ -32,7 +32,14 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import { ROUTES } from "@/lib/routes";
-import { getCustomerDashboard } from "@/services/customer";
+import {
+  getCustomerDashboard,
+  getCustomerDirectSaleSummary,
+  listCustomerDirectSales,
+  type CustomerDirectSaleListItem,
+} from "@/services/customer";
+import { listCustomerDeliveries, type DeliveryReportSummary } from "@/services/deliveries";
+import { listCustomerSupportTickets } from "@/services/support";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -52,6 +59,7 @@ type DashboardPaymentsPayload = Awaited<
   ReturnType<typeof listDashboardRecentPayments>
 >;
 type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
+type DirectSaleSummaryPayload = Awaited<ReturnType<typeof getCustomerDirectSaleSummary>>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -109,6 +117,14 @@ export default function CustomerDashboardPage() {
   const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
     null
   );
+  const [directSaleSummary, setDirectSaleSummary] = useState<DirectSaleSummaryPayload | null>(null);
+  const [latestDirectSales, setLatestDirectSales] = useState<CustomerDirectSaleListItem[]>([]);
+  const [notificationSummary, setNotificationSummary] =
+    useState<NotificationSummaryResponse | null>(null);
+  const [deliverySummary, setDeliverySummary] = useState<DeliveryReportSummary | null>(
+    null
+  );
+  const [supportOpenCount, setSupportOpenCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +157,11 @@ export default function CustomerDashboardPage() {
           upcomingResult,
           recentPaymentsResult,
           winnersResult,
+          directSaleSummaryResult,
+          directSalesListResult,
+          notificationSummaryResult,
+          deliveriesResult,
+          supportOpenResult,
         ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
@@ -148,6 +169,11 @@ export default function CustomerDashboardPage() {
           listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+          getCustomerDirectSaleSummary(),
+          listCustomerDirectSales({ page: 1, pageSize: 5 }),
+          getCustomerNotificationSummary(),
+          listCustomerDeliveries(),
+          listCustomerSupportTickets("open"),
         ]);
 
         if (legacyResult.status !== "fulfilled") {
@@ -168,6 +194,21 @@ export default function CustomerDashboardPage() {
             : null
         );
         setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
+        setDirectSaleSummary(
+          directSaleSummaryResult.status === "fulfilled" ? directSaleSummaryResult.value : null
+        );
+        setLatestDirectSales(
+          directSalesListResult.status === "fulfilled" ? directSalesListResult.value.results : []
+        );
+        setNotificationSummary(
+          notificationSummaryResult.status === "fulfilled" ? notificationSummaryResult.value : null
+        );
+        setDeliverySummary(
+          deliveriesResult.status === "fulfilled" ? deliveriesResult.value.summary : null
+        );
+        setSupportOpenCount(
+          supportOpenResult.status === "fulfilled" ? supportOpenResult.value.count : null
+        );
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -177,6 +218,9 @@ export default function CustomerDashboardPage() {
         setUpcoming(null);
         setRecentPayments(null);
         setWinnerItems(null);
+        setDirectSaleSummary(null);
+        setLatestDirectSales([]);
+        setNotificationSummary(null);
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
@@ -203,8 +247,99 @@ export default function CustomerDashboardPage() {
     0,
     6
   );
-  const paymentRows = recentPayments?.results ?? [];
+  const paymentRows = useMemo(
+    () => recentPayments?.results ?? [],
+    [recentPayments?.results]
+  );
   const winnerRows = winnerItems?.results ?? [];
+  const lastPayment = useMemo(() => paymentRows[0] ?? null, [paymentRows]);
+
+  const atAGlanceMetrics = useMemo(() => {
+    if (!summary) return [];
+    const d = deliverySummary;
+    const inFlight =
+      d === null
+        ? null
+        : d.pending +
+          d.scheduled +
+          d.in_transit +
+          d.dispatched +
+          d.out_for_delivery;
+    const items: Array<{
+      label: string;
+      value: ReactNode;
+      helper?: ReactNode;
+      href?: string;
+    }> = [
+      {
+        label: "Active contracts",
+        value: String(summary.active_subscriptions ?? 0),
+        helper: `${summary.completed_subscriptions ?? 0} completed`,
+        href: ROUTES.customer.subscriptions,
+      },
+      {
+        label: "Next payment",
+        value:
+          summary.next_due_date && summary.next_due_amount
+            ? money(summary.next_due_amount)
+            : "None due",
+        helper: summary.next_due_date
+          ? `Due ${formatDate(summary.next_due_date)}`
+          : "No upcoming EMI on file",
+        href: ROUTES.customer.subscriptions,
+      },
+      {
+        label: "Last payment",
+        value: lastPayment ? money(lastPayment.amount) : "—",
+        helper: lastPayment
+          ? `${formatDate(lastPayment.payment_date || lastPayment.created_at)}${
+              lastPayment.is_reversed ? " · Reversed" : ""
+            }`
+          : "No payments in this date range",
+        href: lastPayment
+          ? `${ROUTES.customer.payments}/${lastPayment.payment_id}`
+          : ROUTES.customer.payments,
+      },
+    ];
+
+    if (d !== null) {
+      items.push({
+        label: "Deliveries",
+        value: d.total > 0 ? `${d.delivered} delivered` : "—",
+        helper:
+          inFlight !== null && inFlight > 0
+            ? `${inFlight} in progress`
+            : d.total === 0
+              ? "No shipment records yet"
+              : "No active shipments",
+        href: ROUTES.customer.deliveries,
+      });
+    }
+
+    if (supportOpenCount !== null) {
+      items.push({
+        label: "Open support",
+        value: String(supportOpenCount),
+        helper:
+          supportOpenCount === 0
+            ? "No open requests"
+            : "Waiting on the shop team",
+        href: ROUTES.customer.support,
+      });
+    }
+
+    const winnerCount = Number(summary.winner_subscriptions ?? 0);
+    if (winnerCount > 0) {
+      items.push({
+        label: "Lucky draw",
+        value: `${winnerCount} winner contract${winnerCount === 1 ? "" : "s"}`,
+        helper: "Open a subscription for benefit detail",
+        href: ROUTES.customer.subscriptions,
+      });
+    }
+
+    return items;
+  }, [deliverySummary, lastPayment, summary, supportOpenCount]);
   const spotlightSubscriptions =
     legacy?.subscriptions
       ?.slice()
@@ -246,6 +381,11 @@ export default function CustomerDashboardPage() {
       href: ROUTES.customer.payments,
     },
     {
+      title: "Direct Sales",
+      description: "View direct-sale invoices, dues, and receipt downloads linked to your profile.",
+      href: ROUTES.customer.directSales,
+    },
+    {
       title: "Finance Summary",
       description: "Track invoices, receipts, outstanding balance, and payment method split.",
       href: "/customer/finance",
@@ -265,10 +405,10 @@ export default function CustomerDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Customer Operations"
+        eyebrow="Your account"
         title="Customer Workspace"
-        description="View subscriptions, payment records, profile information, and support resources."
-        helperNote="Figures and statuses below come from your live subscription and payment records, including due and winner posture."
+        description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
+        helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."
         helperTone="info"
         actions={
           <ActionButton
@@ -370,6 +510,18 @@ export default function CustomerDashboardPage() {
 
       {!loading && !error && legacy && summary ? (
         <>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              At a glance
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tap a tile to open subscriptions, payments, deliveries, or support.
+            </p>
+            <div className="mt-4">
+              <MetricStrip items={atAGlanceMetrics} />
+            </div>
+          </section>
+
           <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
             <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
             <div className="pointer-events-none absolute left-0 top-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl" />
@@ -384,89 +536,190 @@ export default function CustomerDashboardPage() {
                   {legacy.customer.name || "Customer"}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                  Paid, remaining, overdue, and winner-related figures here come
-                  from the same canonical summary-v2 flow now shared across all
-                  dashboards, so settlement and waiver posture stay aligned.
+                  Paid, remaining, overdue, and lucky-draw benefit figures are
+                  calculated from your live contracts and payments so what you
+                  see here matches your subscription and receipt records.
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    KYC status
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {legacy.customer.kyc_status || "PENDING"}
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Phone
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {legacy.customer.phone || "—"}
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Contracts
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.subscription_count ?? legacy.subscriptions.length} total
-                  </div>
-                </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Winner history
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.winner_subscriptions ?? 0} subscription
-                    {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
-                  </div>
-                </div>
+                <KpiCard
+                  label="KYC status"
+                  value={legacy.customer.kyc_status || "PENDING"}
+                  helper="From your live profile record"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Phone"
+                  value={legacy.customer.phone || "—"}
+                  helper="Contact on file"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Contracts"
+                  value={summary.subscription_count ?? legacy.subscriptions.length}
+                  helper="Total subscriptions in summary"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
+                <KpiCard
+                  label="Winner history"
+                  value={`${summary.winner_subscriptions ?? 0} subscription${
+                    (summary.winner_subscriptions ?? 0) === 1 ? "" : "s"
+                  }`}
+                  helper="Winner-linked contracts in summary"
+                  className="border-white/80 bg-white/85 shadow-sm"
+                />
               </div>
             </div>
           </section>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
+          <QuickActionGrid>
+            <KpiCard
               label="Paid"
               value={money(summary.total_paid_amount)}
-              subtext={`${summary.paid_emis} EMI settled through recorded payments`}
-              tone="success"
-              icon={<Wallet className="h-5 w-5" />}
+              helper={`${summary.paid_emis} EMI settled through recorded payments`}
             />
-            <StatCard
+            <KpiCard
               label="Remaining"
               value={money(summary.remaining_amount ?? summary.outstanding_amount)}
-              subtext={`${money(summary.total_pending_amount)} still open across current contracts`}
-              tone={
-                Number(summary.remaining_amount ?? summary.outstanding_amount ?? 0) > 0
-                  ? "info"
-                  : "success"
-              }
-              icon={<CreditCard className="h-5 w-5" />}
+              helper={`${money(summary.total_pending_amount)} still open across current contracts`}
             />
-            <StatCard
+            <KpiCard
               label="Overdue EMI"
               value={String(summary.overdue_emis ?? 0)}
-              subtext={`${money(summary.overdue_amount)} currently past due`}
-              tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
-              icon={<AlertTriangle className="h-5 w-5" />}
+              helper={`${money(summary.overdue_amount)} currently past due`}
             />
-            <StatCard
+            <KpiCard
               label="Upcoming EMI"
               value={String(summary.upcoming_emis ?? 0)}
-              subtext={
+              helper={
                 summary.next_due_date && summary.next_due_amount
                   ? `${money(summary.next_due_amount)} next on ${formatDate(
                       summary.next_due_date
                     )}`
                   : "No upcoming EMI currently visible"
               }
-              tone="default"
-              icon={<CalendarClock className="h-5 w-5" />}
             />
+            <KpiCard
+              label="Direct Sale Dues"
+              value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
+              helper={`${directSaleSummary?.total_direct_sale_invoices ?? 0} direct-sale invoice(s) linked`}
+            />
+          </QuickActionGrid>
+
+          <WorkspaceSection
+            title="Direct sale dues"
+            description="Outstanding dues from direct-sale invoices linked to your customer profile."
+            action={
+              <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
+                View Direct Sales
+              </ActionButton>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <KpiCard
+                label="Outstanding"
+                value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
+                helper="Based on grand total minus received amount."
+              />
+              <KpiCard
+                label="Total paid"
+                value={money(directSaleSummary?.total_paid_direct_sale_amount ?? "0.00")}
+                helper="Recorded direct-sale collections."
+              />
+              <KpiCard
+                label="Latest invoice"
+                value={
+                  String(
+                    (directSaleSummary?.latest_direct_sale_invoice?.invoice_number as string | undefined) ||
+                      (directSaleSummary?.latest_direct_sale_invoice?.document_number as string | undefined) ||
+                      "—"
+                  )
+                }
+                helper="Most recent linked direct-sale invoice."
+              />
+            </div>
+          </WorkspaceSection>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <WorkspaceSection
+              title="Latest direct-sale invoices"
+              description="Recent invoices linked to your customer profile (walk-in snapshot-only sales are excluded)."
+              action={
+                <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
+                  All direct sales
+                </ActionButton>
+              }
+            >
+              {latestDirectSales.length === 0 ? (
+                <EmptyState
+                  title="No direct-sale invoices"
+                  description="When a direct sale is linked to your account, it will appear here with balance context."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {latestDirectSales.map((inv) => (
+                    <Link
+                      key={inv.id}
+                      href={`${ROUTES.customer.directSales}/${inv.id}`}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm transition hover:bg-muted/40"
+                    >
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          {inv.invoice_number || inv.document_number || `Sale #${inv.id}`}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {inv.sale_date ? formatDate(inv.sale_date) : "—"} · Due {money(inv.outstanding_amount)}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <div>Total {money(inv.grand_total)}</div>
+                        <div>Paid {money(inv.paid_amount)}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Notifications"
+              description="Operational updates for your account (payments, documents, and subscription events)."
+              action={
+                <ActionButton href={ROUTES.customer.notifications} variant="secondary" className="h-9 px-3 text-xs">
+                  Notification center
+                </ActionButton>
+              }
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <KpiCard
+                  label="Unread"
+                  value={String(notificationSummary?.unread_count ?? 0)}
+                  helper="Items awaiting your attention"
+                />
+                <KpiCard
+                  label="High priority"
+                  value={String(notificationSummary?.high_priority_count ?? 0)}
+                  helper="Urgent or time-sensitive alerts"
+                />
+              </div>
+              {(notificationSummary?.latest?.length ?? 0) > 0 ? (
+                <ul className="mt-4 space-y-2 text-sm">
+                  {(notificationSummary?.latest ?? []).slice(0, 5).map((n) => (
+                    <li key={n.id} className="rounded-xl border border-border px-3 py-2">
+                      <div className="font-medium text-foreground">{n.title}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {formatDate(n.created_at)}
+                        {n.is_read ? "" : " · Unread"}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">No recent notifications.</p>
+              )}
+            </WorkspaceSection>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -545,24 +798,20 @@ export default function CustomerDashboardPage() {
                 />
               }
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <StatCard
+              <QuickActionGrid className="sm:grid-cols-2">
+                <KpiCard
                   label="Waived by benefit"
                   value={money(
                     winnerSurface?.total_waived_amount ?? summary.total_waived_amount
                   )}
-                  subtext={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
-                  tone="info"
-                  icon={<BadgeCheck className="h-5 w-5" />}
+                  helper={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
                 />
-                <StatCard
+                <KpiCard
                   label="Contracts in view"
                   value={String(summary.subscription_count ?? legacy.subscriptions.length)}
-                  subtext={`${summary.winner_subscriptions ?? 0} with winner history`}
-                  tone="default"
-                  icon={<Layers3 className="h-5 w-5" />}
+                  helper={`${summary.winner_subscriptions ?? 0} with winner history`}
                 />
-              </div>
+              </QuickActionGrid>
               {winnerRows.length > 0 ? (
                 <div className="mt-4 grid gap-2">
                   {winnerRows.map((row) => (
@@ -587,7 +836,7 @@ export default function CustomerDashboardPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             <WorkspaceSection
               title="Due collection queue"
-              description="Your next-due rows and overdue rows now come from the same canonical surface layer used across every dashboard."
+              description="Upcoming and overdue instalments from your contracts for the selected date range."
               action={
                 <>
                   <ActionButton
@@ -639,8 +888,8 @@ export default function CustomerDashboardPage() {
             </WorkspaceSection>
 
             <WorkspaceSection
-              title="Recent payment surface"
-              description="Recent recorded payment rows from the canonical recent-payments surface."
+              title="Recent payments"
+              description="Recently recorded payments for the selected date range (same source as the payment history page)."
               action={
                 <>
                   <ActionButton

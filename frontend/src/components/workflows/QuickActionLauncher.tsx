@@ -8,6 +8,7 @@ import { workflowsForRole } from "@/config/workflows";
 import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "@/config/navigation";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ModalShell from "@/components/ui/ModalShell";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import {
   readFavoritesSnapshot,
@@ -36,17 +37,22 @@ type LaunchItem =
 function flattenNav(groups: NavGroup[]): LaunchItem[] {
   const items: LaunchItem[] = [];
   groups.forEach((group) => {
-    group.items.forEach((item) => {
+    const visit = (item: NavGroup["items"][number], parents: string[]) => {
       if (item.hidden || item.disabled) return;
       const href = item.href?.trim();
       if (!href) return;
       items.push({
         kind: "nav",
         label: item.label,
-        description: item.description ?? group.title,
+        description: item.description ?? [...parents, group.title].join(" / "),
         href,
         groupTitle: group.title,
       });
+      item.children?.forEach((child) => visit(child, [...parents, item.label]));
+    };
+
+    group.items.forEach((item) => {
+      visit(item, []);
     });
   });
   return items;
@@ -294,6 +300,17 @@ export default function QuickActionLauncher({
               ) : null}
             </div>
           </section>
+
+          <p className="flex flex-wrap items-center gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
+            Full search palette:
+            <span className="inline-flex items-center gap-1 font-medium text-foreground">
+              <Kbd>Ctrl</Kbd>
+              <span>/</span>
+              <Kbd className="min-w-[26px] px-2">⌘</Kbd>
+              <span>+</span>
+              <Kbd>K</Kbd>
+            </span>
+          </p>
         </div>
       </div>
     </ModalShell>

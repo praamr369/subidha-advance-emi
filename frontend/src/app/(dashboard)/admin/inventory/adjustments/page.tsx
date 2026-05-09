@@ -10,7 +10,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
-import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
+import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { InventoryItem, StockAdjustment, StockLocation } from "@/services/inventory";
 import {
   approveStockAdjustment,
@@ -27,6 +27,7 @@ const FIELD_CLASS =
 type AdjustmentLineForm = {
   inventory_item: string;
   quantity_delta: string;
+  unit_cost_snapshot: string;
   notes: string;
 };
 
@@ -46,6 +47,7 @@ function createEmptyLine(defaultItemId?: number): AdjustmentLineForm {
   return {
     inventory_item: defaultItemId ? String(defaultItemId) : "",
     quantity_delta: "",
+    unit_cost_snapshot: "",
     notes: "",
   };
 }
@@ -110,6 +112,16 @@ export default function InventoryAdjustmentsPage() {
       key: "lines",
       header: "Lines",
       render: (row) => String(row.lines.length),
+    },
+    {
+      key: "valuation",
+      header: "Line valuation",
+      render: (row) =>
+        row.lines
+          .map((ln) => ln.valuation_amount_snapshot)
+          .filter(Boolean)
+          .map((v) => accountingMoney(v))
+          .join(" · ") || "—",
     },
     {
       key: "actions",
@@ -313,7 +325,7 @@ export default function InventoryAdjustmentsPage() {
             {form.lines.map((line, index) => (
               <div
                 key={`line-${index}`}
-                className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 xl:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_auto]"
+                className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 xl:grid-cols-[minmax(0,1.3fr)_140px_140px_minmax(0,1fr)_auto]"
               >
                 <select
                   value={line.inventory_item}
@@ -336,6 +348,17 @@ export default function InventoryAdjustmentsPage() {
                   disabled={saving}
                   className={FIELD_CLASS}
                   placeholder="Quantity delta"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={line.unit_cost_snapshot}
+                  onChange={(event) => updateLine(index, "unit_cost_snapshot", event.target.value)}
+                  disabled={saving}
+                  className={FIELD_CLASS}
+                  placeholder="Unit cost"
+                  title="Optional override; if blank, inventory standard unit cost is used on draft save."
                 />
                 <input
                   type="text"
@@ -361,6 +384,16 @@ export default function InventoryAdjustmentsPage() {
                 >
                   Remove
                 </button>
+                <p className="text-xs leading-relaxed text-muted-foreground xl:col-span-full">
+                  {(() => {
+                    const selected = items.find((it) => String(it.id) === line.inventory_item);
+                    const std = selected?.standard_unit_cost;
+                    if (std !== undefined && std !== null && String(std).trim() !== "") {
+                      return `Standard unit cost ${accountingMoney(std)} — used for draft line cost if unit cost is left blank.`;
+                    }
+                    return "Stock tracking cost: no standard unit cost on this item. Enter unit cost above or set standard cost on the inventory item; posting requires an effective unit cost.";
+                  })()}
+                </p>
               </div>
             ))}
           </div>

@@ -2,13 +2,16 @@ import {
   AlertTriangle,
   Archive,
   BadgeCheck,
+  Banknote,
   CheckCheck,
   CheckCircle2,
   Circle,
   Clock3,
   FolderOpen,
+  Landmark,
   Lock,
   RefreshCw,
+  Smartphone,
   Trophy,
   Undo2,
   type LucideIcon,
@@ -27,12 +30,26 @@ export type StatusPresentation = {
   label: string;
   tone: StatusTone;
   icon: LucideIcon;
+  /** Operator tooltip: collection / delivery semantics (visual only; backend rules unchanged). */
+  hint?: string;
 };
 
-const STATUS_META: Record<string, Omit<StatusPresentation, "token">> = {
+type StatusMetaEntry = {
+  label: string;
+  tone: StatusTone;
+  icon: LucideIcon;
+  hint?: string;
+};
+
+const STATUS_META: Record<string, StatusMetaEntry> = {
   ACTIVE: { label: "Active", tone: "success", icon: CheckCircle2 },
   INACTIVE: { label: "Inactive", tone: "neutral", icon: Lock },
-  PENDING: { label: "Pending", tone: "warning", icon: Clock3 },
+  PENDING: {
+    label: "Pending",
+    tone: "warning",
+    icon: Clock3,
+    hint: "Outstanding. Collectible when due unless business rules block collection.",
+  },
   APPROVED: { label: "Approved", tone: "success", icon: BadgeCheck },
   VERIFIED: { label: "Verified", tone: "success", icon: BadgeCheck },
   REJECTED: { label: "Rejected", tone: "danger", icon: AlertTriangle },
@@ -40,27 +57,76 @@ const STATUS_META: Record<string, Omit<StatusPresentation, "token">> = {
   SUBMITTED: { label: "Submitted", tone: "warning", icon: Clock3 },
   UNDER_REVIEW: { label: "Under Review", tone: "info", icon: RefreshCw },
   RECORDED: { label: "Recorded", tone: "success", icon: BadgeCheck },
-  PAID: { label: "Paid", tone: "success", icon: BadgeCheck },
-  WAIVED: { label: "Waived", tone: "info", icon: CheckCheck },
-  OVERDUE: { label: "Overdue", tone: "danger", icon: AlertTriangle },
+  PAID: {
+    label: "Paid",
+    tone: "neutral",
+    icon: BadgeCheck,
+    hint: "Settled. Not payable / not collectible on this line.",
+  },
+  WAIVED: {
+    label: "Waived",
+    tone: "neutral",
+    icon: CheckCheck,
+    hint: "Benefit applied. No EMI payable on this line.",
+  },
+  OVERDUE: {
+    label: "Overdue",
+    tone: "danger",
+    icon: AlertTriangle,
+    hint: "Past due. Collectible where the backend and your role allow collection.",
+  },
   WON: { label: "Won", tone: "info", icon: Trophy },
   NOT_WON: { label: "Not Won", tone: "neutral", icon: Circle },
   COMPLETED: { label: "Completed", tone: "neutral", icon: CheckCheck },
   DEFAULTED: { label: "Defaulted", tone: "danger", icon: AlertTriangle },
-  REVERSED: { label: "Reversed", tone: "warning", icon: Undo2 },
+  REVERSED: {
+    label: "Reversed",
+    tone: "neutral",
+    icon: Undo2,
+    hint: "Ledger reversed. Not collectible.",
+  },
   OPEN: { label: "Open", tone: "info", icon: FolderOpen },
   CLOSED: { label: "Closed", tone: "neutral", icon: Lock },
   AVAILABLE: { label: "Available", tone: "success", icon: CheckCircle2 },
   ASSIGNED: { label: "Assigned", tone: "warning", icon: Clock3 },
   BLOCKED: { label: "Blocked", tone: "danger", icon: AlertTriangle },
+  FAILED: { label: "Failed", tone: "danger", icon: AlertTriangle },
   DRAFT: { label: "Draft", tone: "neutral", icon: Archive },
+  VOID: {
+    label: "Void",
+    tone: "neutral",
+    icon: Archive,
+    hint: "Invalidated. Not collectible.",
+  },
+  ARCHIVED: {
+    label: "Archived",
+    tone: "neutral",
+    icon: Archive,
+    hint: "Inactive for new operational actions.",
+  },
+  RETURNED: {
+    label: "Returned",
+    tone: "neutral",
+    icon: Undo2,
+    hint: "Goods returned. Do not treat as normal in-transit delivery.",
+  },
+  LOCKED: { label: "Locked", tone: "neutral", icon: Lock },
   FULL: { label: "Full", tone: "warning", icon: Archive },
   DRAW_IN_PROGRESS: {
     label: "Draw In Progress",
     tone: "warning",
     icon: RefreshCw,
   },
-  CANCELLED: { label: "Cancelled", tone: "neutral", icon: Lock },
+  CANCELLED: {
+    label: "Cancelled",
+    tone: "neutral",
+    icon: Lock,
+    hint: "Cancelled. Not collectible.",
+  },
+  CREDITED_FULLY: { label: "Credited Fully", tone: "neutral", icon: CheckCheck },
+  CASH: { label: "Cash", tone: "success", icon: Banknote },
+  UPI: { label: "UPI", tone: "info", icon: Smartphone },
+  BANK: { label: "Bank", tone: "info", icon: Landmark },
 };
 
 function toTitleCase(value: string): string {
@@ -97,6 +163,7 @@ export function resolveStatusPresentation(
       label: options?.label?.trim() || meta.label,
       tone: meta.tone,
       icon: meta.icon,
+      hint: meta.hint,
     };
   }
 
@@ -107,20 +174,3 @@ export function resolveStatusPresentation(
     icon: Circle,
   };
 }
-
-export const statusVariant: Record<
-  string,
-  "success" | "warning" | "destructive" | "neutral"
-> = {
-  ACTIVE: "success",
-  PENDING: "warning",
-  PAID: "success",
-  WAIVED: "neutral",
-  OVERDUE: "destructive",
-  WON: "success",
-  COMPLETED: "neutral",
-  DEFAULTED: "destructive",
-  REVERSED: "warning",
-  OPEN: "success",
-  CLOSED: "neutral",
-};

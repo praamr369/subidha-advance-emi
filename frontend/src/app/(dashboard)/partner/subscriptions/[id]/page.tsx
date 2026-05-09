@@ -18,6 +18,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
+import { MobileSafeTable } from "@/components/ui/operations";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
@@ -834,7 +835,9 @@ export default function PartnerSubscriptionDetailPage() {
                   description="No advance EMI rows are available for this subscription yet."
                 />
               ) : (
-                <DataTable<EmiRow> rows={emiRows} columns={emiColumns} />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<EmiRow> rows={emiRows} columns={emiColumns} />
+                </MobileSafeTable>
               )}
             </WorkspaceSection>
           </>

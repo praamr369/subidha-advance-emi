@@ -109,7 +109,7 @@ function buildRouteWithQuery(
 export function buildAdminReconciliationRoute(
   params: AdminReconciliationRouteParams = {}
 ): string {
-  return buildRouteWithQuery(ROUTES.admin.reconciliation, {
+  return buildRouteWithQuery(ROUTES.admin.financeCanonicalReconciliation, {
     view: params.view === "payments" ? "payments" : null,
     subscription: params.subscription,
     payment: params.payment,

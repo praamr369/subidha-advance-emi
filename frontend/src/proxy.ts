@@ -22,6 +22,7 @@ const ROLE_BASE_PATHS: Record<string, string> = {
   CASHIER: "/cashier",
   PARTNER: "/partner",
   CUSTOMER: "/customer",
+  VENDOR: "/vendor",
 };
 
 function normalizeRole(role: string | undefined): string {
@@ -41,6 +42,7 @@ function getRequiredRoleForPath(pathname: string): string | null {
   if (pathname === "/cashier" || pathname.startsWith("/cashier/")) return "CASHIER";
   if (pathname === "/partner" || pathname.startsWith("/partner/")) return "PARTNER";
   if (pathname === "/customer" || pathname.startsWith("/customer/")) return "CUSTOMER";
+  if (pathname === "/vendor" || pathname.startsWith("/vendor/")) return "VENDOR";
   return null;
 }
 
@@ -99,6 +101,7 @@ export const config = {
     "/cashier/:path*",
     "/partner/:path*",
     "/customer/:path*",
+    "/vendor/:path*",
     "/login",
     "/logout",
   ],

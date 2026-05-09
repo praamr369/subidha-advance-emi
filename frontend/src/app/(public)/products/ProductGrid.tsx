@@ -5,6 +5,7 @@ import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 import { ArrowUpRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 
 import PublicProductMedia from "@/components/public/PublicProductMedia";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
@@ -111,7 +112,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
         <button
           type="button"
           onClick={() => setShowFilters((current) => !current)}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/75 bg-white/85 px-4 py-3 text-sm font-medium text-foreground shadow-[0_22px_48px_-36px_rgba(15,23,42,0.76)]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/75 bg-white/85 px-4 py-3 text-sm font-medium text-foreground shadow-[0_22px_48px_-36px_rgba(15,23,42,0.76)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
         >
           <SlidersHorizontal className="h-4 w-4" />
           {showFilters ? labels.hideFilters : labels.showFilters}
@@ -139,7 +140,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-medium text-foreground shadow-[0_18px_36px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-medium text-foreground shadow-[0_18px_36px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
               >
                 <X className="h-4 w-4" />
                 {labels.reset}
@@ -156,7 +157,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder={labels.searchPlaceholder}
-                  className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground"
                 />
               </div>
             </FieldShell>
@@ -168,7 +169,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
                   setSelectedCategory(event.target.value);
                   setSelectedSubcategory("");
                 }}
-                className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground"
               >
                 <option value="">{labels.allCategories}</option>
                 {categories.map((category) => (
@@ -183,7 +184,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
               <select
                 value={selectedSubcategory}
                 onChange={(event) => setSelectedSubcategory(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground"
                 disabled={!selectedCategory && subcategories.length === 0}
               >
                 <option value="">{labels.allSubcategories}</option>
@@ -209,7 +210,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
                     }));
                   }}
                   placeholder={labels.min}
-                  className="h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="public-control-focus h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground"
                 />
                 <input
                   type="number"
@@ -223,7 +224,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
                     }));
                   }}
                   placeholder={labels.max}
-                  className="h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="public-control-focus h-12 rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground"
                 />
               </div>
             </FieldShell>
@@ -309,13 +310,13 @@ function CatalogEmptyState() {
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link
             href={ROUTES.public.apply}
-            className="inline-flex h-11 items-center rounded-xl bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.84)]"
+            className="public-action-primary h-11 !min-h-0 justify-center px-5"
           >
             Open enquiry form
           </Link>
           <Link
             href={ROUTES.public.home}
-            className="inline-flex h-11 items-center rounded-xl border border-white/80 bg-white/80 px-5 text-sm font-medium text-foreground shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)]"
+            className="inline-flex h-11 items-center rounded-xl border border-white/80 bg-white/80 px-5 text-sm font-medium text-foreground shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             Return home
           </Link>
@@ -342,7 +343,7 @@ function FilteredEmptyState({ onReset }: { onReset: () => void }) {
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex h-11 items-center rounded-xl border border-white/80 bg-white px-5 text-sm font-medium text-foreground shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)]"
+          className="inline-flex h-11 items-center rounded-xl border border-white/80 bg-white px-5 text-sm font-medium text-foreground shadow-[0_18px_40px_-28px_rgba(15,23,42,0.72)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
         >
           Clear all filters
         </button>
@@ -355,18 +356,23 @@ function ProductCard({ product }: { product: PublicProduct }) {
   const mediaState = product.image ? "Media ready" : "Media pending";
 
   return (
-    <Link href={`/products/${product.id}`} className="group block">
-      <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.82)] transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)]">
+    <Link
+      href={`/products/${product.id}`}
+      className="group block rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+    >
+      <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.82)] transition duration-300 group-hover:-translate-y-1.5 group-hover:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)] group-focus-visible:-translate-y-1.5 group-focus-visible:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)]">
         <div className="relative p-3">
           <div className="pointer-events-none absolute inset-x-7 top-3 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-          <PublicProductMedia
-            src={product.image}
-            alt={product.name}
-            badge={product.category || null}
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            className="aspect-[4/3]"
-            imageClassName="transition duration-500 group-hover:scale-[1.04]"
-          />
+          <AspectRatio ratio={4 / 3}>
+            <PublicProductMedia
+              src={product.image}
+              alt={product.name}
+              badge={product.category || null}
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              className="absolute inset-0 size-full rounded-[1.7rem]"
+              imageClassName="transition duration-500 group-hover:scale-[1.04]"
+            />
+          </AspectRatio>
         </div>
 
         <div className="space-y-4 px-5 pb-5 pt-2">
@@ -378,8 +384,8 @@ function ProductCard({ product }: { product: PublicProduct }) {
               className={cn(
                 "rounded-full border px-3 py-1 text-[11px] font-medium",
                 product.image
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-amber-200 bg-amber-50 text-amber-700"
+                  ? "border-[color-mix(in_oklab,var(--border)_55%,var(--primary)_45%)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,var(--accent)_10%)] text-[color-mix(in_oklab,var(--foreground)_72%,var(--primary)_28%)]"
+                  : "border-[color-mix(in_oklab,var(--warning)_35%,var(--border)_65%)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,var(--warning)_12%)] text-[color-mix(in_oklab,var(--foreground)_65%,var(--warning-foreground)_35%)]"
               )}
             >
               {mediaState}
@@ -391,8 +397,7 @@ function ProductCard({ product }: { product: PublicProduct }) {
               {product.name}
             </h3>
             <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-              {product.description?.trim() ||
-                "Live furniture catalogue entry ready for product enquiry and branch follow-up."}
+              {product.description?.trim() || "No short description was added in the catalogue for this item."}
             </p>
           </div>
 

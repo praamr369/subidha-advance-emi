@@ -113,9 +113,25 @@ class DirectSaleStatus(models.TextChoices):
     DELIVERED = "DELIVERED", "Delivered"
     INVOICED = "INVOICED", "Invoiced"
     CANCELLED = "CANCELLED", "Cancelled"
+    # Additive lifecycle states for post-invoice reversal/archive workflows.
+    CANCELLED_PRE_INVOICE = "CANCELLED_PRE_INVOICE", "Cancelled (Pre-invoice)"
+    CANCELLED_AFTER_DELIVERY = "CANCELLED_AFTER_DELIVERY", "Cancelled (After delivery)"
+    REVERSED_POST_INVOICE = "REVERSED_POST_INVOICE", "Reversed (Post-invoice)"
+    RETURNED = "RETURNED", "Returned"
+    EXCHANGED_CLOSED = "EXCHANGED_CLOSED", "Exchange closed"
+    ARCHIVED = "ARCHIVED", "Archived"
 
 
 class DirectSale(BillingTimeStampedModel):
+    class CustomerGstType(models.TextChoices):
+        UNREGISTERED_CONSUMER = "UNREGISTERED_CONSUMER", "Unregistered Consumer"
+        REGISTERED_BUSINESS = "REGISTERED_BUSINESS", "Registered Business"
+
+    class TaxCalculationMode(models.TextChoices):
+        NON_GST = "NON_GST", "Non-GST"
+        GST_INCLUSIVE = "GST_INCLUSIVE", "GST Inclusive"
+        GST_EXCLUSIVE = "GST_EXCLUSIVE", "GST Exclusive"
+
     sale_no = models.CharField(max_length=40, unique=True, null=True, blank=True, db_index=True)
     sale_date = models.DateField(db_index=True)
     financial_year = models.CharField(max_length=9, db_index=True)
@@ -146,7 +162,7 @@ class DirectSale(BillingTimeStampedModel):
         related_name="direct_sales",
     )
     status = models.CharField(
-        max_length=16,
+        max_length=32,
         choices=DirectSaleStatus.choices,
         default=DirectSaleStatus.DRAFT,
         db_index=True,
@@ -155,6 +171,18 @@ class DirectSale(BillingTimeStampedModel):
         max_length=10,
         choices=BillingTaxMode.choices,
         default=BillingTaxMode.NON_GST,
+        db_index=True,
+    )
+    tax_calculation_mode = models.CharField(
+        max_length=20,
+        choices=TaxCalculationMode.choices,
+        default=TaxCalculationMode.NON_GST,
+        db_index=True,
+    )
+    customer_gst_type = models.CharField(
+        max_length=32,
+        choices=CustomerGstType.choices,
+        default=CustomerGstType.UNREGISTERED_CONSUMER,
         db_index=True,
     )
     finance_account = models.ForeignKey(
@@ -185,7 +213,23 @@ class DirectSale(BillingTimeStampedModel):
     balance_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     customer_name_snapshot = models.CharField(max_length=160, blank=True, default="")
     customer_phone_snapshot = models.CharField(max_length=20, blank=True, default="")
+    customer_snapshot_email = models.EmailField(blank=True, default="")
+    customer_snapshot_billing_address_line1 = models.CharField(max_length=255, blank=True, default="")
+    customer_snapshot_billing_address_line2 = models.CharField(max_length=255, blank=True, default="")
+    customer_snapshot_city = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_district = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_state = models.CharField(max_length=120, blank=True, default="")
+    customer_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
     customer_gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    customer_snapshot_place_of_supply = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_address_line1 = models.CharField(max_length=255, blank=True, default="")
+    delivery_snapshot_address_line2 = models.CharField(max_length=255, blank=True, default="")
+    delivery_snapshot_city = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_district = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_state = models.CharField(max_length=120, blank=True, default="")
+    delivery_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
+    idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -216,10 +260,7 @@ class DirectSale(BillingTimeStampedModel):
             finance_branch_id = getattr(self.finance_account, "branch_id", None)
             if self.branch_id and finance_branch_id and self.branch_id != finance_branch_id:
                 errors["finance_account"] = "Selected finance account must belong to the sale branch."
-        if self.delivery_required and self.status in {
-            DirectSaleStatus.DELIVERED,
-            DirectSaleStatus.INVOICED,
-        } and not self.delivered_at:
+        if self.delivery_required and self.status == DirectSaleStatus.DELIVERED and not self.delivered_at:
             errors["delivered_at"] = "Delivered sales must store the delivery timestamp."
         if errors:
             raise ValidationError(errors)
@@ -230,13 +271,45 @@ class DirectSale(BillingTimeStampedModel):
             immutable_statuses={
                 DirectSaleStatus.INVOICED,
                 DirectSaleStatus.CANCELLED,
+                DirectSaleStatus.CANCELLED_PRE_INVOICE,
+                DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+                DirectSaleStatus.REVERSED_POST_INVOICE,
+                DirectSaleStatus.RETURNED,
+                DirectSaleStatus.EXCHANGED_CLOSED,
+                DirectSaleStatus.ARCHIVED,
+            },
+            allowed={
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.REVERSED_POST_INVOICE),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.RETURNED),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.CANCELLED_AFTER_DELIVERY),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.ARCHIVED),
+                (DirectSaleStatus.INVOICED, DirectSaleStatus.EXCHANGED_CLOSED),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.RETURNED),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.CANCELLED_AFTER_DELIVERY),
+                (DirectSaleStatus.DELIVERED, DirectSaleStatus.ARCHIVED),
             },
         )
         self.sale_no = (self.sale_no or "").strip().upper() or None
         self.delivery_reference = (self.delivery_reference or "").strip().upper()
         self.customer_name_snapshot = (self.customer_name_snapshot or "").strip()
         self.customer_phone_snapshot = (self.customer_phone_snapshot or "").strip()
+        self.customer_snapshot_email = (self.customer_snapshot_email or "").strip()
+        self.customer_snapshot_billing_address_line1 = (self.customer_snapshot_billing_address_line1 or "").strip()
+        self.customer_snapshot_billing_address_line2 = (self.customer_snapshot_billing_address_line2 or "").strip()
+        self.customer_snapshot_city = (self.customer_snapshot_city or "").strip()
+        self.customer_snapshot_district = (self.customer_snapshot_district or "").strip()
+        self.customer_snapshot_state = (self.customer_snapshot_state or "").strip()
+        self.customer_snapshot_pincode = (self.customer_snapshot_pincode or "").strip()
         self.customer_gstin = (self.customer_gstin or "").strip().upper() or None
+        self.customer_snapshot_place_of_supply = (self.customer_snapshot_place_of_supply or "").strip()
+        self.delivery_snapshot_address_line1 = (self.delivery_snapshot_address_line1 or "").strip()
+        self.delivery_snapshot_address_line2 = (self.delivery_snapshot_address_line2 or "").strip()
+        self.delivery_snapshot_city = (self.delivery_snapshot_city or "").strip()
+        self.delivery_snapshot_district = (self.delivery_snapshot_district or "").strip()
+        self.delivery_snapshot_state = (self.delivery_snapshot_state or "").strip()
+        self.delivery_snapshot_pincode = (self.delivery_snapshot_pincode or "").strip()
+        self.idempotency_key = (self.idempotency_key or "").strip() or None
+        self.idempotency_payload_hash = (self.idempotency_payload_hash or "").strip()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = (
@@ -1066,3 +1139,193 @@ class ReceiptDocument(BillingTimeStampedModel):
 
     def __str__(self):
         return self.receipt_no or f"RCT-{self.pk}"
+
+
+class DirectSaleReturnStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class DirectSaleReturnKind(models.TextChoices):
+    POST_INVOICE_CANCEL = "POST_INVOICE_CANCEL", "Post-Invoice Cancel"
+    DELIVERED_RETURN = "DELIVERED_RETURN", "Delivered Return"
+    DELIVERED_EXCHANGE = "DELIVERED_EXCHANGE", "Delivered Exchange"
+    DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
+    PARTIAL_RETURN = "PARTIAL_RETURN", "Partial Return"
+
+
+class ReturnStockDestination(models.TextChoices):
+    SELLABLE = "SELLABLE", "Sellable"
+    INSPECTION = "INSPECTION", "Inspection"
+    DAMAGED = "DAMAGED", "Damaged"
+    SERVICE = "SERVICE", "Service"
+
+
+class RefundMethod(models.TextChoices):
+    CASH_REFUND = "CASH_REFUND", "Cash Refund"
+    UPI_REFUND = "UPI_REFUND", "UPI Refund"
+    BANK_REFUND = "BANK_REFUND", "Bank Refund"
+
+
+class CustomerRefundStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    PAID = "PAID", "Paid"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class PurchaseReturnStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class DirectSaleReturn(BillingTimeStampedModel):
+    return_no = models.CharField(max_length=48, unique=True, db_index=True)
+    direct_sale = models.ForeignKey(DirectSale, on_delete=models.PROTECT, related_name="sale_returns")
+    original_invoice = models.ForeignKey(BillingInvoice, on_delete=models.PROTECT, related_name="sale_returns")
+    credit_note = models.OneToOneField(
+        BillingCreditNote,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="direct_sale_return",
+    )
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="direct_sale_returns")
+    status = models.CharField(max_length=16, choices=DirectSaleReturnStatus.choices, default=DirectSaleReturnStatus.DRAFT, db_index=True)
+    return_kind = models.CharField(
+        max_length=24,
+        choices=DirectSaleReturnKind.choices,
+        default=DirectSaleReturnKind.DELIVERED_RETURN,
+        db_index=True,
+    )
+    stock_destination = models.CharField(
+        max_length=16,
+        choices=ReturnStockDestination.choices,
+        default=ReturnStockDestination.SELLABLE,
+        db_index=True,
+    )
+    stock_location = models.ForeignKey(
+        "inventory.StockLocation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="direct_sale_returns",
+    )
+    reason = models.TextField()
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    exchange_amount_due = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    exchange_customer_credit = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    stock_effect = models.BooleanField(default=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_direct_sale_returns"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_direct_sale_returns"
+    )
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "billing_direct_sale_returns"
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["status", "created_at"]), models.Index(fields=["customer", "created_at"])]
+
+
+class DirectSaleReturnLine(BillingTimeStampedModel):
+    direct_sale_return = models.ForeignKey(DirectSaleReturn, on_delete=models.CASCADE, related_name="lines")
+    direct_sale_line = models.ForeignKey(DirectSaleLine, on_delete=models.PROTECT, related_name="return_lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, null=True, blank=True, related_name="direct_sale_return_lines")
+    description = models.CharField(max_length=255)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    taxable_value = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "billing_direct_sale_return_lines"
+        ordering = ["id"]
+
+
+class CustomerCreditLedger(BillingTimeStampedModel):
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="credit_ledger_entries")
+    direct_sale_return = models.ForeignKey(
+        DirectSaleReturn, on_delete=models.PROTECT, null=True, blank=True, related_name="credit_ledger_entries"
+    )
+    credit_note = models.ForeignKey(BillingCreditNote, on_delete=models.PROTECT, null=True, blank=True, related_name="credit_ledger_entries")
+    refund = models.ForeignKey("CustomerRefund", on_delete=models.PROTECT, null=True, blank=True, related_name="credit_ledger_entries")
+    entry_date = models.DateField(default=timezone.localdate, db_index=True)
+    reference_no = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    credit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    debit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    notes = models.TextField(blank=True, default="")
+    posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_customer_credit_entries")
+
+    class Meta:
+        db_table = "billing_customer_credit_ledger"
+        ordering = ["entry_date", "id"]
+        indexes = [models.Index(fields=["customer", "entry_date", "id"])]
+
+
+class CustomerRefund(BillingTimeStampedModel):
+    refund_no = models.CharField(max_length=48, unique=True, db_index=True)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="customer_refunds")
+    direct_sale_return = models.ForeignKey(DirectSaleReturn, on_delete=models.PROTECT, null=True, blank=True, related_name="customer_refunds")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    method = models.CharField(max_length=16, choices=RefundMethod.choices)
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, related_name="customer_refunds")
+    status = models.CharField(max_length=16, choices=CustomerRefundStatus.choices, default=CustomerRefundStatus.DRAFT, db_index=True)
+    reason = models.TextField()
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_customer_refunds")
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    paid_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="paid_customer_refunds")
+    paid_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="customer_refund")
+
+    class Meta:
+        db_table = "billing_customer_refunds"
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["status", "created_at"]), models.Index(fields=["customer", "created_at"])]
+
+
+class PurchaseReturn(BillingTimeStampedModel):
+    return_no = models.CharField(max_length=48, unique=True, db_index=True)
+    purchase_bill = models.ForeignKey("inventory.PurchaseBill", on_delete=models.PROTECT, related_name="purchase_returns")
+    vendor = models.ForeignKey("accounting.Vendor", on_delete=models.PROTECT, related_name="purchase_returns")
+    status = models.CharField(max_length=16, choices=PurchaseReturnStatus.choices, default=PurchaseReturnStatus.DRAFT, db_index=True)
+    return_date = models.DateField(default=timezone.localdate, db_index=True)
+    reason = models.TextField()
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    metadata = models.JSONField(default=dict, blank=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_return")
+    posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_purchase_returns")
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "billing_purchase_returns"
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["status", "return_date"]), models.Index(fields=["vendor", "return_date"])]
+
+
+class PurchaseReturnLine(BillingTimeStampedModel):
+    purchase_return = models.ForeignKey(PurchaseReturn, on_delete=models.CASCADE, related_name="lines")
+    purchase_bill_line = models.ForeignKey("inventory.PurchaseBillLine", on_delete=models.PROTECT, related_name="purchase_return_lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="purchase_return_lines")
+    description = models.CharField(max_length=255, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    taxable_value = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+
+    class Meta:
+        db_table = "billing_purchase_return_lines"
+        ordering = ["id"]
