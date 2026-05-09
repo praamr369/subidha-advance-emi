@@ -75,7 +75,14 @@ function deleteHeader(headers: Record<string, string>, key: string): void {
 
 function buildApiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}`;
+  const base = API_BASE_URL.replace(/\/+$/, "");
+  // `API_BASE_URL` is normalized to end with `/api/v1` (see `lib/env.ts`). Many
+  // call sites still pass absolute API paths like `/api/v1/...`; concatenating
+  // blindly would produce `/api/v1/api/v1/...` and break requests at runtime.
+  if (base.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1")) {
+    return `${base}${normalizedPath.slice("/api/v1".length) || ""}`;
+  }
+  return `${base}${normalizedPath}`;
 }
 
 type ParsedResponseBody = {

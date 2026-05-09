@@ -7,8 +7,7 @@ from decimal import Decimal
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from billing.models import BillingInvoice, DirectSale, ReceiptDocument
-from core.services.operational_visibility import direct_sale_active_q, invoice_active_q, receipt_active_q
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
 from core.services.operational_visibility import direct_sale_active_q, invoice_active_q, receipt_active_q
 from subscriptions.models import (
     Emi,
