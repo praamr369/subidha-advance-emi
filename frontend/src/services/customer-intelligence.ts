@@ -2,8 +2,11 @@ import { request } from "@/services/api";
 
 export type CustomerRiskStatus =
   | "GOOD"
+  | "ACTIVE"
   | "DUE"
   | "OVERDUE"
+  | "HISTORY"
+  | "CANCELLED"
   | "DELIVERY_PENDING"
   | "SERVICE_OPEN";
 
@@ -17,14 +20,18 @@ export type CustomerOperationalSummaryResponse = {
   };
   summary: {
     active_subscriptions: number;
+    cancelled_subscription_count?: number;
     historical_subscriptions?: number;
     active_contract_value?: string;
     historical_contract_value?: string;
     subscription_outstanding: string;
+    active_subscription_due?: string;
     direct_sale_outstanding: string;
     returned_direct_sale_count?: number;
     rent_lease_outstanding: string;
     overdue_emi_count: number;
+    active_overdue_emi_count?: number;
+    active_overdue_emi_amount?: string;
     pending_delivery_count: number;
     open_service_count: number;
     last_payment_date: string | null;
@@ -32,6 +39,8 @@ export type CustomerOperationalSummaryResponse = {
     reversed_payment_count?: number;
     active_collected_amount?: string;
     reversed_payment_amount?: string;
+    has_history_only_contracts?: boolean;
+    history_badges?: string[];
     risk_status: CustomerRiskStatus;
   };
   subscriptions: Record<string, unknown>[];

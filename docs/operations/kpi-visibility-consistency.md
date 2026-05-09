@@ -3,6 +3,8 @@
 ## Active vs History Contract
 - KPI values used for active operational decisions must exclude history-only documents.
 - History-only rows remain visible in registers and audit/history views.
+- Historical contract value is per-subscription and must not be aggregated from EMI joins.
+- Cancelled subscription EMI rows remain historical-only and must not inflate active overdue counts.
 
 ## Billing and Receipt Rules
 - Active Invoice Balance excludes `VOID`, `REVERSED`, `CANCELLED`, `CREDITED_FULLY`, and draft invoices.
@@ -12,6 +14,7 @@
 ## Dashboard Consistency
 - Finance strip, queue rows, and ledger summaries must use the same active filters.
 - If historical amounts are shown, they must be explicitly labeled as historical.
+- Customer list, customer detail, customer hover, and CRM customer previews must consume the same active/history summary semantics.
 
 ## Safety Notes
 - No mutation or deletion of financial history rows to satisfy visibility.

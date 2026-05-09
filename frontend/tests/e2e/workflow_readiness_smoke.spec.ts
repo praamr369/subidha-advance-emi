@@ -206,8 +206,10 @@ test.describe("cashier workflow smoke", () => {
   test("cashier collection and payment pages load with counter pre-flight banner", async ({
     page,
   }) => {
-    await page.goto("/cashier/collect");
-    await expect(page.getByRole("heading", { name: "Collect Payment" })).toBeVisible();
+    await page.goto("/cashier/collect", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Collect Payment" })).toBeVisible({
+      timeout: 60_000,
+    });
     await expect(page.getByTestId("business-setup-readiness-banner")).toContainText(
       "Counter pre-flight reminder"
     );

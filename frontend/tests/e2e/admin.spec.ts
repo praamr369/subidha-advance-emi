@@ -1039,6 +1039,88 @@ test("admin customer detail separates active and historical finance after cancel
   await expect(page.locator("body")).not.toContainText("Collect Direct-Sale Balance");
 });
 
+test("admin customer list and intelligence hover keep cancelled contracts in history-only posture", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/customers/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: 88,
+          name: "Cancelled Only Customer",
+          phone: "01788888888",
+          email: "cancelled-only@example.com",
+          status: "ACTIVE",
+          kyc_status: "VERIFIED",
+          active_subscription_count: 0,
+          historical_subscription_count: 1,
+          cancelled_subscription_count: 1,
+          active_contract_value: "0.00",
+          historical_contract_value: "67500.00",
+          total_subscription_value: "67500.00",
+          active_subscription_due: "0.00",
+          active_direct_sale_outstanding: "0.00",
+          active_invoice_outstanding: "0.00",
+        },
+      ]),
+    });
+  });
+  await page.route("**/api/v1/admin/customers/88/operational-summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        customer: {
+          id: 88,
+          name: "Cancelled Only Customer",
+          phone: "01788888888",
+          status: "ACTIVE",
+        },
+        summary: {
+          active_subscriptions: 0,
+          historical_subscriptions: 1,
+          cancelled_subscription_count: 1,
+          active_contract_value: "0.00",
+          historical_contract_value: "67500.00",
+          active_subscription_due: "0.00",
+          subscription_outstanding: "0.00",
+          direct_sale_outstanding: "0.00",
+          overdue_emi_count: 0,
+          active_overdue_emi_count: 0,
+          pending_delivery_count: 0,
+          open_service_count: 0,
+          last_payment_date: null,
+          risk_status: "CANCELLED",
+          history_badges: ["CANCELLED", "HISTORY"],
+        },
+        subscriptions: [],
+        direct_sales: [],
+        rent_lease_contracts: [],
+        deliveries: [],
+        service_tickets: [],
+        recent_activity: [],
+      }),
+    });
+  });
+
+  await page.goto("/admin/customers");
+  await expect(page.locator("body")).toContainText("Historical contract (deduped) ₹67500.00");
+  const cancelledRow = page.locator("tr", { hasText: "Cancelled Only Customer" });
+  await expect(cancelledRow.getByRole("link", { name: "Payment History" })).toBeVisible();
+  await expect(cancelledRow.getByRole("link", { name: "Payments" })).toHaveCount(0);
+
+  const customerNameButton = page.getByRole("button", {
+    name: "Open customer intelligence for Cancelled Only Customer",
+  });
+  await customerNameButton.hover();
+  await expect(page.getByText("Active overdue EMI: 0")).toBeVisible();
+  await expect(page.getByText("Cancelled contracts: 1")).toBeVisible();
+  await expect(page.getByText("Historical contract value: ₹67500.00")).toBeVisible();
+  await expect(page.getByText("Overdue EMI: 15")).toHaveCount(0);
+});
+
 test("admin customer edit uses the real JSON contract and audit timeline", async ({
   page,
 }) => {

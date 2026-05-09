@@ -66,6 +66,7 @@ type CustomerRow = {
   historical_subscription_count?: number;
   cancelled_subscription_count?: number;
   total_subscription_value?: string;
+  historical_contract_value?: string;
   active_contract_value?: string;
   active_subscription_due?: string;
   active_direct_sale_outstanding?: string;
@@ -186,6 +187,9 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
     cancelled_subscription_count: toOptionalNumber(raw.cancelled_subscription_count) ?? 0,
     total_subscription_value: toMoneyString(
       raw.total_subscription_value ?? raw.total_contract_value
+    ),
+    historical_contract_value: toMoneyString(
+      raw.historical_contract_value ?? raw.total_subscription_value ?? raw.total_contract_value
     ),
     active_contract_value: toMoneyString(raw.active_contract_value),
     active_subscription_due: toMoneyString(raw.active_subscription_due),
@@ -540,7 +544,7 @@ export default function AdminCustomersPage() {
               </div>
             ) : null}
             <div className="text-xs text-muted-foreground">
-              Historical contract {money(row.total_subscription_value)}
+              Historical contract (deduped) {money(row.historical_contract_value ?? "0.00")}
             </div>
           </div>
         ),
@@ -1134,7 +1138,12 @@ export default function AdminCustomersPage() {
                         href={`/admin/payments?customer=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Payments
+                        {(Number(row.active_subscription_count || 0) > 0 ||
+                          Number(row.active_subscription_due || 0) > 0 ||
+                          Number(row.active_direct_sale_outstanding || 0) > 0 ||
+                          Number(row.active_invoice_outstanding || 0) > 0)
+                          ? "Payments"
+                          : "Payment History"}
                       </Link>
                     </div>
                   )}

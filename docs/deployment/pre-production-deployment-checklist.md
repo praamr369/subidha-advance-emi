@@ -88,6 +88,8 @@ npx playwright test tests/e2e/admin.spec.ts tests/e2e/customer.spec.ts tests/e2e
 - Confirm active monthly booked value excludes cancelled subscriptions.
 - Confirm available Lucky IDs do not display cancelled holders as current assignment.
 - Confirm customer register active contract/due columns stay zero for cancelled-only customers.
+- Confirm customer register historical contract value equals one-contract total (not EMI-count multiplied).
+- Confirm cancelled-only customer hover shows active overdue EMI as zero.
 - Confirm customer detail active direct-sale outstanding stays zero for returned/reversed sales.
 - Confirm reversed payments remain in history but not in active payment/collection KPI cards.
 - Confirm documents/history remain visible for audit.

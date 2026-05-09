@@ -27,6 +27,8 @@ from subscriptions.services.winner_state_service import get_subscription_winner_
 from core.services.operational_visibility import (
     direct_sale_active_q,
     invoice_active_q,
+    is_subscription_active_receivable,
+    is_subscription_history_only,
     is_payment_active_collection,
     receipt_active_q,
 )
@@ -121,6 +123,23 @@ def build_customer_profile_summary(customer: Customer) -> dict[str, object]:
     }
 
 
+def get_customer_historical_subscription_contract_value(customer: Customer) -> Decimal:
+    """
+    Historical contract value is counted once per non-active subscription.
+    Never aggregate this from EMI joins.
+    """
+    subscriptions = (
+        get_subscription_detail_queryset()
+        .filter(customer=customer)
+        .order_by("-created_at", "-id")
+    )
+    return sum(
+        (subscription.total_amount or Decimal("0.00"))
+        for subscription in subscriptions
+        if is_subscription_history_only(subscription)
+    )
+
+
 def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
     subscriptions = list(
         get_subscription_detail_queryset()
@@ -129,13 +148,24 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
     )
     subscription_summary = build_customer_dashboard_summary(subscriptions)
     active_subscriptions = [
-        sub
-        for sub in subscriptions
-        if sub.status in {"ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"}
+        sub for sub in subscriptions if is_subscription_active_receivable(sub)
     ]
-    historical_subscriptions = [sub for sub in subscriptions if sub.status not in {"ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"}]
+    active_subscription_summary = build_customer_dashboard_summary(active_subscriptions)
+    historical_subscriptions = [
+        sub for sub in subscriptions if is_subscription_history_only(sub)
+    ]
     active_contract_value = sum((sub.total_amount or Decimal("0.00")) for sub in active_subscriptions)
-    historical_contract_value = sum((sub.total_amount or Decimal("0.00")) for sub in historical_subscriptions)
+    historical_contract_value = get_customer_historical_subscription_contract_value(
+        customer
+    )
+    cancelled_subscription_count = sum(
+        1 for sub in subscriptions if str(getattr(sub, "status", "")) == "CANCELLED"
+    )
+    history_badges: list[str] = []
+    if cancelled_subscription_count > 0:
+        history_badges.append("CANCELLED")
+    if len(historical_subscriptions) > 0:
+        history_badges.append("HISTORY")
 
     direct_sales_qs = (
         DirectSale.objects.select_related("branch", "cash_counter", "finance_account")
@@ -500,6 +530,7 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "subscription_count": subscription_summary["subscription_count"],
             "active_subscriptions": len(active_subscriptions),
             "historical_subscriptions": len(historical_subscriptions),
+            "cancelled_subscription_count": cancelled_subscription_count,
             "completed_subscriptions": subscription_summary["completed_subscriptions"],
             "winner_subscriptions": subscription_summary["winner_subscriptions"],
             "total_subscription_paid": subscription_summary["total_paid_amount"],
@@ -513,6 +544,17 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             ),
             "active_contract_value": _money(active_contract_value),
             "historical_contract_value": _money(historical_contract_value),
+            "active_subscription_due": _money(
+                active_subscription_summary["outstanding_amount"]
+            ),
+            "active_overdue_emi_count": int(
+                active_subscription_summary.get("overdue_emis", 0) or 0
+            ),
+            "active_overdue_emi_amount": _money(
+                active_subscription_summary.get("overdue_amount", "0.00")
+            ),
+            "has_history_only_contracts": len(historical_subscriptions) > 0,
+            "history_badges": history_badges,
             "direct_sale_count": direct_sales_totals["total_count"] or 0,
             "active_direct_sale_count": direct_sales_active_totals["total_count"] or 0,
             "returned_direct_sale_count": direct_sales_history_totals["total_count"] or 0,
@@ -645,7 +687,17 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
     payments = profile.get("payments", {})
 
     active_subscriptions = int(overview.get("active_subscriptions", 0) or 0)
-    overdue_emi_count = int(subscriptions.get("summary", {}).get("pending_emis", 0) or 0)
+    overdue_emi_count = int(overview.get("active_overdue_emi_count", 0) or 0)
+    active_subscription_due = _money(
+        overview.get("active_subscription_due")
+        or overview.get("subscription_outstanding_amount")
+    )
+    historical_subscriptions = int(overview.get("historical_subscriptions", 0) or 0)
+    cancelled_subscription_count = int(
+        overview.get("cancelled_subscription_count", 0) or 0
+    )
+    has_history_only_contracts = bool(overview.get("has_history_only_contracts"))
+    history_badges = list(overview.get("history_badges") or [])
     pending_delivery_count = SubscriptionDelivery.objects.filter(
         subscription__customer=customer,
         status__in=[
@@ -670,14 +722,19 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
     )
 
     risk_status = "GOOD"
-    if open_service_count > 0:
-        risk_status = "SERVICE_OPEN"
-    if pending_delivery_count > 0:
-        risk_status = "DELIVERY_PENDING"
-    if overdue_emi_count > 0:
-        risk_status = "OVERDUE"
-    elif active_subscriptions > 0 and Decimal(str(overview.get("subscription_outstanding_amount") or "0.00")) > Decimal("0.00"):
-        risk_status = "DUE"
+    if active_subscriptions > 0:
+        if overdue_emi_count > 0:
+            risk_status = "OVERDUE"
+        elif Decimal(active_subscription_due) > Decimal("0.00"):
+            risk_status = "DUE"
+        elif pending_delivery_count > 0:
+            risk_status = "DELIVERY_PENDING"
+        elif open_service_count > 0:
+            risk_status = "SERVICE_OPEN"
+        else:
+            risk_status = "ACTIVE"
+    elif has_history_only_contracts:
+        risk_status = "CANCELLED" if cancelled_subscription_count > 0 else "HISTORY"
 
     contract_reference_rows = profile.get("contract_references", {}).get("rows", [])
     rent_lease_contracts = [
@@ -696,10 +753,12 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
         },
         "summary": {
             "active_subscriptions": active_subscriptions,
-            "historical_subscriptions": int(overview.get("historical_subscriptions", 0) or 0),
+            "historical_subscriptions": historical_subscriptions,
+            "cancelled_subscription_count": cancelled_subscription_count,
             "active_contract_value": _money(overview.get("active_contract_value")),
             "historical_contract_value": _money(overview.get("historical_contract_value")),
-            "subscription_outstanding": _money(overview.get("subscription_outstanding_amount")),
+            "subscription_outstanding": active_subscription_due,
+            "active_subscription_due": active_subscription_due,
             "direct_sale_outstanding": _money(
                 direct_sales.get("summary", {}).get("outstanding_total")
             ),
@@ -708,6 +767,10 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
             ),
             "rent_lease_outstanding": "0.00",
             "overdue_emi_count": overdue_emi_count,
+            "active_overdue_emi_count": overdue_emi_count,
+            "active_overdue_emi_amount": _money(
+                overview.get("active_overdue_emi_amount")
+            ),
             "pending_delivery_count": pending_delivery_count,
             "open_service_count": open_service_count,
             "last_payment_date": last_payment_date,
@@ -719,6 +782,8 @@ def build_customer_operational_summary(customer: Customer) -> dict[str, object]:
             "reversed_payment_amount": _money(
                 payments.get("summary", {}).get("reversed_payment_amount")
             ),
+            "has_history_only_contracts": has_history_only_contracts,
+            "history_badges": history_badges,
             "risk_status": risk_status,
         },
         "subscriptions": subscriptions.get("rows", []),

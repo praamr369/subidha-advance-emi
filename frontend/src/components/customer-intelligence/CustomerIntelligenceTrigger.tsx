@@ -13,9 +13,12 @@ function money(value: string): string {
 
 function CustomerStatusBadge({ status }: { status: string }) {
   const palette: Record<string, string> = {
+    ACTIVE: "bg-emerald-100 text-emerald-800",
     GOOD: "bg-emerald-100 text-emerald-800",
     DUE: "bg-amber-100 text-amber-800",
     OVERDUE: "bg-rose-100 text-rose-800",
+    HISTORY: "bg-slate-100 text-slate-800",
+    CANCELLED: "bg-violet-100 text-violet-800",
     DELIVERY_PENDING: "bg-orange-100 text-orange-800",
     SERVICE_OPEN: "bg-blue-100 text-blue-800",
   };
@@ -49,6 +52,8 @@ function supportTicketTitle(ticket: Record<string, unknown>): string {
 }
 
 function CustomerIntelligencePopover({ data }: { data: CustomerOperationalSummaryResponse }) {
+  const activeOverdue = data.summary.active_overdue_emi_count ?? data.summary.overdue_emi_count;
+  const activeDue = data.summary.active_subscription_due ?? data.summary.subscription_outstanding;
   return (
     <div className="space-y-2 text-xs">
       <div className="flex items-center justify-between gap-2">
@@ -56,11 +61,20 @@ function CustomerIntelligencePopover({ data }: { data: CustomerOperationalSummar
         <CustomerStatusBadge status={data.summary.risk_status} />
       </div>
       <div className="text-muted-foreground">{data.customer.phone || "No phone"}</div>
-      <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-        <div>Active: {data.summary.active_subscriptions}</div>
-        <div>Overdue EMI: {data.summary.overdue_emi_count}</div>
-        <div>Subs due: {money(data.summary.subscription_outstanding)}</div>
-        <div>Direct due: {money(data.summary.direct_sale_outstanding)}</div>
+      <div className="space-y-2 text-muted-foreground">
+        <div className="font-medium text-foreground">Active posture</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>Active contracts: {data.summary.active_subscriptions}</div>
+          <div>Active overdue EMI: {activeOverdue}</div>
+          <div>Active subs due: {money(activeDue)}</div>
+          <div>Active direct due: {money(data.summary.direct_sale_outstanding)}</div>
+        </div>
+        <div className="font-medium text-foreground">History posture</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>Cancelled contracts: {data.summary.cancelled_subscription_count ?? 0}</div>
+          <div>Historical contracts: {data.summary.historical_subscriptions ?? 0}</div>
+          <div>Historical contract value: {money(data.summary.historical_contract_value || "0.00")}</div>
+        </div>
       </div>
     </div>
   );
@@ -110,12 +124,13 @@ function CustomerIntelligenceDrawer({
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>Active subs: {data.summary.active_subscriptions}</div>
             <div>Historical subs: {data.summary.historical_subscriptions ?? 0}</div>
-            <div>Overdue EMI: {data.summary.overdue_emi_count}</div>
+            <div>Active overdue EMI: {data.summary.active_overdue_emi_count ?? data.summary.overdue_emi_count}</div>
             <div>Pending deliveries: {data.summary.pending_delivery_count}</div>
             <div>Open service: {data.summary.open_service_count}</div>
+            <div>Cancelled contracts: {data.summary.cancelled_subscription_count ?? 0}</div>
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div>Subscription due: {money(data.summary.subscription_outstanding)}</div>
+            <div>Active subscription due: {money(data.summary.active_subscription_due ?? data.summary.subscription_outstanding)}</div>
             <div>Direct-sale due: {money(data.summary.direct_sale_outstanding)}</div>
             <div>Last payment: {data.summary.last_payment_date || "—"}</div>
           </div>
@@ -125,7 +140,7 @@ function CustomerIntelligenceDrawer({
             <div>Active payments: {data.summary.active_payment_count ?? 0}</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(Number(data.summary.subscription_outstanding || 0) > 0 ||
+            {(Number(data.summary.active_subscription_due || data.summary.subscription_outstanding || 0) > 0 ||
               Number(data.summary.direct_sale_outstanding || 0) > 0) ? (
               <Link href={collectHref} className="rounded border px-3 py-1.5 text-xs">Collect payment</Link>
             ) : (

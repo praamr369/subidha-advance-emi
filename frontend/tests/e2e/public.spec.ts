@@ -32,6 +32,21 @@ test("public product enquiry routes into apply and the apply form submits", asyn
   const suffix = Date.now().toString().slice(-8);
   const phone = `9${suffix.padStart(9, "0")}`;
 
+  await page.route("**/api/v1/public/leads/", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        message: "Application submitted successfully.",
+        lead_id: 5501,
+      }),
+    });
+  });
+
   await page.goto("/products");
   await expect(
     page.getByRole("heading", { name: "Products" })
@@ -55,7 +70,8 @@ test("public product enquiry routes into apply and the apply form submits", asyn
     .getByRole("button", { name: "Submit Application" })
     .click();
 
-  await expect(page.getByText(/Reference #\d+\./)).toBeVisible();
+  await expect(page.getByText(/Application submitted successfully\./)).toBeVisible();
+  await expect(page.getByText(/Reference #5501\./)).toBeVisible();
 });
 
 test("public product detail keeps enquiry workflow and catalogue facts visible", async ({

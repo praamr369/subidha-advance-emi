@@ -4,12 +4,16 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PortalPage from "@/components/ui/PortalPage";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import PageHeader from "@/components/ui/PageHeader";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { ROUTES } from "@/lib/routes";
 import { getInventoryReadiness } from "@/services/inventory-ops";
 
@@ -41,11 +45,21 @@ export default function InventoryReadinessPage() {
   const warnings = (data?.warnings as { code?: string; message?: string }[]) || [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Inventory readiness"
-        description="Read-only ATP, opening-stock, and stock-need signals before fulfilling subscriptions or retail deliveries."
-      />
+    <PortalPage
+      title="Inventory readiness"
+      subtitle="Read-only ATP, opening-stock, and stock-need signals before fulfilling subscriptions or retail deliveries."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Inventory", href: ROUTES.admin.inventory },
+        { label: "Readiness" },
+      ]}
+      actions={[
+        { label: "Inventory workspace", href: ROUTES.admin.inventoryWorkspace, variant: "secondary" },
+        { label: "Stock needs", href: ROUTES.admin.inventoryStockNeeds, variant: "secondary" },
+      ]}
+      statusBadge={{ label: "Operational Readiness", tone: "info" }}
+    >
+      <div className="space-y-6">
       <div className="flex flex-wrap gap-2 text-sm">
         <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryWorkspace}>
           Inventory workspace
@@ -55,18 +69,18 @@ export default function InventoryReadinessPage() {
         </Link>
       </div>
 
-      {loading ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
-      {error ? (
-        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
+      {loading ? <LoadingBlock label="Loading readiness snapshot..." /> : null}
+      {!loading && error ? (
+        <ErrorState title="Unable to load inventory readiness" description={error} />
       ) : null}
 
       {data?.module_not_configured ? (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+        <WorkspaceNotice tone="warning" title="Inventory module not configured">
           Inventory evaluation module is not configured on this deployment. Verify migrations and API connectivity.
-        </div>
+        </WorkspaceNotice>
       ) : null}
 
-      {!loading && data && !data.module_not_configured ? (
+      {!loading && !error && data && !data.module_not_configured ? (
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-border bg-card p-4">
             <div className="text-xs font-medium uppercase text-muted-foreground">Inventory ready</div>
@@ -81,6 +95,13 @@ export default function InventoryReadinessPage() {
             <div className="mt-2 text-2xl font-semibold">{String(data.stock_needs_open ?? "—")}</div>
           </div>
         </section>
+      ) : null}
+
+      {!loading && !error && !data ? (
+        <EmptyState
+          title="No readiness data"
+          description="Inventory readiness data is currently unavailable for this branch."
+        />
       ) : null}
 
       {warnings.length > 0 ? (
@@ -100,6 +121,7 @@ export default function InventoryReadinessPage() {
           </CollapsibleContent>
         </Collapsible>
       ) : null}
-    </div>
+      </div>
+    </PortalPage>
   );
 }

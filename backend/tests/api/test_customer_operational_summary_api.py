@@ -11,11 +11,13 @@ from tests.helpers import (
     create_batch,
     create_cashier_user,
     create_customer_profile,
+    create_customer_user,
     create_emi,
     create_lucky_id,
     create_product,
     create_subscription,
 )
+from subscriptions.models import Subscription, Emi
 
 
 class CustomerOperationalSummaryApiTests(APITestCase):
@@ -135,3 +137,64 @@ class CustomerOperationalSummaryApiTests(APITestCase):
             "Payment Issue",
         )
         self.assertIn("duplicate receipt", ticket["message"])
+
+    def test_cancelled_only_subscription_is_history_and_not_active_overdue(self):
+        customer = create_customer_profile(
+            user=create_customer_user(
+                username="cancelled_summary_customer",
+                phone="7381110999",
+            ),
+            name="Cancelled Summary Customer", phone="7381110999"
+        )
+        product = create_product(
+            name="Cancelled Summary Product",
+            product_code="OPS-SUM-CANCEL-001",
+            base_price=Decimal("67500.00"),
+        )
+        batch = create_batch(
+            batch_code="OPSSUMCANCEL0426",
+            duration_months=15,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 4, 1),
+        )
+        lucky_id = create_lucky_id(batch=batch, lucky_number=45)
+        subscription = create_subscription(
+            customer=customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky_id,
+            total_amount=Decimal("67500.00"),
+            monthly_amount=Decimal("4500.00"),
+            tenure_months=15,
+            status="CANCELLED",
+        )
+        for month_no in range(1, 16):
+            create_emi(
+                subscription=subscription,
+                month_no=month_no,
+                amount=Decimal("4500.00"),
+                due_date=date(2026, 1, 1),
+            )
+
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(
+            f"/api/v1/admin/customers/{customer.id}/operational-summary/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        summary = response.data["summary"]
+        self.assertEqual(summary["active_subscriptions"], 0)
+        self.assertEqual(summary["active_contract_value"], "0.00")
+        self.assertEqual(summary["historical_contract_value"], "67500.00")
+        self.assertEqual(summary["active_overdue_emi_count"], 0)
+        self.assertEqual(summary["overdue_emi_count"], 0)
+        self.assertEqual(summary["active_subscription_due"], "0.00")
+        self.assertEqual(summary["subscription_outstanding"], "0.00")
+        self.assertEqual(summary["cancelled_subscription_count"], 1)
+        self.assertEqual(summary["risk_status"], "CANCELLED")
+        self.assertIn("CANCELLED", summary["history_badges"])
+        self.assertIn("HISTORY", summary["history_badges"])
+        self.assertTrue(
+            Subscription.objects.filter(pk=subscription.pk, status="CANCELLED").exists()
+        )
+        self.assertEqual(Emi.objects.filter(subscription=subscription).count(), 15)

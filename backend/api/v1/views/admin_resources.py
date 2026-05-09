@@ -116,6 +116,7 @@ from subscriptions.services.winner_state_service import (
 from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 from core.services.operational_visibility import (
     subscription_batch_active_q,
+    subscription_collectible_q,
     subscription_draw_eligible_q,
     direct_sale_active_q,
     invoice_active_q,
@@ -579,54 +580,111 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     serializer_class = CustomerAdminSerializer
 
     def get_queryset(self):
+        zero_money = Value(
+            Decimal("0.00"),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        zero_count = Value(0, output_field=IntegerField())
+
+        subscription_base = Subscription.objects.filter(customer_id=OuterRef("pk"))
+        active_subscription_base = subscription_base.filter(subscription_batch_active_q())
+        historical_subscription_base = subscription_base.exclude(
+            subscription_batch_active_q()
+        )
+        cancelled_subscription_base = subscription_base.filter(
+            status=SubscriptionStatus.CANCELLED
+        )
+
+        active_due_base = (
+            Emi.objects.filter(subscription__customer_id=OuterRef("pk"))
+            .filter(subscription_collectible_q("subscription__"))
+            .filter(status=EmiStatus.PENDING)
+        )
+
+        # Use per-domain subqueries to avoid cross-join multiplication between
+        # subscriptions, EMIs, invoices, and direct-sales aggregates.
         queryset = super().get_queryset().annotate(
-            active_subscription_count=Count(
-                'subscriptions',
-                filter=subscription_batch_active_q("subscriptions__"),
-                distinct=True
+            active_subscription_count=Coalesce(
+                Subquery(
+                    active_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
             ),
-            historical_subscription_count=Count(
-                "subscriptions",
-                filter=~subscription_batch_active_q("subscriptions__"),
-                distinct=True,
+            historical_subscription_count=Coalesce(
+                Subquery(
+                    historical_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
             ),
-            cancelled_subscription_count=Count(
-                "subscriptions",
-                filter=Q(subscriptions__status=SubscriptionStatus.CANCELLED),
-                distinct=True,
+            cancelled_subscription_count=Coalesce(
+                Subquery(
+                    cancelled_subscription_base.values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
             ),
             total_subscription_value=Coalesce(
-                Sum('subscriptions__total_amount'),
-                Value(Decimal('0.00'), output_field=DecimalField(max_digits=12, decimal_places=2))
+                Subquery(
+                    subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            historical_contract_value=Coalesce(
+                Subquery(
+                    historical_subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
             ),
             active_contract_value=Coalesce(
-                Sum(
-                    "subscriptions__total_amount",
-                    filter=subscription_batch_active_q("subscriptions__"),
+                Subquery(
+                    active_subscription_base.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
                 ),
-                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+                zero_money,
             ),
             active_subscription_due=Coalesce(
-                Sum(
-                    "subscriptions__emis__amount",
-                    filter=subscription_batch_active_q("subscriptions__")
-                    & Q(subscriptions__emis__status=EmiStatus.PENDING),
+                Subquery(
+                    active_due_base.values("subscription__customer_id")
+                    .annotate(total=Sum("amount"))
+                    .values("total")[:1]
                 ),
-                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+                zero_money,
             ),
             active_direct_sale_outstanding=Coalesce(
-                Sum(
-                    "direct_sales__balance_total",
-                    filter=direct_sale_active_q("direct_sales__"),
+                Subquery(
+                    Customer.objects.filter(pk=OuterRef("pk"))
+                    .annotate(
+                        total=Sum(
+                            "direct_sales__balance_total",
+                            filter=direct_sale_active_q("direct_sales__"),
+                        )
+                    )
+                    .values("total")[:1]
                 ),
-                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+                zero_money,
             ),
             active_invoice_outstanding=Coalesce(
-                Sum(
-                    "billing_invoices__balance_total",
-                    filter=invoice_active_q("billing_invoices__"),
+                Subquery(
+                    Customer.objects.filter(pk=OuterRef("pk"))
+                    .annotate(
+                        total=Sum(
+                            "billing_invoices__balance_total",
+                            filter=invoice_active_q("billing_invoices__"),
+                        )
+                    )
+                    .values("total")[:1]
                 ),
-                Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+                zero_money,
             ),
         )
 

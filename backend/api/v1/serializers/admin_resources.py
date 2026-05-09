@@ -185,6 +185,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     historical_subscription_count = serializers.IntegerField(read_only=True)
     cancelled_subscription_count = serializers.IntegerField(read_only=True)
     active_contract_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    historical_contract_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_subscription_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_direct_sale_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_invoice_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -223,6 +224,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "cancelled_subscription_count",
             "total_subscription_value",
             "active_contract_value",
+            "historical_contract_value",
             "active_subscription_due",
             "active_direct_sale_outstanding",
             "active_invoice_outstanding",
@@ -243,6 +245,7 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "cancelled_subscription_count",
             "total_subscription_value",
             "active_contract_value",
+            "historical_contract_value",
             "active_subscription_due",
             "active_direct_sale_outstanding",
             "active_invoice_outstanding",

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PageHeader from "@/components/ui/PageHeader";
+import PortalPage from "@/components/ui/PortalPage";
 import { StockNeedsOperationalWorkspace } from "@/components/workspace/StockNeedsOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { listStockNeeds } from "@/services/inventory-ops";
@@ -38,11 +38,21 @@ export default function StockNeedsPage() {
   }, [loadRows]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Purchase need workspace"
-        description="Operational purchase/stock needs (PurchaseNeed). Mutations require admin privileges."
-      />
+    <PortalPage
+      title="Purchase need workspace"
+      subtitle="Operational purchase/stock needs (PurchaseNeed). Mutations require admin privileges."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Inventory", href: ROUTES.admin.inventory },
+        { label: "Stock needs" },
+      ]}
+      statusBadge={{ label: "Inventory Need Signals", tone: "info" }}
+      actions={[
+        { label: "Readiness", href: ROUTES.admin.inventoryReadiness, variant: "secondary" },
+        { label: "Purchase needs (legacy workspace)", href: ROUTES.admin.inventoryPurchaseNeeds, variant: "secondary" },
+      ]}
+    >
+      <div className="space-y-6">
       <div className="flex flex-wrap gap-2 text-sm">
         <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryReadiness}>
           Readiness
@@ -60,6 +70,7 @@ export default function StockNeedsPage() {
       {!loading && !error ? (
         <StockNeedsOperationalWorkspace rows={rows} count={count} onRefresh={loadRows} />
       ) : null}
-    </div>
+      </div>
+    </PortalPage>
   );
 }
