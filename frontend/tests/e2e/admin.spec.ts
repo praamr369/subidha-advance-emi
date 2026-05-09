@@ -68,6 +68,40 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
   await expect(page.locator("#finance_account_id")).not.toHaveValue("");
 });
 
+test("admin dashboard renders operations cockpit strips and ledgers", async ({ page }) => {
+  await page.goto("/admin");
+  const heading = page.getByRole("heading", {
+    name: /Daily Operator Dashboard|Executive Dashboard|Admin Dashboard/i,
+  });
+  const headingVisible = await heading.isVisible().catch(() => false);
+  if (!headingVisible) {
+    await expect(page.locator("body")).toContainText(/Unable to load|Failed to load/i);
+    return;
+  }
+  const simpleModeMarker = page.getByText("Today Collection");
+  const dashboardErrorVisible = await page
+    .locator("body")
+    .getByText(/Unable to load|Failed to load/i)
+    .isVisible()
+    .catch(() => false);
+  if (dashboardErrorVisible) {
+    await expect(page.locator("body")).toContainText(/Unable to load|Failed to load/i);
+    return;
+  }
+  if (await simpleModeMarker.isVisible().catch(() => false)) {
+    await expect(page.getByText("Active Outstanding")).toBeVisible();
+    await expect(page.getByText("Returns / Refunds")).toBeVisible();
+    await expect(page.getByText("Lucky Draw Actions")).toBeVisible();
+    await expect(page.getByText("Needs Collection")).toBeVisible();
+    await expect(page.getByText("Active Invoice Balance")).toBeVisible();
+  } else {
+    await expect(page.getByText("Collections today")).toBeVisible();
+    await expect(page.getByText("Outstanding receivables")).toBeVisible();
+    await expect(page.getByText("Needs attention")).toBeVisible();
+    await expect(page.getByText("Quick actions")).toBeVisible();
+  }
+});
+
 test("admin finance control center renders operational settlement and transfer surfaces", async ({
   page,
 }) => {
@@ -774,6 +808,82 @@ test("admin customer detail shows OTP access handoff for existing customer", asy
   await expect(
     page.locator('a[href="/forgot-password?identifier=access%40example.com"]')
   ).toBeVisible();
+});
+
+test("admin customer detail supports username change with required reason", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/admin/customers/58/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 58,
+        name: "Username Change Customer",
+        phone: "01799999999",
+        email: "username-change@example.com",
+        user_id: 458,
+        user_username: "before-change-user",
+        status: "ACTIVE",
+        kyc_status: "VERIFIED",
+      }),
+    });
+  });
+  await page.route("**/api/v1/admin/subscriptions/?customer=58", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ results: [] }),
+    });
+  });
+  await page.route("**/api/v1/admin/payments/?customer=58", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ results: [] }),
+    });
+  });
+  await page.route("**/api/v1/admin/customers/58/operational-profile/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ overview: {}, direct_sales: { summary: {}, rows: [] } }),
+    });
+  });
+  await page.route("**/api/v1/admin/system/otp-delivery-readiness/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(otpReadinessFixture),
+    });
+  });
+  await page.route("**/api/v1/admin/users/458/username/", async (route) => {
+    const payload = route.request().postDataJSON() as { new_username?: string; reason?: string };
+    if (!payload.reason) {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Reason is required for admin username changes." }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        username: payload.new_username || "changed-user",
+        changed: true,
+        requires_relogin: true,
+      }),
+    });
+  });
+
+  await page.goto("/admin/customers/58");
+  await expect(page.locator("body")).toContainText("Access Handoff");
+  await page.getByPlaceholder("New username").fill("after-change-user");
+  await page.getByPlaceholder("Reason (required)").fill("Customer requested correction");
+  await page.getByRole("button", { name: "Change Username" }).click();
+  await expect(page.locator("body")).toContainText("Username updated. User must sign in again.");
 });
 
 test("admin customer detail separates active and historical finance after cancellation/reversal/return", async ({

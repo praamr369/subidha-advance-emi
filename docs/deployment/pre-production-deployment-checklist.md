@@ -55,6 +55,8 @@ source ../.venv/bin/activate && python3 manage.py showmigrations
 source ../.venv/bin/activate && python3 manage.py migrate billing 0012
 source ../.venv/bin/activate && python3 manage.py test tests.api.test_reversal_control_blockers tests.billing.test_reversal_service tests.api.test_reversal_center_api
 source ../.venv/bin/activate && python3 manage.py test tests.api.test_permissions tests.api.test_admin_outstandings tests.api.test_public_stats tests.api.test_direct_sale_billing_workspace tests.api.test_partner tests.api.test_lucky_draw_public_trust tests.api.test_dashboard_navigation_badges
+source ../.venv/bin/activate && python3 manage.py test tests.api.test_username_change
+source ../.venv/bin/activate && python3 manage.py test tests.api.test_admin_reports_analytics
 
 # frontend
 cd ../frontend
@@ -66,6 +68,7 @@ npx playwright install chromium
 npx playwright test --list
 npx playwright test tests/e2e/ux_polish_smoke.spec.ts --project=chromium-smoke
 npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_smoke.spec.ts --project=chromium-smoke
+npx playwright test tests/e2e/admin.spec.ts tests/e2e/customer.spec.ts tests/e2e/partner.spec.ts --project=chromium-smoke
 ```
 
 ## 7) Manual Business Smoke Checklist
@@ -88,6 +91,13 @@ npx playwright test tests/e2e/dashboard_smoke.spec.ts tests/e2e/reversal_center_
 - Confirm customer detail active direct-sale outstanding stays zero for returned/reversed sales.
 - Confirm reversed payments remain in history but not in active payment/collection KPI cards.
 - Confirm documents/history remain visible for audit.
+- Confirm customer self username change requires current password and forces re-login.
+- Confirm partner self username change keeps partner code/commission ownership unchanged.
+- Confirm admin username change requires reason and updates login identifier only.
+- Confirm old username cannot be reused and old login identifier no longer authenticates.
+- Confirm Active Invoice Balance excludes VOID/REVERSED/CANCELLED/CREDITED_FULLY invoices.
+- Confirm Window Collections and Cash/UPI/Bank split exclude VOID receipts.
+- Confirm history-only invoices/receipts remain visible in document registers.
 - Collect Advance EMI and verify receipt.
 - Verify reconciliation surfaces load and operate.
 - Verify lucky draw pages load.

@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import DocumentSequence
-from billing.models import DirectSale, DirectSaleStatus
+from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleStatus, ReceiptDocument
 from subscriptions.models import PlanType, PublicLead, PublicLeadIntent, Subscription, SubscriptionStatus
 from subscriptions.services.payment_service import record_emi_payment
 from tests.helpers import (
@@ -160,6 +160,68 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
             status="NEW",
         )
 
+        self.active_invoice = BillingInvoice.objects.create(
+            invoice_date=self.today - timedelta(days=1),
+            document_no="INV-ANL-ACTIVE",
+            financial_year="2026-2027",
+            doc_series=doc_series,
+            status=BillingDocumentStatus.APPROVED,
+            document_type="INVOICE",
+            customer=self.customer,
+            source_type="MANUAL",
+            source_reference="ANL-ACTIVE",
+            subtotal=Decimal("1000.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1000.00"),
+            received_total=Decimal("300.00"),
+            balance_total=Decimal("700.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        self.void_invoice = BillingInvoice.objects.create(
+            invoice_date=self.today - timedelta(days=1),
+            document_no="INV-ANL-VOID",
+            financial_year="2026-2027",
+            doc_series=doc_series,
+            status=BillingDocumentStatus.APPROVED,
+            document_type="INVOICE",
+            customer=self.customer,
+            source_type="MANUAL",
+            source_reference="ANL-VOID",
+            subtotal=Decimal("900.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("900.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("900.00"),
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        BillingInvoice.objects.filter(pk=self.void_invoice.id).update(status=BillingDocumentStatus.VOID)
+        self.void_invoice.refresh_from_db(fields=["status"])
+        ReceiptDocument.objects.create(
+            receipt_no="RCT-ANL-ACTIVE",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.APPROVED,
+            receipt_date=self.today - timedelta(days=1),
+            amount=Decimal("300.00"),
+            customer=self.customer,
+            billing_invoice=self.active_invoice,
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        historical_receipt = ReceiptDocument.objects.create(
+            receipt_no="RCT-ANL-VOID",
+            receipt_type="RETAIL_RECEIPT",
+            status=BillingDocumentStatus.APPROVED,
+            receipt_date=self.today - timedelta(days=1),
+            amount=Decimal("900.00"),
+            customer=self.customer,
+            billing_invoice=self.void_invoice,
+            customer_name_snapshot=self.customer.name,
+            customer_phone_snapshot=self.customer.phone,
+        )
+        ReceiptDocument.objects.filter(pk=historical_receipt.id).update(status=BillingDocumentStatus.VOID)
+
     def test_admin_analytics_summary_returns_report_sections(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.get("/api/v1/admin/reports/analytics-summary/?window=LAST_30_DAYS")
@@ -234,3 +296,19 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/reports/analytics-summary/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_void_invoice_and_void_receipt_are_history_only_in_overview(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/admin/reports/analytics-summary/?window=LAST_30_DAYS")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        invoice_posture = response.data["invoice_document_posture"]["summary"]
+        overview = response.data["overview"]
+        method_rows = response.data["payment_method_mix"]["rows"]
+
+        self.assertEqual(invoice_posture["invoice_balance"], "700.00")
+        self.assertEqual(invoice_posture["active_receipt_count"], 1)
+        self.assertEqual(invoice_posture["active_receipt_total"], "300.00")
+        self.assertEqual(overview["window_net_collections"], "300.00")
+        self.assertEqual(overview["window_active_collection_count"], 1)
+        self.assertTrue(any(row["method"] == "OTHER" and row["net_amount"] == "300.00" for row in method_rows))

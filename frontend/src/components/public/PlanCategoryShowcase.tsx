@@ -53,16 +53,10 @@ export default function PlanCategoryShowcase({ className }: { className?: string
         description="Public pages explain each path clearly. Availability and approval depend on product, records, and branch readiness."
       >
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href={ROUTES.public.apply}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-950/10 bg-slate-950 px-4 text-sm font-semibold text-white shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5"
-          >
+          <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0">
             Apply / Enquire
           </Link>
-          <Link
-            href={ROUTES.public.products}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
-          >
+          <Link href={ROUTES.public.products} className="public-action-secondary h-10 !min-h-0">
             Browse products
           </Link>
         </div>
@@ -86,7 +80,7 @@ export default function PlanCategoryShowcase({ className }: { className?: string
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   href={category.cta.href}
-                  className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
+                  className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
                 >
                   {category.cta.label}
                 </Link>

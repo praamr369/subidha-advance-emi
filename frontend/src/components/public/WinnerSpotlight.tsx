@@ -44,13 +44,13 @@ export default function WinnerSpotlight({
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
             href={ROUTES.public.winnerHistory}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
+            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             Winner history
           </Link>
           <Link
             href={ROUTES.public.howItWorks}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white"
+            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             How it works
           </Link>
@@ -62,14 +62,14 @@ export default function WinnerSpotlight({
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[2rem] border border-emerald-200/80 bg-[radial-gradient(circle_at_top_right,rgba(110,231,183,0.18),transparent_34%),linear-gradient(180deg,rgba(236,253,245,0.98),rgba(220,252,231,0.88))] p-6 shadow-[0_28px_60px_-42px_rgba(6,95,70,0.45)]",
+        "relative overflow-hidden rounded-[2rem] border border-[color-mix(in_oklab,var(--border)_65%,oklch(0.55_0.06_58)_35%)] bg-[radial-gradient(circle_at_top_right,color-mix(in_oklab,var(--accent)_35%,transparent),transparent_36%),linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),color-mix(in_oklab,var(--surface-card-soft)_88%,oklch(0.93_0.02_75)_12%))] p-6 shadow-[0_28px_60px_-42px_rgba(60,40,20,0.18)]",
         className
       )}
     >
-      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/80 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_oklab,var(--primary)_25%,transparent)] to-transparent" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color-mix(in_oklab,var(--primary)_78%,var(--foreground)_22%)]">
             Latest published draw result
           </div>
           <h3 className="mt-2 text-2xl font-semibold text-foreground">
@@ -87,13 +87,13 @@ export default function WinnerSpotlight({
         <div className="flex flex-wrap gap-2">
           <Link
             href={ROUTES.public.winnerHistory}
-            className="inline-flex h-10 items-center rounded-xl border border-white/75 bg-white/75 px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white"
+            className="inline-flex h-10 items-center rounded-xl border border-white/75 bg-white/75 px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             View history
           </Link>
           <Link
             href={ROUTES.public.apply}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5"
+            className="public-action-primary h-10 !min-h-0 px-4"
           >
             Apply
           </Link>

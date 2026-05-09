@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw, Search } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -14,6 +15,7 @@ import {
   DetailPanel,
   FormSection,
   KpiCard,
+  MobileSafeTable,
   QuickActionGrid,
 } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
@@ -49,6 +51,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function CashierPaymentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,20 +93,21 @@ export default function CashierPaymentsPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    const qParam = (searchParams.get("q") || "").trim();
+    setSearchInput(qParam);
+    setQuery(qParam);
+    void loadPage("initial", qParam);
+  }, [searchParams, loadPage]);
 
   function handleApplySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextQuery = searchInput.trim();
-    setQuery(nextQuery);
-    void loadPage("refresh", nextQuery);
+    router.replace(nextQuery ? `/cashier/payments?q=${encodeURIComponent(nextQuery)}` : "/cashier/payments");
   }
 
   function handleResetSearch() {
     setSearchInput("");
-    setQuery("");
-    void loadPage("refresh", "");
+    router.replace("/cashier/payments");
   }
 
   const visibleAmount = useMemo(
@@ -123,11 +128,16 @@ export default function CashierPaymentsPage() {
         key: "id",
         title: "Payment",
         render: (row) => (
-          <div className="space-y-1">
+          <div
+            className={`space-y-1 ${row.is_reversed ? "opacity-60" : ""}`}
+          >
             <div className="font-medium text-foreground">#{row.id}</div>
             <div className="text-xs text-muted-foreground">
               Ref {row.reference_no || `AUTO-${row.id}`}
             </div>
+            {row.is_reversed ? (
+              <StatusBadge status="REVERSED" hideIcon />
+            ) : null}
           </div>
         ),
       },
@@ -165,7 +175,8 @@ export default function CashierPaymentsPage() {
       {
         key: "method",
         title: "Method",
-        render: (row) => row.method || "—",
+        render: (row) =>
+          row.method ? <StatusBadge status={row.method} hideIcon /> : <span className="text-muted-foreground">—</span>,
       },
       {
         key: "recorded_at",
@@ -252,7 +263,9 @@ export default function CashierPaymentsPage() {
           <div className="mb-4 flex justify-end">
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh", query)}
+              onClick={() =>
+                void loadPage("refresh", (searchParams.get("q") || "").trim())
+              }
               disabled={loading || refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -359,15 +372,17 @@ export default function CashierPaymentsPage() {
               />
             ) : (
               <DataTableShell>
-                <DataTable<CashierTransaction>
-                  rows={rows}
-                  columns={columns}
-                  rowActions={(row) => (
-                    <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
-                      Receipt
-                    </ActionButton>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent shadow-none">
+                  <DataTable<CashierTransaction>
+                    rows={rows}
+                    columns={columns}
+                    rowActions={(row) => (
+                      <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
+                        Receipt
+                      </ActionButton>
+                    )}
+                  />
+                </MobileSafeTable>
               </DataTableShell>
             )}
           </DetailPanel>

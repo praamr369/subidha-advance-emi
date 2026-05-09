@@ -98,7 +98,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     >
       <Link
         href={ROUTES.public.products}
-        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to catalogue
@@ -140,20 +140,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 {formatCurrency(product.base_price)}
               </div>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                This is the base price from the live master. The enquiry form carries the product context so branch follow-up stays aligned.
+                This is the catalogue base price from live product records. Taxes, offers, bundle terms, and EMI mapping are finalized with branch documentation—not inferred from this screen.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href={applyHref}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_20px_42px_-30px_rgba(15,23,42,0.88)] transition hover:-translate-y-0.5"
-                >
+                <Link href={applyHref} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
                   <ShoppingCart className="h-4 w-4" />
                   Enquire Now
                 </Link>
                 <Link
                   href={ROUTES.public.contact}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/85 px-6 text-sm font-semibold text-foreground shadow-[0_20px_42px_-30px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-white"
+                  className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6 shadow-[0_20px_42px_-30px_rgba(15,23,42,0.72)]"
                 >
                   Contact branch
                   <ArrowUpRight className="h-4 w-4" />

@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
+import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import { getAdminOperationsQueueSummary } from "@/services/phase5-control";
 import { getHrSummary, type HrSummary } from "@/services/admin-hr";
@@ -35,6 +39,7 @@ export default function AdminOperationsWorkspacePage() {
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [hrSummary, setHrSummary] = useState<HrSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -45,10 +50,12 @@ export default function AdminOperationsWorkspacePage() {
         setRows(queue?.results || []);
         setHrSummary(hrPayload);
         setError(null);
+        setLoading(false);
       })
       .catch((err: unknown) => {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Failed to load operations workspace.");
+        setLoading(false);
       });
     return () => {
       active = false;
@@ -83,8 +90,18 @@ export default function AdminOperationsWorkspacePage() {
       statusBadge={{ label: "Action Mode", tone: "warning" }}
     >
       <div className="space-y-6">
-        {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        {loading ? <LoadingBlock label="Loading operations queues..." /> : null}
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load operations workspace"
+            description={error}
+          />
+        ) : null}
+        {!loading && !error && focusRows.length === 0 ? (
+          <EmptyState
+            title="No operational queues returned"
+            description="No active overdue, delivery, stock, or KYC queue rows were returned by the current operations summary payload."
+          />
         ) : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -94,7 +111,9 @@ export default function AdminOperationsWorkspacePage() {
               <article key={`op-focus-${row.key}-${index}`} className="rounded-2xl border border-white/80 bg-white/80 p-4">
                 <div className="text-sm font-semibold text-foreground">{row.key.replaceAll("_", " ")}</div>
                 <div className="mt-2 text-2xl font-semibold text-foreground">{row.count}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Severity: {row.severity || "INFO"}</div>
+                <div className="mt-2">
+                  <StatusBadge status={String(row.severity || "INFO").toUpperCase()} hideIcon />
+                </div>
                 <div className="mt-3 flex gap-2">
                   <ActionButton href={href} size="sm" variant="secondary">View Queue</ActionButton>
                   <ActionButton href={href} size="sm" variant="primary">{actionLabelForQueue(row.key)}</ActionButton>

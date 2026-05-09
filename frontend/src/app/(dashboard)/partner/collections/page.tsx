@@ -10,7 +10,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, KpiCard, MobileSafeTable, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import { getPartnerDashboard } from "@/services/partner";
 
 type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
@@ -408,28 +408,32 @@ export default function PartnerCollectionsPage() {
                     />
                   ) : (
                     <DataTableShell>
-                      <DataTable<CollectionRequestRow>
-                        rows={requests}
-                        columns={requestColumns}
-                        rowActions={(row) => (
-                          <div className="flex flex-wrap gap-2">
-                            <ActionButton
-                              href={`/partner/collections/${row.id}`}
-                              variant="outline"
-                            >
-                              Request detail
-                            </ActionButton>
-                            {typeof row.subscription_id === "number" ? (
+                      <MobileSafeTable className="border-none bg-transparent">
+                        <DataTable<CollectionRequestRow>
+                          rows={requests}
+                          columns={requestColumns}
+                          rowActions={(row) => (
+                            <div className="flex flex-wrap gap-2">
                               <ActionButton
-                                href={`/partner/collections/create?subscription=${row.subscription_id}`}
+                                href={`/partner/collections/${row.id}`}
                                 variant="outline"
+                                className="min-h-11"
                               >
-                                New request
+                                Request detail
                               </ActionButton>
-                            ) : null}
-                          </div>
-                        )}
-                      />
+                              {typeof row.subscription_id === "number" ? (
+                                <ActionButton
+                                  href={`/partner/collections/create?subscription=${row.subscription_id}`}
+                                  variant="outline"
+                                  className="min-h-11"
+                                >
+                                  New request
+                                </ActionButton>
+                              ) : null}
+                            </div>
+                          )}
+                        />
+                      </MobileSafeTable>
                     </DataTableShell>
                   )}
                 </DetailPanel>
@@ -445,22 +449,25 @@ export default function PartnerCollectionsPage() {
                     />
                   ) : (
                     <DataTableShell>
-                      <DataTable<VerifiedPaymentRow>
-                        rows={verifiedPayments}
-                        columns={verifiedColumns}
-                        rowActions={(row) => (
-                          <ActionButton
-                            href={
-                              row.subscription_id
-                                ? `/partner/payments?subscription=${row.subscription_id}`
-                                : "/partner/payments"
-                            }
-                            variant="outline"
-                          >
-                            Open payments
-                          </ActionButton>
-                        )}
-                      />
+                      <MobileSafeTable className="border-none bg-transparent">
+                        <DataTable<VerifiedPaymentRow>
+                          rows={verifiedPayments}
+                          columns={verifiedColumns}
+                          rowActions={(row) => (
+                            <ActionButton
+                              href={
+                                row.subscription_id
+                                  ? `/partner/payments?subscription=${row.subscription_id}`
+                                  : "/partner/payments"
+                              }
+                              variant="outline"
+                              className="min-h-11"
+                            >
+                              Open payments
+                            </ActionButton>
+                          )}
+                        />
+                      </MobileSafeTable>
                     </DataTableShell>
                   )}
                 </DetailPanel>
@@ -476,42 +483,46 @@ export default function PartnerCollectionsPage() {
                     />
                   ) : (
                     <DataTableShell>
-                      <DataTable<CollectionRequestRow>
-                        rows={followUpQueue}
-                        columns={[
-                          ...requestColumns.slice(0, 2),
-                          {
-                            key: "status",
-                            title: "Status",
-                            render: (row) => <StatusBadge status={row.status} />,
-                          },
-                          {
-                            key: "review_note",
-                            title: "Review Note",
-                            render: (row) => row.review_note || "—",
-                          },
-                        ]}
-                        rowActions={(row) => (
-                          <div className="flex flex-wrap gap-2">
-                            <ActionButton
-                              href={`/partner/collections/${row.id}`}
-                              variant="outline"
-                            >
-                              Request detail
-                            </ActionButton>
-                            <ActionButton
-                              href={
-                                row.subscription_id
-                                  ? `/partner/collections/create?subscription=${row.subscription_id}`
-                                  : "/partner/collections/create"
-                              }
-                              variant="outline"
-                            >
-                              Submit new request
-                            </ActionButton>
-                          </div>
-                        )}
-                      />
+                      <MobileSafeTable className="border-none bg-transparent">
+                        <DataTable<CollectionRequestRow>
+                          rows={followUpQueue}
+                          columns={[
+                            ...requestColumns.slice(0, 2),
+                            {
+                              key: "status",
+                              title: "Status",
+                              render: (row) => <StatusBadge status={row.status} />,
+                            },
+                            {
+                              key: "review_note",
+                              title: "Review Note",
+                              render: (row) => row.review_note || "—",
+                            },
+                          ]}
+                          rowActions={(row) => (
+                            <div className="flex flex-wrap gap-2">
+                              <ActionButton
+                                href={`/partner/collections/${row.id}`}
+                                variant="outline"
+                                className="min-h-11"
+                              >
+                                Request detail
+                              </ActionButton>
+                              <ActionButton
+                                href={
+                                  row.subscription_id
+                                    ? `/partner/collections/create?subscription=${row.subscription_id}`
+                                    : "/partner/collections/create"
+                                }
+                                variant="outline"
+                                className="min-h-11"
+                              >
+                                Submit new request
+                              </ActionButton>
+                            </div>
+                          )}
+                        />
+                      </MobileSafeTable>
                     </DataTableShell>
                   )}
                 </DetailPanel>

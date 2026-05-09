@@ -38,6 +38,7 @@ from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
     get_subscription_detail_queryset,
 )
+from core.services.operational_visibility import invoice_active_q, receipt_active_q
 
 
 MAX_TREND_POINTS = 120
@@ -168,14 +169,24 @@ def _build_collections_trend(window_params: DashboardWindowParams) -> dict[str, 
 
 
 def _build_payment_method_mix(window_params: DashboardWindowParams) -> dict[str, object]:
-    payments_queryset = _apply_date_window_to_queryset(
-        Payment.objects.all(),
-        field_name="payment_date",
+    try:
+        from billing.models import ReceiptDocument
+    except Exception:
+        return {
+            "rows": [],
+            "summary": {
+                "total_net_amount": "0.00",
+            },
+        }
+
+    receipts_queryset = _apply_date_window_to_queryset(
+        ReceiptDocument.objects.select_related("payment"),
+        field_name="receipt_date",
         window_params=window_params,
-    )
-    reversed_filter = Q(allocation_metadata__reversal__is_reversed=True)
+    ).filter(receipt_active_q())
+    reversed_filter = Q(payment__allocation_metadata__reversal__is_reversed=True)
     grouped_rows = (
-        payments_queryset.values("method")
+        receipts_queryset.values("payment__method")
         .annotate(
             count=Count("id"),
             gross_amount=Coalesce(Sum("amount"), Value(DECIMAL_ZERO)),
@@ -185,7 +196,7 @@ def _build_payment_method_mix(window_params: DashboardWindowParams) -> dict[str,
                 Value(DECIMAL_ZERO),
             ),
         )
-        .order_by("method")
+        .order_by("payment__method")
     )
 
     bucket_template: dict[str, dict[str, object]] = {
@@ -228,7 +239,7 @@ def _build_payment_method_mix(window_params: DashboardWindowParams) -> dict[str,
     }
 
     for row in grouped_rows:
-        method = str(row.get("method") or "").strip().upper()
+        method = str(row.get("payment__method") or "").strip().upper()
         bucket_key = method if method in {"CASH", "UPI", "BANK"} else "OTHER"
         gross_amount = _decimal(row.get("gross_amount"))
         reversed_amount = _decimal(row.get("reversed_amount"))
@@ -644,10 +655,17 @@ def _build_invoice_document_posture(window_params: DashboardWindowParams) -> dic
             "invoice_count": 0,
             "invoice_total": "0.00",
             "invoice_balance": "0.00",
+            "active_invoice_count": 0,
+            "historical_invoice_count": 0,
+            "historical_invoice_total": "0.00",
             "direct_sale_invoice_count": 0,
             "direct_sale_invoice_total": "0.00",
             "receipt_count": 0,
             "receipt_total": "0.00",
+            "active_receipt_count": 0,
+            "active_receipt_total": "0.00",
+            "historical_receipt_count": 0,
+            "historical_receipt_total": "0.00",
         },
         "invoice_status": [],
         "receipt_status": [],
@@ -683,7 +701,8 @@ def _build_invoice_document_posture(window_params: DashboardWindowParams) -> dic
     invoice_summary = invoice_queryset.aggregate(
         count=Count("id"),
         total=Coalesce(Sum("grand_total"), Value(DECIMAL_ZERO)),
-        balance=Coalesce(Sum("balance_total"), Value(DECIMAL_ZERO)),
+        balance=Coalesce(Sum("balance_total", filter=invoice_active_q()), Value(DECIMAL_ZERO)),
+        active_count=Count("id", filter=invoice_active_q()),
         direct_sale_count=Count("id", filter=Q(source_type=BillingSourceType.DIRECT_SALE)),
         direct_sale_total=Coalesce(
             Sum("grand_total", filter=Q(source_type=BillingSourceType.DIRECT_SALE)),
@@ -693,6 +712,8 @@ def _build_invoice_document_posture(window_params: DashboardWindowParams) -> dic
     receipt_summary = receipt_queryset.aggregate(
         count=Count("id"),
         total=Coalesce(Sum("amount"), Value(DECIMAL_ZERO)),
+        active_count=Count("id", filter=receipt_active_q()),
+        active_total=Coalesce(Sum("amount", filter=receipt_active_q()), Value(DECIMAL_ZERO)),
     )
 
     verification_rows = (
@@ -707,10 +728,23 @@ def _build_invoice_document_posture(window_params: DashboardWindowParams) -> dic
             "invoice_count": int(invoice_summary["count"] or 0),
             "invoice_total": _money(invoice_summary["total"]),
             "invoice_balance": _money(invoice_summary["balance"]),
+            "active_invoice_count": int(invoice_summary["active_count"] or 0),
+            "historical_invoice_count": int(invoice_summary["count"] or 0)
+            - int(invoice_summary["active_count"] or 0),
+            "historical_invoice_total": _money(
+                _decimal(invoice_summary["total"]) - _decimal(invoice_summary["balance"])
+            ),
             "direct_sale_invoice_count": int(invoice_summary["direct_sale_count"] or 0),
             "direct_sale_invoice_total": _money(invoice_summary["direct_sale_total"]),
             "receipt_count": int(receipt_summary["count"] or 0),
             "receipt_total": _money(receipt_summary["total"]),
+            "active_receipt_count": int(receipt_summary["active_count"] or 0),
+            "active_receipt_total": _money(receipt_summary["active_total"]),
+            "historical_receipt_count": int(receipt_summary["count"] or 0)
+            - int(receipt_summary["active_count"] or 0),
+            "historical_receipt_total": _money(
+                _decimal(receipt_summary["total"]) - _decimal(receipt_summary["active_total"])
+            ),
         },
         "invoice_status": [
             {
@@ -1007,8 +1041,8 @@ def build_admin_reporting_analytics_summary(
         "filters": window_params.to_payload(),
         "summary": dashboard.summary,
         "overview": {
-            "window_net_collections": collections_trend["summary"]["net_amount"],
-            "window_active_collection_count": collections_trend["summary"]["active_count"],
+            "window_net_collections": invoice_document_posture["summary"]["active_receipt_total"],
+            "window_active_collection_count": invoice_document_posture["summary"]["active_receipt_count"],
             "window_reversed_amount": collections_trend["summary"]["reversed_amount"],
             "outstanding_amount": dashboard.summary.get("outstanding_amount", "0.00"),
             "overdue_emi_count": receivables_pressure["overdue_count"],

@@ -1,3 +1,23 @@
+# Mobile UI UX Polish
+
+## Required Responsive Behavior
+- `MetricStrip` wraps to compact multi-row layout on mobile.
+- Queue rows stack vertically with readable count/value alignment.
+- Ledger rows preserve label/value readability at 360px and 390px widths.
+- No body-level horizontal overflow on 390px.
+- Buttons remain touch-friendly (`>=40px` height where possible).
+
+## Target Breakpoints
+- 360px
+- 390px
+- 768px
+- 1024px
+- 1366px
+
+## Admin Dashboard Guidance
+- Keep top strip dense, not oversized.
+- Use queue and ledger sections with clear separators.
+- Preserve status chip readability and avoid clipped labels.
 # Mobile UI/UX Polish
 
 ## Scope

@@ -10,6 +10,7 @@ import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
 import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -192,9 +193,7 @@ export default function AdminSupportRequestsPage() {
         key: "status",
         title: "Status",
         render: (row: AdminSupportRequest) => (
-          <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-            {row.status}
-          </span>
+          <StatusBadge status={row.status} hideIcon />
         ),
       },
       {

@@ -126,6 +126,15 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [mobileSheet, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(ev: KeyboardEvent) {
+      if (ev.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   async function onToggle() {
     const next = !open;
     setOpen(next);
@@ -191,7 +200,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
       <button
         type="button"
         onClick={() => void onToggle()}
-        className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)]"
+        className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
         aria-label="Notifications"
         title="Notifications"
         data-testid="header-notification-bell"
@@ -298,7 +307,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
           </div>
         ) : (
         <div
-          className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"
+          className="absolute right-0 z-50 mt-2 flex max-h-[min(24rem,calc(100dvh-5.5rem))] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"
           role="dialog"
           aria-label="Notifications menu"
         >
@@ -324,7 +333,7 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
             </div>
           </div>
           <div
-            className="max-h-80 overflow-y-auto py-2"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-2"
             aria-busy={dropdownBusy || bellQuery.isPending}
           >
             {bellQuery.isError ? (

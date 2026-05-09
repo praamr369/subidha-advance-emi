@@ -14,6 +14,7 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { MobileSafeTable } from "@/components/ui/operations";
 import {
   getPartnerDashboard,
   listPartnerPayments,
@@ -402,36 +403,38 @@ export default function PartnerPaymentsPage() {
                 description="No verified partner-scoped payment rows matched the current filters."
               />
             ) : (
-              <DataTable<PartnerPayment>
-                rows={rows}
-                columns={columns}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/partner/payments/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
-                      className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                    >
-                      View Detail
-                    </Link>
-                    {row.customer ? (
+              <MobileSafeTable className="border-none bg-transparent">
+                <DataTable<PartnerPayment>
+                  rows={rows}
+                  columns={columns}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/partner/customers/${row.customer}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        href={`/partner/payments/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
+                        className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Customer
+                        View Detail
                       </Link>
-                    ) : null}
-                    {row.customer ? (
-                      <Link
-                        href={`/partner/subscriptions?customer=${row.customer}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Subscriptions
-                      </Link>
-                    ) : null}
-                  </div>
-                )}
-              />
+                      {row.customer ? (
+                        <Link
+                          href={`/partner/customers/${row.customer}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Customer
+                        </Link>
+                      ) : null}
+                      {row.customer ? (
+                        <Link
+                          href={`/partner/subscriptions?customer=${row.customer}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Subscriptions
+                        </Link>
+                      ) : null}
+                    </div>
+                  )}
+                />
+              </MobileSafeTable>
             )}
           </WorkspaceSection>
         ) : null}

@@ -67,8 +67,8 @@ export default function WinnerHistoryTableClient({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Batch, month, Lucky ID, winner name, product"
-              className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              placeholder="Batch, draw month, Lucky ID, product, or hash fragment"
+              className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground"
             />
           </div>
         </label>
@@ -107,7 +107,7 @@ export default function WinnerHistoryTableClient({
                 "Batch",
                 "Draw month",
                 "Lucky ID",
-                "Winner (masked)",
+                "Public label",
                 "Verification",
                 "Public commit hash",
                 "Product",
@@ -185,7 +185,7 @@ export default function WinnerHistoryTableClient({
             </p>
             <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
               <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
-                Winner: {winner.winner_name_masked || "Masked for privacy"}
+                Public label: {winner.winner_name_masked || "Not published"}
               </div>
               <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">
                 Product: {winner.product_name || "—"}

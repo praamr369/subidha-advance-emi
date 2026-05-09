@@ -11,6 +11,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import { DetailPanel, FormSection, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getCashierPaymentDetail,
@@ -298,7 +299,14 @@ export default function CashierPaymentReceiptPage() {
                     { label: "Operator", value: payment.collected_by_username || "—" },
                     { label: "Customer", value: payment.customer_name || "—" },
                     { label: "Subscription", value: subscriptionLabel },
-                    { label: "Method", value: payment.method || "—" },
+                    {
+                      label: "Method",
+                      value: payment.method ? (
+                        <StatusBadge status={payment.method} hideIcon />
+                      ) : (
+                        "—"
+                      ),
+                    },
                     { label: "Amount", value: money(payment.amount), tone: "success" },
                   ]}
                 />

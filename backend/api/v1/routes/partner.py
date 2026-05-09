@@ -37,12 +37,14 @@ from api.v1.views.notifications import (
     PartnerNotificationListView,
     PartnerNotificationSummaryView,
 )
+from api.v1.views.username_change import PartnerSelfUsernameChangeView
 
 urlpatterns = [
     path("dashboard/", PartnerDashboardView.as_view()),
     path("dashboard/summary/", PartnerDashboardView.as_view()),
     path("notifications/", PartnerNotificationListView.as_view()),
     path("notifications/summary/", PartnerNotificationSummaryView.as_view()),
+    path("profile/username/", PartnerSelfUsernameChangeView.as_view()),
     path("subscriptions/", PaginatedPartnerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", PartnerSubscriptionDetailView.as_view()),
     path("subscription-request-options/", PartnerSubscriptionRequestOptionsView.as_view()),

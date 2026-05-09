@@ -177,6 +177,9 @@ export default function BillingDocumentDetailPage() {
     { key: "status", header: "Status" },
     { key: "amount", header: "Amount", render: (row) => accountingMoney(row.amount) },
   ];
+  const isHistoryOnlyInvoice = ["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(
+    String(invoice?.status || "").toUpperCase()
+  );
 
   return (
     <PortalPage
@@ -247,6 +250,7 @@ export default function BillingDocumentDetailPage() {
           <div className="receipt-print-hide space-y-5">
             {invoice.direct_sale &&
             String(invoice.status || "").toUpperCase() === "POSTED" &&
+            !isHistoryOnlyInvoice &&
             Number(invoice.balance_total || 0) > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <div>
@@ -262,6 +266,14 @@ export default function BillingDocumentDetailPage() {
                 >
                   Collect Direct-Sale Balance
                 </button>
+              </div>
+            ) : null}
+            {isHistoryOnlyInvoice ? (
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+                <div className="font-semibold">This invoice is voided and preserved for history</div>
+                <div className="mt-1 text-muted-foreground">
+                  It is not active outstanding. Collection actions are disabled and this page stays read-only for audit/history.
+                </div>
               </div>
             ) : null}
             {invoice.direct_sale &&
@@ -282,7 +294,10 @@ export default function BillingDocumentDetailPage() {
               <DetailValue label="Customer" value={invoice.customer_name_snapshot || invoice.customer_name || "Walk-in"} />
               <DetailValue label="Phone" value={invoice.customer_phone_snapshot || "—"} />
               <DetailValue label="Grand Total" value={accountingMoney(invoice.grand_total)} />
-              <DetailValue label="Balance" value={accountingMoney(invoice.balance_total)} />
+              <DetailValue
+                label="Active Balance"
+                value={isHistoryOnlyInvoice ? "History only (0 active)" : accountingMoney(invoice.balance_total)}
+              />
             </div>
 
             <WorkspaceSection
@@ -397,7 +412,11 @@ export default function BillingDocumentDetailPage() {
               { label: "Tax Total", value: accountingMoney(invoice.tax_total) },
               { label: "Grand Total", value: accountingMoney(invoice.grand_total), emphasize: true },
               { label: "Received", value: accountingMoney(invoice.received_total) },
-              { label: "Balance Due", value: accountingMoney(invoice.balance_total), emphasize: true },
+              {
+                label: isHistoryOnlyInvoice ? "Balance Due (History only)" : "Balance Due",
+                value: isHistoryOnlyInvoice ? accountingMoney(0) : accountingMoney(invoice.balance_total),
+                emphasize: true,
+              },
             ]}
             detailFields={[
               { label: "Document Status", value: invoice.status },

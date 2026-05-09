@@ -51,6 +51,7 @@ from api.v1.views.notifications import (
     CustomerNotificationListView,
     CustomerNotificationSummaryView,
 )
+from api.v1.views.username_change import CustomerSelfUsernameChangeView
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
@@ -58,6 +59,7 @@ urlpatterns = [
     path("notifications/", CustomerNotificationListView.as_view()),
     path("notifications/summary/", CustomerNotificationSummaryView.as_view()),
     path("profile/", CustomerProfileView.as_view()),
+    path("profile/username/", CustomerSelfUsernameChangeView.as_view()),
     path("profile/photo/", CustomerPhotoUploadView.as_view()),
     path("kyc/documents/", CustomerKycDocumentListView.as_view()),
     path("kyc/request-update/", CustomerKycUpdateRequestView.as_view()),

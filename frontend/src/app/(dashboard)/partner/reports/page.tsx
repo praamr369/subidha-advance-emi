@@ -8,6 +8,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import { MobileSafeTable } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
@@ -428,12 +429,14 @@ export default function PartnerReportsPage() {
                   description="No partner-scoped collection or commission history is currently available."
                 />
               ) : (
-                <DataTable<TrendRow>
-                  rows={trendRows}
-                  emptyText="No partner report rows."
-                  columns={trendColumns}
-                  pageSize={12}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<TrendRow>
+                    rows={trendRows}
+                    emptyText="No partner report rows."
+                    columns={trendColumns}
+                    pageSize={12}
+                  />
+                </MobileSafeTable>
               )}
             </WorkspaceSection>
           </>

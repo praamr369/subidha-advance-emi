@@ -7,6 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
+import { MobileSafeTable } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -87,7 +88,7 @@ export default function CustomerSupportHubPage() {
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={`rounded-full border px-3 py-1.5 text-sm ${
+              className={`min-h-11 rounded-full border px-4 py-2 text-sm touch-manipulation ${
                 tab === key
                   ? "border-primary bg-primary/10 font-medium text-primary"
                   : "border-border bg-[var(--surface-card)] text-muted-foreground"
@@ -114,32 +115,36 @@ export default function CustomerSupportHubPage() {
             title="Your tickets"
             description={`${count} total in this filter · ticket numbers look like TKT-FY-#####`}
           >
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full min-w-[640px] text-left text-sm">
+            <MobileSafeTable className="border-border">
+              <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="bg-[var(--surface-muted)] text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2">Ticket</th>
-                    <th className="px-3 py-2">Subject</th>
-                    <th className="px-3 py-2">Category</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Updated</th>
-                    <th className="px-3 py-2" />
+                    <th className="px-3 py-3">Ticket</th>
+                    <th className="px-3 py-3">Subject</th>
+                    <th className="px-3 py-3">Category</th>
+                    <th className="px-3 py-3">Priority</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Updated</th>
+                    <th className="px-3 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t border-border">
-                      <td className="px-3 py-2 font-mono text-xs">{r.ticket_no}</td>
-                      <td className="px-3 py-2">{r.subject}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{r.category.replaceAll("_", " ")}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-3 font-mono text-xs">{r.ticket_no}</td>
+                      <td className="px-3 py-3">{r.subject}</td>
+                      <td className="px-3 py-3 text-muted-foreground">{r.category.replaceAll("_", " ")}</td>
+                      <td className="px-3 py-3">
+                        <StatusBadge status={r.priority} label={r.priority.replaceAll("_", " ")} hideIcon />
+                      </td>
+                      <td className="px-3 py-3">
                         <StatusBadge status={r.status} />
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">{formatDt(r.updated_at)}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-3 text-muted-foreground">{formatDt(r.updated_at)}</td>
+                      <td className="px-3 py-3 text-right">
                         <Link
                           href={`${ROUTES.customer.support}/${r.id}`}
-                          className="text-primary underline-offset-2 hover:underline"
+                          className="inline-flex min-h-11 min-w-[4.5rem] items-center justify-end text-primary underline-offset-2 hover:underline"
                         >
                           View
                         </Link>
@@ -148,7 +153,7 @@ export default function CustomerSupportHubPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </MobileSafeTable>
           </WorkspaceSection>
         ) : null}
       </div>

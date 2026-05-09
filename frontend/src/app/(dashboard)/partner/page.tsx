@@ -23,6 +23,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { MetricStrip } from "@/components/ui/operations";
 import {
   buildReconciliationPosture,
   buildSettlementPosture,
@@ -31,7 +32,7 @@ import {
   money,
 } from "@/lib/dashboard-summary";
 import { ROUTES } from "@/lib/routes";
-import { getPartnerDashboard } from "@/services/partner";
+import { changePartnerUsername, getPartnerDashboard } from "@/services/partner";
 import {
   getPartnerNotificationSummary,
   type NotificationSummaryResponse,
@@ -45,6 +46,7 @@ import {
   normalizeDashboardSummary,
 } from "@/services/dashboards";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import { useLogout } from "@/hooks/useLogout";
 
 type LegacyDashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
 type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
@@ -62,6 +64,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function PartnerDashboardPage() {
+  const { logout, isLoggingOut } = useLogout();
   const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
   const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
@@ -80,6 +83,11 @@ export default function PartnerDashboardPage() {
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
   const dashboardQuery = useMemo(
     () =>
       windowPreset === "CUSTOM"
@@ -162,6 +170,82 @@ export default function PartnerDashboardPage() {
   );
   const paymentRows = recentPayments?.results ?? [];
   const winnerRows = winnerItems?.results ?? [];
+  const pendingRequests =
+    (legacy?.summary.under_review_collection_requests ?? 0) +
+    (legacy?.summary.submitted_collection_requests ?? 0);
+  const payoutStatusLabel =
+    Number(legacy?.summary.pending_commission ?? 0) > 0
+      ? "Pending payout"
+      : "No pending payout";
+  const commissionEarned = Number(
+    legacy?.summary.settled_commission ?? 0
+  ) + Number(legacy?.summary.pending_commission ?? 0);
+  const partnerAtAGlance = [
+    {
+      label: "My customers",
+      value: String(legacy?.summary.total_customers ?? 0),
+      href: ROUTES.partner.customers,
+    },
+    {
+      label: "My subscriptions",
+      value: String(legacy?.summary.total_subscriptions ?? 0),
+      href: ROUTES.partner.subscriptions,
+    },
+    {
+      label: "Pending requests",
+      value: String(pendingRequests),
+      helper: `${legacy?.summary.approved_collection_requests ?? 0} approved`,
+      href: ROUTES.partner.collectionRequests,
+    },
+    {
+      label: "Commission earned",
+      value: money(commissionEarned),
+      href: ROUTES.partner.commissions,
+    },
+    {
+      label: "Pending commission",
+      value: money(legacy?.summary.pending_commission),
+      helper: money(legacy?.summary.settled_commission) + " settled",
+      href: ROUTES.partner.payouts,
+    },
+    {
+      label: "Payout status",
+      value: payoutStatusLabel,
+      helper: "Based on current commission ledger visibility",
+      href: ROUTES.partner.payouts,
+    },
+  ];
+
+  const handleUsernameSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setUsernameSaving(true);
+      setUsernameError(null);
+      setUsernameSuccess(null);
+      try {
+        const response = await changePartnerUsername({
+          new_username: newUsername.trim(),
+          current_password: currentPassword,
+        });
+        if (response.changed && response.requires_relogin) {
+          setUsernameSuccess(
+            "Username changed. Please sign in again. Changing username does not affect your partner code, customers, commissions, or payout history."
+          );
+          setCurrentPassword("");
+          setTimeout(() => {
+            void logout();
+          }, 1200);
+          return;
+        }
+        setUsernameSuccess("Username updated.");
+      } catch (err) {
+        setUsernameError(toErrorMessage(err));
+      } finally {
+        setUsernameSaving(false);
+      }
+    },
+    [currentPassword, logout, newUsername]
+  );
 
   return (
     <PortalPage
@@ -339,6 +423,18 @@ export default function PartnerDashboardPage() {
 
         {!loading && !error && legacy && summary ? (
           <>
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                At a glance
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Partner-safe shortcuts for customers, subscriptions, requests, collections, and commission visibility.
+              </p>
+              <div className="mt-4">
+                <MetricStrip items={partnerAtAGlance} />
+              </div>
+            </section>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Paid"
@@ -670,6 +766,47 @@ export default function PartnerDashboardPage() {
               )}
             </WorkspaceSection>
 
+            <WorkspaceSection
+              title="Change username"
+              description="Changing username does not affect your partner code, customers, commissions, or payout history."
+            >
+              <h2 className="text-lg font-semibold text-foreground">Change username</h2>
+              {usernameError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {usernameError}
+                </div>
+              ) : null}
+              {usernameSuccess ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {usernameSuccess}
+                </div>
+              ) : null}
+              <form onSubmit={handleUsernameSubmit} className="grid gap-3 md:grid-cols-2">
+                <input
+                  value={newUsername}
+                  onChange={(event) => setNewUsername(event.target.value)}
+                  placeholder="New username"
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  required
+                />
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  placeholder="Current password"
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={usernameSaving || isLoggingOut}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                >
+                  {usernameSaving ? "Updating username..." : "Change Username"}
+                </button>
+              </form>
+            </WorkspaceSection>
+
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
                 title="Recent collection requests"
@@ -777,6 +914,49 @@ export default function PartnerDashboardPage() {
               </WorkspaceSection>
             </div>
           </>
+        ) : null}
+
+        {!loading && (error || !legacy || !summary) ? (
+          <WorkspaceSection
+            title="Change username"
+            description="Username changes do not alter partner code, customers, commissions, or payout history."
+          >
+            <h2 className="text-lg font-semibold text-foreground">Change username</h2>
+            {usernameError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {usernameError}
+              </div>
+            ) : null}
+            {usernameSuccess ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {usernameSuccess}
+              </div>
+            ) : null}
+            <form onSubmit={handleUsernameSubmit} className="grid gap-3 md:grid-cols-2">
+              <input
+                value={newUsername}
+                onChange={(event) => setNewUsername(event.target.value)}
+                placeholder="New username"
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                required
+              />
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                placeholder="Current password"
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                required
+              />
+              <button
+                type="submit"
+                disabled={usernameSaving || isLoggingOut}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              >
+                {usernameSaving ? "Updating username..." : "Change Username"}
+              </button>
+            </form>
+          </WorkspaceSection>
         ) : null}
       </div>
     </PortalPage>

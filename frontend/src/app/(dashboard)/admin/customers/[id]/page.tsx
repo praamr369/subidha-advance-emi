@@ -1283,6 +1283,19 @@ async function submitCustomerKycDecision(
   );
 }
 
+async function adminChangeUserUsername(
+  userId: number,
+  payload: { new_username: string; reason: string }
+): Promise<{ username: string; changed: boolean; requires_relogin: boolean }> {
+  return apiFetch<{ username: string; changed: boolean; requires_relogin: boolean }>(
+    `/admin/users/${userId}/username/`,
+    {
+      method: "PATCH",
+      body: payload,
+    }
+  );
+}
+
 // =====================================================
 // MAIN COMPONENT
 // =====================================================
@@ -1303,6 +1316,11 @@ export default function AdminCustomerDetailPage() {
   const [kycError, setKycError] = useState<string | null>(null);
   const [kycSuccess, setKycSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [usernameReason, setUsernameReason] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -1632,6 +1650,32 @@ export default function AdminCustomerDetailPage() {
     }
   }
 
+  async function handleAdminUsernameChange() {
+    if (!customer?.user_id) {
+      setUsernameError("No linked login user found.");
+      return;
+    }
+    setUsernameSaving(true);
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    try {
+      const response = await adminChangeUserUsername(customer.user_id, {
+        new_username: newUsername.trim(),
+        reason: usernameReason.trim(),
+      });
+      setUsernameSuccess(
+        response.changed ? "Username updated. User must sign in again." : "Username unchanged."
+      );
+      setNewUsername("");
+      setUsernameReason("");
+      await loadPage("refresh");
+    } catch (err) {
+      setUsernameError(toErrorMessage(err));
+    } finally {
+      setUsernameSaving(false);
+    }
+  }
+
   const kycTone: "success" | "warning" | "danger" | "default" =
     customer?.kyc_status === "VERIFIED" || customer?.kyc_status === "APPROVED"
       ? "success"
@@ -1861,6 +1905,47 @@ export default function AdminCustomerDetailPage() {
                 </div>
 
                 <OtpDeliveryReadinessCard operatorContext="detail" className="mt-4" />
+
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This changes login username only. Customer/partner IDs and financial history remain unchanged.
+                </div>
+                {usernameError ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {usernameError}
+                  </div>
+                ) : null}
+                {usernameSuccess ? (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {usernameSuccess}
+                  </div>
+                ) : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <input
+                    value={newUsername}
+                    onChange={(event) => setNewUsername(event.target.value)}
+                    placeholder="New username"
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                  <input
+                    value={usernameReason}
+                    onChange={(event) => setUsernameReason(event.target.value)}
+                    placeholder="Reason (required)"
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleAdminUsernameChange()}
+                    disabled={
+                      usernameSaving ||
+                      !customer.user_id ||
+                      !newUsername.trim() ||
+                      !usernameReason.trim()
+                    }
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {usernameSaving ? "Changing username..." : "Change Username"}
+                  </button>
+                </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link

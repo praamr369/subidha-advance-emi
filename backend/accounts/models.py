@@ -417,3 +417,107 @@ class PasswordResetRequest(models.Model):
 
     def __str__(self):
         return f"PasswordResetRequest#{self.pk} user={self.user_id} status={self.status}"
+
+
+class UsernameChangeSource(models.TextChoices):
+    SELF = "SELF", "Self"
+    ADMIN = "ADMIN", "Admin"
+
+
+class ReservedUsername(models.Model):
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+    reserved_from_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="reserved_usernames",
+        null=True,
+        blank=True,
+    )
+    reserved_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    reason = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "reserved_usernames"
+        ordering = ["-reserved_at", "-id"]
+        indexes = [
+            models.Index(fields=["reserved_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        self.username = (self.username or "").strip().lower()
+        self.reason = (self.reason or "").strip()
+        if not self.username:
+            raise ValidationError({"username": "Reserved username is required."})
+
+    def save(self, *args, **kwargs):
+        self.username = (self.username or "").strip().lower()
+        self.reason = (self.reason or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.username
+
+
+class UsernameChangeAudit(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="username_change_audits",
+    )
+    old_username = models.CharField(max_length=150)
+    new_username = models.CharField(max_length=150)
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="performed_username_changes",
+        null=True,
+        blank=True,
+    )
+    changed_by_role = models.CharField(max_length=20, blank=True, default="")
+    source = models.CharField(
+        max_length=20,
+        choices=UsernameChangeSource.choices,
+        default=UsernameChangeSource.SELF,
+        db_index=True,
+    )
+    reason = models.TextField(blank=True, default="")
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "username_change_audits"
+        ordering = ["-changed_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "changed_at"]),
+            models.Index(fields=["source", "changed_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        self.old_username = (self.old_username or "").strip()
+        self.new_username = (self.new_username or "").strip()
+        self.changed_by_role = (self.changed_by_role or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.user_agent = (self.user_agent or "").strip()
+
+        if not self.old_username:
+            errors["old_username"] = "Old username is required."
+        if not self.new_username:
+            errors["new_username"] = "New username is required."
+        if self.source == UsernameChangeSource.ADMIN and not self.reason:
+            errors["reason"] = "Reason is required for admin username changes."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.old_username = (self.old_username or "").strip()
+        self.new_username = (self.new_username or "").strip()
+        self.changed_by_role = (self.changed_by_role or "").strip().upper()
+        self.reason = (self.reason or "").strip()
+        self.user_agent = (self.user_agent or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)

@@ -177,7 +177,7 @@ class AdminOutstandingsApiTests(APITestCase):
             customer=self.customer,
             source_type="MANUAL",
             source_reference="manual-balance",
-            status="DRAFT",
+            status="APPROVED",
             subtotal=Decimal("2000.00"),
             discount_total=Decimal("0.00"),
             taxable_total=Decimal("2000.00"),

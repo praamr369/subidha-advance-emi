@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { NotificationSummaryResponse } from "@/services/notifications";
 import { getCustomerNotificationSummary } from "@/services/notifications";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   RefreshCw,
@@ -20,6 +20,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import PageHeader from "@/components/ui/PageHeader";
 import {
   KpiCard,
+  MetricStrip,
   QuickActionGrid,
 } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -37,6 +38,8 @@ import {
   listCustomerDirectSales,
   type CustomerDirectSaleListItem,
 } from "@/services/customer";
+import { listCustomerDeliveries, type DeliveryReportSummary } from "@/services/deliveries";
+import { listCustomerSupportTickets } from "@/services/support";
 import {
   getDashboardSummaryV2,
   listDashboardOverdue,
@@ -118,6 +121,10 @@ export default function CustomerDashboardPage() {
   const [latestDirectSales, setLatestDirectSales] = useState<CustomerDirectSaleListItem[]>([]);
   const [notificationSummary, setNotificationSummary] =
     useState<NotificationSummaryResponse | null>(null);
+  const [deliverySummary, setDeliverySummary] = useState<DeliveryReportSummary | null>(
+    null
+  );
+  const [supportOpenCount, setSupportOpenCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +160,8 @@ export default function CustomerDashboardPage() {
           directSaleSummaryResult,
           directSalesListResult,
           notificationSummaryResult,
+          deliveriesResult,
+          supportOpenResult,
         ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
@@ -163,6 +172,8 @@ export default function CustomerDashboardPage() {
           getCustomerDirectSaleSummary(),
           listCustomerDirectSales({ page: 1, pageSize: 5 }),
           getCustomerNotificationSummary(),
+          listCustomerDeliveries(),
+          listCustomerSupportTickets("open"),
         ]);
 
         if (legacyResult.status !== "fulfilled") {
@@ -191,6 +202,12 @@ export default function CustomerDashboardPage() {
         );
         setNotificationSummary(
           notificationSummaryResult.status === "fulfilled" ? notificationSummaryResult.value : null
+        );
+        setDeliverySummary(
+          deliveriesResult.status === "fulfilled" ? deliveriesResult.value.summary : null
+        );
+        setSupportOpenCount(
+          supportOpenResult.status === "fulfilled" ? supportOpenResult.value.count : null
         );
         setError(null);
       } catch (err) {
@@ -230,8 +247,99 @@ export default function CustomerDashboardPage() {
     0,
     6
   );
-  const paymentRows = recentPayments?.results ?? [];
+  const paymentRows = useMemo(
+    () => recentPayments?.results ?? [],
+    [recentPayments?.results]
+  );
   const winnerRows = winnerItems?.results ?? [];
+  const lastPayment = useMemo(() => paymentRows[0] ?? null, [paymentRows]);
+
+  const atAGlanceMetrics = useMemo(() => {
+    if (!summary) return [];
+    const d = deliverySummary;
+    const inFlight =
+      d === null
+        ? null
+        : d.pending +
+          d.scheduled +
+          d.in_transit +
+          d.dispatched +
+          d.out_for_delivery;
+    const items: Array<{
+      label: string;
+      value: ReactNode;
+      helper?: ReactNode;
+      href?: string;
+    }> = [
+      {
+        label: "Active contracts",
+        value: String(summary.active_subscriptions ?? 0),
+        helper: `${summary.completed_subscriptions ?? 0} completed`,
+        href: ROUTES.customer.subscriptions,
+      },
+      {
+        label: "Next payment",
+        value:
+          summary.next_due_date && summary.next_due_amount
+            ? money(summary.next_due_amount)
+            : "None due",
+        helper: summary.next_due_date
+          ? `Due ${formatDate(summary.next_due_date)}`
+          : "No upcoming EMI on file",
+        href: ROUTES.customer.subscriptions,
+      },
+      {
+        label: "Last payment",
+        value: lastPayment ? money(lastPayment.amount) : "—",
+        helper: lastPayment
+          ? `${formatDate(lastPayment.payment_date || lastPayment.created_at)}${
+              lastPayment.is_reversed ? " · Reversed" : ""
+            }`
+          : "No payments in this date range",
+        href: lastPayment
+          ? `${ROUTES.customer.payments}/${lastPayment.payment_id}`
+          : ROUTES.customer.payments,
+      },
+    ];
+
+    if (d !== null) {
+      items.push({
+        label: "Deliveries",
+        value: d.total > 0 ? `${d.delivered} delivered` : "—",
+        helper:
+          inFlight !== null && inFlight > 0
+            ? `${inFlight} in progress`
+            : d.total === 0
+              ? "No shipment records yet"
+              : "No active shipments",
+        href: ROUTES.customer.deliveries,
+      });
+    }
+
+    if (supportOpenCount !== null) {
+      items.push({
+        label: "Open support",
+        value: String(supportOpenCount),
+        helper:
+          supportOpenCount === 0
+            ? "No open requests"
+            : "Waiting on the shop team",
+        href: ROUTES.customer.support,
+      });
+    }
+
+    const winnerCount = Number(summary.winner_subscriptions ?? 0);
+    if (winnerCount > 0) {
+      items.push({
+        label: "Lucky draw",
+        value: `${winnerCount} winner contract${winnerCount === 1 ? "" : "s"}`,
+        helper: "Open a subscription for benefit detail",
+        href: ROUTES.customer.subscriptions,
+      });
+    }
+
+    return items;
+  }, [deliverySummary, lastPayment, summary, supportOpenCount]);
   const spotlightSubscriptions =
     legacy?.subscriptions
       ?.slice()
@@ -297,10 +405,10 @@ export default function CustomerDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Customer Operations"
+        eyebrow="Your account"
         title="Customer Workspace"
-        description="View subscriptions, payment records, profile information, and support resources."
-        helperNote="Figures and statuses below come from your live subscription and payment records, including due and winner posture."
+        description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
+        helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."
         helperTone="info"
         actions={
           <ActionButton
@@ -402,6 +510,18 @@ export default function CustomerDashboardPage() {
 
       {!loading && !error && legacy && summary ? (
         <>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              At a glance
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tap a tile to open subscriptions, payments, deliveries, or support.
+            </p>
+            <div className="mt-4">
+              <MetricStrip items={atAGlanceMetrics} />
+            </div>
+          </section>
+
           <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
             <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
             <div className="pointer-events-none absolute left-0 top-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl" />
@@ -416,9 +536,9 @@ export default function CustomerDashboardPage() {
                   {legacy.customer.name || "Customer"}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                  Paid, remaining, overdue, and winner-related figures here come
-                  from the same canonical summary-v2 flow now shared across all
-                  dashboards, so settlement and waiver posture stay aligned.
+                  Paid, remaining, overdue, and lucky-draw benefit figures are
+                  calculated from your live contracts and payments so what you
+                  see here matches your subscription and receipt records.
                 </p>
               </div>
 
@@ -716,7 +836,7 @@ export default function CustomerDashboardPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             <WorkspaceSection
               title="Due collection queue"
-              description="Your next-due rows and overdue rows now come from the same canonical surface layer used across every dashboard."
+              description="Upcoming and overdue instalments from your contracts for the selected date range."
               action={
                 <>
                   <ActionButton
@@ -768,8 +888,8 @@ export default function CustomerDashboardPage() {
             </WorkspaceSection>
 
             <WorkspaceSection
-              title="Recent payment surface"
-              description="Recent recorded payment rows from the canonical recent-payments surface."
+              title="Recent payments"
+              description="Recently recorded payments for the selected date range (same source as the payment history page)."
               action={
                 <>
                   <ActionButton

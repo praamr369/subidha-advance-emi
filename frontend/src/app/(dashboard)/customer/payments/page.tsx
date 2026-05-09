@@ -10,7 +10,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
-import { DataTableShell, DetailPanel } from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
@@ -421,16 +421,22 @@ export default function CustomerPaymentsPage() {
               />
             ) : (
               <DataTableShell>
-                <DataTable<CustomerPayment>
-                  rows={rows}
-                  columns={columns}
-                  onRowClick={(row) => router.push(`/customer/payments/${row.id}`)}
-                  rowActions={(row) => (
-                    <ActionButton href={`/customer/payments/${row.id}`} variant="outline">
-                      View receipt
-                    </ActionButton>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<CustomerPayment>
+                    rows={rows}
+                    columns={columns}
+                    onRowClick={(row) => router.push(`/customer/payments/${row.id}`)}
+                    rowActions={(row) => (
+                      <ActionButton
+                        href={`/customer/payments/${row.id}`}
+                        variant="outline"
+                        className="min-h-11"
+                      >
+                        View receipt
+                      </ActionButton>
+                    )}
+                  />
+                </MobileSafeTable>
               </DataTableShell>
             )}
 
@@ -451,7 +457,7 @@ export default function CustomerPaymentsPage() {
               />
             ) : (
               <DataTableShell>
-                <div className="overflow-x-auto rounded-2xl border border-border">
+                <MobileSafeTable className="rounded-2xl">
                   <table className="min-w-full text-sm">
                     <thead className="bg-muted/40 text-left">
                       <tr>
@@ -499,7 +505,7 @@ export default function CustomerPaymentsPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </MobileSafeTable>
               </DataTableShell>
             )}
           </DetailPanel>
@@ -515,7 +521,7 @@ export default function CustomerPaymentsPage() {
               />
             ) : (
               <DataTableShell>
-                <div className="overflow-x-auto rounded-2xl border border-border">
+                <MobileSafeTable className="rounded-2xl">
                   <table className="min-w-full text-sm">
                     <thead className="bg-muted/40 text-left">
                       <tr>
@@ -551,7 +557,7 @@ export default function CustomerPaymentsPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </MobileSafeTable>
               </DataTableShell>
             )}
           </DetailPanel>
@@ -562,7 +568,7 @@ export default function CustomerPaymentsPage() {
               description="Official receipt documents linked to EMI (Lucky Plan) subscriptions. These complement the payment register above; both reflect posted collections."
             >
               <DataTableShell>
-                <div className="overflow-x-auto rounded-2xl border border-border">
+                <MobileSafeTable className="rounded-2xl">
                   <table className="min-w-full text-sm">
                     <thead className="bg-muted/40 text-left">
                       <tr>
@@ -600,7 +606,7 @@ export default function CustomerPaymentsPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </MobileSafeTable>
               </DataTableShell>
             </DetailPanel>
           ) : null}

@@ -139,6 +139,10 @@ export default function ResetPasswordPage() {
       panelDescription="OTP verification and password change stay inside the existing Subidha CORE auth workflow."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="rounded-xl border border-slate-200/90 bg-slate-50/90 px-4 py-3 text-xs leading-relaxed text-slate-600">
+          <span className="font-semibold text-slate-800">How this works: </span>
+          Use the same email, username, or phone you already registered. After you request a reset, open the OTP email, enter the code below, choose a new password, then sign in again. If the code expires, use “Resend OTP” or start again from Forgot password.
+        </div>
         <div>
           <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-slate-800">
             Email, username, or phone
@@ -148,7 +152,7 @@ export default function ResetPasswordPage() {
             type="text"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
             placeholder="Enter email, username, or phone"
             disabled={submitting || success}
             required
@@ -175,7 +179,7 @@ export default function ResetPasswordPage() {
               This reset code may have expired or the reset session may no longer be active.{" "}
               <Link
                 href={buildForgotPasswordHref(identifier)}
-                className="font-semibold text-amber-950 underline underline-offset-2"
+                className="rounded font-semibold text-amber-950 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
               >
                 Request a new code
               </Link>{" "}
@@ -189,7 +193,7 @@ export default function ResetPasswordPage() {
               onClick={() => void handleResendOtp()}
               disabled={resending || submitting || success}
               aria-busy={resending}
-              className="font-medium text-slate-800 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded font-medium text-slate-800 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {resending ? "Resending..." : "Resend OTP"}
             </button>
@@ -206,7 +210,7 @@ export default function ResetPasswordPage() {
               type={showPassword ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               placeholder="Minimum 8 characters"
               disabled={submitting || success}
               required
@@ -214,7 +218,8 @@ export default function ResetPasswordPage() {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-900"
+              aria-label={showPassword ? "Hide new password" : "Show new password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-slate-500 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -231,7 +236,7 @@ export default function ResetPasswordPage() {
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               placeholder="Confirm new password"
               disabled={submitting || success}
               required
@@ -239,7 +244,8 @@ export default function ResetPasswordPage() {
             <button
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-900"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-slate-500 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
             >
               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -287,12 +293,15 @@ export default function ResetPasswordPage() {
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
         <Link
           href={buildForgotPasswordHref(identifier)}
-          className="font-medium text-slate-900 hover:underline"
+          className="rounded font-medium text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
         >
           Back to forgot password
         </Link>
         <span className="text-slate-400">•</span>
-        <Link href="/login" className="font-medium text-slate-900 hover:underline">
+        <Link
+          href="/login"
+          className="rounded font-medium text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
+        >
           Back to login
         </Link>
       </div>

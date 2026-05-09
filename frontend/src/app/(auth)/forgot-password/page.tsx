@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
             autoComplete="off"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
             placeholder="Enter email, username, or phone"
             disabled={submitting}
             required
@@ -97,14 +97,14 @@ export default function ForgotPasswordPage() {
             <div className="flex flex-wrap gap-2">
               <Link
                 href={buildResetPasswordHref(identifier)}
-                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               >
                 Continue with OTP
               </Link>
               <button
                 type="button"
                 onClick={() => setSuccess(false)}
-                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               >
                 Use another identifier
               </button>
@@ -140,7 +140,10 @@ export default function ForgotPasswordPage() {
       </form>
 
       <div className="mt-6 text-center text-sm text-slate-600">
-        <Link href="/login" className="inline-flex items-center gap-1 font-medium text-slate-900 hover:underline">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1 rounded font-medium text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to login
         </Link>

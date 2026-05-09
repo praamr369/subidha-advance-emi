@@ -134,6 +134,15 @@ test.describe("UX polish smoke", () => {
         timeout: 45_000,
       });
     });
+
+    test("customer mobile sidebar excludes admin-only routes", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/customer");
+      await page.getByRole("button", { name: "Open menu" }).click();
+      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
+      await expect(page.locator("body")).not.toContainText("Finance Workspace");
+      await expect(page.locator("body")).not.toContainText("Reversal & Return Control");
+    });
   });
 
   test.describe("cashier navigation boundaries", () => {
@@ -146,6 +155,19 @@ test.describe("UX polish smoke", () => {
       await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
       await expect(page.locator("body")).not.toContainText("Admin Workspace");
       await expect(page.locator("body")).not.toContainText("Reversal Center");
+    });
+  });
+
+  test.describe("partner dashboard", () => {
+    test.use({ storageState: authStatePath("partner") });
+
+    test("partner mobile sidebar excludes admin-only routes", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/partner");
+      await page.getByRole("button", { name: "Open menu" }).click();
+      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
+      await expect(page.locator("body")).not.toContainText("Accounting Control Center");
+      await expect(page.locator("body")).not.toContainText("Reversal & Return Control");
     });
   });
 

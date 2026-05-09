@@ -77,3 +77,18 @@ class PermissionBoundaryTests(APITestCase):
         response = self.client.get("/api/v1/auth/me/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["role"], "PARTNER")
+
+    def test_non_admin_roles_cannot_use_admin_username_change_endpoint(self):
+        target = create_customer_user(
+            username="perm_username_target",
+            phone="9003334445",
+            email="perm-username-target@example.com",
+        )
+        for actor in (self.cashier, self.customer, self.partner):
+            self.client.force_authenticate(user=actor)
+            response = self.client.patch(
+                f"/api/v1/admin/users/{target.id}/username/",
+                {"new_username": f"{actor.username}_blocked", "reason": "blocked"},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

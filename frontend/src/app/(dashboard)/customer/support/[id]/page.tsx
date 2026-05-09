@@ -109,10 +109,10 @@ export default function CustomerSupportTicketDetailPage() {
         { label: ticket.ticket_no },
       ]}
       actions={[{ href: ROUTES.customer.support, label: "All tickets", variant: "secondary" }]}
-      statusBadge={{ label: ticket.status, tone: "info" }}
+      statusBadge={{ label: ticket.status.replaceAll("_", " "), tone: "info" }}
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <WorkspaceSection title="Details">
             <p className="whitespace-pre-wrap text-sm text-foreground">{ticket.description}</p>
             {ticket.resolution_summary ? (
@@ -139,43 +139,63 @@ export default function CustomerSupportTicketDetailPage() {
             )}
             <form onSubmit={onComment} className="mt-4 space-y-2">
               <textarea
-                className="min-h-[80px] w-full rounded-lg border border-border bg-[var(--surface-card)] px-3 py-2 text-sm"
+                className="min-h-[100px] w-full rounded-lg border border-border bg-[var(--surface-card)] px-3 py-3 text-sm"
                 placeholder="Add a message"
                 value={comment}
                 onChange={(ev) => setComment(ev.target.value)}
               />
-              <ActionButton type="submit" disabled={busy || !comment.trim()}>
+              <ActionButton
+                type="submit"
+                className="min-h-11 w-full sm:w-auto"
+                disabled={busy || !comment.trim()}
+              >
                 Send reply
               </ActionButton>
             </form>
           </WorkspaceSection>
           <WorkspaceSection title="Timeline (summary)">
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              {ticket.timeline.slice(-12).map((row, idx) => (
-                <li key={`${String(row.at)}-${idx}`}>
-                  {String(row.event_type ?? row.kind ?? "")} · {String(row.at ?? "")}
-                </li>
-              ))}
-            </ul>
+            {ticket.timeline.length === 0 ? (
+              <EmptyState
+                title="No timeline entries yet"
+                description="Updates from the shop will appear here when the ticket moves forward."
+              />
+            ) : (
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                {ticket.timeline.slice(-12).map((row, idx) => (
+                  <li key={`${String(row.at)}-${idx}`}>
+                    {String(row.event_type ?? row.kind ?? "")} · {String(row.at ?? "")}
+                  </li>
+                ))}
+              </ul>
+            )}
           </WorkspaceSection>
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="rounded-xl border border-border bg-[var(--surface-card)] p-4 text-sm">
             <DetailItem label="Status" value={<StatusBadge status={ticket.status} />} />
-            <DetailItem label="Priority" value={ticket.priority} />
+            <DetailItem
+              label="Priority"
+              value={
+                <StatusBadge
+                  status={ticket.priority}
+                  label={ticket.priority.replaceAll("_", " ")}
+                  hideIcon
+                />
+              }
+            />
             <DetailItem label="Category" value={ticket.category.replaceAll("_", " ")} />
             <DetailItem label="Opened" value={new Date(ticket.created_at).toLocaleString("en-IN")} />
           </div>
           {canReopen ? (
-            <ActionButton variant="outline" disabled={busy} onClick={() => void onReopen()}>
+            <ActionButton
+              variant="outline"
+              className="min-h-11 w-full sm:w-auto"
+              disabled={busy}
+              onClick={() => void onReopen()}
+            >
               Reopen ticket
             </ActionButton>
           ) : null}
-          <WorkspaceSection title="Context" description="Read-only snapshot from linked records.">
-            <pre className="max-h-64 overflow-auto rounded-lg bg-[var(--surface-muted)] p-2 text-xs">
-              {JSON.stringify(ticket.operational_context, null, 2)}
-            </pre>
-          </WorkspaceSection>
         </div>
       </div>
     </PortalPage>

@@ -13,9 +13,10 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
-import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, KpiCard, MobileSafeTable, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import {
   listPartnerCustomersRegister,
+  listPartnerSubscriptionsRegister,
   type PartnerCustomerRegisterResponse,
 } from "@/services/partner/registers";
 import type { PartnerCustomer } from "@/services/partner";
@@ -82,9 +83,32 @@ export default function PartnerCustomersPage() {
           page: currentPage,
           pageSize: PAGE_SIZE,
         });
+        let resolvedRows = Array.isArray(data.results) ? data.results : [];
+        let resolvedCount = data.count;
+        if (resolvedRows.length === 0) {
+          const fallbackSubscriptions = await listPartnerSubscriptionsRegister({
+            q: q || undefined,
+            page: 1,
+            pageSize: 200,
+          });
+          const customerMap = new Map<number, PartnerCustomer>();
+          for (const sub of fallbackSubscriptions.results) {
+            if (!sub.customer) continue;
+            if (customerMap.has(sub.customer)) continue;
+            customerMap.set(sub.customer, {
+              id: sub.customer,
+              name: sub.customer_name || `Customer #${sub.customer}`,
+              phone: sub.customer_phone || "",
+              kyc_status: "NOT_PROVIDED",
+              created_at: sub.created_at || "",
+            });
+          }
+          resolvedRows = Array.from(customerMap.values());
+          resolvedCount = resolvedRows.length;
+        }
 
-        setRows(Array.isArray(data.results) ? data.results : []);
-        setCount(data.count);
+        setRows(resolvedRows);
+        setCount(resolvedCount);
         setPage(data.page);
         setNumPages(data.num_pages);
         setHasNext(data.has_next);
@@ -339,27 +363,29 @@ export default function PartnerCustomersPage() {
               />
             ) : (
               <DataTableShell>
-                <DataTable<PartnerCustomer>
-                  rows={rows}
-                  columns={columns}
-                  onRowClick={(row) => router.push(`/partner/customers/${row.id}`)}
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/partner/customers/${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View Detail
-                      </Link>
-                      <Link
-                        href={`/partner/subscriptions?customer=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Subscriptions
-                      </Link>
-                    </div>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<PartnerCustomer>
+                    rows={rows}
+                    columns={columns}
+                    onRowClick={(row) => router.push(`/partner/customers/${row.id}`)}
+                    rowActions={(row) => (
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/partner/customers/${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          View Detail
+                        </Link>
+                        <Link
+                          href={`/partner/subscriptions?customer=${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Subscriptions
+                        </Link>
+                      </div>
+                    )}
+                  />
+                </MobileSafeTable>
               </DataTableShell>
             )}
 

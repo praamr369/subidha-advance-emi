@@ -195,15 +195,19 @@ body {
 
 .public-app {
   min-height: 100vh;
+  /* Warm retail brown primary for marketing + auth only (dashboard uses .dashboard-app). */
+  --primary: oklch(0.44 0.072 58);
+  --primary-foreground: oklch(0.985 0.004 95);
+  --ring: oklch(0.5 0.085 56);
   background:
     radial-gradient(
       circle at 10% 0%,
-      color-mix(in oklab, var(--accent) 18%, transparent),
+      color-mix(in oklab, var(--accent) 22%, transparent),
       transparent 42%
     ),
     radial-gradient(
       circle at 92% 6%,
-      color-mix(in oklab, oklch(0.28 0.02 258) 14%, transparent),
+      color-mix(in oklab, oklch(0.38 0.045 58) 12%, transparent),
       transparent 46%
     ),
     repeating-linear-gradient(
@@ -220,7 +224,20 @@ body {
       transparent 1px,
       transparent 84px
     ),
-    linear-gradient(180deg, #fbfaf7 0%, #edf2f8 62%, #e8eef6 100%);
+    linear-gradient(180deg, #fbfaf7 0%, #f4f0eb 55%, #ebe6df 100%);
+}
+
+/* Shared focus treatment for public marketing + lead forms */
+.public-app .public-control-focus {
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.public-app .public-control-focus:focus-visible {
+  border-color: color-mix(in oklab, var(--ring) 55%, var(--border) 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent);
 }
 
 .public-nav {
@@ -335,6 +352,22 @@ body {
 .public-action-primary:hover,
 .public-action-secondary:hover {
   transform: translateY(-1px);
+}
+
+.public-action-primary:focus-visible,
+.public-action-secondary:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ring) 32%, transparent),
+    0 22px 48px -34px rgba(15, 23, 42, 0.78);
+}
+
+.public-action-secondary:focus-visible {
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 18px 42px -34px rgba(15, 23, 42, 0.46);
 }
 
 input::placeholder,

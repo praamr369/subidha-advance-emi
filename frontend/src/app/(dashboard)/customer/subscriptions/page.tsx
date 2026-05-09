@@ -13,7 +13,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { DataTableShell, DetailPanel } from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import {
@@ -446,27 +446,31 @@ export default function CustomerSubscriptionsPage() {
               />
             ) : (
               <DataTableShell>
-                <DataTable<CustomerSubscription>
-                  rows={rows}
-                  columns={columns}
-                  onRowClick={(row) => router.push(`/customer/subscriptions/${row.id}`)}
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <ActionButton
-                        href={`/customer/subscriptions/${row.id}`}
-                        variant="outline"
-                      >
-                        View
-                      </ActionButton>
-                      <ActionButton
-                        href={`/customer/payments?subscription=${row.id}`}
-                        variant="outline"
-                      >
-                        Payments
-                      </ActionButton>
-                    </div>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<CustomerSubscription>
+                    rows={rows}
+                    columns={columns}
+                    onRowClick={(row) => router.push(`/customer/subscriptions/${row.id}`)}
+                    rowActions={(row) => (
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <ActionButton
+                          href={`/customer/subscriptions/${row.id}`}
+                          variant="outline"
+                          className="min-h-11"
+                        >
+                          View
+                        </ActionButton>
+                        <ActionButton
+                          href={`/customer/payments?subscription=${row.id}`}
+                          variant="outline"
+                          className="min-h-11"
+                        >
+                          Payments
+                        </ActionButton>
+                      </div>
+                    )}
+                  />
+                </MobileSafeTable>
               </DataTableShell>
             )}
 

@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import FormActions from "@/components/ui/FormActions";
 import PortalPage from "@/components/ui/PortalPage";
+import StatusBadge from "@/components/ui/status-badge";
+import { DetailPanel, FormSection, MobileSafeTable } from "@/components/ui/operations";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
   approveAdminSubscriptionRequest,
@@ -49,7 +52,7 @@ function DetailItem({
   value,
 }: {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3">
@@ -251,22 +254,18 @@ export default function AdminSubscriptionRequestDetailPage() {
 
             <SubscriptionRequestCard request={request} showRequester />
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="space-y-1">
-                <h2 className="text-base font-semibold text-foreground">
-                  Audit and review context
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Approval must either link an existing customer or create one from the captured request snapshot. Lucky-number overrides remain explicit and auditable.
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem label="Submitted At" value={formatDateTime(request.created_at)} />
-                <DetailItem label="Updated At" value={formatDateTime(request.updated_at)} />
-                <DetailItem label="Reviewed By" value={text(request.reviewed_by_username)} />
-                <DetailItem label="Reviewed At" value={formatDateTime(request.reviewed_at)} />
-              </div>
+            <DetailPanel
+              title="Audit and review context"
+              description="Approval must either link an existing customer or create one from the captured request snapshot. Lucky-number overrides remain explicit and auditable."
+            >
+              <MobileSafeTable className="border-none bg-transparent">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <DetailItem label="Submitted At" value={formatDateTime(request.created_at)} />
+                  <DetailItem label="Updated At" value={formatDateTime(request.updated_at)} />
+                  <DetailItem label="Reviewed By" value={text(request.reviewed_by_username)} />
+                  <DetailItem label="Reviewed At" value={formatDateTime(request.reviewed_at)} />
+                </div>
+              </MobileSafeTable>
 
               <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -287,18 +286,13 @@ export default function AdminSubscriptionRequestDetailPage() {
                   </Link>
                 </div>
               ) : null}
-            </section>
+            </DetailPanel>
 
             {request.status === "SUBMITTED" ? (
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="space-y-1">
-                  <h2 className="text-base font-semibold text-foreground">
-                    Review action
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval.
-                  </p>
-                </div>
+              <FormSection
+                title="Review action"
+                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval."
+              >
 
                 {!request.customer_id ? (
                   <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
@@ -427,26 +421,27 @@ export default function AdminSubscriptionRequestDetailPage() {
                   </label>
                 </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleApprove()}
-                    disabled={actionLoading}
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-foreground bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {actionLoading ? "Processing..." : "Approve Request"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleReject()}
-                    disabled={actionLoading}
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-red-300 bg-red-50 px-5 text-sm font-medium text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {actionLoading ? "Processing..." : "Reject Request"}
-                  </button>
-                </div>
-              </section>
-            ) : null}
+                <FormActions
+                  submitLabel="Approve Request"
+                  submitLoadingLabel="Processing..."
+                  onSubmitClick={() => void handleApprove()}
+                  submitting={actionLoading}
+                  danger={{
+                    label: actionLoading ? "Processing..." : "Reject Request",
+                    onClick: () => void handleReject(),
+                    disabled: actionLoading,
+                  }}
+                  align="left"
+                />
+              </FormSection>
+            ) : (
+              <DetailPanel
+                title="Request resolution"
+                description="This request is finalized and remains visible for audit history."
+              >
+                <StatusBadge status={request.status} />
+              </DetailPanel>
+            )}
           </>
         ) : null}
       </div>

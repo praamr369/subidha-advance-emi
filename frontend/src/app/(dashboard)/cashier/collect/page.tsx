@@ -99,6 +99,12 @@ function overdueLabel(emi: PendingEmiRecord | null | undefined): string {
   return "Due queue";
 }
 
+function isRestrictedSubscriptionStatus(status?: string | null): boolean {
+  if (!status) return false;
+  const token = status.trim().toUpperCase();
+  return ["BLOCKED", "CANCELLED", "DEFAULTED", "VOID", "CLOSED", "INACTIVE"].includes(token);
+}
+
 type PaymentMethod = "CASH" | "UPI" | "BANK";
 type CashierSearchMode = "phone" | "subscription" | "lucky" | "emi";
 type CollectionWorkflow = "subscription" | "direct-sale";
@@ -733,7 +739,8 @@ export default function CashierCollectPage() {
         tone: "info",
       }}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 pb-24 sm:pb-6">
+        <div id="cashier-unified-search">
         <UnifiedReceivableSearchPanel
           title="Universal receivable search"
           description="Search Advance EMI, rent, lease, and direct-sale contract references before opening the supported collection workflow."
@@ -749,6 +756,7 @@ export default function CashierCollectPage() {
           lastPaymentSummary={unifiedLastPaymentSummary}
           onRetrySearch={() => void handleUnifiedReceivableSearch(unifiedSearchQuery)}
         />
+        </div>
 
         <QuickActionGrid>
           <KpiCard
@@ -834,13 +842,14 @@ export default function CashierCollectPage() {
           <CashierDirectSaleCollectPanel prefillDirectSaleId={prefillDirectSaleId} />
         ) : (
           <>
+        <div id="cashier-step-search">
         <FormSection
           title="Step 1 · Search collectible EMI rows"
           description="Phone loads the full customer queue directly. Subscription, lucky, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
         >
           <form
             onSubmit={handleLookup}
-            className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]"
+            className="grid gap-4 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_auto]"
           >
             <div>
               <label
@@ -910,6 +919,7 @@ export default function CashierCollectPage() {
             {activeSearchConfig.help}
           </div>
         </FormSection>
+        </div>
 
         {searchingMatches ? (
           <LoadingBlock label="Searching collectible EMI rows..." />
@@ -1083,6 +1093,12 @@ export default function CashierCollectPage() {
               title="Step 2 · Select pending EMI"
               description="Choose the exact EMI row you are collecting against."
             >
+              {pendingEmis.some((row) => isRestrictedSubscriptionStatus(row.subscription_status)) ? (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  At least one visible contract shows a restricted subscription status. Confirm with a supervisor before
+                  you describe outcomes to the customer; collection posting rules are still enforced by the server.
+                </div>
+              ) : null}
               {pendingEmis.length === 0 ? (
                 <EmptyState
                   title="No pending Advance EMIs"
@@ -1092,6 +1108,9 @@ export default function CashierCollectPage() {
                 <div className="space-y-3">
                   {pendingEmis.map((emi) => {
                     const isSelected = selectedEmiId === emi.id;
+                    const subscriptionRestricted = isRestrictedSubscriptionStatus(
+                      emi.subscription_status
+                    );
 
                     return (
                       <button
@@ -1103,6 +1122,9 @@ export default function CashierCollectPage() {
                           isSelected
                             ? "border-primary bg-primary/5"
                             : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                          subscriptionRestricted
+                            ? "border-amber-300/80 bg-amber-50/40 opacity-90"
+                            : "",
                         ].join(" ")}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1115,6 +1137,13 @@ export default function CashierCollectPage() {
                                 status={emi.status}
                                 isOverdue={isEmiOverdue(emi)}
                               />
+                              {subscriptionRestricted ? (
+                                <StatusBadge
+                                  status="BLOCKED"
+                                  label={`Contract ${emi.subscription_status || "restricted"}`}
+                                  hideIcon
+                                />
+                              ) : null}
                               <span className="text-sm text-slate-600">
                                 Due {formatDate(emi.due_date)} · {overdueLabel(emi)}
                               </span>
@@ -1164,6 +1193,7 @@ export default function CashierCollectPage() {
               )}
             </FormSection>
 
+            <div id="cashier-step-collect">
             <FormSection
               title="Step 3 · Post collection"
               description="Collect only against the selected EMI row. UPI and bank entries require a reference number."
@@ -1427,6 +1457,7 @@ export default function CashierCollectPage() {
                 </form>
               )}
             </FormSection>
+            </div>
 
             <FormSection
               title="Step 4 · Collect unapplied customer advance"
@@ -1556,6 +1587,40 @@ export default function CashierCollectPage() {
         ) : null}
           </>
         )}
+
+        {collectionWorkflow === "subscription" ? (
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 sm:hidden">
+            <div className="pointer-events-auto border-t border-border bg-background/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-18px_rgba(15,23,42,0.45)]">
+              <div className="mx-auto flex max-w-lg gap-2">
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() =>
+                    document
+                      .getElementById("cashier-step-search")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  Search
+                </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!selectedEmi || collecting}
+                  onClick={() =>
+                    document
+                      .getElementById("cashier-step-collect")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  Collect
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </PortalPage>
   );

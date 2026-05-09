@@ -32,6 +32,7 @@ import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
   getCustomerProfile,
+  changeCustomerUsername,
   getCustomerDirectSaleSummary,
   listCustomerPayments,
   updateCustomerProfile,
@@ -48,6 +49,7 @@ import {
   type CustomerReferralRecord,
 } from "@/services/customer/index";
 import { initialsFromDisplayName } from "@/lib/display-name";
+import { useLogout } from "@/hooks/useLogout";
 
 function money(value: string | number): string {
   return `₹${Number(value || 0).toFixed(2)}`;
@@ -98,6 +100,7 @@ function noticeToneForKyc(
 }
 
 export default function CustomerProfilePage() {
+  const { logout, isLoggingOut } = useLogout();
   const [data, setData] = useState<CustomerProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -140,6 +143,11 @@ export default function CustomerProfilePage() {
   const [directSaleError, setDirectSaleError] = useState<string | null>(null);
   const [paymentPreview, setPaymentPreview] = useState<CustomerPayment[]>([]);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
 
   function hydrate(payload: CustomerProfileResponse) {
     setData(payload);
@@ -357,6 +365,34 @@ export default function CustomerProfilePage() {
     }
   }
 
+  async function handleUsernameSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUsernameSaving(true);
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    try {
+      const response = await changeCustomerUsername({
+        new_username: newUsername.trim(),
+        current_password: currentPassword,
+      });
+      if (response.changed && response.requires_relogin) {
+        setUsernameSuccess("Username changed. Please sign in again.");
+        setCurrentPassword("");
+        setTimeout(() => {
+          void logout();
+        }, 1200);
+        return;
+      }
+      setUsernameSuccess("Username updated.");
+      setCurrentPassword("");
+      await loadPage();
+    } catch (err) {
+      setUsernameError(toErrorMessage(err));
+    } finally {
+      setUsernameSaving(false);
+    }
+  }
+
   const selfServiceLanes = [
     {
       title: "Subscriptions",
@@ -491,6 +527,53 @@ export default function CustomerProfilePage() {
               <DetailItem label="Address" value={data.address || "No address recorded"} />
             </div>
           </DetailPanel>
+
+          <WorkspaceSection
+            title="Change username"
+            description="Username is only your login identifier. Your customer ID, subscriptions, invoices, receipts, payments, and audit trail remain unchanged."
+          >
+            {usernameError ? (
+              <WorkspaceNotice tone="danger" title="Unable to change username">
+                {usernameError}
+              </WorkspaceNotice>
+            ) : null}
+            {usernameSuccess ? (
+              <WorkspaceNotice tone="success" title="Username changed">
+                {usernameSuccess}
+              </WorkspaceNotice>
+            ) : null}
+            <form onSubmit={handleUsernameSubmit} className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">New username</label>
+                <input
+                  value={newUsername}
+                  onChange={(event) => setNewUsername(event.target.value)}
+                  placeholder="letters, numbers, dots, underscores, hyphens"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Current password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={usernameSaving || isLoggingOut}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {usernameSaving ? "Updating username..." : "Change Username"}
+                </button>
+              </div>
+            </form>
+          </WorkspaceSection>
 
           <WorkspaceSection
             title="EMI subscriptions & rent/lease contracts"

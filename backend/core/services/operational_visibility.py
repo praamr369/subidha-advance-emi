@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from django.db.models import Q, QuerySet
+from decimal import Decimal
+
+from django.db.models import Q, QuerySet, Sum
 
 
 INACTIVE_SUBSCRIPTION_STATUSES = {
@@ -45,6 +47,8 @@ INACTIVE_INVOICE_STATUSES = {
     "CREDITED_FULLY",
 }
 
+NON_COLLECTIBLE_INVOICE_STATUSES = INACTIVE_INVOICE_STATUSES | {"DRAFT"}
+
 ACTIVE_RECEIPT_STATUSES = {
     "POSTED",
     "APPROVED",
@@ -79,7 +83,10 @@ def is_direct_sale_history_only(direct_sale) -> bool:
 
 
 def is_invoice_customer_active_outstanding(invoice) -> bool:
-    if getattr(invoice, "status", None) in INACTIVE_INVOICE_STATUSES:
+    if getattr(invoice, "status", None) in NON_COLLECTIBLE_INVOICE_STATUSES:
+        return False
+    direct_sale = getattr(invoice, "direct_sale", None)
+    if direct_sale is not None and not is_direct_sale_customer_active(direct_sale):
         return False
     return (getattr(invoice, "balance_total", 0) or 0) > 0
 
@@ -91,7 +98,20 @@ def is_payment_active_collection(payment) -> bool:
 
 
 def is_receipt_active_collection(receipt) -> bool:
-    return getattr(receipt, "status", None) in ACTIVE_RECEIPT_STATUSES
+    if getattr(receipt, "status", None) not in ACTIVE_RECEIPT_STATUSES:
+        return False
+    payment = getattr(receipt, "payment", None)
+    if payment is not None and not is_payment_active_collection(payment):
+        return False
+    return True
+
+
+def is_invoice_history_only(invoice) -> bool:
+    return not is_invoice_customer_active_outstanding(invoice)
+
+
+def is_receipt_history_only(receipt) -> bool:
+    return not is_receipt_active_collection(receipt)
 
 
 def subscription_dashboard_visible_q(prefix: str = "") -> Q:
@@ -115,11 +135,25 @@ def direct_sale_active_q(prefix: str = "") -> Q:
 
 
 def invoice_active_q(prefix: str = "") -> Q:
-    return ~Q(**{f"{prefix}status__in": list(INACTIVE_INVOICE_STATUSES)})
+    return ~Q(**{f"{prefix}status__in": list(NON_COLLECTIBLE_INVOICE_STATUSES)})
 
 
 def receipt_active_q(prefix: str = "") -> Q:
     return Q(**{f"{prefix}status__in": list(ACTIVE_RECEIPT_STATUSES)})
+
+
+def get_active_invoice_balance(queryset: QuerySet, *, prefix: str = "") -> Decimal:
+    payload = queryset.filter(invoice_active_q(prefix)).aggregate(
+        total=Sum(f"{prefix}balance_total")
+    )
+    return Decimal(str(payload.get("total") or "0.00")).quantize(Decimal("0.01"))
+
+
+def get_active_receipt_total(queryset: QuerySet, *, prefix: str = "") -> Decimal:
+    payload = queryset.filter(receipt_active_q(prefix)).aggregate(
+        total=Sum(f"{prefix}amount")
+    )
+    return Decimal(str(payload.get("total") or "0.00")).quantize(Decimal("0.01"))
 
 
 def filter_dashboard_visible_subscriptions(queryset: QuerySet, *, prefix: str = "") -> QuerySet:

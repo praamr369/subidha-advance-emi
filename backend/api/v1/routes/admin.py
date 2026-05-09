@@ -430,6 +430,7 @@ from api.v1.views.vendor_ops import (
     AdminVendorSourcingSuggestView,
     AdminVendorViewSet,
 )
+from api.v1.views.username_change import AdminUserUsernameChangeView
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -453,6 +454,7 @@ router.register(
 )
 
 urlpatterns = [
+    path("users/<int:user_id>/username/", AdminUserUsernameChangeView.as_view()),
     path(
         "customers/<int:pk>/operational-summary/",
         CustomerOperationalSummaryView.as_view(),

@@ -504,6 +504,14 @@ export default function AdminPartnersPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
+                        onClick={() => router.push(`/admin/partners/${row.id}`)}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Access
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() =>
                           router.push(`/admin/subscriptions?partner=${row.id}`)
                         }
@@ -557,6 +565,14 @@ export default function AdminPartnersPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/admin/partners/${partner.id}`)}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Access
+                      </button>
+
                       <button
                         type="button"
                         onClick={() =>

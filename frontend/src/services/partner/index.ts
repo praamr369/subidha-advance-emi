@@ -14,6 +14,17 @@ export type PartnerCustomer = {
   created_at?: string;
 };
 
+export type SelfUsernameChangePayload = {
+  new_username: string;
+  current_password: string;
+};
+
+export type UsernameChangeResponse = {
+  username: string;
+  changed: boolean;
+  requires_relogin: boolean;
+};
+
 export type PartnerSubscription = {
   id: number;
   subscription_number?: string;
@@ -880,6 +891,15 @@ function normalizeDashboardResponse(payload: unknown): PartnerDashboardResponse 
 export async function getPartnerDashboard(): Promise<PartnerDashboardResponse> {
   const payload = await apiFetch<unknown>("/partner/dashboard/");
   return normalizeDashboardResponse(payload);
+}
+
+export async function changePartnerUsername(
+  payload: SelfUsernameChangePayload
+): Promise<UsernameChangeResponse> {
+  return apiFetch<UsernameChangeResponse>("/partner/profile/username/", {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export async function listPartnerCustomers(params?: { q?: string }) {

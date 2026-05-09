@@ -14,6 +14,7 @@ import {
   DataTableShell,
   DetailPanel,
   KpiCard,
+  MobileSafeTable,
   QuickActionGrid,
   WorkflowCard,
 } from "@/components/ui/operations";
@@ -455,20 +456,23 @@ export default function PartnerPayoutsPage({
               <EmptyState title="No commission entries found" description={emptyFilterExplanation} />
             ) : (
               <DataTableShell>
-                <DataTable<PartnerCommission>
-                  rows={rows}
-                  columns={columns}
-                  rowActions={(row) =>
-                    row.subscription ? (
-                      <ActionButton
-                        href={`/partner/subscriptions/${row.subscription}`}
-                        variant="outline"
-                      >
-                        Subscription
-                      </ActionButton>
-                    ) : null
-                  }
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<PartnerCommission>
+                    rows={rows}
+                    columns={columns}
+                    rowActions={(row) =>
+                      row.subscription ? (
+                        <ActionButton
+                          href={`/partner/subscriptions/${row.subscription}`}
+                          variant="outline"
+                          className="min-h-11"
+                        >
+                          Subscription
+                        </ActionButton>
+                      ) : null
+                    }
+                  />
+                </MobileSafeTable>
               </DataTableShell>
             )}
           </DetailPanel>

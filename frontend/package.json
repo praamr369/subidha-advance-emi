@@ -10,6 +10,7 @@
     "start:smoke": "next start --hostname 127.0.0.1 --port 3100",
     "lint": "node scripts/run-eslint.mjs",
     "check:routes": "node scripts/check-routes.mjs",
+    "inventory:routes": "node scripts/generate-route-inventory.mjs",
     "typecheck": "node scripts/run-typecheck.mjs",
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run test:dashboard-presets && npm run build",
     "test:e2e:smoke": "npm run build:smoke && playwright test --project=chromium-smoke",

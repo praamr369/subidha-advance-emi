@@ -24,7 +24,7 @@ export default async function LuckyPlanPage() {
   return (
     <PublicPageShell
       title={dictionary.common.luckyPlan}
-      subtitle="Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication."
+      subtitle="Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents."
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan },

@@ -5,8 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
+import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/status-badge";
+import TableToolbar from "@/components/ui/TableToolbar";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import {
   activateInternalUser,
   deactivateInternalUser,
@@ -152,10 +156,7 @@ export default function AdminInternalUsersPage() {
     };
   }, [rows]);
 
-  async function handleActivate(user: InternalUserRecord) {
-    const confirmed = window.confirm(`Activate ${user.username}?`);
-    if (!confirmed) return;
-
+async function handleActivate(user: InternalUserRecord) {
     try {
       setActionLoadingId(user.id);
       setMessage(null);
@@ -171,12 +172,7 @@ export default function AdminInternalUsersPage() {
     }
   }
 
-  async function handleDeactivate(user: InternalUserRecord) {
-    const confirmed = window.confirm(
-      `Deactivate ${user.username}? They will no longer be able to log in.`
-    );
-    if (!confirmed) return;
-
+async function handleDeactivate(user: InternalUserRecord) {
     try {
       setActionLoadingId(user.id);
       setMessage(null);
@@ -265,14 +261,10 @@ export default function AdminInternalUsersPage() {
         />
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Filter register</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Search by username, phone, email, or name. Filter by role and active status to operate safely across internal and partner-managed accounts.
-          </p>
-        </div>
-
+      <TableToolbar
+        title="Filter register"
+        description="Search by username, phone, email, or name. Filter by role and active status to operate safely across internal and partner-managed accounts."
+      >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Role</label>
@@ -355,7 +347,7 @@ export default function AdminInternalUsersPage() {
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
-      </section>
+      </TableToolbar>
 
       {message ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -381,8 +373,9 @@ export default function AdminInternalUsersPage() {
       ) : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
-          <table className="min-w-full divide-y divide-border">
+        <DataTableShell>
+          <MobileSafeTable className="border-none bg-transparent">
+            <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted/40">
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">User</th>
@@ -416,11 +409,7 @@ export default function AdminInternalUsersPage() {
 
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${roleTone(
-                            row.role
-                          )}`}
-                        >
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${roleTone(row.role)}`}>
                           {row.role}
                         </span>
                         <div className="text-xs text-muted-foreground">
@@ -438,7 +427,7 @@ export default function AdminInternalUsersPage() {
                     <td className="px-4 py-3 text-foreground">{row.phone || "—"}</td>
                     <td className="px-4 py-3 text-foreground">{row.email || "—"}</td>
                     <td className="px-4 py-3 text-foreground">
-                      {row.is_active ? "Active" : "Inactive"}
+                      <StatusBadge status={row.is_active ? "ACTIVE" : "ARCHIVED"} hideIcon />
                     </td>
                     <td className="px-4 py-3 text-foreground">
                       {row.is_staff ? "Yes" : "No"}
@@ -467,23 +456,29 @@ export default function AdminInternalUsersPage() {
                         </Link>
 
                         {row.is_active ? (
-                          <button
-                            type="button"
+                          <ConfirmActionButton
+                            label={actionLoadingId === row.id ? "Working..." : "Deactivate"}
+                            confirmLabel="Deactivate user"
+                            title={`Deactivate ${row.username}?`}
+                            description="The user will no longer be able to log in until reactivated by an admin."
+                            onConfirm={async () => {
+                              await handleDeactivate(row);
+                            }}
+                            variant="destructive"
                             disabled={actionLoadingId === row.id}
-                            onClick={() => void handleDeactivate(row)}
-                            className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
-                          >
-                            {actionLoadingId === row.id ? "Working..." : "Deactivate"}
-                          </button>
+                          />
                         ) : (
-                          <button
-                            type="button"
+                          <ConfirmActionButton
+                            label={actionLoadingId === row.id ? "Working..." : "Activate"}
+                            confirmLabel="Activate user"
+                            title={`Activate ${row.username}?`}
+                            description="This account will be able to access internal portals again according to its role."
+                            onConfirm={async () => {
+                              await handleActivate(row);
+                            }}
+                            variant="secondary"
                             disabled={actionLoadingId === row.id}
-                            onClick={() => void handleActivate(row)}
-                            className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
-                          >
-                            {actionLoadingId === row.id ? "Working..." : "Activate"}
-                          </button>
+                          />
                         )}
                       </div>
                     </td>
@@ -491,8 +486,9 @@ export default function AdminInternalUsersPage() {
                 );
               })}
             </tbody>
-          </table>
-        </section>
+            </table>
+          </MobileSafeTable>
+        </DataTableShell>
       ) : null}
     </div>
   );

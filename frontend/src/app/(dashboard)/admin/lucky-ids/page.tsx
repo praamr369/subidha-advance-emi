@@ -8,7 +8,14 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import { DataTableShell, DetailPanel, FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import {
+  DataTableShell,
+  DetailPanel,
+  KpiCard,
+  MobileSafeTable,
+  QuickActionGrid,
+} from "@/components/ui/operations";
+import TableToolbar from "@/components/ui/TableToolbar";
 import { apiFetch, toArray } from "@/lib/api";
 
 type LuckyIdStatus =
@@ -469,7 +476,7 @@ export default function AdminLuckyIdsPage() {
           </QuickActionGrid>
         </DetailPanel>
 
-        <FormSection
+        <TableToolbar
           title="Filter register"
           description="Narrow by batch, status, lucky number, customer, or subscription for daily administration and reconciliation."
         >
@@ -574,7 +581,7 @@ export default function AdminLuckyIdsPage() {
               Export Current View
             </button>
           </div>
-        </FormSection>
+        </TableToolbar>
 
         {loading ? <LoadingBlock label="Loading Lucky ID register..." /> : null}
 
@@ -598,7 +605,7 @@ export default function AdminLuckyIdsPage() {
               />
             ) : (
               <DataTableShell>
-                <div className="overflow-x-auto">
+                <MobileSafeTable className="border-none bg-transparent">
                   <table className="min-w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-left">
@@ -701,7 +708,7 @@ export default function AdminLuckyIdsPage() {
                     })}
                   </tbody>
                 </table>
-                </div>
+                </MobileSafeTable>
               </DataTableShell>
             )}
           </DetailPanel>

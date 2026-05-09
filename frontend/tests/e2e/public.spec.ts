@@ -18,7 +18,7 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "Bring Home Furniture with a Smarter Monthly Plan",
+      name: /Furniture and appliances with clear monthly plans/i,
     })
   ).toBeVisible();
   await expect(page.getByText("Published batches").first()).toBeVisible();

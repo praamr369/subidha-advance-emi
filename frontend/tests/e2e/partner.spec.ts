@@ -14,6 +14,9 @@ test("partner dashboard loads and payouts is shown in navigation", async ({
   await expect(
     page.getByRole("complementary").getByRole("link", { name: "Payouts" }).first()
   ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Change username" })).toBeVisible();
+  await expect(page.getByPlaceholder("New username")).toBeVisible();
+  await expect(page.getByPlaceholder("Current password")).toBeVisible();
 });
 
 test("partner payouts route renders payout visibility list", async ({ page }) => {

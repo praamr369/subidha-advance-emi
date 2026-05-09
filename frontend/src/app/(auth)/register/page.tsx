@@ -283,7 +283,7 @@ export default function RegisterPage() {
       {/* Left Panel - Desktop Only */}
       <section className="relative hidden overflow-hidden xl:block">
         <div className="absolute inset-0 bg-slate-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.28),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.22),_transparent_32%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(160,110,72,0.18),_transparent_36%)]" />
         <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto p-8 2xl:p-12">
           <div className="space-y-8">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
@@ -423,8 +423,9 @@ export default function RegisterPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Choose a username"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
+                      disabled={submitting}
                     />
                   </div>
                 </div>
@@ -445,8 +446,9 @@ export default function RegisterPage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="Enter phone number"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
+                      disabled={submitting}
                     />
                   </div>
                 </div>
@@ -468,8 +470,9 @@ export default function RegisterPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter email"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
+                      disabled={submitting}
                     />
                   </div>
                 </div>
@@ -488,7 +491,8 @@ export default function RegisterPage() {
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="First name"
-                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    disabled={submitting}
                   />
                 </div>
 
@@ -506,7 +510,8 @@ export default function RegisterPage() {
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Last name"
-                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -546,13 +551,15 @@ export default function RegisterPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Create a password"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
+                      disabled={submitting}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                      disabled={submitting}
+                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2 disabled:opacity-50"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
@@ -604,13 +611,15 @@ export default function RegisterPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter password"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
+                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
+                      disabled={submitting}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
-                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                      disabled={submitting}
+                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2 disabled:opacity-50"
                       aria-label={
                         showConfirmPassword
                           ? "Hide confirm password"
@@ -698,7 +707,7 @@ export default function RegisterPage() {
 
                   <Link
                     href="/login"
-                    className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                   >
                     Back to sign in
                   </Link>
@@ -774,7 +783,7 @@ export default function RegisterPage() {
             Already have an account?{" "}
             <Link
               href="/login"
-              className="font-medium text-foreground hover:underline"
+              className="rounded font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
             >
               Sign in
             </Link>

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 import ErrorState from "@/components/feedback/ErrorState";
+import EmptyState from "@/components/feedback/EmptyState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { DashboardGridSkeleton } from "@/components/feedback/Skeleton";
 import DashboardWidgetBoard, {
@@ -41,6 +42,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import ActionButton from "@/components/ui/ActionButton";
 import { PageSection } from "@/components/ui/portal-primitives";
+import { LedgerSummary, MetricStrip, QueueList } from "@/components/ui/operations";
+import StatusBadge from "@/components/ui/status-badge";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
   buildReconciliationPosture,
@@ -173,65 +176,6 @@ function LaunchCard({
       <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{description}</p>
       {meta ? <div className="mt-2.5 text-xs font-medium text-foreground/90">{meta}</div> : null}
     </Link>
-  );
-}
-
-function CommandMetricCard({
-  label,
-  value,
-  helper,
-  href,
-  icon,
-  tone = "default",
-}: {
-  label: string;
-  value: ReactNode;
-  helper: ReactNode;
-  href?: string;
-  icon: ReactNode;
-  tone?: "default" | "success" | "warning" | "info";
-}) {
-  const toneClass =
-    tone === "warning"
-      ? "border-amber-200 bg-amber-50/80 text-amber-900"
-      : tone === "success"
-        ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
-        : tone === "info"
-          ? "border-sky-200 bg-sky-50/80 text-sky-900"
-          : "border-[color-mix(in_oklab,var(--surface-border-strong)_72%,white_28%)] bg-white text-foreground";
-
-  const content = (
-    <div
-      className={cn(
-        "group relative h-full overflow-hidden rounded-[1.35rem] border p-4 shadow-[0_18px_48px_-38px_rgba(76,45,24,0.55)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 motion-safe:transition motion-safe:hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-38px_rgba(76,45,24,0.62)]",
-        toneClass
-      )}
-    >
-      <div className="absolute inset-x-4 top-0 h-px bg-[color-mix(in_oklab,var(--accent)_56%,white_44%)]" />
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
-          <div className="mt-2 text-2xl font-bold tracking-normal text-foreground sm:text-3xl">{value}</div>
-        </div>
-        <div className="rounded-2xl border border-[color-mix(in_oklab,var(--accent)_42%,white_58%)] bg-[color-mix(in_oklab,var(--accent)_18%,white_82%)] p-2.5 text-[color-mix(in_oklab,var(--accent-foreground)_86%,black_14%)]">
-          {icon}
-        </div>
-      </div>
-      <p className="mt-3 text-sm leading-5 text-muted-foreground">{helper}</p>
-      {href ? (
-        <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-          Open details <ArrowUpRight className="h-3.5 w-3.5" />
-        </div>
-      ) : null}
-    </div>
-  );
-
-  return href ? (
-    <Link href={href} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2">
-      {content}
-    </Link>
-  ) : (
-    content
   );
 }
 
@@ -403,7 +347,6 @@ export default function AdminDashboardPage() {
     ? deliverySummary.pending + deliverySummary.scheduled + deliverySummary.in_transit
     : 0;
   const nextDraw = legacy?.batches?.next_draw_batch;
-  const activeSubscriptions = summary?.active_subscriptions ?? legacy?.subscriptions?.active ?? 0;
   const openBatches = legacy?.batches?.open_batches ?? legacy?.operations?.open_batches ?? 0;
   const widgetStorageKey = "subidha:dashboard-widgets:admin:v1";
   const outstandingRaw = summary?.outstanding_amount ?? legacy?.financial?.total_outstanding ?? "0.00";
@@ -426,6 +369,11 @@ export default function AdminDashboardPage() {
     analyticsOverview?.pending_commission_amount ?? legacy?.commission_summary?.pending_commission ?? "0.00";
   const draftPayoutCount = analytics?.finance_posture.payout_batches.draft_count ?? 0;
   const lowStockCount = stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
+  const returnQueueCount =
+    queueSummary?.results?.find((item) => item.key === "return_inspections_pending")?.count ?? 0;
+  const refundQueueCount =
+    queueSummary?.results?.find((item) => item.key === "deposit_refunds_pending")?.count ?? 0;
+  const luckyDrawActions = (nextDraw?.days_until_draw ?? 0) <= 7 && nextDraw?.draw_date ? 1 : 0;
 
   const summaryWindowLabel =
     summaryWindow === "THIS_MONTH"
@@ -573,16 +521,40 @@ export default function AdminDashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <CommandMetricCard label="Today collection" value={money(todayNet)} helper={`${todayTransactions} collection transaction rows from today's branch reporting.`} tone="success" href={ROUTES.admin.branchReporting} icon={<Wallet className="h-5 w-5" />} />
-            <CommandMetricCard label="Pending EMI" value={String(pendingEmiCount)} helper={`${money(pendingEmiAmount)} pending amount from canonical summary.`} tone={pendingEmiCount > 0 ? "info" : "success"} href={ROUTES.admin.emisPending} icon={<CalendarClock className="h-5 w-5" />} />
-            <CommandMetricCard label="Overdue EMI" value={String(overdueCount)} helper={overdueCount > 0 ? `${money(overdueAmount)} overdue exposure needs follow-up.` : "No overdue rows in current summary."} tone={overdueCount > 0 ? "warning" : "success"} href={ROUTES.admin.emisOverdue} icon={<AlertTriangle className="h-5 w-5" />} />
-            <CommandMetricCard label="Active subscriptions" value={String(activeSubscriptions)} helper="Active contracts from canonical dashboard summary." href={ROUTES.admin.subscriptions} icon={<FileText className="h-5 w-5" />} />
-            <CommandMetricCard label="Open batches" value={String(openBatches)} helper="Open batch count from admin dashboard payload." href={ROUTES.admin.batches} icon={<LayoutGrid className="h-5 w-5" />} />
-            <CommandMetricCard label="Ready-to-lock batches" value={readyToLockBatches ?? "—"} helper="Read-only count from the batch register filtered by READY_TO_LOCK." tone={(readyToLockBatches ?? 0) > 0 ? "warning" : "success"} href={`${ROUTES.admin.batches}?status=READY_TO_LOCK`} icon={<LockKeyhole className="h-5 w-5" />} />
-            <CommandMetricCard label="Lucky draw status" value={nextDraw?.batch_code ?? "—"} helper={nextDraw?.draw_date ? `${nextDraw.days_until_draw ?? 0} days to ${formatDate(nextDraw.draw_date)}.` : "No next draw scheduled in dashboard payload."} href={ROUTES.admin.luckyDraws} icon={<ClipboardCheck className="h-5 w-5" />} />
-            <CommandMetricCard label="Reconciliation warnings" value={String(reconciliationFlags)} helper={reconciliationFlags > 0 ? "Flagged rows require controlled review." : "No flags in the current reconciliation surface."} tone={reconciliationFlags > 0 ? "warning" : "success"} href={reconciliationFlags > 0 ? buildAdminReconciliationRoute({ flagged: true }) : ROUTES.admin.reconciliation} icon={<ShieldCheck className="h-5 w-5" />} />
-          </section>
+          <MetricStrip
+            items={[
+              { label: "Today Collection", value: money(todayNet), helper: `${todayTransactions} txns`, href: ROUTES.admin.branchReporting },
+              { label: "Active Outstanding", value: money(outstandingRaw), helper: "Active receivable only" },
+              { label: "Due Today", value: String(pendingEmiCount), helper: money(pendingEmiAmount), href: ROUTES.admin.emisPending },
+              { label: "Overdue", value: String(overdueCount), helper: money(overdueAmount), href: ROUTES.admin.emisOverdue },
+              { label: "Pending Delivery", value: String(deliveryActions), helper: `${deliverySummary?.pending ?? 0} pending`, href: buildAdminDeliveriesRoute({ bucket: "PENDING" }) },
+              { label: "Returns / Refunds", value: String(returnQueueCount + refundQueueCount), helper: `${returnQueueCount} returns · ${refundQueueCount} refunds`, href: ROUTES.admin.financeReversalControl },
+              { label: "Low Stock", value: String(lowStockCount), helper: `${trackedInventoryItems} tracked`, href: ROUTES.admin.inventoryStockOnHand },
+              { label: "Lucky Draw Actions", value: String(luckyDrawActions), helper: nextDraw?.batch_code ?? "No immediate draw", href: ROUTES.admin.luckyDraws },
+              { label: "Open Batches", value: String(openBatches), helper: `Ready lock ${readyToLockBatches ?? 0}`, href: ROUTES.admin.batches },
+              { label: "Reconciliation Alerts", value: String(reconciliationFlags), helper: reconciliationFlags > 0 ? "Needs review" : "Clear", href: ROUTES.admin.reconciliation },
+            ]}
+          />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <QueueList
+              rows={[
+                { title: "Needs Collection", count: overdueCount, amount: money(overdueAmount), route: ROUTES.admin.emisOverdue },
+                { title: "Needs Delivery", count: deliveryActions, route: buildAdminDeliveriesRoute({ bucket: "PENDING" }) },
+                { title: "Needs Return / Refund", count: returnQueueCount + refundQueueCount, route: ROUTES.admin.financeReversalControl },
+                { title: "Needs Reconciliation", count: reconciliationFlags, route: buildAdminReconciliationRoute({ flagged: true }) },
+                { title: "Needs Stock Action", count: lowStockCount, route: ROUTES.admin.inventoryStockOnHand },
+              ]}
+            />
+            <LedgerSummary
+              rows={[
+                { label: "Cash Collection", value: money(analytics?.payment_method_mix?.rows?.find((r) => r.method === "CASH")?.net_amount ?? "0.00"), route: ROUTES.admin.billingCashBook },
+                { label: "UPI Collection", value: money(analytics?.payment_method_mix?.rows?.find((r) => r.method === "UPI")?.net_amount ?? "0.00"), route: ROUTES.admin.billingCashBook },
+                { label: "Bank Collection", value: money(analytics?.payment_method_mix?.rows?.find((r) => r.method === "BANK")?.net_amount ?? "0.00"), route: ROUTES.admin.billingCashBook },
+                { label: "Active Invoice Balance", value: money(invoiceBalance), helper: "Excludes history-only invoices", route: ROUTES.admin.billingInvoices },
+              ]}
+            />
+          </div>
 
           <CommandSection
             title="Quick actions"
@@ -625,7 +597,10 @@ export default function AdminDashboardPage() {
               description="Latest payment activity from the admin dashboard payload. Reversed rows remain visibly distinct."
             >
               {recentPayments.length === 0 ? (
-                <div className="rounded-xl border border-border bg-[var(--surface-muted)]/60 px-4 py-3 text-sm text-muted-foreground">No recent payment rows returned.</div>
+              <EmptyState
+                title="No recent activity returned by the server."
+                description="Payment activity will appear here when the current admin dashboard payload contains recent rows."
+              />
               ) : (
                 <div className="grid gap-2">
                   {recentPayments.slice(0, 5).map((payment, index) => (
@@ -636,9 +611,9 @@ export default function AdminDashboardPage() {
                     >
                       <div>
                         <div className="text-sm font-semibold text-foreground">{payment.customer_name ?? "Unknown customer"}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {payment.subscription_number ?? "No subscription"} · {payment.method ?? "Method unavailable"}
-                          {payment.is_reversed ? " · Reversed" : ""}
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>{payment.subscription_number ?? "No subscription"} · {payment.method ?? "Method unavailable"}</span>
+                          {payment.is_reversed ? <StatusBadge status="REVERSED" size="sm" /> : <StatusBadge status="PAID" size="sm" />}
                         </div>
                       </div>
                       <div className="text-right text-sm font-semibold text-foreground">{money(payment.amount ?? "0.00")}</div>

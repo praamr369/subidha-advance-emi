@@ -694,6 +694,73 @@ test("customer profile keeps identity visible when direct-sale summary fails", a
   );
 });
 
+test("customer profile shows change username controls", async ({ page }) => {
+  await page.route("**/api/v1/customer/profile/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: 31,
+        name: "Customer One",
+        phone: "01700000000",
+        email: "customer@example.com",
+        address: "Dhaka",
+        city: "Dhaka",
+        kyc_status: "VERIFIED",
+        username: "customer_one",
+        summary: {
+          total_subscriptions: 0,
+          active_subscriptions: 0,
+          won_subscriptions: 0,
+          completed_subscriptions: 0,
+          pending_emis: 0,
+          paid_emis: 0,
+          waived_emis: 0,
+          total_paid_amount: "0.00",
+          lucky_plan_draw: [],
+        },
+      }),
+    });
+  });
+  await page.route("**/api/v1/customer/subscriptions/register/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, results: [] }) });
+  });
+  await page.route("**/api/v1/customer/kyc/documents/", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, kyc_status: "VERIFIED", results: [] }) });
+  });
+  await page.route("**/api/v1/customer/referrals/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        count: 0,
+        commission_summary: { total_referrals: 0, approved_commissions: 0, total_approved_commission_amount: "0.00" },
+        results: [],
+      }),
+    });
+  });
+  await page.route("**/api/v1/customer/direct-sales/summary/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total_direct_sale_invoices: 0,
+        total_outstanding_direct_sale_dues: "0.00",
+        total_paid_direct_sale_amount: "0.00",
+        overdue_direct_sale_count: 0,
+      }),
+    });
+  });
+  await page.route("**/api/v1/customer/payments/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 0, total_paid_amount: "0.00", results: [] }) });
+  });
+
+  await page.goto("/customer/profile");
+  await expect(page.getByRole("heading", { name: "Change username" })).toBeVisible();
+  await expect(page.getByPlaceholder("letters, numbers, dots, underscores, hyphens")).toBeVisible();
+  await expect(page.locator("input[type='password']").first()).toBeVisible();
+});
+
 test("customer completed winner detail separates contract and winner history", async ({
   page,
 }) => {

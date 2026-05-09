@@ -22,7 +22,8 @@ function WinnerCard({ winner }: { winner: PublicWinner }) {
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Batch {winner.batch_code} · Month {winner.draw_month}</div>
       <div className="mt-3 text-xl font-semibold text-foreground">Lucky ID {winner.lucky_id || "—"}</div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Winner: {winner.winner_name_masked || "Masked for privacy"}
+        <span className="font-medium text-foreground">Public display label:</span>{" "}
+        {winner.winner_name_masked || "Not published"}
       </p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         Draw: {winner.draw_datetime || winner.draw_date || "—"} · Verification {winner.verification_status || "unavailable"}
@@ -52,7 +53,7 @@ export default async function WinnersPage() {
   return (
     <PublicPageShell
       title={dictionary.common.winners}
-      subtitle="Real winner records only."
+      subtitle="Only rows returned by the public draw API are shown. Names appear in a privacy-safe masked form; internal customer identifiers are never listed here."
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winners }]}
       actions={[
         { label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" },

@@ -6,7 +6,10 @@ import { useParams } from "next/navigation";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import FormActions from "@/components/ui/FormActions";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/status-badge";
+import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import {
   getInternalUser,
   updateInternalUser,
@@ -280,6 +283,10 @@ export default function AdminInternalUserEditPage() {
         </div>
       ) : null}
 
+      <WorkspaceNotice tone="warning" title="Role and access safety">
+        Promote to ADMIN only when required. Partner role changes can affect future commission ownership visibility and should be applied with explicit approval.
+      </WorkspaceNotice>
+
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form
           onSubmit={handleSubmit}
@@ -437,23 +444,16 @@ export default function AdminInternalUserEditPage() {
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60"
-            >
-              {submitting ? "Saving..." : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={() => hydrateForm(user)}
-              disabled={submitting}
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-            >
-              Reset Form
-            </button>
-          </div>
+          <FormActions
+            submitLabel="Save Changes"
+            submitLoadingLabel="Saving..."
+            submitting={submitting}
+            cancel={{
+              label: "Reset Form",
+              onClick: () => hydrateForm(user),
+              disabled: submitting,
+            }}
+          />
         </form>
 
         <aside className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -467,7 +467,12 @@ export default function AdminInternalUserEditPage() {
           <dl className="space-y-3">
             <PreviewRow label="Display Name" value={previewName} />
             <PreviewRow label="Role" value={role} />
-            <PreviewRow label="Status" value={isActive ? "Active" : "Inactive"} />
+            <div className="flex items-start justify-between gap-3">
+              <dt className="text-sm text-muted-foreground">Status</dt>
+              <dd className="text-right text-sm font-medium text-foreground">
+              <StatusBadge status={isActive ? "ACTIVE" : "ARCHIVED"} hideIcon />
+              </dd>
+            </div>
             <PreviewRow
               label="Commission"
               value={role === "PARTNER" ? `${commissionRate || "0.00"}%` : "0.00%"}

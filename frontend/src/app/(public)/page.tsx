@@ -46,38 +46,43 @@ export default async function PublicHome() {
             <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={`${profile.resolved_tagline} · ${brandConfig.publicBranchLocation}`} />
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.2rem]">{heroTitle}</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{heroSubtitle}</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href={ROUTES.public.apply}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-              >
-                Apply now
+            <div className="mt-6 flex w-full max-w-xl flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap">
+              <Link href={ROUTES.public.apply} className="public-action-primary justify-center sm:min-w-[9.5rem]">
+                Apply / Enquire
               </Link>
-              <Link
-                href={ROUTES.public.products}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
-              >
+              <Link href={ROUTES.public.products} className="public-action-secondary justify-center sm:min-w-[9.5rem]">
                 Explore products
               </Link>
+            </div>
+            <p className="mt-4 max-w-2xl rounded-2xl border border-[color-mix(in_oklab,var(--border)_70%,transparent)] bg-[color-mix(in_oklab,white_88%,var(--surface-muted)_12%)] px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+              Trust note: published winner rows come only from revealed draws. We do not promise inventory, pricing, or draw outcomes until confirmed by branch records.
+            </p>
+            <nav aria-label="Learn more" className="mt-5 flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
               <Link
                 href={ROUTES.public.luckyPlan}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
               >
-                See Lucky Plan
+                Lucky Plan overview
+              </Link>
+              <Link
+                href={ROUTES.public.howItWorks}
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
+              >
+                How it works
               </Link>
               <Link
                 href={ROUTES.public.winners}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
               >
-                Visit winners
+                Winners
               </Link>
               <Link
                 href={ROUTES.public.policies}
-                className="inline-flex h-11 items-center rounded-xl border border-white/75 bg-white/75 px-5 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+                className="font-medium text-foreground underline decoration-[color-mix(in_oklab,var(--foreground)_35%,transparent)] underline-offset-4 transition hover:decoration-foreground focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 focus-visible:ring-offset-2"
               >
-                Business policies
+                Policies
               </Link>
-            </div>
+            </nav>
           </div>
 
           <PublicMarketingBanner

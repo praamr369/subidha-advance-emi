@@ -30,7 +30,7 @@ export default function UnauthorizedPage() {
 
           <div className="relative z-[1] mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <ActionButton href="/login" variant="primary" size="lg">
-              Sign in
+              Sign in with the correct role
             </ActionButton>
             <ActionButton href="/" variant="outline" size="lg">
               Go to Home

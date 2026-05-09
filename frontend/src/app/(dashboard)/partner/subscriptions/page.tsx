@@ -15,6 +15,7 @@ import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { MobileSafeTable } from "@/components/ui/operations";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   listPartnerSubscriptionsRegister,
@@ -431,39 +432,41 @@ export default function PartnerSubscriptionsPage() {
                 description="The current page has no results. Move to a previous page or change the filters."
               />
             ) : (
-              <DataTable<PartnerSubscription>
-                rows={rows}
-                columns={columns}
-                pageSize={PAGE_SIZE}
-                onRowClick={(row) => router.push(`/partner/subscriptions/${row.id}`)}
-                rowActions={(row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <ActionButton
-                      href={`/partner/subscriptions/${row.id}`}
-                      variant="outline"
-                      size="sm"
-                    >
-                      View Detail
-                    </ActionButton>
-                    {row.customer ? (
+              <MobileSafeTable className="border-none bg-transparent">
+                <DataTable<PartnerSubscription>
+                  rows={rows}
+                  columns={columns}
+                  pageSize={PAGE_SIZE}
+                  onRowClick={(row) => router.push(`/partner/subscriptions/${row.id}`)}
+                  rowActions={(row) => (
+                    <div className="flex flex-wrap gap-2">
                       <ActionButton
-                        href={`/partner/customers/${row.customer}`}
-                        variant="ghost"
-                        size="sm"
+                        href={`/partner/subscriptions/${row.id}`}
+                        variant="outline"
+                        className="min-h-11"
                       >
-                        Customer
+                        View Detail
                       </ActionButton>
-                    ) : null}
-                    <ActionButton
-                      href={`/partner/collections/create?subscription=${row.id}`}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      Collect
-                    </ActionButton>
-                  </div>
-                )}
-              />
+                      {row.customer ? (
+                        <ActionButton
+                          href={`/partner/customers/${row.customer}`}
+                          variant="ghost"
+                          className="min-h-11"
+                        >
+                          Customer
+                        </ActionButton>
+                      ) : null}
+                      <ActionButton
+                        href={`/partner/collections/create?subscription=${row.id}`}
+                        variant="ghost"
+                        className="min-h-11"
+                      >
+                        Collect
+                      </ActionButton>
+                    </div>
+                  )}
+                />
+              </MobileSafeTable>
             )}
 
             <div className="mt-5">

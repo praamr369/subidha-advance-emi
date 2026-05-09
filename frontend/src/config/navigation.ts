@@ -89,6 +89,7 @@ function normalizeAdminGroupTitle(title: string): string {
   if (key.includes("command")) return "Command Center";
   if (key.includes("sales")) return "Sales & Contracts";
   if (key.includes("subscription")) return "Sales & Contracts";
+  if (key.includes("collection")) return "Collections";
   if (key.includes("finance")) return "Billing & Finance";
   if (key.includes("delivery")) return "Delivery & Service";
   if (key.includes("return") || key.includes("reversal")) return "Returns & Reversals";
@@ -96,7 +97,7 @@ function normalizeAdminGroupTitle(title: string): string {
   if (key.includes("lucky")) return "Lucky Plan";
   if (key.includes("crm") || key.includes("partner")) return "CRM & Partners";
   if (key.includes("report") || key.includes("audit")) return "Reports & Audit";
-  if (key.includes("setup") || key.includes("staff")) return "Setup";
+  if (key.includes("setup") || key.includes("staff") || key.includes("setting")) return "Settings";
   return title;
 }
 
@@ -115,6 +116,18 @@ function inferAdminBadgeSource(item: AdminRouteRegistryItem): string | undefined
   return item.badgeSource;
 }
 
+function isSecondaryWorkflowRoute(label: string, href: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const pathname = href.split("?")[0] ?? href;
+  if (/^create\s/.test(normalizedLabel)) return true;
+  if (/^edit\s/.test(normalizedLabel)) return true;
+  if (normalizedLabel.includes(" detail")) return true;
+  if (pathname.includes("/create")) return true;
+  if (pathname.includes("/edit")) return true;
+  if (pathname.includes("/[") || /\/\d+(\/|$)/.test(pathname)) return true;
+  return false;
+}
+
 function buildAdminNavigationGroups(): NavGroup[] {
   const grouped = new Map<string, NavItem[]>();
   const toNavItem = (row: AdminRouteRegistryItem): NavItem => ({
@@ -124,11 +137,13 @@ function buildAdminNavigationGroups(): NavGroup[] {
     disabled: row.status === "deferred",
     description: row.description,
     badgeSource: inferAdminBadgeSource(row),
-    children: row.children?.map(toNavItem),
+    children: row.children
+      ?.filter((child) => !isSecondaryWorkflowRoute(child.label, child.href))
+      .map(toNavItem),
   });
 
   ADMIN_ROUTE_TREE.forEach((row) => {
-    if (/^create\s/i.test(row.label)) return;
+    if (isSecondaryWorkflowRoute(row.label, row.href)) return;
     const groupTitle = normalizeAdminGroupTitle(row.group);
     if (!grouped.has(groupTitle)) grouped.set(groupTitle, []);
     grouped.get(groupTitle)!.push(toNavItem(row));

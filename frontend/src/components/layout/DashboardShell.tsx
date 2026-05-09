@@ -581,13 +581,16 @@ function SidebarContent({
     if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
     const allowedGroupTitles = new Set([
       "Command Center",
-      "Staff & Business Setup",
-      "CRM",
-      "Sales",
-      "Subscriptions",
-      "Product & Inventory",
-      "Delivery & Returns",
-      "Finance & Accounting",
+      "Sales & Contracts",
+      "Collections",
+      "Billing & Finance",
+      "Delivery & Service",
+      "Returns & Reversals",
+      "Inventory",
+      "Lucky Plan",
+      "CRM & Partners",
+      "Reports & Audit",
+      "Settings",
     ]);
     const simpleFinanceAllowed = new Set([
       "Finance Workspace",
@@ -601,7 +604,7 @@ function SidebarContent({
     return navGroups
       .filter((group) => allowedGroupTitles.has(group.title))
       .map((group) => {
-        if (group.title !== "Finance & Accounting") return group;
+        if (group.title !== "Billing & Finance") return group;
         return {
           ...group,
           items: group.items.filter((item) => simpleFinanceAllowed.has(item.label)),
@@ -1211,8 +1214,8 @@ function Topbar({
 }) {
   return (
     <PortalHeader>
-      <div className="flex min-h-[4.8rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-h-[4.8rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 max-w-full flex-[1_1_12rem] items-center gap-3 sm:flex-[1_1_40%]">
           <button
             type="button"
             onClick={onOpenSidebar}
@@ -1235,9 +1238,9 @@ function Topbar({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-[0_1_auto]">
           {role === "ADMIN" ? (
-            <div className="hidden items-center gap-1.5 2xl:flex">
+            <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 2xl:flex">
               {[
                 { label: "Customer", href: `${ROUTES.admin.customers}/create` },
                 { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
@@ -1284,12 +1287,12 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenQuickActions}
-            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-2.5 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] sm:px-3"
             aria-label="Open quick actions"
             title="Quick actions"
           >
-            <ReceiptText className="h-4 w-4" />
-            Quick Actions
+            <ReceiptText className="h-4 w-4 shrink-0" />
+            <span className="max-[380px]:sr-only">Quick Actions</span>
           </button>
           <NotificationBellDropdown role={role} />
           <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
@@ -1302,7 +1305,8 @@ function Topbar({
 export default function DashboardShell({ children }: DashboardShellProps) {
   const nested = useContext(DashboardShellContext);
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileOpen = mobileMenuOpen;
   const sessionSnapshot = useSyncExternalStore(subscribeDashboardShell, readSessionSnapshot, () => "null");
   const session = useMemo(() => parseSessionSnapshot(sessionSnapshot), [sessionSnapshot]);
   const { logout, isLoggingOut } = useLogout();
@@ -1368,6 +1372,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   useEffect(() => {
     if (nested) return;
+    void Promise.resolve().then(() => {
+      setMobileMenuOpen(false);
+    });
+  }, [nested, pathname]);
+
+  useEffect(() => {
+    if (nested) return;
     function shouldIgnore(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (!target) return false;
@@ -1386,6 +1397,14 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [nested, openCommandPalette]);
+
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+  }, []);
+
+  const openMobileMenu = useCallback(() => {
+    setMobileMenuOpen(true);
+  }, []);
 
   if (nested) {
     return <>{children}</>;
@@ -1419,7 +1438,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   title={title}
                   role={role}
                   displayName={displayName}
-                  onOpenSidebar={() => setMobileOpen(true)}
+                  onOpenSidebar={openMobileMenu}
                   onOpenCommandPalette={openCommandPalette}
                   onOpenQuickActions={() => setQuickActionsOpen(true)}
                   onLogout={logout}
@@ -1440,7 +1459,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             </>
           </PortalShell>
 
-          <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={() => setMobileOpen(false)}>
+          <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={closeMobileMenu}>
             <div id="mobile-sidebar-nav">
             <SidebarContent
               key={`sidebar-mobile:${role}:${sessionId ?? "anon"}`}
@@ -1452,7 +1471,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               isLoggingOut={isLoggingOut}
               collapsed={false}
               onToggleCollapse={toggleSidebarCollapse}
-              onClose={() => setMobileOpen(false)}
+              onClose={closeMobileMenu}
               workspaceWidthPreset={workspaceWidthPreset}
               onWorkspaceWidthPresetChange={persistWorkspaceWidthPreset}
             />
@@ -1461,7 +1480,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
           <QuickActionLauncher
             open={quickActionsOpen}
-            onClose={() => setQuickActionsOpen(false)}
+            onClose={() => {
+              setQuickActionsOpen(false);
+              closeMobileMenu();
+            }}
             role={role}
             sessionId={sessionId}
             currentPathname={pathname}
@@ -1469,7 +1491,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           <CommandPalette
             key={`command:${role}:${sessionId ?? "anon"}:${commandEpoch}`}
             open={commandOpen}
-            onClose={() => setCommandOpen(false)}
+            onClose={() => {
+              setCommandOpen(false);
+              closeMobileMenu();
+            }}
             role={role}
             sessionId={sessionId}
             currentPathname={pathname}

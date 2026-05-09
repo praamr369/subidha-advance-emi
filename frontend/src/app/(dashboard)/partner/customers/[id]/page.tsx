@@ -12,6 +12,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
+import { MobileSafeTable } from "@/components/ui/operations";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   getPartnerCustomerDetail,
@@ -382,32 +383,34 @@ export default function PartnerCustomerDetailPage() {
                   description="No partner-linked subscriptions were returned for this customer."
                 />
               ) : (
-                <DataTable<SubscriptionRow>
-                  rows={subscriptions}
-                  columns={subscriptionColumns}
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/partner/subscriptions/${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View Detail
-                      </Link>
-                      <Link
-                        href={`/partner/collections/create?subscription=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Collect
-                      </Link>
-                      <Link
-                        href={`/partner/payments?subscription=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Payments
-                      </Link>
-                    </div>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<SubscriptionRow>
+                    rows={subscriptions}
+                    columns={subscriptionColumns}
+                    rowActions={(row) => (
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/partner/subscriptions/${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          View Detail
+                        </Link>
+                        <Link
+                          href={`/partner/collections/create?subscription=${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Collect
+                        </Link>
+                        <Link
+                          href={`/partner/payments?subscription=${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Payments
+                        </Link>
+                      </div>
+                    )}
+                  />
+                </MobileSafeTable>
               )}
             </WorkspaceSection>
 
@@ -431,26 +434,28 @@ export default function PartnerCustomerDetailPage() {
                   description="No partner-visible payment rows have been recorded for this customer yet."
                 />
               ) : (
-                <DataTable<PaymentRow>
-                  rows={recentPayments}
-                  columns={paymentColumns}
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/partner/payments/${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View Detail
-                      </Link>
-                      <Link
-                        href={`/partner/subscriptions/${row.subscription}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Subscription
-                      </Link>
-                    </div>
-                  )}
-                />
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<PaymentRow>
+                    rows={recentPayments}
+                    columns={paymentColumns}
+                    rowActions={(row) => (
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/partner/payments/${row.id}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          View Detail
+                        </Link>
+                        <Link
+                          href={`/partner/subscriptions/${row.subscription}`}
+                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                        >
+                          Subscription
+                        </Link>
+                      </div>
+                    )}
+                  />
+                </MobileSafeTable>
               )}
             </WorkspaceSection>
           </>

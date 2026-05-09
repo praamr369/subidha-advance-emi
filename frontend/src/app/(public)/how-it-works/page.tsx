@@ -22,7 +22,7 @@ export default async function HowItWorksPage() {
   return (
     <PublicPageShell
       title={dictionary.common.howItWorks}
-      subtitle="A simple 6-step journey for customers and families."
+      subtitle="A simple 6-step journey for customers and families. Winning a draw is not assured—review Lucky Plan and policy pages for eligibility, tenure, and benefit scope."
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.howItWorks },

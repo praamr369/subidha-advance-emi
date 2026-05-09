@@ -71,6 +71,22 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function resolveEmiBadge(row: EmiRow): { status: string; label: string } {
+  const raw = row.status.toUpperCase();
+  if (raw === "PAID") return { status: "PAID", label: "Paid" };
+  if (raw === "WAIVED") return { status: "WAIVED", label: "Waived" };
+
+  if (row.outstanding_amount > 0 && row.due_date) {
+    const dueTs = Date.parse(row.due_date);
+    if (!Number.isNaN(dueTs) && dueTs < Date.now()) {
+      return { status: "OVERDUE", label: "Overdue" };
+    }
+  }
+
+  if (raw === "PENDING") return { status: "PENDING", label: "Pending" };
+  return { status: raw || "PENDING", label: raw ? raw.replaceAll("_", " ") : "Pending" };
+}
+
 type EmiRow = {
   id: number;
   month_no: number;
@@ -347,9 +363,10 @@ export default function CustomerSubscriptionDetailPage() {
       {
         key: "status",
         title: "Status",
-        render: (row: EmiRow) => (
-          <StatusBadge status={row.status} />
-        ),
+        render: (row: EmiRow) => {
+          const badge = resolveEmiBadge(row);
+          return <StatusBadge status={badge.status} label={badge.label} />;
+        },
       },
     ],
     []

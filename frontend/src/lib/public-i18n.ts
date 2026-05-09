@@ -131,14 +131,14 @@ export const publicContent = {
   },
   homeHero: {
     title: {
-      en: "Bring Home Furniture with a Smarter Monthly Plan",
-      hi: "फर्नीचर, इलेक्ट्रॉनिक्स और होम अप्लायंसेज़ अब आसान मासिक योजना के साथ घर लाएँ।",
-      bn: "সহজ মাসিক পরিকল্পনায় ফার্নিচার, ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্সস ঘরে আনুন।",
+      en: "Furniture and appliances with clear monthly plans — and honest Lucky Plan rules",
+      hi: "स्पष्ट मासिक योजना के साथ फर्नीचर व उपकरण — और ईमानदार लकी प्लान नियम",
+      bn: "স্পষ্ট মাসিক পরিকল্পনায় ফার্নিচার ও অ্যাপ্লায়েন্স — আর স্বচ্ছ লাকি প্ল্যান নিয়ম",
     },
     subtitle: {
-      en: "Choose your product, join the plan, and follow a simple, transparent path to ownership with branch guidance.",
-      hi: "अपना पसंदीदा सामान चुनें, योजना में शामिल हों और शाखा सहायता के साथ आसान व पारदर्शी किस्तों में खरीदारी करें।",
-      bn: "আপনার পছন্দের পণ্য বেছে নিন, পরিকল্পনায় যুক্ত হন, আর শাখা সহায়তায় সহজ ও স্বচ্ছ কিস্তিতে ঘরে তুলুন।",
+      en: "Browse the live catalogue, apply with product context, and work with the branch on tenure and EMI comfort. Draws are conducted fairly; holding a Lucky ID does not guarantee a win, and winner benefits apply only to future EMI as published.",
+      hi: "लाइव कैटलॉग देखें, उत्पाद संदर्भ के साथ आवेदन करें, और शाखा से किश्त अवधि व राशि तय करें। ड्रॉ निष्पक्ष होते हैं; लकी ID रखने का मतलब जीत की गारंटी नहीं, और लाभ केवल प्रकाशित नियमों के अनुसार भविष्य की EMI पर लागू होता है।",
+      bn: "লাইভ ক্যাটালগ দেখুন, পণ্য প্রসঙ্গে আবেদন করুন, আর শাখার সঙ্গে কিস্তির মেয়াদ ও সামর্থ্য ঠিক করুন। ড্রয় ন্যায্য; লাকি ID থাকা জেতার গ্যারান্টি নয়, আর সুবিধা শুধু প্রকাশিত নিয়ম অনুযায়ী ভবিষ্যৎ EMI-তে প্রযোজ্য।",
     },
   },
   supportStrip: {

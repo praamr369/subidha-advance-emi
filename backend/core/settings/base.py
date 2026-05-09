@@ -517,6 +517,7 @@ REST_FRAMEWORK = {
         "resend_password_reset_otp": "10/hour",
         "reset_password": "20/hour",
         "payment_mutation": "60/minute",
+        "username_change_self": "5/hour",
     },
 }
 

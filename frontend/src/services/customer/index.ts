@@ -164,6 +164,17 @@ export type UpdateCustomerProfilePayload = {
   city?: string;
 };
 
+export type SelfUsernameChangePayload = {
+  new_username: string;
+  current_password: string;
+};
+
+export type UsernameChangeResponse = {
+  username: string;
+  changed: boolean;
+  requires_relogin: boolean;
+};
+
 export type CustomerSubscriptionListResponse = {
   count: number;
   results: CustomerSubscription[];
@@ -823,6 +834,15 @@ export async function updateCustomerProfile(
     body: JSON.stringify(payload),
   });
   return normalizeProfileResponse(response);
+}
+
+export async function changeCustomerUsername(
+  payload: SelfUsernameChangePayload
+): Promise<UsernameChangeResponse> {
+  return apiFetch<UsernameChangeResponse>("/customer/profile/username/", {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export async function listCustomerSubscriptions(params?: { status?: string }) {

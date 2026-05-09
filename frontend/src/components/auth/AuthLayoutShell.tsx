@@ -45,7 +45,7 @@ export default function AuthLayoutShell({
   return (
     <section className={cn("auth-stage w-full", className)}>
       <div className="auth-shell grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-        <aside className="hidden border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(96,165,250,0.14),transparent_34%),linear-gradient(160deg,rgba(2,6,23,0.99),rgba(15,23,42,0.97))] lg:block">
+        <aside className="hidden border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(180,130,70,0.16),transparent_36%),linear-gradient(160deg,rgba(28,18,12,0.99),rgba(38,28,22,0.98))] lg:block">
         <div className="flex h-full flex-col justify-between p-8 xl:p-10">
           <div>
             <AuthBrand tone="dark" />
