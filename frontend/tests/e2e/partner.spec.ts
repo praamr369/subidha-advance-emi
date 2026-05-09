@@ -75,15 +75,17 @@ test("partner customers detail flow and payments history work", async ({
   await expect(
     page.getByRole("heading", { name: "Partner Payments" })
   ).toBeVisible();
-  const firstPaymentDetailLink = page.getByRole("link", { name: "View Detail" }).first();
-  const hasPaymentDetailLink = await firstPaymentDetailLink.isVisible().catch(() => false);
-  if (!hasPaymentDetailLink) {
+  const firstPaymentDetailLink = page
+    .locator(`a[href^="/partner/payments/"]`)
+    .filter({ hasText: "View Detail" });
+  if ((await firstPaymentDetailLink.count()) === 0) {
     await expect(page.locator("body")).toContainText(
       /No partner payment rows|No payments|Unable to load partner payments|Failed to fetch/i
     );
     return;
   }
-  await firstPaymentDetailLink.click();
+  await firstPaymentDetailLink.first().scrollIntoViewIfNeeded();
+  await firstPaymentDetailLink.first().click();
   await expect(page).toHaveURL(
     /\/partner\/payments\/\d+/
   );

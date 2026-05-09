@@ -55,14 +55,18 @@ test("admin dashboard loads and subscription detail handoff preserves payment co
     })
   ).toBeVisible();
 
-  const collectPaymentLink = page.getByRole("link", { name: "Collect Payment" });
-  if (!(await collectPaymentLink.isVisible().catch(() => false))) {
+  const subscriptionId = manifest.entities.admin.subscription_id;
+  const collectPaymentLink = page.locator(
+    `a[href="/admin/finance/collect?subscription=${subscriptionId}"]`,
+  );
+  if ((await collectPaymentLink.count()) === 0) {
     await expect(page.locator("body")).toContainText(
       /Unable to load subscription detail|Failed to fetch|Loading subscription detail|Checking setup readiness/i
     );
     return;
   }
-  await collectPaymentLink.click();
+  await collectPaymentLink.first().scrollIntoViewIfNeeded();
+  await collectPaymentLink.first().click();
   await expect(page).toHaveURL(
     new RegExp(
       `/admin/finance/collect\\?subscription=${manifest.entities.admin.subscription_id}$`

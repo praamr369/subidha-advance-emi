@@ -4,10 +4,25 @@ import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("cashier") });
 
+/** Phone lookup sets `lookupLoading`; asserting before it finishes races the success path. */
+async function waitForCashierPendingQueueSettled(
+  page: Parameters<typeof test>[0]["page"],
+) {
+  const terminal = page
+    .getByText("Unable to load pending EMI records")
+    .or(page.getByText("Customer summary"))
+    .or(page.getByText("No pending Advance EMIs"))
+    .or(page.getByRole("button", { name: /Advance EMI Month \d+/i }))
+    .or(page.getByText("Failed to fetch").first());
+  // Error state renders title + description; OR matches both — use first for strict visibility.
+  await expect(terminal.first()).toBeVisible({ timeout: 60_000 });
+}
+
 async function expectCashierSuccessOrControlledFetchError(
   page: Parameters<typeof test>[0]["page"],
   success: () => Promise<void>,
 ) {
+  await waitForCashierPendingQueueSettled(page);
   const failedToFetch = page.getByText("Failed to fetch").first();
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(failedToFetch).toBeVisible();
@@ -121,6 +136,7 @@ test.describe.serial("cashier smoke", () => {
       .getByRole("button", { name: "Search" })
       .click();
 
+    await waitForCashierPendingQueueSettled(page);
     const failedToFetch = page.getByText("Failed to fetch").first();
     if (await failedToFetch.isVisible().catch(() => false)) {
       await expect(failedToFetch).toBeVisible();
@@ -171,6 +187,7 @@ test.describe.serial("cashier smoke", () => {
       .getByRole("button", { name: "Search" })
       .click();
 
+    await waitForCashierPendingQueueSettled(page);
     const failedToFetch = page.getByText("Failed to fetch").first();
     if (await failedToFetch.isVisible().catch(() => false)) {
       await expect(failedToFetch).toBeVisible();
