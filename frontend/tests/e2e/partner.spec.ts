@@ -76,16 +76,36 @@ test("partner customers detail flow and payments history work", async ({
     page.getByRole("heading", { name: "Partner Payments" })
   ).toBeVisible();
   const firstPaymentDetailLink = page
-    .locator(`a[href^="/partner/payments/"]`)
-    .filter({ hasText: "View Detail" });
-  if ((await firstPaymentDetailLink.count()) === 0) {
+    .locator('a[href^="/partner/payments/"], a[href*="/partner/payments/"]')
+    .filter({ hasText: /View Detail/i })
+    .first();
+
+  const detailLinkVisible = await firstPaymentDetailLink
+    .waitFor({ state: "visible", timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!detailLinkVisible) {
+    // Stats (e.g. Total Collected ₹200) can paint before the actions column links attach; only the
+    // smoke reference is guaranteed to come from the payment row body.
+    const hasPaymentRow = await page
+      .getByText(/SMOKE-PAID-001/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (hasPaymentRow) {
+      throw new Error(
+        "Partner payments rendered rows, but no partner payment detail link was found."
+      );
+    }
     await expect(page.locator("body")).toContainText(
       /No partner payment rows|No payments|Unable to load partner payments|Failed to fetch/i
     );
     return;
   }
-  await firstPaymentDetailLink.first().scrollIntoViewIfNeeded();
-  await firstPaymentDetailLink.first().click();
+
+  await firstPaymentDetailLink.scrollIntoViewIfNeeded();
+  await firstPaymentDetailLink.click();
   await expect(page).toHaveURL(
     /\/partner\/payments\/\d+/
   );
