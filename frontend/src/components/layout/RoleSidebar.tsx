@@ -32,7 +32,7 @@ export default function RoleSidebar({
         ) : null}
         <aside
           className={cn(
-            "dashboard-shell-chrome fixed inset-y-0 left-0 z-50 w-[min(22rem,calc(100vw-2.25rem))] border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-transform duration-200 md:hidden",
+            "dashboard-shell-chrome fixed inset-y-0 left-0 z-50 flex min-h-0 w-[min(20rem,calc(100vw-1.5rem))] flex-col border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-transform duration-200 md:hidden",
             "bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_26%),linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
             "shadow-[0_30px_90px_-58px_rgba(15,23,42,0.84)]",
             mobileOpen ? "translate-x-0" : "-translate-x-full",
@@ -48,10 +48,10 @@ export default function RoleSidebar({
   return (
     <aside
       className={cn(
-        "dashboard-shell-chrome h-screen border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-[width] duration-200",
+        "dashboard-shell-chrome flex h-screen min-h-0 flex-col border-r border-[var(--sidebar-rail-border)] text-[var(--sidebar-foreground)] transition-[width] duration-200",
         "bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_74%,black_26%))]",
         "shadow-[24px_0_60px_-52px_rgba(15,23,42,0.82)]",
-        collapsed ? "w-[6rem]" : "w-[23rem]",
+        collapsed ? "w-[6rem]" : "w-64",
         className
       )}
     >

@@ -33,10 +33,13 @@ import {
   Home,
   Landmark,
   LayoutDashboard,
+  LayoutGrid,
   LifeBuoy,
   LogOut,
+  Maximize2,
   Menu,
   Package,
+  PanelLeft,
   Plus,
   Receipt,
   ReceiptText,
@@ -66,7 +69,6 @@ import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
 import CommandPalette from "@/components/workflows/CommandPalette";
 import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
@@ -153,7 +155,6 @@ const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
 /** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
 const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
 const WORKSPACE_WIDTH_CSS_VALUES = ["1380px", "1580px", "1800px"] as const;
-const WORKSPACE_WIDTH_PRESET_LABELS = ["Compact", "Balanced", "Spacious"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 type OperatorMode = "SIMPLE" | "ADVANCED";
 
@@ -836,19 +837,19 @@ function SidebarContent({
   }
 
   return (
-    <div className="flex h-full flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
-      <div className="sticky top-0 z-20 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
-        <div className="flex h-[5rem] items-center gap-3 px-5">
-          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-sm font-semibold text-[var(--sidebar-primary)] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.9)]">
+    <div className="flex h-full min-h-0 flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
+      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
+        <div className="flex h-14 items-center gap-2.5 px-3.5 sm:px-4">
+          <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-xs font-semibold text-[var(--sidebar-primary)] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.9)]">
             SF
           </div>
 
           {!collapsed ? (
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
+              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
                 {brandConfig.companyName}
               </div>
-              <div className="truncate text-lg font-semibold tracking-tight text-white">{brandConfig.platformName}</div>
+              <div className="truncate text-base font-semibold leading-tight tracking-tight text-white">{brandConfig.platformName}</div>
             </div>
           ) : (
             <span className="sr-only">{brandConfig.platformName}</span>
@@ -861,7 +862,7 @@ function SidebarContent({
                 setFlyoutGroup(null);
                 onToggleCollapse();
               }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -871,7 +872,7 @@ function SidebarContent({
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
+              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
               aria-label="Close sidebar"
             >
               <X className="h-4 w-4" />
@@ -881,27 +882,27 @@ function SidebarContent({
       </div>
 
       {!collapsed ? (
-        <div className="border-b border-[var(--sidebar-rail-border)] px-5 py-4">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_74%,transparent)] px-3.5 py-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                {formatRoleLabel(role)} Navigation
-              </div>
-              <div className="mt-1 text-sm font-semibold text-white">All operational modules are grouped here.</div>
-            </div>
-            <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_74%,transparent)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+        <div className="shrink-0 border-b border-[var(--sidebar-rail-border)] px-3.5 py-3 sm:px-4">
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_74%,transparent)] px-2.5 py-2">
+            <span className="min-w-0 truncate text-xs font-semibold text-white" title={formatRoleLabel(role)}>
+              {formatRoleLabel(role)}
+            </span>
+            <span
+              className="shrink-0 rounded-md border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_74%,transparent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]"
+              title="Live session"
+            >
               Live
-            </div>
+            </span>
           </div>
 
           {favoriteLinks.length > 0 ? (
-            <div className="mt-3.5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Favorites</div>
-              <div className="mt-2 space-y-1">
+            <div className="mt-2.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">Favorites</div>
+              <div className="mt-1.5 space-y-0.5">
                 {favoriteLinks.map((item) => (
                   <div
                     key={`fav-${item.href}`}
-                    className="group/fav flex items-center justify-between gap-2 rounded-xl border border-transparent px-2.5 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] transition hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                    className="group/fav flex items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-semibold text-[var(--sidebar-item-muted)] transition hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
                   >
                     <Link
                       href={item.href}
@@ -933,60 +934,73 @@ function SidebarContent({
             </div>
           ) : null}
 
-          <div className="mt-3.5">
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">Navigate</label>
-            <div className="relative mt-2">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
+          <div className="mt-2.5">
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">Modules</label>
+            <div className="relative mt-1.5">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
               <input
                 type="search"
                 value={navQuery}
                 onChange={(event) => setNavQuery(event.target.value)}
                 placeholder="Filter modules"
-                className="h-11 w-full rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-10 pr-3 text-sm font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
+                className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-2.5 text-sm font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
               />
             </div>
           </div>
-          {!collapsed ? (
-            <div className="mt-3.5 rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
-                    Workspace width
-                  </div>
-                  <div className="mt-0.5 text-xs leading-snug text-[var(--sidebar-item-muted)]">
-                    Display preference only — how wide the main workspace column appears on this browser.
-                  </div>
-                </div>
-                <span className="shrink-0 pt-0.5 text-[11px] font-semibold tracking-wide text-[var(--sidebar-item-muted)]">
-                  {WORKSPACE_WIDTH_PRESET_LABELS[workspaceWidthPreset]}
-                </span>
-              </div>
-              <Slider
-                aria-label="Workspace content width"
+          <div
+            className="mt-2.5 rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-2 py-2"
+            title="Layout preference for this browser only (not stored on the server)."
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+                Width
+              </span>
+              <ToggleGroup
+                type="single"
+                value={String(workspaceWidthPreset)}
                 data-testid="workspace-width-slider"
-                min={0}
-                max={2}
-                step={1}
-                value={[workspaceWidthPreset]}
-                onValueChange={(next) => {
-                  const step = next[0];
-                  if (step === undefined) return;
-                  onWorkspaceWidthPresetChange(clampWorkspaceWidthPreset(step));
+                aria-label="Workspace content width preset"
+                onValueChange={(value: string) => {
+                  if (value !== "0" && value !== "1" && value !== "2") return;
+                  onWorkspaceWidthPresetChange(clampWorkspaceWidthPreset(Number.parseInt(value, 10)));
                 }}
-                className="mt-3 w-full [&_[data-slot=slider-track]]:bg-white/15 [&_[data-slot=slider-range]]:bg-[var(--sidebar-item-active-border)] [&_[data-slot=slider-thumb]]:border-[var(--sidebar-rail-border)] [&_[data-slot=slider-thumb]]:bg-white"
-              />
+                className="flex shrink-0 border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-0.5"
+              >
+                <ToggleGroupItem
+                  value="0"
+                  aria-label={`Compact: max content width ${WORKSPACE_WIDTH_CSS_VALUES[0]}`}
+                  title={`Compact (${WORKSPACE_WIDTH_CSS_VALUES[0]} cap for components that respect workspace width)`}
+                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  <PanelLeft className="mx-auto h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="1"
+                  aria-label={`Balanced: max content width ${WORKSPACE_WIDTH_CSS_VALUES[1]}`}
+                  title={`Balanced (${WORKSPACE_WIDTH_CSS_VALUES[1]})`}
+                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  <LayoutGrid className="mx-auto h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="2"
+                  aria-label={`Spacious: max content width ${WORKSPACE_WIDTH_CSS_VALUES[2]}`}
+                  title={`Spacious (${WORKSPACE_WIDTH_CSS_VALUES[2]})`}
+                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                >
+                  <Maximize2 className="mx-auto h-3.5 w-3.5" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
-          ) : null}
+          </div>
           {role === "ADMIN" ? (
-            <div className="mt-3.5 flex items-center justify-between rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-2.5">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
-                  Operator Mode
-                </div>
-                <div className="text-xs text-[var(--sidebar-item-muted)]">
-                  {operatorMode === "SIMPLE" ? "Simple workflow view" : "Advanced ERP view"}
-                </div>
-              </div>
+            <div
+              className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-2 py-1.5"
+              title="Simple hides advanced finance modules in the sidebar. Advanced shows the full catalog."
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+                Mode
+              </span>
               <ToggleGroup
                 type="single"
                 value={operatorMode}
@@ -1000,13 +1014,13 @@ function SidebarContent({
                   if (event.target !== event.currentTarget) return;
                   persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
                 }}
-                className="border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-1"
+                className="shrink-0 border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-0.5"
               >
                 <ToggleGroupItem
                   value="SIMPLE"
                   aria-label="Simple workflow view"
                   onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
-                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                  className="border-transparent px-2.5 py-1.5 text-[11px] font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Simple
                 </ToggleGroupItem>
@@ -1014,7 +1028,7 @@ function SidebarContent({
                   value="ADVANCED"
                   aria-label="Advanced ERP view"
                   onClick={() => persistOperatorMode("ADVANCED")}
-                  className="border-transparent px-3 py-2 text-xs font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                  className="border-transparent px-2.5 py-1.5 text-[11px] font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
                 >
                   Advanced
                 </ToggleGroupItem>
@@ -1024,7 +1038,7 @@ function SidebarContent({
         </div>
       ) : null}
 
-      <nav className="flex-1 overflow-y-auto px-4 py-5" role="navigation" aria-label={`${formatRoleLabel(role)} sidebar navigation`}>
+      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-3.5" role="navigation" aria-label={`${formatRoleLabel(role)} sidebar navigation`}>
         <div className="space-y-3">
           {visibleGroups.length === 0 && !collapsed ? (
             <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
@@ -1121,9 +1135,9 @@ function SidebarContent({
         </div>
       </nav>
 
-      <div className="sticky bottom-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-3">
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-2.5 sm:p-3">
         {!collapsed ? (
-          <div className="rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-3.5">
+          <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-2.5 sm:p-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{displayName}</div>

@@ -110,22 +110,24 @@ export default function PortalPage({
   stats = [],
   statusBadge,
   children,
-  maxWidth = "var(--workspace-max-width-tight)",
+  maxWidth = "none",
   className,
   presentation = "page",
 }: PortalPageProps) {
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
+  const widthStyle =
+    resolvedMaxWidth === "none" || resolvedMaxWidth === "100%" ? undefined : { maxWidth: resolvedMaxWidth };
   const isPopup = presentation === "popup";
   const showPopupMeta = isPopup && Boolean(subtitle || helperNote || statusBadge || actions.length > 0);
 
   return (
     <main
       className={cn(
-        "portal-page mx-auto flex flex-col gap-[var(--workspace-gap)]",
+        "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap)]",
         isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
         className
       )}
-      style={{ maxWidth: resolvedMaxWidth }}
+      style={widthStyle}
     >
       {!isPopup && breadcrumbs.length > 0 ? (
         <nav
@@ -331,7 +333,7 @@ export default function PortalPage({
         </section>
       )}
 
-      <section className="portal-page-content grid gap-4 sm:gap-5">{children}</section>
+      <section className="portal-page-content grid min-w-0 gap-4 sm:gap-5">{children}</section>
     </main>
   );
 }
