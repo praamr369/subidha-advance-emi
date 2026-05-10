@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { authStatePath, readSmokeManifest } from "./helpers/smoke-data";
+import {
+  authStatePath,
+  escapeRegex,
+  readSmokeManifest,
+} from "./helpers/smoke-data";
 
 test.use({ storageState: authStatePath("cashier") });
 
@@ -82,6 +86,10 @@ test.describe.serial("cashier smoke", () => {
       .getByRole("button", { name: "Search" })
       .click();
 
+    await expect(
+      page.getByText("Searching collectible EMI rows...")
+    ).toBeHidden({ timeout: 60_000 });
+
     const failedToFetchAfterSubscriptionSearch = page.getByText("Failed to fetch").first();
     if (await failedToFetchAfterSubscriptionSearch.isVisible().catch(() => false)) {
       await expect(failedToFetchAfterSubscriptionSearch).toBeVisible();
@@ -89,30 +97,58 @@ test.describe.serial("cashier smoke", () => {
       await expect(page.getByRole("heading", { name: /Unauthorized/i })).toHaveCount(0);
     } else {
       const subscriptionRef = manifest.entities.cashier.subscription_number;
-      const matchButton = page.getByRole("button", {
-        name: new RegExp(subscriptionRef),
-      }).first();
-      const searchMatches = page.getByText(/Search matches/i);
-      const searchMatchesVisible = await searchMatches.isVisible().catch(() => false);
-      const bodyHasSubscriptionRef = await page
-        .locator("body")
-        .evaluate(
-          (el, ref) => (el.textContent || "").includes(ref),
-          subscriptionRef,
-        )
-        .catch(() => false);
-      if (searchMatchesVisible || bodyHasSubscriptionRef) {
-        if (searchMatchesVisible) {
-          await expect(searchMatches).toBeVisible();
-        }
-        if (await matchButton.isVisible().catch(() => false)) {
-          await expect(matchButton).toBeVisible();
+      const customerName = manifest.entities.cashier.customer_name;
+      const collectibleEmiId = manifest.entities.cashier.collectible_emi_id;
+      const searchMatchesHeading = page.getByRole("heading", { name: /Search matches/i });
+
+      // Build alternates without empty segments — a leading "|" in the regex adds an empty
+      // alternative so hasText matches every control; .first() then picks the wrong button.
+      const subscriptionMarkers = [
+        subscriptionRef?.trim() ? escapeRegex(subscriptionRef.trim()) : "",
+        "SMOKE-SUB-CASHIER",
+        customerName?.trim() ? escapeRegex(customerName.trim()) : "",
+        Number.isFinite(collectibleEmiId) ? `EMI #${collectibleEmiId}\\b` : "",
+        "Advance EMI Amount",
+      ].filter(Boolean);
+
+      const subscriptionMatchPattern = new RegExp(subscriptionMarkers.join("|"), "i");
+
+      const subscriptionMatchText = page.getByText(subscriptionMatchPattern).first();
+
+      let subscriptionResultRow = page
+        .getByRole("button")
+        .filter({ hasText: new RegExp(`EMI #${collectibleEmiId}\\b`, "i") });
+
+      if (subscriptionRef?.trim()) {
+        subscriptionResultRow = subscriptionResultRow.filter({
+          hasText: new RegExp(escapeRegex(subscriptionRef.trim()), "i"),
+        });
+      } else {
+        subscriptionResultRow = subscriptionResultRow.filter({ hasText: /SMOKE-SUB-CASHIER/i });
+      }
+
+      if (customerName?.trim()) {
+        subscriptionResultRow = subscriptionResultRow.filter({
+          hasText: new RegExp(escapeRegex(customerName.trim()), "i"),
+        });
+      }
+
+      const subscriptionResultRowFirst = subscriptionResultRow.first();
+
+      if (await subscriptionResultRowFirst.isVisible().catch(() => false)) {
+        await expect(searchMatchesHeading).toBeVisible();
+        await expect(subscriptionResultRowFirst).toBeVisible();
+      } else if (await subscriptionMatchText.isVisible().catch(() => false)) {
+        await expect(searchMatchesHeading).toBeVisible();
+        await expect(subscriptionMatchText).toBeVisible();
+      } else if (await searchMatchesHeading.isVisible().catch(() => false)) {
+        await expect(searchMatchesHeading).toBeVisible();
+        const collectButton = page.getByRole("button", { name: /collect/i }).first();
+        if (await collectButton.isVisible().catch(() => false)) {
+          await expect(collectButton).toBeVisible();
         } else {
-          await expect(page.locator("body")).toContainText(new RegExp(subscriptionRef));
+          await expect(page.locator("body")).toContainText(subscriptionMatchPattern);
         }
-      } else if (await matchButton.isVisible().catch(() => false)) {
-        await expect(searchMatches).toBeVisible();
-        await expect(matchButton).toBeVisible();
       } else {
         await expect(page.locator("body")).toContainText(
           /No collectible|No matching|No results|Unable to search collectible EMI rows|Search failed/i
