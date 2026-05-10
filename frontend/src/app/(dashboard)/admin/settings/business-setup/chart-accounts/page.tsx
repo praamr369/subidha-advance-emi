@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
-import { getSetupChecklist, type SetupChecklist } from "@/services/business-setup";
+import { getAccountingSetupStatus, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 
 function toNumber(value: unknown): number {
   const parsed = Number(value);
@@ -13,29 +13,35 @@ function toNumber(value: unknown): number {
 }
 
 export default function ChartAccountsSetupGuidePage() {
-  const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
+  const [status, setStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    getSetupChecklist()
+    getAccountingSetupStatus()
       .then((payload) => {
         if (!mounted) return;
-        setChecklist(payload);
+        setStatus(payload);
         setError(null);
       })
       .catch((err) => {
         if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Failed to load setup status.");
+        setError(err instanceof Error ? err.message : "Failed to load accounting setup status.");
       });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const chartActiveTotal = toNumber(checklist?.counts?.active_chart_accounts ?? checklist?.counts?.chart_of_accounts_active);
-  const chartRootsStmt = toNumber(checklist?.counts?.visible_register_count);
-  const chartChildren = toNumber(checklist?.counts?.active_child_chart_accounts);
+  const chartActiveTotal = toNumber(status?.chart_accounts_active);
+  const chartRootsAll = toNumber(status?.chart_accounts_root);
+  const chartChildrenActive = toNumber(status?.chart_accounts_active_child);
+  const chartChildrenAll = toNumber(status?.chart_accounts_child);
+  const mappingsLine =
+    status?.required_mappings_complete != null && status?.required_mappings_total != null
+      ? `${status.required_mappings_complete} of ${status.required_mappings_total} required mapping purposes covered`
+      : "—";
+  const journalLine = status?.journal_ready ? "Journal posting prerequisites satisfied" : "Journal posting blocked — see Accounting setup";
 
   return (
     <div className="space-y-6">
@@ -53,35 +59,50 @@ export default function ChartAccountsSetupGuidePage() {
 
       <section className="grid gap-5 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="text-sm font-medium text-muted-foreground">Active chart accounts (total)</div>
-          <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div>
+          <div className="text-sm font-medium text-muted-foreground">Active chart accounts</div>
+          <div className="mt-2 text-3xl font-semibold text-foreground">{status ? chartActiveTotal : "—"}</div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Statement roots (ASSET/LIABILITY/INCOME/EXPENSE): {checklist ? chartRootsStmt : "—"}
+            Chart accounts (total): {status ? toNumber(status.chart_accounts_total) : "—"} · Root chart accounts:{" "}
+            {status ? chartRootsAll : "—"}
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="text-sm font-medium text-muted-foreground">Child / sub accounts</div>
-          <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div>
+          <div className="text-sm font-medium text-muted-foreground">Child chart accounts</div>
+          <div className="mt-2 text-3xl font-semibold text-foreground">{status ? chartChildrenActive : "—"}</div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Equity-only roots and inactive rows explain gaps versus filtered tallies.
+            Active child rows (parent set). All child rows (incl. inactive): {status ? chartChildrenAll : "—"}.
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-3">
-          <div className="text-sm font-medium text-muted-foreground">Next action</div>
+          <div className="text-sm font-medium text-muted-foreground">Mappings and journal readiness</div>
+          <div className="mt-2 text-sm text-foreground">{status ? mappingsLine : "—"}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{status ? journalLine : "—"}</div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+            <Link
+              href="/admin/accounting/chart-of-accounts"
+              className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
               Open Chart of Accounts
             </Link>
-            <Link href="/admin/accounting/books" className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground">
+            <Link
+              href="/admin/accounting/setup"
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground"
+            >
+              Accounting setup
+            </Link>
+            <Link
+              href="/admin/accounting/books"
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground"
+            >
               Open Books
             </Link>
           </div>
           <div className="mt-3 text-sm text-muted-foreground">
-            Configure chart accounts first, then finance accounts (cash/bank/UPI). This keeps your ledger auditable and avoids mixing EMI payment history with accounting postings.
+            Configure chart accounts first, then finance accounts (cash/bank/UPI). Counts here match the same backend
+            service used on the Chart of Accounts KPI band — not the visible table page length.
           </div>
         </div>
       </section>
     </div>
   );
 }
-

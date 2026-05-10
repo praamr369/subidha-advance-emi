@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { Plus } from "lucide-react";
+
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ChartAccountCreateDrawer from "@/components/accounting/ChartAccountCreateDrawer";
 import ChartAccountEditDrawer from "@/components/accounting/ChartAccountEditDrawer";
 import FinanceAccountEditDrawer from "@/components/accounting/FinanceAccountEditDrawer";
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
@@ -20,8 +23,8 @@ import {
   accountingMoney,
 } from "@/components/accounting/shared";
 import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import {
-  createChartOfAccount,
   createFinanceAccount,
   listChartOfAccounts,
   listFinanceAccounts,
@@ -30,18 +33,18 @@ import {
   type FinanceAccount,
   type FinanceAccountDetail,
 } from "@/services/accounting";
+import { getAccountingSetupStatus, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 
 function pillClassName(tone: "default" | "success" | "warning" | "info" = "default") {
-  if (tone === "success") {
-    return "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800";
-  }
-  if (tone === "warning") {
-    return "inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800";
-  }
-  if (tone === "info") {
-    return "inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-800";
-  }
-  return "inline-flex rounded-full border border-border bg-[var(--surface-card-elevated)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+  const base =
+    "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]";
+  if (tone === "success") return cn(base, "chip-tone-success");
+  if (tone === "warning") return cn(base, "chip-tone-warning");
+  if (tone === "info") return cn(base, "chip-tone-info");
+  return cn(
+    base,
+    "border border-border bg-[var(--surface-card-elevated)] text-muted-foreground shadow-[var(--badge-inset-highlight)]"
+  );
 }
 
 export default function AccountingChartOfAccountsPage() {
@@ -51,7 +54,9 @@ export default function AccountingChartOfAccountsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [chartAccounts, setChartAccounts] = useState<ChartOfAccount[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [setupStatus, setSetupStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [selectedChartAccountId, setSelectedChartAccountId] = useState<number | null>(null);
+  const [createChartOpen, setCreateChartOpen] = useState(false);
   const [selectedFinanceAccountId, setSelectedFinanceAccountId] = useState<number | null>(null);
 
   const [chartTypeFilter, setChartTypeFilter] = useState("ALL");
@@ -59,15 +64,6 @@ export default function AccountingChartOfAccountsPage() {
   const [financeKindFilter, setFinanceKindFilter] = useState("ALL");
   const [financeStatusFilter, setFinanceStatusFilter] = useState("ALL");
 
-  const [chartForm, setChartForm] = useState({
-    code: "",
-    name: "",
-    account_type: "ASSET",
-    parent: "",
-    allow_manual_posting: true,
-    system_code: "",
-    notes: "",
-  });
   const [financeForm, setFinanceForm] = useState({
     name: "",
     kind: "CASH",
@@ -83,18 +79,21 @@ export default function AccountingChartOfAccountsPage() {
     else setRefreshing(true);
 
     try {
-      const [chartPayload, financePayload] = await Promise.all([
-        listChartOfAccounts({ page_size: 100 }),
-        listFinanceAccounts({ page_size: 100 }),
+      const [chartPayload, financePayload, statusPayload] = await Promise.all([
+        listChartOfAccounts({ page_size: 500 }),
+        listFinanceAccounts({ page_size: 500 }),
+        getAccountingSetupStatus(),
       ]);
       setChartAccounts(chartPayload.results);
       setFinanceAccounts(financePayload.results);
+      setSetupStatus(statusPayload);
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to load accounting master data."));
       if (mode === "initial") {
         setChartAccounts([]);
         setFinanceAccounts([]);
+        setSetupStatus(null);
       }
     } finally {
       if (mode === "initial") setLoading(false);
@@ -105,36 +104,6 @@ export default function AccountingChartOfAccountsPage() {
   useEffect(() => {
     void loadPage("initial");
   }, []);
-
-  async function handleCreateChartAccount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    try {
-      await createChartOfAccount({
-        code: chartForm.code || undefined,
-        name: chartForm.name,
-        account_type: chartForm.account_type as ChartOfAccount["account_type"],
-        parent: chartForm.parent ? Number(chartForm.parent) : null,
-        allow_manual_posting: chartForm.allow_manual_posting,
-        system_code: chartForm.system_code || null,
-        notes: chartForm.notes,
-      });
-      setChartForm({
-        code: "",
-        name: "",
-        account_type: "ASSET",
-        parent: "",
-        allow_manual_posting: true,
-        system_code: "",
-        notes: "",
-      });
-      setNotice("Chart account created.");
-      setError(null);
-      await loadPage("refresh");
-    } catch (err) {
-      setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create chart account."));
-    }
-  }
 
   async function handleCreateFinanceAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -233,7 +202,11 @@ export default function AccountingChartOfAccountsPage() {
         </div>
       ),
     },
-    { key: "account_type", header: "Type" },
+    {
+      key: "account_type",
+      header: "Type",
+      render: (row) => <span className={pillClassName("info")}>{row.account_type}</span>,
+    },
     {
       key: "is_active",
       header: "Status",
@@ -321,8 +294,15 @@ export default function AccountingChartOfAccountsPage() {
     },
   ];
 
-  const activeChartAccounts = chartAccounts.filter((account) => account.is_active).length;
-  const activeFinanceAccounts = financeAccounts.filter((account) => account.is_active).length;
+  const regChartCount = chartAccounts.length;
+  const regFinanceCount = financeAccounts.length;
+  const apiChartCount = setupStatus?.chart_accounts_total;
+  const apiFinanceCount = setupStatus?.finance_accounts_total;
+  const summaryChartTotal = apiChartCount ?? regChartCount;
+  const summaryFinanceTotal = apiFinanceCount ?? regFinanceCount;
+  const summaryChartActive = setupStatus?.chart_accounts_active ?? chartAccounts.filter((a) => a.is_active).length;
+  const summaryFinanceActive =
+    setupStatus?.finance_accounts_active ?? financeAccounts.filter((a) => a.is_active).length;
 
   return (
     <PortalPage
@@ -342,15 +322,46 @@ export default function AccountingChartOfAccountsPage() {
         { href: ROUTES.admin.settingsImports, label: "Imports", variant: "primary" },
       ]}
       stats={[
-        { label: "Chart Accounts", value: String(chartAccounts.length), tone: "info" },
-        { label: "Active Chart", value: String(activeChartAccounts), tone: activeChartAccounts > 0 ? "success" : "default" },
-        { label: "Finance Accounts", value: String(financeAccounts.length), tone: "info" },
-        { label: "Active Finance", value: String(activeFinanceAccounts), tone: activeFinanceAccounts > 0 ? "success" : "default" },
+        { label: "Chart accounts (total)", value: String(summaryChartTotal), tone: "info" },
+        {
+          label: "Active chart accounts",
+          value: String(summaryChartActive),
+          tone: summaryChartActive > 0 ? "success" : "default",
+        },
+        { label: "Root chart accounts", value: String(setupStatus?.chart_accounts_root ?? "—"), tone: "info" },
+        { label: "Child chart accounts", value: String(setupStatus?.chart_accounts_child ?? "—"), tone: "info" },
+        { label: "Finance accounts (total)", value: String(summaryFinanceTotal), tone: "info" },
+        {
+          label: "Active finance accounts",
+          value: String(summaryFinanceActive),
+          tone: summaryFinanceActive > 0 ? "success" : "default",
+        },
+        {
+          label: "Account mappings complete",
+          value:
+            setupStatus?.required_mappings_complete != null && setupStatus?.required_mappings_total != null
+              ? `${setupStatus.required_mappings_complete}/${setupStatus.required_mappings_total}`
+              : "—",
+          tone: setupStatus?.mappings_complete ? "success" : "warning",
+        },
+        {
+          label: "Journal readiness",
+          value: setupStatus?.journal_ready ? "Ready" : "Blocked",
+          tone: setupStatus?.journal_ready ? "success" : "warning",
+        },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCreateChartOpen(true)}
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+          >
+            <Plus className="h-4 w-4" />
+            Create chart account
+          </button>
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
@@ -378,133 +389,9 @@ export default function AccountingChartOfAccountsPage() {
           <>
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
-                title="Create chart account"
-                description="Codes, type, parent, and manual-posting posture are still set at creation time. After usage begins, only safe fields remain editable."
-              >
-                <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateChartAccount}>
-                  <label className="text-sm text-muted-foreground">
-                    Code
-                    <input
-                      className={accountingFieldClassName()}
-                      value={chartForm.code}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          code: event.target.value,
-                        }))
-                      }
-                      placeholder="Optional auto-generated"
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Name
-                    <input
-                      className={accountingFieldClassName()}
-                      value={chartForm.name}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Type
-                    <select
-                      className={accountingFieldClassName()}
-                      value={chartForm.account_type}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          account_type: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="ASSET">Asset</option>
-                      <option value="LIABILITY">Liability</option>
-                      <option value="EQUITY">Equity</option>
-                      <option value="INCOME">Income</option>
-                      <option value="EXPENSE">Expense</option>
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Parent
-                    <select
-                      className={accountingFieldClassName()}
-                      value={chartForm.parent}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          parent: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">No parent</option>
-                      {chartAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} · {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground md:col-span-2">
-                    System code
-                    <input
-                      className={accountingFieldClassName()}
-                      value={chartForm.system_code}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          system_code: event.target.value,
-                        }))
-                      }
-                      placeholder="Optional protected system code"
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground md:col-span-2">
-                    Notes
-                    <textarea
-                      rows={3}
-                      className={accountingFieldClassName()}
-                      value={chartForm.notes}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }))
-                      }
-                      placeholder="Setup notes or control remarks."
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
-                    <input
-                      type="checkbox"
-                      checked={chartForm.allow_manual_posting}
-                      onChange={(event) =>
-                        setChartForm((current) => ({
-                          ...current,
-                          allow_manual_posting: event.target.checked,
-                        }))
-                      }
-                    />
-                    Allow manual posting to this account
-                  </label>
-                  <div className="md:col-span-2">
-                    <button
-                      type="submit"
-                      className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                    >
-                      Create chart account
-                    </button>
-                  </div>
-                </form>
-              </WorkspaceSection>
-
-              <WorkspaceSection
                 title="Create finance account"
                 description="Operational cash, bank, and UPI accounts stay linked to asset-side chart codes so future posting flows and books remain auditable."
+                className="xl:col-span-2"
               >
                 <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateFinanceAccount}>
                   <label className="text-sm text-muted-foreground">
@@ -631,10 +518,11 @@ export default function AccountingChartOfAccountsPage() {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Current register view: {chartRegisterScopeLabel}. Showing{" "}
+              KPI band above uses the canonical accounting setup service (full database counts). This register:{" "}
+              {chartRegisterScopeLabel}. Showing{" "}
               <span className="font-semibold text-foreground">{filteredChartAccounts.length}</span> row(s) of{" "}
               <span className="font-semibold text-foreground">{chartRowsForStatus.length}</span> matching the status filter
-              before type filter.
+              before type filter (loaded {regChartCount} chart / {regFinanceCount} finance rows for this page).
               {chartHiddenByTypeFilterCount > 0 ? (
                 <>
                   {" "}
@@ -653,7 +541,7 @@ export default function AccountingChartOfAccountsPage() {
               onRowClick={(row) => setSelectedChartAccountId(row.id)}
               globalFilterPlaceholder="Search chart accounts by code or name..."
               emptyTitle="No chart accounts found"
-              emptyDescription="Adjust the current filters or create a new chart account above."
+              emptyDescription="Adjust the current filters or create a chart account with Create chart account."
               toolbar={
                 <>
                   <select
@@ -718,6 +606,17 @@ export default function AccountingChartOfAccountsPage() {
           </>
         ) : null}
       </div>
+
+      <ChartAccountCreateDrawer
+        open={createChartOpen}
+        chartAccounts={chartAccounts}
+        onClose={() => setCreateChartOpen(false)}
+        onCreated={async (account) => {
+          setNotice(`Chart account ${account.code} created.`);
+          setError(null);
+          await loadPage("refresh");
+        }}
+      />
 
       <ChartAccountEditDrawer
         open={selectedChartAccountId !== null}

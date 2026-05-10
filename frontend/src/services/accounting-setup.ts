@@ -1,7 +1,44 @@
 import { request } from "@/services/api";
 
-export async function getAccountingSetupStatus() {
-  return request("/admin/accounting/setup/status/");
+/** Canonical accounting master + readiness payload (GET /admin/accounting/setup/status/). */
+export type AccountingSetupStatusPayload = {
+  status?: string;
+  warnings_count?: number;
+  warnings?: { code: string; message: string }[];
+  last_validated_at?: string;
+  coa_ready?: boolean;
+  finance_accounts_ready?: boolean;
+  mappings_complete?: boolean;
+  missing_required_accounts?: string[];
+  missing_required_mappings?: string[];
+  required_coa_system_codes?: string[];
+  required_mapping_purposes?: string[];
+  ledger_anchor_present?: boolean;
+  real_settlement_accounts_present?: boolean;
+  chart_accounts_total?: number;
+  chart_accounts_active?: number;
+  chart_accounts_inactive?: number;
+  chart_accounts_root?: number;
+  chart_accounts_child?: number;
+  chart_accounts_active_root?: number;
+  chart_accounts_active_child?: number;
+  finance_accounts_total?: number;
+  finance_accounts_active?: number;
+  finance_accounts_inactive?: number;
+  required_system_accounts_total?: number;
+  required_system_accounts_present?: number;
+  required_system_accounts_missing?: string[];
+  required_mappings_total?: number;
+  required_mappings_complete?: number;
+  required_mappings_missing?: string[];
+  journals_configured?: boolean;
+  journal_ready?: boolean;
+  setup_complete?: boolean;
+  blocking_reasons?: string[];
+};
+
+export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {
+  return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
 }
 
 export async function postAccountingSetupBootstrap(dryRun = false) {

@@ -105,7 +105,54 @@ class ChartOfAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "system_code"]
+
+
+class ChartOfAccountCreateSerializer(serializers.ModelSerializer):
+    """Admin manual create: no client-supplied system_code (reserved for bootstrap / imports)."""
+
+    code = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = ChartOfAccount
+        fields = [
+            "code",
+            "name",
+            "account_type",
+            "parent",
+            "is_active",
+            "allow_manual_posting",
+            "notes",
+        ]
+
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        return cleaned
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        raw_code = attrs.get("code", "") or ""
+        cleaned_code = raw_code.strip().upper()
+        if cleaned_code:
+            if ChartOfAccount.objects.filter(code=cleaned_code).exists():
+                raise serializers.ValidationError({"code": "An account with this code already exists."})
+            attrs["code"] = cleaned_code
+        else:
+            attrs.pop("code", None)
+
+        parent = attrs.get("parent")
+        account_type = attrs["account_type"]
+        if parent and parent.account_type != account_type:
+            raise serializers.ValidationError(
+                {"parent": "Parent account must have the same account type as the new account."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        return ChartOfAccount.objects.create(**validated_data)
 
 
 class ChartOfAccountDetailSerializer(ChartOfAccountSerializer):
@@ -200,6 +247,24 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        chart = attrs.get("chart_account")
+        if chart is None:
+            return attrs
+        is_settlement = attrs.get("is_real_settlement_account")
+        if is_settlement is None:
+            is_settlement = True
+        if is_settlement and chart.account_type != ChartOfAccountType.ASSET:
+            raise serializers.ValidationError(
+                {
+                    "chart_account": (
+                        "Cash, bank, and UPI settlement finance accounts must link to an ASSET chart account."
+                    )
+                }
+            )
+        return attrs
 
     class Meta:
         model = FinanceAccount

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable, Iterable
 
 from django.core.paginator import Paginator
+from rest_framework.pagination import PageNumberPagination
 
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
@@ -67,3 +68,11 @@ def build_paginated_payload(
         payload.update(extra)
 
     return payload
+
+
+class AdminAccountingPagination(PageNumberPagination):
+    """Honor page_size for chart/finance registers; cap to avoid unbounded queries."""
+
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 500

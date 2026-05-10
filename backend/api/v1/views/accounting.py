@@ -53,10 +53,15 @@ from accounting.services.workforce_service import (
     reject_employee_expense_claim,
     reject_leave_request,
 )
+from api.v1.pagination import AdminAccountingPagination
 from api.v1.permissions import IsAdmin
+from subscriptions.models import AuditLog
+from subscriptions.services.audit_service import log_audit
+
 from api.v1.serializers.accounting import (
     AccountingValidationQuerySerializer,
     ChartOfAccountSerializer,
+    ChartOfAccountCreateSerializer,
     ChartOfAccountDetailSerializer,
     ChartOfAccountUpdateSerializer,
     EmployeeExpenseClaimActionSerializer,
@@ -93,9 +98,32 @@ class AdminAccountingModelViewSet(viewsets.ModelViewSet):
 class ChartOfAccountViewSet(AdminAccountingModelViewSet):
     queryset = ChartOfAccount.objects.select_related("parent").all()
     serializer_class = ChartOfAccountSerializer
+    pagination_class = AdminAccountingPagination
     search_fields = ["code", "name", "system_code"]
     ordering_fields = ["code", "name", "created_at"]
     ordering = ["code", "id"]
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=instance,
+            performed_by=self.request.user,
+            metadata={
+                "event": "CHART_OF_ACCOUNT_MANUAL_CREATE",
+                "code": instance.code,
+                "account_type": instance.account_type,
+            },
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        instance = serializer.instance
+        output = ChartOfAccountSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -108,6 +136,8 @@ class ChartOfAccountViewSet(AdminAccountingModelViewSet):
         return queryset
 
     def get_serializer_class(self):
+        if self.action == "create":
+            return ChartOfAccountCreateSerializer
         if self.action == "retrieve":
             return ChartOfAccountDetailSerializer
         if self.action == "partial_update":
@@ -143,6 +173,7 @@ class ChartOfAccountViewSet(AdminAccountingModelViewSet):
 class FinanceAccountViewSet(AdminAccountingModelViewSet):
     queryset = FinanceAccount.objects.select_related("chart_account", "branch").all()
     serializer_class = FinanceAccountSerializer
+    pagination_class = AdminAccountingPagination
     search_fields = ["name", "upi_handle", "bank_last4", "chart_account__code"]
     ordering_fields = ["name", "kind", "created_at"]
     ordering = ["name", "id"]

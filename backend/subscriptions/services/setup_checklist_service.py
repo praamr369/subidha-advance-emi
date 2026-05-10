@@ -14,6 +14,9 @@ from accounting.models import (
 from accounts.models import User, UserRole
 from branch_control.models import Branch, BranchStatus, CashCounter
 from inventory.models import InventoryItem, StockLocation
+from accounting.services.accounting_setup_service import AccountingSetupService
+from accounting.services.accounting_setup_status import compute_accounting_master_metrics
+
 from subscriptions.models import Batch, Product
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.services.document_numbering_service import (
@@ -56,12 +59,13 @@ def compute_setup_checklist():
     # Counters (existing operational cash desk mapping)
     active_counters = CashCounter.objects.filter(is_active=True)
 
-    # Accounting (existing models)
+    # Accounting (canonical counts shared with /admin/accounting/setup/status/)
+    coa_metrics = compute_accounting_master_metrics()
+    chart_accounts_total = coa_metrics["chart_accounts_total"]
+    chart_accounts_inactive = coa_metrics["chart_accounts_inactive"]
+    chart_active_root_accounts = coa_metrics["chart_accounts_active_root"]
+    chart_active_child_accounts = coa_metrics["chart_accounts_active_child"]
     active_chart_accounts = ChartOfAccount.objects.filter(is_active=True)
-    chart_accounts_total = ChartOfAccount.objects.count()
-    chart_accounts_inactive = ChartOfAccount.objects.filter(is_active=False).count()
-    chart_active_root_accounts = active_chart_accounts.filter(parent__isnull=True).count()
-    chart_active_child_accounts = active_chart_accounts.exclude(parent__isnull=True).count()
     chart_active_system_accounts = (
         active_chart_accounts.exclude(system_code__isnull=True).exclude(system_code="").count()
     )
@@ -92,6 +96,10 @@ def compute_setup_checklist():
     numbering_ready = all(row["configured"] for row in numbering_rows)
     numbering_preview_ready = all((row.get("next_number_preview") or "").strip() for row in numbering_rows if row["configured"])
     no_duplicate_numbers = bool(numbering_state["checks"]["no_duplicate_issued_numbers"])
+
+    missing_required_coa = AccountingSetupService.missing_required_coa_codes()
+    missing_required_mappings = AccountingSetupService.missing_required_mapping_purposes()
+    accounting_validation = AccountingSetupService.validate_accounting_setup()
 
     has_cash_finance = active_finance_accounts.filter(kind="CASH").exists()
     has_bank_finance = active_finance_accounts.filter(kind="BANK").exists()
@@ -138,22 +146,48 @@ def compute_setup_checklist():
         ),
         _item(
             key="chart_of_accounts",
-            label="Chart of accounts configured",
+            label="Required chart of accounts (system ledgers)",
             level="required",
-            is_complete=active_chart_accounts.exists(),
+            is_complete=len(missing_required_coa) == 0,
             detail=(
                 (
-                    f"{active_chart_accounts.count()} active chart account(s) total — "
-                    f"{chart_active_root_accounts} root account(s), {chart_active_child_accounts} child account(s); "
-                    f"{visible_register_count} active roots in ASSET/LIABILITY/INCOME/EXPENSE "
-                    f"(statement-style register tally); equity accounts add "
-                    f"{chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0)} active row(s). "
-                    f"Non-statement operational/control accounts: {non_statement_accounts}. "
-                    "Filtered accounting screens only show rows matching current filters."
+                    f"All {len(accounting_validation['required_coa_system_codes'])} required system ledger rows are active "
+                    f"({coa_metrics['chart_accounts_active']} active chart account(s) total). "
+                    "Use Accounting → Chart of Accounts to add custom accounts, or run default accounting setup."
                 )
-                if active_chart_accounts.exists()
-                else "Set up the chart of accounts to enable finance posting without touching the EMI ledger."
+                if len(missing_required_coa) == 0
+                else (
+                    "Missing required system chart accounts: "
+                    + ", ".join(missing_required_coa[:12])
+                    + ("…" if len(missing_required_coa) > 12 else "")
+                    + ". Run default accounting setup from the finance-accounting setup flow or seed the listed ledgers."
+                )
             ),
+            route="/admin/accounting/chart-of-accounts",
+        ),
+        _item(
+            key="accounting_posting_mappings",
+            label="Accounting posting mappings complete",
+            level="required",
+            is_complete=len(missing_required_mappings) == 0,
+            detail=(
+                "Default finance-account → COA mappings exist for collections, receivables, income, and control purposes."
+                if len(missing_required_mappings) == 0
+                else (
+                    "Missing active mappings for: "
+                    + ", ".join(missing_required_mappings[:10])
+                    + ("…" if len(missing_required_mappings) > 10 else "")
+                    + ". Complete setup so posting flows can resolve ledger accounts."
+                )
+            ),
+            route="/admin/settings/business-setup/finance-accounts",
+        ),
+        _item(
+            key="manual_coa_available",
+            label="Manual chart of accounts maintenance",
+            level="optional",
+            is_complete=True,
+            detail="Admins can create non-system accounts from Chart of Accounts → Create account (drawer).",
             route="/admin/accounting/chart-of-accounts",
         ),
         _item(
@@ -166,7 +200,7 @@ def compute_setup_checklist():
                 if active_finance_accounts.exists()
                 else "Create at least one cash account and at least one bank/UPI account."
             ),
-            route="/admin/accounting/chart-of-accounts",
+            route="/admin/settings/business-setup/finance-accounts",
         ),
         _item(
             key="accounting_period",
@@ -261,16 +295,18 @@ def compute_setup_checklist():
         "branches_active": active_branches.count(),
         "branches_primary_configured": bool(primary_branch_exists),
         "cash_counters_active": active_counters.count(),
-        "chart_of_accounts_active": active_chart_accounts.count(),
+        "chart_of_accounts_active": coa_metrics["chart_accounts_active"],
         "total_chart_accounts": chart_accounts_total,
-        "active_chart_accounts": active_chart_accounts.count(),
+        "active_chart_accounts": coa_metrics["chart_accounts_active"],
         "inactive_chart_accounts": chart_accounts_inactive,
         "active_root_chart_accounts": chart_active_root_accounts,
         "active_child_chart_accounts": chart_active_child_accounts,
+        "chart_accounts_root": coa_metrics["chart_accounts_root"],
+        "chart_accounts_child": coa_metrics["chart_accounts_child"],
         "active_system_chart_accounts": chart_active_system_accounts,
         "active_custom_chart_accounts": chart_active_custom_accounts,
         "visible_register_count": visible_register_count,
-        "active_chart_accounts_total": active_chart_accounts.count(),
+        "active_chart_accounts_total": coa_metrics["chart_accounts_active"],
         "statement_root_accounts": visible_register_count,
         "child_sub_accounts": chart_active_child_accounts,
         "non_statement_accounts": non_statement_accounts,
@@ -279,7 +315,9 @@ def compute_setup_checklist():
         "chart_active_equity": chart_type_counts.get(ChartOfAccountType.EQUITY.value, 0),
         "chart_active_income": chart_type_counts.get(ChartOfAccountType.INCOME.value, 0),
         "chart_active_expense": chart_type_counts.get(ChartOfAccountType.EXPENSE.value, 0),
-        "finance_accounts_active": active_finance_accounts.count(),
+        "finance_accounts_active": coa_metrics["finance_accounts_active"],
+        "finance_accounts_total": coa_metrics["finance_accounts_total"],
+        "finance_accounts_inactive": coa_metrics["finance_accounts_inactive"],
         "finance_accounts_cash": int(has_cash_finance),
         "finance_accounts_bank": int(has_bank_finance),
         "finance_accounts_upi": int(has_upi_finance),
@@ -301,6 +339,11 @@ def compute_setup_checklist():
         "customer_users_active": customer_users.count(),
         "required_items_total": len(required_items),
         "required_items_complete": completed_required,
+        "accounting_setup_status": accounting_validation.get("status"),
+        "accounting_missing_coa_codes": len(missing_required_coa),
+        "accounting_missing_mapping_purposes": len(missing_required_mappings),
+        "accounting_coa_ready": int(accounting_validation.get("coa_ready", False)),
+        "accounting_mappings_ready": int(len(missing_required_mappings) == 0),
     }
 
     return {

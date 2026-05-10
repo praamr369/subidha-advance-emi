@@ -4,7 +4,8 @@ from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
+from accounting.models import DocumentSequence, FinanceAccount
+from accounting.services.accounting_setup_service import AccountingSetupService
 from branch_control.models import Branch, BranchStatus, CashCounter
 from subscriptions.models_business_setup import BusinessProfile
 from tests.helpers import create_admin_user, create_product, create_user
@@ -42,35 +43,10 @@ class AdminBusinessSetupApiTests(APITestCase):
         branch.status = BranchStatus.ACTIVE
         branch.save(update_fields=["status"])
 
-        cash_chart = ChartOfAccount.objects.create(
-            name="Cash in Hand",
-            account_type=ChartOfAccountType.ASSET,
-        )
-        bank_chart = ChartOfAccount.objects.create(
-            name="Bank",
-            account_type=ChartOfAccountType.ASSET,
-        )
+        AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
 
-        FinanceAccount.objects.create(
-            name="Cash",
-            branch=branch,
-            kind=FinanceAccountKind.CASH,
-            chart_account=cash_chart,
-            opening_balance=Decimal("0.00"),
-            is_active=True,
-        )
-        cash_finance = FinanceAccount.objects.filter(kind=FinanceAccountKind.CASH).first()
+        cash_finance = FinanceAccount.objects.filter(name__iexact="Main Cash Desk").first()
         self.assertIsNotNone(cash_finance)
-
-        FinanceAccount.objects.create(
-            name="UPI",
-            branch=branch,
-            kind=FinanceAccountKind.UPI,
-            chart_account=bank_chart,
-            opening_balance=Decimal("0.00"),
-            is_active=True,
-            upi_handle="subidha@upi",
-        )
 
         CashCounter.objects.create(
             code="COUNTER1",
@@ -85,7 +61,12 @@ class AdminBusinessSetupApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/business-setup/checklist/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_ready_for_go_live"])
+        item_keys = {row["key"] for row in response.data["items"]}
+        self.assertIn("accounting_posting_mappings", item_keys)
+        self.assertIn("manual_coa_available", item_keys)
         counts = response.data["counts"]
+        self.assertEqual(counts.get("accounting_missing_coa_codes"), 0)
+        self.assertEqual(counts.get("accounting_missing_mapping_purposes"), 0)
         self.assertIn("total_chart_accounts", counts)
         self.assertIn("active_chart_accounts", counts)
         self.assertIn("active_root_chart_accounts", counts)

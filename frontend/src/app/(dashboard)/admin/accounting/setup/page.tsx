@@ -15,21 +15,8 @@ import {
   patchFinanceAccountMapping,
   postAccountingSetupBootstrap,
   repairSuggestedMappings,
+  type AccountingSetupStatusPayload,
 } from "@/services/accounting-setup";
-
-type SetupStatus = {
-  status?: string;
-  warnings_count?: number;
-  warnings?: { code: string; message: string }[];
-  coa_ready?: boolean;
-  finance_accounts_ready?: boolean;
-  mappings_complete?: boolean;
-  last_validated_at?: string;
-  missing_required_accounts?: string[];
-  missing_required_mappings?: string[];
-  ledger_anchor_present?: boolean;
-  real_settlement_accounts_present?: boolean;
-};
 
 type MappingRow = {
   id: number;
@@ -65,7 +52,7 @@ const PURPOSE_LABELS: Record<string, string> = {
 };
 
 export default function AdminAccountingSetupPage() {
-  const [status, setStatus] = useState<SetupStatus | null>(null);
+  const [status, setStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,7 +67,7 @@ export default function AdminAccountingSetupPage() {
     setError(null);
     try {
       const [statusRes, mappingRes] = await Promise.all([
-        getAccountingSetupStatus() as Promise<SetupStatus>,
+        getAccountingSetupStatus(),
         getFinanceAccountMappings() as Promise<{ results?: MappingRow[] }>,
       ]);
       setStatus(statusRes);

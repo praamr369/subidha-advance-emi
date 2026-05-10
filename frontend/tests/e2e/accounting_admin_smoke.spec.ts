@@ -16,6 +16,10 @@ test("admin accounting routes load", async ({ page }) => {
 
   await page.goto("/admin/accounting/chart-of-accounts");
   await expect(shellHeading(page, "Chart Of Accounts")).toBeVisible();
+  await page.getByRole("button", { name: "Create chart account" }).click();
+  await expect(page.getByTestId("chart-account-create-form")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create chart account" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.goto("/admin/accounting/expenses");
   await expect(shellHeading(page, "Expenses")).toBeVisible();

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from accounting.models import FinanceAccountCoaMapping
 from accounting.services.accounting_setup_service import AccountingSetupService
+from accounting.services.accounting_setup_status import get_admin_accounting_setup_status
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import FinanceAccountCoaMappingSerializer
 from subscriptions.models import AuditLog
@@ -18,7 +19,7 @@ class _AdminBase(APIView):
 
 class AccountingSetupStatusView(_AdminBase):
     def get(self, request):
-        return Response(AccountingSetupService.validate_accounting_setup())
+        return Response(get_admin_accounting_setup_status())
 
 
 class AccountingSetupBootstrapSerializer(serializers.Serializer):
