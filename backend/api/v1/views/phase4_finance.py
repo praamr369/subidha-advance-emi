@@ -776,7 +776,7 @@ class CustomerDirectSaleSummaryView(APIView):
             invoice_status = (getattr(invoice, "status", "") or "").strip().upper()
             is_payable_status = (
                 status_token not in INACTIVE_DIRECT_SALE_STATUSES
-                and invoice_status == BillingDocumentStatus.POSTED
+                and invoice_status in {BillingDocumentStatus.APPROVED, BillingDocumentStatus.POSTED}
             )
             if is_payable_status:
                 total_due += outstanding

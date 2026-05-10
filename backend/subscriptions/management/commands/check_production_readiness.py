@@ -40,8 +40,16 @@ class Command(BaseCommand):
             failures.append("DEFAULT_FROM_EMAIL must be configured.")
 
         otp_backend = (getattr(settings, "OTP_DELIVERY_BACKEND", "") or "").strip().lower()
-        if otp_backend in {"", "console", "auto"}:
-            warnings.append("OTP delivery backend is not explicitly set to sms/email for production.")
+        allowed_otp_backends = {"sms", "email", "sms_email"}
+        if otp_backend not in allowed_otp_backends:
+            failures.append("OTP delivery backend must be explicitly set to sms/email/sms_email for production.")
+        elif otp_backend in {"email", "sms_email"}:
+            email_backend = (getattr(settings, "EMAIL_BACKEND", "") or "").strip()
+            email_host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
+            if email_backend != "django.core.mail.backends.smtp.EmailBackend":
+                failures.append("EMAIL_BACKEND must use SMTP when OTP delivery includes email.")
+            if not email_host:
+                failures.append("EMAIL_HOST must be configured when OTP delivery includes email.")
 
         backup_root = Path((getattr(settings, "BACKUP_ROOT", "") or "").strip())
         if not str(backup_root):
@@ -101,6 +109,14 @@ class Command(BaseCommand):
         setup_payload = AccountingSetupService.validate_accounting_setup()
         if not bool(setup_payload.get("mappings_complete")):
             failures.append("Finance account mappings are incomplete.")
+            missing_keys = setup_payload.get("missing_required_mappings") or []
+            for mapping_key in missing_keys:
+                failures.append(f"Missing required finance mapping: {mapping_key}")
+            for warning in setup_payload.get("warnings") or []:
+                code = (warning or {}).get("code")
+                message = (warning or {}).get("message")
+                if code and message:
+                    failures.append(f"Finance mapping validation failed [{code}]: {message}")
 
         try:
             executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])

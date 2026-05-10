@@ -8,7 +8,7 @@ from subscriptions.services.public_lead_service import (
     complete_public_lead_conversion,
     create_public_lead,
 )
-from tests.helpers import create_admin_user, create_customer_profile, create_partner_user
+from tests.helpers import create_admin_user, create_customer_profile, create_customer_user, create_partner_user
 
 
 class CrmApiTests(APITestCase):
@@ -83,7 +83,12 @@ class CrmApiTests(APITestCase):
 
     def test_party_directory_merges_multiple_people_roles_on_shared_phone(self):
         shared_phone = "7388000999"
+        shared_customer_user = create_customer_user(
+            username="crm_customer_shared",
+            phone="7388000988",
+        )
         create_customer_profile(
+            user=shared_customer_user,
             name="Unified Person",
             phone=shared_phone,
         )

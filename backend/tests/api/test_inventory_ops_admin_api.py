@@ -36,11 +36,11 @@ class AdminInventoryOpsApiTests(APITestCase):
                 "required_quantity": "4.000",
                 "available_quantity": "1.000",
                 "shortage_quantity": "3.000",
-                "source_module": "MANUAL",
+                "source_module": "GENERAL",
             },
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         need_id = response.data["id"]
         patch = self.client.patch(
             f"/api/v1/admin/inventory/stock-needs/{need_id}/",

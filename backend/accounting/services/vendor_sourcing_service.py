@@ -94,7 +94,9 @@ def _filters_active(
     product_name: str,
     material_q: str,
 ) -> bool:
-    return bool(product_id is not None or category_text_up or (product_name and product_name.strip()) or (material_q and material_q.strip()))
+    # Product-name free text is treated as a soft hint only; hard filtering is
+    # applied only when structured procurement filters are provided.
+    return bool(product_id is not None or category_text_up or (material_q and material_q.strip()))
 
 
 def suggest_vendors_for_order(

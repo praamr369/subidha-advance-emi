@@ -117,7 +117,14 @@ class BusinessEventLogApiTests(TestCase):
 
     def test_event_failure_does_not_corrupt_payment_flow(self):
         self.client.force_authenticate(self.admin)
-        with patch("subscriptions.services.business_event_service.BusinessEventLog.objects.create", side_effect=Exception("db down")):
+        with (
+            patch(
+                "subscriptions.services.business_event_service.BusinessEventLog.objects.create",
+                side_effect=Exception("db down"),
+            ),
+            patch("subscriptions.services.business_event_service.logger.exception") as mocked_logger_exception,
+        ):
             response = self.client.post("/api/v1/admin/receivables/collect/", self._collect_payload(), format="json")
         self.assertIn(response.status_code, (200, 201), response.data)
+        self.assertGreaterEqual(mocked_logger_exception.call_count, 1)
 

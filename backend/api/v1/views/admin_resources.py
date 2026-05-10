@@ -391,10 +391,23 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
     def transition_status(self, request, pk=None):
         batch = self.get_object()
         next_status = (request.data.get("status") or "").strip().upper()
+        transition_allowed_targets = {
+            BatchStatus.OPEN,
+            BatchStatus.FULL,
+            BatchStatus.DRAW_IN_PROGRESS,
+            BatchStatus.COMPLETED,
+            BatchStatus.CLOSED,
+        }
 
         if not next_status:
             return Response(
                 {"status": ["Target status is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if next_status not in transition_allowed_targets:
+            return Response(
+                {"status": [f"\"{next_status}\" is not a valid choice."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

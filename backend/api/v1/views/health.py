@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.executor import MigrationExecutor
-from django.db.utils import OperationalError, ProgrammingError
+from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -46,8 +46,15 @@ def _database_check(alias: str) -> tuple[bool, dict]:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
+    except (OperationalError, DatabaseError) as exc:
+        logger.warning("Database readiness check failed")
+        return False, {
+            "status": "error",
+            "alias": alias,
+            "error": _serialize_exception(exc),
+        }
     except Exception as exc:  # pragma: no cover - defensive endpoint guard
-        logger.warning("Readiness database connectivity check failed", exc_info=True)
+        logger.exception("Unexpected readiness database connectivity check failure")
         return False, {
             "status": "error",
             "alias": alias,
@@ -75,7 +82,7 @@ def _migration_check(alias: str) -> tuple[bool, dict]:
         targets = executor.loader.graph.leaf_nodes()
         plan = executor.migration_plan(targets)
     except (OperationalError, ProgrammingError) as exc:
-        logger.warning("Readiness migration check failed", exc_info=True)
+        logger.warning("Migration readiness check failed")
         return False, {
             "status": "error",
             "alias": alias,

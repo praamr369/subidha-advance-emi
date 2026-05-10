@@ -51,6 +51,11 @@ class AdminPurchaseNeedSerializer(serializers.ModelSerializer):
 
 
 class AdminPurchaseNeedCreateSerializer(serializers.ModelSerializer):
+    warehouse = serializers.PrimaryKeyRelatedField(
+        queryset=PurchaseNeed._meta.get_field("warehouse").remote_field.model.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     notes = serializers.CharField(source="note", required=False, allow_blank=True, default="")
 
     class Meta:
@@ -78,7 +83,7 @@ class AdminPurchaseNeedCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        attrs.setdefault("source_module", PurchaseNeed.SourceModule.MANUAL)
+        attrs.setdefault("source_module", PurchaseNeed.SourceModule.GENERAL)
         attrs.setdefault("status", PurchaseNeedStatus.OPEN)
         avail = Decimal(str(attrs.get("available_quantity") or "0"))
         short = Decimal(str(attrs.get("shortage_quantity") or "0"))

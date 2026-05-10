@@ -4,8 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import CustomerPurchaseEnquiry, Vendor, VendorQuote, VendorQuoteRequest, VendorServiceArea
-from billing.models import PurchaseBill
-from inventory.models import InventoryItem, InventoryItemType, PurchaseOrder
+from inventory.models import InventoryItem, InventoryItemType, PurchaseBill, PurchaseOrder
 from subscriptions.models import PublicLeadIntent
 from tests.helpers import (
     create_admin_user,
