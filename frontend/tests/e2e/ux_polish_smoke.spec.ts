@@ -18,6 +18,21 @@ test.describe("UX polish smoke", () => {
       await expect(page.getByRole("dialog", { name: "Notifications menu" })).toBeVisible();
     });
 
+    test("theme toggle applies and persists html.dark without breaking admin navigation", async ({ page }) => {
+      await page.goto("/admin");
+      await expect(page.getByTestId("theme-select")).toBeVisible();
+      await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toBeVisible();
+      await page.getByTestId("theme-select").selectOption("dark");
+      await expect(page.locator("html")).toHaveClass(/(?:^|\s)dark(?:\s|$)/);
+      await page.reload();
+      await expect(page.locator("html")).toHaveClass(/(?:^|\s)dark(?:\s|$)/);
+      await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toBeVisible();
+      await page.getByTestId("theme-select").selectOption("light");
+      await expect
+        .poll(async () => page.locator("html").evaluate((el) => el.classList.contains("dark")))
+        .toBe(false);
+    });
+
     test("notification bell opens on mobile viewport", async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/admin");
@@ -54,7 +69,7 @@ test.describe("UX polish smoke", () => {
       await page.goto("/admin");
       const openMenu = page.getByRole("button", { name: "Open menu" });
       await openMenu.click();
-      await expect(page.locator("input[placeholder='Filter modules']:visible")).toHaveCount(1);
+      await expect(page.locator("input[placeholder='Search modules']:visible")).toHaveCount(1);
       const nextRouteLink = page.locator("#mobile-sidebar-nav a[href]:visible").nth(1);
       await nextRouteLink.click();
       await expect(openMenu).toHaveAttribute("aria-expanded", "false");
@@ -139,7 +154,7 @@ test.describe("UX polish smoke", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/customer");
       await page.getByRole("button", { name: "Open menu" }).click();
-      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
+      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Search modules']")).toBeVisible();
       await expect(page.locator("body")).not.toContainText("Finance Workspace");
       await expect(page.locator("body")).not.toContainText("Reversal & Return Control");
     });
@@ -152,7 +167,7 @@ test.describe("UX polish smoke", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/cashier");
       await page.getByRole("button", { name: "Open menu" }).click();
-      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
+      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Search modules']")).toBeVisible();
       await expect(page.locator("body")).not.toContainText("Admin Workspace");
       await expect(page.locator("body")).not.toContainText("Reversal Center");
     });
@@ -165,7 +180,7 @@ test.describe("UX polish smoke", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/partner");
       await page.getByRole("button", { name: "Open menu" }).click();
-      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Filter modules']")).toBeVisible();
+      await expect(page.locator("#mobile-sidebar-nav input[placeholder='Search modules']")).toBeVisible();
       await expect(page.locator("body")).not.toContainText("Accounting Control Center");
       await expect(page.locator("body")).not.toContainText("Reversal & Return Control");
     });

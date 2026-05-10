@@ -63,25 +63,25 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(sidebar.getByRole("link", { name: "Lucky Draws", exact: true })).toBeVisible();
 
     await sidebar.getByRole("button", { name: "Expand Rent" }).click();
-    const rentLink = sidebar.getByRole("link", { name: "Rent", exact: true });
-    const rentSection = rentLink.locator("xpath=ancestor::div[contains(@class,'space-y-1')][1]");
-    await expect(rentSection.getByRole("link", { name: "Rent Contract Register", exact: true })).toBeVisible();
-    await expect(rentSection.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
-    await expect(rentSection.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
+    const rentRegister = sidebar.getByRole("link", { name: "Rent Contract Register", exact: true });
+    await expect(rentRegister).toBeVisible();
+    const rentNested = rentRegister.locator("xpath=ancestor::div[contains(@class,'border-l')][1]");
+    await expect(rentNested.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
+    await expect(rentNested.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
 
     await sidebar.getByRole("button", { name: "Expand Lease" }).click();
-    const leaseLink = sidebar.getByRole("link", { name: "Lease", exact: true });
-    const leaseSection = leaseLink.locator("xpath=ancestor::div[contains(@class,'space-y-1')][1]");
-    await expect(leaseSection.getByRole("link", { name: "Lease Contract Register", exact: true })).toBeVisible();
-    await expect(leaseSection.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
-    await expect(leaseSection.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
+    const leaseRegister = sidebar.getByRole("link", { name: "Lease Contract Register", exact: true });
+    await expect(leaseRegister).toBeVisible();
+    const leaseNested = leaseRegister.locator("xpath=ancestor::div[contains(@class,'border-l')][1]");
+    await expect(leaseNested.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
+    await expect(leaseNested.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
 
     await sidebar.getByRole("button", { name: "Expand Partner Operations" }).click();
     await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Partner Collections", exact: true })).toBeVisible();
-    await sidebar.getByPlaceholder("Filter modules").fill("Partner Payment Requests");
+    await sidebar.getByPlaceholder("Search modules").fill("Partner Payment Requests");
     await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
-    await sidebar.getByPlaceholder("Filter modules").clear();
+    await sidebar.getByPlaceholder("Search modules").clear();
     const executiveLoadError = page.getByText(/Unable to load executive dashboard|Failed to fetch/i).first();
     if (await executiveLoadError.isVisible().catch(() => false)) {
       await expect(executiveLoadError).toBeVisible();

@@ -9,13 +9,13 @@ import { usePriorityAlerts } from "@/features/admin-dashboard/hooks/usePriorityA
 function severityClass(severity: string) {
   switch (severity) {
     case "CRITICAL":
-      return "border-destructive/30 bg-destructive/10 text-destructive";
+      return "chip-tone-danger";
     case "HIGH":
-      return "border-orange-500/30 bg-orange-500/10 text-orange-600";
+      return "border border-[color-mix(in_oklab,oklch(0.62_0.14_55)_40%,var(--border)_60%)] bg-[color-mix(in_oklab,oklch(0.62_0.12_55)_14%,var(--card)_86%)] text-[var(--semantic-warning-fg)] shadow-[var(--badge-inset-highlight)]";
     case "MEDIUM":
-      return "border-yellow-500/30 bg-yellow-500/10 text-yellow-700";
+      return "chip-tone-warning";
     default:
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
+      return "chip-tone-success";
   }
 }
 

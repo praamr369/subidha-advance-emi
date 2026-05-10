@@ -34,9 +34,8 @@ export function buildSettlementPosture(summary: CanonicalDashboardSummary) {
       title: "Scoped contracts are currently settled",
       description:
         "Paid and waived EMI history already closes the contract exposure visible in this dashboard scope.",
-      tone:
-        "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(220,252,231,0.84))]",
-      badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      tone: "dashboard-posture-success",
+      badgeClass: "chip-tone-success",
       badgeLabel: "Settled",
     };
   }
@@ -47,9 +46,8 @@ export function buildSettlementPosture(summary: CanonicalDashboardSummary) {
       description: `Overdue exposure currently stands at ${money(
         summary.overdue_amount
       )}.`,
-      tone:
-        "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.84))]",
-      badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+      tone: "dashboard-posture-warning",
+      badgeClass: "chip-tone-warning",
       badgeLabel: "Overdue",
     };
   }
@@ -61,9 +59,8 @@ export function buildSettlementPosture(summary: CanonicalDashboardSummary) {
           nextDueDate
         )}.`
       : "There is remaining exposure, but no next due row is currently visible in scope.",
-    tone:
-      "border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.84))]",
-    badgeClass: "border-sky-200 bg-sky-50 text-sky-700",
+    tone: "dashboard-posture-info",
+    badgeClass: "chip-tone-info",
     badgeLabel: "In progress",
   };
 }
@@ -92,7 +89,8 @@ export function buildWinnerPosture(
         } carry winner history, and ${money(
           waivedAmount
         )} is already recorded as waived EMI value.`,
-      badgeClass: "border-violet-200 bg-violet-50 text-violet-700",
+      badgeClass:
+        "border border-[color-mix(in_oklab,oklch(0.5_0.1_290)_32%,var(--border)_68%)] bg-[color-mix(in_oklab,oklch(0.45_0.06_290)_14%,var(--card)_86%)] text-foreground shadow-[var(--badge-inset-highlight)]",
       badgeLabel: "Winner benefit",
     };
   }
@@ -102,7 +100,7 @@ export function buildWinnerPosture(
     description:
       winnerSurface?.note ??
       "If a draw benefit is applied later, it should stay separate from payment settlement and contract status.",
-    badgeClass: "border-slate-200 bg-slate-100 text-slate-700",
+    badgeClass: "border border-border bg-muted text-muted-foreground shadow-[var(--badge-inset-highlight)]",
     badgeLabel: "No winner benefit",
   };
 }
@@ -119,10 +117,9 @@ export function buildReconciliationPosture(
       description:
         reconciliation?.note ??
         "Use the reconciliation drilldown to review the mismatched rows before manual finance action.",
-      badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+      badgeClass: "chip-tone-warning",
       badgeLabel: "Needs review",
-      tone:
-        "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.84))]",
+      tone: "dashboard-posture-warning",
     };
   }
 
@@ -132,9 +129,8 @@ export function buildReconciliationPosture(
       checkedCount > 0
         ? `${checkedCount} scoped subscriptions were checked without mismatch warnings.`
         : reconciliation?.note ?? "No reconciliation rows are currently visible in scope.",
-    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    badgeClass: "chip-tone-success",
     badgeLabel: "Aligned",
-    tone:
-      "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(220,252,231,0.84))]",
+    tone: "dashboard-posture-success",
   };
 }

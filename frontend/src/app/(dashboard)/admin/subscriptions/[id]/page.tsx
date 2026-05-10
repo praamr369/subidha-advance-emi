@@ -22,6 +22,7 @@ import {
 } from "@/domains/subscriptions/detail/surfaces";
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import { cn } from "@/lib/utils";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -920,7 +921,7 @@ export default function AdminSubscriptionDetailPage() {
                   "Delivery",
                 ].map((step, index) => (
                   <div key={`flow-step-${step}-${index}`} className="flex items-center gap-2">
-                    <span className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900">
+                    <span className="rounded-lg border border-amber-200 bg-card px-2.5 py-1 text-xs font-semibold text-amber-900">
                       {step}
                     </span>
                     {index < 6 ? <span className="text-amber-700">→</span> : null}
@@ -929,16 +930,16 @@ export default function AdminSubscriptionDetailPage() {
               </div>
             </section>
             <section className="grid gap-4">
-              <div className="rounded-[30px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.22),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-5 shadow-[0_30px_120px_-48px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+              <div className="surface-glass rounded-[30px] p-5 shadow-[var(--surface-shadow-lg)]">
                 <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                       Operational Lens
                     </p>
-                    <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                    <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
                       Contract, winner, and waiver posture
                     </h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                       Contract lifecycle, winner benefit, and waiver and settlement posture are shown as separate truths so completed winners stay readable without masking reconciliation issues.
                     </p>
                   </div>
@@ -947,7 +948,7 @@ export default function AdminSubscriptionDetailPage() {
                     type="button"
                     onClick={() => void loadPage("refresh")}
                     disabled={refreshing || loading}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-4 text-sm font-medium text-slate-700 shadow-[0_16px_36px_-24px_rgba(15,23,42,0.35)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-[var(--surface-shadow)] transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <svg
                       className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
@@ -1079,24 +1080,27 @@ export default function AdminSubscriptionDetailPage() {
               </div>
 
               {winnerIntegrityIssues.length > 0 ? (
-                <div className="rounded-[24px] border border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.96),rgba(254,226,226,0.88))] p-4 shadow-[0_20px_70px_-40px_rgba(185,28,28,0.35)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-700">
+                <div className="dashboard-posture-danger rounded-[24px] p-4 shadow-[var(--surface-shadow)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--semantic-danger-fg)]">
                     Winner Integrity Warning
                   </p>
-                  <ul className="mt-3 space-y-2 text-sm text-red-900">
+                  <ul className="mt-3 space-y-2 text-sm text-card-foreground">
                     {winnerIntegrityIssues.map((warning) => (
-                      <li key={warning} className="rounded-2xl border border-red-200/80 bg-white/60 px-4 py-3">
+                      <li
+                        key={warning}
+                        className="rounded-2xl border border-border/80 bg-card/80 px-4 py-3 text-card-foreground"
+                      >
                         {warning}
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : detailSemantics.hasWinnerHistory ? (
-                <div className="rounded-[24px] border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96),rgba(209,250,229,0.84))] p-4 shadow-[0_20px_70px_-42px_rgba(5,150,105,0.3)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                <div className="dashboard-posture-success rounded-[24px] p-4 shadow-[var(--surface-shadow)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--semantic-success-fg)]">
                     Winner State Synced
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-900">
+                  <p className="mt-2 text-sm leading-6 text-card-foreground">
                     Winner history, Lucky ID state, and waiver posture are aligned with the canonical backend snapshot for this contract.
                   </p>
                 </div>
@@ -1107,7 +1111,7 @@ export default function AdminSubscriptionDetailPage() {
               <DetailPanel
                 title="Contract overview"
                 description="Commercial, customer, product, batch, and assignment context."
-                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                className="rounded-[28px]"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
@@ -1162,7 +1166,7 @@ export default function AdminSubscriptionDetailPage() {
                 <DetailPanel
                   title="Winner / lucky context"
                   description="Winning draw linkage and waived EMI posture."
-                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                  className="rounded-[28px]"
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
@@ -1215,7 +1219,7 @@ export default function AdminSubscriptionDetailPage() {
                 <DetailPanel
                   title="Rent/Lease profile"
                   description="Security deposit posture, return assessment status, and contract documents."
-                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                  className="rounded-[28px]"
                 >
                   {contractProfile ? (
                     <>
@@ -1347,7 +1351,7 @@ export default function AdminSubscriptionDetailPage() {
             <DetailPanel
               title="Delivery tracking"
               description="Current fulfillment path, receiver details, and historical delivery records for this subscription."
-              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+              className="rounded-[28px]"
             >
               {currentDelivery ? (
                 <>
@@ -1450,7 +1454,7 @@ export default function AdminSubscriptionDetailPage() {
             <DetailPanel
               title="Financial position"
               description="Canonical ledger-aware finance summary for this subscription."
-              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+              className="rounded-[28px]"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue label="Total Contract Value" value={money(financialSummary.total_amount)} />
@@ -1474,7 +1478,7 @@ export default function AdminSubscriptionDetailPage() {
             <DetailPanel
               title="Reconciliation status"
               description="Backend flags for remaining balance alignment, reversals, waivers, and warning conditions."
-              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+              className="rounded-[28px]"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue
@@ -1496,18 +1500,16 @@ export default function AdminSubscriptionDetailPage() {
               </div>
 
               {showReconciliationWarning ? (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
-                  <div className="font-semibold">
-                    Review required
-                  </div>
-                  <ul className="mt-3 space-y-2">
+                <div className="dashboard-posture-danger mt-4 rounded-xl px-4 py-4 text-sm">
+                  <div className="font-semibold text-[var(--semantic-danger-fg)]">Review required</div>
+                  <ul className="mt-3 space-y-2 text-card-foreground">
                     {financeWarnings.map((warning) => (
                       <li key={warning}>{warning}</li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <div className="dashboard-posture-success mt-4 rounded-xl px-4 py-3 text-sm text-card-foreground">
                   Pending, waived, reversed, and remaining amounts align with the canonical backend summary.
                 </div>
               )}
@@ -1517,7 +1519,7 @@ export default function AdminSubscriptionDetailPage() {
               <DetailPanel
                 title="Advance EMI schedule"
                 description="Paid, waived, reversed, and pending exposure by installment from the canonical detail payload."
-                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                className="rounded-[28px]"
               >
               {emis.length === 0 ? (
                 <EmptyState
@@ -1618,7 +1620,7 @@ export default function AdminSubscriptionDetailPage() {
                 <DetailPanel
                   title="Waived Advance EMI rows"
                   description="Future waived rows should be visible distinctly and never rewrite already paid installments."
-                  className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                  className="rounded-[28px]"
                 >
                   {waivedEmis.length === 0 ? (
                     <EmptyState
@@ -1663,7 +1665,7 @@ export default function AdminSubscriptionDetailPage() {
               <DetailPanel
                 title="Recent payments"
                 description="Operational payment visibility with reversed rows clearly marked."
-                className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+                className="rounded-[28px]"
               >
                 {payments.length === 0 ? (
                   <EmptyState
@@ -1695,12 +1697,10 @@ export default function AdminSubscriptionDetailPage() {
                           </div>
 
                           <span
-                            className={[
-                              "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                              payment.is_reversed
-                                ? "border-red-200 bg-red-50 text-red-700"
-                                : "border-emerald-200 bg-emerald-50 text-emerald-700",
-                            ].join(" ")}
+                            className={cn(
+                              "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                              payment.is_reversed ? "chip-tone-danger" : "chip-tone-success"
+                            )}
                           >
                             {payment.is_reversed ? "REVERSED" : "ACTIVE"}
                           </span>
@@ -1715,7 +1715,7 @@ export default function AdminSubscriptionDetailPage() {
             <DetailPanel
               title="Audit timeline"
               description="Chronological audit visibility for subscription and EMI actions."
-              className="rounded-[28px] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)]"
+              className="rounded-[28px]"
             >
               {timeline.length === 0 ? (
                 <EmptyState

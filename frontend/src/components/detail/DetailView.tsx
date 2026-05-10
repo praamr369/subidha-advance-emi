@@ -8,16 +8,16 @@ type Tone = "default" | "success" | "warning" | "danger" | "info";
 function toneClassName(tone: Tone): string {
   switch (tone) {
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+      return "chip-tone-success";
     case "warning":
-      return "border-amber-200 bg-amber-50 text-amber-800";
+      return "chip-tone-warning";
     case "danger":
-      return "border-red-200 bg-red-50 text-red-800";
+      return "chip-tone-danger";
     case "info":
-      return "border-sky-200 bg-sky-50 text-sky-800";
+      return "chip-tone-info";
     case "default":
     default:
-      return "border-border bg-muted text-foreground";
+      return "border border-border bg-muted text-foreground";
   }
 }
 
@@ -53,7 +53,7 @@ export function StatusChip({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em]",
+        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em]",
         toneClassName(tone)
       )}
     >
@@ -111,13 +111,13 @@ export function DetailMetaGrid({
             className={cn(
               "mt-2 text-sm font-medium",
               item.tone === "success"
-                ? "text-emerald-700"
+                ? "text-[var(--semantic-success-fg)]"
                 : item.tone === "warning"
-                  ? "text-amber-700"
+                  ? "text-[var(--semantic-warning-fg)]"
                   : item.tone === "danger"
-                    ? "text-red-700"
+                    ? "text-[var(--semantic-danger-fg)]"
                     : item.tone === "info"
-                      ? "text-sky-700"
+                      ? "text-[var(--semantic-info-fg)]"
                       : "text-foreground"
             )}
           >
@@ -145,11 +145,11 @@ export function MoneySummary({
             className={cn(
               "mt-1.5 text-sm font-semibold",
               item.tone === "success"
-                ? "text-emerald-700"
+                ? "text-[var(--semantic-success-fg)]"
                 : item.tone === "warning"
-                  ? "text-amber-700"
+                  ? "text-[var(--semantic-warning-fg)]"
                   : item.tone === "danger"
-                    ? "text-red-700"
+                    ? "text-[var(--semantic-danger-fg)]"
                     : "text-foreground"
             )}
           >

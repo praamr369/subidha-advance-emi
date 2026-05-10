@@ -24,13 +24,13 @@ type FormFieldProps = {
 const getToneStyles = (tone: Tone) => {
   switch (tone) {
     case "danger":
-      return "border-red-300 bg-red-50/55 focus-within:border-red-400 focus-within:ring-red-400/35";
+      return "border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-bg)] focus-within:border-destructive focus-within:ring-[var(--ring)]/40";
     case "success":
-      return "border-emerald-300 bg-emerald-50/50 focus-within:border-emerald-400 focus-within:ring-emerald-400/35";
+      return "border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] focus-within:border-primary focus-within:ring-[var(--ring)]/40";
     case "warning":
-      return "border-amber-300 bg-amber-50/55 focus-within:border-amber-400 focus-within:ring-amber-400/35";
+      return "border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-bg)] focus-within:border-primary focus-within:ring-[var(--ring)]/40";
     case "info":
-      return "border-sky-300 bg-sky-50/55 focus-within:border-sky-400 focus-within:ring-sky-400/35";
+      return "border-[var(--semantic-info-border)] bg-[var(--semantic-info-bg)] focus-within:border-primary focus-within:ring-[var(--ring)]/40";
     default:
       return "border-border bg-[var(--surface-card-elevated)] focus-within:border-[var(--surface-border-strong)] focus-within:ring-[var(--ring)]/35";
   }

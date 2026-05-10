@@ -48,27 +48,27 @@ function attentionConfig(
   if (attention === "urgent") {
     return {
       label: "Urgent",
-      className: "border-red-200/80 bg-red-50/90 text-red-900",
+      className: "chip-tone-danger",
       Icon: Siren,
     };
   }
   if (attention === "warning") {
     return {
       label: "Attention",
-      className: "border-amber-200/80 bg-amber-50/90 text-amber-900",
+      className: "chip-tone-warning",
       Icon: AlertTriangle,
     };
   }
   if (attention === "quiet") {
     return {
       label: "Quiet",
-      className: "border-emerald-200/80 bg-emerald-50/90 text-emerald-900",
+      className: "chip-tone-success",
       Icon: CheckCircle2,
     };
   }
   return {
     label: "Normal",
-    className: "border-border bg-[var(--surface-muted)] text-foreground",
+    className: "border border-border bg-[var(--surface-muted)] text-foreground shadow-[var(--badge-inset-highlight)]",
     Icon: CircleDot,
   };
 }
@@ -143,11 +143,11 @@ export default function WidgetShell({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-base font-semibold text-slate-950">{title}</h2>
+                <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
 
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
                     chip.className
                   )}
                 >

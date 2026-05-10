@@ -58,6 +58,7 @@ import {
   X,
 } from "lucide-react";
 
+import ThemeToggle from "@/components/ui/ThemeToggle";
 import NotificationBellDropdown from "@/components/layout/NotificationBellDropdown";
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
@@ -68,7 +69,7 @@ import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
 import CommandPalette from "@/components/workflows/CommandPalette";
 import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
 import { useLogout } from "@/hooks/useLogout";
@@ -82,7 +83,6 @@ import {
   type NavigationRole,
 } from "@/config/navigation";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
-import { initialsFromDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
 import { getAdminNavigationBadges } from "@/services/navigation-badges";
 
@@ -443,24 +443,27 @@ function UserDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/35"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-label={`Open account menu for ${displayName}, ${formatRoleLabel(role)}`}
       >
-        <Avatar className="size-8 rounded-lg border-[var(--surface-border-strong)]">
-          <AvatarFallback className="rounded-lg">{initialsFromDisplayName(displayName)}</AvatarFallback>
-        </Avatar>
+        <WorkspaceBrandMark size={32} variant="onLight" />
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">{displayName}</span>
           <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
         </span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
       {isOpen ? (
-        <div className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100">
+        <div
+          className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100"
+          role="menu"
+          aria-label="Account menu"
+        >
           <div className="flex items-center gap-3 border-b border-border px-3 py-2">
-            <Avatar className="size-9 shrink-0 rounded-xl border-[var(--surface-border-strong)]">
-              <AvatarFallback className="rounded-xl">{initialsFromDisplayName(displayName)}</AvatarFallback>
-            </Avatar>
+            <WorkspaceBrandMark size={36} variant="onLight" className="rounded-xl" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-foreground">{displayName}</div>
               <div className="text-xs text-muted-foreground">{formatRoleLabel(role)}</div>
@@ -697,20 +700,22 @@ function SidebarContent({
         flattenShellItems([child]).some((candidate) => candidate.href === activeHref)
       );
       const Icon = item.icon;
-      const classes = cn(
-        "group relative flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition",
-        depth > 0 ? "ml-3" : "",
+      const rowActive = !item.disabled && (active || childActive);
+      const rowShell = cn(
+        "flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm transition-colors outline-none",
+        depth > 0 ? "ml-2" : "",
         item.disabled
-          ? "cursor-not-allowed border-transparent text-[var(--sidebar-item-muted)] opacity-70"
-          : active || childActive
-            ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-            : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+          ? "cursor-not-allowed text-[var(--sidebar-item-muted)] opacity-60"
+          : rowActive
+            ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] text-[var(--sidebar-foreground)]"
+            : "text-[var(--sidebar-item-muted)] hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)]"
       );
 
       const key = `${groupTitle}:${item.href}:${item.label}:${depth}`;
       const row = item.disabled ? (
-        <div key={key} className={classes} aria-disabled="true" title="Not available yet">
-          <Icon className="h-4 w-4 shrink-0 text-[var(--sidebar-item-muted)]" />
+        <div key={key} className={rowShell} aria-disabled="true" title="Not available yet">
+          <span className="h-5 w-0.5 shrink-0 rounded-full bg-transparent" aria-hidden />
+          <Icon className="h-4 w-4 shrink-0 opacity-70" />
           <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
           {renderBadge(item)}
         </div>
@@ -719,16 +724,24 @@ function SidebarContent({
           key={key}
           href={item.href}
           onClick={isMobile ? onClose : undefined}
-          className={classes}
+          className={cn(rowShell, "focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45")}
           role="menuitem"
+          aria-current={active ? "page" : undefined}
         >
+          <span
+            className={cn(
+              "h-5 w-0.5 shrink-0 rounded-full transition-colors",
+              active ? "bg-[var(--sidebar-primary)]" : "bg-transparent"
+            )}
+            aria-hidden
+          />
           <Icon
             className={cn(
               "h-4 w-4 shrink-0",
-              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover:text-white"
+              active || childActive ? "text-[var(--sidebar-primary)]" : "opacity-90"
             )}
           />
-          <span className="min-w-0 truncate text-[13px] font-medium">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{item.label}</span>
           {renderBadge(item)}
         </Link>
       );
@@ -737,7 +750,7 @@ function SidebarContent({
         <div key={key}>
           {row}
           {item.children && item.children.length > 0 ? (
-            <div className="mt-1 space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+            <div className="mt-0.5 space-y-0.5 border-l border-white/[0.08] pl-2 ml-2">
               {item.children.map((child) => renderFlyoutItem(groupTitle, child, depth + 1))}
             </div>
           ) : null}
@@ -754,29 +767,39 @@ function SidebarContent({
       const defaultOpen = childActive || normalizedNavQuery.length > 0;
       const itemOpen = hasChildren && (childActive || (expandedGroups[itemKey] ?? defaultOpen));
       const Icon = item.icon;
+      const rowHighlight = !item.disabled && (active || childActive);
       const rowBase = cn(
-        "group/item relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition",
-        depth > 0 ? "ml-3" : "",
-        active || childActive
-          ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-          : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+        "group/item flex min-h-10 items-center gap-1 rounded-lg pr-1 text-sm transition-colors outline-none",
+        depth > 0 ? "ml-1" : "",
+        item.disabled
+          ? "cursor-not-allowed text-[var(--sidebar-item-muted)] opacity-60"
+          : rowHighlight
+            ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] text-[var(--sidebar-foreground)]"
+            : "text-[var(--sidebar-item-muted)] hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)]"
       );
 
       const rowContent = (
         <>
+          <span
+            className={cn(
+              "h-5 w-0.5 shrink-0 rounded-full transition-colors",
+              active ? "bg-[var(--sidebar-primary)]" : "bg-transparent"
+            )}
+            aria-hidden
+          />
           <Icon
             className={cn(
               "h-4 w-4 shrink-0",
-              active ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/item:text-white"
+              active || childActive ? "text-[var(--sidebar-primary)]" : "opacity-90"
             )}
           />
-          <span className="min-w-0 truncate text-[13px] font-semibold">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{item.label}</span>
           {renderBadge(item)}
         </>
       );
 
       const row = item.disabled ? (
-        <div className={cn(rowBase, "cursor-not-allowed opacity-70")} aria-disabled="true" title="Not available yet">
+        <div className={cn(rowBase, "px-2")} aria-disabled="true" title="Not available yet">
           {rowContent}
         </div>
       ) : (
@@ -784,8 +807,11 @@ function SidebarContent({
           <Link
             href={item.href}
             onClick={isMobile ? onClose : undefined}
-            className="flex min-w-0 flex-1 items-center gap-2.5"
+            className={cn(
+              "flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+            )}
             aria-label={item.label}
+            aria-current={active ? "page" : undefined}
           >
             {rowContent}
           </Link>
@@ -797,17 +823,17 @@ function SidebarContent({
                 event.stopPropagation();
                 toggleNestedItem(itemKey, defaultOpen);
               }}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] transition hover:bg-black/10 hover:text-white"
+              className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
               aria-label={itemOpen ? `Collapse ${item.label}` : `Expand ${item.label}`}
             >
-              {itemOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {itemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           ) : sessionId && !collapsed ? (
             <button
               type="button"
               className={cn(
-                "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/item:opacity-100",
-                favorites.includes(item.href) ? "opacity-100 text-amber-200" : ""
+                "inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-primary)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 group-hover/item:opacity-100 md:min-h-8 md:min-w-8",
+                favorites.includes(item.href) ? "opacity-100 text-[var(--sidebar-primary)]" : ""
               )}
               onClick={(event) => {
                 event.preventDefault();
@@ -818,17 +844,17 @@ function SidebarContent({
               aria-label={favorites.includes(item.href) ? "Remove favorite" : "Add favorite"}
               title={favorites.includes(item.href) ? "Favorited" : "Favorite"}
             >
-              <Star className={cn("h-3.5 w-3.5", favorites.includes(item.href) ? "fill-amber-400 text-amber-200" : "")} />
+              <Star className={cn("h-4 w-4", favorites.includes(item.href) ? "fill-[var(--sidebar-primary)] text-[var(--sidebar-primary)]" : "")} />
             </button>
           ) : null}
         </div>
       );
 
       return (
-        <div key={itemKey} className="space-y-1">
+        <div key={itemKey} className="space-y-0.5">
           {row}
           {itemOpen ? (
-            <div className="space-y-1 border-l border-[var(--sidebar-rail-border)]/60 pl-2">
+            <div className="space-y-0.5 border-l border-white/[0.08] pl-2 ml-2">
               {item.children!.map((child) => renderExpandedItem(groupTitle, child, depth + 1))}
             </div>
           ) : null}
@@ -838,21 +864,26 @@ function SidebarContent({
 
   return (
     <div className="flex h-full min-h-0 flex-col" onMouseLeave={() => setFlyoutGroup(null)}>
-      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)]">
-        <div className="flex h-14 items-center gap-2.5 px-3.5 sm:px-4">
-          <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-xs font-semibold text-[var(--sidebar-primary)] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.9)]">
-            SF
-          </div>
+      <div className="sticky top-0 z-20 shrink-0 border-b border-white/[0.06] bg-[color-mix(in_oklab,var(--sidebar-surface)_96%,black_4%)]">
+        <div className="flex h-[3.25rem] items-center gap-2.5 px-3 sm:px-3.5">
+          <WorkspaceBrandMark size={32} variant="onSidebar" />
 
           {!collapsed ? (
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">
+            <div
+              className="min-w-0 flex-1"
+              title={`${brandConfig.systemProductName} — operational shell (internal)`}
+            >
+              <div className="truncate text-[13px] font-semibold leading-tight tracking-tight text-[var(--sidebar-foreground)]">
                 {brandConfig.companyName}
               </div>
-              <div className="truncate text-base font-semibold leading-tight tracking-tight text-white">{brandConfig.platformName}</div>
+              <div className="truncate text-[11px] font-medium text-[var(--sidebar-section-label)]">
+                {formatRoleLabel(role)} workspace
+              </div>
             </div>
           ) : (
-            <span className="sr-only">{brandConfig.platformName}</span>
+            <span className="sr-only">
+              {brandConfig.companyName}. {formatRoleLabel(role)} workspace.
+            </span>
           )}
 
           {!isMobile ? (
@@ -862,7 +893,7 @@ function SidebarContent({
                 setFlyoutGroup(null);
                 onToggleCollapse();
               }}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_70%,transparent)] text-[var(--sidebar-foreground)] transition hover:bg-[var(--sidebar-item-hover)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -872,7 +903,7 @@ function SidebarContent({
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_80%,transparent)] text-[var(--sidebar-foreground)]"
+              className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               aria-label="Close sidebar"
             >
               <X className="h-4 w-4" />
@@ -882,32 +913,29 @@ function SidebarContent({
       </div>
 
       {!collapsed ? (
-        <div className="shrink-0 border-b border-[var(--sidebar-rail-border)] px-3.5 py-3 sm:px-4">
-          <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_74%,transparent)] px-2.5 py-2">
-            <span className="min-w-0 truncate text-xs font-semibold text-white" title={formatRoleLabel(role)}>
+        <div className="shrink-0 space-y-2.5 border-b border-white/[0.06] px-3 py-2.5 sm:px-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex max-w-[65%] items-center truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]">
               {formatRoleLabel(role)}
             </span>
-            <span
-              className="shrink-0 rounded-md border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_74%,transparent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]"
-              title="Live session"
-            >
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/95">
+              <span className="size-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]" aria-hidden />
               Live
             </span>
           </div>
 
           {favoriteLinks.length > 0 ? (
-            <div className="mt-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">Favorites</div>
-              <div className="mt-1.5 space-y-0.5">
+            <div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+                Favorites
+              </div>
+              <div className="space-y-0.5">
                 {favoriteLinks.map((item) => (
-                  <div
-                    key={`fav-${item.href}`}
-                    className="group/fav flex items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-semibold text-[var(--sidebar-item-muted)] transition hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
-                  >
+                  <div key={`fav-${item.href}`} className="group/fav flex min-h-10 items-center gap-1 rounded-lg pr-1 hover:bg-white/[0.04]">
                     <Link
                       href={item.href}
                       onClick={isMobile ? onClose : undefined}
-                      className="min-w-0 flex-1 truncate"
+                      className="min-w-0 flex-1 truncate rounded-md px-2 py-2 text-[13px] font-medium text-[var(--sidebar-item-muted)] transition-colors hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                       aria-label={item.label}
                     >
                       {item.label}
@@ -915,7 +943,7 @@ function SidebarContent({
                     {sessionId ? (
                       <button
                         type="button"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-[var(--sidebar-item-muted)] opacity-0 transition hover:bg-black/10 hover:text-white group-hover/fav:opacity-100"
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] group-hover/fav:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -925,7 +953,7 @@ function SidebarContent({
                         aria-label="Remove favorite"
                         title="Remove favorite"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-4 w-4" />
                       </button>
                     ) : null}
                   </div>
@@ -934,27 +962,34 @@ function SidebarContent({
             </div>
           ) : null}
 
-          <div className="mt-2.5">
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-section-label)]">Modules</label>
-            <div className="relative mt-1.5">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
+          <div>
+            <label
+              htmlFor="sidebar-module-search"
+              className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]"
+            >
+              Modules
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)] opacity-80" />
               <input
+                id="sidebar-module-search"
                 type="search"
                 value={navQuery}
                 onChange={(event) => setNavQuery(event.target.value)}
-                placeholder="Filter modules"
-                className="h-9 w-full rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] pl-9 pr-2.5 text-sm font-medium text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-item-muted)] focus:border-[var(--sidebar-item-active-border)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-item-active-border)]/30"
+                placeholder="Search modules"
+                className="h-9 w-full rounded-lg bg-white/[0.04] pl-9 pr-2.5 text-sm text-[var(--sidebar-foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] placeholder:text-[var(--sidebar-item-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-ring)]/40"
               />
             </div>
           </div>
+
           <div
-            className="mt-2.5 rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-2 py-2"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/[0.06] pt-2.5"
             title="Layout preference for this browser only (not stored on the server)."
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
-                Width
-              </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+              View
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
               <ToggleGroup
                 type="single"
                 value={String(workspaceWidthPreset)}
@@ -964,13 +999,13 @@ function SidebarContent({
                   if (value !== "0" && value !== "1" && value !== "2") return;
                   onWorkspaceWidthPresetChange(clampWorkspaceWidthPreset(Number.parseInt(value, 10)));
                 }}
-                className="flex shrink-0 border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-0.5"
+                className="flex gap-0.5 rounded-md border-0 bg-transparent p-0 shadow-none"
               >
                 <ToggleGroupItem
                   value="0"
                   aria-label={`Compact: max content width ${WORKSPACE_WIDTH_CSS_VALUES[0]}`}
                   title={`Compact (${WORKSPACE_WIDTH_CSS_VALUES[0]} cap for components that respect workspace width)`}
-                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <PanelLeft className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
@@ -978,7 +1013,7 @@ function SidebarContent({
                   value="1"
                   aria-label={`Balanced: max content width ${WORKSPACE_WIDTH_CSS_VALUES[1]}`}
                   title={`Balanced (${WORKSPACE_WIDTH_CSS_VALUES[1]})`}
-                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <LayoutGrid className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
@@ -986,62 +1021,59 @@ function SidebarContent({
                   value="2"
                   aria-label={`Spacious: max content width ${WORKSPACE_WIDTH_CSS_VALUES[2]}`}
                   title={`Spacious (${WORKSPACE_WIDTH_CSS_VALUES[2]})`}
-                  className="h-8 w-8 border-transparent p-0 text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <Maximize2 className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
               </ToggleGroup>
+              {role === "ADMIN" ? (
+                <ToggleGroup
+                  type="single"
+                  value={operatorMode}
+                  data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
+                  aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
+                  title="Simple hides advanced finance modules in the sidebar. Advanced shows the full catalog."
+                  onValueChange={(value: string) => {
+                    if (value !== "SIMPLE" && value !== "ADVANCED") return;
+                    persistOperatorMode(value as OperatorMode);
+                  }}
+                  onClick={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
+                  }}
+                  className="gap-0 rounded-md border-0 bg-white/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
+                >
+                  <ToggleGroupItem
+                    value="SIMPLE"
+                    aria-label="Simple workflow view"
+                    onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
+                    className="h-7 rounded px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+                  >
+                    Simple
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="ADVANCED"
+                    aria-label="Advanced ERP view"
+                    onClick={() => persistOperatorMode("ADVANCED")}
+                    className="h-7 rounded px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+                  >
+                    Advanced
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              ) : null}
             </div>
           </div>
-          {role === "ADMIN" ? (
-            <div
-              className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-2 py-1.5"
-              title="Simple hides advanced finance modules in the sidebar. Advanced shows the full catalog."
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
-                Mode
-              </span>
-              <ToggleGroup
-                type="single"
-                value={operatorMode}
-                data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
-                aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
-                onValueChange={(value: string) => {
-                  if (value !== "SIMPLE" && value !== "ADVANCED") return;
-                  persistOperatorMode(value as OperatorMode);
-                }}
-                onClick={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
-                }}
-                className="shrink-0 border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] p-0.5"
-              >
-                <ToggleGroupItem
-                  value="SIMPLE"
-                  aria-label="Simple workflow view"
-                  onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
-                  className="border-transparent px-2.5 py-1.5 text-[11px] font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
-                >
-                  Simple
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="ADVANCED"
-                  aria-label="Advanced ERP view"
-                  onClick={() => persistOperatorMode("ADVANCED")}
-                  className="border-transparent px-2.5 py-1.5 text-[11px] font-semibold text-[var(--sidebar-item-muted)] hover:text-white data-[state=on]:border-[var(--sidebar-rail-border)] data-[state=on]:bg-[var(--sidebar-item-active)] data-[state=on]:text-white"
-                >
-                  Advanced
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-3.5" role="navigation" aria-label={`${formatRoleLabel(role)} sidebar navigation`}>
-        <div className="space-y-3">
+      <nav
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2 sm:px-3"
+        role="navigation"
+        aria-label={`${formatRoleLabel(role)} sidebar navigation`}
+      >
+        <div className="space-y-4">
           {visibleGroups.length === 0 && !collapsed ? (
-            <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] px-3 py-3 text-xs text-[var(--sidebar-item-muted)]">
+            <div className="rounded-lg bg-white/[0.03] px-3 py-2.5 text-xs text-[var(--sidebar-item-muted)]">
               No navigation matches for &quot;{navQuery.trim()}&quot;.
             </div>
           ) : null}
@@ -1080,11 +1112,11 @@ function SidebarContent({
                   type="button"
                   onClick={() => toggleGroup(group.title, defaultOpen)}
                   className={cn(
-                    "group/nav relative flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition",
-                    collapsed ? "justify-center" : "",
+                    "flex w-full min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45",
+                    collapsed ? "min-h-10 min-w-10 justify-center px-0" : "",
                     groupActive
-                      ? "border-[var(--sidebar-item-active-border)] bg-[var(--sidebar-item-active)] text-white"
-                      : "border-transparent text-[var(--sidebar-item-muted)] hover:border-[var(--sidebar-rail-border)] hover:bg-[var(--sidebar-item-hover)] hover:text-white"
+                      ? "text-[var(--sidebar-foreground)]"
+                      : "text-[var(--sidebar-section-label)] hover:bg-white/[0.04] hover:text-[var(--sidebar-foreground)]"
                   )}
                   aria-expanded={collapsed ? flyoutOpen : groupOpen}
                   aria-haspopup={collapsed ? "menu" : undefined}
@@ -1092,14 +1124,16 @@ function SidebarContent({
                 >
                   <GroupIcon
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      groupActive ? "text-[var(--sidebar-primary)]" : "text-[var(--sidebar-item-muted)] group-hover/nav:text-white"
+                      "h-4 w-4 shrink-0 opacity-90",
+                      groupActive ? "text-[var(--sidebar-primary)]" : ""
                     )}
                   />
                   {!collapsed ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[0.01em]">{group.title}</span>
-                      {groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      <span className="min-w-0 flex-1 truncate normal-case tracking-normal text-[13px] font-semibold">
+                        {group.title}
+                      </span>
+                      {groupOpen ? <ChevronDown className="h-4 w-4 shrink-0 opacity-70" /> : <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />}
                     </>
                   ) : (
                     <>
@@ -1118,14 +1152,14 @@ function SidebarContent({
                       recentRoutes={recentLinks}
                       primaryAction={group.items[0] ? { label: `Open ${group.items[0].label}`, href: group.items[0].href } : undefined}
                     />
-                    <div className="absolute left-full top-[14.5rem] z-50 ml-3 w-72 rounded-2xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] p-2 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.62)]">
-                      <div className="space-y-1">{group.items.map((item) => renderFlyoutItem(group.title, item))}</div>
+                    <div className="absolute left-full top-[14.5rem] z-50 ml-3 w-72 rounded-xl bg-[color-mix(in_oklab,var(--sidebar-surface)_94%,black_6%)] p-2 shadow-[0_22px_50px_-34px_rgba(28,25,23,0.55)] ring-1 ring-white/[0.08]">
+                      <div className="space-y-0.5">{group.items.map((item) => renderFlyoutItem(group.title, item))}</div>
                     </div>
                   </div>
                 ) : null}
 
                 {groupOpen ? (
-                  <div className="space-y-1.5 border-l border-[var(--sidebar-rail-border)]/80 pl-4">
+                  <div className="space-y-0.5 border-l border-white/[0.08] pl-2 ml-1.5">
                     {group.items.map((item) => renderExpandedItem(group.title, item))}
                   </div>
                 ) : null}
@@ -1135,30 +1169,30 @@ function SidebarContent({
         </div>
       </nav>
 
-      <div className="sticky bottom-0 z-10 shrink-0 border-t border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] p-2.5 sm:p-3">
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] bg-[color-mix(in_oklab,var(--sidebar-surface)_97%,black_3%)] px-3 py-3 sm:px-3.5">
         {!collapsed ? (
-          <div className="rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_76%,transparent)] p-2.5 sm:p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-white">{displayName}</div>
-                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-section-label)]">
-                  {formatRoleLabel(role)}
-                </div>
+          <>
+            <div className="flex items-center gap-3">
+              <WorkspaceBrandMark size={36} variant="onSidebar" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-[var(--sidebar-foreground)]">{displayName}</div>
+                <div className="truncate text-[11px] text-[var(--sidebar-section-label)]">{formatRoleLabel(role)}</div>
               </div>
               <Link
                 href={getSettingsHref(role)}
                 onClick={isMobile ? onClose : undefined}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                 title="Settings"
+                aria-label="Settings"
               >
                 <Settings className="h-4 w-4" />
               </Link>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 flex gap-2">
               <Link
                 href={getProfileHref(role)}
                 onClick={isMobile ? onClose : undefined}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-white/[0.05] text-xs font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               >
                 Profile
               </Link>
@@ -1166,18 +1200,30 @@ function SidebarContent({
                 type="button"
                 onClick={onLogout}
                 disabled={isLoggingOut}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-white/[0.05] text-xs font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoggingOut ? "Logging out..." : "Logout"}
               </button>
             </div>
-          </div>
+          </>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div className="group relative">
               <Link
+                href={getProfileHref(role)}
+                onClick={isMobile ? onClose : undefined}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                title={`Profile — ${displayName}`}
+                aria-label={`Profile — ${displayName}`}
+              >
+                <WorkspaceBrandMark size={28} variant="onSidebar" />
+              </Link>
+              <RailTooltip label={`Profile (${displayName})`} />
+            </div>
+            <div className="group relative">
+              <Link
                 href={getSettingsHref(role)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-white transition hover:bg-[var(--sidebar-item-hover)]"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                 title="Settings"
                 aria-label="Settings"
               >
@@ -1190,7 +1236,7 @@ function SidebarContent({
                 type="button"
                 onClick={onLogout}
                 disabled={isLoggingOut}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface-alt)_82%,transparent)] text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
                 title="Logout"
                 aria-label="Logout"
               >
@@ -1308,6 +1354,7 @@ function Topbar({
             <ReceiptText className="h-4 w-4 shrink-0" />
             <span className="max-[380px]:sr-only">Quick Actions</span>
           </button>
+          <ThemeToggle variant="dashboard" />
           <NotificationBellDropdown role={role} />
           <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
         </div>

@@ -241,10 +241,10 @@ export function WorkflowLane({
   steps: WorkflowLaneStep[];
 }) {
   const toneClass = (tone: WorkflowLaneStep["tone"]) => {
-    if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-900";
-    if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-900";
-    if (tone === "danger") return "border-red-200 bg-red-50 text-red-900";
-    return "border-border bg-[var(--surface-card-elevated)] text-foreground";
+    if (tone === "success") return "chip-tone-success";
+    if (tone === "warning") return "chip-tone-warning";
+    if (tone === "danger") return "chip-tone-danger";
+    return "border border-border bg-[var(--surface-card-elevated)] text-foreground";
   };
 
   return (
@@ -254,7 +254,7 @@ export function WorkflowLane({
         {steps.map((step) => (
           <div
             key={step.label}
-            className={cn("min-w-[11rem] rounded-xl border px-3 py-2", toneClass(step.tone))}
+            className={cn("min-w-[11rem] rounded-xl px-3 py-2", toneClass(step.tone))}
           >
             <p className="text-[11px] font-semibold uppercase tracking-wide">{step.label}</p>
             {step.value ? <p className="mt-1 text-sm font-semibold">{step.value}</p> : null}

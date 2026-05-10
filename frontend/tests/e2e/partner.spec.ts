@@ -52,8 +52,10 @@ test("partner customers detail flow and payments history work", async ({
   } else {
     await searchBox.fill("");
     await page.getByRole("button", { name: "Apply" }).click();
-    const firstDetailLink = page.getByRole("link", { name: /View Detail/i }).first();
-    const hasDetailLink = await firstDetailLink.isVisible().catch(() => false);
+    const firstDetailLink = page.locator("tr").getByRole("link", {
+      name: /View Detail/i,
+    }).first();
+    const hasDetailLink = (await firstDetailLink.count()) > 0;
     if (!hasDetailLink) {
       await expect(page.locator("body")).toContainText(
         /No customers found|Unable to load partner customers|Failed to fetch/i

@@ -48,30 +48,30 @@ type PortalPageProps = {
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
   switch (variant) {
     case "primary":
-      return "border-primary/80 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(30,64,175,0.62)] hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]";
+      return "border-primary/85 bg-primary text-primary-foreground shadow-[0_16px_36px_-22px_color-mix(in_oklab,var(--primary)_38%,transparent)] hover:bg-[color-mix(in_oklab,var(--primary)_88%,black_12%)]";
     case "danger":
       return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)]";
     case "ghost":
       return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]";
     case "secondary":
     default:
-      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
+      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
   }
 }
 
 function getToneClassName(tone: PortalStat["tone"] | PortalStatusBadge["tone"] = "default") {
   switch (tone) {
     case "success":
-      return "border-emerald-200/80 bg-emerald-50/90 text-emerald-900";
+      return "chip-tone-success font-semibold";
     case "warning":
-      return "border-amber-200/80 bg-amber-50/90 text-amber-900";
+      return "chip-tone-warning font-semibold";
     case "danger":
-      return "border-red-200/80 bg-red-50/90 text-red-900";
+      return "chip-tone-danger font-semibold";
     case "info":
-      return "border-sky-200/80 bg-sky-50/90 text-sky-900";
+      return "chip-tone-info font-semibold";
     case "default":
     default:
-      return "border-slate-300 bg-slate-100 text-foreground";
+      return "border-border bg-muted text-foreground";
   }
 }
 
@@ -177,7 +177,7 @@ export default function PortalPage({
                   {statusBadge ? (
                     <span
                       className={cn(
-                        "workspace-pill mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                        "mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                         getToneClassName(statusBadge.tone)
                       )}
                     >
@@ -203,12 +203,12 @@ export default function PortalPage({
                   {helperNote ? (
                     <div
                       className={cn(
-                        "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
+                        "mt-3 inline-flex max-w-4xl items-start rounded-xl px-3 py-2 text-xs font-medium leading-6",
                         helperTone === "warning"
-                          ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                          ? "chip-tone-warning"
                           : helperTone === "info"
-                            ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-                            : "border-border bg-[var(--surface-muted)] text-foreground"
+                            ? "chip-tone-info"
+                            : "border border-border bg-[var(--surface-muted)] text-foreground"
                       )}
                     >
                       {helperNote}
@@ -249,7 +249,7 @@ export default function PortalPage({
                   {statusBadge ? (
                     <span
                       className={cn(
-                        "workspace-pill inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold",
+                        "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold",
                         getToneClassName(statusBadge.tone)
                       )}
                     >
@@ -305,7 +305,7 @@ export default function PortalPage({
                 {stats.map((stat, index) => (
                   <div
                     key={`${stat.label}-${index}`}
-                    className="rounded-[1.1rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.28)]"
+                    className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
                   >
                     <div className="enterprise-eyebrow">{stat.label}</div>
 
@@ -313,13 +313,13 @@ export default function PortalPage({
                       className={cn(
                         "enterprise-metric mt-2",
                         stat.tone === "success"
-                          ? "text-emerald-800"
+                          ? "text-[var(--semantic-success-fg)]"
                           : stat.tone === "warning"
-                            ? "text-amber-800"
+                            ? "text-[var(--semantic-warning-fg)]"
                             : stat.tone === "danger"
-                              ? "text-red-800"
+                              ? "text-[var(--semantic-danger-fg)]"
                               : stat.tone === "info"
-                                ? "text-sky-800"
+                                ? "text-[var(--semantic-info-fg)]"
                                 : "text-foreground"
                       )}
                     >

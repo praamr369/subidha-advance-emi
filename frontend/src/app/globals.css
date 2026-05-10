@@ -1,58 +1,78 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (html.dark) for Tailwind `dark:` utilities */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Manrope", "Satoshi", "Avenir Next", "Segoe UI Variable", sans-serif;
 }
 
 :root {
-  --background: oklch(0.966 0.006 253);
-  --foreground: oklch(0.23 0.018 258);
+  /* Warm retail workspace — brown/gold brand, soft neutrals (not cold blue-gray) */
+  --background: oklch(0.985 0.006 82);
+  --foreground: oklch(0.24 0.022 72);
 
-  --card: oklch(0.995 0.002 250);
-  --card-foreground: oklch(0.2 0.017 258);
+  --card: oklch(0.998 0.004 82);
+  --card-foreground: oklch(0.22 0.02 72);
 
-  --popover: oklch(0.998 0.002 250);
-  --popover-foreground: oklch(0.2 0.017 258);
+  --popover: oklch(0.998 0.004 82);
+  --popover-foreground: oklch(0.22 0.02 72);
 
-  --primary: oklch(0.39 0.083 255);
-  --primary-foreground: oklch(0.986 0.003 250);
+  --primary: oklch(0.44 0.078 62);
+  --primary-foreground: oklch(0.985 0.01 95);
 
-  --secondary: oklch(0.942 0.007 252);
-  --secondary-foreground: oklch(0.25 0.016 258);
+  --secondary: oklch(0.945 0.008 82);
+  --secondary-foreground: oklch(0.26 0.02 72);
 
-  --muted: oklch(0.95 0.006 253);
-  --muted-foreground: oklch(0.49 0.015 260);
+  --muted: oklch(0.952 0.007 82);
+  --muted-foreground: oklch(0.46 0.018 78);
 
-  --accent: oklch(0.907 0.03 84);
-  --accent-foreground: oklch(0.28 0.02 74);
-  --success: oklch(0.67 0.14 156);
-  --success-foreground: oklch(0.2 0.02 158);
-  --warning: oklch(0.77 0.14 86);
-  --warning-foreground: oklch(0.25 0.03 84);
-  --danger: oklch(0.61 0.22 28);
+  --accent: oklch(0.93 0.028 78);
+  --accent-foreground: oklch(0.3 0.03 72);
+  --success: oklch(0.48 0.09 145);
+  --success-foreground: oklch(0.985 0.01 95);
+  --warning: oklch(0.62 0.12 76);
+  --warning-foreground: oklch(0.22 0.04 72);
+  --danger: oklch(0.52 0.18 28);
   --danger-foreground: oklch(0.985 0 0);
-  --info: oklch(0.69 0.11 230);
-  --info-foreground: oklch(0.23 0.03 232);
+  --info: oklch(0.52 0.09 240);
+  --info-foreground: oklch(0.985 0.01 250);
 
-  --destructive: oklch(0.58 0.22 27);
+  --destructive: oklch(0.52 0.18 28);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.873 0.011 253);
-  --input: oklch(0.866 0.011 253);
-  --ring: oklch(0.51 0.08 255);
+  --border: oklch(0.88 0.012 82);
+  --input: oklch(0.87 0.012 82);
+  --ring: oklch(0.52 0.085 62);
 
-  --surface-shell: oklch(0.973 0.004 251);
-  --surface-content: oklch(0.982 0.003 250);
-  --surface-card: oklch(0.997 0.002 250);
-  --surface-card-elevated: oklch(1 0 0);
-  --surface-card-soft: oklch(0.986 0.004 251);
+  /* Semantic surfaces for badges, posture cards, alerts (theme-aware) */
+  --semantic-success-bg: color-mix(in oklab, oklch(0.94 0.02 135) 88%, var(--card) 12%);
+  --semantic-success-border: color-mix(in oklab, oklch(0.58 0.06 135) 26%, var(--border) 74%);
+  --semantic-success-fg: oklch(0.3 0.07 135);
+  --semantic-warning-bg: color-mix(in oklab, oklch(0.96 0.035 76) 88%, var(--card) 12%);
+  --semantic-warning-border: color-mix(in oklab, oklch(0.68 0.1 76) 28%, var(--border) 72%);
+  --semantic-warning-fg: oklch(0.32 0.07 72);
+  --semantic-info-bg: color-mix(in oklab, oklch(0.94 0.025 240) 88%, var(--card) 12%);
+  --semantic-info-border: color-mix(in oklab, oklch(0.58 0.08 240) 24%, var(--border) 76%);
+  --semantic-info-fg: oklch(0.3 0.07 245);
+  --semantic-danger-bg: color-mix(in oklab, oklch(0.95 0.03 25) 88%, var(--card) 12%);
+  --semantic-danger-border: color-mix(in oklab, oklch(0.58 0.16 25) 28%, var(--border) 72%);
+  --semantic-danger-fg: oklch(0.34 0.11 25);
+  --badge-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  --hairline-shine: rgba(255, 255, 255, 0.55);
+
+  --surface-shell: oklch(0.978 0.005 82);
+  --surface-content: oklch(0.985 0.004 82);
+  --surface-card: oklch(0.995 0.004 82);
+  --surface-card-elevated: oklch(1 0.002 82);
+  --surface-card-soft: oklch(0.988 0.005 82);
   --surface-card-glass: color-mix(in oklab, var(--surface-card-elevated) 82%, transparent);
-  --surface-inset: oklch(0.952 0.006 252);
+  --surface-inset: oklch(0.955 0.007 82);
   --surface-accent-soft: color-mix(in oklab, var(--accent) 22%, var(--surface-card-elevated) 78%);
-  --surface-muted: oklch(0.957 0.005 251);
-  --surface-strong: oklch(0.939 0.01 252);
-  --surface-border-strong: oklch(0.84 0.014 253);
-  --surface-panel-outline: oklch(0.806 0.016 253);
+  --surface-muted: oklch(0.958 0.006 82);
+  --surface-strong: oklch(0.94 0.009 82);
+  --surface-border-strong: oklch(0.84 0.014 82);
+  --surface-panel-outline: oklch(0.805 0.016 82);
   --surface-shadow: 0 24px 56px -42px rgba(15, 23, 42, 0.56);
   --surface-shadow-lg: 0 34px 72px -46px rgba(15, 23, 42, 0.62);
   --popup-shadow-xl: 0 32px 90px -42px rgba(15, 23, 42, 0.78),
@@ -60,32 +80,33 @@
   --popup-shadow-drawer: -26px 0 90px -54px rgba(15, 23, 42, 0.7),
     -44px 0 160px -108px rgba(15, 23, 42, 0.55);
 
-  --sidebar-surface: oklch(0.236 0.023 258);
-  --sidebar-surface-alt: oklch(0.281 0.025 258);
-  --sidebar-rail-border: oklch(0.37 0.021 258);
-  --sidebar-section-label: oklch(0.77 0.014 255);
-  --sidebar-item-muted: oklch(0.88 0.01 255);
-  --sidebar-item-hover: oklch(0.316 0.03 258);
-  --sidebar-item-active: oklch(0.345 0.035 256);
-  --sidebar-item-active-border: oklch(0.77 0.055 90);
+  /* Warm charcoal sidebar (Subidha ERP shell) */
+  --sidebar-surface: oklch(0.245 0.022 68);
+  --sidebar-surface-alt: oklch(0.288 0.024 72);
+  --sidebar-rail-border: oklch(0.38 0.02 78);
+  --sidebar-section-label: oklch(0.72 0.018 88);
+  --sidebar-item-muted: oklch(0.86 0.014 88);
+  --sidebar-item-hover: oklch(0.33 0.028 75);
+  --sidebar-item-active: oklch(0.4 0.048 82);
+  --sidebar-item-active-border: oklch(0.78 0.07 85);
 
-  --topbar-surface: oklch(0.986 0.002 250);
-  --topbar-border: oklch(0.86 0.011 253);
+  --topbar-surface: oklch(0.988 0.004 82);
+  --topbar-border: oklch(0.86 0.012 82);
   --topbar-control: color-mix(in oklab, var(--surface-card-elevated) 88%, var(--surface-muted) 12%);
   --workspace-max-width: 1800px;
   --workspace-max-width-tight: 1380px;
   --workspace-gap: 1.35rem;
   --workspace-shell-grid: rgba(15, 23, 42, 0.042);
   --workspace-shell-highlight: rgba(255, 255, 255, 0.72);
-  --workspace-pill: oklch(0.972 0.004 251);
+  --workspace-pill: oklch(0.972 0.006 82);
   --auth-shell: rgba(255, 255, 255, 0.94);
   --auth-shell-border: rgba(148, 163, 184, 0.22);
 
   --focus-glow: 0 0 0 3px color-mix(in oklab, var(--primary) 22%, transparent);
   --focus-ring-color: color-mix(in oklab, var(--primary) 80%, black 20%);
   --focus-ring-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 28%, transparent);
-  --control-bg: oklch(0.997 0.001 251);
-  --control-bg-soft: oklch(0.961 0.005 250);
+  --control-bg: oklch(0.998 0.003 82);
+  --control-bg-soft: oklch(0.962 0.006 82);
 
   --radius: 0.875rem;
   --radius-sm: calc(var(--radius) - 4px);
@@ -100,55 +121,169 @@
   --chart-5: oklch(0.55 0.12 14);
 
   --sidebar: var(--sidebar-surface);
-  --sidebar-foreground: oklch(0.94 0.01 255);
-  --sidebar-primary: oklch(0.73 0.056 88);
-  --sidebar-primary-foreground: oklch(0.23 0.022 74);
+  --sidebar-foreground: oklch(0.94 0.012 88);
+  --sidebar-primary: oklch(0.76 0.06 78);
+  --sidebar-primary-foreground: oklch(0.22 0.022 72);
   --sidebar-accent: var(--sidebar-item-hover);
-  --sidebar-accent-foreground: oklch(0.965 0.006 250);
+  --sidebar-accent-foreground: oklch(0.965 0.008 88);
   --sidebar-border: var(--sidebar-rail-border);
   --sidebar-ring: oklch(0.72 0.055 88);
 }
 
+/* Status chips — semantic tokens (readable in light + dark) */
+.chip-tone-success {
+  border: 1px solid var(--semantic-success-border);
+  background: var(--semantic-success-bg);
+  color: var(--semantic-success-fg);
+  box-shadow: var(--badge-inset-highlight);
+}
+.chip-tone-warning {
+  border: 1px solid var(--semantic-warning-border);
+  background: var(--semantic-warning-bg);
+  color: var(--semantic-warning-fg);
+  box-shadow: var(--badge-inset-highlight);
+}
+.chip-tone-danger {
+  border: 1px solid var(--semantic-danger-border);
+  background: var(--semantic-danger-bg);
+  color: var(--semantic-danger-fg);
+  box-shadow: var(--badge-inset-highlight);
+}
+.chip-tone-info {
+  border: 1px solid var(--semantic-info-border);
+  background: var(--semantic-info-bg);
+  color: var(--semantic-info-fg);
+  box-shadow: var(--badge-inset-highlight);
+}
+
+/* Large dashboard posture / reconciliation callouts */
+.dashboard-posture-success {
+  border: 1px solid var(--semantic-success-border);
+  background: var(--semantic-success-bg);
+  color: var(--card-foreground);
+}
+.dashboard-posture-warning {
+  border: 1px solid var(--semantic-warning-border);
+  background: var(--semantic-warning-bg);
+  color: var(--card-foreground);
+}
+.dashboard-posture-info {
+  border: 1px solid var(--semantic-info-border);
+  background: var(--semantic-info-bg);
+  color: var(--card-foreground);
+}
+
+.dashboard-posture-danger {
+  border: 1px solid var(--semantic-danger-border);
+  background: var(--semantic-danger-bg);
+  color: var(--card-foreground);
+}
+
 .dark {
-  --background: oklch(0.205 0.016 258);
-  --foreground: oklch(0.965 0.006 250);
-  --card: oklch(0.235 0.016 258);
-  --card-foreground: oklch(0.965 0.006 250);
-  --popover: oklch(0.235 0.016 258);
-  --popover-foreground: oklch(0.965 0.006 250);
-  --primary: oklch(0.72 0.075 88);
-  --primary-foreground: oklch(0.23 0.021 74);
-  --secondary: oklch(0.3 0.018 258);
-  --secondary-foreground: oklch(0.965 0.006 250);
-  --muted: oklch(0.285 0.018 258);
-  --muted-foreground: oklch(0.77 0.012 255);
-  --accent: oklch(0.37 0.03 88);
-  --accent-foreground: oklch(0.97 0.006 250);
-  --success: oklch(0.71 0.11 156);
-  --success-foreground: oklch(0.19 0.02 158);
-  --warning: oklch(0.78 0.13 86);
-  --warning-foreground: oklch(0.22 0.03 84);
-  --danger: oklch(0.68 0.2 28);
-  --danger-foreground: oklch(0.985 0 0);
-  --info: oklch(0.75 0.09 230);
-  --info-foreground: oklch(0.2 0.03 232);
-  --destructive: oklch(0.64 0.2 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.35 0.018 258);
-  --input: oklch(0.35 0.018 258);
-  --ring: oklch(0.72 0.075 88);
-  --sidebar: oklch(0.19 0.014 258);
-  --sidebar-foreground: oklch(0.95 0.007 250);
-  --sidebar-primary: oklch(0.72 0.075 88);
-  --sidebar-primary-foreground: oklch(0.24 0.02 74);
-  --sidebar-accent: oklch(0.29 0.022 258);
-  --sidebar-accent-foreground: oklch(0.95 0.007 250);
-  --sidebar-border: oklch(0.32 0.02 258);
-  --sidebar-ring: oklch(0.72 0.075 88);
-  --surface-card-glass: color-mix(in oklab, var(--surface-card) 74%, transparent);
-  --surface-inset: oklch(0.24 0.016 258);
-  --surface-accent-soft: color-mix(in oklab, var(--accent) 22%, var(--surface-card) 78%);
-  --topbar-control: color-mix(in oklab, var(--surface-card) 90%, var(--surface-muted) 10%);
+  /* Soft warm charcoal — premium ERP dark, not pure black */
+  --background: oklch(0.225 0.014 72);
+  --foreground: oklch(0.94 0.012 88);
+  --card: oklch(0.265 0.016 74);
+  --card-foreground: oklch(0.94 0.012 88);
+  --popover: oklch(0.28 0.016 74);
+  --popover-foreground: oklch(0.94 0.012 88);
+  --primary: oklch(0.74 0.07 78);
+  --primary-foreground: oklch(0.2 0.022 72);
+  --secondary: oklch(0.32 0.016 74);
+  --secondary-foreground: oklch(0.94 0.012 88);
+  --muted: oklch(0.32 0.015 74);
+  --muted-foreground: oklch(0.78 0.014 86);
+  --accent: oklch(0.34 0.03 78);
+  --accent-foreground: oklch(0.94 0.012 88);
+  /* Muted success — deep forest, not mint */
+  --success: oklch(0.52 0.08 145);
+  --success-foreground: oklch(0.94 0.03 150);
+  --warning: oklch(0.68 0.1 76);
+  --warning-foreground: oklch(0.2 0.03 72);
+  --danger: oklch(0.58 0.16 25);
+  --danger-foreground: oklch(0.98 0.01 95);
+  --info: oklch(0.58 0.08 240);
+  --info-foreground: oklch(0.94 0.02 250);
+  --destructive: oklch(0.58 0.16 25);
+  --destructive-foreground: oklch(0.98 0.01 95);
+  --border: oklch(0.38 0.018 76);
+  --input: oklch(0.34 0.016 74);
+  --ring: oklch(0.7 0.07 76);
+
+  /* Large surfaces: stay near card luminance — tint is border-forward, not mint panels */
+  --semantic-success-bg: color-mix(in oklab, oklch(0.27 0.022 138) 72%, var(--card) 28%);
+  --semantic-success-border: color-mix(in oklab, oklch(0.45 0.05 140) 38%, var(--border) 62%);
+  --semantic-success-fg: oklch(0.86 0.04 145);
+  --semantic-warning-bg: color-mix(in oklab, oklch(0.34 0.045 72) 90%, var(--card) 10%);
+  --semantic-warning-border: color-mix(in oklab, oklch(0.55 0.08 72) 40%, var(--border) 60%);
+  --semantic-warning-fg: oklch(0.9 0.04 78);
+  --semantic-info-bg: color-mix(in oklab, oklch(0.3 0.04 250) 90%, var(--card) 10%);
+  --semantic-info-border: color-mix(in oklab, oklch(0.48 0.07 250) 40%, var(--border) 60%);
+  --semantic-info-fg: oklch(0.88 0.04 250);
+  --semantic-danger-bg: color-mix(in oklab, oklch(0.32 0.06 25) 90%, var(--card) 10%);
+  --semantic-danger-border: color-mix(in oklab, oklch(0.52 0.14 25) 42%, var(--border) 58%);
+  --semantic-danger-fg: oklch(0.9 0.04 25);
+  --badge-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --hairline-shine: rgba(255, 255, 255, 0.08);
+
+  --surface-shell: oklch(0.215 0.012 72);
+  --surface-content: oklch(0.205 0.011 70);
+  --surface-card: oklch(0.238 0.014 72);
+  --surface-card-elevated: oklch(0.265 0.016 74);
+  --surface-card-soft: oklch(0.232 0.013 72);
+  --surface-card-glass: color-mix(in oklab, var(--surface-card) 78%, transparent);
+  --surface-inset: oklch(0.245 0.014 73);
+  --surface-accent-soft: color-mix(in oklab, var(--accent) 24%, var(--surface-card) 76%);
+  --surface-muted: oklch(0.29 0.014 73);
+  --surface-strong: oklch(0.33 0.016 75);
+  --surface-border-strong: oklch(0.4 0.018 78);
+  --surface-panel-outline: oklch(0.38 0.017 77);
+  --surface-shadow: 0 24px 56px -42px rgba(0, 0, 0, 0.55);
+  --surface-shadow-lg: 0 34px 72px -46px rgba(0, 0, 0, 0.58);
+  --popup-shadow-xl: 0 32px 90px -42px rgba(0, 0, 0, 0.65), 0 60px 160px -88px rgba(0, 0, 0, 0.45);
+  --popup-shadow-drawer: -26px 0 90px -54px rgba(0, 0, 0, 0.55), -44px 0 160px -108px rgba(0, 0, 0, 0.42);
+
+  --topbar-surface: oklch(0.22 0.012 72);
+  --topbar-border: oklch(0.36 0.016 75);
+  --topbar-control: color-mix(in oklab, var(--surface-card) 88%, var(--surface-muted) 12%);
+
+  --workspace-shell-grid: rgba(255, 255, 255, 0.038);
+  --workspace-shell-highlight: rgba(255, 255, 255, 0.055);
+  --workspace-pill: oklch(0.27 0.014 73);
+  --auth-shell: rgba(28, 26, 24, 0.92);
+  --auth-shell-border: rgba(255, 255, 255, 0.12);
+
+  --control-bg: oklch(0.26 0.014 73);
+  --control-bg-soft: oklch(0.3 0.015 74);
+
+  --focus-glow: 0 0 0 3px color-mix(in oklab, var(--primary) 26%, transparent);
+  --focus-ring-color: color-mix(in oklab, var(--primary) 78%, white 22%);
+  --focus-ring-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 32%, transparent);
+
+  --chart-1: oklch(0.62 0.1 82);
+  --chart-2: oklch(0.65 0.08 210);
+  --chart-3: oklch(0.74 0.095 85);
+  --chart-4: oklch(0.66 0.11 36);
+  --chart-5: oklch(0.58 0.12 14);
+
+  /* Premium warm sidebar rails (aligned with light-mode shell) */
+  --sidebar-surface: oklch(0.2 0.022 72);
+  --sidebar-surface-alt: oklch(0.235 0.024 74);
+  --sidebar-rail-border: oklch(0.36 0.02 78);
+  --sidebar-section-label: oklch(0.68 0.02 86);
+  --sidebar-item-muted: oklch(0.78 0.016 88);
+  --sidebar-item-hover: oklch(0.32 0.03 76);
+  --sidebar-item-active: oklch(0.4 0.05 82);
+  --sidebar-item-active-border: oklch(0.76 0.07 85);
+
+  --sidebar: var(--sidebar-surface);
+  --sidebar-foreground: oklch(0.94 0.012 88);
+  --sidebar-primary: oklch(0.73 0.058 86);
+  --sidebar-primary-foreground: oklch(0.22 0.022 74);
+  --sidebar-accent: var(--sidebar-item-hover);
+  --sidebar-accent-foreground: oklch(0.96 0.008 88);
+  --sidebar-border: var(--sidebar-rail-border);
+  --sidebar-ring: oklch(0.72 0.058 86);
 }
 
 html {
@@ -156,7 +291,7 @@ html {
   font-size: 16px;
 }
 
-.dark html {
+html.dark {
   color-scheme: dark;
 }
 
@@ -193,6 +328,28 @@ body {
   overflow-x: clip;
 }
 
+.dark body {
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in oklab, var(--primary) 12%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 92% 4%,
+      color-mix(in oklab, var(--accent) 10%, transparent),
+      transparent 42%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--workspace-shell-grid) 0,
+      var(--workspace-shell-grid) 1px,
+      transparent 1px,
+      transparent 88px
+    ),
+    linear-gradient(180deg, color-mix(in oklab, var(--background) 94%, black 6%), var(--background));
+}
+
 .public-app {
   min-height: 100vh;
   /* Warm retail brown primary for marketing + auth only (dashboard uses .dashboard-app). */
@@ -227,6 +384,38 @@ body {
     linear-gradient(180deg, #fbfaf7 0%, #f4f0eb 55%, #ebe6df 100%);
 }
 
+.dark .public-app {
+  --primary: oklch(0.7 0.068 76);
+  --primary-foreground: oklch(0.98 0.01 95);
+  --ring: oklch(0.62 0.075 74);
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in oklab, var(--accent) 14%, transparent),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 92% 6%,
+      color-mix(in oklab, oklch(0.42 0.04 58) 18%, transparent),
+      transparent 46%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0,
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px,
+      transparent 84px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.025) 0,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 84px
+    ),
+    linear-gradient(180deg, oklch(0.22 0.014 72) 0%, oklch(0.19 0.012 68) 55%, oklch(0.175 0.01 65) 100%);
+}
+
 /* Shared focus treatment for public marketing + lead forms */
 .public-app .public-control-focus {
   outline: none;
@@ -249,12 +438,26 @@ body {
   backdrop-filter: blur(10px);
 }
 
+.dark .public-nav {
+  border-bottom-color: color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--surface-card-elevated) 82%, transparent);
+}
+
 .public-footer {
   border-top: 1px solid color-mix(in oklab, var(--border) 75%, white 25%);
   background: linear-gradient(
     180deg,
     color-mix(in oklab, white 90%, var(--surface-muted) 10%),
     color-mix(in oklab, white 82%, var(--surface-muted) 18%)
+  );
+}
+
+.dark .public-footer {
+  border-top-color: color-mix(in oklab, var(--border) 65%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--surface-card) 88%, var(--surface-muted) 12%),
+    color-mix(in oklab, var(--surface-card-soft) 78%, var(--surface-muted) 22%)
   );
 }
 
@@ -395,6 +598,14 @@ textarea::placeholder {
   background: color-mix(in oklab, var(--primary) 80%, black);
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--muted-foreground) 42%, var(--muted) 58%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 55%, var(--muted) 45%);
+}
+
 /* Focus outline */
 :focus-visible {
   outline: 2px solid var(--focus-ring-color);
@@ -492,6 +703,15 @@ a, button, input, select, textarea {
     transparent
   );
   animation: skeleton-shimmer 1.45s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 12%, transparent),
+    transparent
+  );
 }
 
 @keyframes skeleton-shimmer {
@@ -650,6 +870,299 @@ button {
     );
 }
 
+.dark .dashboard-app {
+  background:
+    radial-gradient(
+      circle at 8% 2%,
+      color-mix(in oklab, var(--primary) 8%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 86% -2%,
+      color-mix(in oklab, var(--accent) 8%, transparent),
+      transparent 38%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--workspace-shell-grid) 0,
+      var(--workspace-shell-grid) 1px,
+      transparent 1px,
+      transparent 96px
+    ),
+    linear-gradient(180deg, var(--surface-shell), var(--surface-content));
+}
+
+/* Dark dashboard: flat token surfaces — no bright white/mint gradients on large chrome */
+.dark .dashboard-app .surface-panel,
+.dark .dashboard-app .surface-inset,
+.dark .dashboard-app .surface-subtle {
+  background: var(--surface-card);
+  border-color: var(--border);
+  box-shadow: var(--surface-shadow);
+}
+
+.dark .dashboard-app .surface-panel-elevated {
+  background: var(--surface-card-elevated);
+  border-color: var(--border);
+  box-shadow: var(--surface-shadow-lg);
+}
+
+.dark .dashboard-app .surface-glass {
+  background: color-mix(in oklab, var(--surface-card) 94%, var(--muted) 6%);
+  border-color: var(--border);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.dark .dashboard-app .surface-accent {
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface-card) 82%);
+  border-color: var(--border);
+}
+
+.dark .dashboard-app .workspace-kpi-band,
+.dark .dashboard-app .workspace-header-panel,
+.dark .dashboard-app .workspace-pill,
+.dark .dashboard-app .workspace-action-bar,
+.dark .dashboard-app .workspace-filter-bar,
+.dark .dashboard-app .table-surface-frame {
+  background: var(--surface-card);
+  border-color: var(--border);
+  box-shadow: var(--surface-shadow);
+}
+
+.dark .dashboard-app .workspace-shell-stage::before,
+.dark .dashboard-app .workspace-shell-stage::after {
+  opacity: 0.18;
+}
+
+.dark .dashboard-app .workspace-header-panel::after {
+  opacity: 0.08;
+}
+
+.dark .dashboard-app .popup-control {
+  background: var(--surface-card-elevated);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.dark .dashboard-app .popup-control:hover {
+  background: var(--surface-muted);
+}
+
+.dark .dashboard-app .popup-action-bar {
+  background: var(--surface-card);
+  border-color: var(--border);
+}
+
+.dark .dashboard-app .workflow-panel-header,
+.dark .dashboard-app .workflow-panel-footer {
+  background: var(--surface-muted);
+  border-color: var(--border);
+}
+
+.dark .dashboard-app .workflow-panel-body {
+  background: var(--surface-card);
+}
+
+.dark .dashboard-app .workflow-modal-panel,
+.dark .dashboard-app .workflow-drawer-panel {
+  background: var(--surface-card-elevated);
+  border-color: var(--border);
+}
+
+.dark .dashboard-app .portal-stat-tile {
+  border-color: var(--border);
+  background: var(--surface-card-elevated);
+  box-shadow: var(--surface-shadow);
+}
+
+/*
+ * Legacy Tailwind palette remaps (dark only): admin pages historically used emerald/amber/sky/red
+ * 50/100 surfaces that read as neon mint or washed pastels on charcoal. Map them to semantic tokens
+ * inside dashboard + auth shells only (not public marketing).
+ */
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-emerald-50,
+    .bg-emerald-50\/70,
+    .bg-emerald-50\/80,
+    .bg-emerald-50\/90,
+    .bg-emerald-100
+  ) {
+  background-color: var(--semantic-success-bg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.bg-emerald-500\/10, .bg-emerald-600\/10) {
+  background-color: color-mix(in oklab, var(--semantic-success-border) 18%, var(--card) 82%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-emerald-200,
+    .border-emerald-200\/80,
+    .border-emerald-200\/90,
+    .border-emerald-300,
+    .border-emerald-600\/40
+  ) {
+  border-color: var(--semantic-success-border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900) {
+  color: var(--semantic-success-fg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) .hover\:bg-emerald-100:hover {
+  background-color: color-mix(in oklab, var(--semantic-success-bg) 58%, var(--surface-muted) 42%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-amber-50,
+    .bg-amber-50\/70,
+    .bg-amber-50\/80,
+    .bg-amber-50\/90,
+    .bg-amber-100
+  ) {
+  background-color: var(--semantic-warning-bg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-amber-200,
+    .border-amber-200\/80,
+    .border-amber-200\/90,
+    .border-amber-300
+  ) {
+  border-color: var(--semantic-warning-border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) {
+  color: var(--semantic-warning-fg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) .hover\:bg-amber-100:hover {
+  background-color: color-mix(in oklab, var(--semantic-warning-bg) 58%, var(--surface-muted) 42%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-sky-50,
+    .bg-sky-50\/70,
+    .bg-sky-50\/80,
+    .bg-sky-50\/90,
+    .bg-sky-100
+  ) {
+  background-color: var(--semantic-info-bg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-sky-200,
+    .border-sky-200\/80,
+    .border-sky-200\/90,
+    .border-sky-300
+  ) {
+  border-color: var(--semantic-info-border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900) {
+  color: var(--semantic-info-fg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) .hover\:bg-sky-100:hover {
+  background-color: color-mix(in oklab, var(--semantic-info-bg) 58%, var(--surface-muted) 42%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-blue-50,
+    .bg-blue-50\/70,
+    .bg-blue-50\/80,
+    .bg-blue-50\/90,
+    .bg-blue-100
+  ) {
+  background-color: var(--semantic-info-bg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-blue-200,
+    .border-blue-200\/80,
+    .border-blue-200\/90,
+    .border-blue-300
+  ) {
+  border-color: var(--semantic-info-border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900) {
+  color: var(--semantic-info-fg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) .hover\:bg-blue-100:hover {
+  background-color: color-mix(in oklab, var(--semantic-info-bg) 58%, var(--surface-muted) 42%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-red-50,
+    .bg-red-50\/60,
+    .bg-red-50\/70,
+    .bg-red-50\/80,
+    .bg-red-50\/90,
+    .bg-red-100
+  ) {
+  background-color: var(--semantic-danger-bg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-red-200,
+    .border-red-200\/80,
+    .border-red-200\/90,
+    .border-red-300
+  ) {
+  border-color: var(--semantic-danger-border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900) {
+  color: var(--semantic-danger-fg) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) .hover\:bg-red-100:hover {
+  background-color: color-mix(in oklab, var(--semantic-danger-bg) 58%, var(--surface-muted) 42%) !important;
+}
+
+/* Cold slate copy + paper-white panels from legacy layouts */
+.dark :is(.dashboard-app, .auth-stage) :is(.text-slate-950, .text-slate-900) {
+  color: var(--foreground) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(.text-slate-500, .text-slate-600, .text-slate-700) {
+  color: var(--muted-foreground) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-slate-200,
+    .border-slate-200\/80,
+    .border-slate-300
+  ) {
+  border-color: var(--border) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .bg-white,
+    .bg-white\/50,
+    .bg-white\/60,
+    .bg-white\/70,
+    .bg-white\/75,
+    .bg-white\/80,
+    .bg-white\/85,
+    .bg-white\/90
+  ) {
+  background-color: color-mix(in oklab, var(--card) 90%, var(--surface-muted) 10%) !important;
+}
+
+.dark :is(.dashboard-app, .auth-stage) :is(
+    .border-white,
+    .border-white\/10,
+    .border-white\/12,
+    .border-white\/15,
+    .border-white\/75,
+    .border-white\/80
+  ) {
+  border-color: color-mix(in oklab, var(--border) 82%, var(--surface-muted) 18%) !important;
+}
+
 .subidha-popup-root {
   position: relative;
   z-index: 260;
@@ -666,11 +1179,24 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
+.dark .dashboard-app input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.dark .dashboard-app select,
+.dark .dashboard-app textarea {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 .dashboard-app input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus,
 .dashboard-app select:focus,
 .dashboard-app textarea:focus {
   border-color: color-mix(in oklab, var(--primary) 72%, white);
   box-shadow: var(--focus-glow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dark .dashboard-app input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus,
+.dark .dashboard-app select:focus,
+.dark .dashboard-app textarea:focus {
+  border-color: color-mix(in oklab, var(--primary) 55%, var(--border) 45%);
+  box-shadow: var(--focus-glow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .dashboard-app .surface-panel {

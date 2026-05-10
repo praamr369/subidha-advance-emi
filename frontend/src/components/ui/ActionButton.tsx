@@ -35,16 +35,16 @@ type ActionButtonProps = Omit<
 function getVariantClassName(variant: ActionButtonVariant) {
   switch (variant) {
     case "primary":
-      return "border-primary/90 bg-primary text-primary-foreground shadow-[0_18px_34px_-24px_rgba(15,23,42,0.62)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] hover:border-primary";
+      return "border-primary/90 bg-primary text-primary-foreground shadow-[0_16px_36px_-22px_color-mix(in_oklab,var(--primary)_36%,transparent)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--primary)_88%,black_12%)] hover:border-primary";
     case "destructive":
-      return "border-red-700/80 bg-red-700 text-white shadow-[0_18px_34px_-24px_rgba(127,29,29,0.76)] hover:-translate-y-0.5 hover:bg-red-800";
+      return "border-destructive/90 bg-destructive text-destructive-foreground shadow-[0_16px_36px_-22px_color-mix(in_oklab,var(--destructive)_34%,transparent)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--destructive)_88%,black_12%)]";
     case "outline":
-      return "border-[var(--surface-border-strong)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_86%,var(--surface-muted)_14%))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]";
+      return "border-[var(--surface-border-strong)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]";
     case "ghost":
       return "border-transparent bg-transparent text-foreground hover:border-border hover:bg-[var(--surface-muted)]";
     case "secondary":
     default:
-      return "border-border bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-strong)_82%,var(--surface-muted)_18%))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_80%,var(--surface-muted)_20%)]";
+      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_78%,var(--surface-muted)_22%)]";
   }
 }
 

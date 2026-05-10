@@ -1417,7 +1417,7 @@ export default function AdminOperationsDashboard() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Posture</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">
+              <div className="mt-2 text-sm font-semibold text-foreground">
                 {settlementPosture?.title ?? "—"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
@@ -1426,7 +1426,7 @@ export default function AdminOperationsDashboard() {
             </div>
             <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Next due</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">
+              <div className="mt-2 text-sm font-semibold text-foreground">
                 {summary?.next_due_subscription_number ?? "—"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
@@ -1437,7 +1437,7 @@ export default function AdminOperationsDashboard() {
             </div>
             <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Collections today</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">
+              <div className="mt-2 text-sm font-semibold text-foreground">
                 {money(todayNetCollections)}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
@@ -1446,7 +1446,7 @@ export default function AdminOperationsDashboard() {
             </div>
             <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Lucky draw</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">
+              <div className="mt-2 text-sm font-semibold text-foreground">
                 {legacy?.batches?.next_draw_batch?.batch_code ?? "—"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">

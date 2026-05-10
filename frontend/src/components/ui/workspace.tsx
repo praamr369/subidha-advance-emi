@@ -27,10 +27,10 @@ function Note({ text, tone }: { text: string; tone: "default" | "warning" | "inf
       className={cn(
         "mt-2 inline-flex max-w-3xl rounded-xl border px-3 py-2 text-xs font-medium leading-6",
         tone === "warning"
-          ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+          ? "chip-tone-warning"
           : tone === "info"
-            ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-            : "border-border bg-[var(--surface-muted)] text-foreground"
+            ? "chip-tone-info"
+            : "border border-border bg-[var(--surface-muted)] text-foreground shadow-[var(--badge-inset-highlight)]"
       )}
     >
       {text}
@@ -91,13 +91,13 @@ export function DetailItem({
 }: DetailItemProps) {
   const toneClassName =
     tone === "success"
-      ? "text-emerald-700"
+      ? "text-[var(--semantic-success-fg)]"
       : tone === "warning"
-        ? "text-amber-700"
+        ? "text-[var(--semantic-warning-fg)]"
         : tone === "danger"
-          ? "text-red-700"
+          ? "text-[var(--semantic-danger-fg)]"
           : tone === "info"
-            ? "text-sky-700"
+            ? "text-[var(--semantic-info-fg)]"
             : "text-foreground";
 
   return (
