@@ -2,6 +2,30 @@
 
 **Phase 1 — documentation only.** Defines shared page archetypes for future layout alignment. Examples cite **actual routes** from this repository.
 
+## Shell mapping (Phase 2)
+
+Typed **layout-only** shells live in `frontend/src/components/layout/page-shells.tsx`. They accept `ReactNode` slots, perform **no** data fetching, API calls, storage access, or role checks, and render **nothing** for omitted slots.
+
+**Composition with `PortalPage`:** For authenticated portal routes, keep `PortalPage` as the outer chrome (title, breadcrumbs, optional `stats`, actions) and place a shell **inside** `children` to structure the body. For `(public)` marketing pages, `PublicMarketingShell` renders `<main>` and may wrap the full page body. Do not nest a second `<main>` inside `PortalPage` (it already renders `<main>`).
+
+| Taxonomy page type | Shell component | When to use | When not to use | KPI policy |
+| ------------------- | --------------- | ----------- | ----------------- | ---------- |
+| `register_list` | `RegistryPageShell` | Entity ledgers, search + table registers | Pure marketing or auth-only screens | Optional compact summary only; avoid KPI walls above the table |
+| `transaction_form` | `TransactionPageShell` | Create / edit / collect forms, imports | Read-only audit trails | Prefer inline derived totals near fields; optional `summaryAside` for verification |
+| `detail_page` | `DetailPageShell` | `[id]` / `[caseId]` drill-downs | Full-fleet list landing | Record-level chips OK; keep aside narrow (timeline/context) |
+| `setup_checklist` | `SetupChecklistPageShell` | Business setup, accounting setup wizards | Daily operational queues | Completion / blocker counts only |
+| `approval_queue` | `ApprovalQueuePageShell` | Subscription/collection/payment request queues | Undifferentiated CRM lists | Pending / overdue queue counts OK |
+| `cashier_workflow` | `CashierWorkflowShell` | Counter collect and payment flows | Analytics or settings | Session / selection summary OK; avoid dense dashboards |
+| `accounting_control` | `AccountingControlShell` | COA, journals, reconciliation control, mappings | Customer self-service | Balances / lock state OK; no vanity marketing KPIs |
+| `report_analytics` | `ReportPageShell` | BI, exports, charts, statements | Money-moving primary workflows | Dense metrics appropriate here |
+| `customer_self_service` | `SelfServicePageShell` | `/customer/*` self-service | Admin registers | Personal posture only; no firm-wide aggregates |
+| `partner_vendor_workspace` | `PartnerVendorWorkspaceShell` | `/partner/*`, `/vendor/*` scoped workspaces | Admin global control surfaces | Scoped totals OK |
+| `operations_workspace` | `OperationsWorkspaceShell` | Admin inventory, delivery, finance hubs, service desks | Public pages | Lane/exception summaries OK; avoid duplicate Portal stats |
+| `executive_dashboard` | `ExecutiveDashboardShell` | Role home dashboards (`/admin`, `/partner`, …) | Full-width data grids as home | Limited posture + queues; not a KPI wall |
+| `public_marketing` | `PublicMarketingShell` | `(public)/*` marketing and trust content | Authenticated portals | Non-financial marketing proof only |
+| `auth_flow` | *(none)* | Login/register/reset stay thin | N/A | No business KPIs |
+| `system_utility` | *(none)* | Unauthorized, redirects, minimal utilities | N/A | No KPIs |
+
 ## Type reference
 
 ### executive_dashboard
