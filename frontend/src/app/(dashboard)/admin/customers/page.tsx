@@ -565,16 +565,21 @@ export default function AdminCustomersPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Visible Customers", value: rows.length },
-        { label: "Active Customers", value: activeCustomers, tone: "success" },
-        { label: "Pending KYC", value: pendingKyc, tone: pendingKyc > 0 ? "warning" : undefined },
-        { label: "Active Subscriptions", value: activeSubscriptions },
-      ]}
       statusBadge={{ label: "Customer Operations", tone: "info" }}
     >
-      <RegistryPageShell>
-        <DetailPanel
+      <RegistryPageShell
+        summary={
+          !loading && !error ? (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="font-semibold text-foreground">Current register</span>
+              {": "}
+              {rows.length} visible · {activeCustomers} active · {pendingKyc} pending KYC · {activeSubscriptions} active
+              contract rows (sum on this page)
+            </div>
+          ) : null
+        }
+        filters={
+          <DetailPanel
           title="Customer workflow"
           description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
         >
@@ -703,7 +708,9 @@ export default function AdminCustomersPage() {
             </form>
           </TableToolbar>
         </DetailPanel>
-
+        }
+        register={
+          <>
         {loading ? <LoadingBlock label="Loading customer register..." /> : null}
 
         {!loading && error ? (
@@ -780,8 +787,8 @@ export default function AdminCustomersPage() {
 
 
         <ControlLaneGrid
-          title="Customer control lanes"
-          description="Shortcuts after you have located the right row in the register."
+          title="Shortcuts"
+          description="After you locate the right row, jump to common follow-up routes."
           lanes={[
             {
               title: "Create customer",
@@ -1124,7 +1131,9 @@ export default function AdminCustomersPage() {
 
           </>
         ) : null}
-      </RegistryPageShell>
+          </>
+        }
+      />
     </PortalPage>
   );
 }

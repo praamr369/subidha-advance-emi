@@ -679,54 +679,6 @@ export default function CashierCollectPage() {
           variant: "secondary",
         },
       ]}
-      stats={[
-        {
-          label: "Workflow",
-          value:
-            collectionWorkflow === "direct-sale"
-              ? "Direct Sale"
-              : "Subscription EMI",
-        },
-        {
-          label:
-            collectionWorkflow === "direct-sale"
-              ? "Search Mode"
-              : "Pending EMI Count",
-          value:
-            collectionWorkflow === "direct-sale"
-              ? "Phone / Sale / Customer"
-              : String(lookup?.total_pending_emis ?? 0),
-          tone: "warning",
-        },
-        {
-          label:
-            collectionWorkflow === "direct-sale"
-              ? "Current Queue"
-              : "Overdue EMI",
-          value:
-            collectionWorkflow === "direct-sale"
-              ? lookup?.customer_name || "Direct-sale receivables"
-              : String(lookup?.overdue_emi_count ?? 0),
-          tone: "warning",
-        },
-        {
-          label:
-            collectionWorkflow === "direct-sale"
-              ? "Reference"
-              : "Next Due",
-          value:
-            collectionWorkflow === "direct-sale"
-              ? "Receipt-safe retail collection"
-              : lookup?.next_due_date
-                ? formatDate(lookup.next_due_date)
-                : "—",
-          tone:
-            collectionWorkflow === "subscription" &&
-            (lookup?.overdue_emi_count ?? 0) > 0
-              ? "warning"
-              : undefined,
-        },
-      ]}
       statusBadge={{
         label:
           collectionWorkflow === "direct-sale"
@@ -736,6 +688,21 @@ export default function CashierCollectPage() {
       }}
     >
       <CashierWorkflowShell>
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+          <span className="font-semibold text-foreground">
+            {collectionWorkflow === "direct-sale" ? "Direct sale collection" : "Subscription EMI collection"}
+          </span>
+          {collectionWorkflow === "subscription" && lookup ? (
+            <>
+              {" · "}
+              {lookup.total_pending_emis ?? 0} pending EMI · {lookup.overdue_emi_count ?? 0} overdue · Next due{" "}
+              {lookup.next_due_date ? formatDate(lookup.next_due_date) : "—"}
+            </>
+          ) : null}
+          {collectionWorkflow === "direct-sale" ? (
+            <span> · Use phone / sale / customer search in the direct-sale panel.</span>
+          ) : null}
+        </div>
         <div id="cashier-unified-search">
         <UnifiedReceivableSearchPanel
           title="Universal receivable search"
@@ -754,9 +721,8 @@ export default function CashierCollectPage() {
         />
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          Counter sequence: search, verify the exact row, post once, then open receipt or payment history. Current
-          queue context is summarized in the header above.
+        <p className="text-xs text-muted-foreground">
+          Flow: search → verify the exact row → post once → receipt or payment history.
         </p>
 
         <FormSection
@@ -1164,10 +1130,14 @@ export default function CashierCollectPage() {
               )}
             </FormSection>
 
-            <div id="cashier-step-collect">
+            <div
+              id="cashier-step-collect"
+              className="rounded-xl border border-transparent lg:border-border lg:bg-card/80 lg:p-4 lg:shadow-sm lg:backdrop-blur-sm"
+            >
             <FormSection
               title="Step 3 · Post collection"
               description="Collect only against the selected EMI row. UPI and bank entries require a reference number."
+              className="lg:sticky lg:top-24 lg:z-[5] lg:max-h-[min(100dvh-6rem,920px)] lg:overflow-y-auto"
             >
               {success ? (
                 <div

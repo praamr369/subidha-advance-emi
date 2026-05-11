@@ -320,56 +320,58 @@ export default function AccountingChartOfAccountsPage() {
         { href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" },
         { href: ROUTES.admin.settingsImports, label: "Imports", variant: "primary" },
       ]}
-      stats={[
-        {
-          label: "Active chart / finance",
-          value: `${summaryChartActive} / ${summaryFinanceActive}`,
-          tone: summaryChartActive > 0 && summaryFinanceActive > 0 ? "success" : "warning",
-        },
-        {
-          label: "Mappings (required)",
-          value:
-            setupStatus?.required_mappings_complete != null && setupStatus?.required_mappings_total != null
-              ? `${setupStatus.required_mappings_complete}/${setupStatus.required_mappings_total}`
-              : "—",
-          tone: setupStatus?.mappings_complete ? "success" : "warning",
-        },
-        {
-          label: "Journal readiness",
-          value: setupStatus?.journal_ready ? "Ready" : "Blocked",
-          tone: setupStatus?.journal_ready ? "success" : "warning",
-        },
-        {
-          label: "Chart register (total)",
-          value: String(summaryChartTotal),
-          tone: "info",
-        },
-      ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <AccountingControlShell>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateChartOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
-          >
-            <Plus className="h-4 w-4" />
-            Create chart account
-          </button>
-          <AccountingRefreshButton
-            loading={loading}
-            refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
-          />
-        </div>
-
-        {notice ? <AccountingNotice tone="success" message={notice} /> : null}
-        <WorkspaceDirectory
-          title="Accounting control map"
-          description="Move between accounting setup, payables, books, and statements without leaving the accounting control family."
-          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
-        />
+      <AccountingControlShell
+        readinessWarnings={
+          <div className="space-y-3">
+            {notice ? <AccountingNotice tone="success" message={notice} /> : null}
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="font-semibold text-foreground">Control posture</span>
+              {": "}
+              Active chart / finance{" "}
+              <span className="tabular-nums text-foreground">
+                {summaryChartActive} / {summaryFinanceActive}
+              </span>
+              {" · "}
+              Required mappings{" "}
+              {setupStatus?.required_mappings_complete != null && setupStatus?.required_mappings_total != null
+                ? `${setupStatus.required_mappings_complete}/${setupStatus.required_mappings_total}`
+                : "—"}
+              {" · "}
+              Journal {setupStatus?.journal_ready ? "ready" : "blocked"}
+              {" · "}
+              Chart accounts (system total){" "}
+              <span className="tabular-nums text-foreground">{summaryChartTotal}</span>
+            </div>
+          </div>
+        }
+        controlPanel={
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateChartOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+              >
+                <Plus className="h-4 w-4" />
+                Create chart account
+              </button>
+              <AccountingRefreshButton
+                loading={loading}
+                refreshing={refreshing}
+                onClick={() => void loadPage("refresh")}
+              />
+            </div>
+            <WorkspaceDirectory
+              title="Accounting control map"
+              description="Move between accounting setup, payables, books, and statements without leaving the accounting control family."
+              groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+            />
+          </div>
+        }
+        primaryRegister={
+          <>
         {loading ? <LoadingBlock label="Loading accounting masters..." /> : null}
 
         {!loading && error ? (
@@ -513,7 +515,7 @@ export default function AccountingChartOfAccountsPage() {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              KPI band above uses the canonical accounting setup service (full database counts). This register:{" "}
+              The posture strip above uses the canonical accounting setup service (full database counts). This register:{" "}
               {chartRegisterScopeLabel}. Showing{" "}
               <span className="font-semibold text-foreground">{filteredChartAccounts.length}</span> row(s) of{" "}
               <span className="font-semibold text-foreground">{chartRowsForStatus.length}</span> matching the status filter
@@ -600,7 +602,9 @@ export default function AccountingChartOfAccountsPage() {
             />
           </>
         ) : null}
-      </AccountingControlShell>
+          </>
+        }
+      />
 
       <ChartAccountCreateDrawer
         open={createChartOpen}

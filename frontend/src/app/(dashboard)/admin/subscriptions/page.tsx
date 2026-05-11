@@ -533,33 +533,24 @@ export default function AdminSubscriptionsPage() {
           variant: "secondary",
         },
       ]}
-      stats={[
-        {
-          label: "Matching Subscriptions",
-          value: String(count),
-        },
-        {
-          label: "Page Active",
-          value: String(pageActiveCount),
-          tone: pageActiveCount > 0 ? "success" : undefined,
-        },
-        {
-          label: "Page Won",
-          value: String(pageWonCount),
-          tone: pageWonCount > 0 ? "info" : undefined,
-        },
-        {
-          label: "Page Contract Value",
-          value: money(pageContractValue),
-          tone: "success",
-        },
-      ]}
       statusBadge={{
         label: "Contract Operations",
         tone: "info",
       }}
     >
-      <RegistryPageShell>
+      <RegistryPageShell
+        summary={
+          !loading && !error ? (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="font-semibold text-foreground">Filtered register</span>
+              {": "}
+              {count} matching · This page: {pageActiveCount} active, {pageWonCount} won · Page contract total{" "}
+              <span className="tabular-nums text-foreground">{money(pageContractValue)}</span>
+            </div>
+          ) : null
+        }
+        filters={
+          <>
         <nav aria-label="Subscription lifecycle" className="flex flex-wrap gap-2">
           {(
             [
@@ -750,7 +741,10 @@ export default function AdminSubscriptionsPage() {
             This export includes only the rows visible on the current page. Use the matching count and page controls below to move through the filtered register, then export another page if needed.
           </p>
         </FormSection>
-
+          </>
+        }
+        register={
+          <>
         {loading ? <LoadingBlock label="Loading subscription register..." /> : null}
 
         {!loading && error ? (
@@ -937,7 +931,9 @@ export default function AdminSubscriptionsPage() {
             </DetailPanel>
           </>
         ) : null}
-      </RegistryPageShell>
+          </>
+        }
+      />
     </PortalPage>
   );
 }

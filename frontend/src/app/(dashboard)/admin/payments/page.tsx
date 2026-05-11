@@ -536,32 +536,25 @@ export default function AdminPaymentsPage() {
           variant: "primary",
         },
       ]}
-      stats={[
-        {
-          label: "Visible Payments",
-          value: String(summary.visible_payments),
-        },
-        {
-          label: "Net Collected",
-          value: money(summary.net_collected_amount),
-          tone: "success",
-        },
-        {
-          label: "Active Payments",
-          value: String(summary.active_payments),
-        },
-        {
-          label: "Reversed Payments",
-          value: String(summary.reversed_payments),
-          tone: summary.reversed_payments > 0 ? "warning" : undefined,
-        },
-      ]}
       statusBadge={{
         label: "Payment Register",
         tone: "info",
       }}
     >
-      <RegistryPageShell>
+      <RegistryPageShell
+        summary={
+          !loading && !error ? (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="font-semibold text-foreground">Current filter view</span>
+              {": "}
+              {summary.visible_payments} payments · Net collected{" "}
+              <span className="tabular-nums text-foreground">{money(summary.net_collected_amount)}</span>
+              {" · "}
+              {summary.active_payments} active · {summary.reversed_payments} reversed
+            </div>
+          ) : null
+        }
+        filters={
         <FormSection
           title="Filter Register"
           description="Search by customer, phone, reference, payment id, subscription id, or batch context. Narrow by method, reversal state, and posting date."
@@ -765,7 +758,9 @@ export default function AdminPaymentsPage() {
             </div>
           ) : null}
         </FormSection>
-
+        }
+        register={
+          <>
         {loading ? <LoadingBlock label="Loading payment register..." /> : null}
 
         {!loading && error ? (
@@ -784,7 +779,9 @@ export default function AdminPaymentsPage() {
             <PaymentsTable rows={rows} />
           </DetailPanel>
         )}
-      </RegistryPageShell>
+          </>
+        }
+      />
     </PortalPage>
   );
 }

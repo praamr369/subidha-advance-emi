@@ -7,7 +7,6 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { SetupChecklistPageShell } from "@/components/layout/page-shells";
-import StatCard from "@/components/ui/StatCard";
 import { ROUTES } from "@/lib/routes";
 import {
   getAccountingMappingSuggestions,
@@ -166,67 +165,85 @@ export default function AdminAccountingSetupPage() {
         { label: "Setup" },
       ]}
     >
-      <SetupChecklistPageShell>
-        <div className="flex flex-wrap gap-2">
-          <ActionButton variant="primary" onClick={applyRecommended} disabled={saving}>
-            {saving ? "Applying..." : "Apply Recommended Mapping"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={repairMappings} disabled={saving}>
-            {saving ? "Repairing..." : "Repair suggested mappings"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()}>
-            Refresh
-          </ActionButton>
-        </div>
-        {error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null}
-        {warningCount > 0 ? (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-            <div className="text-sm font-semibold text-foreground">Ledger anchor</div>
-            <div className="mt-2">
-              Present: {status?.ledger_anchor_present ? "yes" : "no"} · Settlement desks flagged:{" "}
-              {status?.real_settlement_accounts_present ? "yes" : "no"}
+      <SetupChecklistPageShell
+        readiness={
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="font-semibold text-foreground">Setup posture</span>
+              {": "}
+              Status {displayStatus}
+              {" · "}
+              COA {status?.coa_ready ? "ready" : "not ready"}
+              {" · "}
+              Finance accounts {status?.finance_accounts_ready ? "ready" : "not ready"}
+              {" · "}
+              {warningCount} warning{warningCount === 1 ? "" : "s"}
             </div>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-            <div className="text-sm font-semibold text-foreground">Missing mapping purposes</div>
-            <div className="mt-2 max-h-32 overflow-y-auto">
-              {(status?.missing_required_mappings?.length ?? 0) === 0 ? (
-                <span>None detected.</span>
-              ) : (
-                <ul className="list-disc pl-4">
-                  {(status?.missing_required_mappings ?? []).map((code) => (
-                    <li key={code}>{code}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Setup status" value={displayStatus} tone={warningCount > 0 ? "warning" : "success"} />
-          <StatCard label="COA ready" value={status?.coa_ready ? "Yes" : "No"} />
-          <StatCard label="Finance accounts ready" value={status?.finance_accounts_ready ? "Yes" : "No"} />
-          <StatCard label="Warnings" value={String(warningCount)} tone={warningCount > 0 ? "warning" : "success"} />
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="text-sm font-semibold text-foreground">Guided setup (business-first)</div>
-          <div className="mt-2 grid gap-2 md:grid-cols-2">
-            {steps.map((step) => (
-              <div key={step} className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                {step}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground">Ledger anchor</div>
+                <div className="mt-2">
+                  Present: {status?.ledger_anchor_present ? "yes" : "no"} · Settlement desks flagged:{" "}
+                  {status?.real_settlement_accounts_present ? "yes" : "no"}
+                </div>
               </div>
-            ))}
+              <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground">Missing mapping purposes</div>
+                <div className="mt-2 max-h-32 overflow-y-auto">
+                  {(status?.missing_required_mappings?.length ?? 0) === 0 ? (
+                    <span>None detected.</span>
+                  ) : (
+                    <ul className="list-disc pl-4">
+                      {(status?.missing_required_mappings ?? []).map((code) => (
+                        <li key={code}>{code}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
+        }
+        blockers={
+          error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null
+        }
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton variant="primary" onClick={applyRecommended} disabled={saving}>
+              {saving ? "Applying..." : "Apply Recommended Mapping"}
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={repairMappings} disabled={saving}>
+              {saving ? "Repairing..." : "Repair suggested mappings"}
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={() => void load()}>
+              Refresh
+            </ActionButton>
+          </div>
+        }
+        checklist={
+          <>
+            {warningCount > 0 ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
+              </div>
+            ) : null}
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-sm font-semibold text-foreground">Guided setup (business-first)</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                {steps.map((step) => (
+                  <div
+                    key={step}
+                    className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+                  >
+                    {step}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        }
+        evidence={
+          <>
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-foreground">Finance Account Mapping Table</div>
@@ -367,7 +384,9 @@ export default function AdminAccountingSetupPage() {
             </div>
           </div>
         ) : null}
-      </SetupChecklistPageShell>
+          </>
+        }
+      />
     </PortalPage>
   );
 }
