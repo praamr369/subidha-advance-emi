@@ -154,7 +154,8 @@ const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
 const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
 /** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
 const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
-const WORKSPACE_WIDTH_CSS_VALUES = ["1380px", "1580px", "1800px"] as const;
+/** Browser-local content width caps (100% zoom friendly; still bounded by viewport). */
+const WORKSPACE_WIDTH_CSS_VALUES = ["1440px", "1480px", "1680px"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 type OperatorMode = "SIMPLE" | "ADVANCED";
 
@@ -406,7 +407,7 @@ function countsForGroup(groupTitle: string, badges: Record<string, number>): Arr
 
 function RailTooltip({ label }: { label: string }) {
   return (
-    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 rounded-md border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block group-focus-within:block">
+    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 rounded-md border border-[var(--sidebar-rail-border)] bg-[color-mix(in_oklab,var(--sidebar-surface)_92%,black_8%)] px-2 py-1 text-xs font-medium text-white shadow-lg group-hover:block group-focus-within:block">
       {label}
     </span>
   );
@@ -450,8 +451,8 @@ function UserDropdown({
       >
         <WorkspaceBrandMark size={32} variant="onLight" />
         <span className="hidden min-w-0 text-left sm:block">
-          <span className="block max-w-[150px] truncate text-sm font-semibold text-foreground">{displayName}</span>
-          <span className="block text-[11px] text-muted-foreground">{formatRoleLabel(role)}</span>
+          <span className="block max-w-[min(12rem,28vw)] truncate text-sm font-semibold text-foreground">{displayName}</span>
+          <span className="block text-xs text-muted-foreground">{formatRoleLabel(role)}</span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
@@ -687,7 +688,7 @@ function SidebarContent({
   const renderBadge = useCallback(
     (item: ShellNavItem) =>
       item.badgeSource && (queueBadges[item.badgeSource] ?? 0) > 0 ? (
-        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
           {queueBadges[item.badgeSource]}
         </span>
       ) : null,
@@ -915,10 +916,10 @@ function SidebarContent({
       {!collapsed ? (
         <div className="shrink-0 space-y-2.5 border-b border-white/[0.06] px-3 py-2.5 sm:px-3.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-[65%] items-center truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]">
+            <span className="inline-flex max-w-[min(100%,14rem)] items-center truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]">
               {formatRoleLabel(role)}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/95">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-200/95">
               <span className="size-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]" aria-hidden />
               Live
             </span>
@@ -926,7 +927,7 @@ function SidebarContent({
 
           {favoriteLinks.length > 0 ? (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sidebar-section-label)]">
                 Favorites
               </div>
               <div className="space-y-0.5">
@@ -965,7 +966,7 @@ function SidebarContent({
           <div>
             <label
               htmlFor="sidebar-module-search"
-              className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]"
+              className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sidebar-section-label)]"
             >
               Modules
             </label>
@@ -986,7 +987,7 @@ function SidebarContent({
             className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/[0.06] pt-2.5"
             title="Layout preference for this browser only (not stored on the server)."
           >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-section-label)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sidebar-section-label)]">
               View
             </span>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
@@ -1112,7 +1113,7 @@ function SidebarContent({
                   type="button"
                   onClick={() => toggleGroup(group.title, defaultOpen)}
                   className={cn(
-                    "flex w-full min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45",
+                    "flex w-full min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.1em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45",
                     collapsed ? "min-h-10 min-w-10 justify-center px-0" : "",
                     groupActive
                       ? "text-[var(--sidebar-foreground)]"
@@ -1274,8 +1275,8 @@ function Topbar({
 }) {
   return (
     <PortalHeader>
-      <div className="flex min-h-[4.8rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 max-w-full flex-[1_1_12rem] items-center gap-3 sm:flex-[1_1_40%]">
+      <div className="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:min-h-[4.75rem] sm:gap-x-4 sm:px-4 lg:px-6 xl:px-8">
+        <div className="flex min-w-0 max-w-full flex-[1_1_10rem] items-center gap-2 sm:flex-[1_1_38%] sm:gap-3">
           <button
             type="button"
             onClick={onOpenSidebar}
@@ -1294,13 +1295,15 @@ function Topbar({
                 Role Scope Active
               </span>
             </div>
-            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+            <h1 className="min-w-0 max-w-full break-words text-balance text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              {title}
+            </h1>
           </div>
         </div>
 
         <div className="flex min-w-0 max-w-full flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-[0_1_auto]">
           {role === "ADMIN" ? (
-            <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 2xl:flex">
+            <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 xl:flex">
               {[
                 { label: "Customer", href: `${ROUTES.admin.customers}/create` },
                 { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },

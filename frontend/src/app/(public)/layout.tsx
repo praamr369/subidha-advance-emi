@@ -7,7 +7,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
   return (
     <div className="public-app flex min-h-screen flex-col">
       <PublicNav />
-      <main id="main-content" tabIndex={-1} className="flex-1">
+      <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 overflow-x-clip">
         {children}
       </main>
       <PublicFooter />

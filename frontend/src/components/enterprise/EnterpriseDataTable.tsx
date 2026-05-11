@@ -139,8 +139,8 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
 
       {showData ? (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
+          <div className="ops-table-scroll max-w-full">
+            <table className="min-w-[max(100%,720px)] border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--surface-muted)_95%,transparent)] backdrop-blur">
                 <tr className="border-b border-border">
                   {columns.map((column) => (
@@ -176,7 +176,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                       {columns.map((column) => (
                         <td
                           key={String(column.key)}
-                          className="px-4 py-4 text-foreground"
+                          className="min-w-0 break-words px-4 py-3 text-sm leading-snug text-foreground"
                         >
                           {column.render
                             ? column.render(row)

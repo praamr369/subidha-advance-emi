@@ -21,8 +21,8 @@ export default function PortalShell({ sidebar, header, children, className }: Po
             tabIndex={-1}
             className="portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-clip overscroll-behavior-x-contain"
           >
-            <div className="workspace-shell-stage w-full min-w-0 max-w-none px-4 py-4 sm:px-6 sm:py-6 lg:px-7 lg:py-7 xl:px-8">
-              <div className="route-content-fade relative z-[1]">{children}</div>
+            <div className="workspace-shell-stage workspace-content-cap w-full min-w-0 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8">
+              <div className="route-content-fade relative z-[1] min-w-0">{children}</div>
             </div>
           </main>
         </div>

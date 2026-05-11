@@ -140,13 +140,13 @@ export default function DataTable<T extends { id?: number | string }>({
 
   const thCell = cn(
     density === "compact"
-      ? "px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em]"
+      ? "px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
       : "px-4 py-3 text-xs font-semibold uppercase tracking-[0.15em]",
     "text-muted-foreground"
   );
 
   const tdCell = cn(
-    density === "compact" ? "px-3 py-2 text-xs" : "px-4 py-3.5 text-sm",
+    density === "compact" ? "px-3 py-2 text-[0.8125rem] leading-snug" : "px-4 py-3.5 text-sm leading-snug",
     "text-foreground"
   );
 
@@ -191,8 +191,8 @@ export default function DataTable<T extends { id?: number | string }>({
           </ToggleGroup>
         </div>
       ) : null}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+      <div className="ops-table-scroll max-w-full">
+        <table className="w-full min-w-0 border-collapse text-sm">
           <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_86%,white_14%)]">
             <tr>
               {columns.map((column) => {

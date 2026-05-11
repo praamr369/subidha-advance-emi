@@ -93,8 +93,9 @@
   --topbar-surface: oklch(0.988 0.004 82);
   --topbar-border: oklch(0.86 0.012 82);
   --topbar-control: color-mix(in oklab, var(--surface-card-elevated) 88%, var(--surface-muted) 12%);
-  --workspace-max-width: 1800px;
-  --workspace-max-width-tight: 1380px;
+  /* Primary content cap at 100% zoom (presets in DashboardShell still override --workspace-max-width). */
+  --workspace-max-width: min(100%, 1480px);
+  --workspace-max-width-tight: min(100%, 1440px);
   --workspace-gap: 1.35rem;
   --workspace-shell-grid: rgba(15, 23, 42, 0.042);
   --workspace-shell-highlight: rgba(255, 255, 255, 0.72);
@@ -299,6 +300,98 @@ html.dark {
   border-color: var(--border);
 }
 
+/* ---------------------------------------------------------------------------
+ * Operational layout utilities (dashboard): responsive-first, no zoom hacks.
+ * Compose with Tailwind; do not shrink base typography.
+ * --------------------------------------------------------------------------- */
+.ops-page {
+  width: 100%;
+  max-width: min(100%, var(--workspace-max-width, 1480px));
+  margin-inline: auto;
+}
+
+.ops-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .ops-page-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.ops-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.ops-grid-dense {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+}
+
+.ops-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ops-readable {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.ops-panel {
+  min-width: 0;
+}
+
+.ops-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .ops-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .ops-form-grid.ops-form-grid-wide {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ops-modal-body {
+  min-height: 0;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.workspace-content-cap {
+  width: 100%;
+  max-width: min(100%, var(--workspace-max-width, 1480px));
+  margin-inline: auto;
+}
+
 body {
   margin: 0;
   background:
@@ -352,6 +445,7 @@ body {
 
 .public-app {
   min-height: 100vh;
+  overflow-x: clip;
   /* Warm retail brown primary for marketing + auth only (dashboard uses .dashboard-app). */
   --primary: oklch(0.44 0.072 58);
   --primary-foreground: oklch(0.985 0.004 95);
@@ -464,6 +558,8 @@ body {
 .public-hero {
   position: relative;
   overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 2.25rem;
   border: 1px solid color-mix(in oklab, var(--border) 65%, white 35%);
   background:
@@ -1370,8 +1466,8 @@ button {
 }
 
 .dashboard-app .enterprise-metric {
-  font-size: clamp(1.5rem, 2vw, 2rem);
-  line-height: 1.05;
+  font-size: clamp(1.25rem, 1.6vw + 0.6rem, 2.15rem);
+  line-height: 1.08;
   letter-spacing: -0.025em;
   font-weight: 700;
 }
@@ -1417,7 +1513,8 @@ button {
 
 .workspace-header-panel {
   position: relative;
-  overflow: hidden;
+  /* Allow wrapped action bars / long titles to paint; avoid clipping portal quick links at 100% zoom. */
+  overflow: visible;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 88%, white 12%);
   border-radius: 1.7rem;
   background:
@@ -1493,7 +1590,7 @@ button {
 }
 
 .table-surface-frame {
-  overflow: visible;
+  overflow: hidden;
   border-radius: 1.3rem;
   border: 1px solid color-mix(in oklab, var(--surface-border-strong) 84%, white 16%);
   background: linear-gradient(

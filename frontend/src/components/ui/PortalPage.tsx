@@ -121,10 +121,10 @@ export default function PortalPage({
   const showPopupMeta = isPopup && Boolean(subtitle || helperNote || statusBadge || actions.length > 0);
 
   return (
-    <main
+    <div
       className={cn(
         "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap)]",
-        isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-2 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6",
+        isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8",
         className
       )}
       style={widthStyle}
@@ -171,8 +171,8 @@ export default function PortalPage({
           <h1 className="sr-only">{title}</h1>
           {showPopupMeta ? (
             <section className="popup-workflow-toolbar workspace-header-panel rounded-[1.45rem] px-4 py-4 sm:px-5">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-col gap-4">
+                <div className="w-full min-w-0">
                   {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
                   {statusBadge ? (
                     <span
@@ -217,7 +217,7 @@ export default function PortalPage({
                 </div>
 
                 {actions.length > 0 ? (
-                  <div className="portal-page-actions workspace-action-bar flex flex-wrap items-center gap-2 p-2 xl:justify-end">
+                  <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
                     {actions.map((action) => (
                       <Link
                         key={`${action.href}-${action.label}`}
@@ -239,12 +239,12 @@ export default function PortalPage({
       ) : (
         <section className="portal-page-header workspace-header-panel">
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
-          <div className="relative flex flex-col gap-5 p-4 sm:p-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="min-w-0 flex-1">
+          <div className="relative flex min-w-0 flex-col gap-5 p-4 sm:p-6">
+            <div className="flex min-w-0 flex-col gap-4">
+              <div className="w-full min-w-0">
                 {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="enterprise-title">{title}</h1>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                  <h1 className="enterprise-title block w-full max-w-full break-words">{title}</h1>
 
                   {statusBadge ? (
                     <span
@@ -283,7 +283,7 @@ export default function PortalPage({
               </div>
 
               {actions.length > 0 ? (
-                <div className="portal-page-actions workspace-action-bar flex flex-wrap items-center gap-2 p-2 xl:justify-end">
+                <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
                   {actions.map((action) => (
                     <Link
                       key={`${action.href}-${action.label}`}
@@ -301,7 +301,7 @@ export default function PortalPage({
             </div>
 
             {stats.length > 0 ? (
-              <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
                 {stats.map((stat, index) => (
                   <div
                     key={`${stat.label}-${index}`}
@@ -334,6 +334,6 @@ export default function PortalPage({
       )}
 
       <section className="portal-page-content grid min-w-0 gap-4 sm:gap-5">{children}</section>
-    </main>
+    </div>
   );
 }

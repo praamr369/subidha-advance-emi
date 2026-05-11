@@ -76,7 +76,7 @@ export default function ModalShell({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className={cn(
-          "workflow-modal-panel pointer-events-auto relative flex w-full min-h-0 max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[1.85rem] focus:outline-none sm:max-h-[calc(100dvh-3rem)]",
+          "workflow-modal-panel pointer-events-auto relative flex w-full min-h-0 max-h-[min(calc(100dvh-2rem),calc(100vh-2rem))] flex-col overflow-y-auto overflow-x-hidden rounded-[1.85rem] focus:outline-none sm:max-h-[min(calc(100dvh-3rem),calc(100vh-3rem))]",
           panelClassName
         )}
       >
