@@ -9,7 +9,9 @@ import {
 } from "@/components/admin/control-center/WorkspaceDirectory";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { RegistryPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import RegisterPrintDocument from "@/components/print/RegisterPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
@@ -127,75 +129,93 @@ export default function BookRegisterPage<T extends GenericRecord>({
       }
       actions={actions}
       statusBadge={statusBadge ?? { label: "Posted Data Only", tone: "info" }}
-      stats={[
-        { label: "Rows", value: String(rows.length) },
-        { label: "Range", value: rangeLabel, tone: "info" },
-      ]}
     >
-      {directoryGroups?.length ? (
-        <WorkspaceDirectory
-          className="receipt-print-hide"
-          title={directoryTitle ?? "Related routes"}
-          description={directoryDescription}
-          groups={directoryGroups}
-        />
-      ) : null}
+      <RegistryPageShell
+        filters={
+          <div className="receipt-print-hide space-y-4">
+            {directoryGroups?.length ? (
+              <WorkspaceDirectory
+                title={directoryTitle ?? "Related routes"}
+                description={directoryDescription}
+                groups={directoryGroups}
+              />
+            ) : null}
+            <WorkspaceSection
+              title={`${title} Filters`}
+              description="Books remain powered from posted accounting journals and finalized operational registers only."
+              action={
+                <AccountingRefreshButton
+                  loading={loading}
+                  refreshing={refreshing}
+                  onClick={() => void loadPage("refresh")}
+                />
+              }
+            >
+              <AccountingPeriodFilters
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
+            </WorkspaceSection>
+          </div>
+        }
+        summary={
+          !loading && !error ? (
+            <MetricStrip
+              className="receipt-print-hide"
+              items={[
+                { label: "Rows", value: String(rows.length) },
+                { label: "Range", value: rangeLabel },
+              ]}
+            />
+          ) : null
+        }
+        register={
+          <div className="space-y-6">
+            {loading ? <LoadingBlock label={`Loading ${title.toLowerCase()}...`} /> : null}
+            <WorkspaceSection
+              className="receipt-print-hide"
+              title={title}
+              description="Use the table for operational review and the print surface for branded export/print."
+            >
+              <EnterpriseDataTable
+                data={rows}
+                columns={columns}
+                loading={loading}
+                error={error}
+                onRetry={() => void loadPage("initial")}
+                emptyTitle={`No ${title.toLowerCase()} rows found`}
+                emptyDescription="Adjust the date filter or post new operational documents."
+              />
+            </WorkspaceSection>
 
-      <WorkspaceSection
-        className="receipt-print-hide"
-        title={`${title} Filters`}
-        description="Books remain powered from posted accounting journals and finalized operational registers only."
-        action={<AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />}
-      >
-        <AccountingPeriodFilters
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-        />
-      </WorkspaceSection>
+            <PrintActionBanner
+              className="mb-4 receipt-print-hide"
+              title="Register Print / PDF"
+              description="Print this view for filing or save as PDF. The printable preview keeps the latest rows compact for one-page output."
+            />
 
-      {loading ? <LoadingBlock label={`Loading ${title.toLowerCase()}...`} /> : null}
-
-      <WorkspaceSection
-        className="receipt-print-hide"
-        title={title}
-        description="Use the table for operational review and the print surface for branded export/print."
-      >
-        <EnterpriseDataTable
-          data={rows}
-          columns={columns}
-          loading={loading}
-          error={error}
-          onRetry={() => void loadPage("initial")}
-          emptyTitle={`No ${title.toLowerCase()} rows found`}
-          emptyDescription="Adjust the date filter or post new operational documents."
-        />
-      </WorkspaceSection>
-
-      <PrintActionBanner
-        className="mb-4"
-        title="Register Print / PDF"
-        description="Print this view for filing or save as PDF. The printable preview keeps the latest rows compact for one-page output."
+            <WorkspaceSection
+              title="Printable Register"
+              description="This print layout uses live rows and stays compact for one-page filing where possible."
+            >
+              <RegisterPrintDocument
+                title={printTitle}
+                subtitle={subtitle}
+                reference={rangeLabel}
+                headers={columns.map((column) => column.header)}
+                rows={printableRows}
+                footerNote={
+                  overflowRows > 0
+                    ? `Showing ${previewLimit} of ${rows.length} rows for compact print output. Use date filters to print additional slices without shrinking readability.`
+                    : undefined
+                }
+              />
+            </WorkspaceSection>
+          </div>
+        }
       />
-
-      <WorkspaceSection
-        title="Printable Register"
-        description="This print layout uses live rows and stays compact for one-page filing where possible."
-      >
-        <RegisterPrintDocument
-          title={printTitle}
-          subtitle={subtitle}
-          reference={rangeLabel}
-          headers={columns.map((column) => column.header)}
-          rows={printableRows}
-          footerNote={
-            overflowRows > 0
-              ? `Showing ${previewLimit} of ${rows.length} rows for compact print output. Use date filters to print additional slices without shrinking readability.`
-              : undefined
-          }
-        />
-      </WorkspaceSection>
     </PortalPage>
   );
 }

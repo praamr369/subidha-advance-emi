@@ -9,8 +9,10 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
+import { AccountingControlShell } from "@/components/layout/page-shells";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -143,215 +145,236 @@ export default function AccountingBridgesPage() {
         { href: ROUTES.admin.accountingItrPack, label: "ITR Export Pack", variant: "secondary" },
         { href: ROUTES.admin.accountingTaxInvoices, label: "GST Docs", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Legacy Purposes", value: "Collection + Reversal", tone: "info" },
-        { label: "Phase-3 Runners", value: String(phase3Results.length), tone: "info" },
-        { label: "Dry Run", value: form.dry_run ? "Yes" : "No", tone: form.dry_run ? "warning" : "success" },
-      ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
-        {notice ? <AccountingNotice message={notice} /> : null}
-        {submitting ? <LoadingBlock label="Running accounting bridge..." /> : null}
-
-        {!submitting && error ? (
-          <ErrorState title="Unable to run accounting bridge" description={error} />
-        ) : null}
-
-        <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-          <WorkspaceSection
-            title="Run payment bridge"
-            description="Dry run first to inspect payment collection and payment reversal candidates before creating bridge journals."
-          >
-            <form className="grid gap-3" onSubmit={handleRun}>
-              <label className="text-sm text-muted-foreground">
-                Start date
-                <input type="date" value={form.start_date} onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))} className={accountingFieldClassName()} />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                End date
-                <input type="date" value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))} className={accountingFieldClassName()} />
-              </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                <input
-                  type="checkbox"
-                  checked={form.payment_collection}
-                  onChange={(event) => setForm((current) => ({ ...current, payment_collection: event.target.checked }))}
-                />
-                PAYMENT_COLLECTION purpose
-              </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                <input
-                  type="checkbox"
-                  checked={form.payment_reversal}
-                  onChange={(event) => setForm((current) => ({ ...current, payment_reversal: event.target.checked }))}
-                />
-                PAYMENT_REVERSAL purpose
-              </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                <input
-                  type="checkbox"
-                  checked={form.dry_run}
-                  onChange={(event) => setForm((current) => ({ ...current, dry_run: event.target.checked }))}
-                />
-                Dry run only
-              </label>
-              <button
-                type="submit"
-                className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                disabled={
-                  submitting || (!form.payment_collection && !form.payment_reversal)
-                }
-              >
-                Run Bridge
-              </button>
-            </form>
-          </WorkspaceSection>
-
-          <WorkspaceSection
-            title="Latest bridge result"
-            description="The response below comes directly from the bridge run endpoint, including idempotent existing-count tracking."
-          >
-            {!result ? (
-              <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                Run a dry run or live bridge to see the latest result payload here.
-              </div>
-            ) : (
-              <div className="space-y-3">
+      <AccountingControlShell
+        readinessWarnings={
+          <div className="space-y-4">
+            {notice ? <AccountingNotice message={notice} /> : null}
+            <MetricStrip
+              items={[
+                {
+                  label: "Legacy bridge purposes",
+                  value: [form.payment_collection && "Collection", form.payment_reversal && "Reversal"].filter(Boolean).join(" + ") || "None selected",
+                },
+                { label: "Phase-3 results captured", value: String(phase3Results.length) },
+                { label: "Dry run", value: form.dry_run ? "Yes" : "No" },
+                { label: "Recent postings shown", value: String(bridgeRows.length) },
+              ]}
+            />
+            {submitting ? <LoadingBlock label="Running accounting bridge..." /> : null}
+            {!submitting && error ? <ErrorState title="Unable to run accounting bridge" description={error} /> : null}
+          </div>
+        }
+        primaryRegister={
+          <div className="space-y-6">
+            <WorkspaceSection
+              title="Latest bridge result"
+              description="The response below comes directly from the bridge run endpoint, including idempotent existing-count tracking."
+            >
+              {!result ? (
                 <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                  {result.start_date} to {result.end_date} • {result.dry_run ? "Dry run" : "Live run"}
+                  Run a dry run or live bridge to see the latest result payload here.
                 </div>
-                {result.results.map((row) => (
-                  <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                    <div className="font-semibold text-foreground">{row.purpose}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      Candidates: {row.candidates} • Created: {row.created_count} • Existing: {row.existing_count}
-                    </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
+                    {result.start_date} to {result.end_date} • {result.dry_run ? "Dry run" : "Live run"}
                   </div>
-                ))}
-              </div>
-            )}
-          </WorkspaceSection>
-        </div>
-
-        <WorkspaceSection
-          title="Phase-3 Bridge Runners"
-          description="Run the newer additive bridges separately so retail billing, inventory, EMI waiver, commission settlement, payout, and EMI receipt posting stay explicit and auditable."
-          contentClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-        >
-          <ActionButton
-            variant="primary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("Retail sale bridge", runRetailSaleBridge)}
-          >
-            Run retail sale
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("Inventory bridge", runInventoryPostingBridge)}
-          >
-            Run inventory posting
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("EMI subscription bridge", runEmiSubscriptionBridge)}
-          >
-            Run EMI subscription
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("EMI payment bridge", runEmiPaymentBridge)}
-          >
-            Run EMI payment receipts
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("EMI waiver bridge", runEmiWaiverBridge)}
-          >
-            Run EMI waiver
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("Commission settlement bridge", runCommissionSettlementBridge)}
-          >
-            Run commission settlement
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            loading={submitting}
-            onClick={() => void handlePhase3Run("Payout batch bridge", runPayoutBatchBridge)}
-          >
-            Run payout batches
-          </ActionButton>
-        </WorkspaceSection>
-
-        <WorkspaceSection
-          title="Phase-3 Results"
-          description="Each result reflects the real bridge endpoint response, including skips where accounting recognition is intentionally deferred for safety."
-        >
-          {phase3Results.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-              Run one of the Phase-3 bridge actions to inspect its latest payload here.
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {phase3Results.map((row) => (
-                <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                  <div className="font-semibold text-foreground">{row.purpose}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {row.start_date} to {row.end_date} • {row.dry_run ? "Dry run" : "Live run"}
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Candidates: {row.candidates ?? 0} • Created: {row.created_count ?? 0} • Existing: {row.existing_count ?? 0}
-                  </div>
-                  {row.settlement_created_count || row.settlement_existing_count ? (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      Settlement bridges: Created {row.settlement_created_count ?? 0} • Existing {row.settlement_existing_count ?? 0}
+                  {result.results.map((row) => (
+                    <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
+                      <div className="font-semibold text-foreground">{row.purpose}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Candidates: {row.candidates} • Created: {row.created_count} • Existing: {row.existing_count}
+                      </div>
                     </div>
-                  ) : null}
-                  {row.skipped && row.skipped.length > 0 ? (
-                    <div className="mt-2 text-xs text-amber-700">
-                      Skipped: {row.skipped.length} rows
-                    </div>
-                  ) : null}
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </WorkspaceSection>
+              )}
+            </WorkspaceSection>
 
-        <WorkspaceSection
-          title="Recent bridge provenance"
-          description="Read-only bridge posting register showing which source event already produced a controlled journal entry."
-        >
-          {bridgeRows.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-              No bridge postings recorded yet.
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {bridgeRows.map((row) => (
-                <div key={row.id} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                  <div className="font-semibold text-foreground">
-                    {row.purpose} • {row.source_type || row.source_model} #{row.source_reference || row.source_id}
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {row.voucher_type || "SYSTEM_BRIDGE"} • Journal {row.journal_entry_no || row.journal_entry} • {row.journal_entry_status || "UNKNOWN"}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {row.source_event_date || row.journal_entry_date || "—"} • {row.source_document_no || row.journal_entry_memo || "No document reference"}
-                  </div>
+            <WorkspaceSection
+              title="Phase-3 Results"
+              description="Each result reflects the real bridge endpoint response, including skips where accounting recognition is intentionally deferred for safety."
+            >
+              {phase3Results.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
+                  Run one of the Phase-3 bridge actions to inspect its latest payload here.
                 </div>
-              ))}
-            </div>
-          )}
-        </WorkspaceSection>
-      </div>
+              ) : (
+                <div className="grid gap-3">
+                  {phase3Results.map((row) => (
+                    <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
+                      <div className="font-semibold text-foreground">{row.purpose}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {row.start_date} to {row.end_date} • {row.dry_run ? "Dry run" : "Live run"}
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Candidates: {row.candidates ?? 0} • Created: {row.created_count ?? 0} • Existing:{" "}
+                        {row.existing_count ?? 0}
+                      </div>
+                      {row.settlement_created_count || row.settlement_existing_count ? (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Settlement bridges: Created {row.settlement_created_count ?? 0} • Existing{" "}
+                          {row.settlement_existing_count ?? 0}
+                        </div>
+                      ) : null}
+                      {row.skipped && row.skipped.length > 0 ? (
+                        <div className="mt-2 text-xs text-amber-700">Skipped: {row.skipped.length} rows</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Recent bridge provenance"
+              description="Read-only bridge posting register showing which source event already produced a controlled journal entry."
+            >
+              {bridgeRows.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
+                  No bridge postings recorded yet.
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {bridgeRows.map((row) => (
+                    <div key={row.id} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
+                      <div className="font-semibold text-foreground">
+                        {row.purpose} • {row.source_type || row.source_model} #{row.source_reference || row.source_id}
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {row.voucher_type || "SYSTEM_BRIDGE"} • Journal {row.journal_entry_no || row.journal_entry} •{" "}
+                        {row.journal_entry_status || "UNKNOWN"}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {row.source_event_date || row.journal_entry_date || "—"} •{" "}
+                        {row.source_document_no || row.journal_entry_memo || "No document reference"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+          </div>
+        }
+        controlPanel={
+          <div className="space-y-4">
+            <WorkspaceSection
+              title="Run payment bridge"
+              description="Dry run first to inspect payment collection and payment reversal candidates before creating bridge journals."
+            >
+              <form className="grid gap-3" onSubmit={handleRun}>
+                <label className="text-sm text-muted-foreground">
+                  Start date
+                  <input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}
+                    className={accountingFieldClassName()}
+                  />
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  End date
+                  <input
+                    type="date"
+                    value={form.end_date}
+                    onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}
+                    className={accountingFieldClassName()}
+                  />
+                </label>
+                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.payment_collection}
+                    onChange={(event) => setForm((current) => ({ ...current, payment_collection: event.target.checked }))}
+                  />
+                  PAYMENT_COLLECTION purpose
+                </label>
+                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.payment_reversal}
+                    onChange={(event) => setForm((current) => ({ ...current, payment_reversal: event.target.checked }))}
+                  />
+                  PAYMENT_REVERSAL purpose
+                </label>
+                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.dry_run}
+                    onChange={(event) => setForm((current) => ({ ...current, dry_run: event.target.checked }))}
+                  />
+                  Dry run only
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  disabled={submitting || (!form.payment_collection && !form.payment_reversal)}
+                >
+                  Run Bridge
+                </button>
+              </form>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Phase-3 Bridge Runners"
+              description="Run the newer additive bridges separately so retail billing, inventory, EMI waiver, commission settlement, payout, and EMI receipt posting stay explicit and auditable."
+              contentClassName="grid gap-3 md:grid-cols-2"
+            >
+              <ActionButton
+                variant="primary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("Retail sale bridge", runRetailSaleBridge)}
+              >
+                Run retail sale
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("Inventory bridge", runInventoryPostingBridge)}
+              >
+                Run inventory posting
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("EMI subscription bridge", runEmiSubscriptionBridge)}
+              >
+                Run EMI subscription
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("EMI payment bridge", runEmiPaymentBridge)}
+              >
+                Run EMI payment receipts
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("EMI waiver bridge", runEmiWaiverBridge)}
+              >
+                Run EMI waiver
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("Commission settlement bridge", runCommissionSettlementBridge)}
+              >
+                Run commission settlement
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
+                loading={submitting}
+                onClick={() => void handlePhase3Run("Payout batch bridge", runPayoutBatchBridge)}
+              >
+                Run payout batches
+              </ActionButton>
+            </WorkspaceSection>
+          </div>
+        }
+      />
     </PortalPage>
   );
 }

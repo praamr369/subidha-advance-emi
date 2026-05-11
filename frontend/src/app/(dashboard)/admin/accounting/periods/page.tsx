@@ -11,8 +11,10 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
+import { AccountingControlShell } from "@/components/layout/page-shells";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import type { AccountingPeriod, PostingLock } from "@/services/accounting";
@@ -176,88 +178,145 @@ export default function AccountingPeriodsPage() {
         { href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" },
         { href: ROUTES.admin.accountingBridges, label: "Bridge Runs", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Periods", value: String(periods.length), tone: "info" },
-        { label: "Closed", value: String(periods.filter((row) => row.is_locked).length), tone: "warning" },
-        { label: "Posting Locks", value: String(locks.length), tone: "warning" },
-      ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
-        <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
-        </div>
+      <AccountingControlShell
+        readinessWarnings={
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <AccountingRefreshButton
+                loading={loading}
+                refreshing={refreshing}
+                onClick={() => void loadPage("refresh")}
+              />
+            </div>
+            {notice ? <AccountingNotice message={notice} /> : null}
+            {!loading ? (
+              <MetricStrip
+                items={[
+                  { label: "Periods", value: String(periods.length) },
+                  { label: "Closed", value: String(periods.filter((row) => row.is_locked).length) },
+                  { label: "Posting locks", value: String(locks.length) },
+                ]}
+              />
+            ) : null}
+          </div>
+        }
+        primaryRegister={
+          <div className="space-y-6">
+            <EnterpriseDataTable
+              data={periods}
+              columns={periodColumns}
+              loading={loading}
+              error={error}
+              onRetry={() => void loadPage("initial")}
+              emptyTitle="No accounting periods configured"
+              emptyDescription="Create a period before enforcing close or reopen controls."
+            />
 
-        {notice ? <AccountingNotice message={notice} /> : null}
+            <EnterpriseDataTable
+              data={locks}
+              columns={lockColumns}
+              loading={loading}
+              error={error}
+              onRetry={() => void loadPage("initial")}
+              emptyTitle="No posting locks configured"
+              emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows."
+            />
+          </div>
+        }
+        controlPanel={
+          <div className="space-y-4">
+            <WorkspaceSection
+              title="Create Period"
+              description="Use additive periods to formalize future lock and close behavior."
+            >
+              <form className="grid gap-3" onSubmit={handleCreatePeriod}>
+                <label className="text-sm text-muted-foreground">
+                  Code
+                  <input
+                    className={accountingFieldClassName()}
+                    value={periodForm.code}
+                    onChange={(event) => setPeriodForm((current) => ({ ...current, code: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  Label
+                  <input
+                    className={accountingFieldClassName()}
+                    value={periodForm.label}
+                    onChange={(event) => setPeriodForm((current) => ({ ...current, label: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  Start date
+                  <input
+                    type="date"
+                    className={accountingFieldClassName()}
+                    value={periodForm.start_date}
+                    onChange={(event) =>
+                      setPeriodForm((current) => ({ ...current, start_date: event.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  End date
+                  <input
+                    type="date"
+                    className={accountingFieldClassName()}
+                    value={periodForm.end_date}
+                    onChange={(event) =>
+                      setPeriodForm((current) => ({ ...current, end_date: event.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                >
+                  Create Period
+                </button>
+              </form>
+            </WorkspaceSection>
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <WorkspaceSection
-            title="Create Period"
-            description="Use additive periods to formalize future lock and close behavior."
-          >
-            <form className="grid gap-3" onSubmit={handleCreatePeriod}>
-              <label className="text-sm text-muted-foreground">
-                Code
-                <input className={accountingFieldClassName()} value={periodForm.code} onChange={(event) => setPeriodForm((current) => ({ ...current, code: event.target.value }))} required />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                Label
-                <input className={accountingFieldClassName()} value={periodForm.label} onChange={(event) => setPeriodForm((current) => ({ ...current, label: event.target.value }))} required />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                Start date
-                <input type="date" className={accountingFieldClassName()} value={periodForm.start_date} onChange={(event) => setPeriodForm((current) => ({ ...current, start_date: event.target.value }))} required />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                End date
-                <input type="date" className={accountingFieldClassName()} value={periodForm.end_date} onChange={(event) => setPeriodForm((current) => ({ ...current, end_date: event.target.value }))} required />
-              </label>
-              <button type="submit" className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-                Create Period
-              </button>
-            </form>
-          </WorkspaceSection>
-
-          <WorkspaceSection
-            title="Create Posting Lock"
-            description="Exact-date locks are additive safety controls for sensitive close days and correction windows."
-          >
-            <form className="grid gap-3" onSubmit={handleCreateLock}>
-              <label className="text-sm text-muted-foreground">
-                Lock date
-                <input type="date" className={accountingFieldClassName()} value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} required />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                Reason
-                <textarea className={accountingFieldClassName()} value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} />
-              </label>
-              <button type="submit" className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-                Create Lock
-              </button>
-            </form>
-          </WorkspaceSection>
-        </div>
-
-        <EnterpriseDataTable
-          data={periods}
-          columns={periodColumns}
-          loading={loading}
-          error={error}
-          onRetry={() => void loadPage("initial")}
-          emptyTitle="No accounting periods configured"
-          emptyDescription="Create a period before enforcing close or reopen controls."
-        />
-
-        <EnterpriseDataTable
-          data={locks}
-          columns={lockColumns}
-          loading={loading}
-          error={error}
-          onRetry={() => void loadPage("initial")}
-          emptyTitle="No posting locks configured"
-          emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows."
-        />
-      </div>
+            <WorkspaceSection
+              title="Create Posting Lock"
+              description="Exact-date locks are additive safety controls for sensitive close days and correction windows."
+            >
+              <form className="grid gap-3" onSubmit={handleCreateLock}>
+                <label className="text-sm text-muted-foreground">
+                  Lock date
+                  <input
+                    type="date"
+                    className={accountingFieldClassName()}
+                    value={lockForm.lock_date}
+                    onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  Reason
+                  <textarea
+                    className={accountingFieldClassName()}
+                    value={lockForm.reason}
+                    onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                >
+                  Create Lock
+                </button>
+              </form>
+            </WorkspaceSection>
+          </div>
+        }
+      />
     </PortalPage>
   );
 }

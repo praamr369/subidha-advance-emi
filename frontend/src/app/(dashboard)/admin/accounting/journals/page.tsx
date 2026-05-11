@@ -7,7 +7,9 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
+import { AccountingControlShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -169,63 +171,144 @@ export default function AccountingJournalsPage() {
         { href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" },
         { href: ROUTES.admin.accountingExpenses, label: "Expenses", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Chart Accounts", value: String(chartAccounts.length), tone: "info" },
-        { label: "Journal Entries", value: String(journals.length) },
-        {
-          label: "Draft",
-          value: String(journals.filter((item) => item.status === "DRAFT").length),
-          tone: journals.some((item) => item.status === "DRAFT") ? "warning" : "success",
-        },
-        {
-          label: "Posted",
-          value: String(journals.filter((item) => item.status === "POSTED").length),
-          tone: "success",
-        },
-      ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
-        <WorkspaceDirectory
-          title="Accounting control map"
-          description="Use the shared accounting directory to move from manual journals into books, masters, and financial statements."
-          groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
-        />
+      <AccountingControlShell
+        readinessWarnings={
+          <div className="space-y-4">
+            <WorkspaceDirectory
+              title="Accounting control map"
+              description="Use the shared accounting directory to move from manual journals into books, masters, and financial statements."
+              groups={ACCOUNTING_REGISTER_DIRECTORY_GROUPS}
+            />
 
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={refreshing || loading}
-            className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              {notice ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  {notice}
+                </div>
+              ) : (
+                <div />
+              )}
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing || loading}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
 
-        {notice ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            {notice}
+            {!loading && !error ? (
+              <MetricStrip
+                items={[
+                  { label: "Chart accounts", value: String(chartAccounts.length) },
+                  { label: "Journal entries", value: String(journals.length) },
+                  { label: "Draft", value: String(journals.filter((item) => item.status === "DRAFT").length) },
+                  { label: "Posted", value: String(journals.filter((item) => item.status === "POSTED").length) },
+                ]}
+              />
+            ) : null}
+
+            {loading ? <LoadingBlock label="Loading journal register..." /> : null}
+
+            {!loading && error ? (
+              <ErrorState
+                title="Unable to load journal register"
+                description={error}
+                onRetry={() => void loadPage("initial")}
+              />
+            ) : null}
           </div>
-        ) : null}
+        }
+        primaryRegister={
+          !loading && !error ? (
+            <WorkspaceSection
+              title="Journal register"
+              description="Posted journal entries remain immutable except for controlled void with a reason. Draft entries can be reviewed and posted here."
+            >
+              {journals.length === 0 ? (
+                <EmptyState
+                  title="No journal entries yet"
+                  description="Create the first draft journal in the control panel to start the accounting books."
+                />
+              ) : (
+                <div className="grid gap-3">
+                  {journals.map((journal) => (
+                    <div key={journal.id} className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">{journal.entry_no}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {journal.entry_type} • {journal.status} • {formatDate(journal.entry_date)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">
+                            {journal.lines.length > 0
+                              ? money(journal.lines[0].debit_amount || journal.lines[0].credit_amount)
+                              : money(0)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">{journal.memo || "No memo"}</div>
+                        </div>
+                      </div>
 
-        {loading ? <LoadingBlock label="Loading journal register..." /> : null}
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        {journal.lines.map((line, index) => (
+                          <div
+                            key={`${journal.id}-${index}`}
+                            className="rounded-xl border border-white/70 bg-white px-3 py-3 text-sm text-foreground"
+                          >
+                            <div className="font-medium">
+                              {line.chart_account_code} · {line.chart_account_name}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Dr {money(line.debit_amount)} • Cr {money(line.credit_amount)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
 
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load journal register"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {journal.status === "DRAFT" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handlePostJournal(journal.id)}
+                            className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                          >
+                            Post
+                          </button>
+                        ) : null}
+                        {journal.status === "POSTED" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleVoidJournal(journal.id)}
+                            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+                          >
+                            Void
+                          </button>
+                        ) : null}
+                        {journal.void_reason ? (
+                          <span className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            Void reason: {journal.void_reason}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </WorkspaceSection>
+          ) : null
+        }
+        controlPanel={
+          !loading && !error ? (
             <WorkspaceSection
               title="Create manual journal"
               description="This draft form creates a balanced two-line journal. Posting is a separate admin action so no manual entry becomes final by accident."
             >
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateJournal}>
+              <form className="grid gap-3" onSubmit={handleCreateJournal}>
                 <label className="text-sm text-muted-foreground">
                   Entry date
                   <input
@@ -258,7 +341,7 @@ export default function AccountingJournalsPage() {
                     required
                   />
                 </label>
-                <label className="text-sm text-muted-foreground md:col-span-2">
+                <label className="text-sm text-muted-foreground">
                   Memo
                   <input
                     className={fieldClassName()}
@@ -272,7 +355,7 @@ export default function AccountingJournalsPage() {
                     required
                   />
                 </label>
-                <label className="text-sm text-muted-foreground md:col-span-2">
+                <label className="text-sm text-muted-foreground">
                   Line description
                   <input
                     className={fieldClassName()}
@@ -328,103 +411,17 @@ export default function AccountingJournalsPage() {
                     ))}
                   </select>
                 </label>
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                  >
-                    Create draft journal
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                >
+                  Create draft journal
+                </button>
               </form>
             </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Journal register"
-              description="Posted journal entries remain immutable except for controlled void with a reason. Draft entries can be reviewed and posted here."
-            >
-              {journals.length === 0 ? (
-                <EmptyState
-                  title="No journal entries yet"
-                  description="Create the first draft journal above to start the accounting books."
-                />
-              ) : (
-                <div className="grid gap-3">
-                  {journals.map((journal) => (
-                    <div
-                      key={journal.id}
-                      className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {journal.entry_no}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {journal.entry_type} • {journal.status} • {formatDate(journal.entry_date)}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold text-foreground">
-                            {journal.lines.length > 0
-                              ? money(journal.lines[0].debit_amount || journal.lines[0].credit_amount)
-                              : money(0)}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {journal.memo || "No memo"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        {journal.lines.map((line, index) => (
-                          <div
-                            key={`${journal.id}-${index}`}
-                            className="rounded-xl border border-white/70 bg-white px-3 py-3 text-sm text-foreground"
-                          >
-                            <div className="font-medium">
-                              {line.chart_account_code} · {line.chart_account_name}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Dr {money(line.debit_amount)} • Cr {money(line.credit_amount)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {journal.status === "DRAFT" ? (
-                          <button
-                            type="button"
-                            onClick={() => void handlePostJournal(journal.id)}
-                            className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                          >
-                            Post
-                          </button>
-                        ) : null}
-                        {journal.status === "POSTED" ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleVoidJournal(journal.id)}
-                            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
-                          >
-                            Void
-                          </button>
-                        ) : null}
-                        {journal.void_reason ? (
-                          <span className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                            Void reason: {journal.void_reason}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
-          </>
-        ) : null}
-      </div>
+          ) : null
+        }
+      />
     </PortalPage>
   );
 }
