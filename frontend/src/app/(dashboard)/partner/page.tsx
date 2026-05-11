@@ -181,21 +181,22 @@ export default function PartnerDashboardPage() {
   const commissionEarned = Number(
     legacy?.summary.settled_commission ?? 0
   ) + Number(legacy?.summary.pending_commission ?? 0);
-  const partnerAtAGlance = [
+  const partnerAtAGlance = legacy
+    ? [
     {
       label: "My customers",
-      value: String(legacy?.summary.total_customers ?? 0),
+      value: String(legacy.summary.total_customers ?? 0),
       href: ROUTES.partner.customers,
     },
     {
       label: "My subscriptions",
-      value: String(legacy?.summary.total_subscriptions ?? 0),
+      value: String(legacy.summary.total_subscriptions ?? 0),
       href: ROUTES.partner.subscriptions,
     },
     {
       label: "Pending requests",
       value: String(pendingRequests),
-      helper: `${legacy?.summary.approved_collection_requests ?? 0} approved`,
+      helper: `${legacy.summary.approved_collection_requests ?? 0} approved`,
       href: ROUTES.partner.collectionRequests,
     },
     {
@@ -205,8 +206,8 @@ export default function PartnerDashboardPage() {
     },
     {
       label: "Pending commission",
-      value: money(legacy?.summary.pending_commission),
-      helper: money(legacy?.summary.settled_commission) + " settled",
+      value: money(legacy.summary.pending_commission),
+      helper: money(legacy.summary.settled_commission) + " settled",
       href: ROUTES.partner.payouts,
     },
     {
@@ -215,7 +216,13 @@ export default function PartnerDashboardPage() {
       helper: "Based on current commission ledger visibility",
       href: ROUTES.partner.payouts,
     },
-  ];
+    {
+      label: "Unread alerts",
+      value: String(notificationSummary?.unread_count ?? 0),
+      href: ROUTES.partner.notifications,
+    },
+  ]
+    : [];
 
   const handleUsernameSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -278,39 +285,24 @@ export default function PartnerDashboardPage() {
           variant: "secondary",
         },
       ]}
-      stats={
-        legacy
-          ? [
-              {
-                label: "Customers In Scope",
-                value: String(legacy.summary.total_customers ?? 0),
-                tone: "info",
-              },
-              {
-                label: "Subscriptions",
-                value: String(legacy.summary.total_subscriptions ?? 0),
-              },
-              {
-                label: "Collected",
-                value: money(legacy.summary.total_revenue_collected),
-                tone: "success",
-              },
-              {
-                label: "Pending Commission",
-                value: money(legacy.summary.pending_commission),
-                tone: "warning",
-              },
-              {
-                label: "Unread Alerts",
-                value: String(notificationSummary?.unread_count ?? 0),
-                tone: "info",
-              },
-            ]
-          : []
-      }
       statusBadge={{ label: "Partner Scope", tone: "info" }}
     >
-      <PartnerVendorWorkspaceShell>
+      <PartnerVendorWorkspaceShell
+        posture={
+          legacy ? (
+            <MetricStrip
+              className="xl:grid-cols-3 2xl:grid-cols-6"
+              items={partnerAtAGlance.map((item) => ({
+                label: item.label,
+                value: item.value,
+                helper: item.helper,
+                href: item.href,
+              }))}
+            />
+          ) : null
+        }
+        queues={
+        <>
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
@@ -959,7 +951,9 @@ export default function PartnerDashboardPage() {
             </form>
           </WorkspaceSection>
         ) : null}
-      </PartnerVendorWorkspaceShell>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

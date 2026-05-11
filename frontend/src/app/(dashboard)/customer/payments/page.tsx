@@ -11,7 +11,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
-import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, MetricStrip, MobileSafeTable } from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
@@ -298,25 +298,28 @@ export default function CustomerPaymentsPage() {
           variant: "secondary",
         },
       ]}
-      stats={[
-        { label: "Payment records", value: count },
-        { label: "Total paid", value: money(totalPaidAmount), tone: "success" },
-        { label: "Subscriptions", value: uniqueSubscriptionCount },
-        {
-          label: "Reversed",
-          value: reversedCount,
-          tone: reversedCount > 0 ? "warning" : "default",
-        },
-        {
-          label: "Latest payment",
-          value: latestPayment
-            ? formatDateTime(latestPayment.created_at || latestPayment.payment_date)
-            : "—",
-        },
-      ]}
       statusBadge={{ label: "Customer payment truth", tone: "info" }}
     >
-      <SelfServicePageShell>
+      <SelfServicePageShell
+        glance={
+          <MetricStrip
+            className="xl:grid-cols-5"
+            items={[
+              { label: "Payment records", value: String(count) },
+              { label: "Total paid", value: money(totalPaidAmount) },
+              { label: "Subscriptions", value: String(uniqueSubscriptionCount) },
+              { label: "Reversed", value: String(reversedCount) },
+              {
+                label: "Latest payment",
+                value: latestPayment
+                  ? formatDateTime(latestPayment.created_at || latestPayment.payment_date)
+                  : "—",
+              },
+            ]}
+          />
+        }
+        records={
+        <>
         <DetailPanel
           title="Payment filters"
           description="Narrow customer-visible payment history by subscription or collection method."
@@ -613,7 +616,9 @@ export default function CustomerPaymentsPage() {
           ) : null}
           </>
         ) : null}
-      </SelfServicePageShell>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

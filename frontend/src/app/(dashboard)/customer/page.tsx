@@ -400,101 +400,119 @@ export default function CustomerDashboardPage() {
   ];
 
   return (
-    <SelfServicePageShell>
-      <PageHeader
-        eyebrow="Your account"
-        title="Customer Workspace"
-        description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
-        helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."
-        helperTone="info"
-        actions={
-          <ActionButton
-            variant="outline"
-            onClick={() => void loadPage("refresh")}
-            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </ActionButton>
-        }
-      />
+    <SelfServicePageShell
+      glance={
+        <>
+          <PageHeader
+            eyebrow="Your account"
+            title="Customer Workspace"
+            description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
+            helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."
+            helperTone="info"
+            actions={
+              <ActionButton
+                variant="outline"
+                onClick={() => void loadPage("refresh")}
+                leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </ActionButton>
+            }
+          />
 
-      <DashboardTimeWindowSelector
-        value={windowPreset}
-        startDate={startDate}
-        endDate={endDate}
-        loading={loading || refreshing}
-        onWindowChange={setWindowPreset}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
+          <DashboardTimeWindowSelector
+            value={windowPreset}
+            startDate={startDate}
+            endDate={endDate}
+            loading={loading || refreshing}
+            onWindowChange={setWindowPreset}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
 
-      <WorkspaceSection
-        title="Workspace quick lanes"
-        description="Open common customer workflows quickly while keeping contract, payment, and support routes separate."
-      >
-        <DashboardWidgetBoard
-          storageKey="subidha:dashboard-widgets:customer:v1"
-          version={1}
-          title="Customer lane widgets"
-          description="Simple customer lane controls for subscription, payment, and support routes."
-          presets={[
-            {
-              id: "subscription-first",
-              label: "Subscription first",
-              description: "Prioritize subscription and payment visibility.",
-              order: ["subs", "payments", "support"],
-              pinned: ["subs", "payments"],
-            },
-            {
-              id: "support-first",
-              label: "Support first",
-              description: "Prioritize support escalation while preserving subscription context.",
-              order: ["support", "subs", "payments"],
-              pinned: ["support"],
-            },
-          ]}
-          widgets={[
-            {
-              id: "subs",
-              title: "My subscriptions",
-              subtitle: "Contract and winner posture overview.",
-              group: "core",
-              fixed: true,
-              content: (
-                <ActionButton href={ROUTES.customer.subscriptions} variant="outline" className="justify-between">
-                  Open subscriptions
-                  <ArrowRight className="h-4 w-4" />
-                </ActionButton>
-              ),
-            },
-            {
-              id: "payments",
-              title: "My payments",
-              subtitle: "Payment register and receipt lookup.",
-              group: "quick-actions",
-              content: (
-                <ActionButton href={ROUTES.customer.payments} variant="outline" className="justify-between">
-                  Open payments
-                  <ArrowRight className="h-4 w-4" />
-                </ActionButton>
-              ),
-            },
-            {
-              id: "support",
-              title: "Support requests",
-              subtitle: "Escalate customer-side issues safely.",
-              group: "operational",
-              content: (
-                <ActionButton href={ROUTES.customer.support} variant="outline" className="justify-between">
-                  Open support
-                  <ArrowRight className="h-4 w-4" />
-                </ActionButton>
-              ),
-            },
-          ]}
-        />
-      </WorkspaceSection>
-
+          {!loading && !error && legacy && summary ? (
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">At a glance</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tap a tile to open subscriptions, payments, deliveries, or support.
+              </p>
+              <div className="mt-4">
+                <MetricStrip items={atAGlanceMetrics} />
+              </div>
+            </section>
+          ) : null}
+        </>
+      }
+      actions={
+        <WorkspaceSection
+          title="Workspace quick lanes"
+          description="Open common customer workflows quickly while keeping contract, payment, and support routes separate."
+        >
+          <DashboardWidgetBoard
+            storageKey="subidha:dashboard-widgets:customer:v1"
+            version={1}
+            title="Customer lane widgets"
+            description="Simple customer lane controls for subscription, payment, and support routes."
+            presets={[
+              {
+                id: "subscription-first",
+                label: "Subscription first",
+                description: "Prioritize subscription and payment visibility.",
+                order: ["subs", "payments", "support"],
+                pinned: ["subs", "payments"],
+              },
+              {
+                id: "support-first",
+                label: "Support first",
+                description: "Prioritize support escalation while preserving subscription context.",
+                order: ["support", "subs", "payments"],
+                pinned: ["support"],
+              },
+            ]}
+            widgets={[
+              {
+                id: "subs",
+                title: "My subscriptions",
+                subtitle: "Contract and winner posture overview.",
+                group: "core",
+                fixed: true,
+                content: (
+                  <ActionButton href={ROUTES.customer.subscriptions} variant="outline" className="justify-between">
+                    Open subscriptions
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "payments",
+                title: "My payments",
+                subtitle: "Payment register and receipt lookup.",
+                group: "quick-actions",
+                content: (
+                  <ActionButton href={ROUTES.customer.payments} variant="outline" className="justify-between">
+                    Open payments
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+              {
+                id: "support",
+                title: "Support requests",
+                subtitle: "Escalate customer-side issues safely.",
+                group: "operational",
+                content: (
+                  <ActionButton href={ROUTES.customer.support} variant="outline" className="justify-between">
+                    Open support
+                    <ArrowRight className="h-4 w-4" />
+                  </ActionButton>
+                ),
+              },
+            ]}
+          />
+        </WorkspaceSection>
+      }
+      records={
+        <>
       {loading ? <LoadingBlock label="Loading customer workspace..." /> : null}
 
       {!loading && error ? (
@@ -507,18 +525,6 @@ export default function CustomerDashboardPage() {
 
       {!loading && !error && legacy && summary ? (
         <>
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              At a glance
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tap a tile to open subscriptions, payments, deliveries, or support.
-            </p>
-            <div className="mt-4">
-              <MetricStrip items={atAGlanceMetrics} />
-            </div>
-          </section>
-
           <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
             <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
             <div className="pointer-events-none absolute left-0 top-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl" />
@@ -605,88 +611,45 @@ export default function CustomerDashboardPage() {
             </dl>
           </WorkspaceSection>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <WorkspaceSection
-              title="Latest direct-sale invoices"
-              description="Recent invoices linked to your customer profile (walk-in snapshot-only sales are excluded)."
-              action={
-                <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
-                  All direct sales
-                </ActionButton>
-              }
-            >
-              {latestDirectSales.length === 0 ? (
-                <EmptyState
-                  title="No direct-sale invoices"
-                  description="When a direct sale is linked to your account, it will appear here with balance context."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {latestDirectSales.map((inv) => (
-                    <Link
-                      key={inv.id}
-                      href={`${ROUTES.customer.directSales}/${inv.id}`}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm transition hover:bg-muted/40"
-                    >
-                      <div>
-                        <div className="font-semibold text-foreground">
-                          {inv.invoice_number || inv.document_number || `Sale #${inv.id}`}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {inv.sale_date ? formatDate(inv.sale_date) : "—"} · Due {money(inv.outstanding_amount)}
-                        </div>
+          <WorkspaceSection
+            title="Latest direct-sale invoices"
+            description="Recent invoices linked to your customer profile (walk-in snapshot-only sales are excluded)."
+            action={
+              <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
+                All direct sales
+              </ActionButton>
+            }
+          >
+            {latestDirectSales.length === 0 ? (
+              <EmptyState
+                title="No direct-sale invoices"
+                description="When a direct sale is linked to your account, it will appear here with balance context."
+              />
+            ) : (
+              <div className="space-y-2">
+                {latestDirectSales.map((inv) => (
+                  <Link
+                    key={inv.id}
+                    href={`${ROUTES.customer.directSales}/${inv.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm transition hover:bg-muted/40"
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        {inv.invoice_number || inv.document_number || `Sale #${inv.id}`}
                       </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <div>Total {money(inv.grand_total)}</div>
-                        <div>Paid {money(inv.paid_amount)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {inv.sale_date ? formatDate(inv.sale_date) : "—"} · Due {money(inv.outstanding_amount)}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Notifications"
-              description="Operational updates for your account (payments, documents, and subscription events)."
-              action={
-                <ActionButton href={ROUTES.customer.notifications} variant="secondary" className="h-9 px-3 text-xs">
-                  Notification center
-                </ActionButton>
-              }
-            >
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {notificationSummary?.unread_count ?? 0}
-                  </span>{" "}
-                  unread
-                </span>
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {notificationSummary?.high_priority_count ?? 0}
-                  </span>{" "}
-                  high priority
-                </span>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <div>Total {money(inv.grand_total)}</div>
+                      <div>Paid {money(inv.paid_amount)}</div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-              {(notificationSummary?.latest?.length ?? 0) > 0 ? (
-                <ul className="mt-4 space-y-2 text-sm">
-                  {(notificationSummary?.latest ?? []).slice(0, 5).map((n) => (
-                    <li key={n.id} className="rounded-xl border border-border px-3 py-2">
-                      <div className="font-medium text-foreground">{n.title}</div>
-                      <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {formatDate(n.created_at)}
-                        {n.is_read ? "" : " · Unread"}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-sm text-muted-foreground">No recent notifications.</p>
-              )}
-            </WorkspaceSection>
-          </div>
+            )}
+          </WorkspaceSection>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <section
@@ -978,6 +941,52 @@ export default function CustomerDashboardPage() {
           description="Customer dashboard data is not currently available."
         />
       ) : null}
-    </SelfServicePageShell>
+        </>
+      }
+      support={
+        !loading && !error && legacy && summary ? (
+          <WorkspaceSection
+            title="Notifications"
+            description="Operational updates for your account (payments, documents, and subscription events)."
+            action={
+              <ActionButton href={ROUTES.customer.notifications} variant="secondary" className="h-9 px-3 text-xs">
+                Notification center
+              </ActionButton>
+            }
+          >
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <span>
+                <span className="font-semibold text-foreground">
+                  {notificationSummary?.unread_count ?? 0}
+                </span>{" "}
+                unread
+              </span>
+              <span>
+                <span className="font-semibold text-foreground">
+                  {notificationSummary?.high_priority_count ?? 0}
+                </span>{" "}
+                high priority
+              </span>
+            </div>
+            {(notificationSummary?.latest?.length ?? 0) > 0 ? (
+              <ul className="mt-4 space-y-2 text-sm">
+                {(notificationSummary?.latest ?? []).slice(0, 5).map((n) => (
+                  <li key={n.id} className="rounded-xl border border-border px-3 py-2">
+                    <div className="font-medium text-foreground">{n.title}</div>
+                    <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {formatDate(n.created_at)}
+                      {n.is_read ? "" : " · Unread"}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">No recent notifications.</p>
+            )}
+          </WorkspaceSection>
+        ) : null
+      }
+    />
   );
 }

@@ -348,10 +348,8 @@ export default function AdminDashboardPage() {
     ? deliverySummary.pending + deliverySummary.scheduled + deliverySummary.in_transit
     : 0;
   const nextDraw = legacy?.batches?.next_draw_batch;
-  const openBatches = legacy?.batches?.open_batches ?? legacy?.operations?.open_batches ?? 0;
   const widgetStorageKey = "subidha:dashboard-widgets:admin:v1";
   const outstandingRaw = summary?.outstanding_amount ?? legacy?.financial?.total_outstanding ?? "0.00";
-  const outstandingNum = toNumber(outstandingRaw);
   const analyticsOverview = analytics?.overview;
   const contractRows = analytics?.contract_performance.value_by_plan ?? [];
   const scheduleRows = analytics?.contract_performance.schedule_totals_by_plan ?? [];
@@ -374,7 +372,6 @@ export default function AdminDashboardPage() {
     queueSummary?.results?.find((item) => item.key === "return_inspections_pending")?.count ?? 0;
   const refundQueueCount =
     queueSummary?.results?.find((item) => item.key === "deposit_refunds_pending")?.count ?? 0;
-  const luckyDrawActions = (nextDraw?.days_until_draw ?? 0) <= 7 && nextDraw?.draw_date ? 1 : 0;
 
   const summaryWindowLabel =
     summaryWindow === "THIS_MONTH"
@@ -470,7 +467,8 @@ export default function AdminDashboardPage() {
           { href: ROUTES.admin.bi, label: "BI", variant: "secondary" },
         ]}
       >
-        <div className="space-y-6">
+        <ExecutiveDashboardShell
+          posture={
           <section className="overflow-hidden rounded-[1.7rem] border border-[color-mix(in_oklab,var(--accent)_42%,white_58%)] bg-[linear-gradient(135deg,#ffffff_0%,#fffaf0_44%,#f8efe2_100%)] p-5 shadow-[0_24px_70px_-52px_rgba(76,45,24,0.7)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -521,22 +519,22 @@ export default function AdminDashboardPage() {
               </ActionButton>
             </div>
           </section>
-
+          }
+          alerts={
           <MetricStrip
+            className="xl:grid-cols-6"
             items={[
               { label: "Today Collection", value: money(todayNet), helper: `${todayTransactions} txns`, href: ROUTES.admin.branchReporting },
-              { label: "Active Outstanding", value: money(outstandingRaw), helper: "Active receivable only" },
               { label: "Due Today", value: String(pendingEmiCount), helper: money(pendingEmiAmount), href: ROUTES.admin.emisPending },
               { label: "Overdue", value: String(overdueCount), helper: money(overdueAmount), href: ROUTES.admin.emisOverdue },
               { label: "Pending Delivery", value: String(deliveryActions), helper: `${deliverySummary?.pending ?? 0} pending`, href: buildAdminDeliveriesRoute({ bucket: "PENDING" }) },
               { label: "Returns / Refunds", value: String(returnQueueCount + refundQueueCount), helper: `${returnQueueCount} returns · ${refundQueueCount} refunds`, href: ROUTES.admin.financeReversalControl },
-              { label: "Low Stock", value: String(lowStockCount), helper: `${trackedInventoryItems} tracked`, href: ROUTES.admin.inventoryStockOnHand },
-              { label: "Lucky Draw Actions", value: String(luckyDrawActions), helper: nextDraw?.batch_code ?? "No immediate draw", href: ROUTES.admin.luckyDraws },
-              { label: "Open Batches", value: String(openBatches), helper: `Ready lock ${readyToLockBatches ?? 0}`, href: ROUTES.admin.batches },
-              { label: "Reconciliation Alerts", value: String(reconciliationFlags), helper: reconciliationFlags > 0 ? "Needs review" : "Clear", href: ROUTES.admin.reconciliation },
+              { label: "Reconciliation", value: String(reconciliationFlags), helper: reconciliationFlags > 0 ? "Needs review" : "Clear", href: ROUTES.admin.reconciliation },
             ]}
           />
-
+          }
+          queues={
+          <>
           <div className="grid gap-4 xl:grid-cols-2">
             <QueueList
               rows={[
@@ -545,6 +543,11 @@ export default function AdminDashboardPage() {
                 { title: "Needs Return / Refund", count: returnQueueCount + refundQueueCount, route: ROUTES.admin.financeReversalControl },
                 { title: "Needs Reconciliation", count: reconciliationFlags, route: buildAdminReconciliationRoute({ flagged: true }) },
                 { title: "Needs Stock Action", count: lowStockCount, route: ROUTES.admin.inventoryStockOnHand },
+                {
+                  title: "Ready-to-lock batches",
+                  count: readyToLockBatches ?? 0,
+                  route: `${ROUTES.admin.batches}?status=READY_TO_LOCK`,
+                },
               ]}
             />
             <LedgerSummary
@@ -556,7 +559,10 @@ export default function AdminDashboardPage() {
               ]}
             />
           </div>
-
+          </>
+          }
+          actions={
+          <>
           <CommandSection
             title="Quick actions"
             description="Only real admin routes and guided workflows are shown. Payment posting remains server-controlled."
@@ -636,7 +642,9 @@ export default function AdminDashboardPage() {
               <LaunchCard title="Inventory alerts" description={`${lowStockCount} stock rows below reorder level.`} href={ROUTES.admin.inventoryStockOnHand} icon={<Package className="h-5 w-5" />} meta={`${trackedInventoryItems} tracked items`} />
             </div>
           </CommandSection>
-        </div>
+          </>
+          }
+        />
       </PortalPage>
     );
   }
@@ -659,9 +667,10 @@ export default function AdminDashboardPage() {
         tone: summary?.has_payment_adjustments ? "warning" : "info",
       }}
     >
-      <ExecutiveDashboardShell>
-        {/* Top strip: system signal + refresh */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <ExecutiveDashboardShell
+        posture={
+          <>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-sky-50/90 px-3 py-1 text-xs font-semibold text-sky-900">
               <Sparkles className="h-3.5 w-3.5 shrink-0" />
@@ -698,7 +707,96 @@ export default function AdminDashboardPage() {
             {refreshing ? "Refreshing…" : "Refresh data"}
           </ActionButton>
         </div>
-
+            <section aria-labelledby="exec-posture-metrics" className="space-y-2">
+              <h2 id="exec-posture-metrics" className="sr-only">
+                Executive posture metrics
+              </h2>
+              <MetricStrip
+                className="xl:grid-cols-5"
+                items={[
+                  {
+                    label: "Collections today",
+                    value: money(todayNet),
+                    helper: "Net from branch reporting for today",
+                    href: ROUTES.admin.branchReporting,
+                  },
+                  {
+                    label: "Outstanding receivables",
+                    value: money(outstandingRaw),
+                    helper: "From executive summary",
+                  },
+                  {
+                    label: "Overdue EMI",
+                    value: String(overdueCount),
+                    helper: overdueCount > 0 ? `${money(overdueAmount)} exposure` : "No overdue rows in view",
+                    href: ROUTES.admin.emisOverdue,
+                  },
+                  {
+                    label: "Direct sales",
+                    value: money(directSalesTotal),
+                    helper: `${directSalesCount} direct sale rows this month`,
+                    href: ROUTES.admin.billingDirectSales,
+                  },
+                  {
+                    label: "Reconciliation",
+                    value: String(reconciliationFlags),
+                    helper: reconciliationFlags > 0 ? "Flagged rows" : "No flags in current view",
+                    href:
+                      reconciliationFlags > 0
+                        ? buildAdminReconciliationRoute({ flagged: true })
+                        : ROUTES.admin.reconciliation,
+                  },
+                ]}
+              />
+            </section>
+          </>
+        }
+        alerts={
+          <PageSection>
+            <h2 className="text-sm font-semibold text-foreground">Request &amp; Approval Queues</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Live admin queues with severity and deep links.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {REQUIRED_QUEUE_KEYS.map((key) => {
+                const row = (queueSummary?.results ?? []).find((item) => item.key === key);
+                const isLowStock = key === "low_stock_alerts";
+                const lowStockCount =
+                  stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
+                const href = isLowStock
+                  ? ROUTES.admin.inventoryStockOnHand
+                  : row?.detail_url || ROUTES.admin.operationsCommandCenter;
+                const count = isLowStock ? lowStockCount : row?.count ?? 0;
+                const severity = isLowStock
+                  ? lowStockCount > 0
+                    ? "HIGH"
+                    : "INFO"
+                  : row?.severity ?? "INFO";
+                return (
+                  <div key={key} className="rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-semibold text-foreground">{QUEUE_LABELS[key] || key}</div>
+                      <span className="rounded-full border border-border/80 bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {severity}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Count: {count}
+                      {row?.oldest_pending_date ? ` • Oldest: ${row.oldest_pending_date}` : ""}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <ActionButton href={href} size="sm" variant="secondary">
+                        Open Queue
+                      </ActionButton>
+                      <ActionButton href={href} size="sm" variant="outline">
+                        Take Action
+                      </ActionButton>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PageSection>
+        }
+        queues={
         <DashboardWidgetBoard
           storageKey={widgetStorageKey}
           version={1}
@@ -986,106 +1084,9 @@ export default function AdminDashboardPage() {
             },
           ] satisfies DashboardWidgetDefinition[]}
         />
-
-        {/* Key metrics */}
-        <section aria-labelledby="kpi-heading">
-          <h2 id="kpi-heading" className="sr-only">
-            Key performance indicators
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Collections today"
-              value={money(todayNet)}
-              subtext="Net from branch reporting for today"
-              tone="success"
-              icon={<Wallet className="h-5 w-5" />}
-              trend="neutral"
-              trendValue="Today’s window"
-            />
-            <StatCard
-              label="Outstanding receivables"
-              value={money(outstandingRaw)}
-              subtext="From executive summary"
-              tone={outstandingNum > 0 ? "warning" : "success"}
-              icon={<Banknote className="h-5 w-5" />}
-              trend="neutral"
-              trendValue="This month"
-            />
-            <StatCard
-              label="Overdue EMI"
-              value={String(overdueCount)}
-              subtext={overdueCount > 0 ? `${money(overdueAmount)} exposure` : "No overdue rows in view"}
-              tone={overdueCount > 0 ? "warning" : "success"}
-              href={ROUTES.admin.emisOverdue}
-              icon={<AlertTriangle className="h-5 w-5" />}
-              trend="neutral"
-              trendValue={overdueCount > 0 ? "Action needed" : "Clear"}
-            />
-            <StatCard
-              label="Direct sales"
-              value={money(directSalesTotal)}
-              subtext={`${directSalesCount} direct sale rows this month`}
-              href={ROUTES.admin.billingDirectSales}
-              icon={<ShoppingCart className="h-5 w-5" />}
-              trend="neutral"
-              trendValue="Retail"
-            />
-            <StatCard
-              label="Reconciliation"
-              value={String(reconciliationFlags)}
-              subtext={reconciliationFlags > 0 ? "Flagged rows" : "No flags in current view"}
-              tone={reconciliationFlags > 0 ? "warning" : "success"}
-              href={reconciliationFlags > 0 ? buildAdminReconciliationRoute({ flagged: true }) : ROUTES.admin.reconciliation}
-              icon={<ClipboardCheck className="h-5 w-5" />}
-              trend="neutral"
-              trendValue={reconciliationPosture.badgeLabel}
-            />
-          </div>
-        </section>
-        <PageSection>
-          <h2 className="text-sm font-semibold text-foreground">Request & Approval Queues</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Live admin queues with severity and deep links.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {REQUIRED_QUEUE_KEYS.map((key) => {
-              const row = (queueSummary?.results ?? []).find((item) => item.key === key);
-              const isLowStock = key === "low_stock_alerts";
-              const lowStockCount =
-                stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
-              const href = isLowStock
-                ? ROUTES.admin.inventoryStockOnHand
-                : row?.detail_url || ROUTES.admin.operationsCommandCenter;
-              const count = isLowStock ? lowStockCount : row?.count ?? 0;
-              const severity = isLowStock
-                ? lowStockCount > 0
-                  ? "HIGH"
-                  : "INFO"
-                : row?.severity ?? "INFO";
-              return (
-                <div key={key} className="rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold text-foreground">{QUEUE_LABELS[key] || key}</div>
-                    <span className="rounded-full border border-border/80 bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      {severity}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Count: {count}
-                    {row?.oldest_pending_date ? ` • Oldest: ${row.oldest_pending_date}` : ""}
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <ActionButton href={href} size="sm" variant="secondary">
-                      Open Queue
-                    </ActionButton>
-                    <ActionButton href={href} size="sm" variant="outline">
-                      Take Action
-                    </ActionButton>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </PageSection>
-
+        }
+        actions={
+        <>
         {/* Quick actions */}
         <PageSection className="p-0">
           <div className="border-b border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),var(--surface-card-elevated))] px-5 py-4 sm:px-6 sm:py-5">
@@ -1322,7 +1323,9 @@ export default function AdminDashboardPage() {
             <MoreLink href={ROUTES.admin.settingsBusinessSetup} label="Setup & readiness" />
           </div>
         </PageSection>
-      </ExecutiveDashboardShell>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

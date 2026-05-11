@@ -483,27 +483,51 @@ export default function AdminDeliveriesPage() {
           variant: "ghost",
         },
       ]}
-      stats={[
-        { label: "Visible", value: String(count) },
-        { label: "Pending", value: String(summary.pending + summary.scheduled), tone: "warning" },
-        { label: "In Transit", value: String(summary.in_transit), tone: "info" },
-        { label: "Delivered", value: String(summary.delivered), tone: "success" },
-        { label: "Returns", value: String(summary.return_requested + summary.returned) },
-      ]}
       statusBadge={{ label: "Internal Delivery Control", tone: "info" }}
     >
-      <OperationsWorkspaceShell>
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
-
+      <OperationsWorkspaceShell
+        operationalActions={
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div
+              className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground sm:text-sm"
+              aria-label="Delivery register snapshot"
+            >
+              <span>
+                Visible: <span className="font-semibold tabular-nums text-foreground">{count}</span>
+              </span>
+              <span>
+                Pending:{" "}
+                <span className="font-semibold tabular-nums text-foreground">
+                  {summary.pending + summary.scheduled}
+                </span>
+              </span>
+              <span>
+                In transit:{" "}
+                <span className="font-semibold tabular-nums text-foreground">{summary.in_transit}</span>
+              </span>
+              <span>
+                Delivered:{" "}
+                <span className="font-semibold tabular-nums text-foreground">{summary.delivered}</span>
+              </span>
+              <span>
+                Returns:{" "}
+                <span className="font-semibold tabular-nums text-foreground">
+                  {summary.return_requested + summary.returned}
+                </span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        }
+        lanes={
+        <>
         {loading ? <LoadingBlock label="Loading delivery workspace..." /> : null}
 
         {!loading && error ? (
@@ -1276,7 +1300,9 @@ export default function AdminDeliveriesPage() {
             </div>
           </SectionCard>
         ) : null}
-      </OperationsWorkspaceShell>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

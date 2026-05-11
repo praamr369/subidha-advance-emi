@@ -9,7 +9,6 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDollarSign,
-  CreditCard,
   Factory,
   PackageSearch,
   Percent,
@@ -44,6 +43,8 @@ import WidgetLauncher, {
 import WidgetShell from "@/components/admin/dashboard/WidgetShell";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import { ExecutiveDashboardShell } from "@/components/layout/page-shells";
+import { MetricStrip } from "@/components/ui/operations";
 import StatCard from "@/components/ui/StatCard";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import {
@@ -934,34 +935,6 @@ export default function AdminOperationsDashboard() {
     ]
   );
 
-  const coreStats = summary
-    ? [
-        {
-          label: "Collections today",
-          value: money(todayNetCollections),
-          tone: "success" as const,
-        },
-        {
-          label: `Collections · ${branchWindow.label}`,
-          value: money(windowNetCollections),
-          tone: "info" as const,
-        },
-        {
-          label: "Overdue EMI",
-          value: String(overdueCount),
-          tone: overdueCount > 0 ? ("warning" as const) : ("success" as const),
-        },
-        {
-          label: "Reconciliation flags",
-          value: String(flaggedReconciliationCount ?? 0),
-          tone:
-            (flaggedReconciliationCount ?? 0) > 0
-              ? ("warning" as const)
-              : ("success" as const),
-        },
-      ]
-    : [];
-
   if (loadingCore) {
     return (
       <PortalPage
@@ -1052,13 +1025,14 @@ export default function AdminOperationsDashboard() {
           variant: "secondary",
         },
       ]}
-      stats={coreStats}
       statusBadge={{
         label: summary?.has_payment_adjustments ? "Canonical + Adjustments" : "Canonical",
         tone: summary?.has_payment_adjustments ? "warning" : "info",
       }}
     >
-      <div className="space-y-6">
+      <ExecutiveDashboardShell
+        posture={
+          <>
         <div className="surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
           <label className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
             <span className="enterprise-eyebrow mb-2 block">Branch scope</span>
@@ -1123,37 +1097,35 @@ export default function AdminOperationsDashboard() {
           onEndDateChange={setEndDate}
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Active subscriptions"
-            value={String(summary?.active_subscriptions ?? 0)}
-            subtext={`${summary?.subscription_count ?? 0} total contracts`}
-            tone="info"
-            icon={<CreditCard className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Outstanding receivables"
-            value={money(summary?.outstanding_amount ?? "0.00")}
-            subtext={`${money(summary?.overdue_amount ?? "0.00")} overdue`}
-            tone={(toNumber(summary?.outstanding_amount) ?? 0) > 0 ? "warning" : "success"}
-            icon={<Wallet className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Deliveries pending"
-            value={String(deliveryActionCount)}
-            subtext={`${deliverySummary?.pending ?? 0} pending · ${deliverySummary?.in_transit ?? 0} in transit`}
-            tone={deliveryActionCount > 0 ? "warning" : "success"}
-            icon={<Truck className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Collections split (today)"
-            value={money(todayNetCollections)}
-            subtext={`Cash ${cashToday.toFixed(2)} · Bank ${bankToday.toFixed(2)} · UPI ${upiToday.toFixed(2)}`}
-            tone="default"
-            icon={<Banknote className="h-5 w-5" />}
-          />
-        </div>
-
+        <MetricStrip
+          className="xl:grid-cols-4"
+          items={[
+            {
+              label: "Active subscriptions",
+              value: String(summary?.active_subscriptions ?? 0),
+              helper: `${summary?.subscription_count ?? 0} total contracts`,
+            },
+            {
+              label: "Outstanding receivables",
+              value: money(summary?.outstanding_amount ?? "0.00"),
+              helper: `${money(summary?.overdue_amount ?? "0.00")} overdue`,
+            },
+            {
+              label: "Deliveries pending",
+              value: String(deliveryActionCount),
+              helper: `${deliverySummary?.pending ?? 0} pending · ${deliverySummary?.in_transit ?? 0} in transit`,
+            },
+            {
+              label: "Collections split (today)",
+              value: money(todayNetCollections),
+              helper: `Cash ${cashToday.toFixed(2)} · Bank ${bankToday.toFixed(2)} · UPI ${upiToday.toFixed(2)}`,
+            },
+          ]}
+        />
+          </>
+        }
+        queues={
+        <>
         <WorkspaceDirectory
           title="Operational launch map"
           description="Use the route-safe launcher below to move from dashboard posture into the exact workspace that owns the underlying records. Finance, billing, support, and collections stay cross-linked but operationally separate."
@@ -2252,7 +2224,9 @@ export default function AdminOperationsDashboard() {
           </div>
         )}
 
-      </div>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

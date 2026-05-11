@@ -16,6 +16,7 @@ import { SelfServicePageShell } from "@/components/layout/page-shells";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import {
   listCustomerSubscriptionsRegister,
@@ -342,24 +343,23 @@ export default function CustomerSubscriptionsPage() {
           variant: "secondary",
         },
       ]}
-      stats={[
-        { label: "Matching subscriptions", value: count },
-        { label: "Page active", value: pageActiveCount, tone: "success" },
-        {
-          label: "Page winner benefit",
-          value: pageWinnerCount,
-          tone: pageWinnerCount > 0 ? "info" : "default",
-        },
-        {
-          label: "Page outstanding",
-          value: money(pageOutstanding),
-          tone: pageOutstanding > 0 ? "warning" : "success",
-        },
-        { label: "Page next due", value: pageNextDueLabel },
-      ]}
       statusBadge={{ label: "Customer subscription truth", tone: "info" }}
     >
-      <SelfServicePageShell>
+      <SelfServicePageShell
+        glance={
+          <MetricStrip
+            className="xl:grid-cols-5"
+            items={[
+              { label: "Matching subscriptions", value: String(count) },
+              { label: "Active on page", value: String(pageActiveCount) },
+              { label: "Winner benefit on page", value: String(pageWinnerCount) },
+              { label: "Outstanding on page", value: money(pageOutstanding) },
+              { label: "Next due on page", value: pageNextDueLabel },
+            ]}
+          />
+        }
+        records={
+        <>
         <DetailPanel
           title="Subscription filters"
           description="Narrow the register by current contract status and refresh the latest subscription truth."
@@ -498,7 +498,9 @@ export default function CustomerSubscriptionsPage() {
             </div>
           </DetailPanel>
         ) : null}
-      </SelfServicePageShell>
+        </>
+        }
+      />
     </PortalPage>
   );
 }

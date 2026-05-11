@@ -7,6 +7,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
+import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -118,16 +119,6 @@ export default function VendorDashboardPage() {
         { label: "Purchase Orders", href: ROUTES.vendor.orders, variant: "secondary" },
         { label: "Notifications", href: ROUTES.vendor.notifications, variant: "secondary" },
       ]}
-      stats={
-        data
-          ? [
-              { label: "Open quotes", value: String(data.pending_quote_requests ?? 0), tone: "warning" },
-              { label: "Purchase orders", value: String(data.purchase_orders ?? 0) },
-              { label: "Outstanding payable", value: formatMoney(data.outstanding_payable) },
-              { label: "Unread alerts", value: String(notificationSummary?.unread_count ?? 0) },
-            ]
-          : []
-      }
     >
       {loading ? <LoadingBlock label="Loading vendor dashboard..." /> : null}
       {!loading && error ? (
@@ -144,32 +135,63 @@ export default function VendorDashboardPage() {
         />
       ) : null}
       {!loading && !error && data ? (
-        <PartnerVendorWorkspaceShell>
-          <p className="text-sm text-muted-foreground">
-            Accepted quotes: {String(data.accepted_quotes ?? 0)} · Returns:{" "}
-            {String(data.purchase_returns ?? 0)} · Pending bills:{" "}
-            {formatMoney(data.pending_purchase_bills)} · Catalog products:{" "}
-            {String(data.products_count ?? 0)}
-          </p>
+        <PartnerVendorWorkspaceShell
+          posture={
+            <MetricStrip
+              className="xl:grid-cols-4"
+              items={[
+                {
+                  label: "Open quotes",
+                  value: String(data.pending_quote_requests ?? 0),
+                  href: ROUTES.vendor.quotes,
+                },
+                {
+                  label: "Purchase orders",
+                  value: String(data.purchase_orders ?? 0),
+                  href: ROUTES.vendor.orders,
+                },
+                {
+                  label: "Outstanding payable",
+                  value: formatMoney(data.outstanding_payable),
+                  href: ROUTES.vendor.outstanding,
+                },
+                {
+                  label: "Unread alerts",
+                  value: String(notificationSummary?.unread_count ?? 0),
+                  href: ROUTES.vendor.notifications,
+                },
+              ]}
+            />
+          }
+          queues={
+            <>
+              <p className="text-sm text-muted-foreground">
+                Accepted quotes: {String(data.accepted_quotes ?? 0)} · Returns:{" "}
+                {String(data.purchase_returns ?? 0)} · Pending bills:{" "}
+                {formatMoney(data.pending_purchase_bills)} · Catalog products:{" "}
+                {String(data.products_count ?? 0)}
+              </p>
 
-          <WorkspaceSection
-            title="Quick Actions"
-            description="Use these actions to process vendor workflows without navigating through multiple pages."
-          >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <div className="text-sm font-semibold text-foreground">{action.title}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{action.description}</div>
-                </Link>
-              ))}
-            </div>
-          </WorkspaceSection>
-        </PartnerVendorWorkspaceShell>
+              <WorkspaceSection
+                title="Quick Actions"
+                description="Use these actions to process vendor workflows without navigating through multiple pages."
+              >
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <div className="text-sm font-semibold text-foreground">{action.title}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{action.description}</div>
+                    </Link>
+                  ))}
+                </div>
+              </WorkspaceSection>
+            </>
+          }
+        />
       ) : null}
     </PortalPage>
   );

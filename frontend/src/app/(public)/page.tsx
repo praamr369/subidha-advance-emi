@@ -38,10 +38,13 @@ export default async function PublicHome() {
   const dictionary = getPublicDictionary(asLocale(language));
 
   return (
-    <PublicMarketingShell className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }} />
+    <PublicMarketingShell
+      className="mx-auto w-full max-w-[1280px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
+      hero={
+        <>
+          <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }} />
 
-      <section className="public-hero p-8 sm:p-10">
+          <section className="public-hero p-8 sm:p-10">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
             <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={`${profile.resolved_tagline} · ${brandConfig.publicBranchLocation}`} />
@@ -98,9 +101,11 @@ export default async function PublicHome() {
           />
         </div>
       </section>
-
-      <TrustStrip />
-
+        </>
+      }
+      trust={<TrustStrip />}
+      sections={
+        <>
       <PublicMarketingBanner
         eyebrow="Easy monthly plan"
         title="Simple process, transparent records"
@@ -165,6 +170,9 @@ export default async function PublicHome() {
         )}
       </section>
 
+        </>
+      }
+      cta={
       <CtaBanner
         title="Need guidance in your preferred language?"
         description="Use the language switcher in the header for English, हिन्दी, or বাংলা, then connect with the branch for assisted enrollment."
@@ -174,6 +182,7 @@ export default async function PublicHome() {
           { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
         ]}
       />
-    </PublicMarketingShell>
+      }
+    />
   );
 }
