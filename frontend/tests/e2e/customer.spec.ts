@@ -382,10 +382,11 @@ test("customer dashboard renders canonical financial grouping", async ({ page })
     page.getByRole("heading", { name: "Customer Workspace" })
   ).toBeVisible();
   await expect(page.locator("body")).toContainText("Financial alignment");
-  await expect(page.locator("body")).toContainText("Overdue EMI");
-  await expect(page.locator("body")).toContainText("Upcoming EMI");
-  await expect(page.locator("body")).toContainText("Waived by benefit");
-  await expect(page.locator("body")).toContainText("Direct Sale Dues");
+  // Dashboard copy uses sentence case and combines queues in the due-collection section.
+  await expect(page.locator("body")).toContainText(/overdue\s+EMI/i);
+  await expect(page.locator("body")).toContainText(/Upcoming and overdue instalments/i);
+  await expect(page.locator("body")).toContainText(/Waived by benefit/i);
+  await expect(page.locator("body")).toContainText(/Direct sale dues/i);
   await expect(page.locator("body")).toContainText("View Direct Sales");
   await expect(page.locator("body")).toContainText("Latest direct-sale invoices");
   await expect(page.locator("body")).toContainText("INV-2026-00701");

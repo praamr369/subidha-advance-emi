@@ -6,7 +6,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import { KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -118,6 +118,16 @@ export default function VendorDashboardPage() {
         { label: "Purchase Orders", href: ROUTES.vendor.orders, variant: "secondary" },
         { label: "Notifications", href: ROUTES.vendor.notifications, variant: "secondary" },
       ]}
+      stats={
+        data
+          ? [
+              { label: "Open quotes", value: String(data.pending_quote_requests ?? 0), tone: "warning" },
+              { label: "Purchase orders", value: String(data.purchase_orders ?? 0) },
+              { label: "Outstanding payable", value: formatMoney(data.outstanding_payable) },
+              { label: "Unread alerts", value: String(notificationSummary?.unread_count ?? 0) },
+            ]
+          : []
+      }
     >
       {loading ? <LoadingBlock label="Loading vendor dashboard..." /> : null}
       {!loading && error ? (
@@ -134,39 +144,32 @@ export default function VendorDashboardPage() {
         />
       ) : null}
       {!loading && !error && data ? (
-        <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Pending Quote Requests" value={String(data.pending_quote_requests ?? 0)} />
-            <KpiCard label="Accepted Quotes" value={String(data.accepted_quotes ?? 0)} />
-            <KpiCard label="Purchase Orders" value={String(data.purchase_orders ?? 0)} />
-            <KpiCard label="Purchase Returns" value={String(data.purchase_returns ?? 0)} />
-            <KpiCard label="Outstanding Payable" value={formatMoney(data.outstanding_payable)} />
-            <KpiCard label="Pending Purchase Bills" value={formatMoney(data.pending_purchase_bills)} />
-            <KpiCard label="Products" value={String(data.products_count ?? 0)} />
-            <KpiCard
-              label="Unread Notifications"
-              value={String(notificationSummary?.unread_count ?? 0)}
-            />
-          </div>
+        <PartnerVendorWorkspaceShell>
+          <p className="text-sm text-muted-foreground">
+            Accepted quotes: {String(data.accepted_quotes ?? 0)} · Returns:{" "}
+            {String(data.purchase_returns ?? 0)} · Pending bills:{" "}
+            {formatMoney(data.pending_purchase_bills)} · Catalog products:{" "}
+            {String(data.products_count ?? 0)}
+          </p>
 
           <WorkspaceSection
             title="Quick Actions"
             description="Use these actions to process vendor workflows without navigating through multiple pages."
           >
-            <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {quickActions.map((action) => (
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <div className="text-sm font-semibold text-foreground">{action.title}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{action.description}</div>
                 </Link>
               ))}
-            </QuickActionGrid>
+            </div>
           </WorkspaceSection>
-        </div>
+        </PartnerVendorWorkspaceShell>
       ) : null}
     </PortalPage>
   );

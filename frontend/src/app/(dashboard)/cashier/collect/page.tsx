@@ -9,12 +9,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import ActionButton from "@/components/ui/ActionButton";
-import {
-  FormSection,
-  KpiCard,
-  QuickActionGrid,
-  WorkflowCard,
-} from "@/components/ui/operations";
+import { FormSection } from "@/components/ui/operations";
+import { CashierWorkflowShell } from "@/components/layout/page-shells";
 import StatusBadge from "@/components/ui/status-badge";
 import CashierDirectSaleCollectPanel from "@/features/direct-sale/components/CashierDirectSaleCollectPanel";
 import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
@@ -739,7 +735,7 @@ export default function CashierCollectPage() {
         tone: "info",
       }}
     >
-      <div className="space-y-6 pb-24 sm:pb-6">
+      <CashierWorkflowShell>
         <div id="cashier-unified-search">
         <UnifiedReceivableSearchPanel
           title="Universal receivable search"
@@ -758,35 +754,10 @@ export default function CashierCollectPage() {
         />
         </div>
 
-        <QuickActionGrid>
-          <KpiCard
-            label="Workflow"
-            value={collectionWorkflow === "direct-sale" ? "Direct Sale" : "Subscription EMI"}
-            helper="Current cashier collection mode"
-          />
-          <KpiCard
-            label={collectionWorkflow === "direct-sale" ? "Queue Context" : "Pending EMI Count"}
-            value={
-              collectionWorkflow === "direct-sale"
-                ? (lookup?.customer_name || "Direct-sale receivables")
-                : String(lookup?.total_pending_emis ?? 0)
-            }
-            helper={collectionWorkflow === "direct-sale" ? "Current customer/queue" : "Pending collectible EMI rows"}
-          />
-          <KpiCard
-            label={collectionWorkflow === "direct-sale" ? "Reference Mode" : "Overdue EMI"}
-            value={
-              collectionWorkflow === "direct-sale"
-                ? "Receipt-safe retail flow"
-                : String(lookup?.overdue_emi_count ?? 0)
-            }
-            helper={collectionWorkflow === "direct-sale" ? "No EMI allocation mutation" : "Overdue rows requiring attention"}
-          />
-          <WorkflowCard
-            title="Counter sequence"
-            description="Search -> verify row -> post once -> open receipt/history."
-          />
-        </QuickActionGrid>
+        <p className="text-sm text-muted-foreground">
+          Counter sequence: search, verify the exact row, post once, then open receipt or payment history. Current
+          queue context is summarized in the header above.
+        </p>
 
         <FormSection
           title="Workflow selection"
@@ -1621,7 +1592,7 @@ export default function CashierCollectPage() {
             </div>
           </div>
         ) : null}
-      </div>
+      </CashierWorkflowShell>
     </PortalPage>
   );
 }

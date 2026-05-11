@@ -12,6 +12,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
+import { SelfServicePageShell } from "@/components/layout/page-shells";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -358,7 +359,7 @@ export default function CustomerSubscriptionsPage() {
       ]}
       statusBadge={{ label: "Customer subscription truth", tone: "info" }}
     >
-      <div className="space-y-6">
+      <SelfServicePageShell>
         <DetailPanel
           title="Subscription filters"
           description="Narrow the register by current contract status and refresh the latest subscription truth."
@@ -497,7 +498,7 @@ export default function CustomerSubscriptionsPage() {
             </div>
           </DetailPanel>
         ) : null}
-      </div>
+      </SelfServicePageShell>
     </PortalPage>
   );
 }

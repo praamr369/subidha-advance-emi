@@ -9,6 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import PortalPage from "@/components/ui/PortalPage";
+import { OperationsWorkspaceShell } from "@/components/layout/page-shells";
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingRegisterRoute,
@@ -491,7 +492,7 @@ export default function AdminDeliveriesPage() {
       ]}
       statusBadge={{ label: "Internal Delivery Control", tone: "info" }}
     >
-      <div className="space-y-6">
+      <OperationsWorkspaceShell>
         <section className="flex justify-end">
           <button
             type="button"
@@ -1275,7 +1276,7 @@ export default function AdminDeliveriesPage() {
             </div>
           </SectionCard>
         ) : null}
-      </div>
+      </OperationsWorkspaceShell>
     </PortalPage>
   );
 }

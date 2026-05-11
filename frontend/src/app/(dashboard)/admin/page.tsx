@@ -37,6 +37,7 @@ import DashboardWidgetBoard, {
   type DashboardWidgetDefinition,
 } from "@/components/dashboard/DashboardWidgetBoard";
 import PortalPage from "@/components/ui/PortalPage";
+import { ExecutiveDashboardShell } from "@/components/layout/page-shells";
 import StatCard from "@/components/ui/StatCard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -658,7 +659,7 @@ export default function AdminDashboardPage() {
         tone: summary?.has_payment_adjustments ? "warning" : "info",
       }}
     >
-      <div className="space-y-8">
+      <ExecutiveDashboardShell>
         {/* Top strip: system signal + refresh */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -1321,7 +1322,7 @@ export default function AdminDashboardPage() {
             <MoreLink href={ROUTES.admin.settingsBusinessSetup} label="Setup & readiness" />
           </div>
         </PageSection>
-      </div>
+      </ExecutiveDashboardShell>
     </PortalPage>
   );
 }

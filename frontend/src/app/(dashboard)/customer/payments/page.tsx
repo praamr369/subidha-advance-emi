@@ -10,6 +10,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PortalPage from "@/components/ui/PortalPage";
+import { SelfServicePageShell } from "@/components/layout/page-shells";
 import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -315,7 +316,7 @@ export default function CustomerPaymentsPage() {
       ]}
       statusBadge={{ label: "Customer payment truth", tone: "info" }}
     >
-      <div className="space-y-6">
+      <SelfServicePageShell>
         <DetailPanel
           title="Payment filters"
           description="Narrow customer-visible payment history by subscription or collection method."
@@ -612,7 +613,7 @@ export default function CustomerPaymentsPage() {
           ) : null}
           </>
         ) : null}
-      </div>
+      </SelfServicePageShell>
     </PortalPage>
   );
 }

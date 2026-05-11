@@ -6,6 +6,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
+import { SetupChecklistPageShell } from "@/components/layout/page-shells";
 import StatCard from "@/components/ui/StatCard";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -165,7 +166,7 @@ export default function AdminAccountingSetupPage() {
         { label: "Setup" },
       ]}
     >
-      <div className="space-y-6">
+      <SetupChecklistPageShell>
         <div className="flex flex-wrap gap-2">
           <ActionButton variant="primary" onClick={applyRecommended} disabled={saving}>
             {saving ? "Applying..." : "Apply Recommended Mapping"}
@@ -178,12 +179,6 @@ export default function AdminAccountingSetupPage() {
           </ActionButton>
         </div>
         {error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Setup status" value={displayStatus} tone={warningCount > 0 ? "warning" : "success"} />
-          <StatCard label="COA ready" value={status?.coa_ready ? "Yes" : "No"} />
-          <StatCard label="Finance accounts ready" value={status?.finance_accounts_ready ? "Yes" : "No"} />
-          <StatCard label="Warnings" value={String(warningCount)} tone={warningCount > 0 ? "warning" : "success"} />
-        </div>
         {warningCount > 0 ? (
           <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
@@ -212,6 +207,13 @@ export default function AdminAccountingSetupPage() {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Setup status" value={displayStatus} tone={warningCount > 0 ? "warning" : "success"} />
+          <StatCard label="COA ready" value={status?.coa_ready ? "Yes" : "No"} />
+          <StatCard label="Finance accounts ready" value={status?.finance_accounts_ready ? "Yes" : "No"} />
+          <StatCard label="Warnings" value={String(warningCount)} tone={warningCount > 0 ? "warning" : "success"} />
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-4">
@@ -365,7 +367,7 @@ export default function AdminAccountingSetupPage() {
             </div>
           </div>
         ) : null}
-      </div>
+      </SetupChecklistPageShell>
     </PortalPage>
   );
 }

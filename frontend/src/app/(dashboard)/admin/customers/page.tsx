@@ -14,16 +14,12 @@ import {
 import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import { RegistryPageShell } from "@/components/layout/page-shells";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import {
-  DataTableShell,
-  DetailPanel,
-  KpiCard,
-  QuickActionGrid,
-} from "@/components/ui/operations";
+import { DataTableShell, DetailPanel } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
@@ -423,15 +419,6 @@ export default function AdminCustomersPage() {
     [customerImportFile, customerImportPreviewState]
   );
 
-  const totalContractValue = useMemo(
-    () =>
-      rows.reduce(
-        (sum, row) => sum + Number(row.active_contract_value || 0),
-        0
-      ),
-    [rows]
-  );
-
   const activeCustomers = useMemo(
     () => rows.filter((row) => row.status === "ACTIVE").length,
     [rows]
@@ -586,78 +573,7 @@ export default function AdminCustomersPage() {
       ]}
       statusBadge={{ label: "Customer Operations", tone: "info" }}
     >
-      <div className="space-y-6">
-        <ControlLaneGrid
-          title="Customer control lanes"
-          description="Customer onboarding, subscription sale, direct sale, collection operations, and support handling stay linked but operationally separate."
-          lanes={[
-            {
-              title: "Create customer",
-              description: "Start a new customer record in the canonical admin register.",
-              href: `${ROUTES.admin.customers}/create`,
-              icon: <UserPlus className="h-4 w-4" />,
-              badge: "Setup",
-            },
-            {
-              title: "Create subscription",
-              description: "Route a verified customer into the canonical subscription-sale workflow.",
-              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
-              icon: <RefreshCw className="h-4 w-4" />,
-              badge: "Sale",
-            },
-            {
-              title: "Collect payment",
-              description: "Open the admin payment workflow without blending collection into profile edits.",
-              href: ROUTES.admin.financeCollect,
-              icon: <RefreshCw className="h-4 w-4" />,
-              badge: "Payment",
-            },
-            {
-              title: "Direct sales lane",
-              description: "Retail sale and billing work remain explicit and separate from EMI subscriptions.",
-              href: ROUTES.admin.billingDirectSales,
-              icon: <Users className="h-4 w-4" />,
-              badge: "Retail",
-            },
-            {
-              title: "CRM directory",
-              description: "Review party continuity and follow-up posture before conversion or escalation.",
-              href: ROUTES.admin.crmParties,
-              icon: <Users className="h-4 w-4" />,
-              badge: "CRM",
-            },
-            {
-              title: "Support queue",
-              description: "Customer disputes and service issues remain in their own route-safe queue.",
-              href: ROUTES.admin.supportRequests,
-              icon: <ShieldCheck className="h-4 w-4" />,
-              badge: "Support",
-            },
-          ]}
-        />
-        <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            label="Visible customers"
-            value={rows.length}
-            helper="Rows matching the current filter set"
-          />
-          <KpiCard
-            label="Active customers"
-            value={activeCustomers}
-            helper="Account status ACTIVE in this view"
-          />
-          <KpiCard
-            label="Pending KYC"
-            value={pendingKyc}
-            helper={pendingKyc > 0 ? "Needs compliance follow-up" : "No pending KYC in view"}
-          />
-          <KpiCard
-            label="Visible contract value"
-            value={money(totalContractValue)}
-            helper="Sum of total_subscription_value for visible rows"
-          />
-        </QuickActionGrid>
-
+      <RegistryPageShell>
         <DetailPanel
           title="Customer workflow"
           description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
@@ -788,6 +704,129 @@ export default function AdminCustomersPage() {
           </TableToolbar>
         </DetailPanel>
 
+        {loading ? <LoadingBlock label="Loading customer register..." /> : null}
+
+        {!loading && error ? (
+          <ErrorState
+            title="Unable to load customer register"
+            description={error}
+            onRetry={() => void loadPage("initial")}
+          />
+        ) : null}
+
+        {!loading && !error ? (
+          <>
+          <DetailPanel
+            title="Customer rows"
+            description="Open the customer detail page for KYC decisions, subscription context, and recent payment visibility."
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title="No customers found"
+                description="No customer records matched the current search and filter set."
+                action={
+                  <Link
+                    href="/admin/customers/create"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Create Customer
+                  </Link>
+                }
+              />
+            ) : (
+              <DataTableShell>
+                <DataTable<CustomerRow>
+                  rows={rows}
+                  columns={columns}
+                  pageSize={12}
+                  rowActions={(row) => (
+                    <div className="flex flex-col items-end gap-2">
+                      <Link
+                        href={`/admin/customers/${row.id}`}
+                        className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
+                      >
+                        Open Customer
+                      </Link>
+                      <Link
+                        href={`/admin/customers/${row.id}/edit`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Edit
+                      </Link>
+                      <Link
+                        href={`/admin/subscriptions?customer=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Subscriptions
+                      </Link>
+                      <Link
+                        href={`/admin/payments?customer=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        {(Number(row.active_subscription_count || 0) > 0 ||
+                          Number(row.active_subscription_due || 0) > 0 ||
+                          Number(row.active_direct_sale_outstanding || 0) > 0 ||
+                          Number(row.active_invoice_outstanding || 0) > 0)
+                          ? "Payments"
+                          : "Payment History"}
+                      </Link>
+                    </div>
+                  )}
+                />
+              </DataTableShell>
+            )}
+          </DetailPanel>
+
+
+        <ControlLaneGrid
+          title="Customer control lanes"
+          description="Shortcuts after you have located the right row in the register."
+          lanes={[
+            {
+              title: "Create customer",
+              description: "Start a new customer record in the canonical admin register.",
+              href: `${ROUTES.admin.customers}/create`,
+              icon: <UserPlus className="h-4 w-4" />,
+              badge: "Setup",
+            },
+            {
+              title: "Create subscription",
+              description: "Route a verified customer into the canonical subscription-sale workflow.",
+              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Sale",
+            },
+            {
+              title: "Collect payment",
+              description: "Open the admin payment workflow without blending collection into profile edits.",
+              href: ROUTES.admin.financeCollect,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Payment",
+            },
+            {
+              title: "Direct sales lane",
+              description: "Retail sale and billing work remain explicit and separate from EMI subscriptions.",
+              href: ROUTES.admin.billingDirectSales,
+              icon: <Users className="h-4 w-4" />,
+              badge: "Retail",
+            },
+            {
+              title: "CRM directory",
+              description: "Review party continuity and follow-up posture before conversion or escalation.",
+              href: ROUTES.admin.crmParties,
+              icon: <Users className="h-4 w-4" />,
+              badge: "CRM",
+            },
+            {
+              title: "Support queue",
+              description: "Customer disputes and service issues remain in their own route-safe queue.",
+              href: ROUTES.admin.supportRequests,
+              icon: <ShieldCheck className="h-4 w-4" />,
+              badge: "Support",
+            },
+          ]}
+        />
         <DetailPanel
           title="Customer CSV onboarding"
           description="Preview and confirm the existing backend customer import flow from the admin workspace. Confirm import is intentionally gated behind a clean preview."
@@ -894,37 +933,41 @@ export default function AdminCustomersPage() {
 
               {customerImportPreviewState ? (
                 <div className="space-y-4">
-                  <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-4">
-                    <KpiCard
-                      label="Columns"
-                      value={customerImportPreviewState.columns.length}
-                      helper="Detected from CSV header"
-                    />
-                    <KpiCard
-                      label="Valid rows"
-                      value={customerImportPreviewState.valid_count}
-                      helper="Rows passing preview validation"
-                    />
-                    <KpiCard
-                      label="Invalid rows"
-                      value={customerImportPreviewState.invalid_count}
-                      helper={
-                        customerImportPreviewState.invalid_count > 0
+                  <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+                      <dt className="text-xs font-medium text-muted-foreground">Columns</dt>
+                      <dd className="text-sm font-semibold text-foreground">
+                        {customerImportPreviewState.columns.length}
+                      </dd>
+                      <dd className="text-xs text-muted-foreground">From CSV header</dd>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+                      <dt className="text-xs font-medium text-muted-foreground">Valid rows</dt>
+                      <dd className="text-sm font-semibold text-foreground">
+                        {customerImportPreviewState.valid_count}
+                      </dd>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+                      <dt className="text-xs font-medium text-muted-foreground">Invalid rows</dt>
+                      <dd className="text-sm font-semibold text-foreground">
+                        {customerImportPreviewState.invalid_count}
+                      </dd>
+                      <dd className="text-xs text-muted-foreground">
+                        {customerImportPreviewState.invalid_count > 0
                           ? "Fix before confirm import"
-                          : "None"
-                      }
-                    />
-                    <KpiCard
-                      label="Confirm ready"
-                      value={
-                        customerImportPreviewState.invalid_count === 0 &&
+                          : "None"}
+                      </dd>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+                      <dt className="text-xs font-medium text-muted-foreground">Confirm ready</dt>
+                      <dd className="text-sm font-semibold text-foreground">
+                        {customerImportPreviewState.invalid_count === 0 &&
                         customerImportPreviewState.valid_count > 0
                           ? "Yes"
-                          : "No"
-                      }
-                      helper="Requires valid rows and zero invalid"
-                    />
-                  </QuickActionGrid>
+                          : "No"}
+                      </dd>
+                    </div>
+                  </dl>
 
                   <div className="text-xs text-muted-foreground">
                     Detected columns:{" "}
@@ -1079,80 +1122,9 @@ export default function AdminCustomersPage() {
           </div>
         </DetailPanel>
 
-        {loading ? <LoadingBlock label="Loading customer register..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load customer register"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
+          </>
         ) : null}
-
-        {!loading && !error ? (
-          <DetailPanel
-            title="Customer rows"
-            description="Open the customer detail page for KYC decisions, subscription context, and recent payment visibility."
-          >
-            {rows.length === 0 ? (
-              <EmptyState
-                title="No customers found"
-                description="No customer records matched the current search and filter set."
-                action={
-                  <Link
-                    href="/admin/customers/create"
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Create Customer
-                  </Link>
-                }
-              />
-            ) : (
-              <DataTableShell>
-                <DataTable<CustomerRow>
-                  rows={rows}
-                  columns={columns}
-                  pageSize={12}
-                  rowActions={(row) => (
-                    <div className="flex flex-col items-end gap-2">
-                      <Link
-                        href={`/admin/customers/${row.id}`}
-                        className="inline-flex items-center rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background shadow-sm transition hover:opacity-90"
-                      >
-                        Open Customer
-                      </Link>
-                      <Link
-                        href={`/admin/customers/${row.id}/edit`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Edit
-                      </Link>
-                      <Link
-                        href={`/admin/subscriptions?customer=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Subscriptions
-                      </Link>
-                      <Link
-                        href={`/admin/payments?customer=${row.id}`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        {(Number(row.active_subscription_count || 0) > 0 ||
-                          Number(row.active_subscription_due || 0) > 0 ||
-                          Number(row.active_direct_sale_outstanding || 0) > 0 ||
-                          Number(row.active_invoice_outstanding || 0) > 0)
-                          ? "Payments"
-                          : "Payment History"}
-                      </Link>
-                    </div>
-                  )}
-                />
-              </DataTableShell>
-            )}
-          </DetailPanel>
-        ) : null}
-      </div>
+      </RegistryPageShell>
     </PortalPage>
   );
 }

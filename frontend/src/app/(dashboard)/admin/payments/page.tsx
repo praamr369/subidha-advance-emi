@@ -17,14 +17,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
-import {
-  DataTableShell,
-  DetailPanel,
-  FormSection,
-  KpiCard,
-  QuickActionGrid,
-  WorkflowCard,
-} from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, FormSection } from "@/components/ui/operations";
+import { RegistryPageShell } from "@/components/layout/page-shells";
 import StatusBadge from "@/components/ui/status-badge";
 import { downloadCsv } from "@/lib/export/csv";
 import {
@@ -516,10 +510,6 @@ export default function AdminPaymentsPage() {
       : "/admin/finance/collect";
   }, [emiFilter, subscriptionFilter]);
 
-  const activeRate = summary.visible_payments > 0
-    ? ((summary.active_payments / summary.visible_payments) * 100).toFixed(1)
-    : "0";
-
   return (
     <PortalPage
       title="Payments Register"
@@ -571,30 +561,7 @@ export default function AdminPaymentsPage() {
         tone: "info",
       }}
     >
-      <div className="space-y-6">
-        <QuickActionGrid>
-          <KpiCard
-            label="Visible Payments"
-            value={String(summary.visible_payments)}
-            helper="Rows currently returned by filters"
-          />
-          <KpiCard
-            label="Net Collected"
-            value={money(summary.net_collected_amount)}
-            helper="Active collections minus reversed impact"
-          />
-          <KpiCard
-            label="Active Rate"
-            value={`${activeRate}%`}
-            helper={`${summary.active_payments} active of ${summary.visible_payments} visible`}
-          />
-          <KpiCard
-            label="Reversed Amount"
-            value={money(summary.reversed_amount)}
-            helper={`${summary.reversed_payments} reversed payment row(s)`}
-          />
-        </QuickActionGrid>
-
+      <RegistryPageShell>
         <FormSection
           title="Filter Register"
           description="Search by customer, phone, reference, payment id, subscription id, or batch context. Narrow by method, reversal state, and posting date."
@@ -799,21 +766,6 @@ export default function AdminPaymentsPage() {
           ) : null}
         </FormSection>
 
-        <QuickActionGrid className="xl:grid-cols-3">
-          <WorkflowCard
-            title="Gross Amount"
-            description={money(summary.gross_amount)}
-          />
-          <WorkflowCard
-            title="Reversed Amount"
-            description={money(summary.reversed_amount)}
-          />
-          <WorkflowCard
-            title="Net Collected"
-            description={money(summary.net_collected_amount)}
-          />
-        </QuickActionGrid>
-
         {loading ? <LoadingBlock label="Loading payment register..." /> : null}
 
         {!loading && error ? (
@@ -832,7 +784,7 @@ export default function AdminPaymentsPage() {
             <PaymentsTable rows={rows} />
           </DetailPanel>
         )}
-      </div>
+      </RegistryPageShell>
     </PortalPage>
   );
 }

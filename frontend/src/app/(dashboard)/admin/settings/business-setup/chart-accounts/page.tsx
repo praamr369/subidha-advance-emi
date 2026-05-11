@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
+import { AccountingControlShell } from "@/components/layout/page-shells";
 import PageHeader from "@/components/ui/PageHeader";
 import { getAccountingSetupStatus, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 
@@ -44,7 +45,7 @@ export default function ChartAccountsSetupGuidePage() {
   const journalLine = status?.journal_ready ? "Journal posting prerequisites satisfied" : "Journal posting blocked — see Accounting setup";
 
   return (
-    <div className="space-y-6">
+    <AccountingControlShell>
       <PageHeader
         title="Chart accounts"
         description="Chart accounts live under the Accounting module. This setup page is a guide so the first-run flow does not duplicate accounting masters."
@@ -103,6 +104,6 @@ export default function ChartAccountsSetupGuidePage() {
           </div>
         </div>
       </section>
-    </div>
+    </AccountingControlShell>
   );
 }

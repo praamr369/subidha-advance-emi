@@ -18,11 +18,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import PageHeader from "@/components/ui/PageHeader";
-import {
-  KpiCard,
-  MetricStrip,
-  QuickActionGrid,
-} from "@/components/ui/operations";
+import { MetricStrip } from "@/components/ui/operations";
+import { SelfServicePageShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
@@ -403,7 +400,7 @@ export default function CustomerDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <SelfServicePageShell>
       <PageHeader
         eyebrow="Your account"
         title="Customer Workspace"
@@ -542,70 +539,35 @@ export default function CustomerDashboardPage() {
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-                <KpiCard
-                  label="KYC status"
-                  value={legacy.customer.kyc_status || "PENDING"}
-                  helper="From your live profile record"
-                  className="border-white/80 bg-white/85 shadow-sm"
-                />
-                <KpiCard
-                  label="Phone"
-                  value={legacy.customer.phone || "—"}
-                  helper="Contact on file"
-                  className="border-white/80 bg-white/85 shadow-sm"
-                />
-                <KpiCard
-                  label="Contracts"
-                  value={summary.subscription_count ?? legacy.subscriptions.length}
-                  helper="Total subscriptions in summary"
-                  className="border-white/80 bg-white/85 shadow-sm"
-                />
-                <KpiCard
-                  label="Winner history"
-                  value={`${summary.winner_subscriptions ?? 0} subscription${
-                    (summary.winner_subscriptions ?? 0) === 1 ? "" : "s"
-                  }`}
-                  helper="Winner-linked contracts in summary"
-                  className="border-white/80 bg-white/85 shadow-sm"
-                />
-              </div>
+              <dl className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
+                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
+                  <dt className="text-xs font-medium text-slate-500">KYC status</dt>
+                  <dd className="mt-1 text-sm font-semibold text-slate-950">
+                    {legacy.customer.kyc_status || "PENDING"}
+                  </dd>
+                </div>
+                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
+                  <dt className="text-xs font-medium text-slate-500">Phone</dt>
+                  <dd className="mt-1 text-sm font-semibold text-slate-950">
+                    {legacy.customer.phone || "—"}
+                  </dd>
+                </div>
+                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
+                  <dt className="text-xs font-medium text-slate-500">Contracts</dt>
+                  <dd className="mt-1 text-sm font-semibold text-slate-950">
+                    {summary.subscription_count ?? legacy.subscriptions.length}
+                  </dd>
+                </div>
+                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
+                  <dt className="text-xs font-medium text-slate-500">Winner history</dt>
+                  <dd className="mt-1 text-sm font-semibold text-slate-950">
+                    {summary.winner_subscriptions ?? 0} subscription
+                    {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
+                  </dd>
+                </div>
+              </dl>
             </div>
           </section>
-
-          <QuickActionGrid>
-            <KpiCard
-              label="Paid"
-              value={money(summary.total_paid_amount)}
-              helper={`${summary.paid_emis} EMI settled through recorded payments`}
-            />
-            <KpiCard
-              label="Remaining"
-              value={money(summary.remaining_amount ?? summary.outstanding_amount)}
-              helper={`${money(summary.total_pending_amount)} still open across current contracts`}
-            />
-            <KpiCard
-              label="Overdue EMI"
-              value={String(summary.overdue_emis ?? 0)}
-              helper={`${money(summary.overdue_amount)} currently past due`}
-            />
-            <KpiCard
-              label="Upcoming EMI"
-              value={String(summary.upcoming_emis ?? 0)}
-              helper={
-                summary.next_due_date && summary.next_due_amount
-                  ? `${money(summary.next_due_amount)} next on ${formatDate(
-                      summary.next_due_date
-                    )}`
-                  : "No upcoming EMI currently visible"
-              }
-            />
-            <KpiCard
-              label="Direct Sale Dues"
-              value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
-              helper={`${directSaleSummary?.total_direct_sale_invoices ?? 0} direct-sale invoice(s) linked`}
-            />
-          </QuickActionGrid>
 
           <WorkspaceSection
             title="Direct sale dues"
@@ -616,29 +578,31 @@ export default function CustomerDashboardPage() {
               </ActionButton>
             }
           >
-            <div className="grid gap-3 md:grid-cols-3">
-              <KpiCard
-                label="Outstanding"
-                value={money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
-                helper="Based on grand total minus received amount."
-              />
-              <KpiCard
-                label="Total paid"
-                value={money(directSaleSummary?.total_paid_direct_sale_amount ?? "0.00")}
-                helper="Recorded direct-sale collections."
-              />
-              <KpiCard
-                label="Latest invoice"
-                value={
-                  String(
+            <dl className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-card/80 p-4">
+                <dt className="text-xs font-medium text-muted-foreground">Outstanding</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">
+                  {money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
+                </dd>
+                <dd className="mt-1 text-xs text-muted-foreground">Grand total minus received.</dd>
+              </div>
+              <div className="rounded-2xl border border-border bg-card/80 p-4">
+                <dt className="text-xs font-medium text-muted-foreground">Total paid</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">
+                  {money(directSaleSummary?.total_paid_direct_sale_amount ?? "0.00")}
+                </dd>
+              </div>
+              <div className="rounded-2xl border border-border bg-card/80 p-4">
+                <dt className="text-xs font-medium text-muted-foreground">Latest invoice</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">
+                  {String(
                     (directSaleSummary?.latest_direct_sale_invoice?.invoice_number as string | undefined) ||
                       (directSaleSummary?.latest_direct_sale_invoice?.document_number as string | undefined) ||
                       "—"
-                  )
-                }
-                helper="Most recent linked direct-sale invoice."
-              />
-            </div>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </WorkspaceSection>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -691,17 +655,19 @@ export default function CustomerDashboardPage() {
                 </ActionButton>
               }
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <KpiCard
-                  label="Unread"
-                  value={String(notificationSummary?.unread_count ?? 0)}
-                  helper="Items awaiting your attention"
-                />
-                <KpiCard
-                  label="High priority"
-                  value={String(notificationSummary?.high_priority_count ?? 0)}
-                  helper="Urgent or time-sensitive alerts"
-                />
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <span>
+                  <span className="font-semibold text-foreground">
+                    {notificationSummary?.unread_count ?? 0}
+                  </span>{" "}
+                  unread
+                </span>
+                <span>
+                  <span className="font-semibold text-foreground">
+                    {notificationSummary?.high_priority_count ?? 0}
+                  </span>{" "}
+                  high priority
+                </span>
               </div>
               {(notificationSummary?.latest?.length ?? 0) > 0 ? (
                 <ul className="mt-4 space-y-2 text-sm">
@@ -798,20 +764,30 @@ export default function CustomerDashboardPage() {
                 />
               }
             >
-              <QuickActionGrid className="sm:grid-cols-2">
-                <KpiCard
-                  label="Waived by benefit"
-                  value={money(
-                    winnerSurface?.total_waived_amount ?? summary.total_waived_amount
-                  )}
-                  helper={`${winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows already marked waived`}
-                />
-                <KpiCard
-                  label="Contracts in view"
-                  value={String(summary.subscription_count ?? legacy.subscriptions.length)}
-                  helper={`${summary.winner_subscriptions ?? 0} with winner history`}
-                />
-              </QuickActionGrid>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Waived by benefit
+                  </div>
+                  <div className="mt-1 font-semibold text-slate-950">
+                    {money(winnerSurface?.total_waived_amount ?? summary.total_waived_amount)}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows marked waived
+                  </div>
+                </div>
+                <div className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Contracts in view
+                  </div>
+                  <div className="mt-1 font-semibold text-slate-950">
+                    {summary.subscription_count ?? legacy.subscriptions.length}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {summary.winner_subscriptions ?? 0} with winner history
+                  </div>
+                </div>
+              </div>
               {winnerRows.length > 0 ? (
                 <div className="mt-4 grid gap-2">
                   {winnerRows.map((row) => (
@@ -1002,6 +978,6 @@ export default function CustomerDashboardPage() {
           description="Customer dashboard data is not currently available."
         />
       ) : null}
-    </div>
+    </SelfServicePageShell>
   );
 }

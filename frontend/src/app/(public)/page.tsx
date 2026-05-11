@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PublicMarketingShell } from "@/components/layout/page-shells";
 import BrandLockup from "@/components/public/BrandLockup";
 import CtaBanner from "@/components/public/CtaBanner";
 import HomeFeaturedProductsShowcase from "@/components/public/HomeFeaturedProductsShowcase";
@@ -37,7 +38,7 @@ export default async function PublicHome() {
   const dictionary = getPublicDictionary(asLocale(language));
 
   return (
-    <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+    <PublicMarketingShell className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
       <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }} />
 
       <section className="public-hero p-8 sm:p-10">
@@ -173,6 +174,6 @@ export default async function PublicHome() {
           { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
         ]}
       />
-    </main>
+    </PublicMarketingShell>
   );
 }

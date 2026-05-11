@@ -22,6 +22,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
+import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { MetricStrip } from "@/components/ui/operations";
 import {
@@ -309,7 +310,7 @@ export default function PartnerDashboardPage() {
       }
       statusBadge={{ label: "Partner Scope", tone: "info" }}
     >
-      <div className="space-y-6">
+      <PartnerVendorWorkspaceShell>
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
@@ -958,7 +959,7 @@ export default function PartnerDashboardPage() {
             </form>
           </WorkspaceSection>
         ) : null}
-      </div>
+      </PartnerVendorWorkspaceShell>
     </PortalPage>
   );
 }

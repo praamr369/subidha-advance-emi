@@ -12,18 +12,13 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
-import {
-  DataTableShell,
-  DetailPanel,
-  FormSection,
-  KpiCard,
-  QuickActionGrid,
-  WorkflowCard,
-} from "@/components/ui/operations";
+import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
+import { RegistryPageShell } from "@/components/layout/page-shells";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
@@ -564,7 +559,41 @@ export default function AdminSubscriptionsPage() {
         tone: "info",
       }}
     >
-      <div className="space-y-6">
+      <RegistryPageShell>
+        <nav aria-label="Subscription lifecycle" className="flex flex-wrap gap-2">
+          {(
+            [
+              { label: "All", status: "" as const },
+              { label: "Active", status: "ACTIVE" as const },
+              { label: "Pending", status: "PENDING" as const },
+              { label: "Won", status: "WON" as const },
+              { label: "Completed", status: "COMPLETED" as const },
+              { label: "Defaulted", status: "DEFAULTED" as const },
+              { label: "Cancelled / history", status: "CANCELLED" as const },
+            ] as const
+          ).map((tab) => {
+            const active =
+              tab.status === "" ? !currentStatusFilter : currentStatusFilter === tab.status;
+            return (
+              <Link
+                key={tab.label}
+                href={buildListPath({
+                  ...(tab.status ? { status: tab.status } : { status: "" }),
+                  page: "",
+                })}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                )}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+
         <FormSection
           title="Filter register"
           description="Search by subscription, customer, phone, product, batch, lucky number, partner, or plan type."
@@ -734,29 +763,6 @@ export default function AdminSubscriptionsPage() {
 
         {!loading && !error ? (
           <>
-            <DetailPanel
-              title="Operational note"
-              description="Use this register for contract-level visibility. Open subscription detail for lifecycle, EMI schedule, payment history, and audit context."
-            >
-              <QuickActionGrid className="md:grid-cols-3">
-                <KpiCard
-                  label="Matching contracts"
-                  value={String(count)}
-                  helper="Full filtered register size across all pages."
-                />
-                <KpiCard
-                  label="Page active"
-                  value={String(pageActiveCount)}
-                  helper="Active contracts visible on the current page."
-                />
-                <KpiCard
-                  label="Page won"
-                  value={String(pageWonCount)}
-                  helper="Winner contracts visible on the current page."
-                />
-              </QuickActionGrid>
-            </DetailPanel>
-
             <DetailPanel
               title="Subscription rows"
               description="Review contract context and route into detail, customer, or payment operations."
@@ -931,7 +937,7 @@ export default function AdminSubscriptionsPage() {
             </DetailPanel>
           </>
         ) : null}
-      </div>
+      </RegistryPageShell>
     </PortalPage>
   );
 }

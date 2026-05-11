@@ -14,6 +14,7 @@ import FinanceAccountEditDrawer from "@/components/accounting/FinanceAccountEdit
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import PortalPage from "@/components/ui/PortalPage";
+import { AccountingControlShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   AccountingNotice,
@@ -297,9 +298,7 @@ export default function AccountingChartOfAccountsPage() {
   const regChartCount = chartAccounts.length;
   const regFinanceCount = financeAccounts.length;
   const apiChartCount = setupStatus?.chart_accounts_total;
-  const apiFinanceCount = setupStatus?.finance_accounts_total;
   const summaryChartTotal = apiChartCount ?? regChartCount;
-  const summaryFinanceTotal = apiFinanceCount ?? regFinanceCount;
   const summaryChartActive = setupStatus?.chart_accounts_active ?? chartAccounts.filter((a) => a.is_active).length;
   const summaryFinanceActive =
     setupStatus?.finance_accounts_active ?? financeAccounts.filter((a) => a.is_active).length;
@@ -322,22 +321,13 @@ export default function AccountingChartOfAccountsPage() {
         { href: ROUTES.admin.settingsImports, label: "Imports", variant: "primary" },
       ]}
       stats={[
-        { label: "Chart accounts (total)", value: String(summaryChartTotal), tone: "info" },
         {
-          label: "Active chart accounts",
-          value: String(summaryChartActive),
-          tone: summaryChartActive > 0 ? "success" : "default",
-        },
-        { label: "Root chart accounts", value: String(setupStatus?.chart_accounts_root ?? "—"), tone: "info" },
-        { label: "Child chart accounts", value: String(setupStatus?.chart_accounts_child ?? "—"), tone: "info" },
-        { label: "Finance accounts (total)", value: String(summaryFinanceTotal), tone: "info" },
-        {
-          label: "Active finance accounts",
-          value: String(summaryFinanceActive),
-          tone: summaryFinanceActive > 0 ? "success" : "default",
+          label: "Active chart / finance",
+          value: `${summaryChartActive} / ${summaryFinanceActive}`,
+          tone: summaryChartActive > 0 && summaryFinanceActive > 0 ? "success" : "warning",
         },
         {
-          label: "Account mappings complete",
+          label: "Mappings (required)",
           value:
             setupStatus?.required_mappings_complete != null && setupStatus?.required_mappings_total != null
               ? `${setupStatus.required_mappings_complete}/${setupStatus.required_mappings_total}`
@@ -349,10 +339,15 @@ export default function AccountingChartOfAccountsPage() {
           value: setupStatus?.journal_ready ? "Ready" : "Blocked",
           tone: setupStatus?.journal_ready ? "success" : "warning",
         },
+        {
+          label: "Chart register (total)",
+          value: String(summaryChartTotal),
+          tone: "info",
+        },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
+      <AccountingControlShell>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
@@ -605,7 +600,7 @@ export default function AccountingChartOfAccountsPage() {
             />
           </>
         ) : null}
-      </div>
+      </AccountingControlShell>
 
       <ChartAccountCreateDrawer
         open={createChartOpen}
