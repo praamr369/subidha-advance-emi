@@ -1,276 +1,271 @@
-# Page layout taxonomy
+# Page layout taxonomy (SUBIDHA CORE frontend)
 
-This document defines **layout intent** for SUBIDHA CORE frontend pages. It complements `page-route-inventory.md` and the reusable shells in `frontend/src/components/layout/page-shells.tsx`.
+**Phase 1 — documentation only.** Defines shared page archetypes for future layout alignment. Examples cite **actual routes** from this repository.
 
-Shared shells are **layout-only**: they do not fetch data, enforce roles, or inject content.
+## Type reference
 
----
+### executive_dashboard
 
-## `executive_dashboard`
+- **Purpose:** Role landing that answers “what needs attention today” with a small set of trustworthy signals and deep links into work queues.
+- **When to use:** Top-level `/admin`, `/customer`, `/partner`, `/vendor`, or `/cashier` home surfaces; executive command views.
+- **When not to use:** Dense data grids, long forms, or ledger drill-downs (use register_list / transaction_form / detail_page).
+- **KPIs allowed:** Allowed: few, stable metrics tied to posture objects (collections, overdue, draw readiness). Avoid vanity counts.
+- **Primary layout:** `PortalPage` or role shell (`ExecutiveDashboardShell`, `SelfServicePageShell`, `PartnerVendorWorkspaceShell`) + `DashboardWidgetBoard` / `WorkspaceSection` + `MetricStrip`.
+- **Mobile rule:** Prioritize single-column stacks; collapse widget boards; keep one primary CTA visible.
+- **Dark-mode rule:** Follow global tokens; charts and chips must remain legible on dark surfaces.
+- **Examples in this repo:** `/admin`, `/customer`, `/partner`, `/vendor`, `/cashier`
+- **Anti-patterns:** Do not duplicate full register tables on the dashboard. Do not stack unrelated KPI grids above the fold.
 
-| | |
-| --- | --- |
-| **Purpose** | Strategic overview for leadership: today’s risk, queues, and attention items—not a full ERP grid. |
-| **When to use** | `/admin` and similar single-pane executive summaries. |
-| **When not to use** | Registers, transaction posting, or customer self-service. |
-| **KPIs allowed?** | Yes, **limited** (4–8 meaningful metrics from real dashboard endpoints). |
-| **Primary structure** | Time context → priority queues / alerts → deep links to workspaces. |
-| **Examples** | `/admin` (Executive Dashboard). |
-| **Anti-patterns** | Duplicating the same metrics as KPI cards *and* stat strip *and* widget grids; 15+ generic counters. |
-| **Mobile** | Stack sections vertically; keep queue lists scrollable with `min-w-0`. |
-| **Dark mode** | Use semantic tokens (`bg-card`, `text-foreground`, `border-border`); avoid hard-coded light-only gradients for critical text. |
+### operations_workspace
 
----
+- **Purpose:** Day-to-day operational screen: filters, bulk-safe actions, and contextual panels for staff.
+- **When to use:** Most `/admin/*` modules (inventory, CRM, service desk, finance hubs except pure reports).
+- **When not to use:** Customer self-service or public marketing pages.
+- **KPIs allowed:** Allowed sparingly for queue depth / exposure when it drives the next action.
+- **Primary layout:** `PortalPage` + optional `WorkflowCard` row + main workspace (often custom sections, sometimes `DataTableShell`).
+- **Mobile rule:** Filters collapse to sheet/drawer; defer wide tables to horizontal scroll with care.
+- **Dark-mode rule:** Use surface tokens for elevated cards; keep destructive actions visually distinct.
+- **Examples in this repo:** `/admin/operations`, `/admin/inventory/workspace`, `/admin/service-desk`
+- **Anti-patterns:** Avoid turning every workspace into a KPI wall before the primary task UI.
 
-## `operations_workspace`
+### register_list
 
-| | |
-| --- | --- |
-| **Purpose** | Day-to-day internal operations: deliveries, finance tiles, command surfaces. |
-| **When to use** | Multi-lane or card-board ops pages (delivery register, finance workspace). |
-| **When not to use** | Customer/partner scoped pages; pure accounting control. |
-| **KPIs allowed?** | Sparingly; prefer lane counts and status filters from real payloads. |
-| **Primary structure** | Filters → lanes / board → detail drill-down. |
-| **Examples** | `/admin/deliveries`, `/admin/finance/workspace`. |
-| **Anti-patterns** | Same four KPI cards on every ops page regardless of task. |
-| **Mobile** | Horizontal scroll only inside intentional containers; outer page `min-w-0`. |
-| **Dark mode** | Same as above. |
+- **Purpose:** Searchable, paginated ledger of entities (customers, payments, products, tickets).
+- **When to use:** Pages whose main artifact is a table with row actions.
+- **When not to use:** Multi-step wizards or document detail (use transaction_form / detail_page).
+- **KPIs allowed:** Optional small header stats (e.g. list size, open count) — not a full analytics board.
+- **Primary layout:** `PortalPage` + `DataTableShell` + `DetailPanel` pattern where used.
+- **Mobile rule:** `MobileSafeTable` or card list; preserve sort/filter affordances.
+- **Dark-mode rule:** Zebra rows and borders must retain contrast.
+- **Examples in this repo:** `/admin/customers`, `/admin/payments`, `/admin/audit-logs`
+- **Anti-patterns:** Do not wrap non-tabular content solely for visual padding in `DataTableShell`.
 
----
+### transaction_form
 
-## `register_list`
+- **Purpose:** Create or edit a business object with validation, dependent fields, and explicit submit lifecycle.
+- **When to use:** Paths containing `/create`, `/edit`, imports, or structured wizards.
+- **When not to use:** Read-only audit trails.
+- **KPIs allowed:** Generally **no**; show derived totals inline near fields instead of KPI grids.
+- **Primary layout:** `PortalPage` with narrow max width + `FormSection` / field groups.
+- **Mobile rule:** Single column; sticky submit where safe.
+- **Dark-mode rule:** Input borders and error text must meet contrast.
+- **Examples in this repo:** `/admin/subscriptions/create`, `/admin/batches/create`, `/admin/products/create`
+- **Anti-patterns:** Avoid `QuickActionGrid` of KPIs on pure forms unless required for verification summaries.
 
-| | |
-| --- | --- |
-| **Purpose** | Search-first lists: customers, subscriptions, payments, inventory rows. |
-| **When to use** | Any high-volume tabular register. |
-| **When not to use** | When the primary task is a single form (use `transaction_form`). |
-| **KPIs allowed?** | Prefer header **stats** strip only; avoid a second KPI grid repeating the same numbers. |
-| **Primary structure** | Search + filters → table → row actions / export. |
-| **Examples** | `/admin/customers`, `/admin/subscriptions` (register mode), `/admin/payments`. |
-| **Anti-patterns** | KPI grid above the register that duplicates `PortalPage` stats. |
-| **Mobile** | Wrap tables in `overflow-x-auto` / `MobileSafeTable` patterns. |
-| **Dark mode** | Table borders via `border-border`; keep focus rings visible. |
+### detail_page
 
----
+- **Purpose:** Single-record drill-down: timeline, related lists, and scoped actions.
+- **When to use:** Dynamic `[id]`, `[caseId]`, `[slug]`, etc. detail routes.
+- **When not to use:** List landing for the same entity type.
+- **KPIs allowed:** Allowed: record-level summary chips (`PortalPage` `stats`) — keep tight (≤4).
+- **Primary layout:** `PortalPage` + tabs/sections; optional embedded `DataTableShell` for child lists.
+- **Mobile rule:** Stack sections; pin key record metadata at top.
+- **Dark-mode rule:** Separate timeline and surface backgrounds for scanability.
+- **Examples in this repo:** `/admin/customers/[id]`, `/admin/payments/[id]`, `/customer/subscriptions/[id]`
+- **Anti-patterns:** Avoid embedding unrelated registers that belong on their own list routes.
 
-## `transaction_form`
+### approval_queue
 
-| | |
-| --- | --- |
-| **Purpose** | Collect or post a single business action (create payment, create entity). |
-| **When to use** | `/create`, `/new`, wizard-style flows. |
-| **When not to use** | Browsing hundreds of rows. |
-| **KPIs allowed?** | Generally **no**; optional inline validation summaries only. |
-| **Primary structure** | Form sections → primary action → confirmation / receipt. |
-| **Examples** | `/admin/payments/create`, subscription create flows. |
-| **Anti-patterns** | Dashboard KPIs above a long form. |
-| **Mobile** | Full-width fields; sticky primary action where appropriate. |
-| **Dark mode** | Input backgrounds `bg-background`; errors `destructive` tokens. |
+- **Purpose:** Explicit queue of items needing a decision with audit-friendly actions.
+- **When to use:** Subscription requests, collection requests, partner payment requests.
+- **When not to use:** General CRM prospect lists without a decision workflow.
+- **KPIs allowed:** Counts of pending / overdue approvals are appropriate.
+- **Primary layout:** `PortalPage` + table or split view + status badges.
+- **Mobile rule:** Card per item with primary approve/reject pattern.
+- **Dark-mode rule:** Warning/danger tones for blocked items.
+- **Examples in this repo:** `/admin/subscription-requests`, `/partner/subscription-requests`, `/admin/partners/collection-requests`
+- **Anti-patterns:** Do not mix unrelated entity types in one approval table without strong filtering.
 
----
+### setup_checklist
 
-## `detail_page`
+- **Purpose:** Guided business setup: ordered steps, completion states, links into configuration routes.
+- **When to use:** Business setup checklist and similar onboarding flows.
+- **When not to use:** Daily operational queues.
+- **KPIs allowed:** Completion percentage / step counts only.
+- **Primary layout:** `PortalPage` or `PageHeader` + checklist components.
+- **Mobile rule:** Stepper or accordion per section.
+- **Dark-mode rule:** Completed vs pending steps need distinct chips.
+- **Examples in this repo:** `/admin/settings/business-setup/checklist`
+- **Anti-patterns:** Avoid embedding heavy registers; link out instead.
 
-| | |
-| --- | --- |
-| **Purpose** | Single object context: tabs, timeline, related lists. |
-| **When to use** | `/admin/customers/[id]`, `/admin/subscriptions/[id]`, etc. |
-| **When not to use** | List landing pages. |
-| **KPIs allowed?** | Only when they summarize **this** object (not global business KPIs). |
-| **Primary structure** | Object header → tabs → timeline / related tables. |
-| **Examples** | Dynamic `[id]` routes under admin/partner/customer. |
-| **Anti-patterns** | Six KPI cards that duplicate fields already in the header. |
-| **Mobile** | Tabs as scrollable chips; avoid nested interactive controls. |
-| **Dark mode** | Detail panels use `bg-card` / `border-border`. |
+### accounting_control
 
----
+- **Purpose:** Financial period control, ledgers, statements, and reconciliation surfaces.
+- **When to use:** Accounting module: journals, TB/BS/PL, reconciliation, GST registers.
+- **When not to use:** Marketing or CRM list pages.
+- **KPIs allowed:** Balances and period locks — yes; marketing funnels — no.
+- **Primary layout:** `PortalPage` + dense tables + export actions.
+- **Mobile rule:** Read-only summaries first; defer full grids to desktop where possible.
+- **Dark-mode rule:** Numeric columns right-aligned; use tabular nums.
+- **Examples in this repo:** `/admin/accounting`, `/admin/accounting/reports/trial-balance`, `/admin/accounting/reconciliation`
+- **Anti-patterns:** Never use KPI tiles as a substitute for double-entry detail.
 
-## `approval_queue`
+### cashier_workflow
 
-| | |
-| --- | --- |
-| **Purpose** | Review and approve/reject linear workflows. |
-| **When to use** | Subscription requests, collection requests, support queues. |
-| **When not to use** | Generic CRUD lists without an approval state machine. |
-| **KPIs allowed?** | Queue depth / SLA-style counts from real APIs. |
-| **Primary structure** | Queue summary → filter → row actions → detail drawer. |
-| **Examples** | `/admin/subscription-requests`, partner request queues. |
-| **Anti-patterns** | Unrelated finance KPIs above a narrow approval list. |
-| **Mobile** | Card-per-row fallback where tables are cramped. |
-| **Dark mode** | Status badges must meet contrast in both themes. |
+- **Purpose:** Fast, interruption-friendly flows for collection and payment verification at counter.
+- **When to use:** All `/cashier/*` routes.
+- **When not to use:** Long-running analytics.
+- **KPIs allowed:** Session totals and queue depth — yes.
+- **Primary layout:** `PortalPage` tuned for touch / rapid entry; large targets.
+- **Mobile rule:** Assume phone or tablet at desk.
+- **Dark-mode rule:** High contrast for amount entry feedback.
+- **Examples in this repo:** `/cashier`, `/cashier/collect`, `/cashier/payments`
+- **Anti-patterns:** Avoid nested navigation depth; minimize scroll to primary action.
 
----
+### customer_self_service
 
-## `setup_checklist`
+- **Purpose:** Customer-readable status for subscriptions, EMIs, deliveries, and documents.
+- **When to use:** `/customer/*` except staff-only hybrids (there should be none in normal RBAC).
+- **When not to use:** Admin registers.
+- **KPIs allowed:** Personal posture (outstanding, next EMI) — yes; firm-wide KPIs — no.
+- **Primary layout:** `SelfServicePageShell` + `DashboardWidgetBoard` on home; `PortalPage` on inner pages.
+- **Mobile rule:** First-class; customers primarily phone users.
+- **Dark-mode rule:** Maintain readable money formatting.
+- **Examples in this repo:** `/customer`, `/customer/payments`, `/customer/subscriptions`
+- **Anti-patterns:** Do not expose other customers’ data or staff-only actions.
 
-| | |
-| --- | --- |
-| **Purpose** | Onboarding / configuration: blockers, missing mappings, guided steps. |
-| **When to use** | Accounting setup, business setup guides. |
-| **When not to use** | Day-to-day transactional pages. |
-| **KPIs allowed?** | Compact status (COA ready, journal ready)—not decorative trend cards. |
-| **Primary structure** | **Blockers first** → checklist → mapping/table actions. |
-| **Examples** | `/admin/accounting/setup`, `/admin/settings/business-setup/chart-accounts`. |
-| **Anti-patterns** | Hiding missing mappings below unrelated KPI grids. |
-| **Mobile** | Blocker callouts full width; tables `overflow-x-auto`. |
-| **Dark mode** | Warning panels use theme-aware amber/red mixes. |
+### partner_vendor_workspace
 
----
+- **Purpose:** Partner or vendor operational views: collections, quotes, payouts, ledgers scoped to the actor.
+- **When to use:** `/partner/*`, `/vendor/*`.
+- **When not to use:** Admin global registers (even if similar data exists server-side).
+- **KPIs allowed:** Scoped totals (my collections, my outstanding) — yes.
+- **Primary layout:** `PartnerVendorWorkspaceShell` + `PortalPage` on dashboards; inner pages vary.
+- **Mobile rule:** Partner field staff: prioritize collections and customer lookup.
+- **Dark-mode rule:** Same token discipline as admin.
+- **Examples in this repo:** `/partner`, `/partner/collections`, `/vendor/orders`
+- **Anti-patterns:** Avoid admin-only finance controls in partner/vendor UI.
 
-## `accounting_control`
+### report_analytics
 
-| | |
-| --- | --- |
-| **Purpose** | Masters, mappings, journals, COA—**control** not “dashboard vanity”. |
-| **When to use** | Chart of accounts, accounting overview, books. |
-| **When not to use** | Cashier collection; customer balances marketing. |
-| **KPIs allowed?** | **Compact** readiness chips (mappings x/y, journal blocked/ready)—no fake balances. |
-| **Primary structure** | Directory / filters → master table → drawers for create/edit. |
-| **Examples** | `/admin/accounting/chart-of-accounts`. |
-| **Anti-patterns** | Eight header KPIs repeating the same totals as the table below. |
-| **Mobile** | Enterprise tables horizontally scroll inside a shell. |
-| **Dark mode** | Accounting notices use shared `AccountingNotice` tones. |
+- **Purpose:** Read-mostly analysis: exports, charts, cohort views, BI snapshots.
+- **When to use:** `/admin/reports/*`, `/admin/analytics/*`, `/admin/bi/*`, `reports-center`.
+- **When not to use:** Operational edits (posting payments, approving requests).
+- **KPIs allowed:** Yes — this is the appropriate place for dense metrics.
+- **Primary layout:** `PortalPage` + chart/table combinations; export footers.
+- **Mobile rule:** Summaries + link to export; charts may defer.
+- **Dark-mode rule:** Chart palettes must be tested in dark mode.
+- **Examples in this repo:** `/admin/reports`, `/admin/bi`, `/admin/analytics/risk-monitor`
+- **Anti-patterns:** Do not perform money-moving actions hidden inside analytics pages.
 
----
+### public_marketing
 
-## `cashier_workflow`
+- **Purpose:** Unauthenticated marketing, education, and trust content.
+- **When to use:** `(public)/**` routes.
+- **When not to use:** Authenticated dashboards.
+- **KPIs allowed:** Only product marketing stats (non-financial).
+- **Primary layout:** Marketing layouts / `PageHeader` patterns — varies.
+- **Mobile rule:** SEO pages must be responsive.
+- **Dark-mode rule:** Optional; follow brand guidelines.
+- **Examples in this repo:** `/`, `/about`, `/lucky-plan`, `/how-it-works`
+- **Anti-patterns:** Never show customer-specific financial data.
 
-| | |
-| --- | --- |
-| **Purpose** | Fast collection: search → select row → post → receipt. |
-| **When to use** | `/cashier/collect`. |
-| **When not to use** | Admin analytics. |
-| **KPIs allowed?** | **Minimal**; header stats for the active queue only—no dashboard grid. |
-| **Primary structure** | Universal search → workflow toggle → search form → collection panel → receipt. |
-| **Examples** | `/cashier/collect`. |
-| **Anti-patterns** | Four KPI cards + workflow cards duplicating header stats. |
-| **Mobile** | Sticky bottom actions (existing pattern); safe-area padding. |
-| **Dark mode** | Collection panel surfaces use `--surface-*` variables. |
+### auth_flow
 
----
+- **Purpose:** Login, registration, password recovery, logout.
+- **When to use:** `(auth)/**` routes.
+- **When not to use:** Business operations.
+- **KPIs allowed:** No business KPIs.
+- **Primary layout:** Centered auth card layouts.
+- **Mobile rule:** Single column forms.
+- **Dark-mode rule:** Auth backgrounds should not reduce field readability.
+- **Examples in this repo:** `/login`, `/register`, `/reset-password`, `/logout`
+- **Anti-patterns:** Do not preload heavy dashboards on auth pages.
 
-## `customer_self_service`
+### system_utility
 
-| | |
-| --- | --- |
-| **Purpose** | Customer’s own contracts, payments, support—no internal ops noise. |
-| **When to use** | `/customer` and customer sub-routes. |
-| **When not to use** | Admin registers. |
-| **KPIs allowed?** | Simple **at-a-glance** metrics; prefer `MetricStrip` / definition lists over duplicate KPI grids. |
-| **Primary structure** | Quick links → personal summary → subscription/payment widgets. |
-| **Examples** | `/customer`, `/customer/subscriptions`, `/customer/payments`. |
-| **Anti-patterns** | Two stacked grids of the same EMI totals (KPI + settlement card). |
-| **Mobile** | Same as register_list for tables. |
-| **Dark mode** | Customer marketing gradients must keep text readable (slate on light panels is acceptable if contrast holds). |
+- **Purpose:** Cross-cutting utility screens (unauthorized, global search shells if not tied to a domain).
+- **When to use:** `/unauthorized`, narrow utility routes.
+- **When not to use:** Domain registers.
+- **KPIs allowed:** No.
+- **Primary layout:** Minimal shells.
+- **Mobile rule:** Simple message + navigation recovery.
+- **Dark-mode rule:** Neutral surfaces.
+- **Examples in this repo:** `/unauthorized`, `/admin/global-search`
+- **Anti-patterns:** Do not grow utility routes into full modules without renaming and RBAC review.
 
----
+## KPI / card overuse findings (static inspection)
 
-## `partner_vendor_workspace`
+This section flags **patterns that often correlate with visual KPI density**, based on imports and props in `page.tsx` files. It is not a judgment of business correctness.
 
-| | |
-| --- | --- |
-| **Purpose** | Partner/vendor scoped: own customers, commissions, quotes—**never** admin-only links. |
-| **When to use** | `/partner`, `/vendor`, scoped sub-routes. |
-| **When not to use** | Admin financial control centers. |
-| **KPIs allowed?** | Only **scoped** metrics from partner/vendor APIs. |
-| **Primary structure** | Scoped stats strip → lane widgets → tables. |
-| **Examples** | `/partner`, `/vendor`. |
-| **Anti-patterns** | Eight KPI tiles when four header stats + one summary line suffice. |
-| **Mobile** | Touch-friendly action cards. |
-| **Dark mode** | Use dashboard shell variables consistent with other roles. |
+### PortalPage `stats` usage
 
----
+Files passing `stats={...}` or `stats={var}` to `PortalPage`: **138** routes.
 
-## `report_analytics`
+Examples (first 15 alphabetically by route):
+- `/admin/accounting`
+- `/admin/accounting/assets`
+- `/admin/accounting/attendance`
+- `/admin/accounting/books`
+- `/admin/accounting/bridges`
+- `/admin/accounting/chart-of-accounts`
+- `/admin/accounting/depreciation`
+- `/admin/accounting/expense-claims`
+- `/admin/accounting/expenses`
+- `/admin/accounting/exports`
+- `/admin/accounting/exports/itr-pack`
+- `/admin/accounting/gst`
+- `/admin/accounting/gst/credit-notes`
+- `/admin/accounting/gst/debit-notes`
+- `/admin/accounting/gst/tax-invoices`
 
-| | |
-| --- | --- |
-| **Purpose** | Explore, chart, export, drill down. |
-| **When to use** | `/admin/reports/*`, `/admin/bi/*`, analytics routes. |
-| **When not to use** | Operational registers (unless the page is explicitly a report). |
-| **KPIs allowed?** | Yes when **report-specific** and endpoint-backed. |
-| **Primary structure** | Filters → chart/table → export → drilldown links. |
-| **Examples** | `/admin/bi/cashflow`, report sub-routes. |
-| **Anti-patterns** | KPI strip with no tie to the chart’s filter window. |
-| **Mobile** | Charts stack; tables scroll horizontally inside containers. |
-| **Dark mode** | Chart chrome follows CSS variables where applicable. |
+### `KpiCard` / `QuickActionGrid` / `WorkflowCard`
 
----
+Routes importing `KpiCard` and/or `WorkflowCard`: **21**
 
-## `public_marketing`
+- `/admin/batches` — KpiCard, QuickActionGrid
+- `/admin/batches/[id]` — KpiCard, QuickActionGrid
+- `/admin/batches/[id]/control-center` — KpiCard, WorkflowCard, QuickActionGrid
+- `/admin/collections` — KpiCard, WorkflowCard, QuickActionGrid
+- `/admin/customers/[id]` — KpiCard, QuickActionGrid
+- `/admin/emis/overdue` — KpiCard, QuickActionGrid
+- `/admin/finance` — KpiCard, QuickActionGrid
+- `/admin/hr/staff` — KpiCard, WorkflowCard, QuickActionGrid
+- `/admin/hr/staff-documents` — KpiCard, WorkflowCard, QuickActionGrid
+- `/admin/hr/staff/[id]` — KpiCard, WorkflowCard, QuickActionGrid
+- `/admin/lucky-ids` — KpiCard, QuickActionGrid
+- `/admin/products` — KpiCard, QuickActionGrid
+- `/admin/products/create` — KpiCard, QuickActionGrid
+- `/admin/products/import` — KpiCard, QuickActionGrid
+- `/admin/reconciliation` — KpiCard, QuickActionGrid
+- `/admin/subscriptions` — WorkflowCard
+- `/cashier/payments` — KpiCard, QuickActionGrid
+- `/cashier/payments/[id]` — WorkflowCard, QuickActionGrid
+- `/customer/profile` — KpiCard, QuickActionGrid
+- `/partner/collections` — KpiCard, WorkflowCard, QuickActionGrid
+- `/partner/customers` — KpiCard, WorkflowCard, QuickActionGrid
 
-| | |
-| --- | --- |
-| **Purpose** | Trust, product story, published winners—**not** ERP dashboards. |
-| **When to use** | `(public)/*` marketing pages. |
-| **When not to use** | Authenticated workspaces. |
-| **KPIs allowed?** | Only **public** stats from real endpoints (e.g. `getPublicStats`). |
-| **Primary structure** | Hero → trust → product/plan → CTA. |
-| **Examples** | `/`, `/lucky-plan`, `/winners`. |
-| **Anti-patterns** | Admin-style KPI grids on the marketing home page. |
-| **Mobile** | Readable line length; no horizontal page overflow. |
-| **Dark mode** | Public layout already uses theme tokens; `PublicMarketingShell` wraps `<main>`. |
+### `WorkspaceCardsPage`
 
----
+Routes using `WorkspaceCardsPage`: **7**
+- `/admin/delivery` → `frontend/src/app/(dashboard)/admin/delivery/page.tsx`
+- `/admin/delivery/workspace` → `frontend/src/app/(dashboard)/admin/delivery/workspace/page.tsx`
+- `/admin/finance/workspace` → `frontend/src/app/(dashboard)/admin/finance/workspace/page.tsx`
+- `/admin/inventory/workspace` → `frontend/src/app/(dashboard)/admin/inventory/workspace/page.tsx`
+- `/admin/partners/workspace` → `frontend/src/app/(dashboard)/admin/partners/workspace/page.tsx`
+- `/admin/products/workspace` → `frontend/src/app/(dashboard)/admin/products/workspace/page.tsx`
+- `/admin/service` → `frontend/src/app/(dashboard)/admin/service/page.tsx`
 
-## `auth_flow`
+### `WidgetShell`
 
-| | |
-| --- | --- |
-| **Purpose** | Login, register, password reset. |
-| **When to use** | `(auth)/*`. |
-| **When not to use** | Post-login dashboards. |
-| **KPIs allowed?** | No. |
-| **Primary structure** | Branding → form → helper links. |
-| **Examples** | `/login`, `/register`. |
-| **Anti-patterns** | Operational KPIs on login. |
-| **Mobile** | Large tap targets; keyboard-safe forms. |
-| **Dark mode** | Form fields use `bg-background`. |
+Routes importing `WidgetShell`: **0**
 
----
+_No `page.tsx` files import `WidgetShell` directly._
 
-## `system_utility`
+`WidgetShell` is implemented in `frontend/src/components/admin/dashboard/WidgetShell.tsx` and is composed inside `frontend/src/components/admin/dashboard/AdminOperationsDashboard.tsx`. **Static search shows no `page.tsx` (or other feature modules) importing `AdminOperationsDashboard` today**, so this is primarily a **component-layer** KPI shell to be aware of for future wiring or cleanup. Separately, **`DashboardWidgetBoard`** on role home pages still centralizes much widget/KPI layout even when `WidgetShell` is not imported at the route layer.
 
-| | |
-| --- | --- |
-| **Purpose** | Settings, unauthorized, cross-role utilities. |
-| **When to use** | `/unauthorized`, `/settings`, small utility pages. |
-| **When not to use** | Core business workflows. |
-| **KPIs allowed?** | No. |
-| **Primary structure** | Minimal explanation + single action. |
-| **Examples** | `/unauthorized`. |
-| **Anti-patterns** | Embedding admin widgets. |
-| **Mobile** | Centered, narrow column. |
-| **Dark mode** | Standard semantic colors. |
+### `DataTableShell` on non-table-first pages (heuristic)
 
----
+Total routes with `DataTableShell`: **33**. Routes where **recommended type** is not `register_list` / `operations_workspace` / `report_analytics` / `accounting_control` / `approval_queue` / `cashier_workflow` / `partner_vendor_workspace` / `customer_self_service`: **6** (review manually — some detail pages correctly embed child tables).
 
-## KPI / card overuse findings
+- `/admin/batches/[id]` (recommended: `detail_page`)
+- `/admin/hr/staff/[id]` (recommended: `detail_page`)
+- `/admin/products/[id]` (recommended: `detail_page`)
+- `/admin/products/import` (recommended: `transaction_form`)
+- `/admin/subscriptions/[id]` (recommended: `detail_page`)
+- `/customer/subscriptions/[id]` (recommended: `detail_page`)
 
-These pages previously layered **`PortalPage` stats**, **`QuickActionGrid` + `KpiCard`**, and/or **`WorkflowCard`** with **redundant** metrics—fine for a prototype, noisy for daily operations. This pass **removed or replaced** duplicate KPI grids with register-first layouts, definition lists, or summary lines while **keeping** real endpoint-backed numbers.
+### Customer vs partner dashboard classification note
 
-| Route | Overused pattern | Why not operationally useful | Replacement in this pass |
-| --- | --- | --- | --- |
-| `/admin/customers` | Control lanes **before** search + duplicate KPI grid vs header stats | Staff need the register first; KPIs repeated visible/active/KYC | `RegistryPageShell`; search + table **before** lanes + import; removed KPI grid; import preview uses `<dl>` |
-| `/admin/subscriptions` (register) | KPI row duplicating header + no lifecycle navigation | Same counts shown twice; lifecycle filtering is the real mental model | Lifecycle **pill nav**; removed “operational note” KPI panel; `RegistryPageShell` |
-| `/admin/payments` | Double KPI strip + `WorkflowCard` amounts | Net/gross already in header stats; extra cards push filters below fold | `RegistryPageShell`; removed duplicate KPI blocks |
-| `/cashier/collect` | `QuickActionGrid` of workflow KPIs | Duplicates header stats; slows scanning | `CashierWorkflowShell`; one-line counter sequence hint |
-| `/customer` | Multiple `KpiCard` / `QuickActionGrid` layers | Same financial totals repeated in adjacent sections | `SelfServicePageShell`; KPI clusters → `<dl>` / text rows; removed redundant EMI KPI grid |
-| `/vendor` | 8-tile `KpiCard` wall | Dense tiles for a small vendor team; many metrics belong in header strip | `PortalPage.stats` (4) + one prose summary line + link grid |
-| `/admin/accounting/chart-of-accounts` | Long KPI band in header | COA page needs **readiness**, not a second dashboard | Reduced header stats to four **readiness-focused** values; `AccountingControlShell` |
-| `/admin/accounting/setup` | Stats before visible blockers | Setup is **blocker-driven** | `SetupChecklistPageShell`; warnings + missing mappings **before** stat row |
-
-**Intentionally unchanged (still card-heavy but justified)**
-
-- Batch **control center** status cards (lock/draw/delivery)—tightly coupled to operational state machine.
-- **Report / BI** pages where KPIs match the filtered report window.
-- **Subscription workflow landing** (`/admin/subscriptions` with empty query) still uses `WorkflowCard` grid as a **navigator**, not a fake metrics dashboard.
-
----
-
-## Related files
-
-- `frontend/src/components/layout/page-shells.tsx` — reusable layout regions.
-- `frontend/src/components/ui/operations.tsx` — `KpiCard`, `DataTableShell`, etc. (still valid when not duplicated).
-- `frontend/src/components/ui/PortalPage.tsx` — header, breadcrumbs, optional `stats` strip.
+- **Customer home** `/customer` uses `SelfServicePageShell` + `DashboardWidgetBoard` (see imports), not the same shell as admin.
+- **Partner home** `/partner` uses `PartnerVendorWorkspaceShell` + `PortalPage` + dashboard widgets — classify as **partner_vendor_workspace** / executive-style landing for partners.
