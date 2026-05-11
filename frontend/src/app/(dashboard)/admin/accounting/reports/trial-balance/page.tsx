@@ -14,6 +14,7 @@ import {
   AccountingRefreshButton,
   accountingMoney,
 } from "@/components/accounting/shared";
+import { ReportPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -89,92 +90,96 @@ export default function AccountingTrialBalancePage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
-        <WorkspaceDirectory
-          title="Accounting statement map"
-          description="Move between trial balance, profit and loss, balance sheet, and the supporting books that explain posted totals."
-          groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
-        />
+      <ReportPageShell
+        filters={
+          <div className="space-y-6">
+            <WorkspaceDirectory
+              title="Accounting statement map"
+              description="Move between trial balance, profit and loss, balance sheet, and the supporting books that explain posted totals."
+              groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
+            />
 
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <AccountingPeriodFilters
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-          />
-          <AccountingRefreshButton
-            loading={loading}
-            refreshing={refreshing}
-            onClick={() => void loadReport("refresh")}
-          />
-        </div>
-
-        {report && !report.balanced ? (
-          <AccountingNotice
-            tone="danger"
-            message="Trial balance is out of balance. Review posted journal integrity before approving downstream accounting work."
-          />
-        ) : null}
-
-        {loading ? <LoadingBlock label="Loading trial balance..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load trial balance"
-            description={error}
-            onRetry={() => void loadReport("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <WorkspaceSection
-            title="Posted account balances"
-            description="Debits and credits are rolled up directly from posted journal entry lines."
-          >
-            {!report || report.rows.length === 0 ? (
-              <EmptyState
-                title="No posted balances"
-                description="Post accounting journals for the selected period to populate the trial balance."
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <AccountingPeriodFilters
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
               />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-muted-foreground">
-                      <th className="px-3 py-2 font-medium">Account</th>
-                      <th className="px-3 py-2 font-medium">Type</th>
-                      <th className="px-3 py-2 font-medium">Debit</th>
-                      <th className="px-3 py-2 font-medium">Credit</th>
-                      <th className="px-3 py-2 font-medium">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.rows.map((row) => (
-                      <tr key={row.account_id} className="border-b border-slate-100">
-                        <td className="px-3 py-3">
-                          <div className="font-medium text-foreground">
-                            {row.account_code}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {row.account_name}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-muted-foreground">{row.account_type}</td>
-                        <td className="px-3 py-3">{accountingMoney(row.debit_total)}</td>
-                        <td className="px-3 py-3">{accountingMoney(row.credit_total)}</td>
-                        <td className="px-3 py-3">
-                          {accountingMoney(row.balance)} {row.balance_side}
-                        </td>
+              <AccountingRefreshButton
+                loading={loading}
+                refreshing={refreshing}
+                onClick={() => void loadReport("refresh")}
+              />
+            </div>
+          </div>
+        }
+        summary={
+          <div className="space-y-4">
+            {report && !report.balanced ? (
+              <AccountingNotice
+                tone="danger"
+                message="Trial balance is out of balance. Review posted journal integrity before approving downstream accounting work."
+              />
+            ) : null}
+
+            {loading ? <LoadingBlock label="Loading trial balance..." /> : null}
+
+            {!loading && error ? (
+              <ErrorState
+                title="Unable to load trial balance"
+                description={error}
+                onRetry={() => void loadReport("initial")}
+              />
+            ) : null}
+          </div>
+        }
+        chartTable={
+          !loading && !error ? (
+            <WorkspaceSection
+              title="Posted account balances"
+              description="Debits and credits are rolled up directly from posted journal entry lines."
+            >
+              {!report || report.rows.length === 0 ? (
+                <EmptyState
+                  title="No posted balances"
+                  description="Post accounting journals for the selected period to populate the trial balance."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-muted-foreground">
+                        <th className="px-3 py-2 font-medium">Account</th>
+                        <th className="px-3 py-2 font-medium">Type</th>
+                        <th className="px-3 py-2 font-medium">Debit</th>
+                        <th className="px-3 py-2 font-medium">Credit</th>
+                        <th className="px-3 py-2 font-medium">Balance</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </WorkspaceSection>
-        ) : null}
-      </div>
+                    </thead>
+                    <tbody>
+                      {report.rows.map((row) => (
+                        <tr key={row.account_id} className="border-b border-slate-100">
+                          <td className="px-3 py-3">
+                            <div className="font-medium text-foreground">{row.account_code}</div>
+                            <div className="text-xs text-muted-foreground">{row.account_name}</div>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">{row.account_type}</td>
+                          <td className="px-3 py-3">{accountingMoney(row.debit_total)}</td>
+                          <td className="px-3 py-3">{accountingMoney(row.credit_total)}</td>
+                          <td className="px-3 py-3">
+                            {accountingMoney(row.balance)} {row.balance_side}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </WorkspaceSection>
+          ) : null
+        }
+      />
     </PortalPage>
   );
 }

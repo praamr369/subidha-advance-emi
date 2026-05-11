@@ -13,6 +13,7 @@ import {
   AccountingRefreshButton,
   accountingMoney,
 } from "@/components/accounting/shared";
+import { ReportPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -80,81 +81,95 @@ export default function AccountingProfitLossPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <div className="space-y-6">
-        <WorkspaceDirectory
-          title="Accounting statement map"
-          description="Use the shared statement directory to move between income review, balance integrity, and supporting posted books."
-          groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
-        />
+      <ReportPageShell
+        filters={
+          <div className="space-y-6">
+            <WorkspaceDirectory
+              title="Accounting statement map"
+              description="Use the shared statement directory to move between income review, balance integrity, and supporting posted books."
+              groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
+            />
 
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <AccountingPeriodFilters
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-          />
-          <AccountingRefreshButton
-            loading={loading}
-            refreshing={refreshing}
-            onClick={() => void loadReport("refresh")}
-          />
-        </div>
-
-        {loading ? <LoadingBlock label="Loading profit and loss..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load profit and loss"
-            description={error}
-            onRetry={() => void loadReport("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <div className="grid gap-4 xl:grid-cols-2">
-            <WorkspaceSection title="Income" description="Posted income accounts for the selected period.">
-              {!report || report.income.length === 0 ? (
-                <EmptyState title="No income rows" description="Income accounts will appear once posted accounting revenue exists in the selected period." />
-              ) : (
-                <div className="space-y-3">
-                  {report.income.map((row) => (
-                    <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-medium text-foreground">{row.account_code}</div>
-                          <div className="text-xs text-muted-foreground">{row.account_name}</div>
-                        </div>
-                        <div className="font-semibold text-emerald-700">{accountingMoney(row.amount)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
-
-            <WorkspaceSection title="Expenses" description="Posted expense accounts for the selected period.">
-              {!report || report.expenses.length === 0 ? (
-                <EmptyState title="No expense rows" description="Expense accounts will appear once posted accounting spend exists in the selected period." />
-              ) : (
-                <div className="space-y-3">
-                  {report.expenses.map((row) => (
-                    <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-medium text-foreground">{row.account_code}</div>
-                          <div className="text-xs text-muted-foreground">{row.account_name}</div>
-                        </div>
-                        <div className="font-semibold text-amber-700">{accountingMoney(row.amount)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <AccountingPeriodFilters
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
+              <AccountingRefreshButton
+                loading={loading}
+                refreshing={refreshing}
+                onClick={() => void loadReport("refresh")}
+              />
+            </div>
           </div>
-        ) : null}
-      </div>
+        }
+        summary={
+          <div className="space-y-4">
+            {loading ? <LoadingBlock label="Loading profit and loss..." /> : null}
+
+            {!loading && error ? (
+              <ErrorState
+                title="Unable to load profit and loss"
+                description={error}
+                onRetry={() => void loadReport("initial")}
+              />
+            ) : null}
+          </div>
+        }
+        chartTable={
+          !loading && !error ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <WorkspaceSection title="Income" description="Posted income accounts for the selected period.">
+                {!report || report.income.length === 0 ? (
+                  <EmptyState
+                    title="No income rows"
+                    description="Income accounts will appear once posted accounting revenue exists in the selected period."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {report.income.map((row) => (
+                      <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="font-medium text-foreground">{row.account_code}</div>
+                            <div className="text-xs text-muted-foreground">{row.account_name}</div>
+                          </div>
+                          <div className="font-semibold text-emerald-700">{accountingMoney(row.amount)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </WorkspaceSection>
+
+              <WorkspaceSection title="Expenses" description="Posted expense accounts for the selected period.">
+                {!report || report.expenses.length === 0 ? (
+                  <EmptyState
+                    title="No expense rows"
+                    description="Expense accounts will appear once posted accounting spend exists in the selected period."
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {report.expenses.map((row) => (
+                      <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="font-medium text-foreground">{row.account_code}</div>
+                            <div className="text-xs text-muted-foreground">{row.account_name}</div>
+                          </div>
+                          <div className="font-semibold text-amber-700">{accountingMoney(row.amount)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </WorkspaceSection>
+            </div>
+          ) : null
+        }
+      />
     </PortalPage>
   );
 }

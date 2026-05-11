@@ -21,6 +21,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import StatCard from "@/components/ui/StatCard";
 import PortalPage from "@/components/ui/PortalPage";
+import { MetricStrip, QueueList } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -266,49 +267,27 @@ export default function AdminAccountingPage() {
                 },
               ]}
             />
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Today Collection" value={money(kpiTodayCollection)} subtext="Cashier/admin posted collections today" tone="success" />
-              <StatCard label="Monthly Collection" value={money(kpiMonthlyCollection)} subtext="Month-to-date posted collections" tone="info" />
-              <StatCard label="EMI Receivable" value={money(kpiEmiReceivable)} subtext="Open EMI receivable position" tone="warning" />
-              <StatCard label="Overdue Receivable" value={String(kpiOverdue)} subtext="Overdue EMI rows requiring follow-up" tone="warning" />
-              <StatCard label="Rent Deposit Liability" value={money(kpiDepositLiability)} subtext="Held customer deposits outstanding" tone="default" />
-              <StatCard label="Waiver Loss Exposure" value={money(kpiWaiverLoss)} subtext="Waived/loss exposure on contracts" tone="warning" />
-              <StatCard label="Direct Sale Revenue" value={money(kpiDirectSale)} subtext="Direct-sale recognized revenue" tone="success" />
-              <StatCard
-                label="Unbalanced/Unmapped Warnings"
-                value={`${kpiUnbalancedWarnings}/${kpiUnmappedWarnings}`}
-                subtext="journal warnings / account mapping warnings"
-                tone={Number(kpiUnbalancedWarnings) > 0 || Number(kpiUnmappedWarnings) > 0 ? "danger" : "success"}
+            <WorkspaceSection
+              title="Readiness posture"
+              description="Operational indicators loaded from the admin accounting control center endpoint. This surface does not recalculate books in the UI."
+            >
+              <MetricStrip
+                items={[
+                  { label: "Today Collection", value: money(kpiTodayCollection) },
+                  { label: "MTD Collection", value: money(kpiMonthlyCollection) },
+                  { label: "Receivable", value: money(kpiEmiReceivable) },
+                  { label: "Overdue", value: String(kpiOverdue) },
+                  { label: "Rent Deposits", value: money(kpiDepositLiability) },
+                  { label: "Waiver Exposure", value: money(kpiWaiverLoss) },
+                  { label: "Direct Sale", value: money(kpiDirectSale) },
+                  { label: "Unbalanced Warn", value: String(kpiUnbalancedWarnings) },
+                  { label: "Unmapped Warn", value: String(kpiUnmappedWarnings) },
+                  { label: "Expense Approvals", value: String(approvedExpenseCount) },
+                  { label: "Salary Approvals", value: String(approvedSalaryCount) },
+                  { label: "Draft Journals", value: String(draftJournalCount) },
+                ]}
               />
-              <StatCard
-                label="Expense Approvals"
-                value={String(approvedExpenseCount)}
-                subtext="Approved vouchers waiting for controlled posting"
-                tone={approvedExpenseCount > 0 ? "warning" : "success"}
-                icon={<ReceiptText className="h-5 w-5" />}
-              />
-              <StatCard
-                label="Salary Approvals"
-                value={String(approvedSalaryCount)}
-                subtext="Salary sheets ready for payroll accrual posting"
-                tone={approvedSalaryCount > 0 ? "warning" : "success"}
-                icon={<WalletCards className="h-5 w-5" />}
-              />
-              <StatCard
-                label="Draft Journals"
-                value={String(draftJournalCount)}
-                subtext="Manual journals are held in draft until admin posts them"
-                tone={draftJournalCount > 0 ? "info" : "success"}
-                icon={<ScrollText className="h-5 w-5" />}
-              />
-              <StatCard
-                label="Money Movements"
-                value={String(moneyMovements.length)}
-                subtext={`${postedMovementCount} transfers already posted between finance accounts`}
-                tone="default"
-                icon={<Landmark className="h-5 w-5" />}
-              />
-            </div>
+            </WorkspaceSection>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
@@ -480,29 +459,28 @@ export default function AdminAccountingPage() {
               description="Queues that currently need an admin post action to move from draft or approved state into the accounting books."
             >
               {draftJournalCount > 0 || approvedExpenseCount > 0 || approvedSalaryCount > 0 ? (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <StatCard
-                    label="Journals waiting"
-                    value={String(draftJournalCount)}
-                    subtext={latestJournal?.entry_no ? `Latest draft ${latestJournal.entry_no}` : "No draft journals"}
-                    tone={draftJournalCount > 0 ? "warning" : "success"}
-                    href={ROUTES.admin.accountingJournals}
-                  />
-                  <StatCard
-                    label="Expenses waiting"
-                    value={String(approvedExpenseCount)}
-                    subtext={latestExpense?.voucher_no ? `Latest voucher ${latestExpense.voucher_no}` : "No approved vouchers"}
-                    tone={approvedExpenseCount > 0 ? "warning" : "success"}
-                    href={ROUTES.admin.accountingExpenses}
-                  />
-                  <StatCard
-                    label="Salary waiting"
-                    value={String(approvedSalaryCount)}
-                    subtext={latestSalary?.employee_code ? `Latest sheet ${latestSalary.employee_code}` : "No approved salary sheets"}
-                    tone={approvedSalaryCount > 0 ? "warning" : "success"}
-                    href={ROUTES.admin.accountingSalary}
-                  />
-                </div>
+                <QueueList
+                  rows={[
+                    {
+                      title: "Journals waiting",
+                      count: String(draftJournalCount),
+                      helper: latestJournal?.entry_no ? `Latest draft ${latestJournal.entry_no}` : "No draft journals",
+                      route: ROUTES.admin.accountingJournals,
+                    },
+                    {
+                      title: "Expenses waiting",
+                      count: String(approvedExpenseCount),
+                      helper: latestExpense?.voucher_no ? `Latest voucher ${latestExpense.voucher_no}` : "No approved vouchers",
+                      route: ROUTES.admin.accountingExpenses,
+                    },
+                    {
+                      title: "Salary waiting",
+                      count: String(approvedSalaryCount),
+                      helper: latestSalary?.employee_code ? `Latest sheet ${latestSalary.employee_code}` : "No approved salary sheets",
+                      route: ROUTES.admin.accountingSalary,
+                    },
+                  ]}
+                />
               ) : (
                 <EmptyState
                   title="No accounting rows are waiting for admin posting"
