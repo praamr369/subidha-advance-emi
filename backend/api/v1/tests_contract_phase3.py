@@ -95,6 +95,7 @@ from subscriptions.services.rent_lease_contract_service import (
     create_lease_contract,
 )
 from subscriptions.models import Product
+from tests.helpers import suppress_expected_request_logs
 
 
 # ---------------------------------------------------------------------------
@@ -246,15 +247,20 @@ class EmiBatchLuckyIdTests(TestCase):
     def test_4_batch_and_lucky_id_required_via_api(self):
         client = APIClient()
         client.force_authenticate(user=self.admin)
-        resp = client.post("/api/v1/admin/subscriptions/", {
-            "customer": self.customer.pk,
-            "product": self.product.pk,
-            "plan_type": "EMI",
-            "tenure_months": 15,
-            "start_date": str(timezone.localdate()),
-            "total_amount": "15000.00",
-            "monthly_amount": "1000.00",
-        }, format="json")
+        with suppress_expected_request_logs():
+            resp = client.post(
+                "/api/v1/admin/subscriptions/",
+                {
+                    "customer": self.customer.pk,
+                    "product": self.product.pk,
+                    "plan_type": "EMI",
+                    "tenure_months": 15,
+                    "start_date": str(timezone.localdate()),
+                    "total_amount": "15000.00",
+                    "monthly_amount": "1000.00",
+                },
+                format="json",
+            )
         assert resp.status_code == 400
 
     def test_5_duplicate_lucky_id_blocked(self):
@@ -396,7 +402,8 @@ class ContractPermissionTests(TestCase):
         client = APIClient()
         client.force_authenticate(user=partner_user)
         # Profile summary for unrelated customer should return 404
-        resp = client.get(f"/api/v1/customers/{self.customer1.pk}/profile-summary/")
+        with suppress_expected_request_logs():
+            resp = client.get(f"/api/v1/customers/{self.customer1.pk}/profile-summary/")
         assert resp.status_code == 404
 
     def test_14_cashier_cannot_activate_contract(self):
@@ -416,7 +423,8 @@ class ContractPermissionTests(TestCase):
         sub.refresh_from_db()
         client = APIClient()
         client.force_authenticate(user=cashier)
-        resp = client.post(f"/api/v1/admin/contracts/{sub.pk}/activate/")
+        with suppress_expected_request_logs():
+            resp = client.post(f"/api/v1/admin/contracts/{sub.pk}/activate/")
         assert resp.status_code in (403, 404)
 
 

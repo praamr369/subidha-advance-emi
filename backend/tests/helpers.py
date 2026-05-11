@@ -1,5 +1,7 @@
-from decimal import Decimal
+import logging
+from contextlib import contextmanager
 from datetime import date
+from decimal import Decimal
 
 from accounting.models import (
     ChartOfAccount,
@@ -361,3 +363,25 @@ def ensure_default_payment_collection_accounts():
             finance_account.save(update_fields=finance_updates)
         accounts[kind] = finance_account
     return accounts
+
+
+@contextmanager
+def suppress_expected_request_logs(*extra_logger_names: str):
+    """
+    Temporarily silence noisy HTTP request logs during intentional negative-path
+    API tests (4xx/5xx). Does not affect finance.* audit loggers.
+    """
+    logger_names = ("django.request", *extra_logger_names)
+    loggers = [logging.getLogger(name) for name in logger_names]
+    previous = [
+        (logger, logger.disabled, logger.level, logger.propagate) for logger in loggers
+    ]
+    try:
+        for logger in loggers:
+            logger.disabled = True
+        yield
+    finally:
+        for logger, disabled, level, propagate in previous:
+            logger.disabled = disabled
+            logger.setLevel(level)
+            logger.propagate = propagate

@@ -34,7 +34,7 @@ from subscriptions.services.contract_reference_service import (
     ensure_contract_reference_for_direct_sale,
     ensure_contract_reference_for_subscription,
 )
-from tests.helpers import ensure_default_payment_collection_accounts
+from tests.helpers import ensure_default_payment_collection_accounts, suppress_expected_request_logs
 
 
 class PermissionTests(TestCase):
@@ -665,11 +665,12 @@ class Phase7BContractTests(TestCase):
         self.client.force_authenticate(self.customer_actor)
         preview_csv = "name,phone,email\nAlice,9800099911,alice-protected@example.com\n"
         preview_file = SimpleUploadedFile("customers-preview.csv", preview_csv.encode("utf-8"), content_type="text/csv")
-        response = self.client.post(
-            "/api/v1/admin/customers/import/preview/",
-            {"file": preview_file},
-            format="multipart",
-        )
+        with suppress_expected_request_logs():
+            response = self.client.post(
+                "/api/v1/admin/customers/import/preview/",
+                {"file": preview_file},
+                format="multipart",
+            )
         self.assertEqual(response.status_code, 403)
 
     def test_admin_customer_list_supports_status_filter(self):
@@ -764,23 +765,25 @@ class Phase7BContractTests(TestCase):
 
     def test_summary_reports_require_admin(self):
         self.client.force_authenticate(self.partner)
-        response = self.client.get("/api/v1/admin/reports/revenue-summary/")
+        with suppress_expected_request_logs():
+            response = self.client.get("/api/v1/admin/reports/revenue-summary/")
         self.assertEqual(response.status_code, 403)
 
     def test_partner_collection_permissions_and_posting(self):
         self.client.force_authenticate(self.partner)
 
-        forbidden_response = self.client.post(
-            "/api/v1/partner/collections/",
-            {
-                "emi_id": self.other_emi.id,
-                "amount": "100.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-                "reference_no": "P7B-FORBIDDEN",
-            },
-            format="json",
-        )
+        with suppress_expected_request_logs():
+            forbidden_response = self.client.post(
+                "/api/v1/partner/collections/",
+                {
+                    "emi_id": self.other_emi.id,
+                    "amount": "100.00",
+                    "method": "CASH",
+                    "payment_date": "2026-02-01",
+                    "reference_no": "P7B-FORBIDDEN",
+                },
+                format="json",
+            )
         self.assertEqual(forbidden_response.status_code, 403)
 
         success_response = self.client.post(
@@ -800,30 +803,32 @@ class Phase7BContractTests(TestCase):
     def test_partner_payment_collect_endpoint(self):
         self.client.force_authenticate(self.partner)
 
-        forbidden = self.client.post(
-            "/api/v1/partner/payments/collect/",
-            {
-                "subscription_id": self.other_subscription.id,
-                "emi_id": self.other_emi.id,
-                "amount": "100.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-            },
-            format="json",
-        )
+        with suppress_expected_request_logs():
+            forbidden = self.client.post(
+                "/api/v1/partner/payments/collect/",
+                {
+                    "subscription_id": self.other_subscription.id,
+                    "emi_id": self.other_emi.id,
+                    "amount": "100.00",
+                    "method": "CASH",
+                    "payment_date": "2026-02-01",
+                },
+                format="json",
+            )
         self.assertEqual(forbidden.status_code, 403)
 
-        invalid_amount = self.client.post(
-            "/api/v1/partner/payments/collect/",
-            {
-                "subscription_id": self.subscription.id,
-                "emi_id": self.emi.id,
-                "amount": "0.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-            },
-            format="json",
-        )
+        with suppress_expected_request_logs():
+            invalid_amount = self.client.post(
+                "/api/v1/partner/payments/collect/",
+                {
+                    "subscription_id": self.subscription.id,
+                    "emi_id": self.emi.id,
+                    "amount": "0.00",
+                    "method": "CASH",
+                    "payment_date": "2026-02-01",
+                },
+                format="json",
+            )
         self.assertEqual(invalid_amount.status_code, 400)
 
         success = self.client.post(
@@ -842,17 +847,18 @@ class Phase7BContractTests(TestCase):
         self.assertEqual(str(success.data["amount"]), "100.00")
 
     def test_partner_payment_collect_requires_auth(self):
-        response = self.client.post(
-            "/api/v1/partner/payments/collect/",
-            {
-                "subscription_id": self.subscription.id,
-                "emi_id": self.emi.id,
-                "amount": "100.00",
-                "method": "CASH",
-                "payment_date": "2026-02-01",
-            },
-            format="json",
-        )
+        with suppress_expected_request_logs():
+            response = self.client.post(
+                "/api/v1/partner/payments/collect/",
+                {
+                    "subscription_id": self.subscription.id,
+                    "emi_id": self.emi.id,
+                    "amount": "100.00",
+                    "method": "CASH",
+                    "payment_date": "2026-02-01",
+                },
+                format="json",
+            )
         self.assertEqual(response.status_code, 401)
 
     def test_timeline_endpoints_backward_compatible(self):

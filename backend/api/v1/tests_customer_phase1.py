@@ -40,6 +40,7 @@ from subscriptions.services.customer_service import (
     reject_kyc,
     search_customers,
 )
+from tests.helpers import suppress_expected_request_logs
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +637,8 @@ class PartnerScopedAccessTests(TestCase):
         client = APIClient()
         client.force_authenticate(user=self.partner_a)
         url = f"/api/v1/customers/{self.cust_b1.pk}/profile-summary/"
-        response = client.get(url)
+        with suppress_expected_request_logs():
+            response = client.get(url)
         # 404 – partner must not learn whether the customer exists
         assert response.status_code == 404
 
@@ -644,7 +646,8 @@ class PartnerScopedAccessTests(TestCase):
         client = APIClient()
         client.force_authenticate(user=self.partner_a)
         url = f"/api/v1/customers/{self.cust_admin.pk}/profile-summary/"
-        response = client.get(url)
+        with suppress_expected_request_logs():
+            response = client.get(url)
         assert response.status_code == 404
 
     def test_admin_can_access_any_profile_summary(self):

@@ -4,6 +4,8 @@ from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+from tests.helpers import suppress_expected_request_logs
+
 
 class HealthEndpointTests(TestCase):
     def setUp(self):
@@ -38,7 +40,8 @@ class HealthEndpointTests(TestCase):
             "db down"
         )
 
-        response = self.client.get("/readyz/")
+        with suppress_expected_request_logs("api.health"):
+            response = self.client.get("/readyz/")
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.data["status"], "not_ready")
