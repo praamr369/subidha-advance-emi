@@ -105,7 +105,7 @@ export default function AdminOperationsWorkspacePage() {
         ) : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {(focusRows.length ? focusRows : [{ key: "overdue_payments", count: 0 } as QueueRow]).map((row, index) => {
+          {focusRows.map((row, index) => {
             const href = routeForQueue(row.key, row.detail_url);
             return (
               <article key={`op-focus-${row.key}-${index}`} className="rounded-2xl border border-white/80 bg-white/80 p-4">
