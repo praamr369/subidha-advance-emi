@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -205,18 +206,34 @@ export default function AdminServiceDeskReturnsPage() {
       ]}
       statusBadge={{ label: "Return Workflow", tone: "info" }}
     >
-      <div className="space-y-6">
-        {notice ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {notice}
-          </div>
-        ) : null}
-        {loading ? <LoadingBlock label="Loading return register..." /> : null}
-        {!loading && error ? (
-          <ErrorState title="Return register unavailable" description={error} onRetry={() => void loadPage()} />
-        ) : null}
-
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <ApprovalQueuePageShell
+        queueSummary={
+          notice ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {notice}
+            </div>
+          ) : null
+        }
+        queueList={
+          <>
+            {loading ? <LoadingBlock label="Loading return register..." /> : null}
+            {!loading && error ? (
+              <ErrorState title="Return register unavailable" description={error} onRetry={() => void loadPage()} />
+            ) : null}
+            {!loading && !error ? (
+              <DataTable
+                columns={columns}
+                rows={rows}
+                emptyText="No return cases found."
+                onRowClick={(row) => {
+                  window.location.href = buildAdminServiceDeskCaseRoute(row.id);
+                }}
+              />
+            ) : null}
+          </>
+        }
+        detailPane={
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="grid gap-2 text-sm">
               <span>Case Type</span>
@@ -375,19 +392,8 @@ export default function AdminServiceDeskReturnsPage() {
             </button>
           </div>
         </section>
-
-        {!loading && !error ? (
-          <DataTable
-            columns={columns}
-            rows={rows}
-            emptyText="No return cases found."
-            onRowClick={(row) => {
-              window.location.href = buildAdminServiceDeskCaseRoute(row.id);
-            }}
-          />
-        ) : null}
-      </div>
+        }
+      />
     </PortalPage>
   );
 }
-

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -261,16 +262,8 @@ export default function AdminServiceDeskCaseDetailPage() {
       ]}
       statusBadge={{ label: serviceCase?.case_type || "Case", tone: "info" }}
     >
-      <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading service desk case..." /> : null}
-        {!loading && error && !serviceCase ? (
-          <ErrorState title="Unable to load the case" description={error} onRetry={() => void loadPage()} />
-        ) : null}
-        {!loading && !error && !serviceCase ? (
-          <EmptyState title="Case not found" description="The requested service desk case could not be loaded." />
-        ) : null}
-
-        {serviceCase ? (
+      <DetailPageShell
+        statusActions={
           <>
             {error ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -282,8 +275,21 @@ export default function AdminServiceDeskCaseDetailPage() {
                 {notice}
               </div>
             ) : null}
+          </>
+        }
+        sections={
+          <div className="space-y-6">
+            {loading ? <LoadingBlock label="Loading service desk case..." /> : null}
+            {!loading && error && !serviceCase ? (
+              <ErrorState title="Unable to load the case" description={error} onRetry={() => void loadPage()} />
+            ) : null}
+            {!loading && !error && !serviceCase ? (
+              <EmptyState title="Case not found" description="The requested service desk case could not be loaded." />
+            ) : null}
 
-            <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            {serviceCase ? (
+              <div className="space-y-6">
+              <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <WorkspaceSection
                 title="Case Summary"
                 description="The case carries operational context, while the linked modules remain authoritative for their own documents and movements."
@@ -581,9 +587,11 @@ export default function AdminServiceDeskCaseDetailPage() {
                 </div>
               </WorkspaceSection>
             </div>
-          </>
-        ) : null}
-      </div>
+              </div>
+            ) : null}
+          </div>
+        }
+      />
     </PortalPage>
   );
 }

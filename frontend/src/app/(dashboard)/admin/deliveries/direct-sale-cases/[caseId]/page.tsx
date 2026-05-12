@@ -7,10 +7,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch } from "@/lib/api";
 import {
   addDirectSaleDeliveryCaseNote,
+  approveDirectSaleDeliveryPaymentException,
   cancelDirectSaleDeliveryCase,
   dispatchDirectSaleDeliveryCase,
   getAdminDirectSaleDeliveryCase,
@@ -76,9 +78,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -104,6 +106,8 @@ export default function AdminDirectSaleDeliveryDetailPage() {
   const [failureReason, setFailureReason] = useState("");
   const [operationalNotes, setOperationalNotes] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
+  const [paymentExceptionReason, setPaymentExceptionReason] = useState("");
+  const [paymentExceptionAck, setPaymentExceptionAck] = useState(false);
 
   const backHref = useMemo(() => {
     const qs = searchParams.toString();
@@ -174,6 +178,36 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       await loadPage("refresh");
     } catch (err) {
       setError(toErrorMessage(err, "Failed to save metadata."));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleApprovePaymentException() {
+    if (!caseId || !delivery) return;
+    if (isHistoryOnly) return;
+    if (!paymentExceptionReason.trim()) {
+      setError("Approval reason is required.");
+      return;
+    }
+    if (!paymentExceptionAck) {
+      setError("You must acknowledge that the outstanding balance remains collectible.");
+      return;
+    }
+    try {
+      setActionLoading("PAYMENT_EXCEPTION");
+      setMessage(null);
+      const updated = await approveDirectSaleDeliveryPaymentException(caseId, {
+        reason: paymentExceptionReason.trim(),
+        acknowledgement: true,
+      });
+      setDelivery(updated);
+      setMessage("Admin delivery release recorded. Outstanding balance is unchanged and remains receivable.");
+      setPaymentExceptionReason("");
+      setPaymentExceptionAck(false);
+      await loadPage("refresh");
+    } catch (err) {
+      setError(toErrorMessage(err, "Payment exception approval failed."));
     } finally {
       setActionLoading(null);
     }
@@ -258,6 +292,19 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       (delivery?.return_pickup_completed || stockReturnPosted)
   );
 
+  const outstandingBalance = useMemo(() => {
+    const raw = delivery?.balance_total;
+    if (!raw) return 0;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
+  }, [delivery?.balance_total]);
+  const showPaymentExceptionPanel =
+    Boolean(delivery) &&
+    !isHistoryOnly &&
+    outstandingBalance > 0 &&
+    !delivery?.payment_exception_approved_at &&
+    String(delivery?.invoice_state || "").toUpperCase() === "POSTED";
+
   const actionDisabledReason = isHistoryOnly
     ? "History-only: the source sale has been reversed/returned and archived from active delivery operations."
     : blockingReasons.length
@@ -326,17 +373,27 @@ export default function AdminDirectSaleDeliveryDetailPage() {
             : "info",
       }}
     >
-      <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+      <DetailPageShell
+        objectHeader={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        }
+        statusActions={
+          message ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              {message}
+            </div>
+          ) : null
+        }
+        sections={<div className="space-y-6">
 
         {loading ? <LoadingBlock label="Loading direct-sale delivery detail..." /> : null}
         {!loading && error ? (
@@ -345,11 +402,6 @@ export default function AdminDirectSaleDeliveryDetailPage() {
             description={error}
             onRetry={() => void loadPage("initial")}
           />
-        ) : null}
-        {message ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            {message}
-          </div>
         ) : null}
         {!loading && !error && !delivery ? (
           <EmptyState title="Direct-sale delivery not found" description="No case detail was returned for this route." />
@@ -371,7 +423,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     <div className="mt-1 text-violet-900/80">Product return is already posted to stock.</div>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="inline-flex rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-800">
+                    <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-800">
                       {delivery.source_status || "HISTORY"}
                     </span>
                     {delivery.return_pickup_required ? (
@@ -432,21 +484,21 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                 </div>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="text-xs font-semibold uppercase text-slate-600">Sale</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Sale</div>
                   <div className="mt-1 font-medium">{delivery.sale_number || delivery.sale_no || "—"}</div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="text-xs font-semibold uppercase text-slate-600">Invoice</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Invoice</div>
                   <div className="mt-1 font-medium">{delivery.invoice_number || delivery.invoice_document_no || "—"}</div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="text-xs font-semibold uppercase text-slate-600">Customer</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Customer</div>
                   <div className="mt-1 font-medium">{delivery.customer_name || "—"}</div>
-                  <div className="text-xs text-slate-600">{delivery.customer_phone || "—"}</div>
+                  <div className="text-xs text-muted-foreground">{delivery.customer_phone || "—"}</div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="text-xs font-semibold uppercase text-slate-600">Status</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Status</div>
                   <div className="mt-1">
                     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusTone(delivery.status)}`}>
                       {delivery.status_label || delivery.status}
@@ -460,11 +512,37 @@ export default function AdminDirectSaleDeliveryDetailPage() {
               title="Readiness"
               description="Payment, invoice, stock, and delivery gates from backend operational state."
             >
+              <div className="mb-4 grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Paid (posted receipts)</div>
+                  <div className="mt-1 font-medium">{delivery.received_total ?? "—"}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Outstanding</div>
+                  <div className="mt-1 font-medium">{delivery.balance_total ?? "—"}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Grand total</div>
+                  <div className="mt-1 font-medium">{delivery.grand_total ?? "—"}</div>
+                </div>
+              </div>
+              {delivery.blocked_by_stock ? (
+                <div className="mb-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <span className="font-semibold">Blocked by stock:</span> resolve the open purchase/stock requirement
+                  before dispatch. Payment release alone does not bypass this gate.
+                </div>
+              ) : null}
+              {delivery.blocked_by_payment ? (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span className="font-semibold">Payment hold:</span> invoice is posted but balance is due. Delivery
+                  stays blocked until the balance is collected unless an admin records a documented release below.
+                </div>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">Payment: {delivery.payment_state || "—"}</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">Invoice: {delivery.invoice_state || "—"}</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">Stock: {delivery.stock_state || "—"}</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">Delivery: {delivery.delivery_state || "—"}</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">Payment: {delivery.payment_state || "—"}</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">Invoice: {delivery.invoice_state || "—"}</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">Stock: {delivery.stock_state || "—"}</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">Delivery: {delivery.delivery_state || "—"}</div>
               </div>
               {blockingReasons.length > 0 ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -472,6 +550,73 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                 </div>
               ) : null}
             </SectionCard>
+
+            {delivery.payment_exception_approved_at ? (
+              <SectionCard
+                title="Admin delivery release (outstanding)"
+                description="Audited approval only — does not change invoice balances or create receipts."
+              >
+                <div className="space-y-2 text-sm text-foreground">
+                  <div>
+                    <span className="font-semibold">Approved at:</span> {formatDateTime(delivery.payment_exception_approved_at)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Approved by:</span>{" "}
+                    {delivery.payment_exception_approved_by_username || "—"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Reason:</span> {delivery.payment_exception_reason || "—"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Outstanding snapshot:</span>{" "}
+                    {delivery.payment_exception_outstanding_amount_snapshot || "—"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Current live balance on the sale/invoice may differ from the snapshot; receivables and collection
+                    workflows still use posted billing data.
+                  </p>
+                </div>
+              </SectionCard>
+            ) : null}
+
+            {showPaymentExceptionPanel ? (
+              <SectionCard
+                title="Admin: release delivery with outstanding balance"
+                description="Admin-only (this screen is under the admin workspace). Requires a reason and acknowledgement. Does not post payments, alter invoice balances, or bypass stock or invoice posting rules."
+              >
+                <div className="space-y-3 text-sm text-foreground">
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase text-muted-foreground">Reason (required)</span>
+                    <textarea
+                      value={paymentExceptionReason}
+                      onChange={(e) => setPaymentExceptionReason(e.target.value)}
+                      className="mt-1 min-h-[88px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      placeholder="Document why delivery may proceed while balance remains due."
+                    />
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={paymentExceptionAck}
+                      onChange={(e) => setPaymentExceptionAck(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      I acknowledge that the outstanding amount remains legally and operationally collectible, and that
+                      this action does not write off or settle any receivable.
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleApprovePaymentException()}
+                    disabled={actionLoading === "PAYMENT_EXCEPTION"}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {actionLoading === "PAYMENT_EXCEPTION" ? "Saving…" : "Record admin delivery release"}
+                  </button>
+                </div>
+              </SectionCard>
+            ) : null}
 
             <SectionCard
               title="Metadata"
@@ -483,42 +628,42 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   value={scheduledDate}
                   onChange={(event) => setScheduledDate(event.target.value)}
                   disabled={isHistoryOnly}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={receiverName}
                   onChange={(event) => setReceiverName(event.target.value)}
                   placeholder="Receiver name"
                   disabled={isHistoryOnly}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={receiverPhone}
                   onChange={(event) => setReceiverPhone(event.target.value)}
                   placeholder="Receiver phone"
                   disabled={isHistoryOnly}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <input
                   value={failureReason}
                   onChange={(event) => setFailureReason(event.target.value)}
                   placeholder="Failure/cancellation reason"
                   disabled={isHistoryOnly}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <textarea
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   placeholder="Delivery address snapshot"
                   disabled={isHistoryOnly}
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
                 />
                 <textarea
                   value={operationalNotes}
                   onChange={(event) => setOperationalNotes(event.target.value)}
                   placeholder="Operational notes"
                   disabled={isHistoryOnly}
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
                 />
                 <div className="lg:col-span-2">
                   <button
@@ -553,7 +698,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     onClick={() => void runAction("SCHEDULE")}
                     disabled={Boolean(actionDisabledReason) || actionLoading === "SCHEDULE"}
                     title={actionDisabledReason || "Schedule this delivery"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "SCHEDULE" ? "Working..." : "Assign / Reschedule Delivery"}
                   </button>
@@ -564,7 +709,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     onClick={() => void runAction("DISPATCH")}
                     disabled={Boolean(actionDisabledReason) || actionLoading === "DISPATCH"}
                     title={actionDisabledReason || "Dispatch this delivery"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "DISPATCH" ? "Working..." : "Create Delivery Action"}
                   </button>
@@ -585,7 +730,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     type="button"
                     onClick={() => void runAction("CANCEL")}
                     disabled={actionLoading === "CANCEL"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-red-300 bg-white px-4 text-sm font-medium text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-destructive/40 bg-background px-4 text-sm font-semibold text-destructive disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "CANCEL" ? "Working..." : "Cancel Delivery"}
                   </button>
@@ -597,13 +742,13 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   onChange={(event) => setNoteDraft(event.target.value)}
                   placeholder="Add operation note"
                   disabled={isHistoryOnly}
-                  className="h-10 min-w-[260px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-10 min-w-[260px] rounded-xl border border-border bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <button
                   type="button"
                   onClick={() => void runAction("ADD_NOTE")}
                   disabled={isHistoryOnly || actionLoading === "ADD_NOTE"}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {actionLoading === "ADD_NOTE" ? "Working..." : "Create Delivery Action Note"}
                 </button>
@@ -625,9 +770,9 @@ export default function AdminDirectSaleDeliveryDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {timeline.map((entry) => (
-                    <div key={entry.id} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="text-xs font-semibold uppercase text-slate-600">{entry.action_type}</div>
-                      <div className="mt-1 text-xs text-slate-600">
+                    <div key={entry.id} className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">{entry.action_type}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {formatDateTime(entry.created_at)} · {entry.performed_by_username || "System"}
                       </div>
                     </div>
@@ -637,7 +782,8 @@ export default function AdminDirectSaleDeliveryDetailPage() {
             </SectionCard>
           </>
         ) : null}
-      </div>
+      </div>}
+      />
     </PortalPage>
   );
 }

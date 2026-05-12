@@ -15,7 +15,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getServiceDeskOverview, type ServiceDeskOverview } from "@/services/service-desk";
-import { listAdminSupportTickets, type SupportTicketListItem } from "@/services/support";
+import { listAdminSupportTickets, type SupportDashboardSummary, type SupportTicketListItem } from "@/services/support";
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -35,10 +35,13 @@ export default function AdminServiceDeskOverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [issueTickets, setIssueTickets] = useState<SupportTicketListItem[]>([]);
   const [issueCount, setIssueCount] = useState(0);
-  const [issueSummary, setIssueSummary] = useState<{ total: number; open: number } | null>(null);
+  const [issueSummary, setIssueSummary] = useState<SupportDashboardSummary | null>(null);
   const [issueLoading, setIssueLoading] = useState(true);
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issueQ, setIssueQ] = useState("");
+  const [issueLane, setIssueLane] = useState<
+    "OPEN" | "WAITING_FOR_CUSTOMER" | "RESOLVED" | "WAITING_FOR_INTERNAL_ACTION"
+  >("OPEN");
 
   const filteredIssueTickets = useMemo(() => {
     const q = issueQ.trim().toLowerCase();
@@ -69,13 +72,13 @@ export default function AdminServiceDeskOverviewPage() {
     void loadPage();
   }, []);
 
-  const loadIssues = useCallback(async () => {
+  const loadIssues = useCallback(async (lane: typeof issueLane = issueLane) => {
     setIssueLoading(true);
     try {
-      const data = await listAdminSupportTickets({});
+      const data = await listAdminSupportTickets({ status: lane });
       setIssueTickets(data.results);
       setIssueCount(data.count);
-      setIssueSummary({ total: data.summary.total, open: data.summary.open });
+      setIssueSummary(data.summary);
       setIssueError(null);
     } catch (err) {
       setIssueTickets([]);
@@ -87,11 +90,11 @@ export default function AdminServiceDeskOverviewPage() {
     } finally {
       setIssueLoading(false);
     }
-  }, []);
+  }, [issueLane]);
 
   useEffect(() => {
-    void loadIssues();
-  }, [loadIssues]);
+    void loadIssues(issueLane);
+  }, [issueLane, loadIssues]);
 
   return (
     <PortalPage
@@ -141,28 +144,66 @@ export default function AdminServiceDeskOverviewPage() {
           ) : null}
           {!issueLoading && !issueError ? (
             <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <StatCard
-                  label="Open issues"
-                  value={String(issueSummary?.open ?? 0)}
-                  subtext="Non-terminal workflow states."
-                  tone={(issueSummary?.open ?? 0) > 0 ? "warning" : "success"}
-                />
-                <StatCard
-                  label="Total tickets"
-                  value={String(issueCount)}
-                  subtext="Matches current filters."
-                  tone="info"
-                />
-                <div className="flex flex-col justify-end gap-2">
-                  <label className="text-xs text-muted-foreground">
-                    Search subject / ticket / phone
-                    <input
-                      className="mt-1 w-full rounded-lg border border-border bg-[var(--surface-card)] px-2 py-1 text-sm"
-                      value={issueQ}
-                      onChange={(e) => setIssueQ(e.target.value)}
-                    />
-                  </label>
+              <div className="space-y-3">
+                <nav aria-label="Issue ticket queues" className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { key: "OPEN", label: "Open", helper: "New tickets awaiting action." },
+                      { key: "WAITING_FOR_CUSTOMER", label: "Pending customer", helper: "Waiting for customer reply." },
+                      { key: "RESOLVED", label: "Resolved", helper: "Resolved by staff (read-only)." },
+                      { key: "WAITING_FOR_INTERNAL_ACTION", label: "Escalated", helper: "Internal action required." },
+                    ] as const
+                  ).map((lane) => {
+                    const count = issueSummary?.by_status?.[lane.key] ?? 0;
+                    const active = issueLane === lane.key;
+                    return (
+                      <button
+                        key={lane.key}
+                        type="button"
+                        onClick={() => {
+                          setIssueLane(lane.key);
+                          void loadIssues(lane.key);
+                        }}
+                        className={[
+                          "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
+                          active
+                            ? "border-primary/60 bg-primary text-primary-foreground"
+                            : "border-border bg-[var(--surface-strong)] text-foreground hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+                        ].join(" ")}
+                        title={lane.helper}
+                      >
+                        <span>{lane.label}</span>
+                        <span className={active ? "text-primary-foreground/90 tabular-nums" : "text-muted-foreground tabular-nums"}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <StatCard
+                    label="Open (total)"
+                    value={String(issueSummary?.open ?? 0)}
+                    subtext="Across all non-terminal states."
+                    tone={(issueSummary?.open ?? 0) > 0 ? "warning" : "success"}
+                  />
+                  <StatCard
+                    label="Visible (lane)"
+                    value={String(issueCount)}
+                    subtext="Matches the selected lane."
+                    tone="info"
+                  />
+                  <div className="flex flex-col justify-end gap-2">
+                    <label className="text-xs text-muted-foreground">
+                      Search subject / ticket / phone
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border bg-[var(--surface-card)] px-2 py-1 text-sm"
+                        value={issueQ}
+                        onChange={(e) => setIssueQ(e.target.value)}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
               {issueTickets.length === 0 ? (

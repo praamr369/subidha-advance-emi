@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch } from "@/lib/api";
 import { buildAdminBillingRegisterRoute } from "@/lib/route-builders";
@@ -101,10 +102,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -113,8 +114,8 @@ function SectionCard({
 
 function DetailValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+    <div className="rounded-xl border border-border bg-muted/30 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
       <div className="mt-1 text-sm text-foreground">{value}</div>
@@ -347,17 +348,28 @@ export default function AdminDeliveryDetailPage() {
             : "info",
       }}
     >
-      <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+      <DetailPageShell
+        objectHeader={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={loading || refreshing}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        }
+        statusActions={
+          message ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              {message}
+            </div>
+          ) : null
+        }
+        sections={
+          <div className="space-y-6">
 
         {loading ? <LoadingBlock label="Loading delivery detail..." /> : null}
 
@@ -430,9 +442,9 @@ export default function AdminDeliveryDetailPage() {
                 />
                 {/* Phase 2: show block reason when BLOCKED_STOCK_UNAVAILABLE */}
                 {delivery.status === "BLOCKED_STOCK_UNAVAILABLE" && delivery.stock_blocked_reason && (
-                  <div className="col-span-full rounded-md border border-orange-200 bg-orange-50 p-3">
-                    <p className="text-xs font-semibold text-orange-800">Blocked – Stock Unavailable</p>
-                    <p className="mt-1 text-xs text-orange-700">{delivery.stock_blocked_reason}</p>
+                  <div className="col-span-full rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                    <p className="text-xs font-semibold">Blocked – Stock Unavailable</p>
+                    <p className="mt-1 text-xs text-amber-800">{delivery.stock_blocked_reason}</p>
                   </div>
                 )}
                 <DetailValue
@@ -452,44 +464,44 @@ export default function AdminDeliveryDetailPage() {
                   type="date"
                   value={scheduledDate}
                   onChange={(event) => setScheduledDate(event.target.value)}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <input
                   value={receiverName}
                   onChange={(event) => setReceiverName(event.target.value)}
                   placeholder="Receiver name"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <input
                   value={receiverPhone}
                   onChange={(event) => setReceiverPhone(event.target.value)}
                   placeholder="Receiver phone"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="Failure / cancellation reason"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <textarea
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   placeholder="Delivery address snapshot"
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring lg:col-span-2"
                 />
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Operational notes"
-                  className="min-h-[96px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 lg:col-span-2"
+                  className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring lg:col-span-2"
                 />
                 <div className="lg:col-span-2">
                   <button
                     type="button"
                     onClick={() => void handleMetadataSave()}
                     disabled={actionLoading === "metadata"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "metadata" ? "Saving..." : "Save Metadata"}
                   </button>
@@ -502,7 +514,7 @@ export default function AdminDeliveryDetailPage() {
               description="Only valid next actions are shown. Failed and cancelled actions require a reason."
             >
               {availableActions.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                   This delivery is in a terminal state. No further lifecycle transition is available from here.
                 </div>
               ) : (
@@ -513,7 +525,7 @@ export default function AdminDeliveryDetailPage() {
                       type="button"
                       onClick={() => void handleTransition(action)}
                       disabled={actionLoading === action}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {actionLoading === action
                         ? "Working..."
@@ -526,9 +538,14 @@ export default function AdminDeliveryDetailPage() {
                 </div>
               )}
             </SectionCard>
-
+          </>
+        ) : null}
+          </div>
+        }
+        timelineAside={
+          !loading && !error && delivery ? (
             <SectionCard
-              title="Audit timeline"
+              title="Action history"
               description="Delivery lifecycle changes are recorded from the backend service layer."
             >
               {timeline.length === 0 ? (
@@ -541,15 +558,15 @@ export default function AdminDeliveryDetailPage() {
                   {timeline.map((entry) => (
                     <div
                       key={entry.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3"
                     >
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {entry.action_type}
                       </div>
                       <div className="mt-1 text-sm text-foreground">
                         {summarizeAudit(entry)}
                       </div>
-                      <div className="mt-2 text-xs text-slate-600">
+                      <div className="mt-2 text-xs text-muted-foreground">
                         {formatDateTime(entry.created_at)} · {entry.performed_by_username || "System"}
                       </div>
                     </div>
@@ -557,9 +574,9 @@ export default function AdminDeliveryDetailPage() {
                 </div>
               )}
             </SectionCard>
-          </>
-        ) : null}
-      </div>
+          ) : null
+        }
+      />
     </PortalPage>
   );
 }

@@ -146,7 +146,7 @@ test.describe("operational resizable workspaces", () => {
     });
 
     await page.goto("/admin/inventory/stock-needs");
-    await expect(page.getByRole("heading", { name: "Stock needs" })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("heading", { name: "Stock needs" })).toBeVisible();
     await expect(page.locator("[data-op-workspace]")).toBeVisible();
     await expect(page.getByText("PN-9001")).toBeVisible();
   });

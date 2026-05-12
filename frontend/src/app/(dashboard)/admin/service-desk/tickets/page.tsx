@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { FormSection } from "@/components/ui/operations";
@@ -211,21 +212,37 @@ export default function AdminServiceDeskTicketsPage() {
       ]}
       statusBadge={{ label: "After-Sales Service", tone: "info" }}
     >
-      <div className="space-y-6">
-        {notice ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {notice}
-          </div>
-        ) : null}
-        {loading ? <LoadingBlock label="Loading service tickets..." /> : null}
-        {!loading && error ? (
-          <ErrorState title="Service ticket register unavailable" description={error} onRetry={() => void loadPage()} />
-        ) : null}
-
-        <FormSection
-          title="Create service ticket"
-          description="Capture issue context first, then attach optional source references for delivery, billing, or inventory workflows."
-        >
+      <ApprovalQueuePageShell
+        queueSummary={
+          notice ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {notice}
+            </div>
+          ) : null
+        }
+        queueList={
+          <>
+            {loading ? <LoadingBlock label="Loading service tickets..." /> : null}
+            {!loading && error ? (
+              <ErrorState title="Service ticket register unavailable" description={error} onRetry={() => void loadPage()} />
+            ) : null}
+            {!loading && !error ? (
+              <DataTable
+                columns={columns}
+                rows={rows}
+                emptyText="No service tickets found."
+                onRowClick={(row) => {
+                  window.location.href = buildAdminServiceDeskCaseRoute(row.id);
+                }}
+              />
+            ) : null}
+          </>
+        }
+        detailPane={
+          <FormSection
+            title="Create service ticket"
+            description="Capture issue context first, then attach optional source references for delivery, billing, or inventory workflows."
+          >
           <WorkspaceNotice tone="warning" title="Posting boundary">
             Creating service tickets does not post billing, stock, or accounting entries. Those remain controlled actions in their dedicated workspaces.
           </WorkspaceNotice>
@@ -403,19 +420,8 @@ export default function AdminServiceDeskTicketsPage() {
           </div>
           </div>
         </FormSection>
-
-        {!loading && !error ? (
-          <DataTable
-            columns={columns}
-            rows={rows}
-            emptyText="No service tickets found."
-            onRowClick={(row) => {
-              window.location.href = buildAdminServiceDeskCaseRoute(row.id);
-            }}
-          />
-        ) : null}
-      </div>
+        }
+      />
     </PortalPage>
   );
 }
-

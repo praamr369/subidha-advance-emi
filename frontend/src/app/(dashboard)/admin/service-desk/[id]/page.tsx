@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { DetailPageShell } from "@/components/layout/page-shells";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
@@ -116,124 +117,126 @@ export default function AdminServiceDeskTicketDetailPage() {
           {error}
         </div>
       ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
-          <WorkspaceSection title="Description">
-            <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
-          </WorkspaceSection>
-          <WorkspaceSection title="Public comments">
-            <ul className="space-y-2 text-sm">
-              {ticket.comments
-                .filter((c) => !c.is_internal)
-                .map((c) => (
-                  <li key={c.id} className="rounded border border-border px-2 py-1">
-                    <span className="text-xs text-muted-foreground">{c.created_at}</span>
-                    <p className="whitespace-pre-wrap">{c.body}</p>
-                  </li>
-                ))}
-            </ul>
-            <form
-              className="mt-3 space-y-2"
-              onSubmit={(e: FormEvent) => {
-                e.preventDefault();
-                void run(() => commentAdminSupportTicket(ticket.id, publicComment.trim()));
-                setPublicComment("");
-              }}
-            >
-              <textarea
-                className="w-full rounded border px-2 py-1 text-sm"
-                value={publicComment}
-                onChange={(ev) => setPublicComment(ev.target.value)}
-                placeholder="Public reply to customer"
-              />
-              <ActionButton type="submit" disabled={busy || !publicComment.trim()}>
-                Post
-              </ActionButton>
-            </form>
-          </WorkspaceSection>
-          <WorkspaceSection title="Internal notes">
-            <ul className="space-y-2 text-sm">
-              {ticket.comments
-                .filter((c) => c.is_internal)
-                .map((c) => (
-                  <li key={c.id} className="rounded border border-dashed border-border px-2 py-1">
-                    <span className="text-xs text-muted-foreground">{c.created_at}</span>
-                    <p className="whitespace-pre-wrap">{c.body}</p>
-                  </li>
-                ))}
-            </ul>
-            <form
-              className="mt-3 space-y-2"
-              onSubmit={(e: FormEvent) => {
-                e.preventDefault();
-                void run(() => internalNoteAdminSupportTicket(ticket.id, internalNote.trim()));
-                setInternalNote("");
-              }}
-            >
-              <textarea
-                className="w-full rounded border px-2 py-1 text-sm"
-                value={internalNote}
-                onChange={(ev) => setInternalNote(ev.target.value)}
-                placeholder="Staff-only"
-              />
-              <ActionButton type="submit" disabled={busy || !internalNote.trim()}>
-                Save internal note
-              </ActionButton>
-            </form>
-          </WorkspaceSection>
-          <WorkspaceSection title="Timeline">
-            <ul className="max-h-64 space-y-1 overflow-auto text-xs text-muted-foreground">
-              {ticket.timeline.map((row, i) => (
-                <li key={i}>{JSON.stringify(row)}</li>
-              ))}
-            </ul>
-          </WorkspaceSection>
-        </div>
-
-        <div className="space-y-4 text-sm">
-          <div className="rounded-xl border border-border p-4">
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge status={ticket.status} />
-              <StatusBadge status={ticket.priority} />
-            </div>
-            {ticket.customer_detail ? (
-              <div className="mt-3">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Customer</div>
-                <Link className="text-primary underline" href={`${ROUTES.admin.customers}/${ticket.customer}`}>
-                  {ticket.customer_detail.name} · {ticket.customer_detail.phone}
-                </Link>
-              </div>
-            ) : null}
+      <DetailPageShell
+        sections={
+          <div className="space-y-6">
+            <WorkspaceSection title="Description">
+              <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
+            </WorkspaceSection>
+            <WorkspaceSection title="Public comments">
+              <ul className="space-y-2 text-sm">
+                {ticket.comments
+                  .filter((c) => !c.is_internal)
+                  .map((c) => (
+                    <li key={c.id} className="rounded border border-border px-2 py-1">
+                      <span className="text-xs text-muted-foreground">{c.created_at}</span>
+                      <p className="whitespace-pre-wrap">{c.body}</p>
+                    </li>
+                  ))}
+              </ul>
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  void run(() => commentAdminSupportTicket(ticket.id, publicComment.trim()));
+                  setPublicComment("");
+                }}
+              >
+                <textarea
+                  className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={publicComment}
+                  onChange={(ev) => setPublicComment(ev.target.value)}
+                  placeholder="Public reply to customer"
+                />
+                <ActionButton type="submit" disabled={busy || !publicComment.trim()}>
+                  Post
+                </ActionButton>
+              </form>
+            </WorkspaceSection>
+            <WorkspaceSection title="Internal notes">
+              <ul className="space-y-2 text-sm">
+                {ticket.comments
+                  .filter((c) => c.is_internal)
+                  .map((c) => (
+                    <li key={c.id} className="rounded border border-dashed border-border px-2 py-1">
+                      <span className="text-xs text-muted-foreground">{c.created_at}</span>
+                      <p className="whitespace-pre-wrap">{c.body}</p>
+                    </li>
+                  ))}
+              </ul>
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  void run(() => internalNoteAdminSupportTicket(ticket.id, internalNote.trim()));
+                  setInternalNote("");
+                }}
+              >
+                <textarea
+                  className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={internalNote}
+                  onChange={(ev) => setInternalNote(ev.target.value)}
+                  placeholder="Staff-only"
+                />
+                <ActionButton type="submit" disabled={busy || !internalNote.trim()}>
+                  Save internal note
+                </ActionButton>
+              </form>
+            </WorkspaceSection>
           </div>
+        }
+        timelineAside={
+          <div className="space-y-4 text-sm">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge status={ticket.status} />
+                <StatusBadge status={ticket.priority} />
+              </div>
+              {ticket.customer_detail ? (
+                <div className="mt-3">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Customer</div>
+                  <Link className="text-primary underline" href={`${ROUTES.admin.customers}/${ticket.customer}`}>
+                    {ticket.customer_detail.name} · {ticket.customer_detail.phone}
+                  </Link>
+                </div>
+              ) : null}
+            </div>
 
-          <WorkspaceSection title="Workflow">
-            <form
-              className="space-y-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const st = (e.currentTarget.elements.namedItem("status") as HTMLSelectElement).value;
-                void run(() => patchAdminSupportTicket(ticket.id, { status: st }));
-              }}
-            >
-              <select name="status" className="w-full rounded border px-2 py-1" defaultValue={ticket.status}>
-                <option value="OPEN">OPEN</option>
-                <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
-                <option value="IN_REVIEW">IN_REVIEW</option>
-                <option value="WAITING_FOR_CUSTOMER">WAITING_FOR_CUSTOMER</option>
-                <option value="WAITING_FOR_INTERNAL_ACTION">WAITING_FOR_INTERNAL_ACTION</option>
-                <option value="REOPENED">REOPENED</option>
-              </select>
-              <ActionButton type="submit" disabled={busy} variant="outline">
-                Update status
-              </ActionButton>
-            </form>
-          </WorkspaceSection>
+            <WorkspaceSection title="Workflow">
+              <form
+                className="space-y-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const st = (e.currentTarget.elements.namedItem("status") as HTMLSelectElement).value;
+                  void run(() => patchAdminSupportTicket(ticket.id, { status: st }));
+                }}
+              >
+                <select name="status" className="w-full rounded border border-border bg-background px-2 py-1" defaultValue={ticket.status}>
+                  <option value="OPEN">OPEN</option>
+                  <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                  <option value="IN_REVIEW">IN_REVIEW</option>
+                  <option value="WAITING_FOR_CUSTOMER">WAITING_FOR_CUSTOMER</option>
+                  <option value="WAITING_FOR_INTERNAL_ACTION">WAITING_FOR_INTERNAL_ACTION</option>
+                  <option value="REOPENED">REOPENED</option>
+                </select>
+                <ActionButton type="submit" disabled={busy} variant="outline">
+                  Update status
+                </ActionButton>
+              </form>
+            </WorkspaceSection>
 
-          <WorkspaceSection title="Assign">
+            <WorkspaceSection title="Timeline">
+              <ul className="max-h-64 space-y-1 overflow-auto text-xs text-muted-foreground">
+                {ticket.timeline.map((row, i) => (
+                  <li key={i}>{JSON.stringify(row)}</li>
+                ))}
+              </ul>
+            </WorkspaceSection>
+
+            <WorkspaceSection title="Assign">
             <div className="flex gap-2">
               <input
-                className="w-full rounded border px-2 py-1"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
                 placeholder="Internal user id (or empty to clear)"
                 value={assigneeId}
                 onChange={(ev) => setAssigneeId(ev.target.value)}
@@ -255,12 +258,12 @@ export default function AdminServiceDeskTicketDetailPage() {
               </ActionButton>
             </div>
             <p className="text-xs text-muted-foreground">Send null assignee_id to unassign (clear field).</p>
-          </WorkspaceSection>
+            </WorkspaceSection>
 
-          <WorkspaceSection title="Link object">
+            <WorkspaceSection title="Link object">
             <div className="space-y-2">
               <select
-                className="w-full rounded border px-2 py-1"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
                 value={linkType}
                 onChange={(ev) => setLinkType(ev.target.value)}
               >
@@ -272,7 +275,7 @@ export default function AdminServiceDeskTicketDetailPage() {
                 <option value="billing_invoice">billing_invoice</option>
               </select>
               <input
-                className="w-full rounded border px-2 py-1"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
                 placeholder="Object id"
                 value={linkObjectId}
                 onChange={(ev) => setLinkObjectId(ev.target.value)}
@@ -292,11 +295,11 @@ export default function AdminServiceDeskTicketDetailPage() {
                 Add link
               </ActionButton>
             </div>
-          </WorkspaceSection>
+            </WorkspaceSection>
 
-          <WorkspaceSection title="Resolve / reject / close">
+            <WorkspaceSection title="Resolve / reject / close">
             <textarea
-              className="w-full rounded border px-2 py-1"
+              className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
               placeholder="Resolution summary"
               value={resolution}
               onChange={(ev) => setResolution(ev.target.value)}
@@ -309,7 +312,7 @@ export default function AdminServiceDeskTicketDetailPage() {
               Resolve
             </ActionButton>
             <textarea
-              className="mt-3 w-full rounded border px-2 py-1"
+              className="mt-3 w-full rounded border border-border bg-background px-2 py-1 text-foreground"
               placeholder="Reject reason"
               value={rejectReason}
               onChange={(ev) => setRejectReason(ev.target.value)}
@@ -324,7 +327,7 @@ export default function AdminServiceDeskTicketDetailPage() {
               Reject
             </ActionButton>
             <textarea
-              className="mt-3 w-full rounded border px-2 py-1"
+              className="mt-3 w-full rounded border border-border bg-background px-2 py-1 text-foreground"
               placeholder="Close note (optional)"
               value={closeNote}
               onChange={(ev) => setCloseNote(ev.target.value)}
@@ -355,7 +358,8 @@ export default function AdminServiceDeskTicketDetailPage() {
             </pre>
           </WorkspaceSection>
         </div>
-      </div>
+        }
+      />
     </PortalPage>
   );
 }

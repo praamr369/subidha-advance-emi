@@ -30,3 +30,14 @@ export async function recheckStockNeed(id: number) {
     body: JSON.stringify({}),
   });
 }
+
+/** Starts procurement review (PurchaseNeed → IN_REVIEW). Does not create a vendor PO or bill. */
+export async function createPurchaseSuggestionForNeed(
+  id: number,
+  payload: Record<string, unknown> = {}
+) {
+  return request(`/admin/inventory/stock-needs/${id}/purchase-suggestion/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

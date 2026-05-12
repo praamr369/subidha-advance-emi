@@ -9,7 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import PortalPage from "@/components/ui/PortalPage";
-import { OperationsWorkspaceShell } from "@/components/layout/page-shells";
+import { RegistryPageShell } from "@/components/layout/page-shells";
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingRegisterRoute,
@@ -485,8 +485,8 @@ export default function AdminDeliveriesPage() {
       ]}
       statusBadge={{ label: "Internal Delivery Control", tone: "info" }}
     >
-      <OperationsWorkspaceShell
-        operationalActions={
+      <RegistryPageShell
+        header={
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div
               className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground sm:text-sm"
@@ -526,8 +526,8 @@ export default function AdminDeliveriesPage() {
             </button>
           </div>
         }
-        lanes={
-        <>
+        register={
+        <div className="flex flex-col gap-6">
         {loading ? <LoadingBlock label="Loading delivery workspace..." /> : null}
 
         {!loading && error ? (
@@ -544,11 +544,12 @@ export default function AdminDeliveriesPage() {
           </div>
         ) : null}
 
-        <SectionCard
-          title="Filters"
-          description="Keep the list shareable and reload-safe for handoff from subscriptions, customers, or batch operations."
-        >
-          <form className="grid gap-4 lg:grid-cols-4" onSubmit={applyFilters}>
+        <div className="order-1">
+          <SectionCard
+            title="Filters"
+            description="Keep the list shareable and reload-safe for handoff from subscriptions, customers, or batch operations."
+          >
+            <form className="grid gap-4 lg:grid-cols-4" onSubmit={applyFilters}>
             <input
               value={qInput}
               onChange={(event) => setQInput(event.target.value)}
@@ -627,10 +628,11 @@ export default function AdminDeliveriesPage() {
                 Clear
               </button>
             </div>
-          </form>
-        </SectionCard>
+            </form>
+          </SectionCard>
+        </div>
 
-        <div ref={createSectionRef} className="scroll-mt-28">
+        <div ref={createSectionRef} className="scroll-mt-28 order-3">
         <SectionCard
           title="Create Delivery"
           description="Subscribe Advance EMI / Rent / Lease deliveries on SubscriptionDelivery, or sync retail desk tracking for direct-sale deliveries that already require fulfillment."
@@ -1053,6 +1055,7 @@ export default function AdminDeliveriesPage() {
         </SectionCard>
         </div>
 
+        <div className="order-2 space-y-6">
         {!loading && !error && rows.length === 0 ? (
           <EmptyState
             title="No deliveries found"
@@ -1300,7 +1303,8 @@ export default function AdminDeliveriesPage() {
             </div>
           </SectionCard>
         ) : null}
-        </>
+        </div>
+        </div>
         }
       />
     </PortalPage>

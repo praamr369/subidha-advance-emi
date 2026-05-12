@@ -100,7 +100,15 @@ export type DeliveryRecord = {
     mark_delivered?: string | null;
     cancel?: string | null;
     note?: string | null;
+    approve_payment_exception?: string | null;
   } | null;
+  blocked_by_stock?: boolean;
+  blocked_by_payment?: boolean;
+  payment_exception_approved_at?: string | null;
+  payment_exception_approved_by_username?: string | null;
+  payment_exception_reason?: string | null;
+  payment_exception_acknowledged?: boolean;
+  payment_exception_outstanding_amount_snapshot?: string | null;
   links?: {
     open_invoice?: string | null;
     open_direct_sale?: string | null;
@@ -378,6 +386,9 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
             mark_delivered: toStringOrNull((row.action_endpoints as Record<string, unknown>).mark_delivered),
             cancel: toStringOrNull((row.action_endpoints as Record<string, unknown>).cancel),
             note: toStringOrNull((row.action_endpoints as Record<string, unknown>).note),
+            approve_payment_exception: toStringOrNull(
+              (row.action_endpoints as Record<string, unknown>).approve_payment_exception
+            ),
           } as DeliveryRecord["action_endpoints"])
         : null,
     links:
@@ -396,6 +407,13 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     operational_notes: toStringOrNull(row.operational_notes) ?? toStringOrNull(row.notes),
     failure_or_cancellation_reason:
       toStringOrNull(row.failure_or_cancellation_reason) ?? toStringOrNull(row.failure_reason),
+    blocked_by_stock: row.blocked_by_stock === true,
+    blocked_by_payment: row.blocked_by_payment === true,
+    payment_exception_approved_at: toStringOrNull(row.payment_exception_approved_at),
+    payment_exception_approved_by_username: toStringOrNull(row.payment_exception_approved_by_username),
+    payment_exception_reason: toStringOrNull(row.payment_exception_reason),
+    payment_exception_acknowledged: row.payment_exception_acknowledged === true,
+    payment_exception_outstanding_amount_snapshot: toStringOrNull(row.payment_exception_outstanding_amount_snapshot),
   };
 }
 
@@ -832,6 +850,13 @@ export async function addDirectSaleDeliveryCaseNote(
   payload: { note: string }
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/note/`, payload);
+}
+
+export async function approveDirectSaleDeliveryPaymentException(
+  caseId: number | string,
+  payload: { reason: string; acknowledgement: boolean }
+): Promise<DeliveryRecord> {
+  return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/approve-payment-exception/`, payload);
 }
 
 export async function listCustomerDeliveries(params: {
