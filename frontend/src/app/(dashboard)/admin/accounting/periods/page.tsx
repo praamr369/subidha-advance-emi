@@ -276,7 +276,7 @@ export default function AccountingPeriodsPage() {
                 </label>
                 <button
                   type="submit"
-                  className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90"
                 >
                   Create Period
                 </button>
@@ -308,7 +308,7 @@ export default function AccountingPeriodsPage() {
                 </label>
                 <button
                   type="submit"
-                  className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90"
                 >
                   Create Lock
                 </button>

@@ -236,7 +236,10 @@ export default function AccountingJournalsPage() {
               ) : (
                 <div className="grid gap-3">
                   {journals.map((journal) => (
-                    <div key={journal.id} className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4">
+                    <div
+                      key={journal.id}
+                      className="rounded-[1.4rem] border border-border bg-card p-4 text-card-foreground"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-foreground">{journal.entry_no}</div>
@@ -258,7 +261,7 @@ export default function AccountingJournalsPage() {
                         {journal.lines.map((line, index) => (
                           <div
                             key={`${journal.id}-${index}`}
-                            className="rounded-xl border border-white/70 bg-white px-3 py-3 text-sm text-foreground"
+                            className="rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"
                           >
                             <div className="font-medium">
                               {line.chart_account_code} · {line.chart_account_name}
@@ -275,7 +278,7 @@ export default function AccountingJournalsPage() {
                           <button
                             type="button"
                             onClick={() => void handlePostJournal(journal.id)}
-                            className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                            className="inline-flex h-9 items-center justify-center rounded-xl bg-foreground px-3 text-sm font-medium text-background transition hover:opacity-90"
                           >
                             Post
                           </button>
@@ -284,13 +287,13 @@ export default function AccountingJournalsPage() {
                           <button
                             type="button"
                             onClick={() => void handleVoidJournal(journal.id)}
-                            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/45"
                           >
                             Void
                           </button>
                         ) : null}
                         {journal.void_reason ? (
-                          <span className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                          <span className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                             Void reason: {journal.void_reason}
                           </span>
                         ) : null}
@@ -413,7 +416,7 @@ export default function AccountingJournalsPage() {
                 </label>
                 <button
                   type="submit"
-                  className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90"
                 >
                   Create draft journal
                 </button>
