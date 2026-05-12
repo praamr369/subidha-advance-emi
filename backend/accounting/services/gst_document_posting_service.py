@@ -22,6 +22,7 @@ from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.journal_posting_service import (
     _log_accounting_event,
 )
+from accounting.services.system_accounts_service import ensure_system_account
 
 
 def _money(value) -> Decimal:
@@ -65,26 +66,16 @@ def _ensure_system_account(
     name: str,
     account_type: str,
 ) -> ChartOfAccount:
-    account, created = ChartOfAccount.objects.get_or_create(
+    # Preserve import compatibility for existing callers.
+    result = ensure_system_account(
         system_code=system_code,
-        defaults={
-            "code": code,
-            "name": name,
-            "account_type": account_type,
-            "allow_manual_posting": False,
-            "is_active": True,
-        },
+        code=code,
+        name=name,
+        account_type=account_type,
+        allow_manual_posting=False,
+        reactivate=False,
     )
-    if created:
-        _log_accounting_event(
-            event="ACCOUNTING_SYSTEM_ACCOUNT_CREATED",
-            instance=account,
-            metadata={
-                "system_code": system_code,
-                "account_type": account_type,
-            },
-        )
-    return account
+    return result.account
 
 
 def ensure_gst_system_accounts() -> dict[str, ChartOfAccount]:

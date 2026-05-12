@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
+import hashlib
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 
 from accounting.models import AccountingBridgePosting, JournalEntryType
 from accounting.services.journal_posting_service import (
@@ -79,6 +80,23 @@ def _infer_source_event_date(source_instance, fallback) -> date | None:
     return fallback if isinstance(fallback, date) else None
 
 
+def _bridge_advisory_lock(*, source_model: str, source_id: str, purpose: str) -> None:
+    """
+    Prevent race conditions that can create orphan posted journals when the unique bridge row
+    is inserted concurrently.
+
+    Uses PostgreSQL transaction-scoped advisory locks when available; no-ops on other DBs.
+    """
+
+    if connection.vendor != "postgresql":
+        return
+    payload = f"{source_model}:{source_id}:{purpose}".encode("utf-8")
+    digest = hashlib.sha1(payload).digest()  # stable across processes
+    lock_id = int.from_bytes(digest[:8], "big", signed=False) % (2**63)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
+
+
 @transaction.atomic
 def post_bridge_entry(
     *,
@@ -100,6 +118,8 @@ def post_bridge_entry(
     purpose = (purpose or "").strip().upper()
     if not purpose:
         raise ValueError("Bridge posting purpose is required.")
+
+    _bridge_advisory_lock(source_model=source_model, source_id=source_id, purpose=purpose)
 
     resolved_voucher_type = _clean_text(voucher_type) or purpose
     resolved_source_type = _clean_text(source_type) or source_model.upper()

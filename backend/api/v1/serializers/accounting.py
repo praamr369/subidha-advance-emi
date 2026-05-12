@@ -87,6 +87,8 @@ class AccountingValidationQuerySerializer(serializers.Serializer):
 
 class ChartOfAccountSerializer(serializers.ModelSerializer):
     parent_code = serializers.CharField(source="parent.code", read_only=True)
+    superseded_by_code = serializers.CharField(source="superseded_by.code", read_only=True)
+    superseded_by_name = serializers.CharField(source="superseded_by.name", read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
@@ -101,11 +103,24 @@ class ChartOfAccountSerializer(serializers.ModelSerializer):
             "is_active",
             "allow_manual_posting",
             "system_code",
+            "is_legacy",
+            "legacy_reason",
+            "superseded_by",
+            "superseded_by_code",
+            "superseded_by_name",
             "notes",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "system_code"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "system_code",
+            "is_legacy",
+            "legacy_reason",
+            "superseded_by",
+        ]
 
 
 class ChartOfAccountCreateSerializer(serializers.ModelSerializer):
@@ -361,7 +376,10 @@ class FinanceAccountUpdateSerializer(serializers.ModelSerializer):
 
 class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    finance_account_kind = serializers.CharField(source="finance_account.kind", read_only=True)
+    finance_account_is_real_settlement_account = serializers.BooleanField(source="finance_account.is_real_settlement_account", read_only=True)
     chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
+    chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
     chart_account_type = serializers.CharField(source="chart_account.account_type", read_only=True)
 
     class Meta:
@@ -370,7 +388,10 @@ class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
             "id",
             "finance_account",
             "finance_account_name",
+            "finance_account_kind",
+            "finance_account_is_real_settlement_account",
             "chart_account",
+            "chart_account_code",
             "chart_account_name",
             "chart_account_type",
             "purpose",

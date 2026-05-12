@@ -8,20 +8,22 @@ import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { SetupChecklistPageShell } from "@/components/layout/page-shells";
 import { ROUTES } from "@/lib/routes";
+import { getFinanceAccountMappings, patchFinanceAccountMapping } from "@/services/accounting-setup";
 import {
-  getAccountingMappingSuggestions,
-  getAccountingSetupStatus,
-  getFinanceAccountMappings,
-  patchFinanceAccountMapping,
-  postAccountingSetupBootstrap,
-  repairSuggestedMappings,
-  type AccountingSetupStatusPayload,
-} from "@/services/accounting-setup";
+  applyAccountingSetupDefaults,
+  getAccountingSetupHealth,
+  previewAccountingSetupDefaults,
+  type AccountingSetupDefaultsPreviewResponse,
+  type AccountingSetupHealthResponse,
+} from "@/services/accounting";
 
 type MappingRow = {
   id: number;
+  finance_account_kind?: string;
+  finance_account_is_real_settlement_account?: boolean;
   finance_account_name?: string;
   purpose?: string;
+  chart_account_code?: string;
   chart_account_name?: string;
   chart_account_type?: string;
   is_active?: boolean;
@@ -52,10 +54,12 @@ const PURPOSE_LABELS: Record<string, string> = {
 };
 
 export default function AdminAccountingSetupPage() {
-  const [status, setStatus] = useState<AccountingSetupStatusPayload | null>(null);
+  const [health, setHealth] = useState<AccountingSetupHealthResponse | null>(null);
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [defaultsPreview, setDefaultsPreview] = useState<AccountingSetupDefaultsPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<MappingRow | null>(null);
   const [editNotes, setEditNotes] = useState("");
@@ -66,11 +70,11 @@ export default function AdminAccountingSetupPage() {
     setLoading(true);
     setError(null);
     try {
-      const [statusRes, mappingRes] = await Promise.all([
-        getAccountingSetupStatus(),
+      const [healthRes, mappingRes] = await Promise.all([
+        getAccountingSetupHealth(),
         getFinanceAccountMappings() as Promise<{ results?: MappingRow[] }>,
       ]);
-      setStatus(statusRes);
+      setHealth(healthRes);
       setMappings(mappingRes.results ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load accounting setup.");
@@ -83,41 +87,49 @@ export default function AdminAccountingSetupPage() {
     void load();
   }, [load]);
 
-  const applyRecommended = useCallback(async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await postAccountingSetupBootstrap(false);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to apply recommended setup.");
-    } finally {
-      setSaving(false);
-    }
-  }, [load]);
+  const blockers = health?.blockers ?? [];
+  const warnings = health?.warnings ?? [];
+  const displayStatus = health?.status ?? "BLOCKED";
 
-  const warnings = status?.warnings ?? [];
-  const warningCount = status?.warnings_count ?? warnings.length;
-  const displayStatus = warningCount > 0 ? "NEEDS_ATTENTION" : status?.status ?? "UNKNOWN";
-  const repairMappings = useCallback(async () => {
+  const previewDefaults = useCallback(async () => {
+    setPreviewing(true);
+    setError(null);
+    try {
+      const preview = await previewAccountingSetupDefaults();
+      setDefaultsPreview(preview);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to preview suggested defaults.");
+    } finally {
+      setPreviewing(false);
+    }
+  }, []);
+
+  const applyDefaults = useCallback(async () => {
     setSaving(true);
     setError(null);
     try {
-      await repairSuggestedMappings(false);
+      if (!defaultsPreview) {
+        await previewDefaults();
+      }
+      const confirmed = window.confirm(
+        "Apply suggested defaults?\n\nThis creates/claims canonical Chart of Accounts, seeds default Finance Accounts, and updates posting profiles.\nIt will not delete anything and will not rewrite historical journals or payments."
+      );
+      if (!confirmed) return;
+      await applyAccountingSetupDefaults({ confirm: true });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to repair suggested mappings.");
+      setError(err instanceof Error ? err.message : "Failed to apply suggested defaults.");
     } finally {
       setSaving(false);
     }
-  }, [load]);
+  }, [defaultsPreview, load, previewDefaults]);
   const steps = useMemo(
     () => [
       "Step 1: Business finance accounts",
       "Step 2: Chart of Accounts",
-      "Step 3: Auto mapping suggestions",
-      "Step 4: Review warnings",
-      "Step 5: Confirm accounting setup",
+      "Step 3: Canonical mapping and profiles",
+      "Step 4: Review blockers and warnings",
+      "Step 5: Confirm go-live readiness",
     ],
     []
   );
@@ -173,47 +185,55 @@ export default function AdminAccountingSetupPage() {
               {": "}
               Status {displayStatus}
               {" · "}
-              COA {status?.coa_ready ? "ready" : "not ready"}
+              Canonical missing {health?.canonical_accounts?.missing?.length ?? 0}
               {" · "}
-              Finance accounts {status?.finance_accounts_ready ? "ready" : "not ready"}
+              Conflicts {health?.canonical_accounts?.conflicts?.length ?? 0}
               {" · "}
-              {warningCount} warning{warningCount === 1 ? "" : "s"}
+              Blockers {blockers.length}
+              {" · "}
+              Warnings {warnings.length}
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-                <div className="text-sm font-semibold text-foreground">Ledger anchor</div>
-                <div className="mt-2">
-                  Present: {status?.ledger_anchor_present ? "yes" : "no"} · Settlement desks flagged:{" "}
-                  {status?.real_settlement_accounts_present ? "yes" : "no"}
+                <div className="text-sm font-semibold text-foreground">Finance readiness</div>
+                <div className="mt-2 space-y-1">
+                  <div>CASH active: {health?.finance_accounts?.CASH?.active_count ?? 0}</div>
+                  <div>BANK active: {health?.finance_accounts?.BANK?.active_count ?? 0}</div>
+                  <div>UPI active: {health?.finance_accounts?.UPI?.active_count ?? 0}</div>
                 </div>
               </div>
               <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-                <div className="text-sm font-semibold text-foreground">Missing mapping purposes</div>
-                <div className="mt-2 max-h-32 overflow-y-auto">
-                  {(status?.missing_required_mappings?.length ?? 0) === 0 ? (
-                    <span>None detected.</span>
-                  ) : (
-                    <ul className="list-disc pl-4">
-                      {(status?.missing_required_mappings ?? []).map((code) => (
-                        <li key={code}>{code}</li>
-                      ))}
-                    </ul>
-                  )}
+                <div className="text-sm font-semibold text-foreground">Journal integrity</div>
+                <div className="mt-2 space-y-1">
+                  <div>Posted unbalanced: {health?.journals?.posted_unbalanced_count ?? 0}</div>
+                  <div>Posted zero-line: {health?.journals?.posted_zero_line_count ?? 0}</div>
+                  <div>Lines to inactive COA: {health?.journals?.lines_to_inactive_accounts ?? 0}</div>
                 </div>
               </div>
             </div>
           </div>
         }
         blockers={
-          error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null
+          error ? (
+            <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} />
+          ) : blockers.length > 0 ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <div className="font-semibold">Go-live blockers</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                {blockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            <ActionButton variant="primary" onClick={applyRecommended} disabled={saving}>
-              {saving ? "Applying..." : "Apply Recommended Mapping"}
+            <ActionButton variant="secondary" onClick={previewDefaults} disabled={previewing}>
+              {previewing ? "Previewing..." : "Preview Suggested Default"}
             </ActionButton>
-            <ActionButton variant="secondary" onClick={repairMappings} disabled={saving}>
-              {saving ? "Repairing..." : "Repair suggested mappings"}
+            <ActionButton variant="primary" onClick={applyDefaults} disabled={saving}>
+              {saving ? "Applying..." : "Apply Suggested Default"}
             </ActionButton>
             <ActionButton variant="secondary" onClick={() => void load()}>
               Refresh
@@ -222,9 +242,9 @@ export default function AdminAccountingSetupPage() {
         }
         checklist={
           <>
-            {warningCount > 0 ? (
+            {warnings.length > 0 ? (
               <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
+                {warnings.length} warning{warnings.length === 1 ? "" : "s"} detected.
               </div>
             ) : null}
             <div className="rounded-2xl border border-border bg-card p-4">
@@ -247,84 +267,114 @@ export default function AdminAccountingSetupPage() {
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-foreground">Finance Account Mapping Table</div>
-            <ActionButton
-              variant="outline"
-              onClick={async () => {
-                const response = (await getAccountingMappingSuggestions()) as { suggestions?: { details?: { purpose?: string; status?: string }[] } };
-                const target = response.suggestions?.details?.find((row) => row.status === "created");
-                if (!target?.purpose) return;
-                const match = mappings.find((row) => row.purpose === target.purpose);
-                if (!match) return;
-                await patchFinanceAccountMapping(match.id, { is_default: true, is_active: true });
-                await load();
-              }}
-            >
-              Apply Suggested Default
-            </ActionButton>
+            <div className="text-xs text-muted-foreground">Manual collection + system-only profiles</div>
           </div>
+          {defaultsPreview ? (
+            <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              <div className="font-semibold text-foreground">Preview (latest)</div>
+              <div className="mt-1">
+                Canonical create: {defaultsPreview.canonical_accounts.create.length}
+                {" · "}Claim: {defaultsPreview.canonical_accounts.claim.length}
+                {" · "}Conflicts: {defaultsPreview.canonical_accounts.conflicts.length}
+              </div>
+            </div>
+          ) : null}
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-left text-xs">
               <thead className="text-muted-foreground">
                 <tr>
-                  <th className="px-2 py-2">Finance Account</th>
+                  <th className="px-2 py-2">Finance account / profile</th>
                   <th className="px-2 py-2">Used For</th>
                   <th className="px-2 py-2">Mapped Chart Account</th>
                   <th className="px-2 py-2">Account Type</th>
+                  <th className="px-2 py-2">Manual vs System-only</th>
                   <th className="px-2 py-2">Status</th>
                   <th className="px-2 py-2">Warning</th>
                   <th className="px-2 py-2">Edit</th>
                 </tr>
               </thead>
               <tbody>
-                {mappings.length === 0 ? (
+                {mappings.length === 0 && (health?.posting_profiles?.mapped?.length ?? 0) === 0 ? (
                   <tr>
                     <td className="px-2 py-3 text-muted-foreground" colSpan={7}>
                       No mappings found yet.
                     </td>
                   </tr>
                 ) : (
-                  mappings.map((row) => {
-                    const warning = warnings.find((warn) => {
-                      const name = (row.finance_account_name || "").toLowerCase();
-                      const purpose = (row.purpose || "").toLowerCase();
-                      const message = warn.message.toLowerCase();
-                      return message.includes(name) || (purpose ? message.includes(purpose) : false);
-                    });
-                    const isSystemProfile = (row.finance_account_name || "").toLowerCase().includes("ledger posting profiles");
-                    const mappingStatus = !row.chart_account_name
-                      ? "Missing"
-                      : isSystemProfile
-                        ? "System-only"
-                        : warning
-                          ? "Mismatch"
-                          : "Correct";
-                    const warningText =
-                      isSystemProfile
-                        ? "System posting profile — not available for manual receipt/counter selection."
-                        : warning?.message || "—";
-                    return (
-                      <tr key={row.id} className="border-t border-border">
-                        <td className="px-2 py-2">{row.finance_account_name || "—"}</td>
-                        <td className="px-2 py-2">{PURPOSE_LABELS[row.purpose || ""] || row.purpose || "—"}</td>
+                  <>
+                    {mappings.map((row) => {
+                      const manualPurposes = new Set([
+                        "CASH_COLLECTION",
+                        "BANK_COLLECTION",
+                        "UPI_COLLECTION",
+                        "PAYMENT_GATEWAY_COLLECTION",
+                      ]);
+                      const isSystemOnly = !manualPurposes.has(row.purpose || "");
+                      const statusLabel = row.is_active ? (row.is_default ? "Default" : "Active") : "Inactive";
+                      const kind = (row.finance_account_kind || "").toUpperCase();
+                      const financeActiveCount =
+                        kind === "CASH" || kind === "BANK" || kind === "UPI"
+                          ? health?.finance_accounts?.[kind as "CASH" | "BANK" | "UPI"]?.active_count ?? 0
+                          : 0;
+                      const warningText = isSystemOnly
+                        ? "System-only mapping (do not use for receipts/cash counters)."
+                        : financeActiveCount !== 1
+                          ? "Ambiguous or missing active finance account for this kind."
+                          : row.chart_account_type && row.chart_account_type !== "ASSET"
+                            ? "Manual collection must map to an ASSET chart account."
+                            : "—";
+
+                      return (
+                        <tr key={`map-${row.id}`} className="border-t border-border">
+                          <td className="px-2 py-2">
+                            <div className="font-medium text-foreground">{row.finance_account_name || "—"}</div>
+                            <div className="text-[11px] text-muted-foreground">{row.finance_account_kind || "—"}</div>
+                          </td>
+                          <td className="px-2 py-2">{PURPOSE_LABELS[row.purpose || ""] || row.purpose || "—"}</td>
+                          <td className="px-2 py-2">
+                            <div className="font-medium text-foreground">
+                              {row.chart_account_code ? `${row.chart_account_code} · ` : ""}
+                              {row.chart_account_name || "—"}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2">{row.chart_account_type || "—"}</td>
+                          <td className="px-2 py-2">{isSystemOnly ? "System-only" : "Manual"}</td>
+                          <td className="px-2 py-2">{statusLabel}</td>
+                          <td className="px-2 py-2 text-amber-700">{warningText}</td>
+                          <td className="px-2 py-2">
+                            <ActionButton size="sm" variant="ghost" onClick={() => openEdit(row)}>
+                              Advanced Edit
+                            </ActionButton>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {(health?.posting_profiles?.mapped ?? []).map((row) => (
+                      <tr key={`prof-${row.id ?? row.key}`} className="border-t border-border">
                         <td className="px-2 py-2">
-                          <div className="font-medium text-foreground">{row.chart_account_name || "—"}</div>
-                          <div className="text-[11px] text-muted-foreground">{row.purpose || "—"}</div>
+                          <div className="font-medium text-foreground">{row.label || row.key}</div>
+                          <div className="text-[11px] text-muted-foreground">{row.key}</div>
                         </td>
-                        <td className="px-2 py-2">{row.chart_account_type || "—"}</td>
-                        <td className="px-2 py-2">{mappingStatus}</td>
-                        <td className="px-2 py-2 text-amber-700">{warningText}</td>
+                        <td className="px-2 py-2">System posting profile</td>
                         <td className="px-2 py-2">
-                          <ActionButton
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => openEdit(row)}
-                          >
-                            Advanced Edit
-                          </ActionButton>
+                          <div className="font-medium text-foreground">
+                            {row.chart_account_code ? `${row.chart_account_code} · ` : ""}
+                            {row.chart_account_name || "—"}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2">—</td>
+                        <td className="px-2 py-2">System-only</td>
+                        <td className="px-2 py-2">Active</td>
+                        <td className="px-2 py-2 text-amber-700">
+                          {row.chart_account_is_legacy ? "Profile mapped to a legacy COA row." : "—"}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span className="text-[11px] text-muted-foreground">Managed by defaults</span>
                         </td>
                       </tr>
-                    );
-                  })
+                    ))}
+                  </>
                 )}
               </tbody>
             </table>
@@ -338,7 +388,7 @@ export default function AdminAccountingSetupPage() {
           ) : (
             <ul className="mt-2 space-y-2 text-xs text-amber-700">
               {warnings.map((warning) => (
-                <li key={`${warning.code}-${warning.message}`}>{warning.message}</li>
+                <li key={warning}>{warning}</li>
               ))}
             </ul>
           )}

@@ -188,7 +188,7 @@ export default function AccountingChartOfAccountsPage() {
     { key: "code", header: "Code" },
     {
       key: "name",
-      header: "Account",
+      header: "System-developed account name",
       render: (row) => (
         <div className="space-y-1">
           <div className="font-semibold text-foreground">{row.name}</div>
@@ -197,11 +197,22 @@ export default function AccountingChartOfAccountsPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {row.system_code ? <span className={pillClassName("info")}>System</span> : null}
+            {row.is_legacy ? <span className={pillClassName("warning")}>Legacy</span> : null}
             {!row.allow_manual_posting ? <span className={pillClassName("warning")}>Manual locked</span> : null}
             {!row.is_active ? <span className={pillClassName("default")}>Inactive</span> : null}
           </div>
+          {row.is_legacy ? (
+            <div className="text-[11px] text-muted-foreground">
+              {row.legacy_reason ? `Legacy compatibility: ${row.legacy_reason}` : "Legacy compatibility account."}
+            </div>
+          ) : null}
         </div>
       ),
+    },
+    {
+      key: "system_code",
+      header: "System code",
+      render: (row) => <span className="text-xs text-muted-foreground">{row.system_code || "—"}</span>,
     },
     {
       key: "account_type",
@@ -216,6 +227,37 @@ export default function AccountingChartOfAccountsPage() {
           <span className={pillClassName("success")}>Active</span>
         ) : (
           <span className={pillClassName()}>Inactive</span>
+        ),
+    },
+    {
+      key: "legacy_marker",
+      header: "Legacy marker",
+      searchable: false,
+      render: (row) => (row.is_legacy ? <span className={pillClassName("warning")}>Legacy</span> : "—"),
+    },
+    {
+      key: "superseded_by",
+      header: "Superseded by",
+      searchable: false,
+      render: (row) =>
+        row.superseded_by_code ? (
+          <div className="text-xs">
+            <div className="font-medium text-foreground">{row.superseded_by_code}</div>
+            <div className="text-[11px] text-muted-foreground">{row.superseded_by_name || "—"}</div>
+          </div>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      key: "manual_posting",
+      header: "Manual posting",
+      searchable: false,
+      render: (row) =>
+        row.allow_manual_posting ? (
+          <span className={pillClassName("success")}>Unlocked</span>
+        ) : (
+          <span className={pillClassName("warning")}>Locked</span>
         ),
     },
     {

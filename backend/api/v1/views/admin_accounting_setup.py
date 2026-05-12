@@ -7,6 +7,11 @@ from rest_framework.views import APIView
 from accounting.models import FinanceAccountCoaMapping
 from accounting.services.accounting_setup_service import AccountingSetupService
 from accounting.services.accounting_setup_status import get_admin_accounting_setup_status
+from accounting.services.setup_defaults_service import (
+    apply_accounting_setup_defaults,
+    preview_accounting_setup_defaults,
+)
+from accounting.services.setup_health_service import get_accounting_setup_health
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import FinanceAccountCoaMappingSerializer
 from subscriptions.models import AuditLog
@@ -34,6 +39,30 @@ class AccountingSetupBootstrapView(_AdminBase):
             actor=request.user,
             dry_run=serializer.validated_data["dry_run"],
         )
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class AccountingSetupHealthView(_AdminBase):
+    def get(self, request):
+        return Response(get_accounting_setup_health())
+
+
+class AccountingSetupDefaultsPreviewView(_AdminBase):
+    def post(self, request):
+        return Response(preview_accounting_setup_defaults(), status=status.HTTP_200_OK)
+
+
+class AccountingSetupDefaultsApplySerializer(serializers.Serializer):
+    confirm = serializers.BooleanField(required=True)
+
+
+class AccountingSetupDefaultsApplyView(_AdminBase):
+    def post(self, request):
+        serializer = AccountingSetupDefaultsApplySerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data.get("confirm"):
+            raise serializers.ValidationError({"confirm": "Confirm must be true to apply defaults."})
+        payload = apply_accounting_setup_defaults(performed_by=request.user)
         return Response(payload, status=status.HTTP_200_OK)
 
 

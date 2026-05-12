@@ -455,6 +455,15 @@ class ChartOfAccount(AccountingTimeStampedModel):
         blank=True,
         db_index=True,
     )
+    is_legacy = models.BooleanField(default=False, db_index=True)
+    legacy_reason = models.CharField(max_length=255, blank=True, default="")
+    superseded_by = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="legacy_accounts",
+    )
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -469,6 +478,8 @@ class ChartOfAccount(AccountingTimeStampedModel):
         errors = {}
         if self.parent_id and self.parent_id == self.id:
             errors["parent"] = "Account parent cannot reference itself."
+        if self.superseded_by_id and self.superseded_by_id == self.id:
+            errors["superseded_by"] = "An account cannot supersede itself."
         if errors:
             raise ValidationError(errors)
 
@@ -478,6 +489,7 @@ class ChartOfAccount(AccountingTimeStampedModel):
         self.system_code = (
             (self.system_code or "").strip().upper() or None
         )
+        self.legacy_reason = (self.legacy_reason or "").strip()
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
@@ -701,6 +713,41 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class AccountingPostingProfile(AccountingTimeStampedModel):
+    """
+    System-only posting profiles (non-settlement) mapped to canonical chart accounts.
+
+    This is intentionally separate from FinanceAccount:
+    - FinanceAccount represents real settlement instruments (cash/bank/UPI desks).
+    - Posting profiles represent system accounting roles like CUSTOMER_RECEIVABLE, EMI_INCOME, etc.
+    """
+
+    key = models.CharField(max_length=80, unique=True, db_index=True)
+    label = models.CharField(max_length=160)
+    chart_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="posting_profiles",
+    )
+    is_system_only = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    description = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_posting_profiles"
+        ordering = ["key", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "is_system_only"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.key = (self.key or "").strip().upper()
+        self.label = (self.label or "").strip()
+        self.description = (self.description or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

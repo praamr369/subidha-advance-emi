@@ -18,6 +18,11 @@ export type ChartOfAccount = {
   is_active: boolean;
   allow_manual_posting: boolean;
   system_code?: string | null;
+  is_legacy?: boolean;
+  legacy_reason?: string;
+  superseded_by?: number | null;
+  superseded_by_code?: string | null;
+  superseded_by_name?: string | null;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -937,9 +942,117 @@ export type BridgeRunResponse = {
     candidates: number;
     created_count: number;
     existing_count: number;
+    skipped_count?: number;
+    skipped?: Array<Record<string, unknown>>;
     dry_run: boolean;
   }>;
 };
+
+export type AccountingSetupHealthResponse = {
+  status: "OK" | "WARNING" | "BLOCKED";
+  blockers: string[];
+  warnings: string[];
+  generated_at?: string;
+  finance_accounts: Record<
+    "CASH" | "BANK" | "UPI",
+    {
+      active_count: number;
+      active: Array<{
+        id: number;
+        name: string;
+        chart_account_id: number;
+        chart_account_code?: string | null;
+        chart_account_name?: string | null;
+        chart_account_is_active?: boolean | null;
+      }>;
+      linked_to_inactive_coa_ids: number[];
+    }
+  >;
+  canonical_accounts: {
+    missing: Array<{ key: string; code: string; name: string; account_type: string }>;
+    present: Array<{ key: string; id: number; code: string; name: string; is_active: boolean; is_legacy?: boolean }>;
+    claimable: Array<{ key: string; id: number; code: string; name: string }>;
+    conflicts: Array<Record<string, unknown>>;
+  };
+  posting_profiles: {
+    missing: string[];
+    mapped: Array<{
+      id: number;
+      key: string;
+      label: string;
+      chart_account_id: number;
+      chart_account_code?: string | null;
+      chart_account_name?: string | null;
+      chart_account_is_legacy?: boolean;
+    }>;
+    legacy_mapped: Array<{
+      id: number;
+      key: string;
+      label: string;
+      chart_account_id: number;
+      chart_account_code?: string | null;
+      chart_account_name?: string | null;
+      chart_account_is_legacy?: boolean;
+    }>;
+  };
+  coa: {
+    total: number;
+    legacy_count: number;
+    duplicate_names: string[];
+    system_code_conflicts: Array<Record<string, unknown>>;
+  };
+  journals: {
+    posted_unbalanced_count: number;
+    posted_zero_line_count: number;
+    lines_to_inactive_accounts: number;
+  };
+  bridges: {
+    missing_journal_count: number;
+    legacy_brg_collection_count: number;
+  };
+};
+
+export type AccountingSetupDefaultsPreviewResponse = {
+  generated_at: string;
+  canonical_accounts: {
+    create: Array<{ key: string; code: string; name: string; account_type: string }>;
+    claim: Array<{ key: string; id: number; code: string; name: string; account_type: string }>;
+    present: Array<Record<string, unknown>>;
+    conflicts: Array<Record<string, unknown>>;
+    inactive: Array<Record<string, unknown>>;
+  };
+  finance_accounts: {
+    to_create: Array<Record<string, unknown>>;
+    duplicates: Record<string, unknown>;
+  };
+  posting_profiles: {
+    to_create: Array<Record<string, unknown>>;
+    to_update: Array<Record<string, unknown>>;
+  };
+  legacy_candidates: {
+    coa_duplicates_to_mark_legacy: Array<Record<string, unknown>>;
+  };
+  manual_review: string[];
+};
+export type AccountingSetupDefaultsApplyResponse = Record<string, unknown>;
+
+export function getAccountingSetupHealth() {
+  return apiFetch<AccountingSetupHealthResponse>("/admin/accounting/setup-health/");
+}
+
+export function previewAccountingSetupDefaults() {
+  return apiFetch<AccountingSetupDefaultsPreviewResponse>("/admin/accounting/setup-defaults/preview/", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function applyAccountingSetupDefaults(payload: { confirm: true }) {
+  return apiFetch<AccountingSetupDefaultsApplyResponse>("/admin/accounting/setup-defaults/apply/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
 
 export type Phase3BridgeRunResponse = {
   start_date: string;

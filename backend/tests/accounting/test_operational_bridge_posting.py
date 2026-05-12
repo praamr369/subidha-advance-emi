@@ -55,12 +55,21 @@ class OperationalAccountingBridgePostingTests(TestCase):
             name=name,
             account_type=ChartOfAccountType.ASSET,
         )
-        return FinanceAccount.objects.create(
+        account = FinanceAccount.objects.create(
             name=name,
             kind=kind,
             chart_account=chart_account,
             opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
         )
+        # New bridge collection logic requires an unambiguous single active settlement account per kind.
+        FinanceAccount.objects.filter(
+            kind=kind,
+            is_active=True,
+            is_real_settlement_account=True,
+        ).exclude(pk=account.pk).update(is_active=False)
+        return account
 
     def _create_subscription_bundle(self, *, product_code: str, lucky_number: int, partner=None, tenure_months: int = 3):
         customer = create_customer_profile(

@@ -4,15 +4,14 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 
 from accounting.models import (
     AccountingBridgePosting,
-    ChartOfAccountType,
     FinanceAccount,
     FinanceAccountKind,
 )
 from accounting.services.bridge_posting_service import post_bridge_entry
-from accounting.services.gst_document_posting_service import _ensure_system_account
 from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
 from billing.models import BillingDocumentStatus, BillingInvoice
@@ -56,52 +55,44 @@ def _iso_to_date(value, *, fallback: date | None = None) -> date | None:
         return fallback
 
 
-def _method_chart_account(payment: Payment):
-    method = (payment.method or "").strip().upper() or "CASH"
-    if method == "BANK":
-        return _ensure_system_account(
-            system_code="BRIDGE_BANK_COLLECTION",
-            code="BRG-1010",
-            name="Bridge Bank Collections",
-            account_type=ChartOfAccountType.ASSET,
-        )
-    if method == "UPI":
-        return _ensure_system_account(
-            system_code="BRIDGE_UPI_COLLECTION",
-            code="BRG-1020",
-            name="Bridge UPI Collections",
-            account_type=ChartOfAccountType.ASSET,
-        )
-    return _ensure_system_account(
-        system_code="BRIDGE_CASH_COLLECTION",
-        code="BRG-1000",
-        name="Bridge Cash Collections",
-        account_type=ChartOfAccountType.ASSET,
-    )
-
-
-def _collection_clearing_account():
-    return _ensure_system_account(
-        system_code="SUBSCRIPTION_COLLECTION_CLEARING",
-        code="BRG-2000",
-        name="Subscription Collection Clearing",
-        account_type=ChartOfAccountType.LIABILITY,
-    )
-
-
-def _finance_account_for_payment_method(method: str):
+def _resolve_collection_finance_account(*, method: str) -> tuple[FinanceAccount | None, str | None, list[int]]:
     normalized = (method or "").strip().upper() or "CASH"
     kind = FinanceAccountKind.CASH
     if normalized == "BANK":
         kind = FinanceAccountKind.BANK
     elif normalized == "UPI":
         kind = FinanceAccountKind.UPI
+
     candidates = list(
-        FinanceAccount.objects.filter(kind=kind, is_active=True).order_by("id")
+        FinanceAccount.objects.filter(
+            kind=kind,
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        .select_related("chart_account")
+        .order_by("id")
     )
-    if len(candidates) == 1:
-        return candidates[0]
-    return None
+    candidate_ids = [c.id for c in candidates]
+    if len(candidates) == 0:
+        return None, "MISSING_FINANCE_ACCOUNT", candidate_ids
+    if len(candidates) > 1:
+        return None, "AMBIGUOUS_FINANCE_ACCOUNT", candidate_ids
+
+    account = candidates[0]
+    if not account.chart_account.is_active:
+        return None, "FINANCE_ACCOUNT_INACTIVE_COA", candidate_ids
+    return account, None, candidate_ids
+
+
+def _finance_account_for_payment_method(method: str) -> FinanceAccount | None:
+    """
+    Legacy helper used by receipt bridge generation.
+
+    Returns a FinanceAccount only when resolution is unambiguous; otherwise None.
+    """
+
+    account, reason, _candidate_ids = _resolve_collection_finance_account(method=method)
+    return account if reason is None else None
 
 
 def _payment_reversal_date(payment: Payment) -> date:
@@ -126,28 +117,42 @@ def _post_payment_reversal_bridge(*, payment: Payment, performed_by=None):
         "reason": _payment_reversal_reason(payment),
     }
 
-    if _bridge_exists(
-        source_model="Payment",
-        source_id=str(payment.id),
-        purpose="PAYMENT_COLLECTION",
-    ):
-        lines.extend(
-            [
-                {
-                    "chart_account": _collection_clearing_account(),
-                    "description": f"Payment reversal {payment.reference_no or payment.id}",
-                    "debit_amount": payment.amount,
-                    "credit_amount": Decimal("0.00"),
-                },
-                {
-                    "chart_account": _method_chart_account(payment),
-                    "description": f"Payment reversal {payment.method or 'CASH'}",
-                    "debit_amount": Decimal("0.00"),
-                    "credit_amount": payment.amount,
-                },
-            ]
+    bridge = (
+        AccountingBridgePosting.objects.filter(
+            source_model="Payment",
+            source_id=str(payment.id),
+            purpose="PAYMENT_COLLECTION",
         )
+        .select_related("journal_entry")
+        .first()
+    )
+    if bridge is not None and bridge.journal_entry_id:
+        posted = bridge.journal_entry
+        posted_lines = list(posted.lines.select_related("chart_account").all())
+        for line in posted_lines:
+            debit = _money(line.debit_amount)
+            credit = _money(line.credit_amount)
+            if debit > Decimal("0.00"):
+                lines.append(
+                    {
+                        "chart_account": line.chart_account,
+                        "description": f"Payment reversal {payment.reference_no or payment.id}",
+                        "debit_amount": Decimal("0.00"),
+                        "credit_amount": debit,
+                    }
+                )
+            elif credit > Decimal("0.00"):
+                lines.append(
+                    {
+                        "chart_account": line.chart_account,
+                        "description": f"Payment reversal {payment.reference_no or payment.id}",
+                        "debit_amount": credit,
+                        "credit_amount": Decimal("0.00"),
+                    }
+                )
         trace_metadata["payment_collection_bridge_reversed"] = True
+        trace_metadata["payment_collection_bridge_id"] = bridge.id
+        trace_metadata["payment_collection_journal_entry_id"] = bridge.journal_entry_id
     else:
         trace_metadata["payment_collection_bridge_reversed"] = False
 
@@ -358,15 +363,20 @@ def run_bridge_postings(
         "subscription__lucky_id",
     ).filter(
         payment_date__range=(start_date, end_date)
-    ).exclude(
-        allocation_metadata__reversal__is_reversed=True
+    ).filter(
+        Q(allocation_metadata__reversal__is_reversed=False)
+        | Q(allocation_metadata__reversal__is_reversed__isnull=True)
     ).order_by("payment_date", "id")
 
     if "PAYMENT_COLLECTION" in selected_purposes:
-        clearing_account = _collection_clearing_account()
+        accounts = ensure_phase3_system_accounts()
+        clearing_account = accounts.get("EMI_COLLECTION_CLEARING")
+        if clearing_account is None or not clearing_account.is_active:
+            raise ValueError("EMI_COLLECTION_CLEARING system account is missing or inactive.")
         created_count = 0
         existing_count = 0
         candidates = 0
+        skipped: list[dict] = []
         first_payment = None
 
         for payment in payments:
@@ -386,7 +396,29 @@ def run_bridge_postings(
             if dry_run:
                 continue
 
-            method_account = _method_chart_account(payment)
+            finance_account, reason, candidate_ids = _resolve_collection_finance_account(method=payment.method or "")
+            if reason:
+                skipped.append(
+                    {
+                        "payment_id": payment.id,
+                        "method": (payment.method or "").strip().upper() or "CASH",
+                        "reason": reason,
+                        "candidate_finance_account_ids": candidate_ids,
+                    }
+                )
+                _log_accounting_event(
+                    event="ACCOUNTING_BRIDGE_DEFERRED",
+                    instance=payment,
+                    performed_by=performed_by,
+                    metadata={
+                        "purpose": "PAYMENT_COLLECTION",
+                        "payment_id": payment.id,
+                        "method": (payment.method or "").strip().upper() or "CASH",
+                        "reason": reason,
+                        "candidate_finance_account_ids": candidate_ids,
+                    },
+                )
+                continue
             post_bridge_entry(
                 source_instance=payment,
                 purpose=purpose,
@@ -394,8 +426,8 @@ def run_bridge_postings(
                 memo=f"Bridge payment collection {payment.id}",
                 lines=[
                     {
-                        "chart_account": method_account,
-                        "description": f"{payment.method} collection",
+                        "chart_account": finance_account.chart_account,
+                        "description": f"{(payment.method or 'CASH').strip().upper()} collection",
                         "debit_amount": payment.amount,
                         "credit_amount": 0,
                     },
@@ -413,6 +445,10 @@ def run_bridge_postings(
                     "payment_id": payment.id,
                     "subscription_id": payment.subscription_id,
                     "emi_id": payment.emi_id,
+                    "method": (payment.method or "").strip().upper() or "CASH",
+                    "finance_account_id": finance_account.id,
+                    "finance_chart_account_id": finance_account.chart_account_id,
+                    "clearing_chart_account_id": clearing_account.id,
                 },
                 posted_by=performed_by,
             )
@@ -440,6 +476,8 @@ def run_bridge_postings(
                 "candidates": candidates,
                 "created_count": created_count,
                 "existing_count": existing_count,
+                "skipped_count": len(skipped),
+                "skipped": skipped[:200],
                 "dry_run": dry_run,
             }
         )
@@ -623,7 +661,12 @@ def run_emi_subscription_bridges(*, start_date: date, end_date: date, dry_run: b
 
 @transaction.atomic
 def run_emi_payment_bridges(*, start_date: date, end_date: date, dry_run: bool = False, performed_by=None) -> dict:
-    payments = Payment.objects.select_related("customer", "subscription").filter(
+    payments = Payment.objects.select_related(
+        "customer",
+        "subscription",
+        "finance_account",
+        "finance_account__chart_account",
+    ).filter(
         payment_date__range=(start_date, end_date)
     ).exclude(
         allocation_metadata__reversal__is_reversed=True
@@ -636,12 +679,14 @@ def run_emi_payment_bridges(*, start_date: date, end_date: date, dry_run: bool =
         if hasattr(payment, "receipt_document"):
             existing_count += 1
             continue
-        finance_account = _finance_account_for_payment_method(payment.method)
+        finance_account = getattr(payment, "finance_account", None)
+        if finance_account is None:
+            finance_account = _finance_account_for_payment_method(payment.method)
         if finance_account is None:
             skipped.append(
                 {
                     "payment_id": payment.id,
-                    "reason": "AMBIGUOUS_FINANCE_ACCOUNT",
+                    "reason": "MISSING_FINANCE_ACCOUNT",
                     "method": payment.method,
                 }
             )
@@ -652,7 +697,7 @@ def run_emi_payment_bridges(*, start_date: date, end_date: date, dry_run: bool =
                     performed_by=performed_by,
                     metadata={
                         "purpose": "EMI_PAYMENT_RECEIPT",
-                        "reason": "AMBIGUOUS_FINANCE_ACCOUNT",
+                        "reason": "MISSING_FINANCE_ACCOUNT",
                         "method": payment.method,
                     },
                 )
