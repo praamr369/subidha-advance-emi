@@ -73,6 +73,7 @@ export default function BillingOverviewPage() {
   const draftInvoices = invoices.filter((row) => row.status === "DRAFT").length;
   const approvedInvoices = invoices.filter((row) => row.status === "APPROVED").length;
   const latestPosted = postedInvoices[0];
+  const showMetrics = !loading && !error;
 
   return (
     <PortalPage
@@ -99,12 +100,12 @@ export default function BillingOverviewPage() {
         { href: ROUTES.admin.billingCashBook, label: "Cash Book", variant: "secondary" },
       ]}
       stats={[
-        { label: "Invoices", value: String(invoices.length), tone: "info" },
-        { label: "Direct Sales", value: String(directSaleCount), tone: "info" },
-        { label: "Contracts", value: String(contractCount), tone: "info" },
-        { label: "Credit Notes", value: String(creditCount), tone: creditCount > 0 ? "warning" : "default" },
-        { label: "Debit Notes", value: String(debitCount), tone: debitCount > 0 ? "info" : "default" },
-        { label: "Receipts", value: String(receiptCount), tone: "success" },
+        { label: "Invoices", value: showMetrics ? String(invoices.length) : "—", tone: showMetrics ? "info" : "default" },
+        { label: "Direct Sales", value: showMetrics ? String(directSaleCount) : "—", tone: showMetrics ? "info" : "default" },
+        { label: "Contracts", value: showMetrics ? String(contractCount) : "—", tone: showMetrics ? "info" : "default" },
+        { label: "Credit Notes", value: showMetrics ? String(creditCount) : "—", tone: showMetrics && creditCount > 0 ? "warning" : "default" },
+        { label: "Debit Notes", value: showMetrics ? String(debitCount) : "—", tone: showMetrics && debitCount > 0 ? "info" : "default" },
+        { label: "Receipts", value: showMetrics ? String(receiptCount) : "—", tone: showMetrics ? "success" : "default" },
       ]}
     >
       {loading ? <LoadingBlock label="Loading billing operations..." /> : null}
@@ -163,23 +164,23 @@ export default function BillingOverviewPage() {
             />
             <StatCard
               label="Direct Sales"
-              value={String(directSaleCount)}
+              value={showMetrics ? String(directSaleCount) : "—"}
               subtext="Separate operational retail orders feeding the billing engine without overloading EMI tables."
-              tone={directSaleCount > 0 ? "info" : "default"}
+              tone={showMetrics && directSaleCount > 0 ? "info" : "default"}
               icon={<FileText className="h-5 w-5" />}
             />
             <StatCard
               label="Receipt Register"
-              value={String(receiptCount)}
+              value={showMetrics ? String(receiptCount) : "—"}
               subtext="Retail and EMI payment receipts are tracked separately from payment posting."
-              tone="success"
+              tone={showMetrics ? "success" : "default"}
               icon={<Receipt className="h-5 w-5" />}
             />
             <StatCard
               label="Billing Contracts"
-              value={String(contractCount)}
+              value={showMetrics ? String(contractCount) : "—"}
               subtext="Contract mirrors trace delivery-gated invoice eligibility and next-due EMI context."
-              tone={contractCount > 0 ? "info" : "default"}
+              tone={showMetrics && contractCount > 0 ? "info" : "default"}
               icon={<RotateCcw className="h-5 w-5" />}
             />
           </div>
@@ -193,30 +194,30 @@ export default function BillingOverviewPage() {
                 title: "Document control",
                 description: "Primary document registers for invoice and receipt handling.",
                 items: [
-                  {
-                    title: "Document Register",
-                    description: "Canonical document rail for posted, draft, and approved billing documents.",
-                    href: ROUTES.admin.billingRegister,
-                    icon: <FileText className="h-4 w-4" />,
-                    badge: "Register",
-                    detail: `${invoices.length} invoices visible`,
-                  },
+	                  {
+	                    title: "Document Register",
+	                    description: "Canonical document rail for posted, draft, and approved billing documents.",
+	                    href: ROUTES.admin.billingRegister,
+	                    icon: <FileText className="h-4 w-4" />,
+	                    badge: "Register",
+	                    detail: showMetrics ? `${invoices.length} invoices visible` : "— invoices visible",
+	                  },
                   {
                     title: "Invoices",
                     description: "Invoice register with draft, approved, and posted posture.",
-                    href: ROUTES.admin.billingInvoices,
-                    icon: <FileBadge2 className="h-4 w-4" />,
-                    badge: "Invoice",
-                    detail: `${draftInvoices} draft · ${approvedInvoices} approved`,
-                  },
+	                    href: ROUTES.admin.billingInvoices,
+	                    icon: <FileBadge2 className="h-4 w-4" />,
+	                    badge: "Invoice",
+	                    detail: showMetrics ? `${draftInvoices} draft · ${approvedInvoices} approved` : "— draft · — approved",
+	                  },
                   {
                     title: "Receipts",
                     description: "Receipt documents kept separate from payment posting truth.",
-                    href: ROUTES.admin.billingReceipts,
-                    icon: <Receipt className="h-4 w-4" />,
-                    badge: "Receipt",
-                    detail: `${receiptCount} receipt documents`,
-                  },
+	                    href: ROUTES.admin.billingReceipts,
+	                    icon: <Receipt className="h-4 w-4" />,
+	                    badge: "Receipt",
+	                    detail: showMetrics ? `${receiptCount} receipt documents` : "— receipt documents",
+	                  },
                 ],
               },
               {
@@ -226,19 +227,19 @@ export default function BillingOverviewPage() {
                   {
                     title: "Direct Sales",
                     description: "Retail orders, recovery, and billing generation without touching EMI collection rails.",
-                    href: ROUTES.admin.billingDirectSales,
-                    icon: <RotateCcw className="h-4 w-4" />,
-                    badge: "Retail",
-                    detail: `${directSaleCount} direct-sale rows`,
-                  },
+	                    href: ROUTES.admin.billingDirectSales,
+	                    icon: <RotateCcw className="h-4 w-4" />,
+	                    badge: "Retail",
+	                    detail: showMetrics ? `${directSaleCount} direct-sale rows` : "— direct-sale rows",
+	                  },
                   {
                     title: "Contracts",
                     description: "Billing contracts that connect delivery readiness and invoicing posture.",
-                    href: ROUTES.admin.billingContracts,
-                    icon: <FileText className="h-4 w-4" />,
-                    badge: "Contract",
-                    detail: `${contractCount} billing contracts`,
-                  },
+	                    href: ROUTES.admin.billingContracts,
+	                    icon: <FileText className="h-4 w-4" />,
+	                    badge: "Contract",
+	                    detail: showMetrics ? `${contractCount} billing contracts` : "— billing contracts",
+	                  },
                   {
                     title: "Daily Book",
                     description: "Daily billing summary without collapsing into accounting books.",
@@ -255,19 +256,19 @@ export default function BillingOverviewPage() {
                   {
                     title: "Credit Notes",
                     description: "Controlled note register for billing-side reversals and adjustments.",
-                    href: ROUTES.admin.billingCreditNotes,
-                    icon: <RotateCcw className="h-4 w-4" />,
-                    badge: "Credit",
-                    detail: `${creditCount} note rows`,
-                  },
+	                    href: ROUTES.admin.billingCreditNotes,
+	                    icon: <RotateCcw className="h-4 w-4" />,
+	                    badge: "Credit",
+	                    detail: showMetrics ? `${creditCount} note rows` : "— note rows",
+	                  },
                   {
                     title: "Debit Notes",
                     description: "Incremental billing adjustments separate from accounting journals.",
-                    href: ROUTES.admin.billingDebitNotes,
-                    icon: <RotateCcw className="h-4 w-4" />,
-                    badge: "Debit",
-                    detail: `${debitCount} note rows`,
-                  },
+	                    href: ROUTES.admin.billingDebitNotes,
+	                    icon: <RotateCcw className="h-4 w-4" />,
+	                    badge: "Debit",
+	                    detail: showMetrics ? `${debitCount} note rows` : "— note rows",
+	                  },
                   {
                     title: "Cash Book",
                     description: "Billing-side cashbook view for operational visibility before accounting follow-up.",

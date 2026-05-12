@@ -13,7 +13,7 @@ This document describes **how an existing Lucky Plan subscription connects to ot
 
 ### Collections / receipts
 
-- Cashier collections (operator-first): `/cashier/billing/collections`
+- Cashier collections (operator-first): `/cashier/collect`
 - Admin collections overview: `/admin/finance/collections`
 - Payments register: `/admin/payments`
 - Payment detail / audit: `/admin/payments/[id]`
@@ -21,8 +21,8 @@ This document describes **how an existing Lucky Plan subscription connects to ot
 ### Waivers and draw winner impact (future EMI only)
 
 - Waiver register: `/admin/waivers`
-- Lucky draw: `/admin/lucky-draw`
-- Lucky draw winners: `/admin/lucky-draw/winners`
+- Lucky draw register: `/admin/lucky-draws`
+- Lucky draw history: `/admin/lucky-draw/history`
 
 ### Reconciliation and accounting control
 
@@ -54,7 +54,6 @@ This document describes **how an existing Lucky Plan subscription connects to ot
 These are common navigation paths for staff, expressed only with existing routes:
 
 - **Enroll / contract**: `/admin/subscriptions/create` → `/admin/subscriptions/[id]`
-- **Collect EMI**: `/cashier/billing/collections` → `/admin/payments/[id]` (audit/review if needed)
+- **Collect EMI**: `/cashier/collect` → `/admin/payments/[id]` (audit/review if needed)
 - **Handle exceptions**: `/admin/operations` → drill into the routed queue targets (collections/delivery/KYC/inventory)
 - **Reconcile**: `/admin/payments/reconciliation` → `/admin/finance/reconciliation` → `/admin/accounting/reconciliation`
-

@@ -37,9 +37,13 @@ export default function AdminTodayWorkPage() {
       title="Today's Work"
       subtitle="Daily admin action queues from the existing ERP summary service."
     >
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+          {error}
+        </div>
+      ) : null}
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">Loading today&apos;s work...</div>
+        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">Loading today&apos;s work...</div>
       ) : (
         <PipelineBoard title="Action Queues" cards={cards} />
       )}

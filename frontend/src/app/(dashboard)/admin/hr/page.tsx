@@ -11,6 +11,7 @@ import { getHrSummary, type HrSummary } from "@/services/admin-hr";
 export default function AdminHrWorkspacePage() {
   const [payload, setPayload] = useState<HrSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const loading = !payload && !error;
 
   useEffect(() => {
     let active = true;
@@ -47,14 +48,16 @@ export default function AdminHrWorkspacePage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
       stats={[
-        { label: "Active staff", value: payload?.total_active_staff ?? 0, tone: "info" },
-        { label: "Present today", value: payload?.today_present ?? 0, tone: "success" },
-        { label: "Absent today", value: payload?.today_absent ?? 0, tone: "warning" },
-        { label: "Leave pending", value: payload?.pending_leave_requests ?? 0, tone: "warning" },
+        { label: "Active staff", value: payload ? payload.total_active_staff : "—", tone: payload ? "info" : "default" },
+        { label: "Present today", value: payload ? payload.today_present : "—", tone: payload ? "success" : "default" },
+        { label: "Absent today", value: payload ? payload.today_absent : "—", tone: payload ? "warning" : "default" },
+        { label: "Leave pending", value: payload ? payload.pending_leave_requests : "—", tone: payload ? "warning" : "default" },
       ]}
     >
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+          {error}
+        </div>
       ) : null}
 
       {payload ? (
@@ -66,7 +69,7 @@ export default function AdminHrWorkspacePage() {
             <StatCard label="As of" value={new Date(payload.as_of).toLocaleString("en-IN")} tone="default" />
           </div>
 
-          <section className="rounded-2xl border border-white/80 bg-white/80 p-5">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">Quick routes</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {[
@@ -78,7 +81,11 @@ export default function AdminHrWorkspacePage() {
                 ["Expense Claims", ROUTES.admin.hrExpenses],
                 ["Staff Documents", ROUTES.admin.hrStaffDocuments],
               ].map(([label, href]) => (
-                <Link key={String(label)} href={String(href)} className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-foreground hover:bg-white">
+                <Link
+                  key={String(label)}
+                  href={String(href)}
+                  className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-[var(--surface-strong)]"
+                >
                   {label}
                 </Link>
               ))}
@@ -86,9 +93,10 @@ export default function AdminHrWorkspacePage() {
           </section>
         </>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">Loading HR workspace...</div>
+        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          {loading ? "Loading HR workspace..." : "HR summary unavailable."}
+        </div>
       )}
     </PortalPage>
   );
 }
-

@@ -18,7 +18,7 @@ These are the main “join points” that connect day-to-day work:
   - Subscription register: `/admin/subscriptions`
   - Subscription detail: `/admin/subscriptions/[id]`
   - EMI schedule: `/admin/subscriptions/[id]/emis`
-  - Payment collection: `/cashier/billing/collections`
+  - Cashier collection: `/cashier/collect`
 - **Payments / receipts** → billing, accounting books, reconciliation, reversal controls
   - Payments register: `/admin/payments`
   - Payment detail: `/admin/payments/[id]`
@@ -46,14 +46,14 @@ These are the main “join points” that connect day-to-day work:
 
 - Subscriptions drive recurring collections and waivers:
   - Subscription detail → EMI schedule: `/admin/subscriptions/[id]/emis`
-  - Cashier collections: `/cashier/billing/collections`
+  - Cashier collections: `/cashier/collect`
   - Admin collections: `/admin/finance/collections`
 
 ### Subscriptions ↔ Lucky draw / waivers
 
 - Draw operations and winner benefits are connected from subscription context:
-  - Lucky draw: `/admin/lucky-draw`
-  - Winners: `/admin/lucky-draw/winners`
+  - Lucky draw register: `/admin/lucky-draws`
+  - Lucky draw history: `/admin/lucky-draw/history`
   - Waivers: `/admin/waivers`
 
 ### Customers ↔ CRM ↔ Service desk
@@ -73,13 +73,35 @@ These are the main “join points” that connect day-to-day work:
 ### HR ↔ Accounting (attendance / payroll surfaces)
 
 - HR operational work is connected to accounting-control pages:
-  - HR workspace: `/admin/hr/workspace`
-  - Attendance: `/admin/accounting/attendance`
-  - Salary: `/admin/accounting/salary`
+  - HR workspace: `/admin/hr`
+  - Attendance: `/admin/hr/attendance` (accounting mirror: `/admin/accounting/attendance`)
+  - Payroll / salary: `/admin/hr/payroll` (accounting mirror: `/admin/accounting/salary`)
+
+### Vendors / purchase ↔ Inventory ↔ Accounting
+
+- Purchases feed stock movement, delivery readiness, and vendor settlements:
+  - Purchases: `/admin/purchases`
+  - Purchase orders: `/admin/purchases/orders`
+  - Purchase bills: `/admin/purchases/bills`
+  - Vendor register: `/admin/vendors`
+  - Vendor detail: `/admin/vendors/[id]`
+
+### Partners (admin control + partner workspace)
+
+- Partner records connect collections, commissions, and payout controls:
+  - Admin partners: `/admin/partners`
+  - Partner payment requests: `/admin/partner-payment-requests`
+  - Partner workspace: `/partner`
+
+### Customer self-service (customer workspace)
+
+- Customer views are scoped to the logged-in customer:
+  - Customer workspace: `/customer`
+  - Customer payments: `/customer/payments`
+  - Customer documents: `/customer/documents`
 
 ## Admin command center surfaces (existing)
 
 - Operations working screen (queues): `/admin/operations`
 - Operations command center: `/admin/operations/command-center`
 - Admin ERP workspace redirect: `/admin/workspace` → `/admin/erp`
-

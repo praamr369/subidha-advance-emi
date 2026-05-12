@@ -24,7 +24,7 @@ Source of truth for routes:
 
 ### Money
 
-- Collections: `/cashier/billing/collections`, `/admin/finance/collections`
+- Collections: `/cashier/collect`, `/admin/finance/collections`
 - Payments: `/admin/payments`
 - Reconciliation: `/admin/payments/reconciliation`, `/admin/finance/reconciliation`, `/admin/accounting/reconciliation`
 - Period control: `/admin/accounting/periods`
@@ -38,7 +38,7 @@ Source of truth for routes:
 
 ### Sales
 
-- Direct sale: `/admin/sales/direct-sale`
+- Direct sales: `/admin/billing/direct-sales`
 - Billing: `/admin/billing`
 
 ### Customers / CRM / Support
@@ -56,13 +56,12 @@ Source of truth for routes:
 
 ### HR
 
-- HR workspace: `/admin/hr/workspace`
-- Attendance: `/admin/accounting/attendance`
-- Leave: `/admin/accounting/leave`
-- Salary: `/admin/accounting/salary`
+- HR workspace: `/admin/hr`
+- Attendance: `/admin/hr/attendance`
+- Leave: `/admin/hr/leave`
+- Salary: `/admin/hr/payroll`
 
 ## Change control
 
 - Any GUI refactor that touches money flows (collections, payments, reconciliation) must be validated via the release candidate script.
 - Avoid cross-module “shortcuts” that bypass established operational routes.
-

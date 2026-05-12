@@ -18,13 +18,13 @@ This document ties together the **existing** admin operator surfaces.
 
 ## HR surfaces
 
-- HR workspace: `/admin/hr/workspace`
-- Staff register: `/admin/accounting/staff`
-- Staff detail: `/admin/accounting/staff/[id]`
-- Attendance: `/admin/accounting/attendance`
-- Leave: `/admin/accounting/leave`
-- Expense claims: `/admin/accounting/expense-claims`
-- Salary / payroll: `/admin/accounting/salary`
+- HR workspace: `/admin/hr`
+- Staff register: `/admin/hr/staff`
+- Staff detail: `/admin/hr/staff/[id]`
+- Attendance: `/admin/hr/attendance`
+- Leave: `/admin/hr/leave`
+- Expense claims: `/admin/hr/expenses`
+- Salary / payroll: `/admin/hr/payroll`
 
 ## How these connect in daily operations
 
@@ -35,10 +35,9 @@ This document ties together the **existing** admin operator surfaces.
 
 - **Operations → HR actions**
   - Start: `/admin/operations`
-  - Daily staff actions: `/admin/accounting/attendance`, `/admin/accounting/leave`, `/admin/accounting/expense-claims`
+  - Daily staff actions: `/admin/hr/attendance`, `/admin/hr/leave`, `/admin/hr/expenses`
 
 ## Notes (guardrails)
 
 - These pages are for **internal roles only** (admin/cashier). Do not expose these links in customer/partner/public navigation.
 - Do not derive KPIs here unless backed by real API data used in the actual page implementations.
-

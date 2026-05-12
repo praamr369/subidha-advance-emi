@@ -105,10 +105,10 @@ export default function AdminOperationsWorkspacePage() {
         ) : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {focusRows.map((row, index) => {
+          {focusRows.map((row) => {
             const href = routeForQueue(row.key, row.detail_url);
             return (
-              <article key={`op-focus-${row.key}-${index}`} className="rounded-2xl border border-white/80 bg-white/80 p-4">
+              <article key={`op-focus-${row.key}`} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="text-sm font-semibold text-foreground">{row.key.replaceAll("_", " ")}</div>
                 <div className="mt-2 text-2xl font-semibold text-foreground">{row.count}</div>
                 <div className="mt-2">
@@ -123,33 +123,33 @@ export default function AdminOperationsWorkspacePage() {
           })}
         </section>
 
-        <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
+        <section className="rounded-2xl border border-amber-200/70 bg-amber-50/80 p-5 dark:border-amber-900/60 dark:bg-amber-950/25">
           <h2 className="text-base font-semibold text-foreground">HR Actions</h2>
           <p className="mt-1 text-sm text-muted-foreground">Bring daily staff tasks into the same operator workflow.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <article className="rounded-xl border border-white/80 bg-white/80 p-4">
+            <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="text-xs text-muted-foreground">Mark attendance</div>
               <div className="mt-2">
                 <ActionButton href={ROUTES.admin.hrAttendance} size="sm" variant="primary">Mark Attendance</ActionButton>
               </div>
             </article>
-            <article className="rounded-xl border border-white/80 bg-white/80 p-4">
+            <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="text-xs text-muted-foreground">Pending leave</div>
-              <div className="mt-1 text-2xl font-semibold">{hrSummary?.pending_leave_requests ?? 0}</div>
+              <div className="mt-1 text-2xl font-semibold text-foreground">{hrSummary ? hrSummary.pending_leave_requests : "—"}</div>
               <div className="mt-2">
                 <ActionButton href={ROUTES.admin.hrLeave} size="sm" variant="primary">Approve Leave</ActionButton>
               </div>
             </article>
-            <article className="rounded-xl border border-white/80 bg-white/80 p-4">
+            <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="text-xs text-muted-foreground">Pending expenses</div>
-              <div className="mt-1 text-2xl font-semibold">{hrSummary?.pending_expense_claims ?? 0}</div>
+              <div className="mt-1 text-2xl font-semibold text-foreground">{hrSummary ? hrSummary.pending_expense_claims : "—"}</div>
               <div className="mt-2">
                 <ActionButton href={ROUTES.admin.hrExpenses} size="sm" variant="primary">Approve Expense</ActionButton>
               </div>
             </article>
-            <article className="rounded-xl border border-white/80 bg-white/80 p-4">
+            <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="text-xs text-muted-foreground">Payroll pending</div>
-              <div className="mt-1 text-2xl font-semibold">{hrSummary?.payroll_pending ?? 0}</div>
+              <div className="mt-1 text-2xl font-semibold text-foreground">{hrSummary ? hrSummary.payroll_pending : "—"}</div>
               <div className="mt-2">
                 <ActionButton href={ROUTES.admin.hrPayroll} size="sm" variant="primary">Open Payroll</ActionButton>
               </div>
