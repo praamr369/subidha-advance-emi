@@ -35,6 +35,11 @@ export type AccountingSetupStatusPayload = {
   journal_ready?: boolean;
   setup_complete?: boolean;
   blocking_reasons?: string[];
+  setup_health_status?: "OK" | "WARNING" | "BLOCKED" | string;
+  setup_health_blockers_count?: number;
+  setup_health_warnings_count?: number;
+  posting_readiness?: "READY" | "BLOCKED" | string;
+  reconciliation_readiness?: "READY" | "BLOCKED" | string;
 };
 
 export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {

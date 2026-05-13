@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
-import { getAccountingSetupStatus, repairSuggestedMappings } from "@/services/accounting-setup";
+import { getAccountingSetupStatus, repairSuggestedMappings, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 import { getSetupChecklist, type SetupChecklist } from "@/services/business-setup";
 
 function toNumber(value: unknown): number {
@@ -15,7 +15,7 @@ function toNumber(value: unknown): number {
 
 export default function AccountingSetupGuidePage() {
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
-  const [acctStatus, setAcctStatus] = useState<Record<string, unknown> | null>(null);
+  const [acctStatus, setAcctStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [repairing, setRepairing] = useState(false);
 
@@ -25,7 +25,7 @@ export default function AccountingSetupGuidePage() {
       .then(([payload, accounting]) => {
         if (!mounted) return;
         setChecklist(payload);
-        setAcctStatus(accounting as Record<string, unknown>);
+        setAcctStatus(accounting);
         setError(null);
       })
       .catch((err) => {
@@ -41,8 +41,11 @@ export default function AccountingSetupGuidePage() {
   const chartRootsStmt = toNumber(checklist?.counts?.statement_root_accounts ?? checklist?.counts?.visible_register_count);
   const chartChildren = toNumber(checklist?.counts?.child_sub_accounts ?? checklist?.counts?.active_child_chart_accounts);
   const nonStatement = toNumber(checklist?.counts?.non_statement_accounts);
-  const warningCount = toNumber(acctStatus?.warnings_count);
-  const setupStatus = warningCount > 0 ? "NEEDS_ATTENTION" : String(acctStatus?.status ?? "—");
+  const blockerCount = toNumber(acctStatus?.setup_health_blockers_count) || (acctStatus?.blocking_reasons?.length ?? 0);
+  const healthWarningCount = toNumber(acctStatus?.setup_health_warnings_count);
+  const setupStatus = String(acctStatus?.setup_health_status ?? acctStatus?.status ?? "—");
+  const postingReadiness = String(acctStatus?.posting_readiness ?? "BLOCKED");
+  const reconciliationReadiness = String(acctStatus?.reconciliation_readiness ?? "BLOCKED");
   const financeAccounts = toNumber(checklist?.counts?.finance_accounts_active);
   const hasCash = toNumber(checklist?.counts?.finance_accounts_cash) > 0;
   const hasBank = toNumber(checklist?.counts?.finance_accounts_bank) > 0;
@@ -74,17 +77,17 @@ export default function AccountingSetupGuidePage() {
             <div className="font-semibold">{setupStatus}</div>
           </div>
           <div>
-            <div className="text-muted-foreground">Mappings complete</div>
-            <div className="font-semibold">{warningCount > 0 ? "No" : acctStatus?.mappings_complete ? "Yes" : "No"}</div>
+            <div className="text-muted-foreground">Posting readiness</div>
+            <div className="font-semibold">{postingReadiness}</div>
           </div>
           <div>
-            <div className="text-muted-foreground">Warnings</div>
-            <div className="font-semibold">{warningCount}</div>
+            <div className="text-muted-foreground">Reconciliation readiness</div>
+            <div className="font-semibold">{reconciliationReadiness}</div>
           </div>
         </div>
-        {warningCount > 0 ? (
+        {blockerCount > 0 ? (
           <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            {warningCount} blocking mapping warning{warningCount === 1 ? "" : "s"}.
+            {blockerCount} blocker{blockerCount === 1 ? "" : "s"} and {healthWarningCount} warning{healthWarningCount === 1 ? "" : "s"} detected.
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
@@ -104,7 +107,7 @@ export default function AccountingSetupGuidePage() {
                 await repairSuggestedMappings(false);
                 const [payload, accounting] = await Promise.all([getSetupChecklist(), getAccountingSetupStatus()]);
                 setChecklist(payload);
-                setAcctStatus(accounting as Record<string, unknown>);
+                setAcctStatus(accounting);
                 setError(null);
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to repair suggested mappings.");

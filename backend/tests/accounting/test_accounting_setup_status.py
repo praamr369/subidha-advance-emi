@@ -58,6 +58,11 @@ class AccountingSetupStatusTests(APITestCase):
         self.assertIn("setup_complete", data)
         self.assertIn("blocking_reasons", data)
         self.assertIsInstance(data["blocking_reasons"], list)
+        self.assertIn("setup_health_status", data)
+        self.assertIn("setup_health_blockers_count", data)
+        self.assertIn("setup_health_warnings_count", data)
+        self.assertIn("posting_readiness", data)
+        self.assertIn("reconciliation_readiness", data)
 
     def test_chart_list_respects_page_size_query(self):
         self.client.force_authenticate(self.admin)
@@ -106,3 +111,5 @@ class AccountingSetupStatusTests(APITestCase):
         full = get_admin_accounting_setup_status()
         self.assertEqual(full["journal_ready"], full["mappings_complete"])
         self.assertEqual(full["setup_complete"], full["mappings_complete"])
+        self.assertIn(full["posting_readiness"], {"READY", "BLOCKED"})
+        self.assertIn(full["reconciliation_readiness"], {"READY", "BLOCKED"})

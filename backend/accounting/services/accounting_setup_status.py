@@ -16,6 +16,7 @@ from accounting.services.accounting_setup_service import (
     REQUIRED_MAPPING_PURPOSES,
     AccountingSetupService,
 )
+from accounting.services.setup_health_service import get_accounting_setup_health
 
 
 def compute_accounting_master_metrics() -> dict[str, int]:
@@ -91,6 +92,24 @@ def get_admin_accounting_setup_status() -> dict[str, Any]:
     setup_complete = bool(validation.get("mappings_complete"))
     journal_ready = setup_complete
     blocking_reasons = build_blocking_reasons(validation=validation)
+    health = get_accounting_setup_health()
+    health_blockers = list(health.get("blockers") or [])
+    health_warnings = list(health.get("warnings") or [])
+    journals = health.get("journals") or {}
+    bridges = health.get("bridges") or {}
+
+    posting_ready = bool(
+        setup_complete
+        and not health_blockers
+        and bool(validation.get("ledger_anchor_present"))
+        and bool(validation.get("real_settlement_accounts_present"))
+    )
+    reconciliation_ready = bool(
+        posting_ready
+        and int(journals.get("posted_unbalanced_count") or 0) == 0
+        and int(journals.get("posted_zero_line_count") or 0) == 0
+        and int(bridges.get("missing_journal_count") or 0) == 0
+    )
 
     return {
         **validation,
@@ -105,4 +124,9 @@ def get_admin_accounting_setup_status() -> dict[str, Any]:
         "journal_ready": journal_ready,
         "setup_complete": setup_complete,
         "blocking_reasons": blocking_reasons,
+        "setup_health_status": health.get("status"),
+        "setup_health_blockers_count": len(health_blockers),
+        "setup_health_warnings_count": len(health_warnings),
+        "posting_readiness": "READY" if posting_ready else "BLOCKED",
+        "reconciliation_readiness": "READY" if reconciliation_ready else "BLOCKED",
     }
