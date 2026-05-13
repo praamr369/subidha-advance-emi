@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { defineConfig, devices } from "@playwright/test";
 
@@ -11,14 +12,13 @@ const apiBaseUrl =
   process.env.PLAYWRIGHT_API_URL || `${backendRootUrl}/api/v1`;
 const smokeMetaPath =
   process.env.PLAYWRIGHT_SMOKE_META_PATH ||
-  path.resolve(__dirname, "../backend/playwright-smoke-meta.json");
+  `/tmp/subidha-playwright-smoke-meta-${randomUUID()}.json`;
 const smokeDbPath =
   process.env.PLAYWRIGHT_DB_PATH ||
-  `/tmp/subidha-playwright-smoke-${process.pid}.sqlite3`;
-const smokeManifestPath = path.resolve(
-  __dirname,
-  "tests/e2e/.generated/smoke-manifest.json"
-);
+  `/tmp/subidha-playwright-smoke-${randomUUID()}.sqlite3`;
+const smokeManifestPath =
+  process.env.PLAYWRIGHT_SMOKE_MANIFEST_PATH ||
+  `/tmp/subidha-playwright-smoke-manifest-${randomUUID()}.json`;
 const resolvePythonExecutable = () => {
   const envConfigured =
     process.env.PLAYWRIGHT_PYTHON || process.env.PYTHON_BIN || "";
