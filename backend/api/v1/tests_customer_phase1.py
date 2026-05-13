@@ -326,6 +326,52 @@ class CustomerKycUpdateRequestTests(TestCase):
         # Should return 0 documents (not the other customer's docs)
         assert response.data["count"] == 0
 
+    def test_customer_kyc_list_does_not_expose_file_url(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        create_kyc_update_request(
+            self.customer,
+            document_type="AADHAAR",
+            file=SimpleUploadedFile("aadhaar.jpg", b"fake-image-data", content_type="image/jpeg"),
+            uploaded_by=self.customer.user,
+        )
+        client = APIClient()
+        client.force_authenticate(user=self.customer.user)
+        response = client.get("/api/v1/customer/kyc-documents/")
+        assert response.status_code == 200, response.data
+        row = response.data["results"][0]
+        assert "file" not in row
+
+    def test_customer_kyc_documents_new_route_accepts_upload(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        client = APIClient()
+        client.force_authenticate(user=self.customer.user)
+        response = client.post(
+            "/api/v1/customer/kyc-documents/",
+            data={
+                "document_type": "AADHAAR",
+                "file": SimpleUploadedFile("aadhaar.png", b"fake-image-data", content_type="image/png"),
+            },
+            format="multipart",
+        )
+        assert response.status_code == 201, response.data
+
+    def test_customer_kyc_upload_rejects_invalid_content_type(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        client = APIClient()
+        client.force_authenticate(user=self.customer.user)
+        response = client.post(
+            "/api/v1/customer/kyc-documents/",
+            data={
+                "document_type": "AADHAAR",
+                "file": SimpleUploadedFile("script.sh", b"#!/bin/sh", content_type="text/x-shellscript"),
+            },
+            format="multipart",
+        )
+        assert response.status_code == 400, response.data
+
 
 # ---------------------------------------------------------------------------
 # 8. Admin can approve/reject KYC
@@ -409,6 +455,61 @@ class CustomerKycAdminApprovalTests(TestCase):
             format="json",
         )
         assert response.status_code == 400
+
+    def test_admin_can_approve_reject_and_download_kyc_document(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        doc = CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type="PAN",
+            file=SimpleUploadedFile("pan.pdf", b"%PDF-data", content_type="application/pdf"),
+            status=CustomerKycDocumentStatus.SUBMITTED,
+            uploaded_by=self.customer.user,
+            original_filename="pan.pdf",
+            content_type="application/pdf",
+            file_size=8,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        approve = client.post(f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/approve/", {}, format="json")
+        assert approve.status_code == 200, approve.data
+        doc.refresh_from_db()
+        assert doc.status == CustomerKycDocumentStatus.APPROVED
+
+        reject = client.post(
+            f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/reject/",
+            {"reason": "Mismatch"},
+            format="json",
+        )
+        assert reject.status_code == 200, reject.data
+        doc.refresh_from_db()
+        assert doc.status == CustomerKycDocumentStatus.REJECTED
+        assert doc.rejection_reason == "Mismatch"
+
+        download = client.get(f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/download/")
+        assert download.status_code == 200
+
+    def test_non_admin_cannot_approve_reject_or_download_kyc_document(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        doc = CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type="PAN",
+            file=SimpleUploadedFile("pan.pdf", b"%PDF-data", content_type="application/pdf"),
+            status=CustomerKycDocumentStatus.SUBMITTED,
+            uploaded_by=self.customer.user,
+        )
+        outsider = make_customer(phone="8111111112")
+        client = APIClient()
+        client.force_authenticate(user=outsider.user)
+        assert client.post(f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/approve/", {}, format="json").status_code in (401, 403)
+        assert client.post(
+            f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/reject/",
+            {"reason": "x"},
+            format="json",
+        ).status_code in (401, 403)
+        assert client.get(f"/api/v1/admin/customers/{self.customer.pk}/kyc-documents/{doc.id}/download/").status_code in (401, 403)
 
 
 # ---------------------------------------------------------------------------

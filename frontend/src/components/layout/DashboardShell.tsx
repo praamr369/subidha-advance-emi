@@ -895,6 +895,7 @@ function SidebarContent({
                 onToggleCollapse();
               }}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+              data-testid={collapsed ? "sidebar-expand-button" : "sidebar-collapse-button"}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -1073,6 +1074,23 @@ function SidebarContent({
         aria-label={`${formatRoleLabel(role)} sidebar navigation`}
       >
         <div className="space-y-4">
+          {collapsed && !isMobile ? (
+            <div className="sticky top-0 z-30 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFlyoutGroup(null);
+                  onToggleCollapse();
+                }}
+                data-testid="sidebar-expand-button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] text-[var(--sidebar-foreground)] shadow-[0_8px_22px_-16px_rgba(0,0,0,0.65)] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/55"
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
           {visibleGroups.length === 0 && !collapsed ? (
             <div className="rounded-lg bg-white/[0.03] px-3 py-2.5 text-xs text-[var(--sidebar-item-muted)]">
               No navigation matches for &quot;{navQuery.trim()}&quot;.

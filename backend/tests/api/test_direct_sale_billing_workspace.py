@@ -586,6 +586,51 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.assertEqual(deliver.status_code, status.HTTP_400_BAD_REQUEST, deliver.data)
         self.assertIn("payment is due", str(deliver.data).lower())
 
+    def test_admin_can_approve_payment_exception_for_partial_paid_direct_sale(self):
+        payload = self._payload()
+        payload["delivery_required"] = True
+        payload["received_total"] = "1000.00"
+        payload["balance_total"] = "22000.00"
+        created = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        sale_id = created.data["id"]
+        finalize = self.client.post(
+            f"/api/v1/admin/billing/direct-sales/{sale_id}/finalize-invoice/",
+            {},
+            format="json",
+        )
+        self.assertEqual(finalize.status_code, status.HTTP_200_OK, finalize.data)
+        case = ServiceDeskCase.objects.get(direct_sale_id=sale_id)
+
+        approve = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/approve-payment-exception/",
+            {"reason": "Customer requested scheduled delivery", "acknowledgement": True},
+            format="json",
+        )
+        self.assertEqual(approve.status_code, status.HTTP_200_OK, approve.data)
+        case.refresh_from_db()
+        self.assertTrue(case.payment_exception_approved)
+        self.assertIsNotNone(case.payment_exception_approved_at)
+
+        dispatch = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/dispatch/",
+            {"notes": "Dispatch with admin exception"},
+            format="json",
+        )
+        self.assertEqual(dispatch.status_code, status.HTTP_200_OK, dispatch.data)
+        case.direct_sale.refresh_from_db()
+        self.assertGreater(Decimal(str(case.direct_sale.balance_total or "0")), Decimal("0.00"))
+
+    def test_non_admin_cannot_approve_direct_sale_payment_exception(self):
+        case = self._create_paid_ready_delivery_case()
+        self.client.force_authenticate(user=self.customer.user)
+        response = self.client.post(
+            f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/approve-payment-exception/",
+            {"reason": "invalid", "acknowledgement": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+
     def test_direct_sale_cancel_requires_reason(self):
         case = self._create_paid_ready_delivery_case()
         response = self.client.post(

@@ -117,19 +117,33 @@ class CustomerKycDocumentUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
+    def validate_file(self, value):
+        max_size = 5 * 1024 * 1024
+        allowed = {"image/jpeg", "image/png", "application/pdf"}
+        content_type = (getattr(value, "content_type", "") or "").lower()
+        if not content_type or content_type not in allowed:
+            raise serializers.ValidationError("Unsupported file type. Allowed: JPG, PNG, PDF.")
+        file_size = int(getattr(value, "size", 0) or 0)
+        if file_size <= 0:
+            raise serializers.ValidationError("Uploaded file is empty.")
+        if file_size > max_size:
+            raise serializers.ValidationError("File must be 5MB or smaller.")
+        return value
+
 
 class CustomerKycDocumentReadSerializer(serializers.ModelSerializer):
     reviewed_by_username = serializers.SerializerMethodField()
+    original_filename = serializers.CharField(read_only=True)
+    file_size = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = CustomerKycDocument
         fields = (
             "id",
-            "customer",
             "document_type",
-            "file",
-            "notes",
             "status",
+            "original_filename",
+            "file_size",
             "reviewed_by_username",
             "reviewed_at",
             "rejection_reason",
@@ -139,17 +153,6 @@ class CustomerKycDocumentReadSerializer(serializers.ModelSerializer):
 
     def get_reviewed_by_username(self, obj):
         return getattr(obj.reviewed_by, "username", None) if obj.reviewed_by_id else None
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        request = self.context.get("request")
-        if instance.file and request:
-            data["file"] = request.build_absolute_uri(instance.file.url)
-        elif instance.file:
-            data["file"] = instance.file.url
-        else:
-            data["file"] = None
-        return data
 
 
 # ---------------------------------------------------------------------------

@@ -311,13 +311,9 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       ? blockingReasons.join(" ")
       : "";
 
-  const showSchedule = !isHistoryOnly && (nextActions.includes("SCHEDULE_DELIVERY") || delivery?.status === "PENDING");
-  const showDispatch =
-    !isHistoryOnly &&
-    (delivery?.status === "SCHEDULED" || delivery?.status === "PENDING" || nextActions.includes("SCHEDULE_DELIVERY"));
-  const showMarkDelivered =
-    !isHistoryOnly &&
-    (nextActions.includes("MARK_DELIVERED") || delivery?.status === "OUT_FOR_DELIVERY" || delivery?.status === "SCHEDULED");
+  const showSchedule = !isHistoryOnly && nextActions.includes("SCHEDULE_DELIVERY");
+  const showDispatch = !isHistoryOnly && (delivery?.status === "SCHEDULED" || delivery?.status === "PENDING");
+  const showMarkDelivered = !isHistoryOnly && nextActions.includes("MARK_DELIVERED");
   const showCancel = !isHistoryOnly && delivery?.status !== "DELIVERED" && delivery?.status !== "CANCELLED";
 
   return (

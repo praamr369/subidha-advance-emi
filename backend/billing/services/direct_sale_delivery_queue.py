@@ -144,7 +144,13 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
             "mark_delivered": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/mark-delivered/",
             "cancel": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/cancel/",
             "note": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/note/",
+            "approve_payment_exception": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/approve-payment-exception/",
         }
+    blocked_by_stock = bool(snap.get("stock_blocked"))
+    blocked_by_payment = bool(balance > Decimal("0.00")) and not bool(case.payment_exception_approved)
+    next_actions = list(op["next_actions"])
+    if case.payment_exception_approved and "SCHEDULE_DELIVERY" not in next_actions:
+        next_actions.append("SCHEDULE_DELIVERY")
 
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
@@ -225,7 +231,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "delivery_display": phase_label,
         "payment_state": snap.get("payment_state") or ("PAID" if balance <= Decimal("0.00") else "OUTSTANDING"),
         "operational_state": op["operational_state"],
-        "next_actions": op["next_actions"],
+        "next_actions": next_actions,
         "blocking_reasons": op["blocking_reasons"],
         "status_label": phase_label,
         "stock_state": op.get("inventory_state"),
@@ -233,6 +239,15 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
             "SALE_RETURN_IN_POSTED" if return_pickup_completed else "PENDING_RETURN_PICKUP" if return_pickup_required else None
         ),
         "delivery_state": snap.get("phase_code"),
+        "blocked_by_stock": blocked_by_stock,
+        "blocked_by_payment": blocked_by_payment,
+        "payment_exception_approved_at": case.payment_exception_approved_at.isoformat() if case.payment_exception_approved_at else None,
+        "payment_exception_approved_by_username": (
+            case.payment_exception_approved_by.username if case.payment_exception_approved_by_id else None
+        ),
+        "payment_exception_reason": case.payment_exception_reason or None,
+        "payment_exception_acknowledged": bool(case.payment_exception_approved),
+        "payment_exception_outstanding_amount_snapshot": str(balance) if case.payment_exception_approved else None,
         "action_endpoints": action_endpoints,
         "links": {
             "open_invoice": f"/admin/billing/documents/{getattr(invoice, 'id', '')}" if getattr(invoice, "id", None) else None,
@@ -250,7 +265,13 @@ def direct_sale_delivery_cases_queryset(*, active_only: bool = True):
             case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
             direct_sale_id__isnull=False,
         )
-        .select_related("direct_sale", "direct_sale__customer", "billing_invoice", "product")
+        .select_related(
+            "direct_sale",
+            "direct_sale__customer",
+            "billing_invoice",
+            "product",
+            "payment_exception_approved_by",
+        )
         .order_by("-created_at", "-id")
     )
     if active_only:

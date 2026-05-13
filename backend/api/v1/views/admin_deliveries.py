@@ -30,6 +30,7 @@ from billing.models import DirectSale, DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
 from billing.services.direct_sale_delivery_actions import (
     add_direct_sale_delivery_note,
+    approve_direct_sale_delivery_payment_exception,
     cancel_direct_sale_delivery,
     dispatch_direct_sale_delivery,
     mark_direct_sale_delivered,
@@ -699,6 +700,18 @@ class _DirectSaleMetadataSerializer(serializers.Serializer):
     operational_notes = serializers.CharField(required=False, allow_blank=True)
 
 
+class _DirectSalePaymentExceptionApprovalSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=2000)
+    acknowledgement = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if not attrs.get("acknowledgement"):
+            raise serializers.ValidationError(
+                {"acknowledgement": "Acknowledgement is required before approving payment exception."}
+            )
+        return attrs
+
+
 class AdminDirectSaleDeliveryScheduleView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -768,6 +781,23 @@ class AdminDirectSaleDeliveryNoteView(APIView):
         return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
 
 
+class AdminDirectSaleDeliveryApprovePaymentExceptionView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        serializer = _DirectSalePaymentExceptionApprovalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            case = approve_direct_sale_delivery_payment_exception(
+                case_id=case_id,
+                actor=request.user,
+                reason=serializer.validated_data["reason"],
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
 class AdminDirectSaleDeliveryDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -778,6 +808,7 @@ class AdminDirectSaleDeliveryDetailView(APIView):
                 "direct_sale__customer",
                 "billing_invoice",
                 "product",
+                "payment_exception_approved_by",
             ),
             pk=case_id,
             case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,

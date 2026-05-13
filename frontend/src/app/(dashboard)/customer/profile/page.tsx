@@ -927,9 +927,9 @@ export default function CustomerProfilePage() {
                   >
                     <div>
                       <span className="font-medium">{doc.document_type}</span>
-                      {doc.notes && (
-                        <span className="ml-2 text-muted-foreground text-xs">{doc.notes}</span>
-                      )}
+                      <div className="text-xs text-muted-foreground">
+                        {doc.original_filename || "Unnamed file"} · {Math.max(1, Math.round((doc.file_size || 0) / 1024))} KB
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={doc.status} size="sm" />

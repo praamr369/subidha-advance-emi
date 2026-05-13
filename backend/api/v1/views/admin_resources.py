@@ -9,6 +9,7 @@ from urllib import request
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.http import FileResponse, Http404
 from django.db import transaction
 from django.db.models import Count, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
@@ -872,6 +873,89 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 ).data,
             }
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"kyc-documents/(?P<document_id>\d+)/approve",
+    )
+    @transaction.atomic
+    def approve_kyc_document(self, request, pk=None, document_id=None):
+        from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
+        from subscriptions.services.customer_service import approve_kyc
+
+        customer = self.get_object()
+        document = get_object_or_404(
+            CustomerKycDocument.objects.select_for_update(),
+            pk=document_id,
+            customer=customer,
+        )
+        document.status = CustomerKycDocumentStatus.APPROVED
+        document.reviewed_by = request.user
+        document.reviewed_at = timezone.now()
+        document.rejection_reason = ""
+        document.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
+        approve_kyc(customer, performed_by=request.user, document_id=document.id)
+        return Response({"updated": True})
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"kyc-documents/(?P<document_id>\d+)/reject",
+    )
+    @transaction.atomic
+    def reject_kyc_document(self, request, pk=None, document_id=None):
+        from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
+        from subscriptions.services.customer_service import reject_kyc
+
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            return Response({"reason": ["Reason is required when rejecting KYC document."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        customer = self.get_object()
+        document = get_object_or_404(
+            CustomerKycDocument.objects.select_for_update(),
+            pk=document_id,
+            customer=customer,
+        )
+        document.status = CustomerKycDocumentStatus.REJECTED
+        document.reviewed_by = request.user
+        document.reviewed_at = timezone.now()
+        document.rejection_reason = reason
+        document.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
+        reject_kyc(customer, performed_by=request.user, document_id=document.id, reason=reason)
+        return Response({"updated": True})
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"kyc-documents/(?P<document_id>\d+)/download",
+    )
+    def download_kyc_document(self, request, pk=None, document_id=None):
+        from subscriptions.models import CustomerKycDocument
+
+        customer = self.get_object()
+        document = get_object_or_404(
+            CustomerKycDocument.objects.select_related("customer"),
+            pk=document_id,
+            customer=customer,
+        )
+        if not document.file:
+            raise Http404("Document file missing.")
+
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.USER_UPDATED,
+            model_name="CustomerKycDocument",
+            object_id=document.id,
+            performed_by=request.user,
+            metadata={
+                "event": "KYC_DOCUMENT_DOWNLOADED",
+                "customer_id": customer.id,
+                "document_type": document.document_type,
+            },
+        )
+        filename = (document.original_filename or os.path.basename(document.file.name) or f"kyc-{document.id}").strip()
+        return FileResponse(document.file.open("rb"), as_attachment=True, filename=filename)
 
     @action(detail=True, methods=["get"], url_path="referrals")
     def referrals(self, request, pk=None):

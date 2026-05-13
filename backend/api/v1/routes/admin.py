@@ -37,6 +37,7 @@ from api.v1.views.admin_deliveries import (
     AdminDirectSaleDeliveryMarkDeliveredView,
     AdminDirectSaleDeliveryMetadataView,
     AdminDirectSaleDeliveryNoteView,
+    AdminDirectSaleDeliveryApprovePaymentExceptionView,
     AdminDirectSaleDeliveryScheduleView,
     AdminDeliveryCancelView,
     AdminDeliveryDetailView,
@@ -534,6 +535,10 @@ urlpatterns = [
     ),
     path("deliveries/direct-sale-cases/<int:case_id>/cancel/", AdminDirectSaleDeliveryCancelView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/note/", AdminDirectSaleDeliveryNoteView.as_view()),
+    path(
+        "deliveries/direct-sale-cases/<int:case_id>/approve-payment-exception/",
+        AdminDirectSaleDeliveryApprovePaymentExceptionView.as_view(),
+    ),
     path("leads/", AdminLeadListView.as_view()),
     path("leads/<int:pk>/", AdminLeadDetailView.as_view()),
     path("leads/<int:pk>/status/", AdminLeadStatusUpdateView.as_view()),

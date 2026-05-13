@@ -259,6 +259,16 @@ class ServiceDeskCase(ServiceDeskTimeStampedModel):
         blank=True,
         related_name="resolved_service_desk_cases",
     )
+    payment_exception_approved = models.BooleanField(default=False, db_index=True)
+    payment_exception_reason = models.TextField(blank=True, default="")
+    payment_exception_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payment_exception_approved_service_desk_cases",
+    )
+    payment_exception_approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
     closed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -340,6 +350,7 @@ class ServiceDeskCase(ServiceDeskTimeStampedModel):
         self.reporter_phone_snapshot = (self.reporter_phone_snapshot or "").strip()
         self.internal_notes = (self.internal_notes or "").strip()
         self.resolution_summary = (self.resolution_summary or "").strip()
+        self.payment_exception_reason = (self.payment_exception_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

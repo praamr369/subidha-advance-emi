@@ -4177,6 +4177,9 @@ class CustomerKycDocument(TimeStampedModel):
         db_index=True,
     )
     file = models.FileField(upload_to=customer_kyc_doc_upload_to)
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    file_size = models.PositiveBigIntegerField(default=0)
     notes = models.TextField(blank=True, default="")
     status = models.CharField(
         max_length=20,
@@ -4216,10 +4219,20 @@ class CustomerKycDocument(TimeStampedModel):
             errors["customer"] = "Customer is required."
         if not self.file:
             errors["file"] = "Document file is required."
+        if self.file_size < 0:
+            errors["file_size"] = "File size cannot be negative."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.file:
+            self.original_filename = (
+                self.original_filename or Path(getattr(self.file, "name", "")).name
+            )[:255]
+            self.file_size = int(getattr(self.file, "size", None) or self.file_size or 0)
+            content_type = getattr(self.file, "content_type", "") or ""
+            if content_type:
+                self.content_type = content_type[:100]
         self.notes = (self.notes or "").strip()
         self.rejection_reason = (self.rejection_reason or "").strip()
         self.full_clean()

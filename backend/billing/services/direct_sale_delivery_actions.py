@@ -45,6 +45,29 @@ def _validate_delivery_gate(*, sale: DirectSale):
         raise ValueError("Cannot proceed because stock requirement is still open.")
 
 
+def _validate_delivery_gate_allowing_payment_exception(*, case: ServiceDeskCase, sale: DirectSale):
+    if not sale.delivery_required:
+        raise ValueError("Delivery is disabled for this direct sale.")
+    if sale.status in {
+        DirectSaleStatus.CANCELLED,
+        DirectSaleStatus.CANCELLED_PRE_INVOICE,
+        DirectSaleStatus.CANCELLED_AFTER_DELIVERY,
+        DirectSaleStatus.REVERSED_POST_INVOICE,
+        DirectSaleStatus.RETURNED,
+        DirectSaleStatus.ARCHIVED,
+        DirectSaleStatus.EXCHANGED_CLOSED,
+    }:
+        raise ValueError("This direct sale is reversed/archived and cannot be delivered.")
+    invoice = _latest_invoice(sale)
+    if invoice is None or invoice.status != BillingDocumentStatus.POSTED:
+        raise ValueError("Cannot proceed because invoice is not posted.")
+    state = get_direct_sale_operational_state(sale)
+    if state.get("delivery_state") == "STOCK_BLOCKED":
+        raise ValueError("Cannot proceed because stock requirement is still open.")
+    if _as_decimal(sale.balance_total) > Decimal("0.00") and not case.payment_exception_approved:
+        raise ValueError("Cannot proceed because payment is due.")
+
+
 def _audit(event: str, *, case: ServiceDeskCase, actor, metadata: dict | None = None):
     log_meta = {"event": event, "case_id": case.id, "direct_sale_id": case.direct_sale_id, "case_no": case.case_no}
     if metadata:
@@ -185,7 +208,7 @@ def update_direct_sale_delivery_metadata(
 @transaction.atomic
 def dispatch_direct_sale_delivery(*, case_id: int, actor, notes: str = ""):
     case, sale = _lock_direct_sale_case(case_id=case_id)
-    _validate_delivery_gate(sale=sale)
+    _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
     if case.status not in {ServiceDeskCaseStatus.AUTHORIZED, ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW}:
         raise ValueError("Only scheduled direct-sale deliveries can be dispatched.")
     case.status = ServiceDeskCaseStatus.IN_SERVICE
@@ -207,7 +230,7 @@ def mark_direct_sale_delivered(
     delivered_at=None,
 ):
     case, sale = _lock_direct_sale_case(case_id=case_id)
-    _validate_delivery_gate(sale=sale)
+    _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
     if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED} or sale.delivered_at:
         raise ValueError("Direct sale is already delivered.")
     if not (receiver_name or case.reporter_name_snapshot or "").strip():
@@ -260,4 +283,48 @@ def add_direct_sale_delivery_note(*, case_id: int, actor, note: str):
     case.internal_notes = ((case.internal_notes or "").strip() + "\n" + note).strip()
     case.save(update_fields=["internal_notes", "updated_at"])
     _audit("DIRECT_SALE_DELIVERY_NOTE_ADDED", case=case, actor=actor)
+    return case
+
+
+@transaction.atomic
+def approve_direct_sale_delivery_payment_exception(*, case_id: int, actor, reason: str):
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("Approval reason is required.")
+
+    case, sale = _lock_direct_sale_case(case_id=case_id)
+    if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED, ServiceDeskCaseStatus.CANCELLED}:
+        raise ValueError("Cannot approve payment exception for a terminal delivery case.")
+
+    invoice = _latest_invoice(sale)
+    if invoice is None or invoice.status != BillingDocumentStatus.POSTED:
+        raise ValueError("Cannot approve payment exception before invoice posting.")
+    if _as_decimal(sale.balance_total) <= Decimal("0.00"):
+        raise ValueError("Payment exception is only valid when outstanding balance exists.")
+
+    case.payment_exception_approved = True
+    case.payment_exception_reason = reason
+    case.payment_exception_approved_by = actor
+    case.payment_exception_approved_at = timezone.now()
+    case.save(
+        update_fields=[
+            "payment_exception_approved",
+            "payment_exception_reason",
+            "payment_exception_approved_by",
+            "payment_exception_approved_at",
+            "updated_at",
+        ]
+    )
+    _audit(
+        "DIRECT_SALE_DELIVERY_PAYMENT_EXCEPTION_APPROVED",
+        case=case,
+        actor=actor,
+        metadata={
+            "customer_id": getattr(sale, "customer_id", None),
+            "invoice_id": getattr(invoice, "id", None),
+            "invoice_number": getattr(invoice, "document_no", None),
+            "outstanding_amount": str(_as_decimal(sale.balance_total)),
+            "reason": reason,
+        },
+    )
     return case

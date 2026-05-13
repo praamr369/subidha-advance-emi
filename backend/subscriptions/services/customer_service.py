@@ -24,6 +24,7 @@ from django.utils.crypto import get_random_string
 
 from subscriptions.models import (
     AuditLog,
+    BusinessEventType,
     Customer,
     CustomerKycDocument,
     CustomerKycDocumentStatus,
@@ -36,7 +37,6 @@ from subscriptions.services.customer_account_service import (
     build_customer_operational_profile,
 )
 from subscriptions.services.business_event_service import append_business_event
-from subscriptions.models import BusinessEventType
 
 User = get_user_model()
 
@@ -390,6 +390,9 @@ def create_kyc_update_request(
         customer=customer,
         document_type=document_type,
         file=file,
+        original_filename=(getattr(file, "name", "") or "")[:255],
+        content_type=(getattr(file, "content_type", "") or "")[:100],
+        file_size=int(getattr(file, "size", 0) or 0),
         notes=(notes or "").strip(),
         status=CustomerKycDocumentStatus.SUBMITTED,
         uploaded_by=uploaded_by,

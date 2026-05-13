@@ -1147,10 +1147,9 @@ export async function createCustomerSupportRequest(payload: {
 
 export type CustomerKycDocumentRecord = {
   id: number;
-  customer: number;
   document_type: string;
-  file: string | null;
-  notes: string;
+  original_filename: string;
+  file_size: number;
   status: string;
   reviewed_by_username: string | null;
   reviewed_at: string | null;
@@ -1169,6 +1168,46 @@ export type CustomerKycSubmitResponse = {
   kyc_status: string;
   document: CustomerKycDocumentRecord;
 };
+
+export async function listAdminCustomerKycDocuments(
+  customerId: number | string
+): Promise<CustomerKycDocumentListResponse> {
+  const response = await apiFetch<unknown>(`/admin/customers/${customerId}/kyc-documents/`);
+  const root = (response ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results)
+    ? (root.results as unknown[]).map(normalizeKycDocument)
+    : [];
+  return {
+    count: Number(root.count ?? results.length),
+    kyc_status: typeof root.kyc_status === "string" ? root.kyc_status : "PENDING",
+    results,
+  };
+}
+
+export async function approveAdminCustomerKycDocument(
+  customerId: number | string,
+  documentId: number
+): Promise<{ updated: boolean }> {
+  return apiFetch<{ updated: boolean }>(`/admin/customers/${customerId}/kyc-documents/${documentId}/approve/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function rejectAdminCustomerKycDocument(
+  customerId: number | string,
+  documentId: number,
+  reason: string
+): Promise<{ updated: boolean }> {
+  return apiFetch<{ updated: boolean }>(`/admin/customers/${customerId}/kyc-documents/${documentId}/reject/`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function buildAdminCustomerKycDownloadPath(customerId: number | string, documentId: number): string {
+  return `/api/v1/admin/customers/${customerId}/kyc-documents/${documentId}/download/`;
+}
 
 export type CustomerReferralRecord = {
   id: number;
@@ -1199,10 +1238,9 @@ function normalizeKycDocument(raw: unknown): CustomerKycDocumentRecord {
   const r = (raw ?? {}) as Record<string, unknown>;
   return {
     id: Number(r.id ?? 0),
-    customer: Number(r.customer ?? 0),
     document_type: typeof r.document_type === "string" ? r.document_type : "",
-    file: typeof r.file === "string" ? r.file : null,
-    notes: typeof r.notes === "string" ? r.notes : "",
+    original_filename: typeof r.original_filename === "string" ? r.original_filename : "",
+    file_size: Number(r.file_size ?? 0),
     status: typeof r.status === "string" ? r.status : "PENDING",
     reviewed_by_username:
       typeof r.reviewed_by_username === "string" ? r.reviewed_by_username : null,
@@ -1230,7 +1268,7 @@ export async function uploadCustomerPhoto(photoFile: File): Promise<{
 }
 
 export async function listCustomerKycDocuments(): Promise<CustomerKycDocumentListResponse> {
-  const response = await apiFetch<unknown>("/customer/kyc/documents/");
+  const response = await apiFetch<unknown>("/customer/kyc-documents/");
   const root = (response ?? {}) as Record<string, unknown>;
   const results = Array.isArray(root.results)
     ? (root.results as unknown[]).map(normalizeKycDocument)
@@ -1251,7 +1289,7 @@ export async function submitCustomerKycDocument(payload: {
   form.append("document_type", payload.document_type);
   form.append("file", payload.file);
   if (payload.notes) form.append("notes", payload.notes);
-  const response = await apiFetch<unknown>("/customer/kyc/request-update/", {
+  const response = await apiFetch<unknown>("/customer/kyc-documents/", {
     method: "POST",
     body: form,
   });

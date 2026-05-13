@@ -587,6 +587,21 @@ class CustomerKycDocumentListView(APIView):
         )
 
 
+class CustomerKycDocumentView(APIView):
+    """
+    GET/POST /api/v1/customer/kyc-documents/
+    """
+
+    permission_classes = [IsCustomer]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
+        return CustomerKycDocumentListView().get(request)
+
+    def post(self, request):
+        return CustomerKycUpdateRequestView().post(request)
+
+
 class CustomerKycUpdateRequestView(APIView):
     """
     POST /api/v1/customer/kyc/request-update/
