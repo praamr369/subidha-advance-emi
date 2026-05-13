@@ -269,6 +269,10 @@ class SubscriptionRequestWorkflowApiTests(APITestCase):
             Emi.objects.count(),
             before_emi_count + self.batch.duration_months,
         )
+        self.assertEqual(
+            subscription.emis.values_list("month_no", flat=True).distinct().count(),
+            self.batch.duration_months,
+        )
         self.assertEqual(Payment.objects.count(), before_payment_count)
         self.lucky_2.refresh_from_db()
         self.assertEqual(self.lucky_2.status, LuckyIdStatus.ASSIGNED)
@@ -327,6 +331,10 @@ class SubscriptionRequestWorkflowApiTests(APITestCase):
         self.assertEqual(subscription.lucky_id.lucky_number, 3)
         self.assertEqual(subscription.status, "ACTIVE")
         self.assertEqual(subscription.emis.count(), self.batch.duration_months)
+        self.assertEqual(
+            subscription.emis.values_list("month_no", flat=True).distinct().count(),
+            self.batch.duration_months,
+        )
         self.assertEqual(Payment.objects.count(), before_payment_count)
         self.assertEqual(self.customer.__class__.objects.count(), before_customer_count + 1)
 

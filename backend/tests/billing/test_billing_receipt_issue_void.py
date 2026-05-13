@@ -6,6 +6,7 @@ from django.test import TestCase
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from billing.models import BillingDocumentStatus, ReceiptType
 from billing.services.billing_service import create_manual_receipt, void_receipt_document
+from core.services.operational_visibility import is_receipt_active_collection
 from tests.helpers import create_admin_user, create_customer_profile
 
 
@@ -38,6 +39,7 @@ class BillingReceiptIssueVoidTests(TestCase):
         )
         self.assertEqual(receipt.status, BillingDocumentStatus.POSTED)
         self.assertIsNotNone(receipt.posted_journal_entry_id)
+        self.assertTrue(is_receipt_active_collection(receipt))
 
         receipt, updated = void_receipt_document(
             receipt_id=receipt.id,
@@ -47,6 +49,7 @@ class BillingReceiptIssueVoidTests(TestCase):
         self.assertTrue(updated)
         self.assertEqual(receipt.status, BillingDocumentStatus.VOID)
         self.assertIn("Void reason:", receipt.notes)
+        self.assertFalse(is_receipt_active_collection(receipt))
 
         receipt, updated_again = void_receipt_document(
             receipt_id=receipt.id,
@@ -55,4 +58,3 @@ class BillingReceiptIssueVoidTests(TestCase):
         )
         self.assertFalse(updated_again)
         self.assertEqual(receipt.status, BillingDocumentStatus.VOID)
-

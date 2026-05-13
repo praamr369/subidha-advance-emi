@@ -1,38 +1,52 @@
 # Direct Sale Workflow
 
 ## Goal
+Keep retail direct-sale billing, receipt, outstanding, and delivery controls explicit and auditable without mixing with EMI contract collection rails.
 
-Keep retail billing and later direct-sale collections inside one controlled workflow without mixing them into subscription EMI allocation, waiver, or reconciliation logic.
+## Implemented direct-sale lifecycle
 
-## Operational flow
+1. Create `DirectSale` with line-level product/inventory mapping and customer snapshots.
+2. Sync linked draft `BillingInvoice` (source-linked to the sale).
+3. Approve + post invoice.
+4. Posting creates:
+   - accounting bridge journal (`RETAIL_SALE`)
+   - stock movement entries (`SALE_OUT`)
+   - optional auto-receipt when received amount exists
+5. Subsequent collections create posted retail receipts and reduce outstanding balances.
+6. Delivery case and eligibility are synced from sale/invoice/payment/stock posture.
 
-1. Create or continue the direct-sale record from `Admin > Direct Sale Workflow > Direct Sale Register`.
-2. Capture walk-in or registered customer context on the sale itself.
-3. Confirm and invoice the sale through the existing billing flow.
-4. Treat posted retail invoices with remaining balance as direct-sale receivables.
-5. Collect later payments only through:
-   - `Admin > Direct Sale Workflow > Collect Direct-Sale Balance`
-   - `Cashier > Collection Workflows`
-6. Issue retail receipts from the controlled receipt workflow tied to the posted receivable.
+## Collectibility rules
+A direct sale is collectible only when all are true:
+- sale is operationally active
+- sale status is `INVOICED`
+- latest invoice status is `POSTED`
+- outstanding balance is greater than zero
 
-## Controls
+If invoice becomes `VOID/CANCELLED/REVERSED/CREDITED_FULLY`, direct-sale collection is blocked and row is history-only for collection posture.
 
-- Direct-sale collections must remain invoice-backed.
-- Retail receipts must remain finance-account linked.
-- Direct-sale outstanding balance must stay separate from subscription ledger exposure.
-- Later collections must update bill balance, receipt history, and finance-account visibility together.
+## Cancellation/void/reversal controls
+- Posted receipts can be voided only via explicit void flow (with reason + reversal journal).
+- Invoice cancellation/void requires receipt reversal first.
+- Direct-sale cancellation respects delivered/invoiced/reversal constraints and preserves auditable history.
+- Final reversal/archive flow transitions sale to history-only statuses.
 
-## Customer profile visibility
+## Outstanding visibility controls
+- Active outstanding excludes:
+  - cancelled/reversed direct-sale statuses
+  - cancelled/void/reversed/credited invoice states
+  - voided receipts from active collection totals
 
-The admin customer profile now shows:
+## Operator guardrails
+- Do not collect direct-sale balance from EMI collection screens.
+- Do not post direct-sale reversal by editing balances manually.
+- Use return/reversal workflows for delivered or posted-invoice corrections.
 
-- direct-sale history
-- current direct-sale outstanding
-- receipt history tied to direct sales
-- direct-sale collection shortcuts when balance remains
-
-## Daily-use notes
-
-- Use direct sale for retail billing only.
-- Do not use the subscription collection path for direct-sale recovery.
-- Do not use direct-sale collection for EMI, rent, or lease contracts.
+## Key code references
+- `backend/api/v1/views/billing.py`
+- `backend/api/v1/serializers/billing.py`
+- `backend/billing/services/billing_service.py`
+- `backend/billing/services/direct_sale_collection_service.py`
+- `backend/billing/services/direct_sale_delivery_bridge_service.py`
+- `backend/subscriptions/services/operational_cancellation_service.py`
+- `backend/tests/billing/test_direct_sale_workflow.py`
+- `backend/tests/api/test_direct_sale_api.py`

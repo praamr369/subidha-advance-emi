@@ -203,7 +203,13 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
         if delivery_required in {"true", "false"}:
             queryset = queryset.filter(delivery_required=delivery_required == "true")
         if self.request.query_params.get("outstanding_only") in {"1", "true", "TRUE", "yes", "YES"}:
-            queryset = queryset.filter(status="INVOICED", balance_total__gt=Decimal("0.00"))
+            # Keep outstanding-only lists aligned with collectible direct-sale logic:
+            # invoiced sale + active balance + posted invoice document.
+            queryset = queryset.filter(
+                status="INVOICED",
+                balance_total__gt=Decimal("0.00"),
+                billing_invoices__status="POSTED",
+            ).distinct()
         return queryset
 
     def get_serializer_class(self):

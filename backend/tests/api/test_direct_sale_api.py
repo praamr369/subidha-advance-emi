@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
+from billing.models import ReceiptDocument
 from inventory.models import InventoryItem
 from accounting.services.gst_document_posting_service import financial_year_for
 from tests.helpers import create_admin_user, create_customer_profile, create_product
@@ -211,3 +212,92 @@ class DirectSaleApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Direct sale invoice numbering is not configured", str(response.data))
+
+    def test_cancelled_invoice_direct_sale_is_removed_from_outstanding_and_not_collectible(self):
+        create_response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 18),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "delivery_required": False,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "subtotal": "9500.00",
+                "discount_total": "0.00",
+                "taxable_total": "9500.00",
+                "tax_total": "0.00",
+                "grand_total": "9500.00",
+                "received_total": "2500.00",
+                "balance_total": "7000.00",
+                "notes": "Cancel invoice collectible posture test",
+                "lines": [
+                    {
+                        "product": self.product.id,
+                        "inventory_item": self.inventory_item.id,
+                        "description": "Invoice cancel posture line",
+                        "quantity": "1.000",
+                        "unit_price": "9500.00",
+                        "discount_amount": "0.00",
+                        "taxable_value": "9500.00",
+                        "gst_rate": None,
+                        "cgst_amount": "0.00",
+                        "sgst_amount": "0.00",
+                        "igst_amount": "0.00",
+                        "line_total": "9500.00",
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        direct_sale_id = create_response.data["id"]
+        invoice_id = create_response.data["billing_invoice_id"]
+
+        approve_response = self.client.post(
+            f"/api/v1/billing/invoices/{invoice_id}/approve/",
+            {},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK, approve_response.data)
+        post_response = self.client.post(
+            f"/api/v1/billing/invoices/{invoice_id}/post/",
+            {},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, status.HTTP_200_OK, post_response.data)
+
+        receipt_id = ReceiptDocument.objects.filter(billing_invoice_id=invoice_id).order_by("-id").values_list("id", flat=True).first()
+        self.assertTrue(receipt_id)
+        void_response = self.client.post(
+            f"/api/v1/admin/billing/receipts/{receipt_id}/void/",
+            {"reason": "Void receipt before invoice cancellation"},
+            format="json",
+        )
+        self.assertEqual(void_response.status_code, status.HTTP_200_OK, void_response.data)
+
+        cancel_invoice = self.client.post(
+            f"/api/v1/billing/invoices/{invoice_id}/cancel/",
+            {"reason": "Cancel invoice for collectible posture test", "confirm": True},
+            format="json",
+        )
+        self.assertEqual(cancel_invoice.status_code, status.HTTP_200_OK, cancel_invoice.data)
+
+        outstanding_list = self.client.get("/api/v1/billing/direct-sales/?outstanding_only=true")
+        self.assertEqual(outstanding_list.status_code, status.HTTP_200_OK, outstanding_list.data)
+        ids = [row["id"] for row in outstanding_list.data["results"]]
+        self.assertNotIn(direct_sale_id, ids)
+
+        collect_response = self.client.post(
+            f"/api/v1/billing/direct-sales/{direct_sale_id}/collect/",
+            {
+                "amount": "1000.00",
+                "finance_account_id": self.cash_account.id,
+                "reference_no": "DIRSALE-API-NONCOLLECT-001",
+            },
+            format="json",
+        )
+        self.assertEqual(collect_response.status_code, status.HTTP_400_BAD_REQUEST, collect_response.data)
+        self.assertIn("retail invoice is posted", str(collect_response.data).lower())
