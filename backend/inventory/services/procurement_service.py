@@ -3,10 +3,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.models import VendorLedgerEntry
 from inventory.models import (
     GoodsReceipt,
     GoodsReceiptStatus,
@@ -29,6 +31,30 @@ from subscriptions.models import AuditLog
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def _vendor_ledger_balance(vendor_id: int) -> Decimal:
+    row = VendorLedgerEntry.objects.filter(vendor_id=vendor_id).order_by("-posted_at", "-id").first()
+    return _money(row.balance_after if row else Decimal("0.00"))
+
+
+def _create_vendor_ledger_entry(*, vendor_id: int, entry_type: str, source_type: str, source_id: int, source_reference: str, debit: Decimal = Decimal("0.00"), credit: Decimal = Decimal("0.00"), posted_by=None, notes: str = ""):
+    previous = _vendor_ledger_balance(vendor_id)
+    debit_m = _money(debit)
+    credit_m = _money(credit)
+    balance_after = _money(previous + debit_m - credit_m)
+    VendorLedgerEntry.objects.create(
+        vendor_id=vendor_id,
+        entry_type=entry_type,
+        source_type=source_type,
+        source_id=source_id,
+        source_reference=source_reference,
+        debit=debit_m,
+        credit=credit_m,
+        balance_after=balance_after,
+        created_by=posted_by,
+        notes=(notes or "").strip(),
+    )
 
 
 @transaction.atomic
@@ -65,7 +91,22 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
 
     created_count = 0
     existing_count = 0
+    po_line_qty = {line.id: Decimal(str(line.quantity or "0.000")) for line in receipt.purchase_order.lines.all()}
+    posted_receipts = receipt.purchase_order.receipts.exclude(status=GoodsReceiptStatus.CANCELLED)
+    prior_received_by_line: dict[int, Decimal] = {}
+    for row in posted_receipts.exclude(pk=receipt.pk).values("lines__purchase_order_line_id").annotate(total=Sum("lines__quantity_received")):
+        line_id = row.get("lines__purchase_order_line_id")
+        if line_id:
+            prior_received_by_line[int(line_id)] = Decimal(str(row.get("total") or "0.000"))
     for line in receipt.lines.all():
+        if line.purchase_order_line_id and line.purchase_order_line_id in po_line_qty:
+            already = prior_received_by_line.get(line.purchase_order_line_id, Decimal("0.000"))
+            ordered = po_line_qty[line.purchase_order_line_id]
+            after = already + Decimal(str(line.quantity_received or "0.000"))
+            if after > ordered and not receipt.allow_over_receive:
+                raise ValueError(
+                    f"Over-receive blocked for PO line {line.purchase_order_line_id}. Ordered {ordered}, received would become {after}."
+                )
         _, created = create_stock_ledger_entry(
             inventory_item=line.inventory_item,
             movement_type=StockMovementType.PURCHASE_IN,
@@ -207,6 +248,16 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
         event="VENDOR_BILL_POSTED",
         metadata={"vendor_bill_id": bill.id, "bill_no": bill.bill_no, "journal_entry_id": journal_entry.id},
     )
+    _create_vendor_ledger_entry(
+        vendor_id=bill.vendor_id,
+        entry_type="PURCHASE_BILL",
+        source_type="VENDOR_BILL",
+        source_id=bill.id,
+        source_reference=bill.bill_no,
+        debit=_money(bill.grand_total),
+        posted_by=posted_by,
+        notes=f"Vendor bill posted via journal {journal_entry.entry_no}.",
+    )
     return bill, True
 
 
@@ -219,6 +270,14 @@ def post_vendor_payment(*, vendor_payment_id: int, posted_by=None):
         return payment, False
     if payment.status != VendorPaymentStatus.DRAFT:
         raise ValueError("Only draft vendor payments can be posted.")
+    if payment.vendor_bill_id:
+        prior_paid = VendorPayment.objects.filter(
+            vendor_bill_id=payment.vendor_bill_id,
+            status=VendorPaymentStatus.POSTED,
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        bill_total = _money(payment.vendor_bill.grand_total)
+        if _money(prior_paid) + _money(payment.amount) > bill_total:
+            raise ValueError("Vendor payment exceeds linked vendor bill outstanding amount.")
 
     accounts = ensure_phase3_system_accounts()
     journal_entry, _ = post_bridge_entry(
@@ -254,5 +313,15 @@ def post_vendor_payment(*, vendor_payment_id: int, posted_by=None):
         performed_by=posted_by,
         event="VENDOR_PAYMENT_POSTED",
         metadata={"vendor_payment_id": payment.id, "payment_no": payment.payment_no},
+    )
+    _create_vendor_ledger_entry(
+        vendor_id=payment.vendor_id,
+        entry_type="PAYMENT_TO_VENDOR",
+        source_type="VENDOR_PAYMENT",
+        source_id=payment.id,
+        source_reference=payment.payment_no,
+        credit=_money(payment.amount),
+        posted_by=posted_by,
+        notes=f"Vendor payment posted via journal {journal_entry.entry_no}.",
     )
     return payment, True

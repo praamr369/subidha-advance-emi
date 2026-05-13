@@ -304,6 +304,42 @@ export type VendorBill = {
   grand_total: string;
 };
 
+export type VendorPayment = {
+  id: number;
+  payment_no: string;
+  payment_date: string;
+  vendor: number;
+  vendor_name?: string;
+  vendor_bill?: number | null;
+  vendor_bill_no?: string;
+  amount: string;
+  status: "DRAFT" | "POSTED" | "CANCELLED";
+  reference_no?: string;
+};
+
+export type VendorAgreement = {
+  id: number;
+  agreement_no: string;
+  vendor: number;
+  vendor_name?: string;
+  effective_from: string;
+  effective_to?: string | null;
+  status: "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+  payment_terms?: string;
+  credit_period_days: number;
+  notes?: string;
+};
+
+export type PurchaseRequest = {
+  id: number;
+  request_no: string;
+  request_date: string;
+  status: "DRAFT" | "APPROVED" | "PARTIALLY_ORDERED" | "ORDERED" | "CANCELLED";
+  vendor?: number | null;
+  vendor_name?: string;
+  notes?: string;
+};
+
 export type StockLocationPayload = {
   code: string;
   name: string;
@@ -467,6 +503,18 @@ export function listGoodsReceipts(params: Record<string, QueryValue> = {}) {
 
 export function listVendorBills(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<VendorBill>>(`/inventory/vendor-bills/${buildQuery(params)}`);
+}
+
+export function listVendorPayments(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<VendorPayment>>(`/inventory/vendor-payments/${buildQuery(params)}`);
+}
+
+export function listVendorAgreements(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<VendorAgreement>>(`/inventory/vendor-agreements/${buildQuery(params)}`);
+}
+
+export function listPurchaseRequests(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<PurchaseRequest>>(`/inventory/purchase-requests/${buildQuery(params)}`);
 }
 
 export function listAdminOpeningStockEntries(params: Record<string, QueryValue> = {}) {

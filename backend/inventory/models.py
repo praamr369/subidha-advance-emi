@@ -916,6 +916,8 @@ class GoodsReceipt(InventoryTimeStampedModel):
     branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
     stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="goods_receipts")
     notes = models.TextField(blank=True, default="")
+    allow_over_receive = models.BooleanField(default=False, db_index=True)
+    over_receive_reason = models.TextField(blank=True, default="")
     posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_goods_receipts")
 
@@ -926,6 +928,7 @@ class GoodsReceipt(InventoryTimeStampedModel):
     def save(self, *args, **kwargs):
         self.receipt_no = (self.receipt_no or "").strip().upper()
         self.notes = (self.notes or "").strip()
+        self.over_receive_reason = (self.over_receive_reason or "").strip()
         if self.branch_id is None:
             self.branch = getattr(self.stock_location, "branch", None) or getattr(self.purchase_order, "branch", None) or _default_branch()
         self.full_clean()
@@ -994,6 +997,84 @@ class VendorPayment(InventoryTimeStampedModel):
     class Meta:
         db_table = "inventory_vendor_payments"
         ordering = ["-payment_date", "-created_at", "-id"]
+
+
+class VendorAgreementStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    ACTIVE = "ACTIVE", "Active"
+    EXPIRED = "EXPIRED", "Expired"
+    TERMINATED = "TERMINATED", "Terminated"
+
+
+class PurchaseRequestStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    PARTIALLY_ORDERED = "PARTIALLY_ORDERED", "Partially Ordered"
+    ORDERED = "ORDERED", "Ordered"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class VendorAgreement(InventoryTimeStampedModel):
+    agreement_no = models.CharField(max_length=60, unique=True, db_index=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_agreements")
+    effective_from = models.DateField(db_index=True)
+    effective_to = models.DateField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=16, choices=VendorAgreementStatus.choices, default=VendorAgreementStatus.DRAFT, db_index=True)
+    payment_terms = models.CharField(max_length=160, blank=True, default="")
+    credit_period_days = models.PositiveIntegerField(default=0)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_vendor_agreements"
+        ordering = ["-effective_from", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.agreement_no = (self.agreement_no or "").strip().upper()
+        self.payment_terms = (self.payment_terms or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseRequest(InventoryTimeStampedModel):
+    request_no = models.CharField(max_length=60, unique=True, db_index=True)
+    request_date = models.DateField(db_index=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inventory_purchase_requests",
+    )
+    status = models.CharField(max_length=20, choices=PurchaseRequestStatus.choices, default=PurchaseRequestStatus.DRAFT, db_index=True)
+    branch = models.ForeignKey("branch_control.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_requests")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_requests")
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_requests")
+    source_purchase_need = models.ForeignKey("inventory.PurchaseNeed", on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_requests")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_purchase_requests"
+        ordering = ["-request_date", "-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.request_no = (self.request_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = getattr(self.stock_location, "branch", None) or _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PurchaseRequestLine(InventoryTimeStampedModel):
+    purchase_request = models.ForeignKey(PurchaseRequest, on_delete=models.CASCADE, related_name="lines")
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="purchase_request_lines")
+    quantity_requested = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_purchase_request_lines"
+        ordering = ["id"]
 
 class InventoryValuation(InventoryTimeStampedModel):
     as_of_date = models.DateField(db_index=True)

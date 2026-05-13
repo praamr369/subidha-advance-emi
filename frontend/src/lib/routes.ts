@@ -136,6 +136,11 @@ export const ROUTES = {
     purchaseOrders: "/admin/purchases/orders",
     purchaseReceipts: "/admin/purchases/receipts",
     purchaseBills: "/admin/purchases/bills",
+    purchaseRequests: "/admin/purchases/requests",
+    purchaseVendorAgreements: "/admin/purchases/vendor-agreements",
+    purchaseVendorPayables: "/admin/purchases/vendor-payables",
+    purchaseVendorPayments: "/admin/purchases/vendor-payments",
+    purchaseVendorReturns: "/admin/purchases/vendor-returns",
 
     manufacturing: "/admin/manufacturing",
     manufacturingBoms: "/admin/manufacturing/boms",

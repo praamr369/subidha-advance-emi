@@ -88,6 +88,8 @@ class Phase3EndpointsPermissionsTests(APITestCase):
         endpoints = [
             "/api/v1/inventory/items/",
             "/api/v1/inventory/locations/",
+            "/api/v1/inventory/vendor-bills/",
+            "/api/v1/inventory/vendor-payments/",
             "/api/v1/billing/invoices/",
             "/api/v1/billing/profiles/",
             "/api/v1/accounting/periods/",

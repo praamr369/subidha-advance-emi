@@ -9,12 +9,14 @@ from api.v1.views.inventory import (
     OpeningStockImportPreviewView,
     PurchaseBillViewSet,
     PurchaseOrderViewSet,
+    PurchaseRequestViewSet,
     StockLocationViewSet,
     StockAdjustmentViewSet,
     StockLedgerViewSet,
     StockSummaryView,
     VendorBillViewSet,
     VendorContactViewSet,
+    VendorAgreementViewSet,
     VendorPaymentViewSet,
     VendorViewSet,
 )
@@ -35,6 +37,8 @@ router.register(r"stock-adjustments", StockAdjustmentViewSet, basename="inventor
 router.register(r"purchase-bills", PurchaseBillViewSet, basename="inventory-purchase-bills")
 router.register(r"vendors", VendorViewSet, basename="inventory-vendors")
 router.register(r"vendor-contacts", VendorContactViewSet, basename="inventory-vendor-contacts")
+router.register(r"vendor-agreements", VendorAgreementViewSet, basename="inventory-vendor-agreements")
+router.register(r"purchase-requests", PurchaseRequestViewSet, basename="inventory-purchase-requests")
 router.register(r"purchase-orders", PurchaseOrderViewSet, basename="inventory-purchase-orders")
 router.register(r"goods-receipts", GoodsReceiptViewSet, basename="inventory-goods-receipts")
 router.register(r"vendor-bills", VendorBillViewSet, basename="inventory-vendor-bills")

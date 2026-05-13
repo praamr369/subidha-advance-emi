@@ -11,9 +11,14 @@ export default function AdminPurchasesPage() {
       subtitle="Internal procure-to-pay workspace for orders, receipts, and vendor bills."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Purchases" }]}
       actions={[
+        { href: ROUTES.admin.purchaseRequests, label: "Purchase Requests", variant: "secondary" },
+        { href: ROUTES.admin.purchaseVendorAgreements, label: "Vendor Agreements", variant: "secondary" },
         { href: ROUTES.admin.purchaseOrders, label: "Purchase Orders", variant: "primary" },
         { href: ROUTES.admin.purchaseReceipts, label: "Goods Receipts", variant: "secondary" },
         { href: ROUTES.admin.purchaseBills, label: "Vendor Bills", variant: "secondary" },
+        { href: ROUTES.admin.purchaseVendorPayments, label: "Vendor Payments", variant: "secondary" },
+        { href: ROUTES.admin.purchaseVendorPayables, label: "Vendor Payables", variant: "secondary" },
+        { href: ROUTES.admin.purchaseVendorReturns, label: "Vendor Returns", variant: "secondary" },
       ]}
     >
       <WorkspaceSection

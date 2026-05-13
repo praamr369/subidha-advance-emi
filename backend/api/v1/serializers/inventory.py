@@ -11,6 +11,8 @@ from inventory.models import (
     OpeningStockEntry,
     PurchaseOrder,
     PurchaseOrderLine,
+    PurchaseRequest,
+    PurchaseRequestLine,
     PurchaseBill,
     PurchaseBillLine,
     StockAdjustment,
@@ -20,6 +22,7 @@ from inventory.models import (
     StockLocation,
     VendorBill,
     VendorBillLine,
+    VendorAgreement,
     VendorContact,
     VendorPayment,
 )
@@ -554,6 +557,28 @@ class VendorContactSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class VendorAgreementSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+
+    class Meta:
+        model = VendorAgreement
+        fields = [
+            "id",
+            "agreement_no",
+            "vendor",
+            "vendor_name",
+            "effective_from",
+            "effective_to",
+            "status",
+            "payment_terms",
+            "credit_period_days",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
 class VendorLiteSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
@@ -618,6 +643,9 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only draft purchase orders can be edited.")
         if not attrs.get("lines") and instance is None:
             raise serializers.ValidationError({"lines": "At least one purchase order line is required."})
+        vendor = attrs.get("vendor") or getattr(instance, "vendor", None)
+        if vendor and not vendor.is_active:
+            raise serializers.ValidationError({"vendor": "Purchase order vendor must be active."})
         return attrs
 
     def create(self, validated_data):
@@ -679,6 +707,8 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
             "stock_location",
             "stock_location_name",
             "notes",
+            "allow_over_receive",
+            "over_receive_reason",
             "posted_at",
             "posted_by",
             "posted_by_username",
@@ -687,6 +717,28 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "status", "posted_at", "posted_by", "posted_by_username", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        purchase_order = attrs.get("purchase_order") or getattr(instance, "purchase_order", None)
+        lines = attrs.get("lines")
+        if lines:
+            po_line_map = {}
+            if purchase_order is not None:
+                po_line_map = {line.id: line for line in purchase_order.lines.all()}
+            for line in lines:
+                po_line = line.get("purchase_order_line")
+                item = line.get("inventory_item")
+                if po_line and po_line.purchase_order_id != getattr(purchase_order, "id", None):
+                    raise serializers.ValidationError({"lines": "Purchase receipt lines must reference lines from the selected PO."})
+                if po_line and item and po_line.inventory_item_id != item.id:
+                    raise serializers.ValidationError({"lines": "Receipt line inventory item must match PO line inventory item."})
+                if po_line and po_line.id not in po_line_map:
+                    raise serializers.ValidationError({"lines": "Invalid purchase order line for this receipt."})
+        if attrs.get("allow_over_receive") and not (attrs.get("over_receive_reason") or "").strip():
+            raise serializers.ValidationError({"over_receive_reason": "Reason is required when over-receive is enabled."})
+        return attrs
 
     def create(self, validated_data):
         lines = validated_data.pop("lines", [])
@@ -704,6 +756,80 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
         if lines is not None:
             instance.lines.all().delete()
             GoodsReceiptLine.objects.bulk_create([GoodsReceiptLine(goods_receipt=instance, **line) for line in lines])
+        return instance
+
+
+class PurchaseRequestLineSerializer(serializers.ModelSerializer):
+    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+
+    class Meta:
+        model = PurchaseRequestLine
+        fields = [
+            "id",
+            "inventory_item",
+            "inventory_item_sku",
+            "inventory_item_product_name",
+            "quantity_requested",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class PurchaseRequestSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    requested_by_username = serializers.CharField(source="requested_by.username", read_only=True)
+    stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    lines = PurchaseRequestLineSerializer(many=True)
+
+    class Meta:
+        model = PurchaseRequest
+        fields = [
+            "id",
+            "request_no",
+            "request_date",
+            "requested_by",
+            "requested_by_username",
+            "status",
+            "branch",
+            "stock_location",
+            "stock_location_name",
+            "vendor",
+            "vendor_name",
+            "source_purchase_need",
+            "notes",
+            "lines",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "requested_by", "requested_by_username", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        if instance and instance.status not in {"DRAFT", "APPROVED"}:
+            raise serializers.ValidationError("Only draft/approved purchase requests can be edited.")
+        if not attrs.get("lines") and instance is None:
+            raise serializers.ValidationError({"lines": "At least one purchase request line is required."})
+        return attrs
+
+    def create(self, validated_data):
+        lines = validated_data.pop("lines", [])
+        request = self.context.get("request")
+        row = PurchaseRequest.objects.create(requested_by=getattr(request, "user", None), **validated_data)
+        PurchaseRequestLine.objects.bulk_create([PurchaseRequestLine(purchase_request=row, **line) for line in lines])
+        return row
+
+    def update(self, instance, validated_data):
+        lines = validated_data.pop("lines", None)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+        if lines is not None:
+            instance.lines.all().delete()
+            PurchaseRequestLine.objects.bulk_create([PurchaseRequestLine(purchase_request=instance, **line) for line in lines])
         return instance
 
 
@@ -824,3 +950,11 @@ class VendorPaymentSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "status", "posted_journal_entry", "posted_journal_entry_no", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        vendor = attrs.get("vendor") or getattr(getattr(self, "instance", None), "vendor", None)
+        vendor_bill = attrs.get("vendor_bill") or getattr(getattr(self, "instance", None), "vendor_bill", None)
+        if vendor and vendor_bill and vendor_bill.vendor_id != vendor.id:
+            raise serializers.ValidationError({"vendor_bill": "Vendor bill does not belong to selected vendor."})
+        return attrs

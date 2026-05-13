@@ -13,11 +13,13 @@ from inventory.models import (
     InventoryItem,
     PurchaseBill,
     PurchaseOrder,
+    PurchaseRequest,
     StockAdjustment,
     StockLedger,
     StockLocation,
     VendorBill,
     VendorContact,
+    VendorAgreement,
     VendorPayment,
 )
 from inventory.services.audit_service import log_inventory_event
@@ -48,12 +50,14 @@ from api.v1.serializers.inventory import (
     OpeningStockImportPreviewSerializer,
     PurchaseBillSerializer,
     PurchaseOrderSerializer,
+    PurchaseRequestSerializer,
     StockLocationSerializer,
     StockAdjustmentSerializer,
     StockLedgerSerializer,
     GoodsReceiptSerializer,
     VendorBillSerializer,
     VendorContactSerializer,
+    VendorAgreementSerializer,
     VendorLiteSerializer,
     VendorPaymentSerializer,
 )
@@ -266,6 +270,14 @@ class VendorContactViewSet(AdminInventoryModelViewSet):
         )
 
 
+class VendorAgreementViewSet(AdminInventoryModelViewSet):
+    queryset = VendorAgreement.objects.select_related("vendor").all()
+    serializer_class = VendorAgreementSerializer
+    search_fields = ["agreement_no", "vendor__name", "payment_terms"]
+    ordering_fields = ["effective_from", "created_at", "agreement_no"]
+    ordering = ["-effective_from", "-created_at", "-id"]
+
+
 class VendorViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     queryset = Vendor.objects.all()
@@ -327,6 +339,16 @@ class PurchaseOrderViewSet(AdminInventoryModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = PurchaseOrderSerializer(purchase_order, context=self.get_serializer_context())
         return Response({"updated": updated, "purchase_order": payload.data})
+
+
+class PurchaseRequestViewSet(AdminInventoryModelViewSet):
+    queryset = PurchaseRequest.objects.select_related("vendor", "stock_location", "requested_by").prefetch_related(
+        "lines", "lines__inventory_item", "lines__inventory_item__product"
+    )
+    serializer_class = PurchaseRequestSerializer
+    search_fields = ["request_no", "vendor__name"]
+    ordering_fields = ["request_date", "created_at", "request_no"]
+    ordering = ["-request_date", "-created_at", "-id"]
 
 
 class GoodsReceiptViewSet(AdminInventoryModelViewSet):

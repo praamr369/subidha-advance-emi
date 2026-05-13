@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.models import VendorLedgerEntry
 from billing.models import (
     BillingChannel,
     BillingCreditNote,
@@ -103,6 +104,11 @@ def _customer_credit_balance(customer_id: int) -> Decimal:
         debit_total=Sum("debit_amount"),
     )
     return _money(agg.get("credit_total")) - _money(agg.get("debit_total"))
+
+
+def _vendor_ledger_balance(vendor_id: int) -> Decimal:
+    row = VendorLedgerEntry.objects.filter(vendor_id=vendor_id).order_by("-posted_at", "-id").first()
+    return _money(row.balance_after if row else Decimal("0.00"))
 
 
 def _clean_return_kind(value: str | None) -> str:
@@ -1389,4 +1395,18 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
     purchase_return.posted_by = posted_by
     purchase_return.posted_at = timezone.now()
     purchase_return.save(update_fields=["status", "posted_journal_entry", "posted_by", "posted_at", "updated_at"])
+    previous_balance = _vendor_ledger_balance(purchase_return.vendor_id)
+    credit_amount = _money(purchase_return.grand_total)
+    VendorLedgerEntry.objects.create(
+        vendor_id=purchase_return.vendor_id,
+        entry_type="PURCHASE_RETURN",
+        source_type="PURCHASE_RETURN",
+        source_id=purchase_return.id,
+        source_reference=purchase_return.return_no,
+        debit=Decimal("0.00"),
+        credit=credit_amount,
+        balance_after=_money(previous_balance - credit_amount),
+        created_by=posted_by,
+        notes=f"Purchase return posted via journal {posted_journal.entry_no}.",
+    )
     return purchase_return, True
