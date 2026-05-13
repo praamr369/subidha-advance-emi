@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import DocumentSequence, FinanceAccount
 from accounting.services.accounting_setup_service import AccountingSetupService
+from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from branch_control.models import Branch, BranchStatus, CashCounter
 from subscriptions.models_business_setup import BusinessProfile
 from tests.helpers import create_admin_user, create_product, create_user
@@ -44,6 +45,7 @@ class AdminBusinessSetupApiTests(APITestCase):
         branch.save(update_fields=["status"])
 
         AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
+        apply_accounting_setup_defaults(performed_by=self.admin)
 
         cash_finance = FinanceAccount.objects.filter(name__iexact="Main Cash Desk").first()
         self.assertIsNotNone(cash_finance)
@@ -121,3 +123,20 @@ class AdminBusinessSetupApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_checklist_accounting_blocker_clears_after_defaults_but_products_blocker_remains(self):
+        self.client.force_authenticate(self.admin)
+
+        response_before = self.client.get("/api/v1/admin/business-setup/checklist/")
+        self.assertEqual(response_before.status_code, status.HTTP_200_OK)
+        by_key_before = {row["key"]: row for row in response_before.data["items"]}
+        self.assertEqual(by_key_before["products"]["status"], "missing")
+        self.assertEqual(by_key_before["chart_of_accounts"]["status"], "missing")
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+
+        response_after = self.client.get("/api/v1/admin/business-setup/checklist/")
+        self.assertEqual(response_after.status_code, status.HTTP_200_OK)
+        by_key_after = {row["key"]: row for row in response_after.data["items"]}
+        self.assertEqual(by_key_after["chart_of_accounts"]["status"], "complete")
+        self.assertEqual(by_key_after["products"]["status"], "missing")

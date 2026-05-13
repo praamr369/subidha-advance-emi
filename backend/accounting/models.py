@@ -16,6 +16,9 @@ SYSTEM_LEDGER_POSTING_PROFILE_NAME = "ledger posting profiles (system)"
 DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
 DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "DEFAULT_ASSET_BANK_ACCOUNT"
 DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "DEFAULT_ASSET_UPI_GATEWAY"
+CANONICAL_CASH_IN_HAND_SYSTEM_CODE = "CASH_COLLECTION"
+CANONICAL_BANK_ACCOUNT_SYSTEM_CODE = "BANK_COLLECTION"
+CANONICAL_UPI_GATEWAY_SYSTEM_CODE = "UPI_COLLECTION"
 
 
 def _default_branch():
@@ -83,9 +86,19 @@ def _transition_allowed(previous_status: str | None, next_status: str | None, al
 def _is_cash_in_hand_chart(chart: "ChartOfAccount" | None) -> bool:
     if chart is None:
         return False
-    if (chart.system_code or "").strip().upper() == DEFAULT_CASH_IN_HAND_SYSTEM_CODE:
+    if (chart.system_code or "").strip().upper() in {
+        DEFAULT_CASH_IN_HAND_SYSTEM_CODE,
+        CANONICAL_CASH_IN_HAND_SYSTEM_CODE,
+    }:
         return True
     return (chart.name or "").strip().lower() == "cash in hand"
+
+
+def _chart_by_system_codes(*, system_codes: tuple[str, ...]) -> "ChartOfAccount | None":
+    normalized = [code.strip().upper() for code in system_codes if (code or "").strip()]
+    if not normalized:
+        return None
+    return ChartOfAccount.objects.filter(system_code__in=normalized, is_active=True).order_by("id").first()
 
 
 def _immutable_status_guard(
@@ -544,14 +557,12 @@ class FinanceAccount(AccountingTimeStampedModel):
             errors["chart_account"] = "Finance accounts must map to ASSET chart accounts."
         if self.chart_account_id:
             kind = (self.kind or "").strip().upper()
-            bank_chart = ChartOfAccount.objects.filter(
-                system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE,
-                is_active=True,
-            ).first()
-            upi_chart = ChartOfAccount.objects.filter(
-                system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE,
-                is_active=True,
-            ).first()
+            bank_chart = _chart_by_system_codes(
+                system_codes=(DEFAULT_BANK_ACCOUNT_SYSTEM_CODE, CANONICAL_BANK_ACCOUNT_SYSTEM_CODE)
+            )
+            upi_chart = _chart_by_system_codes(
+                system_codes=(DEFAULT_UPI_GATEWAY_SYSTEM_CODE, CANONICAL_UPI_GATEWAY_SYSTEM_CODE)
+            )
             if kind == FinanceAccountKind.BANK and _is_cash_in_hand_chart(self.chart_account):
                 if bank_chart and self.chart_account_id != bank_chart.pk:
                     errors["chart_account"] = (
@@ -682,8 +693,12 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
                 errors["chart_account"] = (
                     "CASH finance accounts cannot map to INCOME/LIABILITY/EXPENSE chart accounts."
                 )
-            bank_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_BANK_ACCOUNT_SYSTEM_CODE, is_active=True).first()
-            upi_chart = ChartOfAccount.objects.filter(system_code=DEFAULT_UPI_GATEWAY_SYSTEM_CODE, is_active=True).first()
+            bank_chart = _chart_by_system_codes(
+                system_codes=(DEFAULT_BANK_ACCOUNT_SYSTEM_CODE, CANONICAL_BANK_ACCOUNT_SYSTEM_CODE)
+            )
+            upi_chart = _chart_by_system_codes(
+                system_codes=(DEFAULT_UPI_GATEWAY_SYSTEM_CODE, CANONICAL_UPI_GATEWAY_SYSTEM_CODE)
+            )
             if (
                 self.purpose == FinanceAccountMappingPurpose.BANK_COLLECTION
                 and _is_cash_in_hand_chart(self.chart_account)

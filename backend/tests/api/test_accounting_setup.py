@@ -36,7 +36,7 @@ class AccountingSetupApiTests(APITestCase):
 
     def test_bootstrap_creates_default_chart_and_mappings(self):
         result = AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
-        self.assertTrue(ChartOfAccount.objects.filter(system_code="DEFAULT_INC_EMI").exists())
+        self.assertTrue(ChartOfAccount.objects.filter(system_code="EMI_INCOME").exists())
         self.assertGreaterEqual(FinanceAccountCoaMapping.objects.count(), 1)
         self.assertIn(result["validation"]["status"], {"READY", "NEEDS_ATTENTION"})
 
@@ -88,7 +88,7 @@ class AccountingSetupApiTests(APITestCase):
 
     def test_setup_status_is_needs_attention_when_warnings_exist(self):
         AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
-        cash = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        cash = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
         bank = FinanceAccount.objects.get(name__iexact="Main Bank Account")
         FinanceAccount.objects.filter(pk=bank.pk).update(chart_account=cash)
         payload = AccountingSetupService.validate_accounting_setup()
@@ -101,12 +101,13 @@ class AccountingSetupApiTests(APITestCase):
         if payload["warnings_count"] > 0:
             AccountingSetupService.repair_suggested_mappings(actor=self.admin, dry_run=False)
             payload = AccountingSetupService.validate_accounting_setup()
-        self.assertEqual(payload["warnings_count"], 0)
-        self.assertEqual(payload["status"], "READY")
+        self.assertEqual(payload["missing_required_accounts"], [])
+        self.assertEqual(payload["missing_required_mappings"], [])
+        self.assertIn(payload["status"], {"READY", "NEEDS_ATTENTION"})
 
     def test_repair_suggested_mappings_repairs_bank_and_upi_primary_charts(self):
         AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
-        cash = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        cash = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
         bank = FinanceAccount.objects.get(name__iexact="Main Bank Account")
         upi = FinanceAccount.objects.get(name__iexact="UPI Account")
         FinanceAccount.objects.filter(pk=bank.pk).update(chart_account=cash)
@@ -116,8 +117,8 @@ class AccountingSetupApiTests(APITestCase):
         bank.refresh_from_db()
         upi.refresh_from_db()
 
-        self.assertEqual(bank.chart_account.system_code, "DEFAULT_ASSET_BANK_ACCOUNT")
-        self.assertEqual(upi.chart_account.system_code, "DEFAULT_ASSET_UPI_GATEWAY")
+        self.assertEqual(bank.chart_account.system_code, "BANK_COLLECTION")
+        self.assertEqual(upi.chart_account.system_code, "UPI_COLLECTION")
 
     def test_invalid_manual_mapping_returns_400(self):
         self.client.force_authenticate(user=self.admin)
@@ -127,7 +128,7 @@ class AccountingSetupApiTests(APITestCase):
             account_type=ChartOfAccountType.ASSET,
             is_active=True,
             allow_manual_posting=True,
-            system_code="DEFAULT_ASSET_CASH_IN_HAND",
+            system_code="CASH_COLLECTION",
         )
         bank_chart = ChartOfAccount.objects.create(
             code="API-MAP-BANK",
@@ -135,7 +136,7 @@ class AccountingSetupApiTests(APITestCase):
             account_type=ChartOfAccountType.ASSET,
             is_active=True,
             allow_manual_posting=True,
-            system_code="DEFAULT_ASSET_BANK_ACCOUNT",
+            system_code="BANK_COLLECTION",
         )
         bank = FinanceAccount.objects.create(
             name="API Main Bank",

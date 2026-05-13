@@ -14,6 +14,9 @@ from accounting.models import (
     FinanceAccountKind,
     FinanceAccountMappingPurpose,
 )
+from accounting.services.accounting_setup_catalog import (
+    CANONICAL_CHART_ACCOUNTS,
+)
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -21,34 +24,7 @@ from subscriptions.services.audit_service import log_audit
 LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME = "Ledger posting profiles (system)"
 
 REQUIRED_COA: list[tuple[str, str, str]] = [
-    ("ASSET", "Cash in Hand", "DEFAULT_ASSET_CASH_IN_HAND"),
-    ("ASSET", "Bank Account", "DEFAULT_ASSET_BANK_ACCOUNT"),
-    ("ASSET", "UPI/Payment Gateway", "DEFAULT_ASSET_UPI_GATEWAY"),
-    ("ASSET", "Customer Receivables", "DEFAULT_ASSET_CUSTOMER_RECEIVABLES"),
-    ("ASSET", "Inventory Asset", "DEFAULT_ASSET_INVENTORY"),
-    ("ASSET", "Rental & Lease Assets", "DEFAULT_ASSET_RENTAL_LEASE"),
-    ("ASSET", "Security Deposit Receivable", "DEFAULT_ASSET_SEC_DEP_RECEIVABLE"),
-    ("ASSET", "Advance to Vendors", "DEFAULT_ASSET_ADVANCE_VENDOR"),
-    ("LIABILITY", "Rent/Lease Security Deposit Liability", "DEFAULT_LIAB_SECURITY_DEPOSIT"),
-    ("LIABILITY", "Partner Commission Payable", "DEFAULT_LIAB_PARTNER_COMMISSION"),
-    ("LIABILITY", "Vendor Payable", "DEFAULT_LIAB_VENDOR_PAYABLE"),
-    ("LIABILITY", "Tax Payable", "DEFAULT_LIAB_TAX_PAYABLE"),
-    ("LIABILITY", "Customer Advance / Unearned Revenue", "DEFAULT_LIAB_CUSTOMER_ADVANCE"),
-    ("INCOME", "Advance EMI Collection Income", "DEFAULT_INC_EMI"),
-    ("INCOME", "Rent Income", "DEFAULT_INC_RENT"),
-    ("INCOME", "Lease Income", "DEFAULT_INC_LEASE"),
-    ("INCOME", "Direct Sale Revenue", "DEFAULT_INC_DIRECT_SALE"),
-    ("INCOME", "Delivery Charges Income", "DEFAULT_INC_DELIVERY_CHARGES"),
-    ("INCOME", "Damage Recovery Income", "DEFAULT_INC_DAMAGE_RECOVERY"),
-    ("EXPENSE", "Lucky Winner Waiver/Loss", "DEFAULT_EXP_WAIVER_LOSS"),
-    ("EXPENSE", "Discount/Adjustment", "DEFAULT_EXP_DISCOUNT_ADJ"),
-    ("EXPENSE", "Inventory Damage/Loss", "DEFAULT_EXP_INVENTORY_DAMAGE"),
-    ("EXPENSE", "Maintenance Expense", "DEFAULT_EXP_MAINTENANCE"),
-    ("EXPENSE", "Commission Expense", "DEFAULT_EXP_COMMISSION"),
-    ("EXPENSE", "Delivery Expense", "DEFAULT_EXP_DELIVERY"),
-    ("EXPENSE", "Staff Salary Expense", "DEFAULT_EXP_SALARY"),
-    ("EQUITY", "Owner Capital", "DEFAULT_EQ_OWNER_CAPITAL"),
-    ("EQUITY", "Retained Earnings / Opening Balance Adjustment", "DEFAULT_EQ_RETAINED_EARNINGS"),
+    (spec.account_type, spec.name, spec.key) for spec in CANONICAL_CHART_ACCOUNTS
 ]
 
 REQUIRED_COA_SYSTEM_CODES: tuple[str, ...] = tuple(code for _, _, code in REQUIRED_COA)
@@ -67,16 +43,16 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ("Main Cash Desk", "Cash in Hand", FinanceAccountMappingPurpose.CASH_COLLECTION, True),
     ("Branch Cash Desk", "Cash in Hand", FinanceAccountMappingPurpose.CASH_COLLECTION, False),
     ("Main Bank Account", "Bank Account", FinanceAccountMappingPurpose.BANK_COLLECTION, True),
-    ("UPI Account", "UPI/Payment Gateway", FinanceAccountMappingPurpose.UPI_COLLECTION, True),
+    ("UPI Account", "UPI Collection Account", FinanceAccountMappingPurpose.UPI_COLLECTION, True),
     (
         "Payment Gateway Settlement Account",
-        "UPI/Payment Gateway",
+        "Payment Gateway Settlement Account",
         FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
         True,
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Customer Receivables",
+        "Accounts Receivable",
         FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,
         True,
     ),
@@ -88,7 +64,7 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Customer Advance / Unearned Revenue",
+        "Customer Advances and Unapplied Receipts",
         FinanceAccountMappingPurpose.CUSTOMER_ADVANCE_UNEARNED_REVENUE,
         True,
     ),
@@ -112,7 +88,7 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Direct Sale Revenue",
+        "Sales Revenue",
         FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,
         True,
     ),
@@ -130,7 +106,7 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Lucky Winner Waiver/Loss",
+        "EMI Winner Waiver Expense",
         FinanceAccountMappingPurpose.WAIVER_LOSS,
         True,
     ),
@@ -142,7 +118,7 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Commission Expense",
+        "Partner Commission Expense",
         FinanceAccountMappingPurpose.COMMISSION_EXPENSE,
         True,
     ),
@@ -160,7 +136,7 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
-        "Staff Salary Expense",
+        "Salary Expense",
         FinanceAccountMappingPurpose.SALARY_EXPENSE,
         True,
     ),
@@ -198,9 +174,9 @@ class SetupResult:
     details: list[dict[str, Any]]
 
 
-DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "DEFAULT_ASSET_CASH_IN_HAND"
-DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "DEFAULT_ASSET_BANK_ACCOUNT"
-DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "DEFAULT_ASSET_UPI_GATEWAY"
+DEFAULT_CASH_IN_HAND_SYSTEM_CODE = "CASH_COLLECTION"
+DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "BANK_COLLECTION"
+DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "UPI_COLLECTION"
 
 # Warnings that remain visible but do not block readiness.
 READINESS_INFORMATIONAL_WARNING_CODES: frozenset[str] = frozenset()
@@ -211,12 +187,13 @@ class AccountingSetupService:
         FinanceAccountMappingPurpose.CASH_COLLECTION: DEFAULT_CASH_IN_HAND_SYSTEM_CODE,
         FinanceAccountMappingPurpose.BANK_COLLECTION: DEFAULT_BANK_ACCOUNT_SYSTEM_CODE,
         FinanceAccountMappingPurpose.UPI_COLLECTION: DEFAULT_UPI_GATEWAY_SYSTEM_CODE,
-        FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE: "DEFAULT_ASSET_CUSTOMER_RECEIVABLES",
-        FinanceAccountMappingPurpose.DIRECT_SALE_INCOME: "DEFAULT_INC_DIRECT_SALE",
-        FinanceAccountMappingPurpose.EMI_INCOME: "DEFAULT_INC_EMI",
-        FinanceAccountMappingPurpose.INVENTORY_ASSET: "DEFAULT_ASSET_INVENTORY",
-        FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY: "DEFAULT_LIAB_SECURITY_DEPOSIT",
-        FinanceAccountMappingPurpose.WAIVER_LOSS: "DEFAULT_EXP_WAIVER_LOSS",
+        FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE: "CUSTOMER_RECEIVABLE",
+        FinanceAccountMappingPurpose.DIRECT_SALE_INCOME: "SALES_REVENUE",
+        FinanceAccountMappingPurpose.EMI_INCOME: "EMI_INCOME",
+        FinanceAccountMappingPurpose.INVENTORY_ASSET: "INVENTORY_ASSET",
+        FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY: "SECURITY_DEPOSIT_LIABILITY",
+        FinanceAccountMappingPurpose.CUSTOMER_ADVANCE_UNEARNED_REVENUE: "CUSTOMER_ADVANCE_UNEARNED_REVENUE",
+        FinanceAccountMappingPurpose.WAIVER_LOSS: "EMI_WAIVER_EXPENSE",
     }
 
     @staticmethod
@@ -325,7 +302,7 @@ class AccountingSetupService:
 
     @staticmethod
     def _resolve_anchor_chart_account():
-        anchor = ChartOfAccount.objects.filter(system_code="DEFAULT_ASSET_CASH_IN_HAND", is_active=True).first()
+        anchor = ChartOfAccount.objects.filter(system_code=DEFAULT_CASH_IN_HAND_SYSTEM_CODE, is_active=True).first()
         if anchor:
             return anchor
         return ChartOfAccount.objects.filter(account_type=ChartOfAccountType.ASSET, is_active=True).order_by("id").first()

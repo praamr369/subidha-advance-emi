@@ -10,6 +10,7 @@ import {
   type SetupChecklist,
 } from "@/services/business-setup";
 import { getAdminPublicBusinessProfile } from "@/services/public-site";
+import { applyAccountingSetupDefaults } from "@/services/accounting";
 
 type Counts = {
   businessProfileConfigured: boolean;
@@ -117,6 +118,8 @@ export default function BusinessSetupOverviewPage() {
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accountingSetupRunning, setAccountingSetupRunning] = useState(false);
+  const [accountingSetupMessage, setAccountingSetupMessage] = useState<string | null>(null);
 
   async function loadData() {
     try {
@@ -157,6 +160,9 @@ export default function BusinessSetupOverviewPage() {
 
   const requiredMissing =
     checklist?.items.filter((item) => item.level === "required" && item.status !== "complete") ?? [];
+  const hasAccountingBlocker = requiredMissing.some(
+    (item) => item.key === "chart_of_accounts" || item.key === "accounting_posting_mappings"
+  );
   const recommendedPending =
     checklist?.items.filter((item) => item.level === "recommended" && item.status !== "complete") ?? [];
 
@@ -211,6 +217,11 @@ export default function BusinessSetupOverviewPage() {
           {error}
         </div>
       ) : null}
+      {accountingSetupMessage ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          {accountingSetupMessage}
+        </div>
+      ) : null}
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
@@ -242,6 +253,36 @@ export default function BusinessSetupOverviewPage() {
               Complete these first before running live operational workflows.
             </p>
             <div className="mt-4 space-y-3">
+              {hasAccountingBlocker ? (
+                <div className="rounded-xl border border-border bg-background px-3 py-3">
+                  <div className="text-sm font-semibold text-foreground">Accounting defaults required</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Required system ledgers or mappings are missing. Run the default accounting setup to create canonical
+                    system accounts and mappings safely.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAccountingSetupRunning(true);
+                      setAccountingSetupMessage(null);
+                      setError(null);
+                      try {
+                        await applyAccountingSetupDefaults({ confirm: true });
+                        await loadData();
+                        setAccountingSetupMessage("Default accounting setup completed. Checklist refreshed.");
+                      } catch (setupError) {
+                        setError(toErrorMessage(setupError));
+                      } finally {
+                        setAccountingSetupRunning(false);
+                      }
+                    }}
+                    disabled={accountingSetupRunning}
+                    className="mt-3 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {accountingSetupRunning ? "Running..." : "Run default accounting setup"}
+                  </button>
+                </div>
+              ) : null}
               {requiredMissing.length > 0 ? (
                 requiredMissing.map((item) => (
                   <Link

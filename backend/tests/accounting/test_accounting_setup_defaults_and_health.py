@@ -190,3 +190,20 @@ class SetupDefaultsAndHealthTests(TestCase):
         self.assertEqual(health["status"], "BLOCKED")
         self.assertGreaterEqual(health["journals"]["posted_zero_line_count"], 1)
         self.assertGreaterEqual(health["journals"]["posted_unbalanced_count"], 1)
+
+    def test_setup_health_reports_missing_before_defaults_and_clears_after_apply(self):
+        before = get_accounting_setup_health()
+        self.assertGreater(len(before["canonical_accounts"]["missing"]), 0)
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        after = get_accounting_setup_health()
+        self.assertEqual(len(after["canonical_accounts"]["missing"]), 0)
+
+    def test_apply_defaults_is_idempotent_for_system_codes(self):
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        first_count = ChartOfAccount.objects.exclude(system_code__isnull=True).exclude(system_code="").count()
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        second_count = ChartOfAccount.objects.exclude(system_code__isnull=True).exclude(system_code="").count()
+
+        self.assertEqual(first_count, second_count)
