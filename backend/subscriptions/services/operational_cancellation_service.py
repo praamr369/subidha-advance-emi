@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from subscriptions.models import (
@@ -329,16 +330,25 @@ def cancel_direct_sale(*, direct_sale_id: int, actor, reason: str, internal_note
             reversal_policy=reversal_policy,
         )
 
-    PurchaseNeed.objects.select_for_update(of=("self",)).filter(
-        source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
-        source_object_id=str(sale.id),
-        status__in=[PurchaseNeedStatus.OPEN, PurchaseNeedStatus.IN_REVIEW],
-    ).update(
-        status=PurchaseNeedStatus.CANCELLED,
-        fulfilled_at=timezone.now(),
-        note="Cancelled because linked direct sale was cancelled.",
-        updated_at=timezone.now(),
+    need_q = (
+        Q(source_module=PurchaseNeed.SourceModule.DIRECT_SALE)
+        & (
+            Q(source_object_id=str(sale.id))
+            | Q(source_object_id__startswith=f"ds:{int(sale.id)}:p:")
+        )
+        & Q(status__in=[PurchaseNeedStatus.OPEN, PurchaseNeedStatus.IN_REVIEW])
     )
+    now_ts = timezone.now()
+    for need in PurchaseNeed.objects.select_for_update(of=("self",)).filter(need_q):
+        existing_note = (need.note or "").strip()
+        need.note = (
+            f"{existing_note}\nCancelled because linked direct sale was cancelled."
+            if existing_note
+            else "Cancelled because linked direct sale was cancelled."
+        )
+        need.status = PurchaseNeedStatus.CANCELLED
+        need.fulfilled_at = now_ts
+        need.save(update_fields=["status", "fulfilled_at", "note", "updated_at"])
 
     ServiceDeskCase.objects.select_for_update(of=("self",)).filter(
         direct_sale=sale,

@@ -20,6 +20,7 @@ from inventory.models import (
     PurchaseBill,
     PurchaseBillLine,
     PurchaseBillStatus,
+    SOFT_HOLD_MOVEMENT_TYPES,
     StockLocation,
     StockAdjustment,
     StockAdjustmentStatus,
@@ -219,6 +220,32 @@ def create_stock_ledger_entry(
     posted_journal_entry=None,
 ) -> tuple[StockLedger, bool]:
     stock_location = stock_location or inventory_item.default_stock_location
+    outbound_guard_types = {
+        StockMovementType.EMI_DELIVERY_OUT,
+        StockMovementType.DELIVERY_OUT,
+    }
+    qty_out = _quantity(quantity_out)
+    if movement_type in outbound_guard_types and qty_out > Decimal("0.000"):
+        if stock_location is None:
+            location_available = _quantity(inventory_item.current_stock_quantity())
+        else:
+            aggregate = (
+                inventory_item.stock_ledger.exclude(movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES))
+                .filter(stock_location=stock_location)
+                .aggregate(total_in=Sum("quantity_in"), total_out=Sum("quantity_out"))
+            )
+            location_total_in = _quantity(aggregate.get("total_in"))
+            location_total_out = _quantity(aggregate.get("total_out"))
+            opening_at_location = Decimal("0.000")
+            if inventory_item.default_stock_location_id == stock_location.id:
+                opening_at_location = _quantity(inventory_item.opening_stock_qty)
+            location_available = opening_at_location + location_total_in - location_total_out
+        if location_available < qty_out:
+            raise ValueError(
+                "Insufficient stock for outbound movement. "
+                f"Available at location: {location_available:.3f}, requested: {qty_out:.3f}."
+            )
+
     lookup = {
         "inventory_item": inventory_item,
         "movement_type": movement_type,
@@ -232,7 +259,7 @@ def create_stock_ledger_entry(
             movement_date=movement_date,
             stock_location=stock_location,
             quantity_in=_quantity(quantity_in),
-            quantity_out=_quantity(quantity_out),
+            quantity_out=qty_out,
             reference_model=reference_model,
             reference_id=str(reference_id),
             warehouse_name=getattr(stock_location, "name", ""),

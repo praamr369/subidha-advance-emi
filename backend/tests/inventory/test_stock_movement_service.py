@@ -44,3 +44,14 @@ class StockMovementServiceTests(TestCase):
         self.assertFalse(created_again)
         self.assertEqual(first_entry.id, second_entry.id)
 
+    def test_outbound_delivery_movement_blocks_when_location_stock_insufficient(self):
+        with self.assertRaisesMessage(ValueError, "Insufficient stock for outbound movement"):
+            create_stock_ledger_entry(
+                inventory_item=self.item,
+                movement_type=StockMovementType.DELIVERY_OUT,
+                movement_date=date(2026, 4, 23),
+                quantity_out=Decimal("6.000"),
+                reference_model="SubscriptionDelivery",
+                reference_id="INV-1:LINE-1",
+                posted_by=self.admin,
+            )

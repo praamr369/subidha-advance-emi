@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
 from billing.models import ReceiptDocument
-from inventory.models import InventoryItem
+from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
 from accounting.services.gst_document_posting_service import financial_year_for
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
@@ -301,3 +301,55 @@ class DirectSaleApiTests(APITestCase):
         )
         self.assertEqual(collect_response.status_code, status.HTTP_400_BAD_REQUEST, collect_response.data)
         self.assertIn("retail invoice is posted", str(collect_response.data).lower())
+
+    def test_cancel_direct_sale_marks_keyed_purchase_needs_cancelled(self):
+        create_response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 19),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "delivery_required": False,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "subtotal": "9500.00",
+                "discount_total": "0.00",
+                "taxable_total": "9500.00",
+                "tax_total": "0.00",
+                "grand_total": "9500.00",
+                "received_total": "0.00",
+                "balance_total": "9500.00",
+                "lines": [
+                    {
+                        "product": self.product.id,
+                        "inventory_item": self.inventory_item.id,
+                        "description": "Need cancellation line",
+                        "quantity": "1.000",
+                        "create_purchase_requirement": True,
+                        "requirement_quantity": "1.000",
+                        "requirement_note": "Create keyed direct-sale stock need",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        sale_id = create_response.data["id"]
+
+        need = PurchaseNeed.objects.get(
+            source_module=PurchaseNeed.SourceModule.DIRECT_SALE,
+            source_object_id=f"ds:{sale_id}:p:{self.product.id}",
+        )
+        self.assertEqual(need.status, PurchaseNeedStatus.OPEN)
+
+        cancel_response = self.client.post(
+            f"/api/v1/billing/direct-sales/{sale_id}/cancel/",
+            {"reason": "Customer dropped order before invoicing", "confirm": True},
+            format="json",
+        )
+        self.assertEqual(cancel_response.status_code, status.HTTP_200_OK, cancel_response.data)
+
+        need.refresh_from_db()
+        self.assertEqual(need.status, PurchaseNeedStatus.CANCELLED)
+        self.assertIn("linked direct sale was cancelled", (need.note or "").lower())
