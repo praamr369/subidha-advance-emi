@@ -67,3 +67,91 @@ class ProductionHardeningTests(TestCase):
     def test_production_checklist_exists(self):
         root = Path(__file__).resolve().parents[3]
         self.assertTrue((root / "docs" / "production-deployment-checklist.md").exists())
+
+    @override_settings(
+        DEBUG=False,
+        ALLOWED_HOSTS=["example.com"],
+        CELERY_BROKER_URL="",
+        BACKUP_ROOT="/tmp",
+        SECRET_KEY="safe-secret-key-for-tests",
+        SESSION_COOKIE_SECURE=True,
+        CSRF_COOKIE_SECURE=True,
+        CORS_ALLOWED_ORIGINS=["https://example.com"],
+        CSRF_TRUSTED_ORIGINS=["https://example.com"],
+        REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"auth_login": "5/min", "forgot_password": "5/min", "reset_password": "5/min", "payment_mutation": "30/min"}},
+        OTP_DELIVERY_BACKEND="email",
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.example.com",
+        EMAIL_PORT=587,
+        EMAIL_HOST_USER="mailer@example.com",
+        EMAIL_HOST_PASSWORD="secret",
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=False,
+        DEFAULT_FROM_EMAIL="SUBIDHA CORE <no-reply@example.com>",
+    )
+    def test_check_production_readiness_accepts_email_otp_when_email_settings_complete(self):
+        with patch("subscriptions.management.commands.check_production_readiness.AccountingSetupService.validate_accounting_setup", return_value={"mappings_complete": True, "missing_required_mappings": [], "warnings": []}), patch("subscriptions.management.commands.check_production_readiness.MigrationExecutor") as mock_executor:
+            mock_executor.return_value.migration_plan.return_value = []
+            call_command("check_production_readiness")
+
+    @override_settings(
+        DEBUG=False,
+        ALLOWED_HOSTS=["example.com"],
+        CELERY_BROKER_URL="",
+        BACKUP_ROOT="/tmp",
+        SECRET_KEY="safe-secret-key-for-tests",
+        SESSION_COOKIE_SECURE=True,
+        CSRF_COOKIE_SECURE=True,
+        CORS_ALLOWED_ORIGINS=["https://example.com"],
+        CSRF_TRUSTED_ORIGINS=["https://example.com"],
+        REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"auth_login": "5/min", "forgot_password": "5/min", "reset_password": "5/min", "payment_mutation": "30/min"}},
+        OTP_DELIVERY_BACKEND="email",
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.example.com",
+        EMAIL_PORT=587,
+        EMAIL_HOST_USER="",
+        EMAIL_HOST_PASSWORD="",
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=False,
+        DEFAULT_FROM_EMAIL="SUBIDHA CORE <no-reply@example.com>",
+    )
+    def test_check_production_readiness_fails_when_email_otp_selected_but_email_settings_incomplete(self):
+        with patch("subscriptions.management.commands.check_production_readiness.AccountingSetupService.validate_accounting_setup", return_value={"mappings_complete": True, "missing_required_mappings": [], "warnings": []}), patch("subscriptions.management.commands.check_production_readiness.MigrationExecutor") as mock_executor:
+            mock_executor.return_value.migration_plan.return_value = []
+            with self.assertRaises(CommandError):
+                call_command("check_production_readiness")
+
+    @override_settings(
+        DEBUG=False,
+        ALLOWED_HOSTS=["example.com"],
+        CELERY_BROKER_URL="",
+        BACKUP_ROOT="/tmp",
+        SECRET_KEY="safe-secret-key-for-tests",
+        SESSION_COOKIE_SECURE=True,
+        CSRF_COOKIE_SECURE=True,
+        CORS_ALLOWED_ORIGINS=["https://example.com"],
+        CSRF_TRUSTED_ORIGINS=["https://example.com"],
+        REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"auth_login": "5/min", "forgot_password": "5/min", "reset_password": "5/min", "payment_mutation": "30/min"}},
+        OTP_DELIVERY_BACKEND="console",
+    )
+    def test_check_production_readiness_fails_for_dev_only_otp_backend(self):
+        with self.assertRaises(CommandError):
+            call_command("check_production_readiness")
+
+    @override_settings(
+        DEBUG=False,
+        ALLOWED_HOSTS=["example.com"],
+        CELERY_BROKER_URL="",
+        BACKUP_ROOT="/tmp",
+        SECRET_KEY="safe-secret-key-for-tests",
+        SESSION_COOKIE_SECURE=True,
+        CSRF_COOKIE_SECURE=True,
+        CORS_ALLOWED_ORIGINS=["https://example.com"],
+        CSRF_TRUSTED_ORIGINS=["https://example.com"],
+        REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"auth_login": "5/min", "forgot_password": "5/min", "reset_password": "5/min", "payment_mutation": "30/min"}},
+        OTP_DELIVERY_BACKEND="sms",
+    )
+    def test_check_production_readiness_accepts_sms_backend_policy(self):
+        with patch("subscriptions.management.commands.check_production_readiness.AccountingSetupService.validate_accounting_setup", return_value={"mappings_complete": True, "missing_required_mappings": [], "warnings": []}), patch("subscriptions.management.commands.check_production_readiness.MigrationExecutor") as mock_executor:
+            mock_executor.return_value.migration_plan.return_value = []
+            call_command("check_production_readiness")

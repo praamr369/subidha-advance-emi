@@ -33,10 +33,17 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
   await expect(page.getByLabel("Snapshot Name")).toHaveValue("No Match Customer");
   await page.getByLabel("Snapshot Name").fill("Smoke Walk In");
   await page.getByLabel("Phone").fill("9812345678");
-  await page.getByLabel("Tax Mode").selectOption("GST");
-  await page.getByLabel("Place of Supply / State").fill("WB");
-  await page.getByLabel("Customer GST Type").selectOption("REGISTERED_BUSINESS");
-  await page.getByLabel("GSTIN").fill("19ABCDE1234F1Z5");
+  const taxModeSelect = page.getByLabel("Tax Mode");
+  const gstOptionCount = await taxModeSelect.locator('option[value="GST"]').count();
+  if (gstOptionCount > 0 && (await taxModeSelect.isEnabled())) {
+    await taxModeSelect.selectOption("GST");
+    await page.getByLabel("Place of Supply / State").fill("WB");
+    await page.getByLabel("Customer GST Type").selectOption("REGISTERED_BUSINESS");
+    await page.getByLabel("GSTIN").fill("19ABCDE1234F1Z5");
+  } else {
+    await expect(taxModeSelect).toBeDisabled();
+    await expect(page.getByText("Current tax mode: GST Unregistered (Commercial Invoice / Non-GST)")).toBeVisible();
+  }
   await page.getByLabel("Search Product").fill(productName);
   const failedProductFetch = page.getByText("Failed to fetch").first();
   if (await failedProductFetch.isVisible().catch(() => false)) {

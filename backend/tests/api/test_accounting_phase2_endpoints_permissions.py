@@ -1,12 +1,22 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode
 from tests.helpers import create_admin_user, create_customer_profile, create_customer_user, create_partner_user
 
 
 class AccountingPhase2EndpointsPermissionsTests(APITestCase):
     def setUp(self):
         super().setUp()
+        BusinessTaxProfile.objects.update(is_active=False)
+        BusinessTaxProfile.objects.create(
+            mode=BusinessTaxRegistrationMode.GST_REGULAR,
+            legal_name="Subidha Furniture",
+            gstin="19ABCDE1234F1Z5",
+            state_code="19",
+            state_name="West Bengal",
+            is_active=True,
+        )
         self.admin = create_admin_user(
             username="accounting_phase2_admin",
             phone="9365000001",

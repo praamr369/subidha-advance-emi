@@ -5,6 +5,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode
 from accounting.models import DocumentSequence
 from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
@@ -24,6 +25,15 @@ from tests.helpers import (
 
 class DirectSaleBillingWorkspaceTests(APITestCase):
     def setUp(self):
+        BusinessTaxProfile.objects.update(is_active=False)
+        BusinessTaxProfile.objects.create(
+            mode=BusinessTaxRegistrationMode.GST_REGULAR,
+            legal_name="Subidha Furniture",
+            gstin="19ABCDE1234F1Z5",
+            state_code="19",
+            state_name="West Bengal",
+            is_active=True,
+        )
         self.admin = create_admin_user(username="direct_sale_workspace_admin", phone="9377000011")
         self.client.force_authenticate(self.admin)
         self.customer = create_customer_profile(

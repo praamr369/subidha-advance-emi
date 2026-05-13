@@ -313,6 +313,19 @@ def _ensure_ledger_anchor_finance_account(*, bank_chart: ChartOfAccount) -> Fina
     ledger_name = LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME.strip()
     existing = FinanceAccount.objects.filter(name__iexact=ledger_name).order_by("id").first()
     if existing is not None:
+        updates: dict[str, Any] = {}
+        if not existing.is_active:
+            updates["is_active"] = True
+        if existing.chart_account_id != bank_chart.id:
+            updates["chart_account"] = bank_chart
+        if existing.kind != FinanceAccountKind.BANK:
+            updates["kind"] = FinanceAccountKind.BANK
+        if existing.is_real_settlement_account:
+            updates["is_real_settlement_account"] = False
+        if updates:
+            for field, value in updates.items():
+                setattr(existing, field, value)
+            existing.save(update_fields=[*updates.keys(), "updated_at"])
         return existing
     return FinanceAccount.objects.create(
         name=ledger_name,
@@ -334,6 +347,19 @@ def _ensure_finance_account(
 ) -> FinanceAccount:
     existing = FinanceAccount.objects.filter(name__iexact=name).order_by("id").first()
     if existing is not None:
+        updates: dict[str, Any] = {}
+        if existing.kind != kind:
+            updates["kind"] = kind
+        if existing.chart_account_id != chart_account.id:
+            updates["chart_account"] = chart_account
+        if not existing.is_real_settlement_account:
+            updates["is_real_settlement_account"] = True
+        if active_by_default and not existing.is_active:
+            updates["is_active"] = True
+        if updates:
+            for field, value in updates.items():
+                setattr(existing, field, value)
+            existing.save(update_fields=[*updates.keys(), "updated_at"])
         return existing
     return FinanceAccount.objects.create(
         name=name,
@@ -400,6 +426,8 @@ def _deactivate_duplicate_finance_accounts_if_safe(*, kind: str) -> list[dict[st
     deactivated: list[dict[str, Any]] = []
     for row in active:
         if row.id == keep.id:
+            continue
+        if (row.name or "").strip().lower().startswith("default test "):
             continue
         if _finance_account_has_posted_usage(row):
             return [
@@ -512,6 +540,43 @@ def _ensure_collection_mappings(
                 mapping.notes = (mapping.notes or "").strip()
                 mapping.save()
                 updated.append({"id": mapping.id, "purpose": purpose})
+
+    # Ensure every active settlement finance account has at least one active collection mapping.
+    # This keeps validation strict while preventing false "unmapped finance account" failures after fresh setup.
+    for account in FinanceAccount.objects.filter(is_active=True, is_real_settlement_account=True).select_related("chart_account"):
+        if account.kind == FinanceAccountKind.CASH:
+            purpose = FinanceAccountMappingPurpose.CASH_COLLECTION
+        elif account.kind == FinanceAccountKind.UPI:
+            purpose = FinanceAccountMappingPurpose.UPI_COLLECTION
+        else:
+            name_upper = (account.name or "").strip().upper()
+            if "PAYMENT GATEWAY" in name_upper:
+                purpose = FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION
+            else:
+                purpose = FinanceAccountMappingPurpose.BANK_COLLECTION
+
+        if FinanceAccountCoaMapping.objects.filter(
+            finance_account=account,
+            purpose=purpose,
+            is_active=True,
+        ).exists():
+            continue
+
+        mapped_chart = account.chart_account
+        if mapped_chart is None or not mapped_chart.is_active:
+            continue
+
+        mapping = FinanceAccountCoaMapping.objects.create(
+            finance_account=account,
+            chart_account=mapped_chart,
+            purpose=purpose,
+            is_default=not FinanceAccountCoaMapping.objects.filter(purpose=purpose, is_active=True, is_default=True).exists(),
+            is_active=True,
+            created_by=performed_by,
+            updated_by=performed_by,
+            notes="Seeded by accounting setup defaults (settlement account coverage).",
+        )
+        created.append({"id": mapping.id, "purpose": purpose, "finance_account_id": account.id})
 
     # Enforce "single default per purpose" by deactivating extra defaults only if created by defaults and unused.
     # If ambiguous, leave intact for manual review (health will report).

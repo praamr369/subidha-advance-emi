@@ -13,6 +13,30 @@ from accounting.services.accounting_setup_service import AccountingSetupService
 from subscriptions.models import AuditLog
 
 
+def _email_otp_settings_complete() -> bool:
+    email_backend = (getattr(settings, "EMAIL_BACKEND", "") or "").strip()
+    email_host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
+    email_port = getattr(settings, "EMAIL_PORT", None)
+    email_host_user = (getattr(settings, "EMAIL_HOST_USER", "") or "").strip()
+    email_host_password = (getattr(settings, "EMAIL_HOST_PASSWORD", "") or "").strip()
+    default_from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").strip()
+    email_use_tls = bool(getattr(settings, "EMAIL_USE_TLS", False))
+    email_use_ssl = bool(getattr(settings, "EMAIL_USE_SSL", False))
+
+    return all(
+        [
+            email_backend == "django.core.mail.backends.smtp.EmailBackend",
+            bool(email_host),
+            email_host.lower() != "localhost",
+            bool(email_port),
+            bool(email_host_user),
+            bool(email_host_password),
+            bool(default_from_email),
+            email_use_tls or email_use_ssl,
+        ]
+    )
+
+
 class Command(BaseCommand):
     help = "Validate production readiness controls before release."
 
@@ -35,21 +59,16 @@ class Command(BaseCommand):
         if jobs_enabled and "redis://" not in broker:
             failures.append("CELERY_BROKER_URL must use redis:// when background jobs are enabled.")
 
-        default_from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").strip()
-        if not default_from_email:
-            failures.append("DEFAULT_FROM_EMAIL must be configured.")
-
         otp_backend = (getattr(settings, "OTP_DELIVERY_BACKEND", "") or "").strip().lower()
         allowed_otp_backends = {"sms", "email", "sms_email"}
         if otp_backend not in allowed_otp_backends:
             failures.append("OTP delivery backend must be explicitly set to sms/email/sms_email for production.")
-        elif otp_backend in {"email", "sms_email"}:
-            email_backend = (getattr(settings, "EMAIL_BACKEND", "") or "").strip()
-            email_host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
-            if email_backend != "django.core.mail.backends.smtp.EmailBackend":
-                failures.append("EMAIL_BACKEND must use SMTP when OTP delivery includes email.")
-            if not email_host:
-                failures.append("EMAIL_HOST must be configured when OTP delivery includes email.")
+        elif otp_backend == "email":
+            if not _email_otp_settings_complete():
+                failures.append("Email OTP selected but email delivery settings are incomplete.")
+        elif otp_backend == "sms_email":
+            if not _email_otp_settings_complete():
+                failures.append("SMS+Email OTP selected but email delivery settings are incomplete.")
 
         backup_root = Path((getattr(settings, "BACKUP_ROOT", "") or "").strip())
         if not str(backup_root):

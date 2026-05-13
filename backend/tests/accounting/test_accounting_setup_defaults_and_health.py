@@ -11,6 +11,8 @@ from accounting.models import (
     ChartOfAccountType,
     FinanceAccount,
     FinanceAccountKind,
+    FinanceAccountMappingPurpose,
+    FinanceAccountCoaMapping,
     JournalEntry,
     JournalEntryLine,
     JournalEntryStatus,
@@ -20,6 +22,8 @@ from accounting.services.setup_defaults_service import apply_accounting_setup_de
 from accounting.services.setup_health_service import get_accounting_setup_health
 from accounting.services.system_accounts_service import ensure_system_account
 from tests.helpers import create_admin_user
+from tests.helpers import ensure_default_payment_collection_accounts
+from accounting.services.accounting_setup_service import AccountingSetupService
 
 
 class SystemAccountEnsureTests(TestCase):
@@ -207,3 +211,46 @@ class SetupDefaultsAndHealthTests(TestCase):
         second_count = ChartOfAccount.objects.exclude(system_code__isnull=True).exclude(system_code="").count()
 
         self.assertEqual(first_count, second_count)
+
+    def test_apply_defaults_maps_default_test_collection_accounts(self):
+        ensure_default_payment_collection_accounts()
+        apply_accounting_setup_defaults(performed_by=self.admin)
+
+        self.assertTrue(
+            FinanceAccountCoaMapping.objects.filter(
+                finance_account__name__iexact="Default Test Cash Account",
+                purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+                is_active=True,
+            ).exists()
+        )
+        self.assertTrue(
+            FinanceAccountCoaMapping.objects.filter(
+                finance_account__name__iexact="Default Test Bank Account",
+                purpose=FinanceAccountMappingPurpose.BANK_COLLECTION,
+                is_active=True,
+            ).exists()
+        )
+        self.assertTrue(
+            FinanceAccountCoaMapping.objects.filter(
+                finance_account__name__iexact="Default Test UPI Account",
+                purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
+                is_active=True,
+            ).exists()
+        )
+
+    def test_validation_passes_after_defaults_and_fails_when_required_purpose_mapping_is_inactive(self):
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        ready = AccountingSetupService.validate_accounting_setup()
+        self.assertTrue(ready["mappings_complete"])
+
+        mapping = FinanceAccountCoaMapping.objects.filter(
+            purpose=FinanceAccountMappingPurpose.EMI_INCOME,
+            is_active=True,
+        ).first()
+        self.assertIsNotNone(mapping)
+        mapping.is_active = False
+        mapping.save(update_fields=["is_active", "updated_at"])
+
+        broken = AccountingSetupService.validate_accounting_setup()
+        self.assertFalse(broken["mappings_complete"])
+        self.assertIn(FinanceAccountMappingPurpose.EMI_INCOME, broken["missing_required_mappings"])

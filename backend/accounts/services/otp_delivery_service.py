@@ -138,6 +138,16 @@ def send_password_reset_otp(*, user, otp: str, email_only: bool = False) -> str:
     if delivery_backend == "email":
         return send_password_reset_otp_via_email(user=user, otp=otp)
 
+    if delivery_backend == "sms_email":
+        if (user.phone or "").strip():
+            try:
+                return send_password_reset_otp_via_sms(user=user, otp=otp)
+            except OTPDeliveryError:
+                pass
+        if allow_email_fallback and (user.email or "").strip():
+            return send_password_reset_otp_via_email(user=user, otp=otp)
+        raise OTPDeliveryError("No OTP delivery channel is available for sms_email backend.")
+
     if delivery_backend == "console":
         return send_password_reset_otp_via_console(user=user, otp=otp)
 

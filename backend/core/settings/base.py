@@ -535,7 +535,7 @@ SIMPLE_JWT = {
 OTP_DELIVERY_BACKEND = _parse_choice(
     os.getenv("OTP_DELIVERY_BACKEND"),
     "console" if _is_local_dev_mode() else "auto",
-    {"auto", "sms", "email", "console"},
+    {"auto", "sms", "email", "sms_email", "console"},
     "OTP_DELIVERY_BACKEND",
 )
 OTP_ALLOW_EMAIL_FALLBACK = _parse_bool(
