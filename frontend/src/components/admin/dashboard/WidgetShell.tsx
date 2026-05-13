@@ -132,7 +132,7 @@ export default function WidgetShell({
     >
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
 
-      <header className="flex flex-wrap items-start justify-between gap-3 p-5">
+      <header className="flex flex-wrap items-start justify-between gap-2.5 p-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {icon ? (
@@ -143,7 +143,7 @@ export default function WidgetShell({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
+                <h2 className="truncate text-sm font-semibold text-foreground sm:text-base">{title}</h2>
 
                 <span
                   className={cn(
@@ -225,12 +225,11 @@ export default function WidgetShell({
       </header>
 
       {!collapsed ? (
-        <div className="px-5 pb-5">
+        <div className="px-4 pb-4">
           {children}
-          {footer ? <div className="mt-5 border-t border-border/80 pt-4">{footer}</div> : null}
+          {footer ? <div className="mt-4 border-t border-border/80 pt-3">{footer}</div> : null}
         </div>
       ) : null}
     </section>
   );
 }
-

@@ -428,6 +428,39 @@ export default function AdminDashboardPage() {
     (hrSummary?.pending_leave_requests ?? 0) +
     (hrSummary?.pending_expense_claims ?? 0) +
     (hrSummary?.today_absent ?? 0);
+  const queueRows = REQUIRED_QUEUE_KEYS.map((key) => {
+    const row = (queueSummary?.results ?? []).find((item) => item.key === key);
+    const isLowStock = key === "low_stock_alerts";
+    const lowStock = stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
+    const count = isLowStock ? lowStock : row?.count;
+    return {
+      key,
+      label: QUEUE_LABELS[key] || key,
+      count: typeof count === "number" ? count : null,
+      severity:
+        isLowStock
+          ? lowStock > 0
+            ? "HIGH"
+            : "INFO"
+          : row?.severity ?? "INFO",
+      href: isLowStock ? ROUTES.admin.inventoryStockOnHand : row?.detail_url || ROUTES.admin.operationsCommandCenter,
+      oldest: row?.oldest_pending_date ?? null,
+    };
+  });
+  const queueRowsWithCount = queueRows.filter((row) => typeof row.count === "number") as Array<
+    (typeof queueRows)[number] & { count: number }
+  >;
+  const queueRowsPositive = queueRowsWithCount.filter((row) => row.count > 0);
+  const queueRowsZero = queueRowsWithCount.filter((row) => row.count === 0);
+  const allQueuesClear = queueRowsWithCount.length === queueRows.length && queueRowsPositive.length === 0;
+  const financeValues = [
+    toNumber(analyticsOverview?.window_net_collections ?? todayNet),
+    toNumber(invoiceBalance),
+    toNumber(analytics?.payment_method_mix.summary.total_net_amount ?? "0.00"),
+    toNumber(analyticsOverview?.pending_commission_amount ?? "0.00"),
+    toNumber(analyticsOverview?.pending_commission_count ?? 0),
+  ];
+  const financeAllZero = financeValues.every((value) => value === 0);
 
   if (loading) {
     return (
@@ -753,47 +786,61 @@ export default function AdminDashboardPage() {
         }
         alerts={
           <PageSection>
-            <h2 className="text-sm font-semibold text-foreground">Request &amp; Approval Queues</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Live admin queues with severity and deep links.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {REQUIRED_QUEUE_KEYS.map((key) => {
-                const row = (queueSummary?.results ?? []).find((item) => item.key === key);
-                const isLowStock = key === "low_stock_alerts";
-                const lowStockCount =
-                  stockSummary?.results?.filter((item) => item.is_below_reorder).length ?? 0;
-                const href = isLowStock
-                  ? ROUTES.admin.inventoryStockOnHand
-                  : row?.detail_url || ROUTES.admin.operationsCommandCenter;
-                const count = isLowStock ? lowStockCount : row?.count ?? 0;
-                const severity = isLowStock
-                  ? lowStockCount > 0
-                    ? "HIGH"
-                    : "INFO"
-                  : row?.severity ?? "INFO";
-                return (
-                  <div key={key} className="rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm font-semibold text-foreground">{QUEUE_LABELS[key] || key}</div>
-                      <span className="rounded-full border border-border/80 bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        {severity}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      Count: {count}
-                      {row?.oldest_pending_date ? ` • Oldest: ${row.oldest_pending_date}` : ""}
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <ActionButton href={href} size="sm" variant="secondary">
-                        Open Queue
-                      </ActionButton>
-                      <ActionButton href={href} size="sm" variant="outline">
-                        Take Action
-                      </ActionButton>
+            <h2 className="text-sm font-semibold text-foreground">Immediate Attention / Blockers</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Live queue posture with route-safe deep links.</p>
+            {allQueuesClear ? (
+              <div className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4 text-sm text-emerald-900">
+                <div className="font-semibold">All clear</div>
+                <div className="mt-1">No request, approval, delivery, reconciliation, or stock queues are pending in this view.</div>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {queueRowsPositive.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {queueRowsPositive.map((row) => (
+                      <div key={row.key} className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] p-3.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-sm font-semibold text-foreground">{row.label}</div>
+                          <span className="rounded-full border border-border/80 bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                            {row.severity}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 text-xs text-muted-foreground">
+                          Count: {row.count}
+                          {row.oldest ? ` • Oldest: ${row.oldest}` : ""}
+                        </div>
+                        <div className="mt-3">
+                          <ActionButton href={row.href} size="sm" variant="secondary">
+                            Open Queue
+                          </ActionButton>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {queueRowsZero.length > 0 ? (
+                  <div className="rounded-[1.1rem] border border-border bg-[var(--surface-muted)]/60 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Clear queues</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {queueRowsZero.map((row) => (
+                        <Link
+                          key={row.key}
+                          href={row.href}
+                          className="rounded-full border border-border bg-[var(--surface-card-elevated)] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
+                        >
+                          {row.label}: 0
+                        </Link>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ) : null}
+                {queueRows.filter((row) => row.count === null).length > 0 ? (
+                  <div className="rounded-[1.1rem] border border-border bg-[var(--surface-muted)]/40 p-3 text-xs text-muted-foreground">
+                    Some queue counters are unavailable for this refresh (shown as <span className="font-semibold">—</span> in source payloads).
+                  </div>
+                ) : null}
+              </div>
+            )}
           </PageSection>
         }
         queues={
@@ -837,20 +884,14 @@ export default function AdminDashboardPage() {
           widgets={[
             {
               id: "quick-actions",
-              title: "Quick actions",
-              subtitle: "High-frequency workflow launchers with service-layer safeguards.",
+              title: "Workflow launchers",
+              subtitle: "Compact guided workflows for frequent operator actions.",
               group: "quick-actions",
               defaultPinned: true,
               content: (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   <ActionButton variant="primary" onClick={() => openWorkflow("admin.createSubscription")}>
                     New Advance EMI Contract
-                  </ActionButton>
-                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createSubscription")}>
-                    New Rent Contract
-                  </ActionButton>
-                  <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createSubscription")}>
-                    New Lease Contract
                   </ActionButton>
                   <ActionButton variant="secondary" onClick={() => openWorkflow("admin.createDirectSale")}>
                     New Direct Sale
@@ -1009,39 +1050,52 @@ export default function AdminDashboardPage() {
               subtitle: "Collections, invoice balance, receipts, and ledger-facing finance posture.",
               group: "core",
               content: (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <StatCard
-                    label="Window Collections"
-                    value={money(analyticsOverview?.window_net_collections ?? todayNet)}
-                    subtext={`${analyticsOverview?.window_active_collection_count ?? 0} active receipt rows`}
-                    tone="success"
-                    href={ROUTES.admin.payments}
-                    icon={<Wallet className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Invoice Balance"
-                    value={money(invoiceBalance)}
-                    subtext={`${analytics?.invoice_document_posture.summary.invoice_count ?? 0} invoices · ${analytics?.invoice_document_posture.summary.receipt_count ?? 0} receipts`}
-                    tone={toNumber(invoiceBalance) > 0 ? "warning" : "success"}
-                    href={ROUTES.admin.billingInvoices}
-                    icon={<ReceiptText className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Cash / UPI / Bank"
-                    value={money(analytics?.payment_method_mix.summary.total_net_amount ?? "0.00")}
-                    subtext={paymentMethodRows.map((row) => `${row.method}: ${money(row.net_amount)}`).join(" · ") || "No method rows"}
-                    href={ROUTES.admin.billingCashBook}
-                    icon={<Landmark className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Pending Commission"
-                    value={money(analyticsOverview?.pending_commission_amount ?? "0.00")}
-                    subtext={`${analyticsOverview?.pending_commission_count ?? 0} commission rows`}
-                    tone={(analyticsOverview?.pending_commission_count ?? 0) > 0 ? "warning" : "success"}
-                    href={ROUTES.admin.financeCommissions}
-                    icon={<Banknote className="h-5 w-5" />}
-                  />
-                </div>
+                financeAllZero ? (
+                  <div className="rounded-2xl border border-border bg-[var(--surface-muted)]/45 p-4">
+                    <p className="text-sm font-medium text-foreground">
+                      No collections or reconciliation flags in the selected window.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <MoreLink href={ROUTES.admin.finance} label="Finance" />
+                      <MoreLink href={ROUTES.admin.accounting} label="Accounting" />
+                      <MoreLink href={ROUTES.admin.reconciliation} label="Reconciliation" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                      label="Window Collections"
+                      value={money(analyticsOverview?.window_net_collections ?? todayNet)}
+                      subtext={`${analyticsOverview?.window_active_collection_count ?? 0} active receipt rows`}
+                      tone="success"
+                      href={ROUTES.admin.payments}
+                      icon={<Wallet className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Invoice Balance"
+                      value={money(invoiceBalance)}
+                      subtext={`${analytics?.invoice_document_posture.summary.invoice_count ?? 0} invoices · ${analytics?.invoice_document_posture.summary.receipt_count ?? 0} receipts`}
+                      tone={toNumber(invoiceBalance) > 0 ? "warning" : "success"}
+                      href={ROUTES.admin.billingInvoices}
+                      icon={<ReceiptText className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Cash / UPI / Bank"
+                      value={money(analytics?.payment_method_mix.summary.total_net_amount ?? "0.00")}
+                      subtext={paymentMethodRows.map((row) => `${row.method}: ${money(row.net_amount)}`).join(" · ") || "No method rows"}
+                      href={ROUTES.admin.billingCashBook}
+                      icon={<Landmark className="h-5 w-5" />}
+                    />
+                    <StatCard
+                      label="Pending Commission"
+                      value={money(analyticsOverview?.pending_commission_amount ?? "0.00")}
+                      subtext={`${analyticsOverview?.pending_commission_count ?? 0} commission rows`}
+                      tone={(analyticsOverview?.pending_commission_count ?? 0) > 0 ? "warning" : "success"}
+                      href={ROUTES.admin.financeCommissions}
+                      icon={<Banknote className="h-5 w-5" />}
+                    />
+                  </div>
+                )
               ),
             },
             {
@@ -1087,46 +1141,11 @@ export default function AdminDashboardPage() {
         }
         actions={
         <>
-        {/* Quick actions */}
-        <PageSection className="p-0">
-          <div className="border-b border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),var(--surface-card-elevated))] px-5 py-4 sm:px-6 sm:py-5">
-            <h2 className="text-base font-semibold text-foreground">Quick actions</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Launch guided workflows. Posting and allocation stay server-validated.</p>
-          </div>
-          <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
-            <button
-              type="button"
-              onClick={() => openWorkflow("admin.createSubscription")}
-              className="flex min-h-[4.5rem] flex-col items-center justify-center rounded-2xl border-2 border-primary/25 bg-primary text-primary-foreground shadow-[0_20px_50px_-28px_rgba(30,64,175,0.55)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
-            >
-              <span className="text-sm font-semibold">New subscription</span>
-              <span className="mt-0.5 text-xs font-medium text-primary-foreground/85">Enroll with service checks</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openWorkflow("admin.collectPayment")}
-              className="flex min-h-[4.5rem] flex-col items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
-            >
-              <span className="text-sm font-semibold">Collect payment</span>
-              <span className="mt-0.5 text-center text-xs text-muted-foreground">Advance EMI allocation</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openWorkflow("admin.createCustomer")}
-              className="flex min-h-[4.5rem] flex-col items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
-            >
-              <span className="text-sm font-semibold">New customer</span>
-              <span className="mt-0.5 text-center text-xs text-muted-foreground">Identity before contract</span>
-            </button>
-          </div>
-        </PageSection>
-
-        <div className="grid items-start gap-6 lg:grid-cols-12">
-          {/* Left: attention + settlement */}
-          <div className="space-y-6 lg:col-span-7">
+        <div className="grid items-start gap-5 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-7">
             <WorkspaceSection
-              title="Needs attention"
-              description="Overdue EMIs, reconciliation flags, and delivery actions that need a decision."
+              title="Today’s Work Lanes"
+              description="Overdue EMIs, reconciliation flags, and delivery actions that need a decision now."
               actionHref={ROUTES.admin.operations}
               actionLabel="Operations workspace"
             >
@@ -1179,8 +1198,8 @@ export default function AdminDashboardPage() {
             </WorkspaceSection>
 
             <WorkspaceSection
-              title="Settlement posture"
-              description="Read-only executive posture. Posting and reconciliation truth remain in service-layer flows."
+              title="Contract and Settlement Posture"
+              description="Advance EMI, rent, lease, and lucky draw posture from live contract and schedule records."
               actionHref={ROUTES.admin.finance}
               actionLabel="Finance control"
             >
@@ -1225,104 +1244,24 @@ export default function AdminDashboardPage() {
             </WorkspaceSection>
           </div>
 
-          {/* Right: quick navigation */}
           <div className="space-y-4 lg:col-span-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-              Quick navigation
+              Cross-Module Command Links
             </div>
-            <p className="text-sm text-muted-foreground">Jump to daily workspaces. Counts are contextual hints, not separate analytics.</p>
+            <p className="text-sm text-muted-foreground">Grouped command links by operational domain.</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <LaunchCard
-                title="ERP Home"
-                description="Unified launchpad for CRM, sales, finance, inventory, delivery, and partner workflows."
-                href={ROUTES.admin.erp}
-                icon={<LayoutGrid className="h-5 w-5" />}
-                badge="Core"
-              />
-              <LaunchCard
-                title="Operations"
-                description="Queues for collections, support, delivery, and onboarding."
-                href={ROUTES.admin.operations}
-                icon={<ClipboardCheck className="h-5 w-5" />}
-                meta={`${overdueCount + deliveryActions + reconciliationFlags} active signals`}
-                badge="Core"
-              />
-              <LaunchCard
-                title="Staff & HR"
-                description="Staff register, attendance, leave, expenses, and payroll posture."
-                href={ROUTES.admin.hr}
-                icon={<Users className="h-5 w-5" />}
-                meta={
-                  hrSummary
-                    ? `${hrSummary.pending_leave_requests} leave · ${hrSummary.pending_expense_claims} expenses`
-                    : "HR summary"
-                }
-                badge="HR"
-              />
-              <LaunchCard
-                title="Finance control"
-                description="Reconciliation, receivables, commissions, and accounting handoffs."
-                href={ROUTES.admin.finance}
-                icon={<Landmark className="h-5 w-5" />}
-                meta={reconciliationPosture.badgeLabel}
-                badge="Finance"
-              />
-              <LaunchCard
-                title="Accounting Control Center"
-                description="Global accounting KPI control, liability posture, and reconciliation command."
-                href="/admin/accounting/control-center"
-                icon={<Landmark className="h-5 w-5" />}
-                badge="Phase 5"
-              />
-              <LaunchCard
-                title="Operations Command Center"
-                description="Cross-module queue control for contracts, delivery, returns, KYC, and partner follow-up."
-                href="/admin/operations/command-center"
-                icon={<ClipboardCheck className="h-5 w-5" />}
-                badge="Phase 5"
-              />
-              <LaunchCard
-                title="Reports"
-                description="Performance, exposure, and operational health from live data."
-                href={ROUTES.admin.reports}
-                icon={<BarChart3 className="h-5 w-5" />}
-                badge="Analytics"
-              />
-              <LaunchCard
-                title="BI Control Center"
-                description="Read-only trends and posture charts."
-                href={ROUTES.admin.bi}
-                icon={<BarChart3 className="h-5 w-5" />}
-                badge="BI"
-              />
-              <LaunchCard
-                title="Record payment"
-                description="Open payment collection with the same server posting rules."
-                href={ROUTES.admin.financeCollect}
-                icon={<Banknote className="h-5 w-5" />}
-                meta="Service-layer"
-                badge="Post"
-              />
+              <LaunchCard title="Money" description="Collections and payment posting." href={buildAdminCollectionsRoute()} icon={<Banknote className="h-5 w-5" />} />
+              <LaunchCard title="Contracts" description="Advance EMI, rent, lease, and subscription control." href={ROUTES.admin.subscriptions} icon={<FileText className="h-5 w-5" />} />
+              <LaunchCard title="Customers" description="Customer register and CRM pipeline." href={ROUTES.admin.customers} icon={<Users className="h-5 w-5" />} />
+              <LaunchCard title="Inventory" description="Stock and movement controls." href={ROUTES.admin.inventory} icon={<Package className="h-5 w-5" />} />
+              <LaunchCard title="Delivery" description="Delivery and field execution queues." href={ROUTES.admin.deliveries} icon={<Truck className="h-5 w-5" />} />
+              <LaunchCard title="HR" description="Staff, attendance, leaves, and payroll posture." href={ROUTES.admin.hr} icon={<Users className="h-5 w-5" />} />
+              <LaunchCard title="Accounting" description="Books, liabilities, and accounting control center." href={ROUTES.admin.accounting} icon={<Landmark className="h-5 w-5" />} />
+              <LaunchCard title="Reports" description="BI and operational reporting." href={ROUTES.admin.reports} icon={<BarChart3 className="h-5 w-5" />} />
             </div>
           </div>
         </div>
-
-        {/* More areas */}
-        <PageSection>
-          <h2 className="text-sm font-semibold text-foreground">More areas</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Additional entry points; same routes as before.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <MoreLink href={buildAdminCollectionsRoute()} label="Collections" />
-            <MoreLink href={ROUTES.admin.accounting} label="Accounting" />
-            <MoreLink href="/admin/accounting/control-center" label="Accounting control center" />
-            <MoreLink href="/admin/operations/command-center" label="Operations command center" />
-            <MoreLink href={ROUTES.admin.billingDirectSales} label="Direct sales" />
-            <MoreLink href={ROUTES.admin.hr} label="Staff & HR" />
-            <MoreLink href={ROUTES.admin.bi} label="BI control center" />
-            <MoreLink href={ROUTES.admin.settingsBusinessSetup} label="Setup & readiness" />
-          </div>
-        </PageSection>
         </>
         }
       />
