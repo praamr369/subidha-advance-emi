@@ -312,6 +312,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    itc_claimable = serializers.SerializerMethodField()
+    supplier_gst_as_cost = serializers.SerializerMethodField()
     lines = PurchaseBillLineSerializer(many=True, required=False)
 
     class Meta:
@@ -335,6 +337,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "stock_location_name",
             "finance_account",
             "finance_account_name",
+            "itc_claimable",
+            "supplier_gst_as_cost",
             "posted_journal_entry",
             "posted_journal_entry_no",
             "notes",
@@ -398,6 +402,14 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
                 for line in instance.lines.select_related("inventory_item").all()
             ]
         return upsert_purchase_bill_draft(**payload)
+
+    def get_itc_claimable(self, obj):
+        snapshot = obj.tax_profile_snapshot or {}
+        return bool(snapshot.get("itc_claimable", False))
+
+    def get_supplier_gst_as_cost(self, obj):
+        snapshot = obj.tax_profile_snapshot or {}
+        return bool(snapshot.get("supplier_gst_as_cost", False))
 
 
 class StockLocationSerializer(serializers.ModelSerializer):

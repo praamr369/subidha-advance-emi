@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from subscriptions.models import (
     AuditLog,
     ContractRefundStatus,
@@ -76,6 +77,16 @@ def _monthly_demand_type(subscription: Subscription) -> str:
     )
 
 
+def _demand_tax_snapshot(*, subscription: Subscription, document_date: date, document_type: str) -> dict:
+    return build_non_gst_snapshot(
+        document_type=document_type,
+        document_date=document_date,
+        party_type="CUSTOMER",
+        party_id=subscription.customer_id,
+        product_id=subscription.product_id,
+    )
+
+
 @transaction.atomic
 def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=None) -> RentLeaseBillingDemand:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
@@ -105,6 +116,11 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
                 "product_id": subscription.product_id,
                 "security_deposit_percent": str(profile.security_deposit_percent),
             },
+            "tax_profile_snapshot": _demand_tax_snapshot(
+                subscription=subscription,
+                document_date=subscription.start_date or timezone.localdate(),
+                document_type="NON_GST_DEPOSIT_RECEIPT",
+            ),
         },
     )
     if created:
@@ -167,6 +183,13 @@ def generate_monthly_demands_for_subscription(
                     "customer_id": subscription.customer_id,
                     "product_id": subscription.product_id,
                 },
+                "tax_profile_snapshot": _demand_tax_snapshot(
+                    subscription=subscription,
+                    document_date=due_date,
+                    document_type="NON_GST_RENT_RECEIPT"
+                    if subscription.plan_type == PlanType.RENT
+                    else "NON_GST_LEASE_RECEIPT",
+                ),
             },
         )
         if created:
@@ -215,7 +238,17 @@ def recalculate_rent_lease_demand_statuses(*, subscription: Subscription) -> Non
             demand.status = RentLeaseDemandStatus.OVERDUE
         else:
             demand.status = RentLeaseDemandStatus.PENDING
-        demand.save(update_fields=["status", "updated_at"])
+        if not demand.tax_profile_snapshot:
+            demand.tax_profile_snapshot = _demand_tax_snapshot(
+                subscription=subscription,
+                document_date=demand.due_date,
+                document_type="NON_GST_RENT_RECEIPT"
+                if demand.demand_type == RentLeaseDemandType.RENT_MONTHLY
+                else "NON_GST_LEASE_RECEIPT",
+            )
+            demand.save(update_fields=["status", "tax_profile_snapshot", "updated_at"])
+        else:
+            demand.save(update_fields=["status", "updated_at"])
 
 
 @transaction.atomic
@@ -238,7 +271,13 @@ def collect_security_deposit(
         if demand.collected_amount >= demand.amount
         else RentLeaseDemandStatus.PARTIAL
     )
-    demand.save(update_fields=["collected_amount", "held_amount", "refundable_amount", "status", "updated_at"])
+    if not demand.tax_profile_snapshot:
+        demand.tax_profile_snapshot = _demand_tax_snapshot(
+            subscription=subscription,
+            document_date=demand.due_date,
+            document_type="NON_GST_DEPOSIT_RECEIPT",
+        )
+    demand.save(update_fields=["collected_amount", "held_amount", "refundable_amount", "status", "tax_profile_snapshot", "updated_at"])
 
     RentLeaseDepositTransaction.objects.create(
         subscription=subscription,
@@ -473,4 +512,3 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
             for row in rows
         ],
     }
-

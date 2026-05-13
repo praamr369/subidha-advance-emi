@@ -16,6 +16,7 @@
   "include": [
     "tests/unit/dashboard-widget-board.test.ts",
     "tests/unit/dashboard-preset-catalogs.test.ts",
+    "tests/unit/non-gst-compliance-ui.test.ts",
     "src/lib/dashboard-widget-board.ts"
   ],
   "exclude": ["node_modules"]

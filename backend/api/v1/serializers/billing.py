@@ -6,6 +6,13 @@ from django.db.models import Q, Sum
 from rest_framework import serializers
 
 from accounting.models import DocumentSequence
+from accounting.services.non_gst_document_service import build_non_gst_snapshot
+from accounting.services.tax_guard_service import (
+    TaxComplianceError,
+    assert_gst_invoice_allowed,
+    current_tax_mode,
+)
+from accounting.services.tax_profile_service import build_product_tax_snapshot, build_tax_profile_snapshot
 from billing.models import (
     BillingCreditNote,
     BillingCreditNoteLine,
@@ -397,6 +404,7 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "delivery_snapshot_district",
             "delivery_snapshot_state",
             "delivery_snapshot_pincode",
+            "tax_profile_snapshot",
             "notes",
             "billing_invoice_id",
             "billing_invoice_no",
@@ -474,6 +482,8 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"lines": "At least one product line is required."})
         _validate_invoice_lines(lines or [], attrs)
         tax_mode = attrs.get("tax_mode") or getattr(instance, "tax_mode", "NON_GST")
+        if current_tax_mode() == "GST_UNREGISTERED" and str(tax_mode).upper() == "GST":
+            raise serializers.ValidationError({"tax_mode": "GST invoices are blocked while business tax mode is GST_UNREGISTERED."})
         customer_gst_type = attrs.get("customer_gst_type") or getattr(
             instance, "customer_gst_type", "UNREGISTERED_CONSUMER"
         )
@@ -786,6 +796,7 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "customer_name_snapshot",
             "customer_phone_snapshot",
             "customer_gstin",
+            "tax_profile_snapshot",
             "notes",
             "terms",
             "printed_at",
@@ -826,14 +837,37 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
         instance = getattr(self, "instance", None)
         if instance and instance.status != BillingDocumentStatus.DRAFT:
             raise serializers.ValidationError("Only draft invoices can be edited.")
+        tax_mode = attrs.get("tax_mode") or getattr(instance, "tax_mode", "NON_GST")
+        if str(tax_mode).upper() == "GST":
+            try:
+                assert_gst_invoice_allowed(operation="GST commercial invoice")
+            except TaxComplianceError as exc:
+                raise serializers.ValidationError({"tax_mode": str(exc)}) from exc
         _validate_invoice_lines(attrs.get("lines") or [], attrs)
         return attrs
 
     def create(self, validated_data):
         lines = validated_data.pop("lines", [])
         doc_series = validated_data.pop("doc_series", None) or _ensure_invoice_sequence(validated_data["invoice_date"])
+        if (validated_data.get("tax_mode") or "NON_GST").upper() == "NON_GST":
+            validated_data["tax_profile_snapshot"] = validated_data.get("tax_profile_snapshot") or build_non_gst_snapshot(
+                document_type="COMMERCIAL_INVOICE",
+                document_date=validated_data.get("invoice_date"),
+                party_type="CUSTOMER",
+                party_id=getattr(validated_data.get("customer"), "id", None),
+            )
+        else:
+            validated_data["tax_profile_snapshot"] = validated_data.get("tax_profile_snapshot") or build_tax_profile_snapshot(
+                on_date=validated_data.get("invoice_date")
+            )
         invoice = BillingInvoice.objects.create(doc_series=doc_series, **validated_data)
         _replace_invoice_lines(invoice, lines)
+        for line in invoice.lines.select_related("product").all():
+            line.tax_profile_snapshot = {
+                "profile": build_tax_profile_snapshot(on_date=invoice.invoice_date),
+                "product": build_product_tax_snapshot(product_id=line.product_id),
+            }
+            line.save(update_fields=["tax_profile_snapshot", "updated_at"])
         return invoice
 
     def update(self, instance, validated_data):
@@ -843,9 +877,26 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             instance.doc_series = doc_series
         for key, value in validated_data.items():
             setattr(instance, key, value)
+        if not instance.tax_profile_snapshot:
+            instance.tax_profile_snapshot = (
+                build_non_gst_snapshot(
+                    document_type="COMMERCIAL_INVOICE",
+                    document_date=instance.invoice_date,
+                    party_type="CUSTOMER",
+                    party_id=instance.customer_id,
+                )
+                if (instance.tax_mode or "NON_GST").upper() == "NON_GST"
+                else build_tax_profile_snapshot(on_date=instance.invoice_date)
+            )
         instance.save()
         if lines is not None:
             _replace_invoice_lines(instance, lines)
+            for line in instance.lines.select_related("product").all():
+                line.tax_profile_snapshot = {
+                    "profile": build_tax_profile_snapshot(on_date=instance.invoice_date),
+                    "product": build_product_tax_snapshot(product_id=line.product_id),
+                }
+                line.save(update_fields=["tax_profile_snapshot", "updated_at"])
         return instance
 
     def _direct_sale_state(self, obj):
@@ -1103,6 +1154,7 @@ class ReceiptDocumentSerializer(serializers.ModelSerializer):
             "amount",
             "customer_name_snapshot",
             "customer_phone_snapshot",
+            "tax_profile_snapshot",
             "notes",
             "posted_journal_entry",
             "posted_journal_entry_no",

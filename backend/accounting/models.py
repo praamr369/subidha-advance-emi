@@ -332,6 +332,213 @@ class ExportPackStatus(models.TextChoices):
     FAILED = "FAILED", "Failed"
 
 
+class BusinessTaxRegistrationMode(models.TextChoices):
+    GST_UNREGISTERED = "GST_UNREGISTERED", "GST Unregistered"
+    GST_REGULAR = "GST_REGULAR", "GST Regular"
+    GST_COMPOSITION = "GST_COMPOSITION", "GST Composition"
+
+
+class TaxReadinessCategory(models.TextChoices):
+    GOODS = "GOODS", "Goods"
+    SERVICE = "SERVICE", "Service"
+    MIXED = "MIXED", "Mixed"
+
+
+class TaxPartyType(models.TextChoices):
+    CUSTOMER = "CUSTOMER", "Customer"
+    SUPPLIER = "SUPPLIER", "Supplier"
+    PARTNER = "PARTNER", "Partner"
+    VENDOR = "VENDOR", "Vendor"
+
+
+class PartyTaxType(models.TextChoices):
+    UNREGISTERED = "UNREGISTERED", "Unregistered"
+    REGISTERED = "REGISTERED", "Registered"
+    COMPOSITION = "COMPOSITION", "Composition"
+
+
+class BusinessTaxProfile(AccountingTimeStampedModel):
+    mode = models.CharField(
+        max_length=32,
+        choices=BusinessTaxRegistrationMode.choices,
+        default=BusinessTaxRegistrationMode.GST_UNREGISTERED,
+        db_index=True,
+    )
+    legal_name = models.CharField(max_length=180, blank=True, default="")
+    gstin = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    pan = models.CharField(max_length=20, blank=True, default="")
+    state_code = models.CharField(max_length=5, blank=True, default="")
+    state_name = models.CharField(max_length=120, blank=True, default="")
+    effective_from = models.DateField(default=timezone.localdate, db_index=True)
+    effective_to = models.DateField(null=True, blank=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_business_tax_profiles"
+        ordering = ["-effective_from", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=Q(is_active=True),
+                name="uq_single_active_business_tax_profile",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["mode", "is_active"]),
+            models.Index(fields=["effective_from", "effective_to"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        mode = (self.mode or "").strip().upper()
+        gstin = (self.gstin or "").strip().upper()
+        if mode in {
+            BusinessTaxRegistrationMode.GST_REGULAR,
+            BusinessTaxRegistrationMode.GST_COMPOSITION,
+        } and not gstin:
+            errors["gstin"] = "GSTIN is required for GST registered modes."
+        if self.effective_to and self.effective_from and self.effective_to < self.effective_from:
+            errors["effective_to"] = "effective_to cannot be before effective_from."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.mode = (self.mode or BusinessTaxRegistrationMode.GST_UNREGISTERED).strip().upper()
+        self.legal_name = (self.legal_name or "").strip()
+        self.gstin = (self.gstin or "").strip().upper()
+        self.pan = (self.pan or "").strip().upper()
+        self.state_code = (self.state_code or "").strip().upper()
+        self.state_name = (self.state_name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class ProductTaxProfile(AccountingTimeStampedModel):
+    product = models.ForeignKey(
+        "subscriptions.Product",
+        on_delete=models.PROTECT,
+        related_name="tax_profiles",
+    )
+    hsn_code = models.CharField(max_length=40, blank=True, default="")
+    tax_category = models.CharField(
+        max_length=20,
+        choices=TaxReadinessCategory.choices,
+        default=TaxReadinessCategory.GOODS,
+        db_index=True,
+    )
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=MONEY_ZERO)
+    effective_from = models.DateField(default=timezone.localdate, db_index=True)
+    effective_to = models.DateField(null=True, blank=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_product_tax_profiles"
+        ordering = ["product_id", "-effective_from", "-id"]
+        indexes = [
+            models.Index(fields=["product", "is_active"]),
+            models.Index(fields=["effective_from", "effective_to"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.effective_to and self.effective_from and self.effective_to < self.effective_from:
+            errors["effective_to"] = "effective_to cannot be before effective_from."
+        if self.gst_rate is not None and self.gst_rate < MONEY_ZERO:
+            errors["gst_rate"] = "gst_rate cannot be negative."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.hsn_code = (self.hsn_code or "").strip().upper()
+        self.tax_category = (self.tax_category or TaxReadinessCategory.GOODS).strip().upper()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PartyTaxProfile(AccountingTimeStampedModel):
+    party_type = models.CharField(
+        max_length=20,
+        choices=TaxPartyType.choices,
+        db_index=True,
+    )
+    party_id = models.PositiveIntegerField(db_index=True)
+    tax_type = models.CharField(
+        max_length=20,
+        choices=PartyTaxType.choices,
+        default=PartyTaxType.UNREGISTERED,
+        db_index=True,
+    )
+    legal_name = models.CharField(max_length=180, blank=True, default="")
+    gstin = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    pan = models.CharField(max_length=20, blank=True, default="")
+    state_code = models.CharField(max_length=5, blank=True, default="")
+    state_name = models.CharField(max_length=120, blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_party_tax_profiles"
+        ordering = ["party_type", "party_id", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["party_type", "party_id"],
+                condition=Q(is_active=True),
+                name="uq_active_party_tax_profile",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["party_type", "party_id", "is_active"]),
+            models.Index(fields=["tax_type", "is_active"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.party_id <= 0:
+            errors["party_id"] = "party_id must be a positive integer."
+        if self.tax_type in {PartyTaxType.REGISTERED, PartyTaxType.COMPOSITION} and not (self.gstin or "").strip():
+            errors["gstin"] = "GSTIN is required for registered/composition parties."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.party_type = (self.party_type or "").strip().upper()
+        self.tax_type = (self.tax_type or PartyTaxType.UNREGISTERED).strip().upper()
+        self.legal_name = (self.legal_name or "").strip()
+        self.gstin = (self.gstin or "").strip().upper()
+        self.pan = (self.pan or "").strip().upper()
+        self.state_code = (self.state_code or "").strip().upper()
+        self.state_name = (self.state_name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class ComplianceAlertThreshold(AccountingTimeStampedModel):
+    key = models.CharField(max_length=60, unique=True, db_index=True)
+    label = models.CharField(max_length=120)
+    threshold_amount = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_compliance_alert_thresholds"
+        ordering = ["key", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "key"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.key = (self.key or "").strip().upper()
+        self.label = (self.label or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class AccountingPeriod(AccountingTimeStampedModel):
     code = models.CharField(max_length=30, unique=True, db_index=True)
     label = models.CharField(max_length=80)

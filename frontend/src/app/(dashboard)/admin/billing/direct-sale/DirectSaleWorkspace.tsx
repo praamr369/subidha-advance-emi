@@ -28,6 +28,7 @@ import {
   type DirectSale,
   type DirectSaleLine,
 } from "@/services/billing";
+import { getComplianceTaxProfile } from "@/services/compliance";
 import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
@@ -269,6 +270,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       return payload.results;
     },
   });
+  const complianceTaxProfileQuery = useQuery({
+    queryKey: ["admin", "compliance", "tax-profile"],
+    queryFn: getComplianceTaxProfile,
+  });
+  const activeTaxMode = complianceTaxProfileQuery.data?.snapshot?.mode || "GST_UNREGISTERED";
+  const isNonGstBusiness = activeTaxMode === "GST_UNREGISTERED";
 
   const salesQuery = useQuery({
     queryKey: [...directSalesKeys.adminRegister(), { customer: customerFilter || null }],
@@ -379,6 +386,21 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     if (!createMode) return;
     resetCreateForm();
   }, [createMode]);
+
+  useEffect(() => {
+    if (!isNonGstBusiness) return;
+    setForm((current) => ({
+      ...current,
+      tax_mode: "NON_GST",
+      tax_calculation_mode: "NON_GST",
+    }));
+    setLines((current) =>
+      current.map((line) => ({
+        ...line,
+        gst_rate: "0.00",
+      }))
+    );
+  }, [isNonGstBusiness]);
 
   useEffect(() => {
     if (!createMode) return;
@@ -1511,6 +1533,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
                   <section className="rounded-lg border border-border bg-card p-4">
                     <h3 className="text-sm font-semibold text-foreground">Bill Details</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Current tax mode: {activeTaxMode === "GST_UNREGISTERED" ? "GST Unregistered (Commercial Invoice / Non-GST)" : activeTaxMode}
+                    </p>
                     <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       <label className="grid gap-2 text-sm">
                         <span className="font-medium text-foreground">Sale Date</span>
@@ -1529,11 +1554,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                           onChange={(event) =>
                             setForm((current) => ({ ...current, tax_mode: event.target.value as "GST" | "NON_GST" }))
                           }
-                          disabled={submitting}
+                          disabled={submitting || isNonGstBusiness}
                           className={FIELD_CLASS}
                         >
                           <option value="NON_GST">Non-GST</option>
-                          <option value="GST">GST</option>
+                          {!isNonGstBusiness ? <option value="GST">GST</option> : null}
                         </select>
                       </label>
                       <label className="grid gap-2 text-sm">
@@ -1546,12 +1571,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                               tax_calculation_mode: event.target.value as FormState["tax_calculation_mode"],
                             }))
                           }
-                          disabled={submitting}
+                          disabled={submitting || isNonGstBusiness}
                           className={FIELD_CLASS}
                         >
                           <option value="NON_GST">Non-GST</option>
-                          <option value="GST_INCLUSIVE">GST Inclusive</option>
-                          <option value="GST_EXCLUSIVE">GST Exclusive</option>
+                          {!isNonGstBusiness ? <option value="GST_INCLUSIVE">GST Inclusive</option> : null}
+                          {!isNonGstBusiness ? <option value="GST_EXCLUSIVE">GST Exclusive</option> : null}
                         </select>
                       </label>
                       <label className="grid gap-2 text-sm">
@@ -1616,7 +1641,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                         <input
                           value={form.customer_gstin}
                           onChange={(event) => setForm((current) => ({ ...current, customer_gstin: event.target.value.toUpperCase() }))}
-                          disabled={submitting || form.tax_mode !== "GST"}
+                          disabled={submitting || form.tax_mode !== "GST" || isNonGstBusiness}
                           className={FIELD_CLASS}
                         />
                       </label>
@@ -1627,7 +1652,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                           onChange={(event) =>
                             setForm((current) => ({ ...current, customer_snapshot_place_of_supply: event.target.value }))
                           }
-                          disabled={submitting || form.tax_mode !== "GST"}
+                          disabled={submitting || form.tax_mode !== "GST" || isNonGstBusiness}
                           className={FIELD_CLASS}
                         />
                       </label>
@@ -1756,7 +1781,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                             </label>
                           </div>
 
-                          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                          <div className={`mt-4 grid gap-4 md:grid-cols-2 ${isNonGstBusiness ? "xl:grid-cols-4" : "xl:grid-cols-5"}`}>
                             <label className="grid gap-2 text-sm">
                               <span className="font-medium text-foreground">Quantity</span>
                               <input
@@ -1793,18 +1818,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 className={FIELD_CLASS}
                               />
                             </label>
-                            <label className="grid gap-2 text-sm">
-                              <span className="font-medium text-foreground">GST Rate</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={line.gst_rate}
-                                onChange={(event) => updateLine(line.id, { gst_rate: event.target.value })}
-                                disabled={submitting || form.tax_mode !== "GST"}
-                                className={FIELD_CLASS}
-                              />
-                            </label>
+                            {!isNonGstBusiness ? (
+                              <label className="grid gap-2 text-sm">
+                                <span className="font-medium text-foreground">GST Rate</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={line.gst_rate}
+                                  onChange={(event) => updateLine(line.id, { gst_rate: event.target.value })}
+                                  disabled={submitting || form.tax_mode !== "GST"}
+                                  className={FIELD_CLASS}
+                                />
+                              </label>
+                            ) : null}
                             <div className="grid gap-1 rounded-lg border border-border bg-muted/40 p-3 text-xs">
                               <span>Gross {accountingMoney(lineTotals.gross)}</span>
                               <span>Taxable {accountingMoney(lineTotals.taxable)}</span>

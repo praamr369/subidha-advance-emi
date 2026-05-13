@@ -1229,6 +1229,7 @@ class Subscription(TimeStampedModel):
     )
     product_snapshot = models.JSONField(null=True, blank=True)
     pricing_snapshot = models.JSONField(null=True, blank=True)
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     # Phase 3: immutable contract number (ADV-EMI / RENT / LEASE prefix + year + seq)
     subscription_number = models.CharField(
         max_length=40, unique=True, null=True, blank=True, db_index=True
@@ -1918,6 +1919,7 @@ class RentLeaseBillingDemand(TimeStampedModel):
     deducted_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     reference_key = models.CharField(max_length=80, unique=True, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
     class Meta:

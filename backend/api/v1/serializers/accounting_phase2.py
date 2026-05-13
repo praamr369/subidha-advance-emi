@@ -20,6 +20,7 @@ from accounting.services.gst_document_posting_service import (
     ensure_document_sequence,
     financial_year_for,
 )
+from accounting.services.tax_guard_service import TaxComplianceError, assert_gst_invoice_allowed
 
 
 def _money(value) -> Decimal:
@@ -211,6 +212,10 @@ class TaxInvoiceSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        try:
+            assert_gst_invoice_allowed(operation="GST tax invoice")
+        except TaxComplianceError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
         instance = getattr(self, "instance", None)
         if instance and instance.status != TaxDocumentStatus.DRAFT:
             raise serializers.ValidationError("Only draft tax invoices can be edited.")
@@ -279,6 +284,10 @@ class BaseGstNoteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        try:
+            assert_gst_invoice_allowed(operation="GST note")
+        except TaxComplianceError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
         instance = getattr(self, "instance", None)
         if instance and instance.status != TaxDocumentStatus.DRAFT:
             raise serializers.ValidationError("Only draft GST notes can be edited.")

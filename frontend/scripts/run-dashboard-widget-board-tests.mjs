@@ -39,6 +39,7 @@ run("node test", process.execPath, [
   "--test",
   "./.tmp-dashboard-tests/tests/unit/dashboard-widget-board.test.js",
   "./.tmp-dashboard-tests/tests/unit/dashboard-preset-catalogs.test.js",
+  "./.tmp-dashboard-tests/tests/unit/non-gst-compliance-ui.test.js",
 ]);
 
 rmSync(outDir, { recursive: true, force: true });

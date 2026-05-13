@@ -718,6 +718,7 @@ class PurchaseBill(InventoryTimeStampedModel):
         blank=True,
         related_name="purchase_bills",
     )
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     posted_journal_entry = models.OneToOneField(
         JournalEntry,
         on_delete=models.PROTECT,

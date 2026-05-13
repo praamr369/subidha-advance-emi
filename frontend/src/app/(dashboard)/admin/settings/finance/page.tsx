@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
+import { getComplianceTaxProfile } from "@/services/compliance";
+import type { BusinessTaxMode } from "@/types/compliance";
 
 const items = [
   {
@@ -27,6 +32,25 @@ const items = [
 ];
 
 export default function AdminSettingsFinancePage() {
+  const [taxMode, setTaxMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const payload = await getComplianceTaxProfile();
+        if (!active) return;
+        setTaxMode(payload.active.mode);
+      } catch {
+        if (!active) return;
+        setTaxMode("GST_UNREGISTERED");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <PortalPage
       title="Finance Configuration"
@@ -38,6 +62,12 @@ export default function AdminSettingsFinancePage() {
       ]}
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
     >
+      <div className="mb-4 rounded-2xl border border-border bg-muted/40 p-4 text-sm">
+        Current tax mode:{" "}
+        <span className="font-medium">
+          {taxMode === "GST_UNREGISTERED" ? "GST Unregistered (Commercial Invoice / Non-GST)" : taxMode}
+        </span>
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((item) => (
           <Link

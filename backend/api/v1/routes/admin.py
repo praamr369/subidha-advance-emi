@@ -257,6 +257,14 @@ from api.v1.views.admin_accounting_setup import (
     FinanceAccountMappingListCreateView,
     FinanceAccountMappingPatchView,
 )
+from api.v1.views.admin_compliance import (
+    CompliancePartyTaxProfilesView,
+    ComplianceProductTaxProfilesView,
+    ComplianceTaxProfileActivateView,
+    ComplianceTaxProfileView,
+    ComplianceTaxReadinessView,
+    ComplianceTurnoverSummaryView,
+)
 from api.v1.views.admin_inventory_ops import (
     AdminInventoryReadinessView,
     AdminInventoryStockNeedCancelView,
@@ -712,6 +720,12 @@ urlpatterns = [
     path("accounting/finance-account-mappings/<int:pk>/", FinanceAccountMappingPatchView.as_view()),
     path("accounting/mapping-suggestions/", AccountingMappingSuggestionsView.as_view()),
     path("accounting/mapping-suggestions/repair/", AccountingRepairSuggestedMappingsView.as_view()),
+    path("compliance/tax-profile/", ComplianceTaxProfileView.as_view()),
+    path("compliance/tax-profile/activate/", ComplianceTaxProfileActivateView.as_view()),
+    path("compliance/tax-readiness/", ComplianceTaxReadinessView.as_view()),
+    path("compliance/turnover-summary/", ComplianceTurnoverSummaryView.as_view()),
+    path("compliance/product-tax-profiles/", ComplianceProductTaxProfilesView.as_view()),
+    path("compliance/party-tax-profiles/", CompliancePartyTaxProfilesView.as_view()),
     path("erp/summary/", AdminErpSummaryView.as_view()),
     path("erp/today-work/", AdminErpTodayWorkView.as_view()),
     path("crm/workspace/", AdminCrmWorkspaceView.as_view()),

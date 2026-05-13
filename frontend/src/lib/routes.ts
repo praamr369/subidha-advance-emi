@@ -230,6 +230,10 @@ export const ROUTES = {
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
+    complianceTaxProfile: "/admin/compliance/tax-profile",
+    complianceTaxReadiness: "/admin/compliance/tax-readiness",
+    complianceProductTaxProfiles: "/admin/compliance/product-tax-profiles",
+    compliancePartyTaxProfiles: "/admin/compliance/party-tax-profiles",
 
     luckyDraw: "/admin/lucky-draws",
     reconciliation: "/admin/reconciliation",

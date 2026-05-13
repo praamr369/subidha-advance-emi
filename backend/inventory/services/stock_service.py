@@ -11,6 +11,10 @@ from django.utils.crypto import get_random_string
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.services.purchase_tax_service import (
+    build_purchase_tax_snapshot,
+    should_post_input_gst,
+)
 from inventory.models import (
     InventoryItem,
     PurchaseBill,
@@ -144,7 +148,9 @@ def upsert_purchase_bill_draft(
             subtotal=subtotal,
             tax_total=tax_total,
             grand_total=grand_total,
+            tax_profile_snapshot={},
         )
+        purchase_bill.tax_profile_snapshot = build_purchase_tax_snapshot(purchase_bill=purchase_bill)
         purchase_bill.save()
         _replace_purchase_bill_lines(purchase_bill=purchase_bill, lines=normalized_lines)
         _log_accounting_event(
@@ -178,6 +184,7 @@ def upsert_purchase_bill_draft(
     purchase_bill.subtotal = subtotal
     purchase_bill.tax_total = tax_total
     purchase_bill.grand_total = grand_total
+    purchase_bill.tax_profile_snapshot = build_purchase_tax_snapshot(purchase_bill=purchase_bill)
     purchase_bill.save()
     _replace_purchase_bill_lines(purchase_bill=purchase_bill, lines=normalized_lines)
     _log_accounting_event(
@@ -539,11 +546,13 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
         if purchase_bill.finance_account_id
         else accounts["ACCOUNTS_PAYABLE"]
     )
+    post_input_gst = should_post_input_gst()
+    inventory_debit_amount = inventory_total if post_input_gst else inventory_total + tax_total
     lines = [
         {
             "chart_account": accounts["INVENTORY_ASSET"],
             "description": purchase_bill.bill_no,
-            "debit_amount": inventory_total,
+            "debit_amount": inventory_debit_amount,
             "credit_amount": Decimal("0.00"),
         },
         {
@@ -553,7 +562,7 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
             "credit_amount": purchase_bill.grand_total,
         },
     ]
-    if tax_total > 0:
+    if tax_total > 0 and post_input_gst:
         lines.insert(
             1,
             {
@@ -580,12 +589,15 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
             "vendor_id": purchase_bill.vendor_id,
             "finance_account_id": purchase_bill.finance_account_id,
             "stock_location_id": purchase_bill.stock_location_id,
+            "itc_claimable": post_input_gst,
+            "supplier_gst_as_cost": bool(tax_total > 0 and not post_input_gst),
         },
         posted_by=posted_by,
     )
     purchase_bill.posted_journal_entry = journal_entry
     purchase_bill.status = PurchaseBillStatus.POSTED
-    purchase_bill.save(update_fields=["posted_journal_entry", "status", "updated_at"])
+    purchase_bill.tax_profile_snapshot = build_purchase_tax_snapshot(purchase_bill=purchase_bill)
+    purchase_bill.save(update_fields=["posted_journal_entry", "status", "tax_profile_snapshot", "updated_at"])
     _log_accounting_event(
         event="INVENTORY_PURCHASE_BILL_POSTED",
         instance=purchase_bill,

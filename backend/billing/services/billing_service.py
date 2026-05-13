@@ -9,6 +9,13 @@ from django.utils import timezone
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
 from accounting.services.journal_posting_service import _log_accounting_event
+from accounting.services.non_gst_document_service import build_non_gst_snapshot
+from accounting.services.tax_guard_service import (
+    current_tax_mode,
+    normalize_non_gst_breakdown,
+    resolve_operational_tax_mode,
+)
+from accounting.services.tax_profile_service import build_product_tax_snapshot, build_tax_profile_snapshot
 from accounting.services.finance_account_collection_guard import (
     assert_finance_account_allowed_for_payment_collection,
 )
@@ -212,6 +219,16 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
     return payloads
 
 
+def _enforce_direct_sale_tax_policy(*, tax_mode: str, line_payloads: list[dict]) -> list[dict]:
+    normalized_mode = (tax_mode or "NON_GST").strip().upper()
+    if normalized_mode != "NON_GST":
+        return line_payloads
+    adjusted: list[dict] = []
+    for payload in line_payloads:
+        adjusted.append(normalize_non_gst_breakdown(line=payload))
+    return adjusted
+
+
 def _rollup_line_totals(line_payloads: list[dict]) -> dict:
     subtotal = Decimal("0.00")
     discount_total = Decimal("0.00")
@@ -345,6 +362,11 @@ def _replace_invoice_lines_from_direct_sale(*, invoice: BillingInvoice, line_pay
                 igst_amount=payload["igst_amount"],
                 line_total=payload["line_total"],
                 hsn_sac_code=payload["hsn_sac_code"],
+                tax_profile_snapshot={
+                    "profile": build_tax_profile_snapshot(on_date=invoice.invoice_date),
+                    "product": build_product_tax_snapshot(product_id=getattr(payload.get("product"), "id", None)),
+                    "line_tax_total": "0.00" if invoice.tax_mode == "NON_GST" else None,
+                },
             )
             for payload in line_payloads
         ]
@@ -381,6 +403,13 @@ def _sync_direct_sale_invoice(*, sale: DirectSale, line_payloads: list[dict]) ->
         "customer_name_snapshot": sale.customer_name_snapshot,
         "customer_phone_snapshot": sale.customer_phone_snapshot,
         "customer_gstin": sale.customer_gstin,
+        "tax_profile_snapshot": sale.tax_profile_snapshot
+        or build_non_gst_snapshot(
+            document_type="COMMERCIAL_INVOICE",
+            document_date=sale.sale_date,
+            party_type="CUSTOMER",
+            party_id=sale.customer_id,
+        ),
         "notes": sale.notes,
         "terms": "",
     }
@@ -485,7 +514,15 @@ def _assert_direct_sale_delivery_gate(invoice: BillingInvoice):
 @transaction.atomic
 def create_direct_sale(*, payload: dict, created_by):
     lines = payload.pop("lines", [])
-    line_payloads = _serialize_direct_sale_line_payloads(lines)
+    requested_tax_mode = payload.get("tax_mode")
+    resolved_tax_mode = resolve_operational_tax_mode(requested_tax_mode=requested_tax_mode)
+    payload["tax_mode"] = resolved_tax_mode
+    if resolved_tax_mode == "NON_GST":
+        payload["tax_calculation_mode"] = "NON_GST"
+    line_payloads = _enforce_direct_sale_tax_policy(
+        tax_mode=resolved_tax_mode,
+        line_payloads=_serialize_direct_sale_line_payloads(lines),
+    )
     totals = _rollup_line_totals(line_payloads)
     customer = payload.get("customer")
     payload.update(
@@ -512,8 +549,18 @@ def create_direct_sale(*, payload: dict, created_by):
     )
     sale_date = payload["sale_date"]
     payload.setdefault("financial_year", financial_year_for(sale_date))
-    payload.setdefault("tax_mode", "NON_GST")
     payload["doc_series"] = payload.get("doc_series") or _ensure_direct_sale_sequence(sale_date)
+    payload.setdefault(
+        "tax_profile_snapshot",
+        build_non_gst_snapshot(
+            document_type="DIRECT_SALE",
+            document_date=sale_date,
+            party_type="CUSTOMER",
+            party_id=getattr(customer, "id", None),
+        )
+        if resolved_tax_mode == "NON_GST"
+        else build_tax_profile_snapshot(on_date=sale_date),
+    )
     payload.update(totals)
     received_total = _money(payload.get("received_total"))
     payload["received_total"] = received_total
@@ -568,12 +615,19 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
         raise ValueError("Invoiced or archived direct sales cannot be edited.")
 
     lines = payload.pop("lines", None)
+    requested_tax_mode = payload.get("tax_mode", sale.tax_mode)
+    resolved_tax_mode = resolve_operational_tax_mode(requested_tax_mode=requested_tax_mode)
+    payload["tax_mode"] = resolved_tax_mode
+    if resolved_tax_mode == "NON_GST":
+        payload["tax_calculation_mode"] = "NON_GST"
     if "sale_date" in payload and "financial_year" not in payload:
         payload["financial_year"] = financial_year_for(payload["sale_date"])
     customer = payload.get("customer", sale.customer)
     line_payloads: list[dict]
     if lines is None:
-        line_payloads = _serialize_direct_sale_line_payloads(
+        line_payloads = _enforce_direct_sale_tax_policy(
+            tax_mode=resolved_tax_mode,
+            line_payloads=_serialize_direct_sale_line_payloads(
             [
                 {
                     "product": line.product,
@@ -592,9 +646,12 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
                 }
                 for line in sale.lines.select_related("product", "inventory_item").all()
             ]
-        )
+        ))
     else:
-        line_payloads = _serialize_direct_sale_line_payloads(lines)
+        line_payloads = _enforce_direct_sale_tax_policy(
+            tax_mode=resolved_tax_mode,
+            line_payloads=_serialize_direct_sale_line_payloads(lines),
+        )
     totals = _rollup_line_totals(line_payloads)
     if "customer_name_snapshot" in payload or "customer_phone_snapshot" in payload or "customer" in payload:
         payload.update(
@@ -620,6 +677,17 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
             )
         )
     payload.update(totals)
+    if "tax_profile_snapshot" not in payload:
+        payload["tax_profile_snapshot"] = (
+            build_non_gst_snapshot(
+                document_type="DIRECT_SALE",
+                document_date=payload.get("sale_date", sale.sale_date),
+                party_type="CUSTOMER",
+                party_id=getattr(customer, "id", None),
+            )
+            if resolved_tax_mode == "NON_GST"
+            else build_tax_profile_snapshot(on_date=payload.get("sale_date", sale.sale_date))
+        )
     received_total = _money(payload.get("received_total", sale.received_total))
     payload["received_total"] = received_total
     payload["balance_total"] = totals["grand_total"] - received_total
@@ -809,6 +877,8 @@ def approve_billing_invoice(*, invoice_id: int, approved_by):
         raise ValueError("Cancelled or void invoices cannot be approved.")
     if not invoice.lines.exists():
         raise ValueError("Invoices require at least one line before approval.")
+    if current_tax_mode() == "GST_UNREGISTERED" and ((invoice.tax_mode or "").upper() == "GST" or _money(invoice.tax_total) > Decimal("0.00")):
+        raise ValueError("GST invoice approval is blocked while business tax mode is GST_UNREGISTERED.")
     _assert_invoice_delivery_gate(invoice)
 
     if not invoice.document_no:
@@ -851,6 +921,8 @@ def post_billing_invoice(*, invoice_id: int, posted_by):
         return invoice, False
     if invoice.status != BillingDocumentStatus.APPROVED:
         raise ValueError("Only approved invoices can be posted.")
+    if current_tax_mode() == "GST_UNREGISTERED" and ((invoice.tax_mode or "").upper() == "GST" or _money(invoice.tax_total) > Decimal("0.00")):
+        raise ValueError("GST invoice posting is blocked while business tax mode is GST_UNREGISTERED.")
     _assert_invoice_delivery_gate(invoice)
     _assert_direct_sale_delivery_gate(invoice)
 
@@ -1066,6 +1138,16 @@ def create_manual_receipt(
         source_type=resolved_source_type,
         source_reference=resolved_source_reference,
         amount=amount,
+        tax_profile_snapshot=build_non_gst_snapshot(
+            document_type=(
+                "ADVANCE_EMI_RECEIPT"
+                if receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT
+                else "NON_GST_RECEIPT"
+            ),
+            document_date=receipt_date,
+            party_type="CUSTOMER",
+            party_id=customer_id or getattr(payment, "customer_id", None),
+        ),
         customer_name_snapshot=(
             payment.customer.name
             if payment is not None

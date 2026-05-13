@@ -230,6 +230,7 @@ class DirectSale(BillingTimeStampedModel):
     delivery_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
     idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -481,6 +482,7 @@ class BillingInvoice(BillingTimeStampedModel):
     customer_name_snapshot = models.CharField(max_length=160, blank=True, default="")
     customer_phone_snapshot = models.CharField(max_length=20, blank=True, default="")
     customer_gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
     terms = models.TextField(blank=True, default="")
     printed_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -761,6 +763,7 @@ class BillingInvoiceLine(BillingTimeStampedModel):
     igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     hsn_sac_code = models.CharField(max_length=40, blank=True, default="")
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = "billing_invoice_lines"
@@ -1069,6 +1072,7 @@ class ReceiptDocument(BillingTimeStampedModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
     customer_name_snapshot = models.CharField(max_length=160, blank=True, default="")
     customer_phone_snapshot = models.CharField(max_length=20, blank=True, default="")
+    tax_profile_snapshot = models.JSONField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
     posted_journal_entry = models.OneToOneField(
         JournalEntry,

@@ -36,6 +36,8 @@ import {
   postPurchaseBill,
   updatePurchaseBill,
 } from "@/services/accounting";
+import { getComplianceTaxProfile } from "@/services/compliance";
+import type { BusinessTaxMode } from "@/types/compliance";
 
 type PurchaseLineForm = {
   inventory_item: string;
@@ -71,7 +73,7 @@ function emptyForm(): PurchaseBillForm {
     bill_no: "",
     bill_date: new Date().toISOString().slice(0, 10),
     vendor: "",
-    tax_mode: "GST",
+    tax_mode: "NON_GST",
     stock_location: "",
     finance_account: "",
     notes: "",
@@ -111,25 +113,28 @@ export default function AccountingPurchaseBillsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [activeTaxMode, setActiveTaxMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload] =
+      const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload, compliancePayload] =
         await Promise.all([
           listPurchaseBills(),
           listVendors({ is_active: 1 }),
           listFinanceAccounts({ is_active: 1 }),
           listStockLocations({ is_active: 1 }),
           listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
+          getComplianceTaxProfile(),
         ]);
       setRows(purchasePayload.results);
       setVendors(vendorPayload.results);
       setFinanceAccounts(financePayload.results);
       setLocations(locationPayload.results);
       setInventoryItems(itemPayload.results);
+      setActiveTaxMode(compliancePayload.active.mode);
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to load purchase bills."));
@@ -154,6 +159,7 @@ export default function AccountingPurchaseBillsPage() {
     () => rows.find((row) => row.id === selectedBillId) ?? null,
     [rows, selectedBillId]
   );
+  const isNonGstBusiness = activeTaxMode === "GST_UNREGISTERED";
 
   const rawMaterialReadyCount = inventoryItems.filter(
     (item) => item.stock_item_type === "RAW_MATERIAL"
@@ -332,6 +338,23 @@ export default function AccountingPurchaseBillsPage() {
           title={selectedBill ? "Edit Draft Purchase Bill" : "Create Draft Purchase Bill"}
           description="Draft purchase bills stay editable until approval. Posting later performs stock inward and accounting recognition together."
         >
+          <div className="mb-4 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+            <p>
+              Current tax mode:{" "}
+              <span className="font-medium">
+                {isNonGstBusiness ? "GST Unregistered (Non-GST operations)" : activeTaxMode}
+              </span>
+            </p>
+            <p>
+              ITC claimable:{" "}
+              <span className="font-medium">{isNonGstBusiness ? "No" : "Yes (subject to active GST mode)"}</span>
+            </p>
+            {isNonGstBusiness ? (
+              <p className="text-muted-foreground">
+                Supplier GST can be captured on purchase lines and is posted to landed cost instead of Input GST.
+              </p>
+            ) : null}
+          </div>
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label className="text-sm text-muted-foreground">

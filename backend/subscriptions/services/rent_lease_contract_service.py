@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from subscriptions.models import (
     MONEY_ZERO,
     AuditLog,
@@ -92,6 +93,13 @@ def create_rent_contract(
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=SubscriptionStatus.ACTIVE,
+        tax_profile_snapshot=build_non_gst_snapshot(
+            document_type="ADVANCE_EMI_CONTRACT",
+            document_date=start_date,
+            party_type="CUSTOMER",
+            party_id=getattr(customer, "id", None),
+            product_id=getattr(product, "id", None),
+        ),
     )
 
     RentSubscriptionProfile.objects.create(
@@ -185,6 +193,13 @@ def create_lease_contract(
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=SubscriptionStatus.ACTIVE,
+        tax_profile_snapshot=build_non_gst_snapshot(
+            document_type="ADVANCE_EMI_CONTRACT",
+            document_date=start_date,
+            party_type="CUSTOMER",
+            party_id=getattr(customer, "id", None),
+            product_id=getattr(product, "id", None),
+        ),
     )
 
     LeaseSubscriptionProfile.objects.create(

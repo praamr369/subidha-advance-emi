@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
+from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from subscriptions.models import LuckyIdStatus, PlanType, Subscription
 from subscriptions.services.emi_engine import generate_emi_schedule
 
@@ -76,6 +77,13 @@ def create_partner_emi_subscription(
             total_amount=total_amount,
             monthly_amount=monthly,
             status="ACTIVE",
+            tax_profile_snapshot=build_non_gst_snapshot(
+                document_type="ADVANCE_EMI_CONTRACT",
+                document_date=start_date,
+                party_type="CUSTOMER",
+                party_id=customer.id,
+                product_id=product.id,
+            ),
         )
 
         lucky.status = LuckyIdStatus.ASSIGNED
@@ -87,4 +95,3 @@ def create_partner_emi_subscription(
             raise serializers.ValidationError(str(exc))
 
     return sub
-
