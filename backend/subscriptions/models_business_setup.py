@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from pathlib import Path
+from uuid import uuid4
 
 
 class BusinessSetupTimeStampedModel(models.Model):
@@ -10,6 +12,15 @@ class BusinessSetupTimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+def business_compliance_document_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".bin"
+    doc_type = (getattr(instance, "document_type", "") or "other").strip().lower()
+    token = uuid4().hex[:12]
+    return f"business/compliance/{doc_type}/{doc_type}-{token}{extension}"
 
 
 class BranchType(models.TextChoices):
@@ -193,6 +204,201 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
 
     def __str__(self):
         return self.display_name or "Public Business Profile"
+
+
+class PolicyCategory(models.TextChoices):
+    GENERAL = "GENERAL", "General"
+    PRIVACY = "PRIVACY", "Privacy"
+    REFUND = "REFUND", "Refund / Cancellation"
+    WARRANTY = "WARRANTY", "Warranty"
+    DELIVERY = "DELIVERY", "Delivery"
+    RENT_LEASE = "RENT_LEASE", "Rental / Lease"
+    LUCKY_PLAN = "LUCKY_PLAN", "Lucky Plan EMI"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+    PAYMENT = "PAYMENT", "Payment"
+    SERVICE = "SERVICE", "Service / Repair"
+    GRIEVANCE = "GRIEVANCE", "Grievance"
+    COMPLIANCE = "COMPLIANCE", "Compliance"
+    CUSTOMER_SUPPORT = "CUSTOMER_SUPPORT", "Customer Support"
+
+
+class PolicyStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    PUBLISHED = "PUBLISHED", "Published"
+    ARCHIVED = "ARCHIVED", "Archived"
+
+
+class PolicyPage(BusinessSetupTimeStampedModel):
+    slug = models.SlugField(max_length=120, db_index=True)
+    version = models.PositiveIntegerField(default=1)
+    category = models.CharField(max_length=40, choices=PolicyCategory.choices, default=PolicyCategory.GENERAL, db_index=True)
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True, default="")
+    content = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=16, choices=PolicyStatus.choices, default=PolicyStatus.DRAFT, db_index=True)
+    effective_date = models.DateField(null=True, blank=True, db_index=True)
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="published_policy_pages",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_policy_pages",
+        null=True,
+        blank=True,
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="updated_policy_pages",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "policy_pages"
+        ordering = ["slug", "-version", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["slug", "version"], name="unique_policy_slug_version"),
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=models.Q(status=PolicyStatus.PUBLISHED),
+                name="unique_published_policy_slug",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["slug", "status"]),
+            models.Index(fields=["category", "status"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        self.slug = (self.slug or "").strip().lower()
+        self.title = (self.title or "").strip()
+        self.summary = (self.summary or "").strip()
+        self.content = (self.content or "").strip()
+        if not self.slug:
+            errors["slug"] = "Policy slug is required."
+        if not self.title:
+            errors["title"] = "Policy title is required."
+        if self.version < 1:
+            errors["version"] = "Version must be at least 1."
+        if self.status == PolicyStatus.PUBLISHED:
+            if not self.published_at:
+                errors["published_at"] = "Published policies require a published_at timestamp."
+            if not self.effective_date:
+                errors["effective_date"] = "Published policies require an effective date."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.slug = (self.slug or "").strip().lower()
+        self.title = (self.title or "").strip()
+        self.summary = (self.summary or "").strip()
+        self.content = (self.content or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.slug} v{self.version} [{self.status}]"
+
+
+class BusinessComplianceDocumentType(models.TextChoices):
+    RENTAL_AGREEMENT = "RENTAL_AGREEMENT", "Rental Agreement"
+    OWNERSHIP_PROOF = "OWNERSHIP_PROOF", "Ownership Proof"
+    UDYAM_CERTIFICATE = "UDYAM_CERTIFICATE", "Udyam Certificate"
+    GST_CERTIFICATE = "GST_CERTIFICATE", "GST Certificate"
+    SHOP_LICENSE = "SHOP_LICENSE", "Shop License"
+    BANK_PROOF = "BANK_PROOF", "Bank Proof"
+    PAN_OR_TAX_PROOF = "PAN_OR_TAX_PROOF", "PAN/Tax Proof"
+    OTHER = "OTHER", "Other"
+
+
+class BusinessComplianceDocumentVisibility(models.TextChoices):
+    PRIVATE = "PRIVATE", "Private"
+    PUBLIC_SUMMARY_ONLY = "PUBLIC_SUMMARY_ONLY", "Public Summary Only"
+
+
+class BusinessComplianceDocumentVerificationStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    VERIFIED = "VERIFIED", "Verified"
+    REJECTED = "REJECTED", "Rejected"
+    NOT_PROVIDED = "NOT_PROVIDED", "Not Provided"
+
+
+class BusinessComplianceDocument(BusinessSetupTimeStampedModel):
+    document_type = models.CharField(max_length=40, choices=BusinessComplianceDocumentType.choices, db_index=True)
+    title = models.CharField(max_length=255, blank=True, default="")
+    file = models.FileField(upload_to=business_compliance_document_upload_to, null=True, blank=True)
+    public_visibility = models.CharField(
+        max_length=24,
+        choices=BusinessComplianceDocumentVisibility.choices,
+        default=BusinessComplianceDocumentVisibility.PRIVATE,
+        db_index=True,
+    )
+    verification_status = models.CharField(
+        max_length=20,
+        choices=BusinessComplianceDocumentVerificationStatus.choices,
+        default=BusinessComplianceDocumentVerificationStatus.PENDING,
+        db_index=True,
+    )
+    public_summary = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_business_compliance_documents",
+        null=True,
+        blank=True,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewed_business_compliance_documents",
+        null=True,
+        blank=True,
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "business_compliance_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["document_type", "verification_status"]),
+            models.Index(fields=["public_visibility", "verification_status"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        self.title = (self.title or "").strip()
+        self.public_summary = (self.public_summary or "").strip()
+        self.notes = (self.notes or "").strip()
+        if (
+            self.public_visibility == BusinessComplianceDocumentVisibility.PUBLIC_SUMMARY_ONLY
+            and not self.public_summary
+        ):
+            errors["public_summary"] = "Public summary is required when visibility is public summary only."
+        if self.verification_status == BusinessComplianceDocumentVerificationStatus.VERIFIED and not self.verified_at:
+            self.verified_at = timezone.now()
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.title = (self.title or "").strip()
+        self.public_summary = (self.public_summary or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.document_type} [{self.verification_status}]"
 
 
 class BrandDataSource(BusinessSetupTimeStampedModel):

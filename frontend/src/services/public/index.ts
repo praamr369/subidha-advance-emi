@@ -146,6 +146,58 @@ export type PublicBusinessProfile = {
   updated_at?: string;
 };
 
+export type PublicPolicyPage = {
+  slug: string;
+  version: number;
+  category: string;
+  title: string;
+  summary: string;
+  content: string;
+  rendered_content?: string;
+  effective_date?: string | null;
+  published_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type PublicPolicyListItem = {
+  slug: string;
+  version: number;
+  category: string;
+  title: string;
+  summary: string;
+  effective_date?: string | null;
+  published_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type PublicPolicyListResponse = {
+  count: number;
+  results: PublicPolicyListItem[];
+};
+
+export type PublicPolicyDetailResponse = {
+  policy: PublicPolicyPage | null;
+};
+
+export type PublicBusinessComplianceSummary = {
+  business_name: string;
+  business_location: string;
+  website_url: string;
+  business_phone: string;
+  business_email: string;
+  business_address: string;
+  gst_status_text: string;
+  udyam_status_text: string;
+  public_documents: Array<{
+    document_type: string;
+    title: string;
+    verification_status: string;
+    public_summary: string;
+    verified_at?: string | null;
+  }>;
+  private_document_disclaimer: string;
+};
+
 type PublicBusinessProfileResponse = {
   profile: PublicBusinessProfile | null;
 };
@@ -422,4 +474,39 @@ export async function getPublicBusinessProfile(): Promise<PublicBusinessProfile 
   );
 
   return payload.profile ?? null;
+}
+
+export async function listPublicPolicies(): Promise<PublicPolicyListResponse> {
+  return fetchPublic<PublicPolicyListResponse>(
+    "/public/policies/",
+    { cache: "no-store" },
+    "Unable to load public policies right now."
+  );
+}
+
+export async function getPublicPolicyBySlug(slug: string): Promise<PublicPolicyPage | null> {
+  try {
+    const payload = await fetchPublic<PublicPolicyDetailResponse>(
+      `/public/policies/${slug}/`,
+      { cache: "no-store" },
+      "Unable to load this policy right now."
+    );
+    return payload.policy ?? null;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.toLowerCase().includes("not found")
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function getPublicBusinessComplianceSummary(): Promise<PublicBusinessComplianceSummary> {
+  return fetchPublic<PublicBusinessComplianceSummary>(
+    "/public/business-compliance/summary/",
+    { cache: "no-store" },
+    "Unable to load compliance summary right now."
+  );
 }

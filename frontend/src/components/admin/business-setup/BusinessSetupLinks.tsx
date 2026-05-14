@@ -6,6 +6,8 @@ const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
   { href: "/admin/settings/business-setup/public-site", label: "Public Site" },
+  { href: "/admin/settings/policies", label: "Policy Governance" },
+  { href: "/admin/settings/business-compliance", label: "Business Compliance" },
   { href: "/admin/settings/business-setup/branches", label: "Branches" },
   { href: "/admin/settings/business-setup/finance-accounts", label: "Accounting Setup" },
   { href: "/admin/settings/business-setup/cash-desks", label: "Counters" },

@@ -1,4 +1,4 @@
-# CMS + Public Content Control (Phase 8)
+# CMS + Public Content Control
 
 ## Confirmed current implementation (code-backed)
 - Admin CMS endpoint exists for public business profile only:
@@ -9,6 +9,14 @@
 - Public profile endpoint exists and is anonymous-safe:
   - `GET /api/v1/public/business-profile/`
   - View: `backend/api/v1/views/public_site.py`
+- Legal/policy registry endpoints exist:
+  - Admin: `/api/v1/admin/public-site/policies/**`
+  - Public: `/api/v1/public/policies/**`
+  - Views: `backend/api/v1/views/admin_policy_site.py`, `backend/api/v1/views/public_policy_site.py`
+  - Service: `backend/subscriptions/services/policy_governance_service.py`
+- Business compliance document governance endpoints exist:
+  - Admin: `/api/v1/admin/public-site/business-compliance/**`
+  - Public summary: `GET /api/v1/public/business-compliance/summary/`
 - Public catalogue and winner endpoints exist:
   - `GET /api/v1/public/products/`
   - `GET /api/v1/public/products/<id>/`
@@ -34,13 +42,13 @@ They must not mutate canonical truth for:
 ## Publishing and audit boundary
 - Public profile updates flow through `upsert_public_business_profile` service.
 - Each update emits `AuditLog.ActionType.PUBLIC_SITE_UPDATED`.
+- Policy draft/publish/archive operations also emit `PUBLIC_SITE_UPDATED` audit metadata events.
 - Public winner pages publish masked identity and draw proof metadata without internal customer identifiers.
 
 ## Not yet endpoint-backed (must remain governance-safe)
-The following are not implemented as standalone CMS APIs/models in current repo state:
+The following remain non-endpoint-backed in current repo state:
 - homepage banner CMS
 - FAQ CMS
-- policy page CMS
 - campaign page CMS
 - media library CMS
 

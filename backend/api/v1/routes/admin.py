@@ -112,6 +112,18 @@ from api.v1.views.admin_resources import (
     ProductUnitOfMeasureMasterViewSet,
 )
 from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
+from api.v1.views.admin_policy_site import (
+    AdminBusinessComplianceDocumentDetailView,
+    AdminBusinessComplianceDocumentListCreateView,
+    AdminBusinessComplianceSummaryView,
+    AdminPolicyPageArchiveView,
+    AdminPolicyPageBySlugView,
+    AdminPolicyPageCreateDraftView,
+    AdminPolicyPageDetailView,
+    AdminPolicyPageListCreateView,
+    AdminPolicyPagePublishView,
+    AdminPolicySeedDefaultsView,
+)
 from api.v1.views.admin_otp_delivery import AdminOtpDeliveryReadinessView
 from api.v1.views.direct_sale_workspace import (
     AdminBillingProductSearchView,
@@ -502,6 +514,25 @@ urlpatterns = [
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
     path("business-profile/", AdminBusinessProfileView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
+    path("public-site/policies/", AdminPolicyPageListCreateView.as_view()),
+    path("public-site/policies/seed-defaults/", AdminPolicySeedDefaultsView.as_view()),
+    path("public-site/policies/by-slug/<slug:slug>/", AdminPolicyPageBySlugView.as_view()),
+    path("public-site/policies/<int:pk>/", AdminPolicyPageDetailView.as_view()),
+    path("public-site/policies/<int:pk>/publish/", AdminPolicyPagePublishView.as_view()),
+    path("public-site/policies/<int:pk>/archive/", AdminPolicyPageArchiveView.as_view()),
+    path("public-site/policies/<int:pk>/create-draft/", AdminPolicyPageCreateDraftView.as_view()),
+    path(
+        "public-site/business-compliance/documents/",
+        AdminBusinessComplianceDocumentListCreateView.as_view(),
+    ),
+    path(
+        "public-site/business-compliance/documents/<int:pk>/",
+        AdminBusinessComplianceDocumentDetailView.as_view(),
+    ),
+    path(
+        "public-site/business-compliance/summary/",
+        AdminBusinessComplianceSummaryView.as_view(),
+    ),
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("business-setup/document-numbering/", BusinessSetupDocumentNumberingView.as_view()),
     path("business-setup/reset-preview/", BusinessSetupResetPreviewView.as_view()),

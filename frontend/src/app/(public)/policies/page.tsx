@@ -1,93 +1,111 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import CtaBanner from "@/components/public/CtaBanner";
-import PublicBanner from "@/components/public/PublicBanner";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
-import PublicPolicySection from "@/components/public/PublicPolicySection";
-import PublicProcessTimeline from "@/components/public/PublicProcessTimeline";
-import PublicTrustBadgeGrid from "@/components/public/PublicTrustBadgeGrid";
 import PublicPageShell from "@/components/public/PublicPageShell";
-import { Typography } from "@/components/ui/typography";
-import {
-  ADVANCE_EMI_POLICY,
-  GENERIC_POLICIES,
-  LEASE_POLICY,
-  POLICY_TIMELINE,
-  PUBLIC_LEGAL_DISCLAIMER_POINTS,
-  PUBLIC_PURPOSE_BADGES,
-  RENT_POLICY,
-} from "@/lib/public-content";
+import { listPublicPolicies } from "@/lib/public-api";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Business policies",
   description:
-    "Public-facing business, payment, delivery, warranty, KYC, and customer education policies for Subidha Furniture.",
+    "Published legal and policy pages for terms, privacy, refund, warranty, delivery, Lucky Plan, direct sale, and compliance.",
   path: "/policies",
 });
 
-export default function PublicPoliciesPage() {
+const routeMap: Record<string, string> = {
+  terms: ROUTES.public.terms,
+  privacy: ROUTES.public.privacy,
+  "refund-cancellation": ROUTES.public.refundCancellation,
+  warranty: ROUTES.public.warranty,
+  "delivery-policy": ROUTES.public.deliveryPolicy,
+  "rental-lease-policy": ROUTES.public.rentalLeasePolicy,
+  "lucky-plan-policy": ROUTES.public.luckyPlanPolicy,
+  "direct-sale-policy": ROUTES.public.directSalePolicy,
+  "payment-policy": ROUTES.public.paymentPolicy,
+  "service-policy": ROUTES.public.servicePolicy,
+  grievance: ROUTES.public.grievance,
+  "data-requests": ROUTES.public.dataRequests,
+  "business-compliance": ROUTES.public.businessCompliance,
+  "udyam-msme": ROUTES.public.udyamMsme,
+};
+
+export default async function PublicPoliciesPage() {
+  const payload = await listPublicPolicies().catch(() => ({ count: 0, results: [] }));
+
   return (
     <PublicPageShell
-      title="Business policies and customer education"
-      subtitle="Public explanation layer for products, contracts, payments, delivery, warranty, service, and verification rules."
+      title="Business policies"
+      subtitle="Only published policies are shown here. Draft or archived legal text is not publicly visible."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Business policies" },
       ]}
       actions={[
-        { label: "Apply Now", href: ROUTES.public.apply, variant: "primary" },
         { label: "Contact Store", href: ROUTES.public.contact, variant: "secondary" },
+        { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
-      <PublicBanner
-        eyebrow="Our purpose"
-        title="Subidha Furniture provides four structured customer paths"
-        description="Advance EMI/Lucky Plan, Rent, Lease, and Direct Sale are built for different household needs with transparent records."
-      />
-      <PublicTrustBadgeGrid items={PUBLIC_PURPOSE_BADGES} />
-
-      <PublicProcessTimeline steps={[...POLICY_TIMELINE]} />
-
-      <PublicPolicySection
-        id="advance-emi"
-        title={ADVANCE_EMI_POLICY.title}
-        intro={ADVANCE_EMI_POLICY.intro}
-        cards={ADVANCE_EMI_POLICY.cards}
-      />
-      <PublicPolicySection id="rent" title={RENT_POLICY.title} intro={RENT_POLICY.intro} cards={RENT_POLICY.cards} />
-      <PublicPolicySection id="lease" title={LEASE_POLICY.title} intro={LEASE_POLICY.intro} cards={LEASE_POLICY.cards} />
-
       <section className="public-surface p-6">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Additional public rules</div>
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          {Object.values(GENERIC_POLICIES).map((policy) => (
-            <article key={policy.title} className="public-card p-5">
-              <h2 className="text-lg font-semibold text-foreground">{policy.title}</h2>
-              <Typography className="mt-3">
-                <ul className="space-y-2">
-                  {policy.points.map((point) => (
-                    <li key={point} className="rounded-lg border border-white/75 bg-white/70 px-3 py-2">
-                      {point}
-                    </li>
-                  ))}
-                </ul>
-              </Typography>
-            </article>
-          ))}
-        </div>
+        <h2 className="text-xl font-semibold text-foreground">Published legal pages</h2>
+        <p className="mt-2 text-sm leading-7 text-muted-foreground sm:text-base">
+          These pages are admin-governed and published through a legal review workflow.
+        </p>
+
+        {payload.results.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            Policy pages are being reviewed and will be published soon.
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {payload.results.map((policy) => {
+              const href = routeMap[policy.slug] || `/policies/${policy.slug}`;
+              return (
+                <article key={`${policy.slug}-${policy.version}`} className="public-card p-5">
+                  <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    <span>{policy.category.replace(/_/g, " ")}</span>
+                    <span>v{policy.version}</span>
+                  </div>
+                  <h3 className="mt-2 text-lg font-semibold text-foreground">{policy.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {policy.summary || "Published policy page"}
+                  </p>
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    {policy.effective_date ? `Effective: ${policy.effective_date}` : "Effective date will be shown after publish review."}
+                  </div>
+                  <div className="mt-4">
+                    <Link
+                      href={href}
+                      className="inline-flex rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:bg-accent"
+                    >
+                      Read policy
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
-      <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
+      <PublicDisclaimerBox
+        title="Public legal notice"
+        points={[
+          "Published policy pages are informational and legally significant for customer transparency.",
+          "Final transaction truth remains in audited contracts, invoices, receipts, and ledgers.",
+          "No fake GST, Udyam, or license claims are displayed on these pages.",
+        ]}
+      />
 
       <CtaBanner
-        title="Need exact term clarification before payment?"
-        description="Please contact the branch for product-specific contract, invoice, warranty, and eligibility confirmation."
+        title="Need clarification before payment or contract signing?"
+        description="Contact Subidha Furniture for transaction-specific confirmation."
         actions={[
           { href: ROUTES.public.contact, label: "Contact Store", variant: "secondary" },
           { href: ROUTES.public.products, label: "View Products", variant: "secondary" },
-          { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "primary" },
+          { href: ROUTES.public.login, label: "Login", variant: "primary" },
         ]}
       />
     </PublicPageShell>

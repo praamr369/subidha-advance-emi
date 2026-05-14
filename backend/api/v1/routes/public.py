@@ -11,6 +11,11 @@ from core.services.operational_visibility import subscription_dashboard_visible_
 from api.v1.serializers.media import serialize_media_url
 from api.v1.serializers.public import PublicProductSerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
+from api.v1.views.public_policy_site import (
+    PublicBusinessComplianceSummaryView,
+    PublicPolicyPageDetailView,
+    PublicPolicyPageListView,
+)
 from api.v1.views.public_site import PublicBusinessProfileView
 from subscriptions.models import (
     AuditLog,
@@ -535,6 +540,9 @@ class PublicWinnersView(PublicWinnerHistoryView):
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("business-profile/", PublicBusinessProfileView.as_view(), name="public-business-profile"),
+    path("policies/", PublicPolicyPageListView.as_view(), name="public-policy-list"),
+    path("policies/<slug:slug>/", PublicPolicyPageDetailView.as_view(), name="public-policy-detail"),
+    path("business-compliance/summary/", PublicBusinessComplianceSummaryView.as_view(), name="public-business-compliance-summary"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
     path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),

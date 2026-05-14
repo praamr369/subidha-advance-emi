@@ -53,6 +53,20 @@ const controls = [
     href: "/admin/settings/roles-permissions",
     icon: <LockKeyhole className="h-5 w-5" />,
   },
+  {
+    title: "Policy governance",
+    description:
+      "Draft, publish, archive, and legal-review workflows for public legal and policy pages.",
+    href: "/admin/settings/policies",
+    icon: <ScrollText className="h-5 w-5" />,
+  },
+  {
+    title: "Business compliance",
+    description:
+      "Admin-only compliance document register with public-safe disclosure controls.",
+    href: "/admin/settings/business-compliance",
+    icon: <ShieldCheck className="h-5 w-5" />,
+  },
 ];
 
 export default function AdminSettingsPage() {
