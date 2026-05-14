@@ -148,6 +148,9 @@ class AdminDeliveryApiTests(APITestCase):
         self.client.force_authenticate(user=self.cashier)
         response = self.client.get("/api/v1/admin/deliveries/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.client.force_authenticate(user=self.partner)
+        response = self.client.get("/api/v1/admin/deliveries/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_admin_delivery_summary_filters_by_subscription_and_bucket(self):
         self.client.force_authenticate(user=self.admin)

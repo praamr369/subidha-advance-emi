@@ -8,10 +8,10 @@ from billing.models import BillingDocumentStatus, BillingInvoice, BillingSourceT
 from billing.services.billing_service import (
     approve_billing_invoice,
     create_direct_sale,
-    mark_direct_sale_delivered,
     post_billing_invoice,
 )
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
+from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from inventory.models import InventoryItem, StockLedger, StockMovementType
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
@@ -99,7 +99,7 @@ class DirectSaleWorkflowTests(TestCase):
         self.assertEqual(invoice.billing_channel, "RETAIL")
         self.assertEqual(invoice.lines.count(), 1)
 
-    def test_delivery_required_direct_sale_blocks_invoice_posting_until_delivered(self):
+    def test_delivery_required_direct_sale_allows_invoice_posting_and_keeps_delivery_separate(self):
         sale = create_direct_sale(
             payload=self._direct_sale_payload(delivery_required=True),
             created_by=self.admin,
@@ -107,34 +107,17 @@ class DirectSaleWorkflowTests(TestCase):
         invoice = BillingInvoice.objects.get(direct_sale=sale)
 
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
-
-        with self.assertRaisesMessage(
-            ValueError,
-            "Direct-sale final invoices can only be posted after the sale is marked delivered.",
-        ):
-            post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
-
-        sale.refresh_from_db()
-        self.assertEqual(sale.status, DirectSaleStatus.DRAFT)
-        self.assertFalse(
-            StockLedger.objects.filter(
-                inventory_item=self.inventory_item,
-                movement_type=StockMovementType.SALE_OUT,
-                reference_model="BillingInvoiceLine",
-            ).exists()
-        )
-
-        mark_direct_sale_delivered(
-            direct_sale_id=sale.id,
-            delivered_by=self.admin,
-            delivery_reference="DS-DLV-001",
-        )
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
 
         sale.refresh_from_db()
         invoice.refresh_from_db()
+        state = get_direct_sale_operational_state(sale)
+
         self.assertEqual(sale.status, DirectSaleStatus.INVOICED)
+        self.assertIsNone(sale.delivered_at)
         self.assertEqual(invoice.status, BillingDocumentStatus.POSTED)
+        self.assertEqual(state["delivery_state"], "READY_FOR_DELIVERY")
+        self.assertEqual(state["operational_state"], "PAID_READY_FOR_DELIVERY")
         self.assertTrue(
             StockLedger.objects.filter(
                 inventory_item=self.inventory_item,

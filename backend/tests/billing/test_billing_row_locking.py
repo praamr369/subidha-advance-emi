@@ -224,7 +224,7 @@ class DirectSaleCollectionLockingRegressionTests(TestCase):
         approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
 
-        with self.assertRaisesMessage(ValueError, "This direct sale does not have an outstanding balance."):
+        with self.assertRaisesMessage(ValueError, "Direct sale has no outstanding balance."):
             collect_direct_sale_payment(
                 direct_sale_id=sale.id,
                 amount=Decimal("1.00"),

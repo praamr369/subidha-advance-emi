@@ -9,6 +9,8 @@ from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode
 from accounting.models import DocumentSequence
 from accounting.services.gst_document_posting_service import financial_year_for
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
+from billing.models import DirectSaleStatus
+from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus, StockLocation, Warehouse
 from inventory.services.purchase_need_service import direct_sale_purchase_need_source_key
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
@@ -665,6 +667,19 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         )
         self.assertEqual(cancelled.status_code, status.HTTP_400_BAD_REQUEST, cancelled.data)
         self.assertIn("cannot be cancelled", str(cancelled.data).lower())
+
+    def test_cancelled_direct_sale_exposes_history_only_delivery_case_with_no_mutation_endpoints(self):
+        case = self._create_paid_ready_delivery_case()
+        DirectSale.objects.filter(pk=case.direct_sale_id).update(status=DirectSaleStatus.CANCELLED)
+        sale = DirectSale.objects.get(pk=case.direct_sale_id)
+        sync_direct_sale_delivery_case(sale=sale, actor=self.admin)
+
+        detail = self.client.get(f"/api/v1/admin/deliveries/direct-sale-cases/{case.id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertTrue(detail.data["history_only"])
+        self.assertTrue(detail.data["source_reversed"])
+        self.assertFalse(detail.data["is_actionable"])
+        self.assertEqual(detail.data.get("action_endpoints"), {})
 
     def test_orphan_direct_sale_delivery_case_returns_400_not_500_for_dispatch_or_deliver(self):
         orphan_case = ServiceDeskCase.objects.create(
