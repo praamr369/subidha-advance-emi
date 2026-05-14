@@ -147,6 +147,48 @@ def _resolve_line_inventory_item(*, product, inventory_item):
     return InventoryItem.objects.filter(product=product).first()
 
 
+def _assert_products_not_in_active_rent_lease_possession(*, line_payloads: list[dict]) -> None:
+    from subscriptions.models import PlanType, PossessionStatus, ProductPossession
+
+    product_ids = {
+        int(payload["product"].id)
+        for payload in line_payloads
+        if payload.get("product") is not None and getattr(payload["product"], "id", None) is not None
+    }
+    if not product_ids:
+        return
+
+    blocked_rows = list(
+        ProductPossession.objects.select_related("product", "subscription")
+        .filter(
+            product_id__in=product_ids,
+            subscription__plan_type__in=[PlanType.RENT, PlanType.LEASE],
+        )
+        .exclude(status=PossessionStatus.CLOSED)
+        .values_list(
+            "product__product_code",
+            "product__name",
+            "subscription__id",
+            "status",
+        )
+    )
+    if not blocked_rows:
+        return
+
+    refs = []
+    for product_code, product_name, subscription_id, status in blocked_rows:
+        code = (product_code or "").strip() or f"PRODUCT#{subscription_id}"
+        name = (product_name or "").strip()
+        label = f"{code} ({name})" if name else code
+        refs.append(f"{label} -> SUB-{subscription_id} [{status}]")
+    refs = sorted(set(refs))
+
+    raise ValueError(
+        "Direct sale is blocked for assets under active rent/lease possession: "
+        + "; ".join(refs)
+    )
+
+
 DIRECT_SALE_LINE_MODEL_FIELDS = {
     "product",
     "inventory_item",
@@ -523,6 +565,7 @@ def create_direct_sale(*, payload: dict, created_by):
         tax_mode=resolved_tax_mode,
         line_payloads=_serialize_direct_sale_line_payloads(lines),
     )
+    _assert_products_not_in_active_rent_lease_possession(line_payloads=line_payloads)
     totals = _rollup_line_totals(line_payloads)
     customer = payload.get("customer")
     payload.update(
@@ -652,6 +695,7 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
             tax_mode=resolved_tax_mode,
             line_payloads=_serialize_direct_sale_line_payloads(lines),
         )
+        _assert_products_not_in_active_rent_lease_possession(line_payloads=line_payloads)
     totals = _rollup_line_totals(line_payloads)
     if "customer_name_snapshot" in payload or "customer_phone_snapshot" in payload or "customer" in payload:
         payload.update(

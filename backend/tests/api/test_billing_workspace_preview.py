@@ -16,6 +16,7 @@ from tests.helpers import (
     create_subscription,
     ensure_default_payment_collection_accounts,
 )
+from subscriptions.services.rent_lease_contract_service import create_rent_contract
 
 
 class BillingWorkspacePreviewApiTests(TestCase):
@@ -101,3 +102,56 @@ class BillingWorkspacePreviewApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_rent_preview_is_view_only_with_disabled_reason(self):
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        rent_subscription = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            start_date=date(2099, 1, 1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/admin/receivables/preview/",
+            {
+                "source_type": "RENT",
+                "source_id": rent_subscription.id,
+                "amount": "1000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["mutates_data"], False)
+        self.assertEqual(response.data["allocation_preview"], [])
+        self.assertIn("not exposed", str(response.data.get("disabled_reason", "")))
+
+    def test_cashier_rent_collect_is_rejected(self):
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        rent_subscription = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            start_date=date(2099, 1, 1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        self.client.force_authenticate(self.cashier)
+        response = self.client.post(
+            "/api/v1/cashier/receivables/collect/",
+            {
+                "source_type": "RENT",
+                "source_id": rent_subscription.id,
+                "amount": "500.00",
+                "payment_method": "CASH",
+                "finance_account": self.finance_account_id,
+                "reference": "RENT-BLOCK-001",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("disabled", str(response.data).lower())

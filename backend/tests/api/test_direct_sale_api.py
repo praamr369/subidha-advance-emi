@@ -8,6 +8,8 @@ from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequen
 from billing.models import ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
 from accounting.services.gst_document_posting_service import financial_year_for
+from subscriptions.services.product_possession_service import record_handover
+from subscriptions.services.rent_lease_contract_service import create_rent_contract
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
 
@@ -212,6 +214,51 @@ class DirectSaleApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Direct sale invoice numbering is not configured", str(response.data))
+
+    def test_direct_sale_create_rejects_product_under_active_rent_possession(self):
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        rent_sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        possession = rent_sub.product_possession
+        record_handover(possession=possession, handed_over_by=self.admin)
+
+        response = self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 16),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [
+                    {
+                        "product": self.product.id,
+                        "inventory_item": self.inventory_item.id,
+                        "description": "Blocked by active possession",
+                        "quantity": "1.000",
+                        "unit_price": "9500.00",
+                        "discount_amount": "0.00",
+                        "taxable_value": "9500.00",
+                        "gst_rate": None,
+                        "cgst_amount": "0.00",
+                        "sgst_amount": "0.00",
+                        "igst_amount": "0.00",
+                        "line_total": "9500.00",
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("active rent/lease possession", str(response.data))
 
     def test_cancelled_invoice_direct_sale_is_removed_from_outstanding_and_not_collectible(self):
         create_response = self.client.post(
