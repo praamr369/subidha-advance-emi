@@ -99,6 +99,11 @@ export default function PublicSiteSettingsPage() {
       />
       <BusinessSetupLinks />
 
+      <div className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+        Phase 8 scope in this release: public business profile content only (identity, hero copy, contact, social, and logo URL).
+        Homepage banners, FAQ blocks, policy-page CMS, campaign-page CMS, and media-library workflows are not endpoint-backed yet and remain governance-controlled read-only requirements until additive backend contracts are introduced.
+      </div>
+
       {message ? (
         <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
           {message}
@@ -289,4 +294,3 @@ export default function PublicSiteSettingsPage() {
     </div>
   );
 }
-
