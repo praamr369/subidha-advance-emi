@@ -571,6 +571,10 @@ export default function AdminProductDetailPage() {
                           : "Not yet activated"
                       }
                     />
+                    <DetailValue
+                      label="Stock Quantity Control"
+                      value="Use opening stock and stock movements only"
+                    />
                   </div>
 
                   {inventoryMessage ? (
@@ -583,14 +587,16 @@ export default function AdminProductDetailPage() {
                     <button
                       type="button"
                       onClick={() => void handlePrepareInventoryProfile()}
-                      disabled={inventoryPreparing}
+                      disabled={inventoryPreparing || !product.is_active}
                       className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {inventoryPreparing
                         ? "Preparing..."
-                        : product.inventory_ready
-                          ? "Sync Inventory Profile"
-                          : "Prepare Inventory Profile"}
+                        : !product.is_active
+                          ? "Inactive Product"
+                          : product.inventory_ready
+                            ? "Prepare Inventory Profile (Recheck)"
+                            : "Prepare Inventory Profile"}
                     </button>
                     <Link
                       href="/admin/products/masters"
@@ -599,12 +605,17 @@ export default function AdminProductDetailPage() {
                       Manage Product Masters
                     </Link>
                     <Link
-                      href="/admin/inventory/items"
+                      href={product.inventory_profile_id ? `/admin/inventory/profiles/${product.inventory_profile_id}` : "/admin/inventory/profiles"}
                       className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                     >
-                      Open Inventory
+                      {product.inventory_profile_id ? "Open Inventory Profile" : "Open Inventory Profiles"}
                     </Link>
                   </div>
+                  {!product.is_active ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      Inventory profile cannot be prepared while the product is inactive.
+                    </div>
+                  ) : null}
                 </div>
               </DetailPanel>
 

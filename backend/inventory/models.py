@@ -182,11 +182,19 @@ class StockLocation(InventoryTimeStampedModel):
 
 
 class InventoryItem(InventoryTimeStampedModel):
+    class StockTrackingStatus(models.TextChoices):
+        NOT_PREPARED = "NOT_PREPARED", "Not Prepared"
+        PREPARED_NO_STOCK = "PREPARED_NO_STOCK", "Prepared (No Stock)"
+        STOCK_ACTIVE = "STOCK_ACTIVE", "Stock Active"
+        INACTIVE = "INACTIVE", "Inactive"
+        ARCHIVED = "ARCHIVED", "Archived"
+
     product = models.OneToOneField(
         Product,
         on_delete=models.PROTECT,
         related_name="inventory_profile",
     )
+    inventory_code = models.CharField(max_length=40, unique=True, null=True, blank=True, db_index=True)
     sku = models.CharField(max_length=60, unique=True, null=True, blank=True, db_index=True)
     unit_of_measure = models.CharField(max_length=30, default="PCS")
     default_stock_location = models.ForeignKey(
@@ -216,18 +224,64 @@ class InventoryItem(InventoryTimeStampedModel):
         default=QUANTITY_ZERO,
         validators=[MinValueValidator(QUANTITY_ZERO)],
     )
+    preferred_stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="preferred_inventory_items",
+        null=True,
+        blank=True,
+    )
+    stock_tracking_status = models.CharField(
+        max_length=24,
+        choices=StockTrackingStatus.choices,
+        default=StockTrackingStatus.PREPARED_NO_STOCK,
+        db_index=True,
+    )
     valuation_method = models.CharField(
         max_length=10,
         choices=InventoryValuationMethod.choices,
         default=InventoryValuationMethod.FIFO,
         db_index=True,
     )
+    costing_method = models.CharField(max_length=20, blank=True, default="")
     standard_unit_cost = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         null=True,
         blank=True,
         validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    purchase_unit_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    manufacturing_cost_enabled = models.BooleanField(default=False, db_index=True)
+    manufacturing_raw_material_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    manufacturing_labour_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    manufacturing_overhead_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    manufacturing_finished_goods_output_qty = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=Decimal("1.000"),
+        validators=[MinValueValidator(Decimal("0.001"))],
     )
     is_active = models.BooleanField(default=True, db_index=True)
 
@@ -241,8 +295,10 @@ class InventoryItem(InventoryTimeStampedModel):
     def save(self, *args, **kwargs):
         product_sku = ((getattr(self.product, "sku", None) or "")).strip().upper() or None
         product_uom = ((getattr(self.product, "unit_of_measure", None) or "PCS")).strip().upper()
+        self.inventory_code = ((self.inventory_code or "").strip().upper()) or None
         self.sku = ((self.sku or product_sku or "").strip().upper()) or None
         self.unit_of_measure = (self.unit_of_measure or product_uom or "PCS").strip().upper()
+        self.costing_method = (self.costing_method or "").strip().upper()
         self.full_clean()
         super().save(*args, **kwargs)
 

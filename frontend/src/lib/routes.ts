@@ -136,6 +136,7 @@ export const ROUTES = {
     inventoryDemandPlanning: "/admin/inventory/demand-planning",
     inventoryPurchaseNeeds: "/admin/inventory/purchase-needs",
     inventoryReadiness: "/admin/inventory/readiness",
+    inventoryProfiles: "/admin/inventory/profiles",
     inventoryStockNeeds: "/admin/inventory/stock-needs",
     vendors: "/admin/vendors",
     vendorsCategories: "/admin/vendors/categories",

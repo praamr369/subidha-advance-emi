@@ -15,13 +15,16 @@ export default function AdminInventoryWorkspacePage() {
         <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryReadiness}>
           Readiness snapshot
         </Link>
+        <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryProfiles}>
+          Inventory profiles
+        </Link>
         <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryStockNeeds}>
           Stock needs
         </Link>
       </div>
       <WorkspaceCardsPage
         title="Inventory Workspace"
-        subtitle="Stock on hand, reserve/release, movement, adjustment, and delivery-blocked stock."
+        subtitle="Products are catalog truth; inventory profiles make products stock-trackable. Setup snapshots carry setup only, while real quantities come from opening stock and movement workflows."
         boardTitle="Inventory Operations"
         loader={loader}
       />

@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 from PIL import Image
 
 from inventory.models import InventoryItem
+from inventory.models import StockLedger
 from subscriptions.models import (
     Product,
     ProductCategoryMaster,
@@ -312,6 +313,46 @@ class AdminProductsApiTests(APITestCase):
 
         product.refresh_from_db()
         self.assertEqual(product.inventory_profile.id, inventory_profile.id)
+
+    def test_prepare_inventory_profile_action_is_idempotent_and_keeps_base_price(self):
+        product = create_product(
+            name="Inventory Idempotent Product",
+            product_code="INV-IDEMP-001",
+            base_price=Decimal("31000.00"),
+        )
+        first = self.client.post(
+            f"/api/v1/admin/products/{product.id}/prepare-inventory-profile/",
+            {},
+            format="json",
+        )
+        second = self.client.post(
+            f"/api/v1/admin/products/{product.id}/prepare-inventory-profile/",
+            {},
+            format="json",
+        )
+        self.assertEqual(first.status_code, status.HTTP_200_OK, first.data)
+        self.assertEqual(second.status_code, status.HTTP_200_OK, second.data)
+        self.assertTrue(first.data["created"])
+        self.assertFalse(second.data["created"])
+        self.assertEqual(InventoryItem.objects.filter(product=product).count(), 1)
+        product.refresh_from_db()
+        self.assertEqual(product.base_price, Decimal("31000.00"))
+
+    def test_prepare_inventory_profile_does_not_create_stock_rows(self):
+        product = create_product(
+            name="Inventory No Stock Mutation",
+            product_code="INV-NOSTOCK-001",
+            base_price=Decimal("29000.00"),
+        )
+        response = self.client.post(
+            f"/api/v1/admin/products/{product.id}/prepare-inventory-profile/",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        item = InventoryItem.objects.get(product=product)
+        self.assertEqual(item.current_stock_quantity(), Decimal("0.000"))
+        self.assertFalse(StockLedger.objects.filter(inventory_item=item).exists())
 
     def test_product_capability_patch_persists_flags(self):
         product = create_product(

@@ -7,6 +7,8 @@ from rest_framework import serializers
 
 from inventory.models import PurchaseNeed, PurchaseNeedStatus
 from inventory.services.purchase_need_service import ensure_primary_warehouse
+from inventory.services.inventory_profile_service import get_inventory_profile_status
+from inventory.models import InventoryItem, StockLocation
 
 
 class AdminPurchaseNeedSerializer(serializers.ModelSerializer):
@@ -130,3 +132,101 @@ class AdminPurchaseNeedPatchSerializer(serializers.ModelSerializer):
         if new_status in terminal and not validated_data.get("fulfilled_at") and not instance.fulfilled_at:
             validated_data["fulfilled_at"] = timezone.now()
         return super().update(instance, validated_data)
+
+
+class AdminInventoryProfileListSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_code = serializers.CharField(source="product.product_code", read_only=True)
+    stock_tracking_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InventoryItem
+        fields = [
+            "id",
+            "inventory_code",
+            "product",
+            "product_name",
+            "product_code",
+            "sku",
+            "stock_tracking_enabled",
+            "stock_tracking_status",
+            "is_active",
+        ]
+
+    def get_stock_tracking_status(self, obj):
+        return get_inventory_profile_status(obj)
+
+
+class AdminInventoryProfileDetailSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_code = serializers.CharField(source="product.product_code", read_only=True)
+    product_base_price = serializers.DecimalField(source="product.base_price", max_digits=12, decimal_places=2, read_only=True)
+    stock_tracking_status = serializers.SerializerMethodField()
+    margin_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InventoryItem
+        fields = [
+            "id",
+            "inventory_code",
+            "product",
+            "product_name",
+            "product_code",
+            "product_base_price",
+            "sku",
+            "unit_of_measure",
+            "stock_tracking_enabled",
+            "stock_tracking_status",
+            "is_active",
+            "reorder_level_qty",
+            "default_stock_location",
+            "preferred_stock_location",
+            "valuation_method",
+            "costing_method",
+            "standard_unit_cost",
+            "purchase_unit_cost",
+            "manufacturing_cost_enabled",
+            "manufacturing_raw_material_cost",
+            "manufacturing_labour_cost",
+            "manufacturing_overhead_cost",
+            "manufacturing_finished_goods_output_qty",
+            "margin_preview",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "product", "created_at", "updated_at", "stock_tracking_status", "margin_preview"]
+
+    def get_stock_tracking_status(self, obj):
+        return get_inventory_profile_status(obj)
+
+    def get_margin_preview(self, obj):
+        if obj.standard_unit_cost is None:
+            return None
+        return str((obj.product.base_price or Decimal("0.00")) - (obj.standard_unit_cost or Decimal("0.00")))
+
+
+class AdminInventoryProfileUpdateSerializer(serializers.ModelSerializer):
+    preferred_stock_location = serializers.PrimaryKeyRelatedField(
+        queryset=StockLocation.objects.filter(is_active=True).order_by("name", "id"),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = InventoryItem
+        fields = [
+            "sku",
+            "reorder_level_qty",
+            "default_stock_location",
+            "preferred_stock_location",
+            "valuation_method",
+            "costing_method",
+            "standard_unit_cost",
+            "purchase_unit_cost",
+            "manufacturing_cost_enabled",
+            "manufacturing_raw_material_cost",
+            "manufacturing_labour_cost",
+            "manufacturing_overhead_cost",
+            "manufacturing_finished_goods_output_qty",
+            "is_active",
+        ]

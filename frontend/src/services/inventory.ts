@@ -349,6 +349,75 @@ export type StockLocationPayload = {
   notes?: string;
 };
 
+export type InventoryProfileRow = {
+  id: number;
+  inventory_code?: string | null;
+  product: number;
+  product_name?: string;
+  product_code?: string;
+  sku?: string | null;
+  stock_tracking_enabled: boolean;
+  stock_tracking_status: string;
+  is_active: boolean;
+};
+
+export type InventoryProfileDetail = InventoryProfileRow & {
+  product_base_price: string;
+  unit_of_measure: string;
+  reorder_level_qty: string;
+  default_stock_location?: number | null;
+  preferred_stock_location?: number | null;
+  valuation_method: "FIFO" | "AVG";
+  costing_method?: string;
+  standard_unit_cost?: string | null;
+  purchase_unit_cost?: string | null;
+  manufacturing_cost_enabled: boolean;
+  manufacturing_raw_material_cost: string;
+  manufacturing_labour_cost: string;
+  manufacturing_overhead_cost: string;
+  manufacturing_finished_goods_output_qty: string;
+  margin_preview?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InventoryProfileStockByLocation = {
+  warehouse_qty: string;
+  showroom_qty: string;
+  total_on_hand_qty: string;
+  reserved_qty: string;
+  available_qty: string;
+  last_movement_date?: string | null;
+  locations: Array<{
+    stock_location_id?: number | null;
+    stock_location_code?: string | null;
+    stock_location_name?: string | null;
+    stock_location_type?: string | null;
+    on_hand_qty: string;
+  }>;
+};
+
+export type InventoryProfileManufacturingCost = {
+  supported: boolean;
+  manufacturing_cost_enabled: boolean;
+  raw_material_cost: string;
+  labour_cost: string;
+  overhead_cost: string;
+  total_estimated_manufacturing_cost: string;
+  finished_goods_output_qty: string;
+  bom_id?: number | null;
+  bom_no?: string | null;
+  bom_lines: Array<{
+    bom_line_id: number;
+    inventory_item_id: number;
+    inventory_item_sku?: string | null;
+    inventory_item_name?: string | null;
+    required_quantity: string;
+    material_unit_cost: string;
+    line_estimated_cost: string;
+  }>;
+};
+
 export type InventoryItemUpdatePayload = Partial<
   Pick<
     InventoryItem,
@@ -361,6 +430,36 @@ export type InventoryItemUpdatePayload = Partial<
     | "is_active"
   >
 >;
+
+export function listInventoryProfiles(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<InventoryProfileRow>>(`/admin/inventory/profiles/${buildQuery(params)}`);
+}
+
+export function getInventoryProfile(id: number | string) {
+  return apiFetch<InventoryProfileDetail>(`/admin/inventory/profiles/${id}/`);
+}
+
+export function updateInventoryProfile(id: number | string, payload: Record<string, unknown>) {
+  return apiFetch<InventoryProfileDetail>(`/admin/inventory/profiles/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getInventoryProfileStockByLocation(id: number | string) {
+  return apiFetch<InventoryProfileStockByLocation>(`/admin/inventory/profiles/${id}/stock-by-location/`);
+}
+
+export function getInventoryProfileManufacturingCost(id: number | string) {
+  return apiFetch<InventoryProfileManufacturingCost>(`/admin/inventory/profiles/${id}/manufacturing-cost/`);
+}
+
+export function updateInventoryProfileManufacturingCost(id: number | string, payload: Record<string, unknown>) {
+  return apiFetch<InventoryProfileManufacturingCost>(`/admin/inventory/profiles/${id}/manufacturing-cost/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
 
 export type CreateStockAdjustmentPayload = {
   adjustment_no?: string;

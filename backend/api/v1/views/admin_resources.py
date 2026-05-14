@@ -59,8 +59,8 @@ from api.v1.serializers.contracts import (
 from api.v1.views import customer
 from products.services.catalog_master_service import (
     build_product_catalog_options,
-    ensure_inventory_profile_for_product,
 )
+from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -2181,11 +2181,14 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         serializer = ProductInventoryProfilePrepareSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
         product = self.get_object()
-        inventory_profile, created = ensure_inventory_profile_for_product(
-            product,
-            default_stock_location=serializer.validated_data.get("default_stock_location"),
-            stock_tracking_enabled=serializer.validated_data.get("stock_tracking_enabled", True),
+        inventory_profile, created = prepare_inventory_profile_for_product(
+            product_id=product.id,
+            actor=request.user,
         )
+        default_stock_location = serializer.validated_data.get("default_stock_location")
+        if default_stock_location and inventory_profile.default_stock_location_id != default_stock_location.id:
+            inventory_profile.default_stock_location = default_stock_location
+            inventory_profile.save(update_fields=["default_stock_location", "updated_at"])
         AuditLog.objects.create(
             action_type=AuditLog.ActionType.PRODUCT_INVENTORY_PROFILE_PREPARED,
             model_name="InventoryItem",

@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.inventory_admin import (
+    AdminInventoryProfileDetailSerializer,
+    AdminInventoryProfileListSerializer,
+    AdminInventoryProfileUpdateSerializer,
     AdminPurchaseNeedCreateSerializer,
     AdminPurchaseNeedPatchSerializer,
     AdminPurchaseNeedSerializer,
 )
 from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
-from inventory.models import PurchaseNeed
+from inventory.models import InventoryItem, PurchaseNeed
 from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
+from inventory.services.inventory_profile_service import (
+    build_manufacturing_cost_profile,
+    build_profile_stock_by_location,
+)
 from inventory.services.purchase_need_reconciliation_service import (
     parse_direct_sale_id_from_need_source,
     recheck_purchase_need_availability,
@@ -32,6 +40,60 @@ class AdminInventoryReadinessView(_AdminBase):
     def get(self, request):
         payload = get_inventory_readiness_snapshot()
         return Response(payload)
+
+
+class AdminInventoryProfileListView(_AdminBase):
+    def get(self, request):
+        queryset = InventoryItem.objects.select_related("product").order_by("product__name", "id")
+        q = (request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(product__name__icontains=q)
+                | Q(product__product_code__icontains=q)
+                | Q(sku__icontains=q)
+                | Q(inventory_code__icontains=q)
+            )
+        payload = AdminInventoryProfileListSerializer(queryset, many=True)
+        return Response({"count": queryset.count(), "results": payload.data})
+
+
+class AdminInventoryProfileDetailView(_AdminBase):
+    def get_object(self, pk: int) -> InventoryItem:
+        return InventoryItem.objects.select_related("product").get(pk=pk)
+
+    def get(self, request, pk):
+        item = self.get_object(pk)
+        payload = AdminInventoryProfileDetailSerializer(item)
+        return Response(payload.data)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        item = self.get_object(pk)
+        serializer = AdminInventoryProfileUpdateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(AdminInventoryProfileDetailSerializer(updated).data)
+
+
+class AdminInventoryProfileStockByLocationView(_AdminBase):
+    def get(self, request, pk):
+        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        return Response(build_profile_stock_by_location(inventory_item=item))
+
+
+class AdminInventoryProfileManufacturingCostView(_AdminBase):
+    def get(self, request, pk):
+        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        return Response(build_manufacturing_cost_profile(inventory_item=item))
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        serializer = AdminInventoryProfileUpdateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        item.refresh_from_db()
+        return Response(build_manufacturing_cost_profile(inventory_item=item))
 
 
 class AdminInventoryStockNeedListCreateView(_AdminBase):

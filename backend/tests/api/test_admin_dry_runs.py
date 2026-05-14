@@ -5,7 +5,7 @@ from unittest.mock import patch
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from inventory.models import PurchaseNeed, PurchaseNeedStatus, Warehouse
+from inventory.models import PurchaseNeed, PurchaseNeedStatus, StockLocation, StockLocationType, Warehouse
 from subscriptions.models import DryRunValidationJob, Payment
 from subscriptions.services import dry_run_control_service as drs
 from tests.helpers import (
@@ -183,4 +183,16 @@ class AdminDryRunsApiTests(APITestCase):
         rows = drs._check_stock_need_workflow_readiness()
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["check"], "STOCK_NEED_WORKFLOW_READINESS")
+        self.assertEqual(rows[0]["status"], "PASS")
+
+    def test_stock_need_workflow_readiness_pass_with_active_warehouse_location(self):
+        Warehouse.objects.all().delete()
+        StockLocation.objects.create(
+            code="WH-LOC-READY",
+            name="Warehouse Location Ready",
+            location_type=StockLocationType.WAREHOUSE,
+            is_active=True,
+        )
+        rows = drs._check_stock_need_workflow_readiness()
+        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["status"], "PASS")

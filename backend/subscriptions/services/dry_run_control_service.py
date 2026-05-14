@@ -27,6 +27,8 @@ from inventory.models import (
     OpeningStockEntryStatus,
     PurchaseNeed,
     PurchaseNeedStatus,
+    StockLocation,
+    StockLocationType,
     Warehouse,
 )
 from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
@@ -976,16 +978,21 @@ def _check_delivery_handoff_readiness() -> list[dict[str, Any]]:
 
 
 def _check_stock_need_workflow_readiness() -> list[dict[str, Any]]:
-    if not Warehouse.objects.filter(is_active=True).exists():
+    has_active_warehouse_profile = Warehouse.objects.filter(is_active=True).exists()
+    has_active_warehouse_location = StockLocation.objects.filter(
+        is_active=True,
+        location_type=StockLocationType.WAREHOUSE,
+    ).exists()
+    if not (has_active_warehouse_profile or has_active_warehouse_location):
         return [
             _row(
                 check=CHECK_STOCK_NEED_WORKFLOW_READINESS,
                 status="BLOCKED",
                 risk_level="HIGH",
                 module="Stock Needs",
-                title="No active warehouse configured",
-                detail="Purchase/stock needs require at least one warehouse.",
-                recommended_action="Create at least one warehouse/stock location.",
+                title="No active warehouse location configured",
+                detail="Purchase/stock needs require at least one active warehouse profile or warehouse stock location.",
+                recommended_action="Create at least one active warehouse stock location from Inventory Locations setup.",
                 action_href="/admin/inventory/locations",
                 safe_to_execute=False,
             )

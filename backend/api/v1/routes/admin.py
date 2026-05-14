@@ -293,7 +293,11 @@ from api.v1.views.admin_compliance import (
     ComplianceTurnoverSummaryView,
 )
 from api.v1.views.admin_inventory_ops import (
+    AdminInventoryProfileDetailView,
+    AdminInventoryProfileListView,
+    AdminInventoryProfileManufacturingCostView,
     AdminInventoryReadinessView,
+    AdminInventoryProfileStockByLocationView,
     AdminInventoryStockNeedCancelView,
     AdminInventoryStockNeedRecheckView,
     AdminInventoryStockNeedListCreateView,
@@ -800,6 +804,10 @@ urlpatterns = [
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
     path("inventory/readiness/", AdminInventoryReadinessView.as_view()),
+    path("inventory/profiles/", AdminInventoryProfileListView.as_view()),
+    path("inventory/profiles/<int:pk>/", AdminInventoryProfileDetailView.as_view()),
+    path("inventory/profiles/<int:pk>/stock-by-location/", AdminInventoryProfileStockByLocationView.as_view()),
+    path("inventory/profiles/<int:pk>/manufacturing-cost/", AdminInventoryProfileManufacturingCostView.as_view()),
     path("inventory/items/search/", AdminInventoryItemSearchView.as_view()),
     path("inventory/locations/setup-return-locations/", AdminReturnLocationsSetupView.as_view()),
     path("inventory/stock-needs/", AdminInventoryStockNeedListCreateView.as_view()),
