@@ -22,6 +22,7 @@ from crm.models import PartyInteraction, PartyLink, PartyLinkRole, PartyMaster
 from reminders.models import PaymentReminder
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseType
 from subscriptions.models import Customer, CustomerSupportRequest, PublicLead, Subscription, SubscriptionDelivery
+from subscriptions.models import Payment
 
 
 def _dt(value):
@@ -130,6 +131,15 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
         )
         .distinct()
         .order_by("-receipt_date", "-id")
+    )
+    payments = list(
+        Payment.objects.select_related("customer", "subscription", "subscription__branch", "emi", "branch")
+        .filter(
+            Q(customer_id__in=customer_ids)
+            | Q(subscription_id__in=subscription_ids)
+        )
+        .distinct()
+        .order_by("-payment_date", "-id")
     )
     deliveries = list(
         SubscriptionDelivery.objects.select_related("subscription", "subscription__customer", "subscription__branch")
@@ -271,6 +281,19 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
                 branch=resolve_receipt_branch(receipt),
             )
         )
+    for payment in payments:
+        timeline.append(
+            _timeline_item(
+                event_at=payment.created_at,
+                event_type="PAYMENT",
+                label=payment.reference_no or f"Payment #{payment.id}",
+                status="RECORDED",
+                reference=payment.reference_no or f"Payment #{payment.id}",
+                detail=f"{payment.amount} {payment.method}",
+                link={"payment_id": payment.id, "subscription_id": payment.subscription_id},
+                branch=payment.branch,
+            )
+        )
     for delivery in deliveries:
         timeline.append(
             _timeline_item(
@@ -370,6 +393,7 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             "direct_sale_count": len(direct_sales),
             "invoice_count": len(invoices),
             "receipt_count": len(receipts),
+            "payment_count": len(payments),
             "delivery_count": len(deliveries),
             "support_count": len(support_requests),
             "service_case_count": len(service_cases),
@@ -494,6 +518,20 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
                     "created_at": _dt(receipt.created_at),
                 }
                 for receipt in receipts[:25]
+            ],
+            "payments": [
+                {
+                    "id": payment.id,
+                    "reference_no": payment.reference_no,
+                    "method": payment.method,
+                    "amount": str(payment.amount),
+                    "subscription_id": payment.subscription_id,
+                    "emi_id": payment.emi_id,
+                    "payment_date": str(payment.payment_date),
+                    **serialize_branch(payment.branch),
+                    "created_at": _dt(payment.created_at),
+                }
+                for payment in payments[:25]
             ],
             "deliveries": [
                 {

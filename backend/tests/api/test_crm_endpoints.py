@@ -4,11 +4,25 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services.public_lead_service import (
     complete_public_lead_conversion,
     create_public_lead,
 )
-from tests.helpers import create_admin_user, create_customer_profile, create_customer_user, create_partner_user
+from tests.helpers import (
+    create_admin_user,
+    create_batch,
+    create_customer_profile,
+    create_customer_user,
+    create_delivery,
+    create_emi,
+    create_lucky_id,
+    create_partner_user,
+    create_payment_collection_finance_account,
+    create_product,
+    create_subscription,
+    create_user,
+)
 
 
 class CrmApiTests(APITestCase):
@@ -22,6 +36,30 @@ class CrmApiTests(APITestCase):
         self.customer = create_customer_profile(
             name="CRM Customer",
             phone="7388000901",
+        )
+        product = create_product(name="CRM Product", product_code="CRM-PROD-001")
+        batch = create_batch(batch_code="CRM-BATCH-2026", duration_months=12, total_slots=100)
+        lucky_id = create_lucky_id(batch=batch, lucky_number=11)
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky_id,
+            tenure_months=12,
+        )
+        self.emi = create_emi(
+            subscription=self.subscription,
+            month_no=1,
+            amount="100.00",
+        )
+        self.delivery = create_delivery(
+            subscription=self.subscription,
+            receiver_name="CRM Receiver",
+            receiver_phone="01910000000",
+        )
+        self.finance_account = create_payment_collection_finance_account(
+            code="CRM-TST-FIN-001",
+            name="CRM Test Finance Account",
         )
         self.lead = create_public_lead(
             name="CRM Lead",
@@ -117,3 +155,39 @@ class CrmApiTests(APITestCase):
             patch_response.data["party"]["notes_summary"],
             "Shared profile across customer and partner contexts.",
         )
+
+    def test_party_timeline_surfaces_payment_and_delivery_events(self):
+        record_emi_payment(
+            emi_id=self.emi.id,
+            amount="100.00",
+            collected_by=self.admin,
+            method="CASH",
+            reference_no="CRM-PAY-REF-001",
+            finance_account_id=self.finance_account.id,
+        )
+
+        parties = self.client.get("/api/v1/crm/parties/?role_type=CUSTOMER")
+        self.assertEqual(parties.status_code, status.HTTP_200_OK, parties.data)
+        party_id = parties.data["results"][0]["id"]
+
+        detail = self.client.get(f"/api/v1/crm/parties/{party_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        timeline = detail.data["timeline"]
+        self.assertTrue(any(item.get("event_type") == "PAYMENT" for item in timeline))
+        self.assertTrue(any(item.get("event_type") == "DELIVERY" for item in timeline))
+        self.assertGreaterEqual(detail.data["summary"].get("payment_count", 0), 1)
+
+    def test_non_admin_roles_cannot_access_admin_crm_surfaces(self):
+        customer_user = create_customer_user(username="crm_non_admin_customer", phone="7388000122")
+        partner_user = create_partner_user(username="crm_non_admin_partner", phone="7388000123")
+        cashier_user = create_user(
+            username="crm_non_admin_cashier",
+            password="CashierPass123!",
+            role="CASHIER",
+            phone="7388000124",
+        )
+
+        for user in [customer_user, partner_user, cashier_user]:
+            self.client.force_authenticate(user=user)
+            overview = self.client.get("/api/v1/crm/overview/")
+            self.assertEqual(overview.status_code, status.HTTP_403_FORBIDDEN, overview.data)
